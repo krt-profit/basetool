@@ -34,7 +34,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.OwnerOrgUnitRequiredException;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
@@ -48,6 +49,9 @@ import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
@@ -58,7 +62,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
@@ -105,6 +109,16 @@ class OwnerScopeServiceTest {
   @Mock private HttpServletRequest request;
 
   private OwnerScopeService service;
+
+  private OperationAccessPolicy operationPolicy;
+
+  private RefineryAccessPolicy refineryPolicy;
+
+  private MissionAccessPolicy missionPolicy;
+
+  private InventoryAccessPolicy inventoryPolicy;
+
+  private JobOrderAccessPolicy jobOrderPolicy;
 
   private static final UUID MEMBER_USER_ID = UUID.randomUUID();
   private static final UUID SQUADRON_A_ID = UUID.randomUUID();
@@ -170,17 +184,7 @@ class OwnerScopeServiceTest {
             request);
     AccessGateService accessGateService =
         new AccessGateService(
-            requestScopeResolver,
-            authHelper,
-            missionRepository,
-            jobOrderRepository,
-            jobOrderHandoverRepository,
-            jobOrderItemHandoverRepository,
-            inventoryItemRepository,
-            refineryOrderRepository,
-            operationRepository,
-            shipRepository,
-            orgUnitMembershipRepository);
+            requestScopeResolver, authHelper, shipRepository, orgUnitMembershipRepository);
     OrgUnitStampingService orgUnitStampingService =
         new OrgUnitStampingService(
             requestScopeResolver,
@@ -190,6 +194,17 @@ class OwnerScopeServiceTest {
             orgUnitRepository);
     service =
         new OwnerScopeService(requestScopeResolver, accessGateService, orgUnitStampingService);
+    operationPolicy = new OperationAccessPolicy(service, authHelper, operationRepository);
+    refineryPolicy = new RefineryAccessPolicy(service, refineryOrderRepository);
+    missionPolicy = new MissionAccessPolicy(service, authHelper, missionRepository);
+    inventoryPolicy = new InventoryAccessPolicy(service, inventoryItemRepository);
+    jobOrderPolicy =
+        new JobOrderAccessPolicy(
+            service,
+            authHelper,
+            jobOrderRepository,
+            jobOrderHandoverRepository,
+            jobOrderItemHandoverRepository);
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */
@@ -475,7 +490,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertTrue(service.canSeeJobOrderBlueprintOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderBlueprintOwners(order.getId()));
     }
 
     @Test
@@ -488,7 +503,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertFalse(service.canSeeJobOrderBlueprintOwners(order.getId()));
+      assertFalse(jobOrderPolicy.canSeeJobOrderBlueprintOwners(order.getId()));
     }
 
     @Test
@@ -504,7 +519,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertFalse(service.canSeeJobOrderBlueprintOwners(order.getId()));
+      assertFalse(jobOrderPolicy.canSeeJobOrderBlueprintOwners(order.getId()));
     }
 
     @Test
@@ -520,7 +535,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(skMembership(MEMBER_USER_ID, skId)));
 
-      assertTrue(service.canSeeJobOrderBlueprintOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderBlueprintOwners(order.getId()));
     }
 
     @Test
@@ -530,7 +545,7 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      assertTrue(service.canSeeJobOrderBlueprintOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderBlueprintOwners(order.getId()));
     }
 
     @Test
@@ -538,7 +553,7 @@ class OwnerScopeServiceTest {
       UUID missing = UUID.randomUUID();
       when(jobOrderRepository.findById(missing)).thenReturn(Optional.empty());
 
-      assertFalse(service.canSeeJobOrderBlueprintOwners(missing));
+      assertFalse(jobOrderPolicy.canSeeJobOrderBlueprintOwners(missing));
     }
   }
 
@@ -560,7 +575,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertTrue(service.canSeeJobOrderInventoryOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderInventoryOwners(order.getId()));
     }
 
     @Test
@@ -573,7 +588,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertFalse(service.canSeeJobOrderInventoryOwners(order.getId()));
+      assertFalse(jobOrderPolicy.canSeeJobOrderInventoryOwners(order.getId()));
     }
 
     @Test
@@ -589,7 +604,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
 
-      assertFalse(service.canSeeJobOrderInventoryOwners(order.getId()));
+      assertFalse(jobOrderPolicy.canSeeJobOrderInventoryOwners(order.getId()));
     }
 
     @Test
@@ -605,7 +620,7 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(skMembership(MEMBER_USER_ID, skId)));
 
-      assertTrue(service.canSeeJobOrderInventoryOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderInventoryOwners(order.getId()));
     }
 
     @Test
@@ -615,7 +630,7 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      assertTrue(service.canSeeJobOrderInventoryOwners(order.getId()));
+      assertTrue(jobOrderPolicy.canSeeJobOrderInventoryOwners(order.getId()));
     }
 
     @Test
@@ -623,7 +638,7 @@ class OwnerScopeServiceTest {
       UUID missing = UUID.randomUUID();
       when(jobOrderRepository.findById(missing)).thenReturn(Optional.empty());
 
-      assertFalse(service.canSeeJobOrderInventoryOwners(missing));
+      assertFalse(jobOrderPolicy.canSeeJobOrderInventoryOwners(missing));
     }
   }
 
@@ -637,7 +652,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeMission(missionId));
+      assertTrue(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -647,7 +662,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeMission(missionId));
+      assertTrue(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -657,7 +672,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeMission(missionId));
+      assertFalse(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -666,7 +681,7 @@ class OwnerScopeServiceTest {
       Mission mission = newMission(missionId, null, false);
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
 
-      assertTrue(service.canSeeMission(missionId));
+      assertTrue(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -676,7 +691,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       when(authHelper.isMemberOrAbove()).thenReturn(true);
 
-      assertTrue(service.canSeeMission(missionId));
+      assertTrue(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -686,7 +701,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       when(authHelper.isMemberOrAbove()).thenReturn(false);
 
-      assertFalse(service.canSeeMission(missionId));
+      assertFalse(missionPolicy.canSeeMission(missionId));
     }
 
     @Test
@@ -694,7 +709,7 @@ class OwnerScopeServiceTest {
       UUID missionId = UUID.randomUUID();
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
 
-      assertFalse(service.canSeeMission(missionId));
+      assertFalse(missionPolicy.canSeeMission(missionId));
     }
   }
 
@@ -708,7 +723,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertFalse(service.canEditMission(missionId));
+      assertFalse(missionPolicy.canEditMission(missionId));
     }
 
     @Test
@@ -718,7 +733,7 @@ class OwnerScopeServiceTest {
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
-      assertTrue(service.canEditMission(missionId));
+      assertTrue(missionPolicy.canEditMission(missionId));
     }
 
     @Test
@@ -727,7 +742,7 @@ class OwnerScopeServiceTest {
       Mission mission = newMission(missionId, null, false);
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
 
-      assertTrue(service.canEditMission(missionId));
+      assertTrue(missionPolicy.canEditMission(missionId));
     }
 
     @Test
@@ -735,7 +750,7 @@ class OwnerScopeServiceTest {
       UUID missionId = UUID.randomUUID();
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
 
-      assertFalse(service.canEditMission(missionId));
+      assertFalse(missionPolicy.canEditMission(missionId));
     }
   }
 
@@ -749,7 +764,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -759,7 +774,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       stubNonProfitMember();
 
-      assertFalse(service.canSeeJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -769,7 +784,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       when(authHelper.isAdmin()).thenReturn(true);
 
-      assertTrue(service.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -779,7 +794,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -789,7 +804,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronB)));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -800,7 +815,7 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      assertTrue(service.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -812,7 +827,7 @@ class OwnerScopeServiceTest {
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_B_ID.toString());
 
-      assertFalse(service.canSeeJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -820,7 +835,7 @@ class OwnerScopeServiceTest {
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-      assertFalse(service.canSeeJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
     }
   }
 
@@ -840,8 +855,8 @@ class OwnerScopeServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(service.canSeeJobOrder(orderId));
-      assertTrue(service.canSeeJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrderAsRequester(orderId));
     }
 
     @Test
@@ -852,7 +867,7 @@ class OwnerScopeServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(service.canSeeJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrderAsRequester(orderId));
     }
 
     @Test
@@ -863,8 +878,8 @@ class OwnerScopeServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(service.canEditJobOrder(orderId));
-      assertTrue(service.canEditJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canEditJobOrderAsRequester(orderId));
     }
 
     @Test
@@ -876,7 +891,7 @@ class OwnerScopeServiceTest {
       stubNonProfitMember();
       when(jobOrderHandoverRepository.existsByJobOrderId(orderId)).thenReturn(true);
 
-      assertFalse(service.canEditJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrderAsRequester(orderId));
     }
 
     @Test
@@ -887,7 +902,7 @@ class OwnerScopeServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(service.canEditJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrderAsRequester(orderId));
     }
   }
 
@@ -901,7 +916,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       stubMemberInSquadronA();
 
-      assertTrue(service.canEditJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -911,7 +926,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       stubNonProfitMember();
 
-      assertFalse(service.canEditJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -921,7 +936,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
       when(authHelper.isAdmin()).thenReturn(true);
 
-      assertTrue(service.canEditJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -931,7 +946,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
       stubMemberInSquadronA();
 
-      assertTrue(service.canEditJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -941,7 +956,7 @@ class OwnerScopeServiceTest {
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronB)));
       stubMemberInSquadronA();
 
-      assertFalse(service.canEditJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
     }
 
     @Test
@@ -949,7 +964,7 @@ class OwnerScopeServiceTest {
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-      assertFalse(service.canEditJobOrder(orderId));
+      assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
     }
   }
 
@@ -1007,7 +1022,7 @@ class OwnerScopeServiceTest {
       when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeInventoryItem(itemId));
+      assertTrue(inventoryPolicy.canSeeInventoryItem(itemId));
     }
 
     @Test
@@ -1019,7 +1034,7 @@ class OwnerScopeServiceTest {
       when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeInventoryItem(itemId));
+      assertFalse(inventoryPolicy.canSeeInventoryItem(itemId));
     }
 
     @Test
@@ -1027,7 +1042,7 @@ class OwnerScopeServiceTest {
       UUID itemId = UUID.randomUUID();
       when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.empty());
 
-      assertFalse(service.canSeeInventoryItem(itemId));
+      assertFalse(inventoryPolicy.canSeeInventoryItem(itemId));
     }
   }
 
@@ -1069,10 +1084,10 @@ class OwnerScopeServiceTest {
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
       assertTrue(
-          service.canSeeInventoryItem(item.getId()),
+          inventoryPolicy.canSeeInventoryItem(item.getId()),
           "owner sees their own item even when it is stamped to a foreign org unit");
       assertTrue(
-          service.canEditInventoryItem(item.getId()),
+          inventoryPolicy.canEditInventoryItem(item.getId()),
           "owner edits their own item even when it is stamped to a foreign org unit");
     }
 
@@ -1082,8 +1097,10 @@ class OwnerScopeServiceTest {
       when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
-      assertTrue(service.canSeeInventoryItem(item.getId()), "owner sees their own stamped item");
-      assertTrue(service.canEditInventoryItem(item.getId()), "owner edits their own stamped item");
+      assertTrue(
+          inventoryPolicy.canSeeInventoryItem(item.getId()), "owner sees their own stamped item");
+      assertTrue(
+          inventoryPolicy.canEditInventoryItem(item.getId()), "owner edits their own stamped item");
     }
 
     @Test
@@ -1095,10 +1112,10 @@ class OwnerScopeServiceTest {
       stubMemberInSquadronA();
 
       assertFalse(
-          service.canSeeInventoryItem(item.getId()),
+          inventoryPolicy.canSeeInventoryItem(item.getId()),
           "a non-owner member of another org unit must not see the item");
       assertFalse(
-          service.canEditInventoryItem(item.getId()),
+          inventoryPolicy.canEditInventoryItem(item.getId()),
           "a non-owner member of another org unit must not edit the item");
     }
 
@@ -1131,9 +1148,11 @@ class OwnerScopeServiceTest {
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
       assertTrue(
-          service.canSeeRefineryOrder(order.getId()), "owner sees their own foreign-org order");
+          refineryPolicy.canSeeRefineryOrder(order.getId()),
+          "owner sees their own foreign-org order");
       assertTrue(
-          service.canEditRefineryOrder(order.getId()), "owner edits their own foreign-org order");
+          refineryPolicy.canEditRefineryOrder(order.getId()),
+          "owner edits their own foreign-org order");
     }
 
     @Test
@@ -1145,9 +1164,10 @@ class OwnerScopeServiceTest {
       stubMemberInSquadronA();
 
       assertFalse(
-          service.canSeeRefineryOrder(order.getId()), "a non-owner outside scope must not see it");
+          refineryPolicy.canSeeRefineryOrder(order.getId()),
+          "a non-owner outside scope must not see it");
       assertFalse(
-          service.canEditRefineryOrder(order.getId()),
+          refineryPolicy.canEditRefineryOrder(order.getId()),
           "a non-owner outside scope must not edit it");
     }
   }
@@ -1164,8 +1184,8 @@ class OwnerScopeServiceTest {
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeRefineryOrder(orderId));
-      assertFalse(service.canEditRefineryOrder(orderId));
+      assertFalse(refineryPolicy.canSeeRefineryOrder(orderId));
+      assertFalse(refineryPolicy.canEditRefineryOrder(orderId));
     }
 
     @Test
@@ -1177,8 +1197,8 @@ class OwnerScopeServiceTest {
       when(refineryOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeRefineryOrder(orderId));
-      assertTrue(service.canEditRefineryOrder(orderId));
+      assertTrue(refineryPolicy.canSeeRefineryOrder(orderId));
+      assertTrue(refineryPolicy.canEditRefineryOrder(orderId));
     }
 
     @Test
@@ -1190,8 +1210,8 @@ class OwnerScopeServiceTest {
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeOperation(opId));
-      assertFalse(service.canEditOperation(opId));
+      assertFalse(operationPolicy.canSeeOperation(opId));
+      assertFalse(operationPolicy.canEditOperation(opId));
     }
 
     @Test
@@ -1203,7 +1223,7 @@ class OwnerScopeServiceTest {
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
       when(authHelper.isMemberOrAbove()).thenReturn(true);
 
-      assertTrue(service.canSeeOperation(opId));
+      assertTrue(operationPolicy.canSeeOperation(opId));
     }
 
     @Test
@@ -1215,7 +1235,7 @@ class OwnerScopeServiceTest {
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
       when(authHelper.isMemberOrAbove()).thenReturn(false);
 
-      assertFalse(service.canSeeOperation(opId));
+      assertFalse(operationPolicy.canSeeOperation(opId));
     }
 
     @Test
@@ -1226,7 +1246,7 @@ class OwnerScopeServiceTest {
       op.setOwningOrgUnit(null);
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
 
-      assertTrue(service.canEditOperation(opId));
+      assertTrue(operationPolicy.canEditOperation(opId));
     }
 
     @Test
@@ -1240,8 +1260,11 @@ class OwnerScopeServiceTest {
       when(operationRepository.existsParticipantUserInOperation(opId, MEMBER_USER_ID))
           .thenReturn(true);
 
-      assertTrue(service.canSeeOperation(opId), "participant may view a foreign-Staffel operation");
-      assertFalse(service.canEditOperation(opId), "participation grants view only, not edit");
+      assertTrue(
+          operationPolicy.canSeeOperation(opId),
+          "participant may view a foreign-Staffel operation");
+      assertFalse(
+          operationPolicy.canEditOperation(opId), "participation grants view only, not edit");
     }
 
     @Test
@@ -1254,8 +1277,8 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-      assertTrue(service.canSeeRefineryOrder(orderId));
-      assertTrue(service.canEditRefineryOrder(orderId));
+      assertTrue(refineryPolicy.canSeeRefineryOrder(orderId));
+      assertTrue(refineryPolicy.canEditRefineryOrder(orderId));
     }
   }
 
@@ -1267,8 +1290,8 @@ class OwnerScopeServiceTest {
       UUID targetUserId = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(true);
 
-      assertTrue(service.canViewUserRefineryOrders(targetUserId));
-      assertTrue(service.canManageUserRefineryOrders(targetUserId));
+      assertTrue(refineryPolicy.canViewUserRefineryOrders(targetUserId));
+      assertTrue(refineryPolicy.canManageUserRefineryOrders(targetUserId));
     }
 
     @Test
@@ -1276,8 +1299,8 @@ class OwnerScopeServiceTest {
       lenient().when(authHelper.isAdmin()).thenReturn(false);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
-      assertTrue(service.canViewUserRefineryOrders(MEMBER_USER_ID));
-      assertTrue(service.canManageUserRefineryOrders(MEMBER_USER_ID));
+      assertTrue(refineryPolicy.canViewUserRefineryOrders(MEMBER_USER_ID));
+      assertTrue(refineryPolicy.canManageUserRefineryOrders(MEMBER_USER_ID));
     }
 
     @Test
@@ -1292,8 +1315,8 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(targetUserId))
           .thenReturn(List.of(staffelMembership(targetUserId, SQUADRON_A_ID)));
 
-      assertTrue(service.canViewUserRefineryOrders(targetUserId));
-      assertTrue(service.canManageUserRefineryOrders(targetUserId));
+      assertTrue(refineryPolicy.canViewUserRefineryOrders(targetUserId));
+      assertTrue(refineryPolicy.canManageUserRefineryOrders(targetUserId));
     }
 
     @Test
@@ -1308,8 +1331,8 @@ class OwnerScopeServiceTest {
           .when(orgUnitMembershipRepository.findAllByIdUserId(targetUserId))
           .thenReturn(List.of(staffelMembership(targetUserId, SQUADRON_B_ID)));
 
-      assertFalse(service.canViewUserRefineryOrders(targetUserId));
-      assertFalse(service.canManageUserRefineryOrders(targetUserId));
+      assertFalse(refineryPolicy.canViewUserRefineryOrders(targetUserId));
+      assertFalse(refineryPolicy.canManageUserRefineryOrders(targetUserId));
     }
   }
 
@@ -1386,8 +1409,8 @@ class OwnerScopeServiceTest {
       when(refineryOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
-      assertTrue(service.canSeeRefineryOrder(order.getId()));
-      assertTrue(service.canEditRefineryOrder(order.getId()));
+      assertTrue(refineryPolicy.canSeeRefineryOrder(order.getId()));
+      assertTrue(refineryPolicy.canEditRefineryOrder(order.getId()));
     }
 
     @Test
@@ -1397,8 +1420,8 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
 
-      assertFalse(service.canSeeRefineryOrder(order.getId()));
-      assertFalse(service.canEditRefineryOrder(order.getId()));
+      assertFalse(refineryPolicy.canSeeRefineryOrder(order.getId()));
+      assertFalse(refineryPolicy.canEditRefineryOrder(order.getId()));
     }
 
     @Test
@@ -1407,8 +1430,8 @@ class OwnerScopeServiceTest {
       when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
-      assertTrue(service.canSeeInventoryItem(item.getId()));
-      assertTrue(service.canEditInventoryItem(item.getId()));
+      assertTrue(inventoryPolicy.canSeeInventoryItem(item.getId()));
+      assertTrue(inventoryPolicy.canEditInventoryItem(item.getId()));
     }
 
     @Test
@@ -1418,8 +1441,8 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
 
-      assertFalse(service.canSeeInventoryItem(item.getId()));
-      assertFalse(service.canEditInventoryItem(item.getId()));
+      assertFalse(inventoryPolicy.canSeeInventoryItem(item.getId()));
+      assertFalse(inventoryPolicy.canEditInventoryItem(item.getId()));
     }
   }
 
@@ -1506,7 +1529,6 @@ class OwnerScopeServiceTest {
 
       service.canAccessBlueprintOverview();
       service.currentOversightScope();
-      service.currentOwnLevelOversightScope();
 
       verify(orgUnitMembershipRepository, times(1)).findAllByIdUserId(MEMBER_USER_ID);
     }
@@ -1856,7 +1878,7 @@ class OwnerScopeServiceTest {
       UUID orgUnit = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(false);
       org.springframework.security.core.GrantedAuthority granted =
-          new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
+          new de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority(
               "LOGISTICIAN", orgUnit);
       withAuthorities(java.util.List.of(granted));
       assertTrue(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
@@ -1868,7 +1890,7 @@ class OwnerScopeServiceTest {
       UUID orgUnitB = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(false);
       org.springframework.security.core.GrantedAuthority granted =
-          new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
+          new de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority(
               "LOGISTICIAN", orgUnitA);
       withAuthorities(java.util.List.of(granted));
       assertFalse(service.hasRoleInOrgUnit(orgUnitB, "LOGISTICIAN"));
@@ -1879,7 +1901,7 @@ class OwnerScopeServiceTest {
       UUID orgUnit = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(false);
       org.springframework.security.core.GrantedAuthority granted =
-          new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
+          new de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority(
               "MISSION_MANAGER", orgUnit);
       withAuthorities(java.util.List.of(granted));
       assertFalse(service.hasRoleInOrgUnit(orgUnit, "LOGISTICIAN"));
@@ -1994,90 +2016,6 @@ class OwnerScopeServiceTest {
           .thenReturn(List.of(flaglessBereich));
 
       assertFalse(service.canAccessBlueprintOverview());
-    }
-  }
-
-  @Nested
-  class CurrentUserHasAreaOrOlOversightTests {
-
-    @Test
-    void admin_qualifies() {
-      when(authHelper.isAdmin()).thenReturn(true);
-
-      assertTrue(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void officerWithoutAreaOrOlSeat_doesNotQualify() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-
-      assertFalse(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void skLead_doesNotQualify() {
-      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, UUID.randomUUID());
-      lead.setRole(MembershipRole.SK_LEAD);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
-
-      assertFalse(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void bereichsleiter_qualifies() {
-      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      seat.setRole(MembershipRole.BEREICHSLEITER);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of(seat));
-
-      assertTrue(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void bereichskoordinator_qualifies() {
-      OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      seat.setRole(MembershipRole.BEREICHSKOORDINATOR);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of(seat));
-
-      assertTrue(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void olMember_qualifies() {
-      OrgUnitMembership seat = olMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID)).thenReturn(List.of(seat));
-
-      assertTrue(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void flaglessBereichSeat_doesNotQualify() {
-      OrgUnitMembership flaglessBereich = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(flaglessBereich));
-
-      assertFalse(service.currentUserHasAreaOrOlOversight());
-    }
-
-    @Test
-    void anonymous_doesNotQualify() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.empty());
-
-      assertFalse(service.currentUserHasAreaOrOlOversight());
     }
   }
 
@@ -2226,103 +2164,6 @@ class OwnerScopeServiceTest {
 
       assertFalse(scope.adminAllScope());
       assertEquals(Set.of(bereichId, childStaffelId), scope.memberOrgUnitIds());
-    }
-  }
-
-  /**
-   * The own-level oversight scope names only the caller's own leadership seats and is not cascaded,
-   * unlike {@link OwnerScopeService#currentOversightScope()} (REQ-BANK-022).
-   */
-  @Nested
-  class CurrentOwnLevelOversightScopeTests {
-
-    @Test
-    void adminWithoutPin_allScope() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertTrue(scope.adminAllScope());
-    }
-
-    @Test
-    void officer_ownLevelIsTheirStaffel() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertEquals(Set.of(SQUADRON_A_ID), scope.memberOrgUnitIds());
-    }
-
-    @Test
-    void skLead_ownLevelIsLedSk() {
-      UUID skId = UUID.randomUUID();
-      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
-      lead.setRole(MembershipRole.SK_LEAD);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertEquals(Set.of(skId), scope.memberOrgUnitIds());
-    }
-
-    @Test
-    void bereichLeader_ownLevelIsBereichOnly_notChildrenAndNeverCascades() {
-      UUID bereichId = UUID.randomUUID();
-      OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
-      bereichSeat.setRole(MembershipRole.BEREICHSLEITER);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(bereichSeat));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertEquals(Set.of(bereichId), scope.memberOrgUnitIds());
-      verify(orgUnitCascadeService, never()).cascadedOfficerReach(any());
-    }
-
-    @Test
-    void olMember_ownLevelIsOlSeatOnly() {
-      UUID olId = UUID.randomUUID();
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(olMembershipRow(MEMBER_USER_ID, olId)));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertEquals(Set.of(olId), scope.memberOrgUnitIds());
-    }
-
-    @Test
-    void plainMemberOrFlaglessBereichSeat_emptyOwnLevel() {
-      OrgUnitMembership flaglessBereich = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID), flaglessBereich));
-      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      ScopePredicate scope = service.currentOwnLevelOversightScope();
-
-      assertTrue(scope.memberOrgUnitIds().isEmpty());
     }
   }
 

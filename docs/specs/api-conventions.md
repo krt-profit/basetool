@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
 > **Owner area:** API · **Related:** [`security-and-access.md`](security-and-access.md), [`observability.md`](observability.md)
 
 # API conventions
@@ -75,6 +75,14 @@ exemption: `MaterialMapper.toEntity`, whose DTO is the admin-edit subset of a ~4
 row, uses `@BeanMapping(ignoreByDefault = true)` and names each of the fields it carries. The switch found
 one real gap — the job type a mission embeds never carried `isMissionLead`.
 
+**As enforced today** (2026-10-10). Every DTO of the backend is a record (321 `*Dto` types, none a
+class). A controller method returns no entity, also not inside `ResponseEntity`, `PageResponse`,
+`List` or another generic (`ArchitectureTest#controllerMethodsShouldNotReturnJpaEntities`,
+`#controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers`). No type is both returned and bound
+as a request body, and a request type carries no server-managed component (REQ-SEC-077); thirteen
+dual-use types are the reviewed exception, each with the test that proves its managed fields
+unwritable. Mapping is MapStruct with `unmappedTargetPolicy = ERROR`, as above.
+
 ### REQ-API-003 — Validation on writes
 
 `@Valid` on every `@RequestBody` for write operations (POST/PUT/PATCH). Enforced since REQ-API-015.
@@ -86,6 +94,19 @@ stable machine-readable `code`, and a per-request `correlationId`; validation er
 `errors` object (field → message) **and** a structured `fieldErrors` array (`{field, message}`).
 Titles and details are localized via `MessageSource`. Extend `GlobalExceptionHandler` rather than
 throwing into the void; problem-type URIs come from `AppProblemProperties`, not hardcoded strings.
+
+**One advice, handlers grouped by family.** `GlobalExceptionHandler` is the only
+`@ControllerAdvice` for problems. Its handlers sit in a chain of abstract classes, one per family,
+each extending the one before: `ProblemSupport` (the `CODE_*` constants, the message lookup, the
+problem factory and the 4xx log line), `ConcurrencyProblemHandlers` (409: optimistic and pessimistic
+locks, data integrity), `SecurityProblemHandlers` (401, 403), `RequestProblemHandlers` (a malformed
+request: validation, an unreadable body, a missing value, media types, an upload over the limit, an
+unsupported method), `ApplicationProblemHandlers` (`AppException`, illegal argument and state, status
+exceptions, a missing resource, a failed outbound call) and, last, `GlobalExceptionHandler` itself
+with the catch-all. A new handler goes into the family it belongs to. Spring reads the whole chain
+as one advice, so there is one resolution order and one disclosure path; `GlobalExceptionHandlerMappingTest`
+pins which method answers which exception type, and every family logs under the
+`GlobalExceptionHandler` logger name. Never a second `@ControllerAdvice` per domain.
 
 **`GlobalExceptionHandler` must outrank Spring's own problem-details advice (ADR-0132).**
 `spring.mvc.problemdetails.enabled: true` makes Spring Boot register a competing
@@ -199,35 +220,39 @@ is still only built on a miss. **Enforced by `EntitiesRequireRatchetTest`**, a s
 `EntityNotFoundException`, which `handleNotFound` answers identically)
 were migrated message by message (BE-SIMP-01, 2026-09-23); `Entities` itself is the only exemption.
 
-**Domain exceptions carry their own error-code contract (S4, #910).** `BadRequestException`,
+**Domain exceptions carry their own error-code contract (S4, #910; ADR-0235).** The sealed
+`exception.AppException` permits the kernel's generic kinds — `BadRequestException`,
 `NotFoundException`, `BusinessConflictException`, `DuplicateEntityException`,
-`EntityInUseException`, `ExternalServiceException`, `ReportGenerationException`,
-`OverAllocationException`, `ProductionAllocationException`, `OwnerOrgUnitRequiredException`,
-`MissionParticipantRequiredException`, `RateLimitExceededException` and `BankConflictException` —
-thirteen in all, beside the exchange's own `ExchangeProblemException` — extend the sealed `exception.AppException`, exposing `status()`,
+`EntityInUseException`, `ExternalServiceException`, `ReportGenerationException` and
+`RateLimitExceededException` — and one open base, `exception.DomainProblem`, which every module's
+exceptions extend from the module's own `api` package: `bank.api.BankConflictException`,
+`exchange.api.ExchangeProblemException`, `inventory.api.OverAllocationException`,
+`joborder.api.ProductionAllocationException`, `refinery.api.MissionParticipantRequiredException`
+and `scope.api.OwnerOrgUnitRequiredException`. Every one exposes `status()`,
 `code()`, `titleKey()`, `detailKey()`, `typeSuffix()` and `logLabel()` on the type itself instead of
 leaving that identity scattered across `GlobalExceptionHandler`'s `CODE_*` constants and per-type
 `@ExceptionHandler` methods. A single `handleAppException` dispatch handler reads those accessors
 for every subtype except `NotFoundException`, whose handler stays dedicated because it also covers
 three non-`AppException` JPA/JDK "not found" flavors (`EntityNotFoundException`,
 `NoSuchElementException`, `NoResourceFoundException`) that cannot be sealed under this hierarchy.
-Every subtype but `BankConflictException` passes its fixed
-`exception.AppExceptionKind` constant to the `AppException(AppExceptionKind, String)` /
-`AppException(AppExceptionKind, String, Throwable)` superclass constructor and inherit every
-accessor from `AppException`, which delegates to that stored kind; the one addition is
-`RateLimitExceededException`, which also overrides `responseHeaders()` so the dispatch handler sends
-its `Retry-After`. `BankConflictException` is the
-one exception that overrides every accessor directly, computing them per-instance from its own
-`code` field (it has no single fixed identity — each throw site picks one of its `CODE_BANK_*`
-constants) via the legacy kind-less `AppException(String)` / `AppException(String, Throwable)`
-constructors. The one behavioural fork — `ExternalServiceException` / `ReportGenerationException`
+Every generic kind passes its fixed `exception.AppExceptionKind` constant to the
+`AppException(AppExceptionKind, String)` / `AppException(AppExceptionKind, String, Throwable)`
+superclass constructor and inherits every accessor from `AppException`, which delegates to that
+stored kind; the one addition is `RateLimitExceededException`, which also overrides
+`responseHeaders()` so the dispatch handler sends its `Retry-After`. A `DomainProblem` names its
+`status()`, `code()` (from its module's `ProblemCode` enum, or for the exchange from its frozen
+registry) and `logLabel()`; the `type` suffix and the `problem.<code>.title` / `.detail` keys follow
+from the code, and its disclosure policy is `STANDARD`. `BankConflictException` and
+`ExchangeProblemException` choose their code per instance, and add their PII-free extension
+properties and log fields. The one behavioural fork — `ExternalServiceException` / `ReportGenerationException`
 suppressing `getMessage()` from the client and logging at ERROR instead of WARN, an
 info-leak-protection constraint (CWE-209) — is the `ErrorDisclosurePolicy` strategy enum on
-`AppExceptionKind`, likewise inherited automatically via the stored kind. A new domain exception
-joins this hierarchy by extending `AppException` and either passing a new `AppExceptionKind`
-constant to the superclass constructor (the common case, requiring zero accessor overrides) or
-implementing the accessors directly (only if its identity is genuinely per-instance, as
-`BankConflictException`'s is) — never by hand-rolling a new `@ExceptionHandler` method.
+`AppExceptionKind`, likewise inherited automatically via the stored kind. A new module exception
+extends `DomainProblem` in its module's `api` package and takes its code from that module's
+`ProblemCode` enum; a new generic kind is a reviewed change of the kernel — never a hand-rolled
+`@ExceptionHandler` method. `ErrorModelShapeTest` pins the permitted kinds and that every
+`DomainProblem` subclass and every module `ProblemCode` enum lives in a module's `api` package;
+`DomainProblemContractTest` pins each module exception's full problem body.
 
 ### REQ-API-019 — Every problem code is registered once and documented
 
@@ -236,15 +261,22 @@ contract — and until 2026-10-03 it lived as about fifty string literals across
 the handler, six filters and the error controller, with no list, no uniqueness check and no
 documentation. The app once listened for `TERMS_ACCEPTANCE_REQUIRED` while the server sends
 `TERMS_NOT_ACCEPTED`. This is the registry and documentation half of ADR-0235; the exception
-hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) follows in Phase 1.
+hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) landed in Phase 1
+(2026-10-04, P1-12).
 
 - **`exception.ProblemCode`** — a code's wire value (`code()`) and its HTTP status (`status()`). The
   code string is the contract; the Java name is not.
-- **`exception.CoreProblemCode`** — one kernel enum listing every code the backend emits outside the
-  exchange: the handler's, the twelve `AppExceptionKind` codes, the 18 bank codes, the filters'
-  (`TERMS_NOT_ACCEPTED`, `PENDING_APPROVAL`, `NO_ROLE`, `ACTING_MEMBER_REFUSED`,
-  `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`) and `NOT_ACCEPTABLE`
-  (`406`) — 50 in all. Three are
+- **`exception.CoreProblemCode`** — the error kernel's enum: the handler's codes, the eight
+  `AppExceptionKind` codes, the request pipeline's (`TERMS_NOT_ACCEPTED`, `PENDING_APPROVAL`,
+  `NO_ROLE`, `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`,
+  `APP_UPDATE_REQUIRED`) and `NOT_ACCEPTABLE` (`406`) — 27 codes.
+- **One enum per module, in the module's `api` package** — `bank.api.BankProblemCode` (the 18
+  `BANK_*` codes), `exchange.api.ExchangeProblemCode` (`ACTING_MEMBER_REFUSED`, which the exchange
+  module's `ActingMemberFilter` answers), `inventory.api.InventoryProblemCode` (`OVER_ALLOCATION`),
+  `joborder.api.JobOrderProblemCode` (`PRODUCTION_ALLOCATION`),
+  `refinery.api.RefineryProblemCode` (`MISSION_PARTICIPANT_REQUIRED`) and
+  `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`). Names and wire values did not change
+  when they left `CoreProblemCode`; the registry holds 50 codes across the seven enums. Three are
   **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039),
   `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109) and `APP_UPDATE_REQUIRED`, which retired paths will
   answer (ADR-0234, D-11; registered with `410`). Every producer references the enum; no code is a
@@ -256,7 +288,8 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) foll
   `ExchangeProblemException`, frozen with the exchange contract (REQ-XCH, ADR-0216); the registry
   only asserts that no kernel code clashes with one of them.
 - **The document lists the codes.** `ProblemDetail.code` is a string whose `x-problem-codes`
-  extension and description list the registered values — never a required enum, because
+  extension (every top-level `ProblemCode` enum found under the backend's root package, sorted by
+  code) and description list the registered values — never a required enum, because
   `theContractRequiredEnumsAreFrozen` would then freeze the list against every addition — beside
   `correlationId`, `errors` and `fieldErrors` (`{field, message}`); every `/api/**` operation
   documents `429` (`OpenApiProblemDetailsConfig`).
@@ -266,7 +299,8 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) foll
 - [x] Every registered code is unique, also against the exchange's; the registry equals the committed
   list, code and status (`ProblemCodeRegistryTest`).
 - [x] Every code `AppExceptionKind`, `GlobalExceptionHandler`, `BankConflictException` and the six
-  filters declare is registered; no main source writes a code as a literal (a source scan whose four
+  filters declare is registered (the module exceptions with a fixed code take it from their module's
+  enum); no main source writes a code as a literal (a source scan whose four
   site shapes are each proven on a planted line); runtime probes through the real filter chain — an
   anonymous read, a wrong verb, an unreadable body, a path no controller serves — answer
   registered codes (`ProblemCodeRuntimeProbeTest`).
@@ -281,8 +315,11 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) foll
   do so through the real chain (`ProblemCodeRuntimeProbeTest`).
 - [x] The committed document's `ProblemDetail` lists exactly the registered codes, keeps `code`
   optional and not an enum.
-- [ ] One `ProblemCode` enum per module and the app generating its constants from the document —
-  **open**, plan Phase 1 (ADR-0235) and the app.
+- [x] One `ProblemCode` enum per module, in the module's `api` package; the sealed root permits only
+  the generic kinds and `DomainProblem`, and every module exception and module enum lives in a
+  module's `api` package — a planted kernel-package exception and enum are caught
+  (`ErrorModelShapeTest`, 2026-10-04).
+- [ ] The app generating its constants from the document — **open**, the app.
 
 **Enforced by:** `ProblemCodeRegistryTest`, `ProblemCodeRuntimeProbeTest`,
 `GlobalExceptionHandlerClientErrorTest` (backend) ·
@@ -323,7 +360,11 @@ display layer only. Write serialization tests for timezone behaviour.
 
 ### REQ-API-007 — OpenAPI documentation
 
-Every backend REST endpoint carries SpringDoc annotations (`@Operation`, `@ApiResponses`). **The
+Controllers carry SpringDoc annotations where they say what the framework cannot infer: an
+`@Operation` summary or description and, for the error answers a client has to handle,
+`@ApiResponses`. No gate demands them on every operation (393 of the 565 operations carry a
+summary on 2026-10-10); what the build does require of every operation is below. *Corrected
+2026-10-10: this sentence said every endpoint carries both annotations.* **The
 backend ships a committed OpenAPI document, the single API-documentation artifact for the
 module** — kept in sync with controller changes and regenerated by its `OpenApiGeneratorTest`:
 
@@ -1628,5 +1669,25 @@ and 4–5 ms without either, within the noise of `docker exec`.
 `docker/edge/include/api-admission.conf`, `docker/edge/include/api-allowlist.conf`,
 `docker/edge/conf.d/50-api.conf.template` · **Related:** REQ-API-009, REQ-API-016, REQ-API-020,
 REQ-OPS-042, REQ-SEC-037, ADR-0135, ADR-0136
+
+---
+
+### REQ-API-022 — A request body is read tolerantly: an unknown property is ignored
+
+The application's Jackson 3 mapper keeps `FAIL_ON_UNKNOWN_PROPERTIES` off, which is Jackson 3's
+default and the behaviour of every body the frozen contract has ever accepted. A client that sends a
+property the server does not declare gets the request handled without it; a property the server
+adds later is invisible to an older client. The frontend and the backend deploy together and the
+contract tests (REQ-API-016, REQ-API-017) check both sides, and the exchange's tolerant reading is
+part of its frozen behaviour (REQ-XCH-009), so the policy is not tightened. Mass assignment is not
+this requirement's concern: REQ-SEC-077 refuses a body that carries a server-managed field.
+
+**Acceptance**
+
+- [x] The primary mapper reads a body with an undeclared property and drops it, and the feature that
+  would refuse it is off (`JacksonTolerantReadingTest`).
+
+**Enforced by:** `JacksonTolerantReadingTest` · **Code:** `JacksonConfig` · **Related:** REQ-API-009,
+REQ-API-011, REQ-SEC-077
 
 ---

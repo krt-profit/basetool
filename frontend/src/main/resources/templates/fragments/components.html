@@ -22,6 +22,74 @@
         th:text="#{${filterHintKey}}">Filter aktiv.</span>
 </th:block>
 
+<div th:fragment="emptyState" class="empty-state" data-testid="empty-state" th:id="${emptyId}">
+  <th:block th:replace="~{fragments/components :: emptyStateBody(${titleKey}, ${textKey}, ${filterHintKey})}"></th:block>
+  <a th:if="${actionHref != null and actionKey != null}" class="btn btn-outline" th:href="${actionHref}"
+     data-testid="empty-state-action" th:text="#{__${actionKey}__}">Aktion</a>
+</div>
+
+<div th:fragment="toolbarSearch(id, name, value, placeholderKey)" class="toolbar__search">
+  <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+  <input type="search" th:id="${id}" th:name="${name}" th:value="${value}" autocomplete="off"
+         data-testid="toolbar-search" data-filter-chip-ignore
+         th:attr="placeholder=#{__${placeholderKey}__},aria-label=#{__${placeholderKey}__}" />
+</div>
+
+<div th:fragment="segmented" class="segmented" role="radiogroup"
+     th:classappend="${variant}"
+     th:attr="aria-label=${labelKey != null} ? #{__${labelKey}__} : null"
+     th:data-segmented="${name}" data-filter-chip-ignore>
+  <label th:each="opt : ${options}" th:with="optValue=${opt['value'] == null ? '' : '' + opt['value']}"
+         th:data-testid="${'segment-' + name + '-' + (optValue == '' ? 'all' : #strings.toLowerCase(optValue))}">
+    <input type="radio" th:name="${name}" th:value="${optValue}" th:attr="form=${form}"
+           th:checked="${optValue == (selected == null ? '' : '' + selected)}" />
+    <span th:text="#{__${opt['labelKey']}__}">Option</span>
+    <span th:if="${opt['count'] != null}" class="seg-count" th:text="${opt['count']}">0</span>
+  </label>
+</div>
+
+<div th:fragment="overflowMenu" class="overflow-menu" data-overflow-menu>
+  <button type="button" class="btn btn-ghost btn-icon overflow-menu__toggle" data-testid="overflow-menu-toggle"
+          aria-haspopup="menu" aria-expanded="false"
+          th:id="${id + '-toggle'}"
+          th:attr="aria-controls=${id},aria-label=#{general.moreActions},title=#{general.moreActions}"
+    ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-more"/></svg></button>
+  <div class="overflow-menu__panel" role="menu" hidden th:id="${id}" th:attr="aria-labelledby=${id + '-toggle'}">
+    <th:block th:replace="${items}"></th:block>
+  </div>
+</div>
+
+<div th:fragment="filterPopover" class="filter-popover">
+  <button type="button" class="btn btn-ghost filter-toggle"
+          th:attr="aria-controls=${panelId},data-testid=${testid}" aria-expanded="true">
+    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"/></svg>
+    <span th:text="#{filter.add}">Filter</span>
+    <span class="filter-badge filter-count" data-filter-count hidden th:data-label="#{filter.activeCount}">
+      <span data-filter-count-value aria-hidden="true">0</span>
+      <span data-filter-count-label class="visually-hidden"></span>
+    </span>
+  </button>
+  <div class="filter-panel filter-popover__panel" role="group" data-filter-transient
+       th:id="${panelId}" th:data-filter-panel="${panelName}" th:attr="aria-label=#{filter.add}">
+    <th:block th:replace="${body}"></th:block>
+  </div>
+</div>
+
+<div th:fragment="listFoot(pageResponse, baseUrl)" class="list-foot"
+     th:if="${pageResponse != null and pageResponse.totalElements() > 0}"
+     th:data-list-total="${pageResponse.totalElements()}">
+  <span data-testid="list-count"
+        th:text="#{list.countOf(${pageResponse.page() * pageResponse.size() + 1}, ${pageResponse.page() * pageResponse.size() + #lists.size(pageResponse.content())}, ${pageResponse.totalElements()})}">1–7 von 24</span>
+  <div th:replace="~{fragments/pagination :: pagination(pageResponse=${pageResponse}, baseUrl=${baseUrl})}"></div>
+</div>
+
+<div th:fragment="filterChips(formId)" class="filter-chips" hidden
+     data-filter-chips th:data-filter-form="${formId}" data-testid="filter-chips"
+     th:data-remove-label="#{filter.remove}">
+  <button type="button" class="filter-chips__reset" data-filter-chips-reset
+          data-testid="filter-chips-reset" th:text="#{filter.resetAll}">Alle zur&uuml;cksetzen</button>
+</div>
+
 <div th:fragment="bankAccSearch(inputId, filterScope, filterEmpty)" class="bank-acc-search">
   <label th:for="${inputId}" class="visually-hidden" th:text="#{bank.filter.label}"
     >Konten nach Namen filtern</label
@@ -33,6 +101,7 @@
     class="bank-acc-search-input"
     autocomplete="off"
     data-bank-acc-filter
+    data-testid="toolbar-search"
     th:attr="data-filter-scope=${filterScope},data-filter-empty=${filterEmpty},placeholder=#{bank.filter.placeholder},aria-label=#{bank.filter.label}" />
 </div>
 
@@ -42,20 +111,6 @@
         <tbody th:insert="${body}"></tbody>
     </table>
 </div>
-
-<button th:fragment="filterToggle(panelId, testid)"
-        type="button" class="btn btn-ghost filter-toggle"
-        th:attr="aria-controls=${panelId},data-testid=${testid}"
-        aria-expanded="true">
-    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"/></svg>
-    <span th:text="#{filter.toggle}">Filter</span>
-    <span class="chip chip--primary filter-count" data-filter-count hidden
-          th:data-label="#{filter.activeCount}">
-        <span data-filter-count-value aria-hidden="true">0</span>
-        <span data-filter-count-label class="visually-hidden"></span>
-    </span>
-    <svg class="krt-icon filter-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-</button>
 
 </body>
 </html>

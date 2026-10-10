@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,6 +74,8 @@ class AdminAuditLogModalRenderMvcTest {
   @WithMockUser(roles = "ADMIN")
   void exportModal_rendersViaFragmentShell_andProjectsFormExactlyOnce() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     String html =
@@ -117,6 +121,8 @@ class AdminAuditLogModalRenderMvcTest {
             "basetool-android");
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
 
     String html =
         mockMvc
@@ -138,6 +144,8 @@ class AdminAuditLogModalRenderMvcTest {
   void bankTab_rendersTheClientFilterAndColumnToo() {
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     String html =
         assertDoesNotThrow(
@@ -151,5 +159,99 @@ class AdminAuditLogModalRenderMvcTest {
 
     assertThat(html).contains("data-testid=\"audit-filter-client\"");
     assertThat(html).doesNotContain("??admin.audit.client.");
+  }
+
+  /**
+   * The viewer renders on the list pattern (REQ-UI-027): page head with the system eyebrow and no
+   * primary action, export and purge in the overflow menu, the live toolbar without a submit
+   * button, and the stacked table with the translated event label.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void rendersTheListPattern() throws Exception {
+    AuditEventDto row =
+        new AuditEventDto(
+            UUID.randomUUID(),
+            Instant.parse("2026-09-02T10:15:00Z"),
+            "INVENTORY",
+            "INVENTORY_ITEM_CREATED",
+            "logi_jo",
+            UUID.randomUUID(),
+            "Quantanium @ Port Olisar",
+            null,
+            "qty=5.0",
+            "basetool-android");
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
+
+    String html = render("INVENTORY");
+
+    String head =
+        html.substring(
+            html.indexOf("data-testid=\"page-head\""), html.indexOf("id=\"audit-results\""));
+    assertThat(head)
+        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .contains("data-list-count-for=\"audit-results\"")
+        .contains("data-overflow-menu")
+        .contains("data-testid=\"audit-export-open\"")
+        .contains("data-testid=\"audit-purge-open\"")
+        .contains("data-testid=\"audit-filter-event\"")
+        .contains("data-testid=\"audit-filter-toggle\"")
+        .contains("data-filter-chips")
+        .doesNotContain("data-testid=\"audit-filter-apply\"");
+    assertThat(head.split("btn--cta", -1).length).isLessThanOrEqualTo(2);
+    assertThat(html).doesNotContain("class=\"greeting").doesNotContain("hud-box");
+    assertThat(html)
+        .contains("class=\"card card--flush\" data-testid=\"audit-panel\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .contains("data-testid=\"audit-row\"")
+        .containsPattern("class=\"cell-title\">Lager-Eintrag angelegt<")
+        .doesNotContain(">INVENTORY_ITEM_CREATED<")
+        .contains("data-list-total=\"1\"")
+        .contains("class=\"alert alert-warning audit-purge-warning\"");
+  }
+
+  /**
+   * An empty result renders the empty state instead of a table.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void rendersTheEmptyState() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    String html = render("INVENTORY");
+
+    assertThat(html)
+        .contains("data-testid=\"empty-state\"")
+        .contains("id=\"audit-empty\"")
+        .contains("Keine Ereignisse für die aktuellen Filter.")
+        .doesNotContain("data-table--stack")
+        .doesNotContain("data-list-total");
+  }
+
+  /**
+   * Renders the viewer for one tab in German.
+   *
+   * @param domain the tab to open
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private String render(String domain) throws Exception {
+    return mockMvc
+        .perform(get("/admin/audit-log").param("domain", domain).locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
   }
 }

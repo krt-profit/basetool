@@ -131,11 +131,12 @@ class BankHolderDetailFragmentMvcTest {
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void holderDetail_rendersHeaderAndHistory() throws Exception {
     UUID holderId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/bank/holders/" + holderId), eq(BankHolderDto.class)))
+    when(backendApiClient.get(
+            eq("/api/v1/bank/holders/{id}"), eq(BankHolderDto.class), eq(holderId)))
         .thenReturn(
             new BankHolderDto(
                 holderId, UUID.randomUUID(), "greluc", true, new BigDecimal("1000000"), false, 0L));
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(holderId), eq(0)))
         .thenReturn(
             new PageResponse<>(
                 List.of(depositRow(), umbuchungRow(), withdrawalRow()), 0, 20, 3L, 1, List.of()));
@@ -149,9 +150,15 @@ class BankHolderDetailFragmentMvcTest {
             .andExpect(content().string(containsString("KB-0001")))
             .andExpect(content().string(containsString("carol")))
             .andExpect(content().string(containsString("497")))
-            .andExpect(content().string(containsString("bank-holder-back-link")))
+            .andExpect(content().string(containsString("data-testid=\"page-eyebrow\"")))
+            .andExpect(content().string(containsString("/bank/manage?tab=halter")))
             .andExpect(content().string(containsString("bank-holder-balance-calc")))
             .andExpect(content().string(containsString("bank-holder-balance-input")))
+            .andExpect(content().string(containsString("data-testid=\"bank-holder-balance-bar\"")))
+            .andExpect(content().string(containsString("class=\"stack-bar")))
+            .andExpect(content().string(containsString("data-table data-table--stack")))
+            .andExpect(content().string(not(containsString("hud-box"))))
+            .andExpect(content().string(not(containsString("class=\"greeting"))))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -162,7 +169,7 @@ class BankHolderDetailFragmentMvcTest {
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void holderDetail_fragmentHolderBookings_rendersOnlyHistoryFragment() throws Exception {
     UUID holderId = UUID.randomUUID();
-    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(holderId), eq(0)))
         .thenReturn(new PageResponse<>(List.of(umbuchungRow()), 0, 20, 25L, 2, List.of()));
 
     mockMvc
@@ -172,7 +179,7 @@ class BankHolderDetailFragmentMvcTest {
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(containsString("/bank/holders/" + holderId + "?page=1")))
         .andExpect(content().string(not(containsString("id=\"bank-holder-bookings-results\""))))
-        .andExpect(content().string(not(containsString("bank-holder-back-link"))))
+        .andExpect(content().string(not(containsString("page-eyebrow"))))
         .andExpect(content().string(not(containsString("bank-holder-balance-calc"))));
   }
 }

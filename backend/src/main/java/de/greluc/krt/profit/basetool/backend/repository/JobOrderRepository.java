@@ -84,10 +84,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * requirements the active-order lookup reads, ordered by ascending {@code priority} (nulls last),
    * then descending {@code displayId}.
    *
-   * <p>Fetches exactly what {@link
-   * de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService#findAllActiveReference()}
-   * reads, each order exactly once (REQ-ORDERS-018). Handovers are not fetched, since they would
-   * multiply the SQL rows.
+   * <p>Fetches exactly what {@code JobOrderQueryService#findAllActiveReference()} reads, each order
+   * exactly once (REQ-ORDERS-018). Handovers are not fetched, since they would multiply the SQL
+   * rows.
    */
   @EntityGraph(
       attributePaths = {
@@ -127,8 +126,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "responsibleOrgUnit"
       })
   @Query(
-      "SELECT o FROM JobOrder o WHERE o.responsibleOrgUnit.id IN :orgUnitIds"
-          + " AND o.status IN :statuses ORDER BY o.displayId ASC")
+      """
+      SELECT o FROM JobOrder o WHERE o.responsibleOrgUnit.id IN :orgUnitIds
+      AND o.status IN :statuses ORDER BY o.displayId ASC
+      """)
   List<JobOrder> findOpenForExchangeDemand(
       @Param("statuses") Collection<JobOrderStatus> statuses,
       @Param("orgUnitIds") Collection<UUID> orgUnitIds);
@@ -175,14 +176,20 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * <p>An order responsible to a Spezialkommando is visible to everyone; a squadron-responsible one
    * only to that squadron and admins (see {@link
    * de.greluc.krt.profit.basetool.backend.service.ScopePredicate}). The squadron filter matches the
-   * responsible or requesting side and only narrows the scoped result. Only the two org units are
-   * fetched; collections batch-load (REQ-DATA-003).
+   * responsible or requesting side and only narrows the scoped result. The processing filter keeps
+   * only orders whose profit-eligible responsible unit is in {@code processingOrgUnitIds}
+   * (REQ-ORDERS-040) and likewise only narrows. Only the two org units are fetched; collections
+   * batch-load (REQ-DATA-003).
    *
    * @param statuses status values to keep; pass the full enum set to disable status filtering
    *     (never empty).
    * @param noSquadronFilter {@code true} to disable the squadron display filter.
    * @param squadronIds the squadron ids to match on either side; never empty, pass a placeholder
    *     when {@code noSquadronFilter} is {@code true}.
+   * @param processingFilter {@code true} to keep only orders a unit in {@code processingOrgUnitIds}
+   *     is responsible for.
+   * @param processingOrgUnitIds the org units whose processing queue is asked for; never empty,
+   *     pass a placeholder when {@code processingFilter} is {@code false}.
    * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection,
    *     which disables the scope filter.
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
@@ -196,11 +203,15 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       "SELECT o FROM JobOrder o WHERE "
           + ScopeSpecifications.JOB_ORDER_SCOPE_PREDICATE
           + " AND o.status IN :statuses AND (:noSquadronFilter = TRUE OR o.responsibleOrgUnit.id IN"
-          + " :squadronIds OR o.requestingOrgUnit.id IN :squadronIds)")
+          + " :squadronIds OR o.requestingOrgUnit.id IN :squadronIds) AND (:processingFilter ="
+          + " FALSE OR (o.responsibleOrgUnit.id IN :processingOrgUnitIds AND"
+          + " o.responsibleOrgUnit.isProfitEligible = TRUE))")
   Page<JobOrder> findScopedJobOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("noSquadronFilter") boolean noSquadronFilter,
       @Param("squadronIds") Collection<UUID> squadronIds,
+      @Param("processingFilter") boolean processingFilter,
+      @Param("processingOrgUnitIds") Collection<UUID> processingOrgUnitIds,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
@@ -219,8 +230,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    */
   @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
-      "SELECT o FROM JobOrder o WHERE o.requestingOrgUnit.id IN :requesterOrgUnitIds AND o.status"
-          + " IN :statuses")
+      """
+      SELECT o FROM JobOrder o WHERE o.requestingOrgUnit.id IN :requesterOrgUnitIds
+      AND o.status IN :statuses
+      """)
   Page<JobOrder> findRequestedOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("requesterOrgUnitIds") Collection<UUID> requesterOrgUnitIds,
@@ -298,7 +311,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE JobOrder o SET o.handle = :sentinel"
-          + " WHERE lower(o.handle) = lower(:handle) AND o.handle <> :sentinel")
+      """
+      UPDATE JobOrder o SET o.handle = :sentinel
+      WHERE lower(o.handle) = lower(:handle) AND o.handle <> :sentinel
+      """)
   int anonymiseHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — requirements accepted by the owner, built except where a status line
 > says otherwise (epic [#2078](https://github.com/krt-profit/basetool/issues/2078)). Last reviewed:
-> 2026-10-03.
+> 2026-10-10.
 > **Owner area:** XCH · **Related ADRs:** [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
 > [ADR-0217](../adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md),
 > [ADR-0218](../adr/0218-exchange-sync-semantics.md),
@@ -1831,12 +1831,16 @@ with a suspend switch. The page is web-only; the app links to it.
 
 The page is `/connected-apps` (the drawer's personal menu *Persönlich*, REQ-UI-026, every member),
 over `/api/v1/connected-apps`.
-Its header links `docs/legal/approved-clients.md` on GitHub
+A line directly under its page head links `docs/legal/approved-clients.md` on GitHub
 (`https://github.com/krt-profit/basetool/blob/main/docs/legal/approved-clients.md`) in a new tab,
 the address the developer site's onboarding page links as well.
 An installation is always named as `‹client name› – „‹label›"`, the client-supplied label escaped
 and never first, so a label cannot pose as the Basetool. Both disconnects ask first and re-swap the
 `connected-apps :: apps` fragment; the page is the member's own and joins no peer sync.
+*Amended 2026-10-03 (website overhaul phase 3):* both pages wear the page head of REQ-UI-027 — the
+confirmation page with „Verbundene Anwendungen" as its back link instead of a link at the bottom —
+and each client is a card with its capabilities as chips; the installation table keeps label,
+first and last seen (first seen as the row's sub-line). No behaviour changed.
 
 The notification is the rule-engine event `EXCHANGE_INSTALLATION_CONNECTED` (seed `V251`,
 `EVENT_RECIPIENT`), published when the installation upsert reports that it created the row, so two
@@ -2099,9 +2103,11 @@ contract allows.
   `ExchangeTokenGateFilter`, `ExchangeGateFilter`, `ExchangeLimitFilter` and
   `ExchangeIdempotencyFilter` after authentication — in the test profile and with the management
   port and the scrape credentials set.
-- **The `e2e` label.** A pull request that changes the exchange path — the backend's exchange
-  controllers, services and DTOs, `ActingMemberFilter`, `ActingMemberHeader`,
-  `ExchangeProblemException`, `ExchangeCapability`, the ingest's `src/main`, the published
+- **The `e2e` label.** A pull request that changes the exchange path — anything in the backend's
+  `exchange` module package (its controllers, services, DTOs, `ActingMemberFilter`,
+  `ExchangeProblemException`, `ExchangeCapability`), the relay header vocabulary
+  `platform.api.ActingMemberHeader` and `platform.api.ActingMemberFilterProvider`, the ingest's
+  `src/main`, the published
   fixtures or the shared seam definition — fails the `Exchange changes carry the e2e label` job of
   `e2e.yml` until it carries the `e2e` label, so the full E2E suite runs on it
   (`.github/scripts/check_exchange_e2e_label.py`, self-tested in `repo-lint.yml`).

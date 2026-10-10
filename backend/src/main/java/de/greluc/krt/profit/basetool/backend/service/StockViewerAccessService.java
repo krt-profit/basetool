@@ -19,30 +19,45 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * Implementation of {@link StockViewerAccess} that delegates entirely to {@link AccessGateService},
- * the same gate the write endpoints use.
+ * Implementation of {@link StockViewerAccess} built from {@link AccessGateService} and {@link
+ * AuthHelperService}, the same gates the write endpoints use.
  */
 @Service
 @RequiredArgsConstructor
 public class StockViewerAccessService implements StockViewerAccess {
 
-  private final AccessGateService accessGateService;
+  private final InventoryAccessPolicy inventoryAccessPolicy;
+  private final AuthHelperService authHelperService;
+  private final EarmarkTargetPolicy earmarkTargetPolicy;
 
   /** {@inheritDoc} */
   @Override
-  public boolean canEditInventoryItem(UUID inventoryItemId) {
-    return inventoryItemId != null && accessGateService.canEditInventoryItem(inventoryItemId);
+  public boolean mayEditInventoryItem(UUID inventoryItemId, UUID ownerId) {
+    return inventoryItemId != null
+        && inventoryAccessPolicy.canEditInventoryItem(inventoryItemId)
+        && (isCaller(ownerId) || authHelperService.isLogisticianOrAbove());
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean mayEditJobOrder(UUID jobOrderId) {
-    return jobOrderId != null && accessGateService.mayEditJobOrder(jobOrderId);
+    return jobOrderId != null && earmarkTargetPolicy.mayEditJobOrderEarmarks(jobOrderId);
+  }
+
+  /**
+   * Reports whether {@code userId} is the authenticated caller.
+   *
+   * @param userId the user to compare; {@code null} never matches.
+   * @return {@code true} iff the caller is authenticated and has that id.
+   */
+  private boolean isCaller(UUID userId) {
+    return userId != null && authHelperService.currentUserId().filter(userId::equals).isPresent();
   }
 }

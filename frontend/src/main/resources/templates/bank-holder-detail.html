@@ -4,6 +4,7 @@
     <title th:text="${holder != null ? @handles.display(holder.handle()) : ''} + ' - ' + ${appTitle}">Halter - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/bank-holder-detail.css}">
     </th:block>
 </head>
 <body>
@@ -12,140 +13,126 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main th:if="${holder != null}">
-    <div class="greeting hud-box flex-between">
-        <div>
-            <h1 th:text="${@handles.display(holder.handle())}" data-testid="bank-holder-handle">greluc</h1>
-            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15">
-                <span class="status-pill"
-                      th:classappend="${holder.active()} ? ' status-active' : ' status-completed'"
-                      th:text="${holder.active()} ? #{bank.holder.status.active} : #{bank.holder.status.inactive}"
-                      data-testid="bank-holder-status">Aktiv</span>
-                <span class="chip krtm-font-size-0-55rem-eff3"
-                      th:text="${holder.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
-            </p>
-        </div>
-        <div class="bank-head-actions">
-            <a th:href="@{/bank/manage(tab='halter')}" class="btn btn-ghost" data-testid="bank-holder-back-link"
-               th:text="#{bank.holder.detail.back}">Zur Bank-Verwaltung</a>
-        </div>
+    <th:block th:with="holderName=${@handles.display(holder.handle())}, holderHref=@{/bank/manage(tab='halter')}">
+        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.bank.manage', eyebrowHref=${holderHref}, titleText=${holderName})}"></th:block>
+    </th:block>
+
+    <div class="cluster bank-holder-meta">
+        <span class="status-pill"
+              th:classappend="${holder.active()} ? ' status-active' : ' status-completed'"
+              th:text="${holder.active()} ? #{bank.holder.status.active} : #{bank.holder.status.inactive}"
+              data-testid="bank-holder-status">Aktiv</span>
+        <span class="chip chip--muted"
+              th:text="${holder.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
     </div>
 
-    <div class="bank-facts mt-2">
-        <div class="kpi-total">
-            <div class="kpi-label" th:text="#{bank.manage.holder.total}">H&auml;lt gesamt</div>
-            <div class="kpi-value" data-testid="bank-holder-total"
-                 th:classappend="${holder.totalHeld().signum() < 0} ? ' bank-amount--neg' : ''"
-                 th:text="${#numbers.formatInteger(@moneyFormat.round(holder.totalHeld()), 1, 'POINT')} + ' aUEC'">1.000.000 aUEC</div>
+    <div class="bank-holder-top">
+        <div class="kpi-grid bank-holder-kpis">
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{bank.manage.holder.total}">H&auml;lt gesamt</div>
+                <div class="kpi-value" data-testid="bank-holder-total"
+                     th:classappend="${holder.totalHeld().signum() < 0} ? ' bank-amount--neg' : ''"
+                     th:text="${#numbers.formatInteger(@moneyFormat.round(holder.totalHeld()), 1, 'POINT')} + ' aUEC'">1.000.000 aUEC</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{bank.detail.bookings}">Buchungen</div>
+                <div class="kpi-value" th:text="${bookings != null ? bookings.totalElements() : 0}">42</div>
+            </div>
         </div>
-        <div class="kpi-total">
-            <div class="kpi-label" th:text="#{bank.detail.bookings}">Buchungen</div>
-            <div class="kpi-value" th:text="${bookings != null ? bookings.totalElements() : 0}">42</div>
-        </div>
-    </div>
 
-    <div class="bank-panel mt-2" data-testid="bank-holder-balance-calc"
-         th:attr="data-reserved=${holder.totalHeld()}">
-        <div class="bank-panel-head">
-            <h2 th:text="#{bank.holder.calc.title}">Kontostand-Aufteilung</h2>
-        </div>
-        <div class="bank-panel-body">
-            <p class="text-muted krtm-margin-0-0-0-75rem-font-size-0-8rem-2c92"
-               th:text="#{bank.holder.calc.hint}">Trag deinen aktuellen Kontostand ein.</p>
-            <div class="bank-form-row krtm-max-width-22rem-08eb">
+        <section class="card bank-holder-calc" data-testid="bank-holder-balance-calc"
+                 th:attr="data-reserved=${holder.totalHeld()}">
+            <h2 class="bank-holder-calc__title" th:text="#{bank.holder.calc.title}">Kontostand-Aufteilung</h2>
+            <div class="bank-form-row bank-holder-calc__input">
                 <label for="bank-holder-balance-input" th:text="#{bank.holder.calc.balance}">Aktueller Kontostand (aUEC)</label>
                 <input type="number" id="bank-holder-balance-input" min="0" step="1" inputmode="numeric"
                        data-balance-input data-testid="bank-holder-balance-input">
+                <span class="bank-field-hint" th:text="#{bank.holder.calc.hint}">Trag deinen aktuellen Kontostand ein.</span>
             </div>
-            <div class="bank-facts" data-balance-result hidden>
-                <div class="kpi-total">
-                    <div class="kpi-label" th:text="#{bank.holder.calc.reserved}">Bank-reserviert</div>
-                    <div class="kpi-value"
-                         th:classappend="${holder.totalHeld().signum() < 0} ? ' bank-amount--neg' : ''"
-                         th:text="${#numbers.formatInteger(@moneyFormat.round(holder.totalHeld()), 1, 'POINT')} + ' aUEC'">1.000.000 aUEC</div>
+            <div class="bank-holder-calc__result" data-balance-result hidden>
+                <div class="stack-bar bank-holder-calc__bar" data-testid="bank-holder-balance-bar">
+                    <i class="stack-seg-0" data-balance-seg="reserved"></i>
+                    <i class="stack-seg-1" data-balance-seg="own"></i>
                 </div>
-                <div class="kpi-total">
-                    <div class="kpi-label" th:text="#{bank.holder.calc.own}">Privat (eigenes Geld)</div>
-                    <div class="kpi-value" data-balance-own data-testid="bank-holder-balance-own">0 aUEC</div>
+                <div class="stack-legend">
+                    <span>
+                        <span class="sw stack-seg-0"></span>
+                        <span th:text="#{bank.holder.calc.reserved}">Bank-reserviert</span>
+                        <strong th:classappend="${holder.totalHeld().signum() < 0} ? ' bank-amount--neg' : ''"
+                                th:text="${#numbers.formatInteger(@moneyFormat.round(holder.totalHeld()), 1, 'POINT')} + ' aUEC'">1.000.000 aUEC</strong>
+                    </span>
+                    <span>
+                        <span class="sw stack-seg-1"></span>
+                        <span th:text="#{bank.holder.calc.own}">Privat (eigenes Geld)</span>
+                        <strong data-balance-own data-testid="bank-holder-balance-own">0 aUEC</strong>
+                    </span>
                 </div>
             </div>
-        </div>
+        </section>
     </div>
 
-    <div class="bank-panel mt-2" data-testid="bank-holder-bookings-panel">
-        <div class="bank-panel-head">
-            <h2 th:text="#{bank.holder.detail.history}">Halter-Buchungen</h2>
+    <section class="bank-holder-history" data-testid="bank-holder-bookings-panel">
+        <h2 class="bank-holder-history__title" th:text="#{bank.holder.detail.history}">Halter-Buchungen</h2>
+        <div id="bank-holder-bookings-results" class="card card--flush">
+        <th:block th:fragment="holderBookings">
+        <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
+            <table class="data-table data-table--stack">
+                <thead>
+                <tr>
+                    <th th:text="#{bank.booking.date}">Datum</th>
+                    <th class="cell-status" th:text="#{bank.booking.type}">Typ</th>
+                    <th th:text="#{bank.holder.booking.reference}">Bezug</th>
+                    <th class="num" th:text="#{bank.booking.amount}">Betrag</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="b : ${bookings.content()}" data-testid="bank-holder-booking-row"
+                    th:attr="data-transaction-id=${b.transactionId()}">
+                    <td>
+                        <span class="cell-title utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span>
+                        <span class="cell-sub bank-holder-note" th:if="${!#strings.isEmpty(b.note())}"
+                              th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</span>
+                    </td>
+                    <td class="cell-status" th:switch="${b.type()}">
+                        <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
+                        <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
+                        <span th:case="'TRANSFER'" class="chip" th:text="#{bank.type.TRANSFER}">Transfer</span>
+                        <span th:case="'HOLDER_TRANSFER'" class="chip" th:text="#{bank.type.HOLDER_TRANSFER}">Umbuchung</span>
+                        <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
+                        <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
+                        <span th:case="*" class="chip" th:text="${b.type()}">?</span>
+                    </td>
+                    <td th:attr="data-label=#{bank.holder.booking.reference}">
+                        <span th:if="${b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() != null}"
+                              th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${@handles.display(b.counterHolderHandle())}">&#8594; carol</span>
+                        <span th:if="${b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() != null}"
+                              th:text="${b.counterAccountNo()} + ' &#8212; ' + ${b.counterAccountName()}">KB-0001 &#8212; Staffel IRIDIUM</span>
+                        <span th:if="${(b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() == null) or (b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() == null)}"
+                              class="text-muted">&mdash;</span>
+                    </td>
+                    <td class="num">
+                        <span class="bank-amount"
+                              th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
+                              th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
+                        <span class="bank-fee-note cell-sub" data-testid="bank-holder-booking-fee"
+                              th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
+                              th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
         </div>
-        <div class="bank-panel-body">
-            <div id="bank-holder-bookings-results">
-            <th:block th:fragment="holderBookings">
-            <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
-                <table class="data-table">
-                    <thead>
-                    <tr>
-                        <th th:text="#{bank.booking.date}">Datum</th>
-                        <th th:text="#{bank.booking.type}">Typ</th>
-                        <th th:text="#{bank.holder.booking.reference}">Bezug</th>
-                        <th th:text="#{bank.booking.note}">Notiz</th>
-                        <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="b : ${bookings.content()}" data-testid="bank-holder-booking-row"
-                        th:attr="data-transaction-id=${b.transactionId()}">
-                        <td><span class="utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span></td>
-                        <td th:switch="${b.type()}">
-                            <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
-                            <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
-                            <span th:case="'TRANSFER'" class="chip" th:text="#{bank.type.TRANSFER}">Transfer</span>
-                            <span th:case="'HOLDER_TRANSFER'" class="chip" th:text="#{bank.type.HOLDER_TRANSFER}">Umbuchung</span>
-                            <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
-                            <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
-                            <span th:case="*" class="chip" th:text="${b.type()}">?</span>
-                        </td>
-                        <td>
-                            <span th:if="${b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() != null}"
-                                  th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${@handles.display(b.counterHolderHandle())}">&#8594; carol</span>
-                            <span th:if="${b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() != null}"
-                                  th:text="${b.counterAccountNo()} + ' &#8212; ' + ${b.counterAccountName()}">KB-0001 &#8212; Staffel IRIDIUM</span>
-                            <span th:if="${(b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() == null) or (b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() == null)}"
-                                  class="text-muted">&mdash;</span>
-                        </td>
-                        <td class="bank-note-cell" th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</td>
-                        <td class="text-right">
-                            <span class="bank-amount"
-                                  th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
-                                  th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
-                            <span class="bank-fee-note text-muted" data-testid="bank-holder-booking-fee"
-                                  th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
-                                  th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-            <p class="text-center text-muted" th:if="${bookings == null or #lists.isEmpty(bookings.content())}"
-               data-testid="bank-holder-bookings-empty" th:text="#{bank.holder.detail.history.empty}">Dieser Halter hat noch keine Buchungen.</p>
-            <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
-            </th:block>
-            </div>
+        <th:block th:if="${bookings == null or #lists.isEmpty(bookings.content())}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.holder.detail.history.empty.title', textKey='bank.holder.detail.history.empty', emptyId='bank-holder-bookings-empty')}"></th:block>
+        </th:block>
+        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${bookings}, baseUrl=${paginationBaseUrl})}"></th:block>
+        </th:block>
         </div>
-    </div>
+    </section>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:attr="nonce=${cspNonce}">
-    function bindBankHolderBookingsPager() {
-        if (window.krtFetch) {
-            window.krtFetch.bindSwap({
-                container: '#bank-holder-bookings-results',
-                fragmentValue: 'holderBookings',
-                history: true
-            });
-        }
-    }
-    document.addEventListener('DOMContentLoaded', bindBankHolderBookingsPager);
-    document.addEventListener('krt:swapped', bindBankHolderBookingsPager);
-</script>
+<script th:src="@{/js/bank-holder-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

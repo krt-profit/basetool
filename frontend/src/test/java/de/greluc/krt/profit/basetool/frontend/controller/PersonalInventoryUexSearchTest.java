@@ -23,18 +23,17 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UexLocationDto;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -47,17 +46,24 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class PersonalInventoryUexSearchTest {
 
+  private static final String SEARCH_URI = "/api/v1/uex/locations/search?q={q}&limit={limit}";
+
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private PersonalInventoryPageController controller;
+  private PersonalInventoryPageController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller =
+        new PersonalInventoryPageController(new PersonalInventoryBackendClient(backendApiClient));
+  }
 
   @Test
   void uexSearch_delegatesToBackend_andDefaultsLimitTo25() {
     UexLocationDto dto =
         new UexLocationDto(
             42, PersonalInventoryLocationType.CITY, "Lorville", "Stanton", "Hurston");
-    when(backendApiClient.get(
-            contains("/api/v1/uex/locations/search?q={q}&limit=25"), anyTypeRef(), eq("lor")))
+    when(backendApiClient.get(eq(SEARCH_URI), anyTypeRef(), eq("lor"), eq(25)))
         .thenReturn(List.of(dto));
 
     List<UexLocationDto> result = controller.uexSearch("lor", null);
@@ -68,8 +74,9 @@ class PersonalInventoryUexSearchTest {
   }
 
   @Test
-  void uexSearch_clampsLimit_to100() {
-    when(backendApiClient.get(contains("limit=100"), anyTypeRef())).thenReturn(List.of());
+  void uexSearch_clampsLimit_to2000() {
+    when(backendApiClient.get(eq(SEARCH_URI), anyTypeRef(), eq("x"), eq(2000)))
+        .thenReturn(List.of());
 
     List<UexLocationDto> result = controller.uexSearch("x", 9999);
 
@@ -78,7 +85,8 @@ class PersonalInventoryUexSearchTest {
 
   @Test
   void uexSearch_returnsEmptyList_whenBackendThrows() {
-    when(backendApiClient.get(any(), anyTypeRef(), any())).thenThrow(new RuntimeException("boom"));
+    when(backendApiClient.get(eq(SEARCH_URI), anyTypeRef(), eq("anything"), eq(25)))
+        .thenThrow(new RuntimeException("boom"));
 
     List<UexLocationDto> result = controller.uexSearch("anything", 25);
 

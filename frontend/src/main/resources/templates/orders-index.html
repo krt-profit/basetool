@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="${requesterView} ? #{nav.orders.own} : #{nav.orders}">Aufträge</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/pages/orders-index.css}">
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -9,211 +12,202 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="${requesterView} ? #{nav.orders.own} : #{nav.orders}">Aufträge</h1>
-        <a th:href="@{/orders/create(source='index')}" class="btn btn--cta" th:text="#{orders.index.new}">Neuer Auftrag</a>
-    </div>
-
-    <div class="hud-box mt-2">
-        <div class="actions-bar">
-            <div th:replace="~{fragments/components :: filterToggle('orders-filter-panel', 'orders-filter-toggle')}"></div>
-        </div>
-
-        <div class="filter-panel" id="orders-filter-panel" data-filter-panel="orders">
-        <form id="orders-filter-form" class="no-track krtm-display-flex-gap-1rem-margin-bottom-1rem-ali-e265" method="get" th:action="@{/orders}">
-            <span th:text="#{orders.index.filter.status}" class="krtm-font-weight-700-font-size-0-8rem-color-var-c-eed8">Status:</span>
-            <label class="flex-gap-2xs">
-                <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
-                <span th:text="#{status.OPEN}">Offen</span>
-            </label>
-            <label class="flex-gap-2xs">
-                <input type="checkbox" name="status" value="IN_PROGRESS" th:checked="${selectedStatuses != null and selectedStatuses.contains('IN_PROGRESS')}">
-                <span th:text="#{status.IN_PROGRESS}">In Bearbeitung</span>
-            </label>
-            <label class="flex-gap-2xs">
-                <input type="checkbox" name="status" value="REJECTED" th:checked="${selectedStatuses != null and selectedStatuses.contains('REJECTED')}">
-                <span th:text="#{status.REJECTED}">Abgelehnt</span>
-            </label>
-            <label class="flex-gap-2xs">
-                <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
-                <span th:text="#{status.COMPLETED}">Abgeschlossen</span>
-            </label>
-            <th:block th:unless="${requesterView}">
-            <span th:text="#{orders.index.filter.scope}" class="krtm-font-weight-700-font-size-0-8rem-color-var-c-372a">Staffel:</span>
-            <div class="multi-select-container" id="squadronFilterContainer">
-                <div class="multi-select-header" data-trigger="ord-toggle-squadron-multi"
-                     data-multi-target="squadronOptions"
-                     th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="squadronHeader">
-                    <span class="selected-text" id="squadronSelectedText" th:text="#{filter.all}">Alle</span>
-                </div>
-                <div class="multi-select-options" id="squadronOptions">
-                    <label class="multi-select-option">
-                        <span th:text="#{filter.all}">Alle</span>
-                        <input type="checkbox" id="sqAll" value="ALL" data-filter-ignore
-                               data-trigger="ord-toggle-squadron-all"
-                               data-all-id="sqAll" data-check-class="sqCheck" data-header-id="squadronHeader">
-                    </label>
-                    <label class="multi-select-option" th:each="sq : ${squadrons}">
-                        <span th:text="${sq.shorthand() != null ? sq.shorthand() : sq.name()}" th:title="${sq.name()}">IRI</span>
-                        <input type="checkbox" class="sqCheck" name="squadronId" th:value="${sq.id}"
-                               th:checked="${selectedSquadronIds == null or selectedSquadronIds.isEmpty() or selectedSquadronIds.contains(sq.id)}"
-                               data-trigger="ord-update-squadron-state"
-                               data-all-id="sqAll" data-check-class="sqCheck" data-header-id="squadronHeader">
-                    </label>
-                </div>
-            </div>
-            </th:block>
-            <button type="submit" class="btn btn-ghost krtm-padding-0-25rem-0-75rem-font-size-0-8rem-e5f2" th:text="#{orders.index.filter.apply}">Filtern</button>
-        </form>
-        </div>
-
-        <div th:if="${error}" class="hud-box hud-box-error">
-            <p th:text="#{__${error}__}">Fehler</p>
-        </div>
-        
-        <div th:if="${success}" class="hud-box hud-box-success">
-            <p th:text="#{__${success}__}">Erfolg</p>
-        </div>
-
-        <div id="orders-results">
-        <th:block th:fragment="ordersResults">
-        <div class="table-responsive">
-        <table class="data-table">
-            <colgroup>
-                <col class="w-1">
-                <col class="w-1">
-                <col class="w-1">
-                <col class="w-full">
-                <col class="w-1">
-            </colgroup>
-            <thead>
-            <tr>
-                <th th:text="#{orders.index.id}" class="nowrap">ID</th>
-                <th class="nowrap"><span th:text="#{orders.index.prio}">Prio</span> / <span th:text="#{orders.index.status}">Status</span></th>
-                <th th:text="#{orders.index.requesting}" class="nowrap">Auftraggeber</th>
-                <th th:text="#{orders.index.materials}">Materialien</th>
-                <th th:text="#{orders.index.actions}" class="nowrap">Aktionen</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="order, stat : ${orders}" data-testid="order-row"
-                th:attr="data-id=${order.id}, data-priority=${order.priority}"
-                th:classappend="${#authorization.expression('hasRole(''LOGISTICIAN'')') and order.priority != null} ? 'draggable-row' : ''"
-                th:draggable="${#authorization.expression('hasRole(''LOGISTICIAN'')') and order.priority != null} ? 'true' : 'false'">
-                <td class="nowrap">
-                    <span class="order-id-display" th:data-utc="${order.createdAt}" th:text="'#' + ${order.displayId}"></span>
-                    <br>
-                    <span th:switch="${order.type}">
-                        <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
-                        <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
-                    </span>
-                    <span class="order-responsible-label" th:text="#{orders.index.responsible}">Bearbeitende Einheit</span>
-                    <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
-                          th:title="${order.responsibleOrgUnit.name()}"
-                          th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
-                    <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted"
-                          th:title="#{orders.index.responsible}">—</span>
-                </td>
-                <td class="nowrap">
-                    <span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:if="${order.priority != null}" class="krtm-cursor-grab-margin-right-0-5rem-color-var-co-df3c" title="Drag & Drop zum Ändern der Priorität">☰</span>
-                    <span th:text="${order.priority != null ? order.priority : '-'}"></span>
-                    <br>
-                    <span th:text="#{__${'status.' + order.status}__}" th:class="'status-badge status-' + ${#strings.toLowerCase(order.status)}"></span>
-                </td>
-                <td class="nowrap">
-                    <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
-                          th:title="${order.requestingOrgUnit.name()}"
-                          th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
-                    <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
-                    <br>
-                    <span th:text="${@handles.display(order.handle)}"></span>
-                </td>
-                <td class="p-0" th:with="matCount=${order.type == 'ITEM' ? (order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0) : (order.materials != null ? order.materials.size() : 0)}">
-                    <button type="button" class="btn btn-ghost ord-materials-toggle" data-trigger="ord-toggle-materials" th:data-order-id="${order.id}" aria-expanded="false">
-                        <span class="toggle-icon" aria-hidden="true">&#9654;</span>
-                        <span th:text="#{orders.index.materials}">Materialien</span>
-                        <span class="text-muted" th:text="'(' + ${matCount} + ')'">(0)</span>
-                    </button>
-                    <div class="ord-materials-body krtm-display-none-5790" th:data-order-materials="${order.id}">
-                    <div th:if="${order.type != 'ITEM'}" class="table-responsive">
-                    <table class="data-table krtm-margin-0-background-transparent-border-none-f884">
-                        <colgroup>
-                            <col class="w-full">
-                            <col class="w-1">
-                            <col class="w-1">
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th th:text="#{orders.material.name}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Material</th>
-                                <th th:text="#{orders.material.amount}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Gefordert</th>
-                                <th th:unless="${requesterView}" th:text="#{orders.material.progress}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Fortschritt</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="mat : ${order.materials}">
-                                <td th:text="${mat.material.name}" th:title="${mat.material.name}" class="krtm-border-bottom-none-white-space-nowrap-overfl-3755"></td>
-                                <td class="krtm-border-bottom-none-white-space-nowrap-d8ee" th:switch="${mat.material.quantityType}">
-                                    <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
-                                    <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
-                                </td>
-                                <td th:unless="${requesterView}" th:text="${#numbers.formatDecimal(mat.amount > 0 ? (mat.currentStock >= mat.amount ? 100.0 : (mat.currentStock * 100.0 / mat.amount)) : 0, 1, 0)} + ' %'" class="krtm-border-bottom-none-white-space-nowrap-d8ee"></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    </div>
-                    <div th:if="${order.type == 'ITEM'}" class="table-responsive">
-                    <table class="data-table krtm-margin-0-background-transparent-border-none-f884">
-                        <colgroup>
-                            <col class="w-full">
-                            <col class="w-1">
-                            <col class="w-1">
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th th:text="#{orders.material.name}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Material</th>
-                                <th th:text="#{orders.material.amount}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Gefordert</th>
-                                <th th:unless="${requesterView}" th:text="#{orders.material.progress}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Fortschritt</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="agg : ${order.aggregatedMaterials}">
-                                <td th:text="${agg.material != null ? agg.material.name() : '-'}" th:title="${agg.material != null ? agg.material.name() : '-'}" class="krtm-border-bottom-none-white-space-nowrap-overfl-3755"></td>
-                                <td class="krtm-border-bottom-none-white-space-nowrap-d8ee" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
-                                    <span th:case="'PIECE'" th:text="|${agg.totalQuantity != null ? #numbers.formatInteger(agg.totalQuantity, 1) : '0'} #{material.quantity.piece}|"></span>
-                                    <span th:case="*" th:text="|${agg.totalQuantity != null ? #numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
-                                </td>
-                                <td th:unless="${requesterView}" th:text="${#numbers.formatDecimal((agg.totalQuantity != null and agg.totalQuantity > 0) ? ((agg.currentStock != null ? agg.currentStock : 0) >= agg.totalQuantity ? 100.0 : ((agg.currentStock != null ? agg.currentStock : 0) * 100.0 / agg.totalQuantity)) : 0, 1, 0)} + ' %'" class="krtm-border-bottom-none-white-space-nowrap-d8ee"></td>
-                            </tr>
-                            <tr th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">
-                                <td colspan="3" class="text-muted krtm-border-bottom-none-30bb" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    </div>
-                    </div>
-                </td>
-                <td class="nowrap">
-                    <div class="flex-gap-xs">
-                        <a th:href="@{/orders/{id}(id=${order.id})}" class="btn btn-ghost">Details</a>
-                    </div>
-                </td>
-            </tr>
-            <tr th:if="${orders.empty}">
-                <td colspan="5" class="text-center" th:text="#{orders.index.empty}">Keine Aufträge vorhanden</td>
-            </tr>
-            </tbody>
-        </table>
-        </div>
-        <div class="pagination-controls" th:if="${ordersPage != null}">
-            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
-            <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl})}"></nav>
-        </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=(${requesterView} ? #{nav.orders.own} : #{nav.orders}),
+        count=${ordersPage != null ? ordersPage.totalElements() : null}, countId='orders-count', countFor='orders-results', actions=~{::orders-actions})}">
+        <th:block th:ref="orders-actions">
+            <a th:href="@{/orders/create(source='index')}" class="btn btn--cta" data-testid="orders-create-link"
+               th:text="#{orders.index.new}">Neuer Auftrag</a>
         </th:block>
+    </th:block>
+
+    <form id="orders-filter-form" class="no-track" method="get" th:action="@{/orders}">
+        <div class="toolbar orders-toolbar">
+            <th:block th:if="${scopeChoice and mineScopeOffered}">
+                <th:block th:replace="~{fragments/components :: segmented(name='scope', labelKey='orders.index.scope.label', selected=${scope},
+                    options=${ {{value: 'MINE', labelKey: 'orders.index.scope.mine'}, {value: 'TO_PROCESS', labelKey: 'orders.index.scope.toProcess'}, {value: 'ALL', labelKey: 'filter.all'}} })}"></th:block>
+            </th:block>
+            <th:block th:if="${scopeChoice and !mineScopeOffered}">
+                <th:block th:replace="~{fragments/components :: segmented(name='scope', labelKey='orders.index.scope.label', selected=${scope},
+                    options=${ {{value: 'TO_PROCESS', labelKey: 'orders.index.scope.toProcess'}, {value: 'ALL', labelKey: 'filter.all'}} })}"></th:block>
+            </th:block>
+            <th:block th:replace="~{fragments/components :: filterPopover(panelId='orders-filter-panel', panelName='orders',
+                testid='orders-filter-toggle', body=~{::orders-filter-body})}">
+                <th:block th:ref="orders-filter-body">
+                    <fieldset class="orders-filter-field">
+                        <legend class="orders-filter-label" th:text="#{orders.index.status}">Status</legend>
+                        <div class="cluster gap-3">
+                            <label class="orders-filter-check">
+                                <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
+                                <span th:text="#{status.OPEN}">Offen</span>
+                            </label>
+                            <label class="orders-filter-check">
+                                <input type="checkbox" name="status" value="IN_PROGRESS" th:checked="${selectedStatuses != null and selectedStatuses.contains('IN_PROGRESS')}">
+                                <span th:text="#{status.IN_PROGRESS}">In Bearbeitung</span>
+                            </label>
+                            <label class="orders-filter-check">
+                                <input type="checkbox" name="status" value="REJECTED" th:checked="${selectedStatuses != null and selectedStatuses.contains('REJECTED')}">
+                                <span th:text="#{status.REJECTED}">Abgelehnt</span>
+                            </label>
+                            <label class="orders-filter-check">
+                                <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
+                                <span th:text="#{status.COMPLETED}">Abgeschlossen</span>
+                            </label>
+                        </div>
+                    </fieldset>
+                    <div th:unless="${requesterView}" id="ordersSquadronField" class="orders-filter-field" data-filter-chip-ignore
+                         th:hidden="${squadronFilterHidden}">
+                        <span class="orders-filter-label" th:text="#{orders.index.filter.squadron}">Staffel</span>
+                        <div class="multi-select-container" id="squadronFilterContainer">
+                            <div class="multi-select-header" data-trigger="ord-toggle-squadron-multi"
+                                 data-multi-target="squadronOptions"
+                                 th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="squadronHeader">
+                                <span class="selected-text" id="squadronSelectedText" th:text="#{filter.all}">Alle</span>
+                            </div>
+                            <div class="multi-select-options" id="squadronOptions">
+                                <label class="multi-select-option">
+                                    <span th:text="#{filter.all}">Alle</span>
+                                    <input type="checkbox" id="sqAll" value="ALL" data-filter-ignore
+                                           data-trigger="ord-toggle-squadron-all"
+                                           data-all-id="sqAll" data-check-class="sqCheck" data-header-id="squadronHeader">
+                                </label>
+                                <label class="multi-select-option" th:each="sq : ${squadrons}">
+                                    <span th:text="${sq.shorthand() != null ? sq.shorthand() : sq.name()}" th:title="${sq.name()}">IRI</span>
+                                    <input type="checkbox" class="sqCheck" name="squadronId" th:value="${sq.id}"
+                                           th:checked="${selectedSquadronIds == null or selectedSquadronIds.isEmpty() or selectedSquadronIds.contains(sq.id)}"
+                                           data-trigger="ord-update-squadron-state"
+                                           data-all-id="sqAll" data-check-class="sqCheck" data-header-id="squadronHeader">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </th:block>
+            </th:block>
         </div>
-    </div>
-    <form id="priority-update-form" th:action="@{/orders/dummy}" method="post" class="krtm-display-none-5790">
-        <input type="hidden" name="priority" id="priority-update-input" value="">
+        <th:block th:replace="~{fragments/components :: filterChips('orders-filter-form')}"></th:block>
     </form>
+
+    <div th:if="${error}" class="alert alert-danger" th:text="#{__${error}__}">Fehler</div>
+    <div th:if="${success}" class="alert alert-success" th:text="#{__${success}__}">Erfolg</div>
+
+    <div id="orders-results" class="card card--flush">
+        <th:block th:fragment="ordersResults">
+        <div class="table-responsive" th:if="${orders != null and !orders.isEmpty()}">
+            <table class="data-table data-table--stack orders-table">
+                <thead>
+                <tr>
+                    <th th:text="#{orders.index.order}">Auftrag</th>
+                    <th class="cell-status" th:text="#{orders.index.status}">Status</th>
+                    <th class="num" th:text="#{orders.index.prio}">Prio</th>
+                    <th th:text="#{orders.index.requesting}">Auftraggeber</th>
+                    <th th:text="#{orders.index.materials}">Materialien</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">Öffnen</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="order : ${orders}" data-testid="order-row"
+                    th:with="reorderable=${#authorization.expression('hasRole(''LOGISTICIAN'')') and order.priority != null}"
+                    th:attr="data-id=${order.id}, data-priority=${order.priority}"
+                    th:classappend="${reorderable} ? 'draggable-row' : ''"
+                    th:draggable="${reorderable} ? 'true' : 'false'">
+                    <td>
+                        <a class="row-link" data-testid="row-link" draggable="false" th:href="@{/orders/{id}(id=${order.id})}">
+                            <span class="cell-title">
+                                <span class="order-id-display" th:data-utc="${order.createdAt}" th:text="'#' + ${order.displayId}">#42</span>
+                            </span>
+                            <span class="cell-sub orders-meta">
+                                <th:block th:switch="${order.type}">
+                                    <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
+                                    <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
+                                </th:block>
+                                <span class="order-responsible-label" th:text="#{orders.index.responsible}">Bearbeitende Einheit</span>
+                                <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
+                                      th:title="${order.responsibleOrgUnit.name()}"
+                                      th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
+                                <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted"
+                                      th:title="#{orders.index.responsible}">—</span>
+                            </span>
+                        </a>
+                    </td>
+                    <td class="cell-status">
+                        <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(order.status)}"
+                              th:text="#{__${'status.' + order.status}__}">Offen</span>
+                    </td>
+                    <td class="num" th:attr="data-label=#{orders.index.prio}">
+                        <span th:if="${reorderable}" class="orders-drag-handle" aria-hidden="true"
+                              th:title="#{orders.index.dragHandle}">☰</span>
+                        <span th:text="${order.priority != null ? order.priority : '-'}">1</span>
+                    </td>
+                    <td th:attr="data-label=#{orders.index.requesting}">
+                        <span th:if="${order.requestingOrgUnit != null}" class="squadron-badge"
+                              th:title="${order.requestingOrgUnit.name()}"
+                              th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
+                        <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
+                        <span class="cell-sub" th:text="${@handles.display(order.handle)}">Handle</span>
+                    </td>
+                    <td class="orders-materials-cell" th:with="matCount=${order.type == 'ITEM' ? (order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0) : (order.materials != null ? order.materials.size() : 0)}">
+                        <button type="button" class="btn btn-ghost btn-xs ord-materials-toggle" data-trigger="ord-toggle-materials" th:data-order-id="${order.id}" aria-expanded="false">
+                            <span class="toggle-icon" aria-hidden="true">&#9654;</span>
+                            <span th:text="#{orders.index.materials}">Materialien</span>
+                            <span class="text-muted" th:text="'(' + ${matCount} + ')'">(0)</span>
+                        </button>
+                        <div class="ord-materials-body" hidden th:data-order-materials="${order.id}">
+                        <table th:if="${order.type != 'ITEM'}" class="data-table data-table--compact orders-materials-table">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{orders.material.name}">Material</th>
+                                    <th class="num" th:text="#{orders.material.amount}">Gefordert</th>
+                                    <th th:unless="${ownScope}" class="num" th:text="#{orders.material.progress}">Fortschritt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="mat : ${order.materials}">
+                                    <td class="orders-material-name" th:text="${mat.material.name}" th:title="${mat.material.name}">Titanium</td>
+                                    <td class="num" th:switch="${mat.material.quantityType}">
+                                        <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
+                                        <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                                    </td>
+                                    <td th:unless="${ownScope}" class="num" th:attr="data-label=#{orders.material.progress}" th:text="${#numbers.formatDecimal(mat.amount > 0 ? (mat.currentStock >= mat.amount ? 100.0 : (mat.currentStock * 100.0 / mat.amount)) : 0, 1, 0)} + ' %'">0 %</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <table th:if="${order.type == 'ITEM' and order.aggregatedMaterials != null and !order.aggregatedMaterials.isEmpty()}"
+                               class="data-table data-table--compact orders-materials-table">
+                            <thead>
+                                <tr>
+                                    <th th:text="#{orders.material.name}">Material</th>
+                                    <th class="num" th:text="#{orders.material.amount}">Gefordert</th>
+                                    <th th:unless="${ownScope}" class="num" th:text="#{orders.material.progress}">Fortschritt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="agg : ${order.aggregatedMaterials}">
+                                    <td class="orders-material-name" th:text="${agg.material != null ? agg.material.name() : '-'}" th:title="${agg.material != null ? agg.material.name() : '-'}">Titanium</td>
+                                    <td class="num" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                                        <span th:case="'PIECE'" th:text="|${agg.totalQuantity != null ? #numbers.formatInteger(agg.totalQuantity, 1) : '0'} #{material.quantity.piece}|"></span>
+                                        <span th:case="*" th:text="|${agg.totalQuantity != null ? #numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                                    </td>
+                                    <td th:unless="${ownScope}" class="num" th:attr="data-label=#{orders.material.progress}" th:text="${#numbers.formatDecimal((agg.totalQuantity != null and agg.totalQuantity > 0) ? ((agg.currentStock != null ? agg.currentStock : 0) >= agg.totalQuantity ? 100.0 : ((agg.currentStock != null ? agg.currentStock : 0) * 100.0 / agg.totalQuantity)) : 0, 1, 0)} + ' %'">0 %</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p th:if="${order.type == 'ITEM' and (order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty())}"
+                           class="orders-materials-empty" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</p>
+                        </div>
+                    </td>
+                    <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <th:block th:if="${orders == null or orders.isEmpty()}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.index.empty', textKey='orders.index.empty.text')}"></th:block>
+        </th:block>
+
+        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+        <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+        </th:block>
+    </div>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

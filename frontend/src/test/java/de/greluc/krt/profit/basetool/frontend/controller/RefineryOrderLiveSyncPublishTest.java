@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreItemForm;
+import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncTopicClass;
@@ -63,7 +64,9 @@ class RefineryOrderLiveSyncPublishTest {
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
     liveSyncLocalBus = mock(LiveSyncLocalBus.class);
-    controller = new RefineryOrderWriteController(backendApiClient, liveSyncLocalBus);
+    controller =
+        new RefineryOrderWriteController(
+            new RefineryBackendClient(backendApiClient), liveSyncLocalBus);
     redirectAttributes = new RedirectAttributesModelMap();
   }
 
@@ -84,7 +87,9 @@ class RefineryOrderLiveSyncPublishTest {
 
   @Test
   void deleteOrder_onBackendFailure_doesNotPublish() {
-    doThrow(new RuntimeException("backend down")).when(backendApiClient).delete(anyString(), any());
+    doThrow(new RuntimeException("backend down"))
+        .when(backendApiClient)
+        .delete(anyString(), any(), any(Object[].class));
 
     controller.deleteOrder(UUID.randomUUID(), redirectAttributes);
 
@@ -100,7 +105,9 @@ class RefineryOrderLiveSyncPublishTest {
 
   @Test
   void deleteOrderAjax_onBackendFailure_doesNotPublish() {
-    doThrow(new RuntimeException("backend down")).when(backendApiClient).delete(anyString(), any());
+    doThrow(new RuntimeException("backend down"))
+        .when(backendApiClient)
+        .delete(anyString(), any(), any(Object[].class));
 
     controller.deleteOrderAjax(UUID.randomUUID());
 
@@ -132,7 +139,7 @@ class RefineryOrderLiveSyncPublishTest {
     UUID id = UUID.randomUUID();
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .post(anyString(), any(), eq(Void.class));
+        .post(anyString(), any(), eq(Void.class), any(Object[].class));
 
     controller.storeOrderAjax(id, storeForm(), noErrors());
 

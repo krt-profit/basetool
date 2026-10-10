@@ -87,6 +87,135 @@ class HomeControllerMvcTest {
   }
 
   /**
+   * The home page renders the overview pattern (REQ-UI-027): the greeting without a description,
+   * the upcoming missions as row links with a date block and translated status, and the
+   * notifications card; no hud-box and no call to action per mission.
+   */
+  @Test
+  void home_ShouldRenderTheOverviewPattern() throws Exception {
+    java.time.Instant start = java.time.Instant.now().plus(2, java.time.temporal.ChronoUnit.DAYS);
+    MissionListDto mission =
+        new MissionListDto(
+            UUID.fromString("00000000-0000-0000-0000-0000000000a1"),
+            "Salvage-Lauf",
+            null,
+            null,
+            "PLANNED",
+            start.minus(30, java.time.temporal.ChronoUnit.MINUTES),
+            start,
+            null,
+            null,
+            null,
+            false,
+            null,
+            null,
+            "GrimHEX",
+            6L,
+            false,
+            0L);
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/").with(oidcLogin()).locale(java.util.Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.assertj.core.api.Assertions.assertThat(html)
+        .contains("data-testid=\"home-head\"")
+        .contains("data-testid=\"home-eyebrow\"")
+        .doesNotContain("hud-box")
+        .doesNotContain("mission-tile")
+        .contains("data-testid=\"home-upcoming\"")
+        .containsPattern(
+            "class=\"home-mission\"[^>]*href=\"/missions/00000000-0000-0000-0000-0000000000a1\"")
+        .contains("class=\"home-date\"")
+        .contains(">GEPLANT<")
+        .doesNotContain(">PLANNED<")
+        .contains("GrimHEX")
+        .contains("data-testid=\"home-notifications\"")
+        .contains("Alle Einsätze →");
+    org.assertj.core.api.Assertions.assertThat(
+            html.substring(html.indexOf("<main"), html.indexOf("</main>")).split("btn--cta", -1))
+        .hasSize(1);
+  }
+
+  /**
+   * REQ-MISSION-012: a row the viewer is signed up for carries the „Angemeldet" chip, read from the
+   * per-caller {@code signedUp} flag of the search; a row they are not signed up for carries none.
+   */
+  @Test
+  void home_ShouldShowSignedUpChip_OnlyOnMissionsTheViewerIsSignedUpFor() throws Exception {
+    MissionListDto joined = upcoming("Erzkonvoi-Eskorte", true);
+    MissionListDto open = upcoming("Grenzpatrouille Sol", false);
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(joined, open), 0, 50, 2, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/").with(oidcLogin()).locale(java.util.Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    String[] rows = html.split("data-testid=\"home-mission\"", -1);
+    org.assertj.core.api.Assertions.assertThat(rows).hasSize(3);
+    org.assertj.core.api.Assertions.assertThat(rows[1])
+        .contains("Erzkonvoi-Eskorte")
+        .containsPattern("class=\"chip chip--success\"[^>]*data-testid=\"home-mission-signed-up\"")
+        .contains(">Angemeldet<");
+    org.assertj.core.api.Assertions.assertThat(rows[2])
+        .contains("Grenzpatrouille Sol")
+        .doesNotContain("home-mission-signed-up");
+  }
+
+  /** The „Angemeldet" chip is translated: an English viewer reads „Signed up". */
+  @Test
+  void home_ShouldTranslateSignedUpChip_ForAnEnglishViewer() throws Exception {
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(List.of(upcoming("Salvage-Lauf", true)), 0, 50, 1, 1, List.of()));
+
+    mockMvc
+        .perform(get("/").with(oidcLogin()).param("lang", "en"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(">Signed up<")));
+  }
+
+  /**
+   * Builds a planned upcoming mission row starting tomorrow.
+   *
+   * @param name the mission name
+   * @param signedUp whether the viewer is signed up for it
+   * @return the list row as the search returns it
+   */
+  private static MissionListDto upcoming(String name, boolean signedUp) {
+    java.time.Instant start = java.time.Instant.now().plus(1, java.time.temporal.ChronoUnit.DAYS);
+    return new MissionListDto(
+        UUID.randomUUID(),
+        name,
+        null,
+        null,
+        "PLANNED",
+        null,
+        start,
+        null,
+        null,
+        null,
+        false,
+        null,
+        null,
+        null,
+        1L,
+        signedUp,
+        0L);
+  }
+
+  /**
    * An {@code ?error=} value matching the key pattern renders the page with the parameter toast.
    */
   @Test
@@ -165,6 +294,7 @@ class HomeControllerMvcTest {
             new SquadronReferenceDto(UUID.randomUUID(), "Alpha Staffel", "ALF"),
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
@@ -198,6 +328,7 @@ class HomeControllerMvcTest {
             null,
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
@@ -257,6 +388,7 @@ class HomeControllerMvcTest {
             myStaffel,
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(ownMission), 0, 50, 1, 1, List.of()));
@@ -315,6 +447,7 @@ class HomeControllerMvcTest {
             new SquadronReferenceDto(UUID.randomUUID(), "Falke Staffel", "FLK"),
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(foreignMission), 0, 50, 1, 1, List.of()));
@@ -376,6 +509,7 @@ class HomeControllerMvcTest {
             new SquadronReferenceDto(specialCommandId, "Phantom SK", "PHA"),
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(skMission), 0, 50, 1, 1, List.of()));

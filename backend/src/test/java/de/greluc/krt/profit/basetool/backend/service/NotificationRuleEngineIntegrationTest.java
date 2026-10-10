@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
-import de.greluc.krt.profit.basetool.backend.event.JobOrderCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.event.OrgUnitRef;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
@@ -34,11 +34,13 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.SelectorKind;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -86,6 +88,74 @@ class NotificationRuleEngineIntegrationTest {
     assertThat(seeded.getNotificationType()).isEqualTo(NotificationType.JOB_ORDER_CREATED);
     assertThat(seeded.isExcludeActor()).isTrue();
     assertThat(seeded.getSelectors()).hasSize(4);
+  }
+
+  @Test
+  void seededBankRequestUpdateRuleReachesTheRecipientsOfACreatedRequest() {
+    NotificationRule update =
+        notificationRuleRepository
+            .findByIdWithSelectors(UUID.fromString("62200000-0000-0000-0000-000000000011"))
+            .orElseThrow();
+    NotificationRule assigned =
+        notificationRuleRepository
+            .findByIdWithSelectors(UUID.fromString("62200000-0000-0000-0000-000000000012"))
+            .orElseThrow();
+
+    assertThat(update.getEventType())
+        .isEqualTo(NotificationEventType.BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER);
+    assertThat(update.getNotificationType())
+        .isEqualTo(NotificationType.BANK_BOOKING_REQUEST_UPDATED);
+    assertThat(update.isExcludeActor()).isTrue();
+    assertThat(update.getSelectors())
+        .extracting(NotificationRuleSelector::getKind)
+        .containsExactlyInAnyOrder(
+            SelectorKind.ROLE, SelectorKind.ACCOUNT_GRANT, SelectorKind.ACCOUNT_RESPONSIBLE);
+    assertThat(assigned.getEventType())
+        .isEqualTo(NotificationEventType.BANK_ACCOUNT_RESPONSIBLE_ASSIGNED);
+    assertThat(assigned.getNotificationType())
+        .isEqualTo(NotificationType.BANK_ACCOUNT_RESPONSIBLE_ASSIGNED);
+    assertThat(assigned.isExcludeActor()).isTrue();
+    assertThat(assigned.getSelectors())
+        .singleElement()
+        .extracting(NotificationRuleSelector::getKind)
+        .isEqualTo(SelectorKind.EVENT_RECIPIENT);
+    assertThat(
+            notificationRuleRepository.findEnabledByEventTypeWithSelectors(
+                NotificationEventType.DISCORD_REGISTRATION_DECIDED))
+        .isEmpty();
+    assertThat(
+            notificationRuleRepository.findEnabledByEventTypeWithSelectors(
+                NotificationEventType.JOB_ORDER_CLOSED))
+        .isEmpty();
+  }
+
+  @Test
+  void seededInventoryTransferRulesNotifyTheEventRecipientButNeverTheActor() {
+    NotificationRule toUser =
+        notificationRuleRepository
+            .findByIdWithSelectors(UUID.fromString("62200000-0000-0000-0000-00000000000f"))
+            .orElseThrow();
+    NotificationRule fromUser =
+        notificationRuleRepository
+            .findByIdWithSelectors(UUID.fromString("62200000-0000-0000-0000-000000000010"))
+            .orElseThrow();
+
+    assertThat(toUser.getEventType())
+        .isEqualTo(NotificationEventType.INVENTORY_TRANSFERRED_TO_USER);
+    assertThat(toUser.getNotificationType())
+        .isEqualTo(NotificationType.INVENTORY_TRANSFERRED_TO_USER);
+    assertThat(fromUser.getEventType())
+        .isEqualTo(NotificationEventType.INVENTORY_TRANSFERRED_FROM_USER);
+    assertThat(fromUser.getNotificationType())
+        .isEqualTo(NotificationType.INVENTORY_TRANSFERRED_FROM_USER);
+    for (NotificationRule rule : List.of(toUser, fromUser)) {
+      assertThat(rule.isEnabled()).isTrue();
+      assertThat(rule.isExcludeActor()).isTrue();
+      assertThat(rule.getSelectors())
+          .singleElement()
+          .extracting(NotificationRuleSelector::getKind)
+          .isEqualTo(SelectorKind.EVENT_RECIPIENT);
+    }
   }
 
   @Test
@@ -205,6 +275,15 @@ class NotificationRuleEngineIntegrationTest {
                 assertThat(n.getEntityId()).isEqualTo(newUserId);
                 assertThat(n.isRead()).isFalse();
               });
+
+      Set<UUID> cleared =
+          flatten(
+              notificationCreationService.createFromEvent(
+                  new DiscordRegistrationDecidedEvent(newUserId, UUID.randomUUID())));
+
+      assertThat(cleared).contains(adminSub);
+      assertThat(notificationRepository.findAllByRecipientUserId(adminSub, Pageable.unpaged()))
+          .isEmpty();
     } finally {
       transactionTemplate.executeWithoutResult(
           status -> {

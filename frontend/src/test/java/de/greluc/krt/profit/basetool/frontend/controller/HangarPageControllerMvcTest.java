@@ -105,8 +105,7 @@ class HangarPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(
             PageStylesheets.content(
-                containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
+                containsString(".form-group input:where(:not([type='checkbox'], [type='radio']))")))
         .andExpect(
             PageStylesheets.content(
                 org.hamcrest.Matchers.not(containsString(".form-group input[type="))));
@@ -181,8 +180,15 @@ class HangarPageControllerMvcTest {
         .perform(get("/hangar").param("fragment", "results"))
         .andExpect(status().isOk())
         .andExpect(view().name("hangar :: hangarResults"))
-        .andExpect(content().string(containsString("data-testid=\"hangar-add-ship\"")))
-        .andExpect(content().string(containsString("id=\"hangar-ship-filter\"")))
+        .andExpect(content().string(containsString("data-testid=\"hangar-ship-row\"")))
+        .andExpect(content().string(containsString("id=\"hangar-stats\"")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(containsString("data-testid=\"hangar-add-ship\""))))
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(containsString("id=\"hangar-ship-filter\""))))
         .andExpect(content().string(org.hamcrest.Matchers.not(containsString("id=\"ship-modal\""))))
         .andExpect(
             content()
@@ -207,13 +213,38 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar/squadron"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar-squadron"))
+        .andExpect(view().name("hangar"))
         .andExpect(content().string(containsString("id=\"squadron-filter-form\"")))
         .andExpect(content().string(containsString("id=\"squadron-ship-filter\"")))
         .andExpect(content().string(containsString("page-size-picker")))
         .andExpect(content().string(containsString("/hangar/squadron?page=0&amp;size=10")))
         .andExpect(content().string(containsString("/hangar/squadron?page=0&amp;size=100")))
         .andExpect(content().string(containsString("Cutlass Black")));
+  }
+
+  /** The org-unit tab's swap returns only the tree fragment, without the tabs or the toolbar. */
+  @Test
+  @WithMockUser
+  void viewSquadron_FragmentResults_RendersOnlyTheTreeFragment() throws Exception {
+    ShipTypeDto shipType =
+        new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", null, null, 0, false);
+    SquadronShipOverviewDto overview = new SquadronShipOverviewDto(shipType, 3L, 1L, List.of());
+    PageResponse<SquadronShipOverviewDto> page =
+        new PageResponse<>(List.of(overview), 0, 50, 1, 1, List.of());
+    when(backendApiClient.get(eq("/api/v1/hangar/squadron-overview?page=0&size=50"), anyTypeRef()))
+        .thenReturn(page);
+
+    mockMvc
+        .perform(get("/hangar/squadron").param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("hangar :: squadronResults"))
+        .andExpect(content().string(containsString("data-testid=\"squadron-type-row\"")))
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(containsString("data-testid=\"hangar-tabs\""))))
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(containsString("id=\"squadron-filter-form\""))));
   }
 
   @Test
@@ -227,7 +258,7 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar/squadron").param("size", "5000"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar-squadron"));
+        .andExpect(view().name("hangar"));
   }
 
   @Test
@@ -244,7 +275,7 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar/squadron").param("search", "Cutlass"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar-squadron"))
+        .andExpect(view().name("hangar"))
         .andExpect(
             content()
                 .string(containsString("/hangar/squadron?search=Cutlass&amp;page=0&amp;size=10")))

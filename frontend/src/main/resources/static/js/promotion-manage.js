@@ -50,7 +50,7 @@ function pmPutEvaluation(url, payload) {
                 return true;
             },
         })
-        .then(function (result) {
+        .then((result) => {
             return result.ok ? result.body : null;
         });
 }
@@ -71,7 +71,7 @@ function pmRefreshMatrix() {
 }
 
 function pmRefreshEligibility(userId) {
-    const row = document.querySelector('tr[data-pm-user-id="' + userId + '"]');
+    const row = document.querySelector(`tr[data-pm-user-id="${userId}"]`);
     if (!row) return Promise.resolve(false);
     const cell = row.querySelector('.pm-eligibility-cell');
     if (!cell || !window.krtFetch || typeof window.krtFetch.swap !== 'function') {
@@ -79,11 +79,11 @@ function pmRefreshEligibility(userId) {
     }
     return window.krtFetch
         .swap({
-            url: '/promotion/manage?userId=' + encodeURIComponent(userId),
+            url: `/promotion/manage?userId=${encodeURIComponent(userId)}`,
             container: cell,
             fragmentValue: 'eligibilityCell',
         })
-        .then(function (ok) {
+        .then((ok) => {
             if (!ok) return false;
             const eligible = !!cell.querySelector('.eligibility-chip[data-pm-eligible="true"]');
             row.setAttribute('data-pm-eligible', eligible ? 'true' : 'false');
@@ -96,7 +96,7 @@ function pmFlushEligibility() {
     if (pmEligibilityDirty.size === 0) return;
     const ids = Array.from(pmEligibilityDirty);
     pmEligibilityDirty.clear();
-    ids.forEach(function (uid) {
+    ids.forEach((uid) => {
         pmRefreshEligibility(uid);
     });
 }
@@ -116,8 +116,8 @@ function pmUpdateQueueIndicator() {
 function pmEnqueueSave(select) {
     const userId = select.getAttribute('data-user-id');
     const catId = select.getAttribute('data-category-id');
-    const key = userId + '_' + catId;
-    pmSaveQueue = pmSaveQueue.filter(function (job) {
+    const key = `${userId}_${catId}`;
+    pmSaveQueue = pmSaveQueue.filter((job) => {
         return job.key !== key;
     });
     pmSaveQueue.push({ key, select });
@@ -146,13 +146,12 @@ function pmProcessNextSave() {
     const cell = select.closest('td');
 
     return pmPutEvaluation(
-        '/api/proxy/promotion/evaluations/user/' +
-            encodeURIComponent(userId) +
-            '/category/' +
-            encodeURIComponent(categoryId),
+        `/api/proxy/promotion/evaluations/user/${encodeURIComponent(
+            userId,
+        )}/category/${encodeURIComponent(categoryId)}`,
         { version, assignedLevel },
     )
-        .then(function (data) {
+        .then((data) => {
             if (data) {
                 select.setAttribute('data-version', data.version);
                 select.setAttribute('data-level', assignedLevel || '');
@@ -161,7 +160,7 @@ function pmProcessNextSave() {
                     cell.classList.remove('pm-cell-saved');
                     void cell.offsetWidth;
                     cell.classList.add('pm-cell-saved');
-                    setTimeout(function () {
+                    setTimeout(() => {
                         cell.classList.remove('pm-cell-saved');
                     }, 850);
                 }
@@ -170,12 +169,12 @@ function pmProcessNextSave() {
                 }
             }
         })
-        .catch(function () {
+        .catch(() => {
             if (typeof window.showFrontendErrorToast === 'function') {
                 window.showFrontendErrorToast(MSG_ERROR);
             }
         })
-        .finally(function () {
+        .finally(() => {
             select.classList.remove('pm-pending');
             pmInFlightKey = null;
             pmProcessNextSave();
@@ -199,25 +198,23 @@ function pmSaveCollapsedTopics(ids) {
 }
 
 function pmSetTopicCollapsed(topicId, collapsed) {
-    const topicHeader = document.querySelector(
-        'th.pm-topic-cell[data-pm-topic-id="' + topicId + '"]',
-    );
+    const topicHeader = document.querySelector(`th.pm-topic-cell[data-pm-topic-id="${topicId}"]`);
     if (!topicHeader) return;
     topicHeader.setAttribute('data-pm-collapsed', collapsed ? 'true' : 'false');
     const toggle = topicHeader.querySelector('.pm-topic-toggle');
     if (toggle) toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
 
     const cells = document.querySelectorAll(
-        '.pm-matrix [data-pm-topic-id="' + topicId + '"]:not(.pm-topic-cell)',
+        `.pm-matrix [data-pm-topic-id="${topicId}"]:not(.pm-topic-cell)`,
     );
-    cells.forEach(function (cell) {
+    cells.forEach((cell) => {
         cell.setAttribute('data-pm-topic-collapsed', collapsed ? 'true' : 'false');
     });
 }
 
 function pmApplyCollapsedState(collapsedIds) {
     const topicHeaders = document.querySelectorAll('th.pm-topic-cell[data-pm-topic-id]');
-    topicHeaders.forEach(function (th) {
+    topicHeaders.forEach((th) => {
         const id = th.getAttribute('data-pm-topic-id');
         pmSetTopicCollapsed(id, collapsedIds.indexOf(id) !== -1);
     });
@@ -240,13 +237,13 @@ function pmToggleTopic(button) {
 
 function pmExpandAllTopics() {
     pmSaveCollapsedTopics([]);
-    document.querySelectorAll('th.pm-topic-cell[data-pm-topic-id]').forEach(function (th) {
+    document.querySelectorAll('th.pm-topic-cell[data-pm-topic-id]').forEach((th) => {
         pmSetTopicCollapsed(th.getAttribute('data-pm-topic-id'), false);
     });
 }
 function pmCollapseAllTopics() {
     const ids = [];
-    document.querySelectorAll('th.pm-topic-cell[data-pm-topic-id]').forEach(function (th) {
+    document.querySelectorAll('th.pm-topic-cell[data-pm-topic-id]').forEach((th) => {
         const id = th.getAttribute('data-pm-topic-id');
         ids.push(id);
         pmSetTopicCollapsed(id, true);
@@ -292,7 +289,7 @@ function pmApplyFilters() {
     const state = pmGetFilterState();
     const rows = document.querySelectorAll('.pm-matrix tbody tr[data-pm-username]');
     let visible = 0;
-    rows.forEach(function (row) {
+    rows.forEach((row) => {
         const name = row.getAttribute('data-pm-member-name') || '';
         const eligible = row.getAttribute('data-pm-eligible') === 'true';
         const hasEvals = row.getAttribute('data-pm-has-evaluations') === 'true';
@@ -334,7 +331,7 @@ function pmApplySort(mode) {
     const tbody = document.querySelector('.pm-matrix tbody');
     if (!tbody) return;
     const rows = Array.from(tbody.querySelectorAll('tr[data-pm-username]'));
-    rows.sort(function (a, b) {
+    rows.sort((a, b) => {
         const origA = parseInt(a.getAttribute('data-pm-original-order') || '0', 10);
         const origB = parseInt(b.getAttribute('data-pm-original-order') || '0', 10);
         if (mode === 0) return origA - origB;
@@ -358,7 +355,7 @@ function pmApplySort(mode) {
         if (rcmp === 0) rcmp = origA - origB;
         return mode === 3 ? rcmp : -rcmp;
     });
-    rows.forEach(function (r) {
+    rows.forEach((r) => {
         tbody.appendChild(r);
     });
 }
@@ -388,7 +385,7 @@ function pmRefreshBulkPanel() {
         );
         const allChecked =
             visible.length > 0 &&
-            Array.from(visible).every(function (r) {
+            Array.from(visible).every((r) => {
                 return r.classList.contains('pm-row-selected');
             });
         selectAll.checked = allChecked;
@@ -405,7 +402,7 @@ function pmOnSelectAll(checkbox) {
     const visible = document.querySelectorAll(
         '.pm-matrix tbody tr[data-pm-username]:not(.pm-row-hidden)',
     );
-    visible.forEach(function (row) {
+    visible.forEach((row) => {
         row.classList.toggle('pm-row-selected', checkbox.checked);
         const cb = row.querySelector('.pm-row-checkbox');
         if (cb) cb.checked = checkbox.checked;
@@ -413,7 +410,7 @@ function pmOnSelectAll(checkbox) {
     pmRefreshBulkPanel();
 }
 function pmClearSelection() {
-    document.querySelectorAll('.pm-matrix tbody tr.pm-row-selected').forEach(function (r) {
+    document.querySelectorAll('.pm-matrix tbody tr.pm-row-selected').forEach((r) => {
         r.classList.remove('pm-row-selected');
         const cb = r.querySelector('.pm-row-checkbox');
         if (cb) cb.checked = false;
@@ -457,17 +454,13 @@ function pmBulkApply() {
         function () {
             return Promise.resolve(true);
         };
-    confirmFn(MSG_BULK_CONFIRM_TITLE, msg).then(function (ok) {
+    confirmFn(MSG_BULK_CONFIRM_TITLE, msg).then((ok) => {
         if (!ok) return;
         const apiLevel = level === '__NONE__' ? '' : level;
-        rows.forEach(function (row) {
+        rows.forEach((row) => {
             const userId = row.getAttribute('data-pm-user-id');
             const select = document.querySelector(
-                '.level-select[data-user-id="' +
-                    userId +
-                    '"][data-category-id="' +
-                    categoryId +
-                    '"]',
+                `.level-select[data-user-id="${userId}"][data-category-id="${categoryId}"]`,
             );
             if (!select) return;
             select.value = apiLevel;
@@ -479,40 +472,40 @@ function pmBulkApply() {
 
 function pmFormatLastEvaluated() {
     const nodes = document.querySelectorAll('.pm-member-last-eval[data-pm-last-evaluated]');
-    nodes.forEach(function (node) {
+    nodes.forEach((node) => {
         const iso = node.getAttribute('data-pm-last-evaluated');
         if (!iso) return;
         const d = new Date(iso);
         if (isNaN(d.getTime())) return;
         const formatted = d.toLocaleDateString();
-        node.textContent = MSG_LAST_EVAL + ': ' + formatted;
-        node.setAttribute('title', MSG_LAST_EVAL + ': ' + d.toLocaleString());
+        node.textContent = `${MSG_LAST_EVAL}: ${formatted}`;
+        node.setAttribute('title', `${MSG_LAST_EVAL}: ${d.toLocaleString()}`);
     });
 }
 function pmRefreshLastEvaluatedFor(userId) {
-    const row = document.querySelector('tr[data-pm-user-id="' + userId + '"]');
+    const row = document.querySelector(`tr[data-pm-user-id="${userId}"]`);
     if (!row) return;
     const node = row.querySelector('.pm-member-last-eval');
     if (!node) return;
     const now = new Date();
     node.setAttribute('data-pm-empty', 'false');
     node.setAttribute('data-pm-last-evaluated', now.toISOString());
-    node.textContent = MSG_LAST_EVAL + ': ' + now.toLocaleDateString();
-    node.setAttribute('title', MSG_LAST_EVAL + ': ' + now.toLocaleString());
+    node.textContent = `${MSG_LAST_EVAL}: ${now.toLocaleDateString()}`;
+    node.setAttribute('title', `${MSG_LAST_EVAL}: ${now.toLocaleString()}`);
     row.setAttribute('data-pm-has-evaluations', 'true');
 }
 
 function pmCsvEscape(value) {
     if (value === null || value === undefined) return '';
     let s = String(value);
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     if (
         s.indexOf('"') !== -1 ||
         s.indexOf(',') !== -1 ||
         s.indexOf('\n') !== -1 ||
         s.indexOf('\r') !== -1
     ) {
-        s = '"' + s.replace(/"/g, '""') + '"';
+        s = `"${s.replace(/"/g, '""')}"`;
     }
     return s;
 }
@@ -534,10 +527,10 @@ function pmExportCsv() {
         MSG_CSV_HEADER_LAST,
     ];
     const catIds = [];
-    catHeaders.forEach(function (th) {
+    catHeaders.forEach((th) => {
         const topicName = th.getAttribute('data-pm-topic-name') || '';
         const catName = th.getAttribute('data-pm-category-name') || th.textContent.trim();
-        headers.push(topicName + ' / ' + catName);
+        headers.push(`${topicName} / ${catName}`);
         catIds.push(th.getAttribute('data-pm-category-id'));
     });
 
@@ -546,7 +539,7 @@ function pmExportCsv() {
     );
     const lines = [headers.map(pmCsvEscape).join(',')];
 
-    rows.forEach(function (row) {
+    rows.forEach((row) => {
         const username = row.getAttribute('data-pm-username') || '';
         const rank = row.getAttribute('data-pm-rank') || '';
         const iso = row.getAttribute('data-pm-last-evaluated') || '';
@@ -557,40 +550,40 @@ function pmExportCsv() {
         }
         const chips = row.querySelectorAll('.eligibility-chip[data-pm-eligible="true"]');
         const eligText = Array.from(chips)
-            .map(function (c) {
-                return (
-                    c.getAttribute('data-pm-from-rank') + '->' + c.getAttribute('data-pm-to-rank')
-                );
+            .map((c) => {
+                return `${c.getAttribute('data-pm-from-rank')}->${c.getAttribute('data-pm-to-rank')}`;
             })
             .join(', ');
 
         const cells = [username, rank, eligText, lastEval];
-        catIds.forEach(function (catId) {
-            const select = row.querySelector('.level-select[data-category-id="' + catId + '"]');
+        catIds.forEach((catId) => {
+            const select = row.querySelector(`.level-select[data-category-id="${catId}"]`);
             cells.push(select ? pmLevelLabel(select.value) : '');
         });
         lines.push(cells.map(pmCsvEscape).join(','));
     });
 
     const csv = lines.join('\r\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const iso = new Date().toISOString().slice(0, 10);
     const a = document.createElement('a');
     a.href = url;
-    a.download = MSG_CSV_NAME + '-' + iso + '.csv';
+    a.download = `${MSG_CSV_NAME}-${iso}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setTimeout(function () {
+    setTimeout(() => {
         URL.revokeObjectURL(url);
     }, 0);
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     pmApplyCollapsedState(pmLoadCollapsedTopics());
     pmFormatLastEvaluated();
     pmRestoreFilters();
+    if (window.krtFilterPanel) window.krtFilterPanel.refresh('pm-filter-panel');
+    if (window.krtFilterChips) window.krtFilterChips.refresh();
     const initialSort = pmRestoreSortMode();
     pmSetSortMode(initialSort);
     pmApplySort(initialSort);
@@ -601,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (search) search.addEventListener('input', pmApplyFilters);
 
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('change', 'pm-save-evaluation', function (el) {
+        window.krtEvents.on('change', 'pm-save-evaluation', (el) => {
             pmEnqueueSave(el);
             pmRefreshLastEvaluatedFor(el.getAttribute('data-user-id'));
         });
@@ -610,7 +603,7 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtEvents.on('click', 'pm-collapse-all', pmCollapseAllTopics);
         window.krtEvents.on('click', 'pm-export-csv', pmExportCsv);
         window.krtEvents.on('click', 'pm-cycle-sort', pmCycleSort);
-        window.krtEvents.on('change', 'pm-filter-change', function () {
+        window.krtEvents.on('change', 'pm-filter-change', () => {
             pmSaveFilters();
             pmApplyFilters();
             pmRefreshBulkPanel();
@@ -621,7 +614,7 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtEvents.on('click', 'pm-bulk-clear', pmClearSelection);
     }
 
-    document.addEventListener('krt:swapped', function (e) {
+    document.addEventListener('krt:swapped', (e) => {
         const c = e.detail && e.detail.container;
         if (!c || c.id !== 'pm-matrix-results') return;
         pmApplyCollapsedState(pmLoadCollapsedTopics());

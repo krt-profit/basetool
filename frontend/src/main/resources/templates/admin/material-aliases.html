@@ -12,154 +12,161 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.materialAlias.title}">Material-Aliase verwalten</h1>
-        <p th:text="#{admin.materialAlias.subtitle}">Externe Commodity-Namen lokalen Materialien zuordnen.</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.materialAlias.title},
+        count=${aliases != null ? aliases.size() : null}, countId='aliases-count', countFor='aliases-results', actions=null)}"></th:block>
 
-    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
-        <p th:text="#{${error}}">Fehler beim Laden.</p>
-    </div>
+    <th:block th:replace="~{fragments/components :: alert('danger', ${error}, null)}"></th:block>
 
-    <div class="hud-box mt-2">
-        <div class="data-section">
-            <h2 th:text="#{admin.materialAlias.section.add}">Neuen Alias anlegen</h2>
-            <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases}" class="form-grid" data-alias-create>
-                <div class="form-group">
-                    <label for="newSourceSystem" th:text="#{admin.materialAlias.sourceSystem}">Quelle</label>
-                    <select id="newSourceSystem" name="sourceSystem" required>
-                        <option value="SCWIKI" th:text="#{admin.materialAlias.sourceSystem.scwiki}">SC Wiki</option>
-                        <option value="UEX" th:text="#{admin.materialAlias.sourceSystem.uex}">UEX</option>
-                        <option value="REFINERY_SCREEN" th:text="#{admin.materialAlias.sourceSystem.refineryScreen}">Raffinerie-Bildschirm</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="newExternalName" th:text="#{admin.materialAlias.externalName}">Externer Name</label>
-                    <input type="text" id="newExternalName" name="externalName" required maxlength="255">
-                </div>
-                <div class="form-group">
-                    <label for="newMaterialId" th:text="#{admin.materialAlias.material}">Material</label>
-                    <select id="newMaterialId" name="materialId" required data-krt-combobox="remote-materials">
-                        <option value="" th:text="#{admin.materialAlias.material.placeholder}">-- bitte wählen --</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="newExternalKey" th:text="#{admin.materialAlias.externalKey}">Externer Key</label>
-                    <input type="text" id="newExternalKey" name="externalKey" maxlength="255">
-                </div>
-                <div class="form-group">
-                    <label for="newExternalUuid" th:text="#{admin.materialAlias.externalUuid}">Externe UUID</label>
-                    <input type="text" id="newExternalUuid" name="externalUuid" pattern="[0-9a-fA-F\-]{36}">
-                </div>
-                <div class="form-group">
-                    <label for="newExternalCode" th:text="#{admin.materialAlias.externalCode}">Externer Code</label>
-                    <input type="text" id="newExternalCode" name="externalCode" maxlength="64">
-                </div>
-                <div class="form-group grid-col-full">
-                    <label for="newNote" th:text="#{admin.materialAlias.note}">Notiz</label>
-                    <textarea id="newNote" name="note" rows="2"></textarea>
-                </div>
-                <div class="form-group grid-col-full">
-                    <button type="submit" class="btn btn--cta" th:text="#{admin.materialAlias.action.create}">Anlegen</button>
-                </div>
-            </form>
+    <section class="card card--accent" th:if="${aliasToEdit != null}" aria-labelledby="alias-edit-title">
+        <div class="card-head">
+            <h2 id="alias-edit-title" class="card-title" th:text="#{admin.materialAlias.section.edit}">Alias bearbeiten</h2>
         </div>
-
-        <div class="data-section">
-            <div class="flex-between-mb">
-                <h2 th:text="#{admin.materialAlias.section.list}">Bestehende Aliase</h2>
+        <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}(id=${aliasToEdit.id})}" class="form-grid" data-alias-update th:data-alias-id="${aliasToEdit.id}">
+            <input type="hidden" name="version" th:value="${aliasToEdit.version}">
+            <div class="form-group">
+                <label for="editSourceSystem" th:text="#{admin.materialAlias.sourceSystem}">Quelle</label>
+                <select id="editSourceSystem" name="sourceSystem" required>
+                    <option value="SCWIKI" th:selected="${aliasToEdit.sourceSystem == 'SCWIKI'}" th:text="#{admin.materialAlias.sourceSystem.scwiki}">SC Wiki</option>
+                    <option value="UEX" th:selected="${aliasToEdit.sourceSystem == 'UEX'}" th:text="#{admin.materialAlias.sourceSystem.uex}">UEX</option>
+                    <option value="REFINERY_SCREEN" th:selected="${aliasToEdit.sourceSystem == 'REFINERY_SCREEN'}" th:text="#{admin.materialAlias.sourceSystem.refineryScreen}">Raffinerie-Bildschirm</option>
+                </select>
             </div>
+            <div class="form-group">
+                <label for="editExternalName" th:text="#{admin.materialAlias.externalName}">Externer Name</label>
+                <input type="text" id="editExternalName" name="externalName" required maxlength="255" th:value="${aliasToEdit.externalName}">
+            </div>
+            <div class="form-group">
+                <label for="editMaterialId" th:text="#{admin.materialAlias.material}">Material</label>
+                <select id="editMaterialId" name="materialId" required data-krt-combobox="remote-materials">
+                    <option th:value="${aliasToEdit.materialId}" th:text="${aliasToEdit.materialName}" selected></option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="editExternalKey" th:text="#{admin.materialAlias.externalKey}">Externer Key</label>
+                <input type="text" id="editExternalKey" name="externalKey" maxlength="255" th:value="${aliasToEdit.externalKey}">
+            </div>
+            <div class="form-group">
+                <label for="editExternalUuid" th:text="#{admin.materialAlias.externalUuid}">Externe UUID</label>
+                <input type="text" id="editExternalUuid" name="externalUuid" pattern="[0-9a-fA-F\-]{36}" th:value="${aliasToEdit.externalUuid}">
+            </div>
+            <div class="form-group">
+                <label for="editExternalCode" th:text="#{admin.materialAlias.externalCode}">Externer Code</label>
+                <input type="text" id="editExternalCode" name="externalCode" maxlength="64" th:value="${aliasToEdit.externalCode}">
+            </div>
+            <div class="form-group grid-col-full">
+                <label for="editNote" th:text="#{admin.materialAlias.note}">Notiz</label>
+                <textarea id="editNote" name="note" rows="2" th:text="${aliasToEdit.note}"></textarea>
+            </div>
+            <div class="form-group grid-col-full">
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{admin.materialAlias.action.update}">Speichern</span></button>
+            </div>
+        </form>
+    </section>
 
+    <div id="aliases-results" class="card card--flush">
+        <div data-alias-table th:hidden="${#lists.isEmpty(aliases)}">
             <div class="table-responsive">
-            <table id="aliasesTable">
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.materialAlias.sourceSystem}">Quelle</th>
-                        <th th:text="#{admin.materialAlias.externalName}">Externer Name</th>
-                        <th th:text="#{admin.materialAlias.material}">Material</th>
-                        <th th:text="#{admin.materialAlias.externalKey}">Externer Key</th>
-                        <th th:text="#{admin.materialAlias.externalCode}">Code</th>
-                        <th th:text="#{admin.materialAlias.createdBy}">Erstellt von</th>
-                        <th th:text="#{admin.materialAlias.action}">Aktion</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="a : ${aliases}" th:attr="data-alias-id=${a.id}">
-                        <td th:text="${a.sourceSystem}">SCWIKI</td>
-                        <td th:text="${a.externalName}">Raw Silicon</td>
-                        <td th:text="${a.materialName}">Silicon (Raw)</td>
-                        <td th:text="${a.externalKey}">-</td>
-                        <td th:text="${a.externalCode}">-</td>
-                        <td th:text="${a.createdBy}">system</td>
-                        <td>
-                            <div class="flex-gap-xs">
+                <table id="aliasesTable" class="data-table data-table--stack">
+                    <thead>
+                        <tr>
+                            <th th:text="#{admin.materialAlias.externalName}">Externer Name</th>
+                            <th th:text="#{admin.materialAlias.sourceSystem}">Quelle</th>
+                            <th th:text="#{admin.materialAlias.material}">Material</th>
+                            <th th:text="#{admin.materialAlias.externalKey}">Externer Key</th>
+                            <th th:text="#{admin.materialAlias.externalCode}">Code</th>
+                            <th th:text="#{admin.materialAlias.createdBy}">Erstellt von</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.materialAlias.action}">Aktion</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="a : ${aliases}" th:attr="data-alias-id=${a.id}" data-testid="alias-row"
+                            th:with="sourceKey=${a.sourceSystem == 'SCWIKI' ? 'admin.materialAlias.sourceSystem.scwiki'
+                                     : (a.sourceSystem == 'UEX' ? 'admin.materialAlias.sourceSystem.uex'
+                                     : (a.sourceSystem == 'REFINERY_SCREEN' ? 'admin.materialAlias.sourceSystem.refineryScreen' : null))}">
+                            <td><span class="cell-title" data-alias-field="externalName" th:text="${a.externalName}">Raw Silicon</span></td>
+                            <td th:attr="data-label=#{admin.materialAlias.sourceSystem}">
+                                <span class="chip chip--muted" data-alias-field="sourceSystem" th:data-source-system="${a.sourceSystem}"
+                                      th:text="${sourceKey != null} ? #{${sourceKey}} : ${a.sourceSystem}">SC Wiki</span>
+                            </td>
+                            <td data-alias-field="materialName" th:attr="data-label=#{admin.materialAlias.material}" th:text="${a.materialName}">Silicon (Raw)</td>
+                            <td data-alias-field="externalKey" th:attr="data-label=#{admin.materialAlias.externalKey}" th:text="${a.externalKey}">-</td>
+                            <td data-alias-field="externalCode" th:attr="data-label=#{admin.materialAlias.externalCode}" th:text="${a.externalCode}">-</td>
+                            <td th:attr="data-label=#{admin.materialAlias.createdBy}" th:text="${a.createdBy}">system</td>
+                            <td class="cell-actions">
                                 <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}/delete(id=${a.id})}" class="m-0" data-alias-delete>
                                     <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{admin.materialAlias.action.delete}" th:aria-label="#{admin.materialAlias.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 </form>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr th:if="${#lists.isEmpty(aliases)}" data-alias-empty>
-                        <td colspan="7" th:text="#{admin.materialAlias.empty}">Noch keine Aliase vorhanden.</td>
-                    </tr>
-                </tbody>
-            </table>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
-
-        <div class="data-section" th:if="${aliasToEdit != null}">
-            <h2 th:text="#{admin.materialAlias.section.edit}">Alias bearbeiten</h2>
-            <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}(id=${aliasToEdit.id})}" class="form-grid" data-alias-update th:data-alias-id="${aliasToEdit.id}">
-                <input type="hidden" name="version" th:value="${aliasToEdit.version}">
-                <div class="form-group">
-                    <label for="editSourceSystem" th:text="#{admin.materialAlias.sourceSystem}">Quelle</label>
-                    <select id="editSourceSystem" name="sourceSystem" required>
-                        <option value="SCWIKI" th:selected="${aliasToEdit.sourceSystem == 'SCWIKI'}" th:text="#{admin.materialAlias.sourceSystem.scwiki}">SC Wiki</option>
-                        <option value="UEX" th:selected="${aliasToEdit.sourceSystem == 'UEX'}" th:text="#{admin.materialAlias.sourceSystem.uex}">UEX</option>
-                        <option value="REFINERY_SCREEN" th:selected="${aliasToEdit.sourceSystem == 'REFINERY_SCREEN'}" th:text="#{admin.materialAlias.sourceSystem.refineryScreen}">Raffinerie-Bildschirm</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="editExternalName" th:text="#{admin.materialAlias.externalName}">Externer Name</label>
-                    <input type="text" id="editExternalName" name="externalName" required maxlength="255" th:value="${aliasToEdit.externalName}">
-                </div>
-                <div class="form-group">
-                    <label for="editMaterialId" th:text="#{admin.materialAlias.material}">Material</label>
-                    <select id="editMaterialId" name="materialId" required data-krt-combobox="remote-materials">
-                        <option th:value="${aliasToEdit.materialId}" th:text="${aliasToEdit.materialName}" selected></option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="editExternalKey" th:text="#{admin.materialAlias.externalKey}">Externer Key</label>
-                    <input type="text" id="editExternalKey" name="externalKey" maxlength="255" th:value="${aliasToEdit.externalKey}">
-                </div>
-                <div class="form-group">
-                    <label for="editExternalUuid" th:text="#{admin.materialAlias.externalUuid}">Externe UUID</label>
-                    <input type="text" id="editExternalUuid" name="externalUuid" pattern="[0-9a-fA-F\-]{36}" th:value="${aliasToEdit.externalUuid}">
-                </div>
-                <div class="form-group">
-                    <label for="editExternalCode" th:text="#{admin.materialAlias.externalCode}">Externer Code</label>
-                    <input type="text" id="editExternalCode" name="externalCode" maxlength="64" th:value="${aliasToEdit.externalCode}">
-                </div>
-                <div class="form-group grid-col-full">
-                    <label for="editNote" th:text="#{admin.materialAlias.note}">Notiz</label>
-                    <textarea id="editNote" name="note" rows="2" th:text="${aliasToEdit.note}"></textarea>
-                </div>
-                <div class="form-group grid-col-full">
-                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{admin.materialAlias.action.update}">Speichern</span></button>
-                </div>
-            </form>
+        <div class="empty-state" data-testid="empty-state" data-alias-empty th:hidden="${!#lists.isEmpty(aliases)}">
+            <th:block th:replace="~{fragments/components :: emptyStateBody('admin.materialAlias.empty.title', 'admin.materialAlias.empty', null)}"></th:block>
         </div>
     </div>
+
+    <section class="card" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" aria-labelledby="alias-create-title">
+        <div class="card-head">
+            <h2 id="alias-create-title" class="card-title" th:text="#{admin.materialAlias.section.add}">Neuen Alias anlegen</h2>
+        </div>
+        <form method="post" th:action="@{/admin/material-aliases}" class="form-grid" data-alias-create>
+            <div class="form-group">
+                <label for="newSourceSystem" th:text="#{admin.materialAlias.sourceSystem}">Quelle</label>
+                <select id="newSourceSystem" name="sourceSystem" required>
+                    <option value="SCWIKI" th:text="#{admin.materialAlias.sourceSystem.scwiki}">SC Wiki</option>
+                    <option value="UEX" th:text="#{admin.materialAlias.sourceSystem.uex}">UEX</option>
+                    <option value="REFINERY_SCREEN" th:text="#{admin.materialAlias.sourceSystem.refineryScreen}">Raffinerie-Bildschirm</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="newExternalName" th:text="#{admin.materialAlias.externalName}">Externer Name</label>
+                <input type="text" id="newExternalName" name="externalName" required maxlength="255">
+            </div>
+            <div class="form-group">
+                <label for="newMaterialId" th:text="#{admin.materialAlias.material}">Material</label>
+                <select id="newMaterialId" name="materialId" required data-krt-combobox="remote-materials">
+                    <option value="" th:text="#{admin.materialAlias.material.placeholder}">-- bitte wählen --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="newExternalKey" th:text="#{admin.materialAlias.externalKey}">Externer Key</label>
+                <input type="text" id="newExternalKey" name="externalKey" maxlength="255">
+            </div>
+            <div class="form-group">
+                <label for="newExternalUuid" th:text="#{admin.materialAlias.externalUuid}">Externe UUID</label>
+                <input type="text" id="newExternalUuid" name="externalUuid" pattern="[0-9a-fA-F\-]{36}">
+            </div>
+            <div class="form-group">
+                <label for="newExternalCode" th:text="#{admin.materialAlias.externalCode}">Externer Code</label>
+                <input type="text" id="newExternalCode" name="externalCode" maxlength="64">
+            </div>
+            <div class="form-group grid-col-full">
+                <label for="newNote" th:text="#{admin.materialAlias.note}">Notiz</label>
+                <textarea id="newNote" name="note" rows="2"></textarea>
+            </div>
+            <div class="form-group grid-col-full">
+                <button type="submit" class="btn btn--cta" th:text="#{admin.materialAlias.action.create}">Anlegen</button>
+            </div>
+        </form>
+    </section>
 </main>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const ALIAS_MSG = {
-        saveSuccess:   /*[[#{notification.success.save}]]*/ 'Gespeichert.',
-        saveError:     /*[[#{notification.error.save}]]*/ 'Speichern fehlgeschlagen.',
-        deleteSuccess: /*[[#{notification.success.delete}]]*/ 'Gelöscht.',
-        deleteError:   /*[[#{notification.error.delete}]]*/ 'Löschen fehlgeschlagen.',
-        deleteTitle:   /*[[#{admin.materialAlias.action.delete}]]*/ 'Löschen',
-        empty:         /*[[#{admin.materialAlias.empty}]]*/ 'Noch keine Aliase vorhanden.'
+        saveSuccess:          /*[[#{notification.success.save}]]*/ 'Gespeichert.',
+        saveError:            /*[[#{notification.error.save}]]*/ 'Speichern fehlgeschlagen.',
+        deleteSuccess:        /*[[#{notification.success.delete}]]*/ 'Gelöscht.',
+        deleteError:          /*[[#{notification.error.delete}]]*/ 'Löschen fehlgeschlagen.',
+        deleteTitle:          /*[[#{admin.materialAlias.action.delete}]]*/ 'Löschen',
+        sourceSystemLabel:    /*[[#{admin.materialAlias.sourceSystem}]]*/ 'Quelle',
+        materialLabel:        /*[[#{admin.materialAlias.material}]]*/ 'Material',
+        externalKeyLabel:     /*[[#{admin.materialAlias.externalKey}]]*/ 'Externer Key',
+        externalCodeLabel:    /*[[#{admin.materialAlias.externalCode}]]*/ 'Externer Code',
+        createdByLabel:       /*[[#{admin.materialAlias.createdBy}]]*/ 'Erstellt von',
+        sourceScwiki:         /*[[#{admin.materialAlias.sourceSystem.scwiki}]]*/ 'SC Wiki',
+        sourceUex:            /*[[#{admin.materialAlias.sourceSystem.uex}]]*/ 'UEX',
+        sourceRefineryScreen: /*[[#{admin.materialAlias.sourceSystem.refineryScreen}]]*/ 'Raffinerie-Bildschirm'
     };
     const ALIAS_CONFLICT = {
         title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',

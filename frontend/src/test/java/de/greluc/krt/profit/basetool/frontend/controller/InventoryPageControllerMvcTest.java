@@ -107,6 +107,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 10, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -115,7 +116,8 @@ class InventoryPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("inventory-index"))
         .andExpect(model().attributeExists("aggregated"))
-        .andExpect(content().string(containsString("colspan=\"4\"")));
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(not(containsString("data-table--stack"))));
   }
 
   @Test
@@ -234,9 +236,10 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * The "Mein Lager" filter row sits in a collapsible panel in both views (REQ-INV-037): the shared
-   * toggle carries {@code aria-expanded}/{@code aria-controls}, the panel is rendered expanded, the
-   * filter form is inside it, and the count chip keeps the raw {@code {0}} placeholder.
+   * The "Mein Lager" filters sit in the toolbar's filter popover in both views (REQ-INV-037,
+   * REQ-UI-027): the toggle carries {@code aria-expanded}/{@code aria-controls}, the popover panel
+   * keeps the panel id and name, the count badge keeps the raw {@code {0}} placeholder, and the
+   * selection bar follows the tree.
    *
    * @param path the Lager view under test, each rendering a different filter form
    * @throws Exception if the request fails
@@ -244,7 +247,7 @@ class InventoryPageControllerMvcTest {
   @ParameterizedTest
   @ValueSource(strings = {"/inventory/my", "/inventory/my?view=items"})
   @WithMockUser(roles = "KRT_MEMBER")
-  void viewMyInventory_rendersTheFilterRowInsideACollapsiblePanel(String path) throws Exception {
+  void viewMyInventory_rendersTheFiltersInsideTheToolbarPopover(String path) throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -254,28 +257,28 @@ class InventoryPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("aria-controls=\"myFilterPanel\"")))
         .andExpect(content().string(containsString("aria-expanded=\"true\"")))
+        .andExpect(content().string(containsString("filter-popover__panel")))
         .andExpect(
             content()
-                .string(
-                    containsString(
-                        "<div class=\"filter-panel\" id=\"myFilterPanel\""
-                            + " data-filter-panel=\"inventory-my\">")))
+                .string(containsString("id=\"myFilterPanel\" data-filter-panel=\"inventory-my\"")))
         .andExpect(content().string(containsString("data-label=\"Aktive Filter: {0}\"")))
         .andExpect(
             content()
                 .string(
                     stringContainsInOrder(
                         List.of(
+                            "my-inventory-filter",
                             "data-testid=\"lager-filter-toggle\"",
                             "id=\"myFilterPanel\"",
-                            "my-inventory-filter",
+                            "id=\"bulkSelectAllBtn\"",
+                            "id=\"myInventoryTableContainer\"",
                             "id=\"bulkCheckoutBar\""))));
   }
 
   /**
-   * The "Globales Lager" filter row sits in a collapsible panel in both views (REQ-INV-037), with
-   * the same four guarantees as the "Mein Lager" test; the source-order assertion ensures the panel
-   * wraps the filter forms themselves.
+   * The "Globales Lager" filters sit in the toolbar's filter popover in both views (REQ-INV-037,
+   * REQ-UI-027), with the same guarantees as the "Mein Lager" test; the source-order assertion
+   * ensures the popover sits inside the filter form, ahead of the tree.
    *
    * @param path the Lager view under test, each rendering a different filter form
    * @throws Exception if the request fails
@@ -283,7 +286,7 @@ class InventoryPageControllerMvcTest {
   @ParameterizedTest
   @ValueSource(strings = {"/inventory/all", "/inventory/all?view=items"})
   @WithMockUser(roles = "KRT_MEMBER")
-  void viewAllInventory_rendersTheFilterRowInsideACollapsiblePanel(String path) throws Exception {
+  void viewAllInventory_rendersTheFiltersInsideTheToolbarPopover(String path) throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -293,21 +296,20 @@ class InventoryPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("aria-controls=\"globalFilterPanel\"")))
         .andExpect(content().string(containsString("aria-expanded=\"true\"")))
+        .andExpect(content().string(containsString("filter-popover__panel")))
         .andExpect(
             content()
                 .string(
-                    containsString(
-                        "<div class=\"filter-panel\" id=\"globalFilterPanel\""
-                            + " data-filter-panel=\"inventory-all\">")))
+                    containsString("id=\"globalFilterPanel\" data-filter-panel=\"inventory-all\"")))
         .andExpect(content().string(containsString("data-label=\"Aktive Filter: {0}\"")))
         .andExpect(
             content()
                 .string(
                     stringContainsInOrder(
                         List.of(
+                            "global-inventory-filter",
                             "data-testid=\"lager-filter-toggle\"",
                             "id=\"globalFilterPanel\"",
-                            "global-inventory-filter",
                             "id=\"tableContainer\""))));
   }
 
@@ -352,7 +354,7 @@ class InventoryPageControllerMvcTest {
             content()
                 .string(
                     stringContainsInOrder(
-                        List.of("id=\"bulkCheckoutBtn\"", "id=\"bulkRebookBtn\""))));
+                        List.of("id=\"bulkRebookBtn\"", "id=\"bulkCheckoutBtn\""))));
   }
 
   @Test
@@ -375,7 +377,7 @@ class InventoryPageControllerMvcTest {
             content()
                 .string(
                     stringContainsInOrder(
-                        List.of("id=\"bulkRebookBtn\"", "id=\"bulkOrgUnitBtn\""))));
+                        List.of("id=\"bulkOrgUnitBtn\"", "id=\"bulkRebookBtn\""))));
   }
 
   @Test
@@ -428,7 +430,7 @@ class InventoryPageControllerMvcTest {
             content()
                 .string(
                     containsString(
-                        "id=\"umbuchenMergeRow\" class=\"form-group check-row mb-1 krtm-hidden\"")))
+                        "id=\"umbuchenMergeRow\" class=\"form-group check-row mb-1\" hidden")))
         .andExpect(
             content()
                 .string(
@@ -453,7 +455,7 @@ class InventoryPageControllerMvcTest {
             content()
                 .string(
                     containsString(
-                        "id=\"umbuchenMergeRow\" class=\"form-group check-row mb-1 krtm-hidden\"")))
+                        "id=\"umbuchenMergeRow\" class=\"form-group check-row mb-1\" hidden")))
         .andExpect(
             content()
                 .string(
@@ -479,13 +481,13 @@ class InventoryPageControllerMvcTest {
             content()
                 .string(
                     stringContainsInOrder(
+                        "class=\"form-group check-row\" id=\"merge-stock-row\" hidden",
+                        "id=\"mergeStock\"",
+                        "for=\"mergeStock\"",
+                        "class=\"form-hint\"",
                         "class=\"form-group check-row\"",
                         "id=\"personal\"",
                         "for=\"personal\"",
-                        "class=\"form-hint\"",
-                        "class=\"form-group check-row krtm-hidden\" id=\"merge-stock-row\"",
-                        "id=\"mergeStock\"",
-                        "for=\"mergeStock\"",
                         "class=\"form-hint\"")));
   }
 
@@ -529,8 +531,11 @@ class InventoryPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("inventory-input"))
         .andExpect(content().string(containsString("name=\"inventoryCatalogMode\"")))
-        .andExpect(content().string(containsString("data-testid=\"inventory-mode-material\"")))
-        .andExpect(content().string(containsString("data-testid=\"inventory-mode-item\"")))
+        .andExpect(
+            content()
+                .string(containsString("data-testid=\"segment-inventoryCatalogMode-material\"")))
+        .andExpect(
+            content().string(containsString("data-testid=\"segment-inventoryCatalogMode-item\"")))
         .andExpect(content().string(containsString("data-krt-combobox=\"remote-game-items\"")))
         .andExpect(
             content()
@@ -557,11 +562,11 @@ class InventoryPageControllerMvcTest {
             content()
                 .string(
                     stringContainsInOrder(
+                        "class=\"form-group check-row\" id=\"merge-stock-row\" hidden",
+                        "id=\"mergeStock\"",
+                        "class=\"form-hint\"",
                         "class=\"form-group check-row\"",
                         "id=\"personal\"",
-                        "class=\"form-hint\"",
-                        "class=\"form-group check-row krtm-hidden\" id=\"merge-stock-row\"",
-                        "id=\"mergeStock\"",
                         "class=\"form-hint\"")));
   }
 
@@ -575,12 +580,9 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
-        .andExpect(
-            PageStylesheets.content(
-                containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
-        .andExpect(
-            PageStylesheets.content(not(containsString(".form-group.check-row.krtm-hidden"))));
+        .andExpect(PageStylesheets.content(containsString(".form-layout [hidden]")))
+        .andExpect(PageStylesheets.content(not(containsString(".form-group input {"))))
+        .andExpect(PageStylesheets.content(not(containsString(".form-group.check-row.is-hidden"))));
   }
 
   @Test
@@ -693,6 +695,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 10, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_LOOKUP), anyTypeRef()))
         .thenReturn(
             List.of(
@@ -744,6 +747,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(item), 1, 50, 120, 3, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(List.of(new MaterialReferenceDto(materialId, "Quantanium", "SCU")));
 
@@ -771,6 +775,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 1, 50, 120, 3, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(
@@ -798,7 +803,6 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("inputmode=\"decimal\"")))
         .andExpect(content().string(containsString("data-scu-allow-zero")))
         .andExpect(content().string(containsString("/js/scu-decimal-input.js")))
-        .andExpect(content().string(containsString("window.krtScuInput")))
         .andExpect(content().string(containsString("window.krtScuI18n")));
   }
 
@@ -828,7 +832,8 @@ class InventoryPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"inventoryTable\"")))
         .andExpect(content().string(containsString("data-user-id=\"test-user-123\"")))
-        .andExpect(content().string(containsString("id=\"personalOnly\"")));
+        .andExpect(
+            content().string(containsString("data-testid=\"segment-personalScope-personal\"")));
   }
 
   /**
@@ -1285,7 +1290,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input").param("source", "admin"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("form-group owner-picker krtm-hidden")))
+        .andExpect(content().string(containsString("form-group owner-picker is-hidden")))
         .andExpect(
             content()
                 .string(
@@ -1721,7 +1726,7 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"minQuality\""))))
         .andExpect(content().string(containsString("id=\"gameItemFilterContainer\"")))
         .andExpect(content().string(containsString("id=\"itemJobOrderFilterContainer\"")))
-        .andExpect(content().string(containsString("id=\"itemPersonalOnly\"")))
+        .andExpect(content().string(containsString("data-testid=\"segment-personalScope-shared\"")))
         .andExpect(content().string(not(containsString("id=\"missionFilterContainer\""))))
         .andExpect(content().string(not(containsString("3.000"))));
   }
@@ -1793,6 +1798,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(row), 0, 10, 1, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1843,6 +1849,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(item), 0, 1000, 1, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -1890,6 +1897,7 @@ class InventoryPageControllerMvcTest {
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(item), 1, 50, 130, 3, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 

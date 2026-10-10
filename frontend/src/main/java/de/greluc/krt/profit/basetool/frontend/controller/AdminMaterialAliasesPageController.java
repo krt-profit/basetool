@@ -21,11 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
@@ -34,7 +34,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -61,13 +60,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminMaterialAliasesPageController {
 
-  private static final String BACKEND_BASE = "/api/v1/material-external-aliases";
-
-  /** Response type for the {@code /material-external-aliases} alias list. */
-  private static final ParameterizedTypeReference<List<MaterialExternalAliasDto>> ALIAS_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads and writes the material aliases. */
+  private final CatalogueBackendClient catalogueClient;
 
   /**
    * Renders the alias list and the add form; a backend failure shows an error banner.
@@ -79,7 +73,7 @@ public class AdminMaterialAliasesPageController {
   @GetMapping
   public String list(Model model) {
     try {
-      List<MaterialExternalAliasDto> aliases = backendApiClient.get(BACKEND_BASE, ALIAS_LIST_TYPE);
+      List<MaterialExternalAliasDto> aliases = catalogueClient.materialAliases();
       model.addAttribute("aliases", aliases == null ? List.of() : aliases);
     } catch (Exception e) {
       log.error("Failed to load material-alias admin page", e);
@@ -100,8 +94,7 @@ public class AdminMaterialAliasesPageController {
   @GetMapping("/{id}")
   public String edit(@PathVariable @NotNull UUID id, Model model) {
     try {
-      MaterialExternalAliasDto alias =
-          backendApiClient.get(BACKEND_BASE + "/" + id, MaterialExternalAliasDto.class);
+      MaterialExternalAliasDto alias = catalogueClient.materialAlias(id);
       model.addAttribute("aliasToEdit", alias);
     } catch (Exception e) {
       log.error("Failed to load alias {} for edit", id, e);
@@ -145,7 +138,7 @@ public class AdminMaterialAliasesPageController {
               StringNormalization.trimToNull(externalCode),
               StringNormalization.trimToNull(note),
               null);
-      backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class);
+      catalogueClient.createMaterialAlias(body);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "POST /api/v1/material-external-aliases", e);
@@ -196,7 +189,7 @@ public class AdminMaterialAliasesPageController {
               StringNormalization.trimToNull(externalCode),
               StringNormalization.trimToNull(note),
               version);
-      backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class);
+      catalogueClient.updateMaterialAlias(id, body);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/material-external-aliases", id, e);
@@ -219,7 +212,7 @@ public class AdminMaterialAliasesPageController {
   @PostMapping("/{id}/delete")
   public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+      catalogueClient.deleteMaterialAlias(id);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "DELETE /api/v1/material-external-aliases", id, e);
@@ -256,8 +249,7 @@ public class AdminMaterialAliasesPageController {
                   StringNormalization.trimToNull(request.externalCode()),
                   StringNormalization.trimToNull(request.note()),
                   null);
-          return ResponseEntity.ok(
-              backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class));
+          return ResponseEntity.ok(catalogueClient.createMaterialAlias(body));
         });
   }
 
@@ -288,8 +280,7 @@ public class AdminMaterialAliasesPageController {
                   StringNormalization.trimToNull(request.externalCode()),
                   StringNormalization.trimToNull(request.note()),
                   request.version());
-          return ResponseEntity.ok(
-              backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class));
+          return ResponseEntity.ok(catalogueClient.updateMaterialAlias(id, body));
         });
   }
 
@@ -307,7 +298,7 @@ public class AdminMaterialAliasesPageController {
         log,
         "delete alias " + id + " (ajax)",
         () -> {
-          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          catalogueClient.deleteMaterialAlias(id);
           return ResponseEntity.ok().build();
         });
   }

@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintIdNameRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductRow;
-import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeBlueprintKeyRow;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import java.time.Instant;
 import java.util.Collection;
@@ -246,7 +245,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeBlueprintKeyRow(
+      SELECT new
+      de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository$ExchangeBlueprintKeyRow(
       b.outputName, b.scwikiUuid, b.p4kUuid, oi.externalUuid, oi.p4kUuid, oi.uexItemId,
       oi.nameKey)
       FROM Blueprint b LEFT JOIN b.outputItem oi
@@ -258,4 +258,25 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       @Param("guids") Collection<UUID> guids,
       @Param("uexIds") Collection<Integer> uexIds,
       @Param("nameKeys") Collection<String> nameKeys);
+
+  /**
+   * The game identifiers of one active blueprint and its output item, for resolving a blueprint by
+   * GUID, UEX id or name key (REQ-XCH-012).
+   *
+   * @param outputName the blueprint's output name, from which its product key is derived
+   * @param blueprintScwikiUuid the blueprint's Wiki UUID, or {@code null}
+   * @param blueprintP4kUuid the blueprint's game-file UUID, or {@code null}
+   * @param itemExternalUuid the output item's Wiki UUID, or {@code null}
+   * @param itemP4kUuid the output item's game-file UUID, or {@code null}
+   * @param itemUexId the output item's UEX id, or {@code null}
+   * @param itemNameKey the output item's {@code global.ini} name key, or {@code null}
+   */
+  record ExchangeBlueprintKeyRow(
+      String outputName,
+      UUID blueprintScwikiUuid,
+      UUID blueprintP4kUuid,
+      UUID itemExternalUuid,
+      UUID itemP4kUuid,
+      Integer itemUexId,
+      String itemNameKey) {}
 }

@@ -8,112 +8,114 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{members.title}">Mitgliederverwaltung</h1>
-        <p th:text="#{members.description}">Verwalte die Mitglieder deiner Squadron.</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{members.title},
+        count=${usersPage != null ? usersPage.totalElements() : null}, countId='members-count', countFor='members-results', actions=~{::members-actions})}">
+        <th:block th:ref="members-actions">
+            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                <th:block th:replace="~{fragments/components :: overflowMenu(id='members-more', items=~{::members-more-items})}">
+                    <th:block th:ref="members-more-items">
+                        <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="members-sync"
+                                data-testid="members-sync" th:title="#{members.sync.title}" th:text="#{members.sync.button}">Jetzt synchronisieren</button>
+                    </th:block>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
 
-    <div class="hud-box mt-2">
+    <form id="members-filter-form" method="get" th:action="@{/members}" class="no-track" role="search">
+        <div class="toolbar">
+            <th:block th:replace="~{fragments/components :: toolbarSearch('member-search', 'search', ${search}, 'members.search.placeholder')}"></th:block>
+        </div>
+    </form>
 
-        <div class="actions-bar">
-            <div th:replace="~{fragments/components :: filterToggle('members-filter-panel', 'members-filter-toggle')}"></div>
-        </div>
-
-        <div class="filter-panel" id="members-filter-panel" data-filter-panel="members">
-        <form id="members-filter-form" method="get" th:action="@{/members}" class="search-form no-track krtm-display-flex-gap-0-5rem-align-items-center-m-f4c7">
-            <label for="member-search" th:text="#{members.search}">Mitglied suchen</label>
-            <div class="krtm-flex-1-min-width-12rem-position-relative-21fc">
-                <input type="text"
-                       id="member-search"
-                       name="search"
-                       th:value="${search}"
-                       th:placeholder="#{members.search.placeholder}"
-                       autocomplete="off"
-                       class="krtm-width-100-box-sizing-border-box-a87c">
-            </div>
-            <button type="submit" class="btn btn-ghost" th:text="#{general.search}">Suche</button>
-        </form>
-        </div>
-        <div class="members-toolbar krtm-display-flex-justify-content-flex-end-margin-63bc"
-             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
-            <button type="button" class="btn btn-ghost" data-trigger="members-sync"
-                    th:title="#{members.sync.title}" th:text="#{members.sync.button}">Jetzt synchronisieren</button>
-        </div>
-        <div id="members-results">
+    <div id="members-results" class="card card--flush">
         <th:block th:fragment="membersTableFragment">
-        <div class="table-responsive">
-        <table th:if="${users}">
-            <thead>
-                <tr>
-                    <th th:text="#{profile.username}">Username</th>
-                    <th th:text="#{members.field.squadron}">Staffel</th>
-                    <th th:text="#{members.list.specialcommands}">SK</th>
-                    <th th:text="#{profile.rank}">Rang</th>
-                    <th th:text="#{members.discord}">Discord</th>
-                    <th th:text="#{members.status}">Status</th>
-                    <th th:text="#{general.action}">Aktion</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="user : ${users}">
-                    <td th:text="${user.effectiveName}">Username</td>
-                    <td>
-                        <span th:if="${user.squadrons != null and !user.squadrons.isEmpty()}">
-                            <th:block th:each="sq, st : ${user.squadrons}">
-                                <span class="squadron-badge"
-                                      th:title="${sq.name()}"
-                                      th:text="${sq.shorthand()}">IRI</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
-                            </th:block>
-                        </span>
-                        <span th:if="${user.squadrons == null or user.squadrons.isEmpty()}"
-                              class="squadron-badge squadron-badge-muted">&mdash;</span>
-                    </td>
-                    <td>
-                        <span th:if="${userSkMemberships != null and userSkMemberships.get(user.id) != null and !userSkMemberships.get(user.id).isEmpty()}">
-                            <th:block th:each="sk, st : ${userSkMemberships.get(user.id)}">
-                                <span class="squadron-badge squadron-badge-sk"
-                                      th:title="${sk.orgUnitName()}"
-                                      th:text="${sk.orgUnitShorthand() != null ? sk.orgUnitShorthand() : sk.orgUnitName()}">ALPHA</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
-                            </th:block>
-                        </span>
-                        <span th:if="${userSkMemberships == null or userSkMemberships.get(user.id) == null or userSkMemberships.get(user.id).isEmpty()}"
-                              class="squadron-badge squadron-badge-muted"
-                              th:utext="#{members.list.specialcommands.none}">&mdash;</span>
-                    </td>
-                    <td th:text="${user.rank}">Rang</td>
-                    <td>
-                        <span th:if="${user.discordLinked}" role="img"
-                              th:title="#{members.discord.linked}" th:aria-label="#{members.discord.linked}">
-                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-discord"/></svg>
-                        </span>
-                        <span th:unless="${user.discordLinked}" class="text-muted"
-                              th:title="#{members.discord.not_linked}" th:aria-label="#{members.discord.not_linked}">&mdash;</span>
-                    </td>
-                    <td>
-                        <span th:if="${user.inKeycloak}" class="krtm-color-var-color-success-font-size-0-8rem-65c1" th:text="#{members.in_keycloak}">In Keycloak</span>
-                        <span th:if="${!user.inKeycloak}" class="text-danger krtm-font-size-0-8rem-0fed" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
-                    </td>
-                    <td>
-                        <div class="flex-gap-xs">
-                            <a th:href="@{/members/{id}/edit(id=${user.id}, source='members')}" class="btn btn-ghost btn-icon" th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></a>
+        <div class="table-responsive" th:if="${users != null and !users.isEmpty()}">
+            <table class="data-table data-table--stack">
+                <thead>
+                    <tr>
+                        <th th:text="#{profile.username}">Username</th>
+                        <th th:text="#{members.field.squadron}">Staffel</th>
+                        <th th:text="#{members.list.specialcommands}">SK</th>
+                        <th class="num" th:text="#{profile.rank}">Rang</th>
+                        <th th:text="#{members.discord}">Discord</th>
+                        <th class="cell-status" th:text="#{members.status}">Status</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="user : ${users}" data-testid="member-row">
+                        <td>
+                            <a class="row-link" data-testid="row-link" th:href="@{/members/{id}/edit(id=${user.id}, source='members')}">
+                                <span class="cell-title" th:text="${user.effectiveName}">Username</span>
+                            </a>
+                        </td>
+                        <td th:attr="data-label=#{members.field.squadron}">
+                            <span th:if="${user.squadrons != null and !user.squadrons.isEmpty()}">
+                                <th:block th:each="sq, st : ${user.squadrons}">
+                                    <span class="squadron-badge"
+                                          th:title="${sq.name()}"
+                                          th:text="${sq.shorthand()}">IRI</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
+                                </th:block>
+                            </span>
+                            <span th:if="${user.squadrons == null or user.squadrons.isEmpty()}"
+                                  class="squadron-badge squadron-badge-muted">&mdash;</span>
+                        </td>
+                        <td th:attr="data-label=#{members.list.specialcommands}">
+                            <span th:if="${userSkMemberships != null and userSkMemberships.get(user.id) != null and !userSkMemberships.get(user.id).isEmpty()}">
+                                <th:block th:each="sk, st : ${userSkMemberships.get(user.id)}">
+                                    <span class="squadron-badge squadron-badge-sk"
+                                          th:title="${sk.orgUnitName()}"
+                                          th:text="${sk.orgUnitShorthand() != null ? sk.orgUnitShorthand() : sk.orgUnitName()}">ALPHA</span><span th:if="${!st.last}">&#160;&middot;&#160;</span>
+                                </th:block>
+                            </span>
+                            <span th:if="${userSkMemberships == null or userSkMemberships.get(user.id) == null or userSkMemberships.get(user.id).isEmpty()}"
+                                  class="squadron-badge squadron-badge-muted"
+                                  th:utext="#{members.list.specialcommands.none}">&mdash;</span>
+                        </td>
+                        <td class="num" th:attr="data-label=#{profile.rank}" th:text="${user.rank}">Rang</td>
+                        <td th:attr="data-label=#{members.discord}">
+                            <span th:if="${user.discordLinked}" role="img"
+                                  th:title="#{members.discord.linked}" th:aria-label="#{members.discord.linked}">
+                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-discord"/></svg>
+                            </span>
+                            <span th:unless="${user.discordLinked}" class="text-muted"
+                                  th:title="#{members.discord.not_linked}" th:aria-label="#{members.discord.not_linked}">&mdash;</span>
+                        </td>
+                        <td class="cell-status">
+                            <span th:if="${user.inKeycloak}" class="status-pill status-active" th:text="#{members.in_keycloak}">In Keycloak</span>
+                            <span th:unless="${user.inKeycloak}" class="status-pill status-rejected" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
+                        </td>
+                        <td class="cell-actions">
                             <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                                    type="button"
                                     class="btn btn-ghost btn-icon"
                                     th:data-user-id="${user.id}"
                                     th:data-user-version="${user.version}"
                                     data-trigger="members-consolidate"
                                     th:title="#{members.consolidate.hint}" th:aria-label="#{members.consolidate}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg></button>
                             <button th:if="${!user.inKeycloak}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                                    type="button"
                                     class="btn btn-quiet-danger btn-icon"
                                     th:data-user-id="${user.id}"
                                     data-trigger="members-delete-user"
                                     th:title="#{members.delete}" th:aria-label="#{members.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                        </div>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+                            <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-        
+
+        <th:block th:if="${error == null and (users == null or users.isEmpty())}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='members.empty', textKey='members.empty.text')}"></th:block>
+        </th:block>
+
+        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${usersPage}, baseUrl='/members')}"></th:block>
+        </th:block>
+    </div>
+
+    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
         <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='consolidate-modal', titleKey='members.consolidate.modal.title', variant='krt-modal--wide', body=~{::consolidate-modal-body})}">
             <th:block th:ref="consolidate-modal-body">
                 <div class="krt-modal-body">
@@ -130,76 +132,10 @@
                 </div>
             </th:block>
         </th:block>
-
-        <div th:replace="~{fragments/pagination :: pagination(pageResponse=${usersPage}, baseUrl='/members')}"></div>
-        
-        <p th:if="${users == null && error == null}" th:text="#{members.empty}">Keine Mitglieder gefunden.</p>
-        </th:block>
-        </div>
-    </div>
-
+    </th:block>
 </main>
 <script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('member-search');
-        const filterForm = document.getElementById('members-filter-form');
-        const resultsContainer = document.getElementById('members-results');
-        let membersFilterTimer = null;
-
-        function applyMembersFilter() {
-            if (!filterForm || !resultsContainer || !window.krtFetch) {
-                if (filterForm) filterForm.submit();
-                return;
-            }
-            const data = new FormData(filterForm);
-            const params = new URLSearchParams();
-            for (const [key, value] of data.entries()) {
-                if (value !== '') params.append(key, value);
-            }
-            const query = params.toString();
-            window.krtFetch.swap({
-                url: '/members' + (query ? '?' + query : ''),
-                container: resultsContainer,
-                history: true,
-            });
-        }
-
-        if (filterForm) {
-            filterForm.addEventListener('submit', function (event) {
-                event.preventDefault();
-                clearTimeout(membersFilterTimer);
-                applyMembersFilter();
-            });
-        }
-
-        if (searchInput) {
-            searchInput.addEventListener('input', function () {
-                clearTimeout(membersFilterTimer);
-                membersFilterTimer = setTimeout(applyMembersFilter, 300);
-            });
-            krtAutocomplete(searchInput, async (query) => {
-                if (query.length < 2) return [];
-                try {
-                    const resp = await fetch(`/members/api/search?query=${encodeURIComponent(query)}`, {
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    if (!resp.ok) return [];
-                    const data = await resp.json();
-                    return [...new Set((data || []).map(u => u.effectiveName).filter(Boolean))].slice(0, 10);
-                } catch (err) {
-                    return [];
-                }
-            }, {
-                onSelect: function(item) {
-                    searchInput.value = item;
-                    clearTimeout(membersFilterTimer);
-                    applyMembersFilter();
-                }
-            });
-        }
-    });
-
     const MSG_DELETE_TITLE = /*[[#{members.delete.title}]]*/ "";
     const MSG_DELETE_CONFIRM = /*[[#{members.delete_confirm}]]*/ "";
     const MSG_DELETE_LABEL = /*[[#{members.delete}]]*/ "";
@@ -211,123 +147,6 @@
     const MSG_CONSOLIDATE_SUCCESS = /*[[#{success.user.consolidate}]]*/ "";
     const MSG_CONSOLIDATE_ERROR = /*[[#{error.user.consolidate}]]*/ "";
     const MSG_CONSOLIDATE_NO_TARGET = /*[[#{error.user.consolidate.no_target}]]*/ "";
-
-    function refreshMembersResults() {
-        const container = document.getElementById('members-results');
-        if (!container || !window.krtFetch) {
-            location.reload();
-            return;
-        }
-        window.krtFetch.swap({
-            url: window.location.pathname + window.location.search,
-            container: container
-        });
-    }
-
-    window.krtRefreshMembersResults = refreshMembersResults;
-
-    async function deleteUser(userId) {
-        const confirmed = await window.showKrtConfirm(MSG_DELETE_TITLE, MSG_DELETE_CONFIRM, MSG_DELETE_LABEL, MSG_CANCEL_LABEL);
-        if (!confirmed) return;
-        window.krtFetch.write({
-            method: 'DELETE',
-            url: '/members/' + encodeURIComponent(userId),
-            successMessage: MSG_DELETE_SUCCESS,
-            errorMessage: MSG_DELETE_ERROR,
-            onSuccess: function () {
-                refreshMembersResults();
-            }
-        });
-    }
-
-    function syncMembersNow() {
-        window.krtFetch.write({
-            method: 'POST',
-            url: '/members/sync',
-            successMessage: MSG_SYNC_SUCCESS,
-            errorMessage: MSG_SYNC_ERROR,
-            onSuccess: function () {
-                refreshMembersResults();
-            }
-        });
-    }
-
-    const consolidateModal = document.getElementById('consolidate-modal');
-    let consolidateSource = null;
-
-    function consolidatePicker() {
-        return document.getElementById('consolidate-target');
-    }
-
-    function openConsolidate(el) {
-        if (!consolidateModal) return;
-        consolidateSource = {
-            id: el.getAttribute('data-user-id'),
-            version: el.getAttribute('data-user-version')
-        };
-        const picker = consolidatePicker();
-        if (picker) {
-            picker.value = '';
-            if (picker.krtComboboxReset) picker.krtComboboxReset();
-        }
-        consolidateModal.style.display = 'flex';
-    }
-
-    function closeConsolidate() {
-        if (!consolidateModal) return;
-        consolidateModal.style.display = 'none';
-        consolidateSource = null;
-    }
-
-    const consolidateCancelBtn = document.getElementById('consolidate-cancel');
-    if (consolidateCancelBtn) {
-        consolidateCancelBtn.addEventListener('click', closeConsolidate);
-    }
-
-    const consolidateConfirmBtn = document.getElementById('consolidate-confirm');
-    if (consolidateConfirmBtn) {
-        consolidateConfirmBtn.addEventListener('click', function () {
-            if (!consolidateSource) return;
-            const picker = consolidatePicker();
-            const targetUserId = picker && picker.value ? picker.value : '';
-            if (!targetUserId) {
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(MSG_CONSOLIDATE_NO_TARGET);
-                }
-                return;
-            }
-            const source = consolidateSource;
-            window.krtFetch.write({
-                method: 'POST',
-                url: '/members/' + encodeURIComponent(source.id) + '/consolidate',
-                payload: {
-                    targetUserId: targetUserId,
-                    version: source.version == null || source.version === '' ? null : Number(source.version)
-                },
-                toast: false,
-                errorMessage: MSG_CONSOLIDATE_ERROR,
-                onSuccess: function () {
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(MSG_CONSOLIDATE_SUCCESS);
-                    }
-                    closeConsolidate();
-                    refreshMembersResults();
-                }
-            });
-        });
-    }
-
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'members-delete-user', function (el) {
-            deleteUser(el.getAttribute('data-user-id'));
-        });
-        window.krtEvents.on('click', 'members-sync', function () {
-            syncMembersNow();
-        });
-        window.krtEvents.on('click', 'members-consolidate', function (el) {
-            openConsolidate(el);
-        });
-    }
 </script>
 <script th:src="@{/js/members.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>

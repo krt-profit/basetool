@@ -5,6 +5,7 @@
     <th:block th:fragment="extraLinks">
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+        <link rel="stylesheet" th:href="@{/css/organisation-unit-detail.css}">
         <link rel="stylesheet" th:href="@{/css/pages/organisation-special-command-detail.css}">
     </th:block>
 </head>
@@ -13,87 +14,30 @@
 
 <th:block th:replace="~{fragments/header :: header}" />
 
-<main>
-    <div class="greeting hud-box">
-        <a th:href="@{${backUrl}}" class="krtm-font-size-0-9rem-color-var-color-gray-2-58f9"
-           th:text="${canToggleLead} ? #{admin.specialcommands.back_to_list} : #{admin.specialcommands.back_to_leitung}">&larr; zurück zur Übersicht</a>
-        <h1 th:text="${specialCommand != null ? specialCommand.name() : ''}">Spezialkommando</h1>
-        <p class="sk-meta">
-            <span th:text="#{admin.specialcommands.column.shorthand}">Kürzel</span>:
-            <strong th:text="${specialCommand != null ? specialCommand.shorthand() : ''}">SHRT</strong>
-        </p>
-        <p th:if="${specialCommand != null and specialCommand.description() != null and !#strings.isEmpty(specialCommand.description())}"
-           class="sk-meta" th:text="${specialCommand.description()}">Beschreibung</p>
-    </div>
+<main th:with="backHref=${canToggleLead or specialCommand == null} ? ${backUrl} : ${backUrl + '?unit=' + specialCommand.id()}">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey=${canToggleLead ? 'admin.specialcommands.title' : 'leitung.title'}, eyebrowHref=@{${backHref}},
+        titleText=${specialCommand != null ? specialCommand.name() : ''}, actions=~{::sk-actions})}">
+        <th:block th:ref="sk-actions">
+            <button id="add-member-btn" class="btn btn--cta" type="button" data-testid="page-head-primary"
+                    ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg><span th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</span></button>
+        </th:block>
+    </th:block>
 
-    <div class="hud-box mt-2" id="members-box" th:data-sc-id="${specialCommand != null ? specialCommand.id() : ''}">
-        <div class="box-header krtm-display-flex-justify-content-space-between-a-1321">
-            <h2 th:text="#{admin.specialcommands.members.title}" class="m-0">Mitglieder</h2>
-            <button id="add-member-btn" class="btn btn--cta" type="button" th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</button>
+    <p class="sk-meta" th:if="${specialCommand != null}">
+        <span class="page-eyebrow" th:text="${specialCommand.shorthand() != null} ? (#{admin.orgStructure.kind.SPECIAL_COMMAND} + ' · ' + ${specialCommand.shorthand()}) : #{admin.orgStructure.kind.SPECIAL_COMMAND}">Spezialkommando · SHRT</span>
+        <span class="sk-meta__description"
+              th:if="${specialCommand.description() != null and !#strings.isEmpty(specialCommand.description())}"
+              th:text="${specialCommand.description()}">Beschreibung</span>
+    </p>
+
+    <div class="card card--flush unit-detail" id="members-box" th:data-sc-id="${specialCommand != null ? specialCommand.id() : ''}">
+        <div class="tab-nav unit-tabs" role="tablist" th:aria-label="${specialCommand != null ? specialCommand.name() : ''}">
+            <button type="button" class="tab active" role="tab" aria-selected="true" id="sk-tab-members" aria-controls="members-results"
+                    ><span th:text="#{admin.specialcommands.members.title}">Mitglieder</span> <span class="tab-count" id="sk-members-count" th:text="${members != null ? #lists.size(members) : 0}">0</span></button>
         </div>
-
-        <div id="members-results">
+        <div id="members-results" class="unit-tabpanel" role="tabpanel" aria-labelledby="sk-tab-members">
         <th:block th:fragment="membersResults">
-        <div th:if="${members == null or #lists.isEmpty(members)}" class="krtm-color-var-color-gray-2-padding-1rem-0-5444" th:text="#{admin.specialcommands.members.empty}">
-            Noch keine Mitglieder zugeordnet.
-        </div>
-
-        <div th:if="${members != null and !#lists.isEmpty(members)}" class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th th:text="#{admin.specialcommands.members.column.name}">Name</th>
-                        <th th:text="#{admin.specialcommands.members.column.roles}">Rollen</th>
-                        <th th:if="${canToggleLead}" th:text="#{admin.specialcommands.members.column.lead}">Leiter</th>
-                        <th th:text="#{admin.specialcommands.column.actions}">Aktion</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="m : ${members}">
-                        <td>
-                            <span th:text="${m.userDisplayName()}">Display Name</span>
-                            <span th:if="${m.isLead()}" class="role-badge lead" th:text="#{admin.specialcommands.members.lead_badge}">Lead</span>
-                        </td>
-                        <td>
-                            <form th:action="@{/organisation/special-commands/{id}/members/{userId}/flags(id=${specialCommand.id()},userId=${m.userId()})}"
-                                  method="post" class="flags-form">
-                                <input type="hidden" name="version" th:value="${m.version()}">
-                                <input type="hidden" name="_isLogistician">
-                                <input type="hidden" name="_isMissionManager">
-                                <label class="krtm-display-inline-flex-align-items-center-gap-0-5ab4">
-                                    <input type="checkbox" class="role-checkbox" name="isLogistician" value="true" th:checked="${m.isLogistician()}">
-                                    <span th:text="#{admin.specialcommands.members.role.logistician}">Logistiker</span>
-                                </label>
-                                <label class="krtm-display-inline-flex-align-items-center-gap-0-f16b">
-                                    <input type="checkbox" class="role-checkbox" name="isMissionManager" value="true" th:checked="${m.isMissionManager()}">
-                                    <span th:text="#{admin.specialcommands.members.role.mission_manager}">Einsatzleiter</span>
-                                </label>
-                                <button type="submit" class="btn btn-ghost btn-icon krtm-font-size-0-8rem-padding-0-25rem-0-5rem-51c7" th:title="#{members.save}" th:aria-label="#{members.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
-                            </form>
-                        </td>
-                        <td th:if="${canToggleLead}">
-                            <form th:action="@{/admin/special-commands/{id}/members/{userId}/lead(id=${specialCommand.id()},userId=${m.userId()})}"
-                                  method="post" class="lead-toggle-form">
-                                <input type="hidden" name="version" th:value="${m.version()}">
-                                <input type="hidden" name="isLead" th:value="${!m.isLead()}">
-                                <button type="submit" class="btn btn-ghost"
-                                        th:text="${m.isLead() ? #messages.msg('admin.specialcommands.members.lead.demote') : #messages.msg('admin.specialcommands.members.lead.promote')}">
-                                    Toggle Lead
-                                </button>
-                            </form>
-                        </td>
-                        <td>
-                            <form th:action="@{/organisation/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
-                                  method="post" class="krtm-margin-0-display-inline-3bbd">
-                                <button type="submit" class="btn btn-quiet-danger delete-btn btn-icon"
-                                        th:data-action="@{/organisation/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
-                                        th:title="#{admin.specialcommands.members.remove}" th:aria-label="#{admin.specialcommands.members.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            </form>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+            <th:block th:replace="~{organisation/unit-detail :: skRoster(skId=${specialCommand.id()}, members=${members}, showFlags=true, canLead=${canToggleLead}, canRemove=true, leadMode='admin', selfUserId=null, admin=true, refreshUrl=${'/organisation/special-commands/' + specialCommand.id()}, refreshContainer='#members-results', refreshFragment='members')}"></th:block>
         </th:block>
         </div>
     </div>
@@ -118,18 +62,25 @@
     </th:block>
 </th:block>
 
+<th:block th:replace="~{fragments/toast :: toast}"/>
+
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var MEMBER_MSG = {
-        saved:   '[[#{notification.success.save}]]',
-        deleted: '[[#{notification.success.delete}]]',
-        error:   '[[#{notification.error.save}]]'
+        saved: /*[[#{notification.success.save}]]*/ 'Gespeichert.',
+        deleted: /*[[#{notification.success.delete}]]*/ 'Entfernt.',
+        error: /*[[#{notification.error.save}]]*/ 'Fehler.',
+        confirm: /*[[#{general.confirm}]]*/ 'Bestätigen',
+        cancel: /*[[#{general.cancel}]]*/ 'Abbrechen',
+        confirmRemove: /*[[#{leitung.confirm.remove}]]*/ 'Wirklich entfernen?',
+        confirmPromote: /*[[#{leitung.confirm.skLeadPromote}]]*/ 'Ernennen?',
+        confirmDemote: /*[[#{leitung.confirm.skLeadDemote}]]*/ 'Entfernen?'
     };
     var MEMBER_CONFLICT = {
-        title:                '[[#{frontend.ajax.conflict.title}]]',
-        reloadDetailFallback: '[[#{frontend.ajax.conflict.detail}]]',
-        reloadLabel:          '[[#{frontend.ajax.conflict.reload}]]',
-        dismissLabel:         '[[#{frontend.ajax.conflict.dismiss}]]',
-        reloadQuestion:       '[[#{frontend.ajax.conflict.question}]]'
+        title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Neu laden.',
+        reloadLabel: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Neu laden',
+        dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+        reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
     };
 </script>
 <script th:src="@{/js/special-command-detail.js}" defer th:attr="nonce=${cspNonce}"></script>

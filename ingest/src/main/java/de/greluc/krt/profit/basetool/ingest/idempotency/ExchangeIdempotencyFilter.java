@@ -168,7 +168,7 @@ public class ExchangeIdempotencyFilter extends OncePerRequestFilter {
         return;
       }
       token = idempotency.claim(namespace).orElse(null);
-    } catch (ExchangeUnavailableException e) {
+    } catch (ExchangeUnavailableException _) {
       storeUnavailable(context.clientId(), response);
       return;
     }
@@ -241,7 +241,7 @@ public class ExchangeIdempotencyFilter extends OncePerRequestFilter {
             "The exchange's storage budget is full; try again later.");
         return;
       }
-    } catch (ExchangeUnavailableException e) {
+    } catch (ExchangeUnavailableException _) {
       storeUnavailable(context.clientId(), wrapper);
       return;
     }
@@ -301,12 +301,12 @@ public class ExchangeIdempotencyFilter extends OncePerRequestFilter {
       }
       try {
         idempotency.store(namespace, stored);
-      } catch (ExchangeUnavailableException e) {
+      } catch (ExchangeUnavailableException _) {
         budget.release(context.clientId(), context.member(), key, size);
         logger.warn("An exchange answer could not be cached for replay");
       }
       return true;
-    } catch (ExchangeUnavailableException e) {
+    } catch (ExchangeUnavailableException _) {
       logger.warn("An exchange answer could not be cached for replay");
       return false;
     }
@@ -396,7 +396,7 @@ public class ExchangeIdempotencyFilter extends OncePerRequestFilter {
     try {
       JsonNode code = objectMapper.readTree(body).get("code");
       return code != null && code.isString() ? code.stringValue() : null;
-    } catch (RuntimeException ignored) {
+    } catch (RuntimeException _) {
       return null;
     }
   }

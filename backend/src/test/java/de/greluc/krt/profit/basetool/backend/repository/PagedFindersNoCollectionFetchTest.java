@@ -84,6 +84,27 @@ class PagedFindersNoCollectionFetchTest {
                         .getResultList()));
   }
 
+  /**
+   * The other half of the gate: a paged collection fetch ordered by the owner's own column is one
+   * Hibernate pushes into the database, so the gate lets it through. Both halves have to hold
+   * before the setting is touched.
+   */
+  @Test
+  void gateIsNarrow_aPagedCollectionFetchOrderedByTheOwnerStillRuns() {
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          status.setRollbackOnly();
+          List<?> rows =
+              entityManager
+                  .createQuery(
+                      "SELECT u FROM User u LEFT JOIN FETCH u.roles ORDER BY u.username",
+                      Object.class)
+                  .setMaxResults(5)
+                  .getResultList();
+          assertTrue(rows.size() <= 5);
+        });
+  }
+
   @Test
   void formerlyGraphedPagedFinders_leaveTheirCollectionsUnfetched() {
     transactionTemplate.executeWithoutResult(
@@ -128,7 +149,15 @@ class PagedFindersNoCollectionFetchTest {
           List<JobOrder> scoped =
               jobOrderRepository
                   .findScopedJobOrders(
-                      statuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), PAGE)
+                      statuses,
+                      true,
+                      Set.of(new UUID(0L, 0L)),
+                      false,
+                      Set.of(new UUID(0L, 0L)),
+                      true,
+                      null,
+                      Set.of(),
+                      PAGE)
                   .getContent();
           assertUnfetched(scoped, JobOrder::getMaterials);
           assertUnfetched(scoped, JobOrder::getAssignees);

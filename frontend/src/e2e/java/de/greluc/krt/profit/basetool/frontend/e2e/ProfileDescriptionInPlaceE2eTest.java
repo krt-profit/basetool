@@ -28,6 +28,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.nio.file.Path;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -79,9 +80,10 @@ class ProfileDescriptionInPlaceE2eTest {
   }
 
   /**
-   * Saves the description in place (asserting a success toast and that the page was never
-   * reloaded), then corrupts the CSRF token and saves again, asserting the stale-token write still
-   * succeeds via the transparent refresh + retry and likewise without a reload.
+   * Saves the description in place through the save bar, which appears with the edit and hides
+   * again after the save (asserting a success toast and that the page was never reloaded), then
+   * corrupts the CSRF token and saves again, asserting the stale-token write still succeeds via the
+   * transparent refresh + retry and likewise without a reload.
    */
   @Test
   void savesDescriptionInPlaceThenSurvivesStaleTokenViaRetry() {
@@ -103,12 +105,15 @@ class ProfileDescriptionInPlaceE2eTest {
                 + " 'none'; } }");
 
         Locator description = page.locator("#description");
-        Locator submit = page.locator("#profile-description-form button[type='submit']");
+        Locator submit = page.getByTestId("profile-save");
+        String run = UUID.randomUUID().toString().substring(0, 8);
 
-        description.fill("E2E in-place description alpha");
+        description.fill("E2E in-place description alpha " + run);
+        assertThat(page.getByTestId("profile-save-bar")).isVisible();
         submit.click();
 
         assertThat(page.locator(".notification-toast:not(.error-toast)")).isVisible();
+        assertThat(page.getByTestId("profile-save-bar")).isHidden();
         assertEquals(
             Boolean.TRUE,
             page.evaluate("() => window.__krtNoReload === true"),
@@ -121,7 +126,7 @@ class ProfileDescriptionInPlaceE2eTest {
             "() => { document.querySelectorAll('.notification-toast').forEach((t) => t.remove());"
                 + " }");
 
-        description.fill("E2E in-place description beta");
+        description.fill("E2E in-place description beta " + run);
         submit.click();
 
         assertThat(page.locator(".notification-toast:not(.error-toast)")).isVisible();

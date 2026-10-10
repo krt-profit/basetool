@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintOverviewEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintOverviewOwnerDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
@@ -76,11 +77,12 @@ public class PersonalBlueprintOverviewService {
    * per variant family with its count of distinct owning members. Empty when the caller oversees no
    * org unit.
    *
-   * <p>{@code search} is applied before sorting and pagination (REQ-INV-013).
+   * <p>{@code search} is applied before sorting and pagination (REQ-INV-013). It keeps a row whose
+   * product name, or the display name of one of its in-scope owners, contains the term.
    *
    * @param pageable page request whose sort is restricted to {@link #SORTABLE_FIELDS}
-   * @param search optional case-insensitive product-name fragment; {@code null} or blank matches
-   *     everything
+   * @param search optional case-insensitive product-name or owner-name fragment; {@code null} or
+   *     blank matches everything
    * @return a page of {@link BlueprintOverviewEntryDto}, sorted by product name then product key
    */
   @NotNull
@@ -100,18 +102,20 @@ public class PersonalBlueprintOverviewService {
       byKey
           .computeIfAbsent(
               familyKey,
-              key -> new ProductAggregate(familyResolver.displayBaseName(bp.productName())))
+              _ -> new ProductAggregate(familyResolver.displayBaseName(bp.productName())))
           .owners
           .add(bp.ownerUserId());
     }
     String needle =
         search == null || search.isBlank() ? null : search.trim().toLowerCase(Locale.ROOT);
+    Set<UUID> matchingOwners = needle == null ? Set.of() : ownersNamed(ownerUserIds, needle);
     List<BlueprintOverviewEntryDto> all =
         byKey.entrySet().stream()
             .filter(
                 entry ->
                     needle == null
-                        || entry.getValue().productName.toLowerCase(Locale.ROOT).contains(needle))
+                        || entry.getValue().productName.toLowerCase(Locale.ROOT).contains(needle)
+                        || entry.getValue().owners.stream().anyMatch(matchingOwners::contains))
             .map(
                 entry ->
                     new BlueprintOverviewEntryDto(
@@ -171,6 +175,27 @@ public class PersonalBlueprintOverviewService {
             Comparator.comparing(
                 BlueprintOverviewOwnerDto::ownerName, String.CASE_INSENSITIVE_ORDER))
         .toList();
+  }
+
+  /**
+   * Selects the in-scope owners whose display name contains the search term, so the list search
+   * also finds a person. Only the already-resolved in-scope owners are read, so the search cannot
+   * reach anyone outside the caller's oversight scope.
+   *
+   * @param ownerUserIds the in-scope owner ids the list aggregates
+   * @param needle the lower-cased, trimmed search term
+   * @return the ids of the owners whose display name contains {@code needle}, case-insensitively
+   */
+  @NotNull
+  private Set<UUID> ownersNamed(@NotNull Set<UUID> ownerUserIds, @NotNull String needle) {
+    return userRepository.findAllById(ownerUserIds).stream()
+        .filter(
+            user -> {
+              String name = user.getEffectiveName();
+              return name != null && name.toLowerCase(Locale.ROOT).contains(needle);
+            })
+        .map(User::getId)
+        .collect(Collectors.toSet());
   }
 
   /**

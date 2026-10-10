@@ -1,0 +1,5 @@
+.planted {
+    color: var(--declared-token);
+    background: var(--planted-in-css);
+    border-color: var(--with-fallback, transparent);
+}

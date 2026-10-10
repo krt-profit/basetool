@@ -37,20 +37,27 @@ import static org.mockito.Mockito.when;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository.ExchangeClientDisplayName;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalBlueprintMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchResult;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.model.projection.ExchangeClientDisplayName;
-import de.greluc.krt.profit.basetool.backend.repository.ExchangeClientRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
@@ -67,6 +74,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -88,6 +96,8 @@ class PersonalBlueprintServiceTest {
   @Mock private GameItemRepository gameItemRepository;
   @Mock private DefaultBlueprintKeyService defaultBlueprintKeyService;
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private UserService userService;
   @Mock private ExchangeClientRepository exchangeClientRepository;
 
   private PersonalBlueprintService service;
@@ -102,7 +112,12 @@ class PersonalBlueprintServiceTest {
             gameItemRepository,
             defaultBlueprintKeyService,
             auditService,
-            exchangeClientRepository);
+            new ExchangeClientDirectory(
+                new IngestGatewayProperties(List.of()),
+                new KnownExchangeClients(exchangeClientRepository)),
+            eventPublisher,
+            userService);
+    org.mockito.Mockito.lenient().when(userService.currentActor()).thenReturn(ADMIN_ACTOR);
   }
 
   private static PersonalBlueprintResponse sampleResponse() {
@@ -514,6 +529,105 @@ class PersonalBlueprintServiceTest {
     verify(repository).save(entity);
   }
 
+  private static final ActorRef ADMIN_ACTOR = new ActorRef(UUID.randomUUID(), "Ada");
+
+  private List<NoticeEvent> published(int expected) {
+    ArgumentCaptor<Object> captured = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, times(expected)).publishEvent(captured.capture());
+    return captured.getAllValues().stream().map(NoticeEvent.class::cast).toList();
+  }
+
+  @Test
+  void anAdminsUpdateTellsTheOwnerWithTheBlueprintsName() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprint entity =
+        PersonalBlueprint.builder().id(id).ownerUserId(OTHER_USER).productKey("k").build();
+    entity.setVersion(5L);
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(repository.save(entity)).thenReturn(entity);
+    when(mapper.toResponse(eq(entity), anyBoolean(), any())).thenReturn(sampleResponse());
+    when(userService.currentActor()).thenReturn(ADMIN_ACTOR);
+
+    service.updateForUser(id, new PersonalBlueprintUpdateRequest(null, "edited", 5L));
+
+    NoticeEvent notice = published(1).getFirst();
+    assertEquals(NotificationEventType.BLUEPRINT_CHANGED_BY_ADMIN, notice.eventType());
+    assertEquals(OTHER_USER, notice.contextRecipientUserId());
+    assertEquals("UPDATED", notice.renderParams().get("changeCode"));
+    assertEquals("Ada", notice.renderParams().get("actor"));
+  }
+
+  @Test
+  void anAdminsDeleteTellsTheOwnerUnlessTheAdminIsTheOwner() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprint entity =
+        PersonalBlueprint.builder()
+            .id(id)
+            .ownerUserId(OTHER_USER)
+            .productName("Arden-SL Core")
+            .build();
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(userService.currentActor()).thenReturn(ADMIN_ACTOR);
+
+    service.deleteForUser(id);
+
+    NoticeEvent notice = published(1).getFirst();
+    assertEquals("DELETED", notice.renderParams().get("changeCode"));
+    assertEquals("Arden-SL Core", notice.renderParams().get("subject"));
+  }
+
+  @Test
+  void anAdminDeletingTheirOwnBlueprintTellsNobody() {
+    UUID id = UUID.randomUUID();
+    PersonalBlueprint entity =
+        PersonalBlueprint.builder().id(id).ownerUserId(ADMIN_ACTOR.id()).build();
+    when(repository.findById(id)).thenReturn(Optional.of(entity));
+    when(userService.currentActor()).thenReturn(ADMIN_ACTOR);
+
+    service.deleteForUser(id);
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
+  @Test
+  void anAdminsImportTellsTheMemberHowManyBlueprintsCame() {
+    when(userService.currentActor()).thenReturn(ADMIN_ACTOR);
+
+    service.announceImportByAdmin(TARGET, new BlueprintImportResultDto(5, 1, 0, 2, 0));
+
+    NoticeEvent notice = published(1).getFirst();
+    assertEquals("IMPORTED", notice.renderParams().get("changeCode"));
+    assertEquals("5×", notice.renderParams().get("subject"));
+  }
+
+  @Test
+  void anImportThatChangedNothingAnnouncesNothing() {
+    service.announceImportByAdmin(TARGET, new BlueprintImportResultDto(0, 1, 3, 2, 0));
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
+  @Test
+  void thePurgeTellsEachMemberWhoLostBlueprintsExceptTheAdmin() {
+    PersonalBlueprintRepository.OwnerBlueprintCount mine =
+        org.mockito.Mockito.mock(PersonalBlueprintRepository.OwnerBlueprintCount.class);
+    PersonalBlueprintRepository.OwnerBlueprintCount theirs =
+        org.mockito.Mockito.mock(PersonalBlueprintRepository.OwnerBlueprintCount.class);
+    when(mine.getOwnerId()).thenReturn(ADMIN_ACTOR.id());
+    when(theirs.getOwnerId()).thenReturn(OTHER_USER);
+    when(theirs.getBlueprintCount()).thenReturn(12L);
+    when(repository.countRemovableByOwner()).thenReturn(List.of(mine, theirs));
+    when(repository.deleteAllRemovable()).thenReturn(15);
+    when(userService.currentActor()).thenReturn(ADMIN_ACTOR);
+
+    service.deleteAllForAllUsers();
+
+    NoticeEvent notice = published(1).getFirst();
+    assertEquals(NotificationEventType.BLUEPRINT_PURGED_BY_ADMIN, notice.eventType());
+    assertEquals(OTHER_USER, notice.contextRecipientUserId());
+    assertEquals("12", notice.renderParams().get("count"));
+  }
+
   @Test
   void updateForUser_throwsNotFound_whenIdUnknown() {
     UUID id = UUID.randomUUID();
@@ -562,6 +676,7 @@ class PersonalBlueprintServiceTest {
   @Test
   void deleteAllForAllUsers_delegatesToGlobalBulkDeleteAndReturnsCount() {
     when(repository.deleteAllRemovable()).thenReturn(7);
+    org.mockito.Mockito.lenient().when(userService.currentActor()).thenReturn(ADMIN_ACTOR);
 
     int removed = service.deleteAllForAllUsers();
 

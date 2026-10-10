@@ -108,7 +108,7 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 
   @Test

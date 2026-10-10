@@ -101,7 +101,7 @@ class ProfileRsiHandleInPlaceE2eTest {
                 + " 'none'; } }");
 
         Locator input = page.locator("[data-testid='profile-rsi-handle-input']");
-        Locator submit = page.locator("[data-testid='profile-rsi-handle-save']");
+        Locator submit = page.getByTestId("profile-save");
 
         input.fill(handle);
         saveInPlace(page, submit);
@@ -121,11 +121,11 @@ class ProfileRsiHandleInPlaceE2eTest {
   }
 
   /**
-   * Submits the RSI-handle form in place and asserts a success toast, no error toast and no
-   * reload-confirm dialog.
+   * Saves the RSI-handle section through the save bar and asserts a success toast, no error toast
+   * and no reload-confirm dialog.
    *
    * @param page the authenticated profile page
-   * @param submit the RSI-handle form's submit button
+   * @param submit the save bar's save button
    */
   private static void saveInPlace(Page page, Locator submit) {
     page.evaluate(

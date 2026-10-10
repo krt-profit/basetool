@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
@@ -34,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintRequirementGr
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -72,7 +72,7 @@ public class BlueprintCraftabilityService {
   private final PersonalBlueprintService personalBlueprintService;
   private final BlueprintProductService blueprintProductService;
   private final InventoryItemService inventoryItemService;
-  private final RefineryOrderService refineryOrderService;
+  private final CraftabilityYieldSource craftabilityYieldSource;
   private final BlueprintRepository blueprintRepository;
   private final GameItemRepository gameItemRepository;
   private final MaterialRepository materialRepository;
@@ -106,7 +106,10 @@ public class BlueprintCraftabilityService {
     if (includeRefinery) {
       List<OwnedStockSlice> merged =
           new ArrayList<>(inventoryItemService.getOwnedStockSlices(userId));
-      merged.addAll(refineryOrderService.getOwnedOpenRefineryYieldSlices(userId));
+      for (CraftabilityYieldSource.YieldSlice slice :
+          craftabilityYieldSource.pendingYieldSlices(userId)) {
+        merged.add(new OwnedStockSlice(slice.materialId(), slice.quality(), slice.totalScu()));
+      }
       withRefinery = slicesPerMaterial(merged);
     }
 

@@ -25,15 +25,19 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.backend.service.ActiveOrgUnitProvider;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import de.greluc.krt.profit.basetool.testsupport.logging.CorrelationIdParity;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -61,13 +65,13 @@ class CorrelationIdFilterTest {
 
   private final LoggingProperties props = BoundProperties.defaults(LoggingProperties.class);
   private final AuthHelperService authHelperService = mock(AuthHelperService.class);
-  private final OwnerScopeService ownerScopeService = mock(OwnerScopeService.class);
+  private final ActiveOrgUnitProvider activeOrgUnitProvider = mock(ActiveOrgUnitProvider.class);
   private final CorrelationIdFilter filter =
-      new CorrelationIdFilter(props, authHelperService, ownerScopeService);
+      new CorrelationIdFilter(props, authHelperService, activeOrgUnitProvider);
 
   {
     when(authHelperService.isAuthenticated()).thenReturn(false);
-    when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
+    when(activeOrgUnitProvider.activeOrgUnitId()).thenReturn(Optional.empty());
   }
 
   @AfterEach
@@ -151,6 +155,48 @@ class CorrelationIdFilterTest {
   }
 
   @Test
+  void authenticatedRequest_ShouldPlaceTheActiveOrgUnitIntoMdc()
+      throws ServletException, IOException {
+    UUID orgUnitId = UUID.randomUUID();
+    when(authHelperService.isAuthenticated()).thenReturn(true);
+    when(activeOrgUnitProvider.activeOrgUnitId()).thenReturn(Optional.of(orgUnitId));
+
+    assertThat(orgUnitIdDuringChain()).isEqualTo(orgUnitId.toString());
+  }
+
+  @Test
+  void authenticatedAdminWithoutSelection_ShouldExposeAll() throws ServletException, IOException {
+    when(authHelperService.isAuthenticated()).thenReturn(true);
+    when(authHelperService.isAdmin()).thenReturn(true);
+
+    assertThat(orgUnitIdDuringChain()).isEqualTo("all");
+  }
+
+  @Test
+  void authenticatedMemberWithoutOrgUnit_ShouldExposeNone() throws ServletException, IOException {
+    when(authHelperService.isAuthenticated()).thenReturn(true);
+
+    assertThat(orgUnitIdDuringChain()).isEqualTo("none");
+  }
+
+  @Test
+  void failingOrgUnitLookup_ShouldExposeNone() throws ServletException, IOException {
+    when(authHelperService.isAuthenticated()).thenReturn(true);
+    when(activeOrgUnitProvider.activeOrgUnitId()).thenThrow(new IllegalStateException("no scope"));
+
+    assertThat(orgUnitIdDuringChain()).isEqualTo("none");
+  }
+
+  private String orgUnitIdDuringChain() throws ServletException, IOException {
+    AtomicReference<String> orgUnitId = new AtomicReference<>();
+    filter.doFilter(
+        new MockHttpServletRequest("GET", "/"),
+        new MockHttpServletResponse(),
+        (req, res) -> orgUnitId.set(MDC.get(props.orgUnitIdMdcKey())));
+    return orgUnitId.get();
+  }
+
+  @Test
   void initialDispatch_ShouldStashTheResolvedValuesForAnAsyncDispatch()
       throws ServletException, IOException {
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/notifications");
@@ -187,7 +233,7 @@ class CorrelationIdFilterTest {
     assertThat(response.getHeader(props.correlationIdHeader()))
         .as("the async pass leaves the response header to the initial dispatch")
         .isNull();
-    verifyNoInteractions(authHelperService, ownerScopeService);
+    verifyNoInteractions(authHelperService, activeOrgUnitProvider);
     assertThat(MDC.get(props.correlationIdMdcKey())).isNull();
     assertThat(MDC.get(props.userIdMdcKey())).isNull();
     assertThat(MDC.get(props.orgUnitIdMdcKey())).isNull();
@@ -210,5 +256,27 @@ class CorrelationIdFilterTest {
 
     assertThat(correlationDuringChain.get()).isNull();
     assertThat(response.getHeader(props.correlationIdHeader())).isNull();
+  }
+
+  /**
+   * Every inbound header of the shared case list comes back as an id that holds the contract all
+   * three correlation filters share (PSA-03).
+   *
+   * @throws Exception if the filter fails
+   */
+  @Test
+  void echoedIdsHoldTheContractTheThreeFiltersShare() throws Exception {
+    List<String> violations = new ArrayList<>();
+    for (String inbound : CorrelationIdParity.inboundCases()) {
+      MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
+      if (inbound != null) {
+        request.addHeader(props.correlationIdHeader(), inbound);
+      }
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      filter.doFilter(request, response, (_, _) -> {});
+      violations.addAll(
+          CorrelationIdParity.violations(inbound, response.getHeader(props.correlationIdHeader())));
+    }
+    assertThat(violations).isEmpty();
   }
 }

@@ -54,8 +54,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies that the "Übergabe protokollieren" button on the order detail page renders after the
- * assignees section and not in the header.
+ * Verifies that the "Übergabe erfassen" button on the order detail page is the primary action of
+ * the handovers tab and not part of the page head.
  */
 @SpringBootTest
 class JobOrderHandoverButtonLayoutTest {
@@ -90,7 +90,7 @@ class JobOrderHandoverButtonLayoutTest {
   }
 
   @Test
-  void orderDetail_HandoverButton_ShouldAppearAfterAssigneesSection_NotInHeader() throws Exception {
+  void orderDetail_HandoverButton_ShouldSitInTheHandoversTab_NotInThePageHead() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     JobOrderDto order =
@@ -116,7 +116,7 @@ class JobOrderHandoverButtonLayoutTest {
             null,
             false);
 
-    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(order);
     when(backendApiClient.get(
             eq("/api/v1/users/me"),
@@ -131,22 +131,22 @@ class JobOrderHandoverButtonLayoutTest {
 
     String html = result.getResponse().getContentAsString();
 
-    int assigneesSectionIndex = html.indexOf("Bearbeiter");
+    int handoversPaneIndex = html.indexOf("id=\"pane-handovers\"");
     int handoverButtonIndex = html.indexOf("data-testid=\"order-handover-open\"");
+    int summaryIndex = html.indexOf("id=\"order-header-results\"");
 
-    assertThat(assigneesSectionIndex)
-        .as("Bearbeiter-Bereich muss im HTML vorhanden sein")
-        .isGreaterThan(0);
+    assertThat(handoversPaneIndex).as("the handovers tab pane is rendered").isPositive();
+    assertThat(handoverButtonIndex).as("the handover button is rendered").isPositive();
     assertThat(handoverButtonIndex)
-        .as("Handover-Button muss im HTML vorhanden sein")
-        .isGreaterThan(0);
+        .as("the handover button sits in the handovers tab pane")
+        .isGreaterThan(handoversPaneIndex)
+        .isLessThan(html.indexOf("</section>", handoversPaneIndex));
     assertThat(handoverButtonIndex)
-        .as("Handover-Button muss nach dem Bearbeiter-Bereich erscheinen")
-        .isGreaterThan(assigneesSectionIndex);
-
-    int headerEnd = html.indexOf("</div>", html.indexOf("flex-between"));
-    assertThat(handoverButtonIndex)
-        .as("Handover-Button darf nicht im Header-Bereich (flex-between) erscheinen")
-        .isGreaterThan(headerEnd);
+        .as("the handover button is not part of the page head")
+        .isGreaterThan(summaryIndex);
+    int buttonStart = html.lastIndexOf("<button", handoverButtonIndex);
+    assertThat(html.substring(buttonStart, handoverButtonIndex))
+        .as("the handover button is the tab's primary action")
+        .contains("btn--cta");
   }
 }

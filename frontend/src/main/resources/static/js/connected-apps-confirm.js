@@ -35,7 +35,7 @@
         const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});
         /** @param {string} key */
         const text = function (key) {
-            const attribute = 'data-' + key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+            const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
             return window.krtI18nText(data[key], attribute);
         };
         return {
@@ -66,7 +66,7 @@
      * @param {string} id
      */
     function show(id) {
-        ['cac-loading', 'cac-preview', 'cac-missing', 'cac-outcome'].forEach(function (other) {
+        ['cac-loading', 'cac-preview', 'cac-missing', 'cac-outcome'].forEach((other) => {
             const element = document.getElementById(other);
             if (element) {
                 element.hidden = other !== id;
@@ -92,7 +92,7 @@
      * @param {Array<string | number>} values
      */
     function format(template, values) {
-        return template.replace(/\{(\d)\}/g, function (match, index) {
+        return template.replace(/\{(\d)\}/g, (match, index) => {
             const value = values[Number(index)];
             return value === undefined ? match : String(value);
         });
@@ -121,7 +121,7 @@
 
     window.krtFetch.write({
         method: 'POST',
-        url: BASE + '/load',
+        url: `${BASE}/load`,
         payload: { handoffId },
         toast: false,
         errorMessage: i18n.error,
@@ -143,10 +143,10 @@
 
     const confirmBtn = document.getElementById('cac-confirm');
     if (confirmBtn) {
-        confirmBtn.addEventListener('click', function () {
+        confirmBtn.addEventListener('click', () => {
             window.krtFetch.write({
                 method: 'POST',
-                url: BASE + '/apply',
+                url: `${BASE}/apply`,
                 payload: { handoffId },
                 toast: false,
                 errorMessage: i18n.error,
@@ -161,10 +161,10 @@
 
     const discardBtn = document.getElementById('cac-discard');
     if (discardBtn) {
-        discardBtn.addEventListener('click', function () {
+        discardBtn.addEventListener('click', () => {
             window.krtFetch.write({
                 method: 'POST',
-                url: BASE + '/discard',
+                url: `${BASE}/discard`,
                 payload: { handoffId },
                 toast: false,
                 errorMessage: i18n.error,

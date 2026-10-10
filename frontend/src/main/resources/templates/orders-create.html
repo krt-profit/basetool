@@ -12,156 +12,192 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="${editOrderId != null} ? #{orders.create.editTitle} : #{orders.create.title}">Neuer Auftrag</h1>
-        <div class="flex-gap-sm">
-            <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
-        </div>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='orders.create.back', eyebrowHref=@{/orders},
+        titleText=(${editOrderId != null} ? #{orders.create.editTitle} : #{orders.create.title}))}"></th:block>
 
-    <div class="hud-box mt-2">
-        <div th:if="${error}" class="hud-box hud-box-error">
-            <p th:text="#{__${error}__}">Fehler</p>
-        </div>
-        
-        <div th:if="${success}" class="hud-box hud-box-success">
-            <p th:text="#{__${success}__}">Erfolg</p>
+    <div class="form-layout card orders-create">
+        <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
+        <div th:if="${success}" class="alert alert-success" role="status" th:text="#{__${success}__}">Erfolg</div>
+
+        <div class="segmented segmented--block segmented--lg orders-create__kind" role="radiogroup"
+             th:attr="aria-label=#{orders.create.kind}" data-segmented="orderModeToggle"
+             th:hidden="${editOrderId != null}">
+            <label data-testid="order-mode-material">
+                <input type="radio" name="orderModeToggle" value="material"
+                       th:checked="${editOrderId == null}"
+                       data-trigger="order-mode-toggle" />
+                <span th:text="#{orders.create.kind.material}">Materialauftrag</span>
+            </label>
+            <label data-testid="order-mode-item">
+                <input type="radio" name="orderModeToggle" value="item"
+                       th:checked="${editOrderId != null}"
+                       data-trigger="order-mode-toggle" />
+                <span th:text="#{orders.create.kind.item}">Item-Auftrag</span>
+            </label>
         </div>
 
-        <div class="form-container">
-            <div class="form-group" th:classappend="${editOrderId != null} ? 'krtm-hidden' : ''">
-                <label th:text="#{orders.create.kind}">Auftragsart</label>
-                <div class="flex-gap-sm krtm-display-flex-gap-1-5rem-7e37">
-                    <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
-                        <input type="radio" name="orderModeToggle" value="material"
-                               th:attr="checked=${editOrderId == null} ? 'checked' : null"
-                               data-trigger="order-mode-toggle"
-                               data-testid="order-mode-material" />
-                        <span th:text="#{orders.create.kind.material}">Materialauftrag</span>
-                    </label>
-                    <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
-                        <input type="radio" name="orderModeToggle" value="item"
-                               th:attr="checked=${editOrderId != null} ? 'checked' : null"
-                               data-trigger="order-mode-toggle"
-                               data-testid="order-mode-item" />
-                        <span th:text="#{orders.create.kind.item}">Item-Auftrag</span>
-                    </label>
-                </div>
-            </div>
-
-            <div id="mode-material">
-            <form th:action="@{/orders/create}" method="post" th:object="${jobOrderForm}">
+        <div id="mode-material" th:hidden="${editOrderId != null}">
+            <form class="orders-create__form" th:action="@{/orders/create}" method="post" th:object="${jobOrderForm}">
                 <input type="hidden" th:field="*{source}" />
-                
-                <div th:if="${#lists.isEmpty(responsibleOptions)}" class="hud-box hud-box-error">
-                    <p th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</p>
-                </div>
-                <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
-                <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
 
-                <div class="form-group">
-                    <label for="handle" th:text="#{orders.create.handle}">Handle Ansprechpartner</label>
-                    <input type="text" id="handle" th:field="*{handle}" autocomplete="off" required>
-                </div>
-                
-                <h3 class="krtm-color-var-color-gray-1-font-family-var-font-03e4" th:text="#{orders.create.materials.title}">Materialien</h3>
-                
-                <details class="form-group scmdb-import krtm-border-1px-dashed-var-color-primary-padding-8290">
-                    <summary th:text="#{orders.create.scmdb.label}">scmdb.net Export</summary>
-                    <div class="mt-1">
-                        <textarea id="scmdb-import-text" rows="5" th:placeholder="#{orders.create.scmdb.placeholder}" class="krtm-width-100-background-color-var-color-surface-101d"></textarea>
-                        <button type="button" class="btn btn-ghost krtm-margin-top-1rem-width-100-a81a" data-trigger="orders-import-scmdb" th:text="#{orders.create.scmdb.button}">Materialien extrahieren</button>
-                    </div>
-                </details>
-                
-                <div id="materials-container">
-                    <div class="material-row" th:each="mat, stat : *{materials}">
-                        <div class="form-group flex-2 mb-0">
-                            <label th:text="#{orders.create.material}">Material</label>
-                            <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" data-role="material-select" data-krt-combobox="remote-materials-joborder" required>
-                                <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                                <option th:each="m : ${materials}" th:if="${m.id == jobOrderForm.materials[stat.index].materialId}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
-                            </select>
+                <fieldset class="form-section">
+                    <legend class="form-section__head" th:text="|1 · #{orders.create.section.order}|">1 · Auftrag</legend>
+                    <div th:if="${#lists.isEmpty(responsibleOptions)}" class="alert alert-danger" role="alert"
+                         th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</div>
+                    <div class="form-grid">
+                        <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
+                        <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
+                        <div class="form-group">
+                            <label for="handle" th:text="#{orders.create.handle}">Handle Ansprechpartner</label>
+                            <input type="text" id="handle" th:field="*{handle}" autocomplete="off" required>
                         </div>
-                        <div class="form-group flex-1 mb-0">
-                            <label>
-                                <span th:text="#{orders.create.amount}">Menge</span>
-                                <span data-role="amount-unit"></span>
+                    </div>
+                </fieldset>
+
+                <fieldset class="form-section">
+                    <legend class="form-section__head">
+                        <span th:text="|2 · #{orders.create.materials.title}|">2 · Materialien</span>
+                        <span class="grow"></span>
+                        <button type="button" class="btn btn-ghost btn-xs" data-trigger="open-modal-display"
+                                data-modal-id="orders-scmdb-modal" data-testid="orders-scmdb-open"
+                                th:text="#{orders.create.scmdb.open}">Aus scmdb importieren</button>
+                    </legend>
+
+                    <div class="material-grid material-grid--head" aria-hidden="true">
+                        <span th:text="#{orders.create.material}">Material</span>
+                        <span th:text="#{orders.create.amount}">Menge</span>
+                        <span th:text="#{orders.create.minQuality}">Min. Qualität</span>
+                        <span></span>
+                    </div>
+
+                    <div id="materials-container" th:attr="data-remove-label=#{orders.create.material.remove}">
+                        <div class="material-row material-grid" th:each="mat, stat : *{materials}">
+                            <div class="form-group">
+                                <label class="visually-hidden" th:text="#{orders.create.material}">Material</label>
+                                <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" data-role="material-select" data-krt-combobox="remote-materials-joborder" required>
+                                    <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                                    <option th:each="m : ${materials}" th:if="${m.id == jobOrderForm.materials[stat.index].materialId}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
+                                </select>
+                            </div>
+                            <div class="form-group material-row__amount">
+                                <input type="text" inputmode="decimal" data-scu-decimal th:field="*{materials[__${stat.index}__].amount}" data-testid="order-material-amount" data-role="material-amount" step="0.001" min="0" required
+                                       th:attr="aria-label=#{orders.create.amount}">
+                                <span class="material-row__unit" data-role="amount-unit"></span>
                                 <th:block th:replace="~{fragments/scu-hint :: scuHint(null, true)}"></th:block>
-                            </label>
-                            <input type="text" inputmode="decimal" data-scu-decimal th:field="*{materials[__${stat.index}__].amount}" data-testid="order-material-amount" data-role="material-amount" step="0.001" min="0" required>
-                        </div>
-                        <div class="form-group flex-1 mb-0">
-                            <label th:text="#{orders.create.minQuality}">Min. Qualität</label>
-                            <select th:field="*{materials[__${stat.index}__].minQuality}" th:title="#{orders.create.minQuality.hint}">
-                                <th:block th:replace="~{fragments/quality-tier :: floorOptions(${qualityTiers}, ${jobOrderForm.materials[__${stat.index}__].minQuality})}"></th:block>
-                            </select>
+                            </div>
+                            <div class="form-group">
+                                <select th:field="*{materials[__${stat.index}__].minQuality}" th:title="#{orders.create.minQuality.hint}"
+                                        th:attr="aria-label=#{orders.create.minQuality}">
+                                    <th:block th:replace="~{fragments/quality-tier :: floorOptions(${qualityTiers}, ${jobOrderForm.materials[__${stat.index}__].minQuality})}"></th:block>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-ghost btn-icon material-row__remove" data-trigger="orders-remove-material"
+                                    data-testid="order-material-remove"
+                                    th:attr="aria-label=#{orders.create.material.remove},title=#{orders.create.material.remove}"
+                                    th:disabled="${#lists.size(jobOrderForm.materials) <= 1}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </div>
                     </div>
-                </div>
-                
-                <button type="button" class="btn btn-ghost mt-1" data-trigger="orders-add-material" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
 
-                <div class="form-group mt-2">
-                    <label for="comment" th:text="#{orders.create.comment}">Kommentar</label>
-                    <textarea id="comment" th:field="*{comment}" rows="4" maxlength="1000" th:placeholder="#{orders.create.comment.placeholder}"></textarea>
-                </div>
+                    <button type="button" class="btn btn-ghost orders-create__add" data-trigger="orders-add-material" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
+                </fieldset>
 
-                <div class="mt-2-flex-gap">
-                    <button type="submit" class="btn btn--cta" data-testid="order-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
-                    <a th:href="@{/orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{orders.create.cancel}">Abbrechen</a>
+                <fieldset class="form-section">
+                    <legend class="form-section__head">
+                        <label for="comment"><span aria-hidden="true">3 · </span><span th:text="#{orders.create.comment}">Kommentar</span></label>
+                        <span class="opt" th:text="|· #{form.optional}|">· optional</span>
+                    </legend>
+                    <div class="form-group">
+                        <textarea id="comment" th:field="*{comment}" rows="4" maxlength="1000" th:placeholder="#{orders.create.comment.placeholder}"
+                                  aria-describedby="comment-count" data-counter="comment-count"></textarea>
+                        <p class="form-hint orders-create__counter" id="comment-count"
+                           th:text="${(jobOrderForm.comment == null ? 0 : jobOrderForm.comment.length()) + ' / 1000'}">0 / 1000</p>
+                    </div>
+                </fieldset>
+
+                <div class="form-actions--sticky">
+                    <span class="form-actions__summary" id="orders-material-summary" data-testid="order-summary"
+                          th:attr="data-one=#{orders.create.summary.material.one},data-other=#{orders.create.summary.material.other},data-for=#{orders.create.summary.for},data-unit=#{material.quantity.scu}"></span>
+                    <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.create.cancel}">Abbrechen</a>
+                    <button type="submit" class="btn btn--cta" data-testid="order-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.submit.create}">Auftrag anlegen</span></button>
                 </div>
             </form>
-            </div>
+        </div>
 
-            <div id="mode-item" hidden>
-            <form th:action="${editOrderId != null} ? @{/orders/{id}/items/update(id=${editOrderId})} : @{/orders/items}" method="post" th:object="${jobOrderItemForm}">
+        <div id="mode-item" th:hidden="${editOrderId == null}">
+            <form class="orders-create__form" th:action="${editOrderId != null} ? @{/orders/{id}/items/update(id=${editOrderId})} : @{/orders/items}" method="post" th:object="${jobOrderItemForm}">
                 <input type="hidden" th:field="*{source}" />
 
-                <div th:if="${#lists.isEmpty(responsibleOptions)}" class="hud-box hud-box-error">
-                    <p th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</p>
-                </div>
-                <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('item-responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderItemForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
-                <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('item-requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderItemForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
+                <fieldset class="form-section">
+                    <legend class="form-section__head" th:text="|1 · #{orders.create.section.order}|">1 · Auftrag</legend>
+                    <div th:if="${#lists.isEmpty(responsibleOptions)}" class="alert alert-danger" role="alert"
+                         th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</div>
+                    <div class="form-grid">
+                        <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('item-responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderItemForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
+                        <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('item-requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderItemForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
+                        <div class="form-group">
+                            <label for="item-handle" th:text="#{orders.create.handle}">Handle Ansprechpartner</label>
+                            <input type="text" id="item-handle" th:field="*{handle}" autocomplete="off" required>
+                        </div>
+                    </div>
+                </fieldset>
 
-                <div class="form-group">
-                    <label for="item-handle" th:text="#{orders.create.handle}">Handle Ansprechpartner</label>
-                    <input type="text" id="item-handle" th:field="*{handle}" autocomplete="off" required>
-                </div>
+                <fieldset class="form-section">
+                    <legend class="form-section__head" th:text="|2 · #{orders.create.items.title}|">2 · Items</legend>
+                    <div th:if="${!hasOrderableItems}" class="alert alert-danger" role="alert"
+                         th:text="#{orders.create.item.noItems}">Keine bestellbaren Items verfügbar.</div>
+                    <div id="item-lines"></div>
+                    <button type="button" class="btn btn-ghost orders-create__add" data-trigger="orders-add-item" th:text="#{orders.create.item.add}">+ Item hinzufügen</button>
+                </fieldset>
 
-                <h3 class="krtm-color-var-color-gray-1-font-family-var-font-03e4" th:text="#{orders.create.items.title}">Items</h3>
+                <fieldset class="form-section">
+                    <legend class="form-section__head">
+                        <label for="item-comment"><span aria-hidden="true">3 · </span><span th:text="#{orders.create.comment}">Kommentar</span></label>
+                        <span class="opt" th:text="|· #{form.optional}|">· optional</span>
+                    </legend>
+                    <div class="form-group">
+                        <textarea id="item-comment" th:field="*{comment}" rows="4" maxlength="1000" th:placeholder="#{orders.create.comment.placeholder}"
+                                  aria-describedby="item-comment-count" data-counter="item-comment-count"></textarea>
+                        <p class="form-hint orders-create__counter" id="item-comment-count"
+                           th:text="${(jobOrderItemForm.comment == null ? 0 : jobOrderItemForm.comment.length()) + ' / 1000'}">0 / 1000</p>
+                    </div>
+                </fieldset>
 
-                <div th:if="${!hasOrderableItems}" class="hud-box hud-box-error">
-                    <p th:text="#{orders.create.item.noItems}">Keine bestellbaren Items verfügbar.</p>
-                </div>
-
-                <div id="item-lines"></div>
-
-                <button type="button" class="btn btn-ghost mt-1" data-trigger="orders-add-item" th:text="#{orders.create.item.add}">+ Item hinzufügen</button>
-
-                <div class="form-group mt-2">
-                    <label for="item-comment" th:text="#{orders.create.comment}">Kommentar</label>
-                    <textarea id="item-comment" th:field="*{comment}" rows="4" maxlength="1000" th:placeholder="#{orders.create.comment.placeholder}"></textarea>
-                </div>
-
-                <div class="mt-2-flex-gap">
-                    <button type="submit" class="btn btn--cta" data-testid="order-item-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
-                    <a th:href="@{/orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{orders.create.cancel}">Abbrechen</a>
+                <div class="form-actions--sticky">
+                    <span class="form-actions__summary" id="orders-item-summary" data-testid="order-item-summary"
+                          th:attr="data-one=#{orders.create.summary.item.one},data-other=#{orders.create.summary.item.other},data-for=#{orders.create.summary.for}"></span>
+                    <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.create.cancel}">Abbrechen</a>
+                    <button type="submit" class="btn btn--cta" data-testid="order-item-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="${editOrderId != null} ? #{orders.create.submit.edit} : #{orders.create.submit.create}">Auftrag anlegen</span></button>
                 </div>
             </form>
-            </div>
         </div>
     </div>
-    
-    <select id="minquality-options-template" class="krtm-display-none-5790">
+
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='orders-scmdb-modal', titleKey='orders.create.scmdb.open', variant='krt-modal--wide', body=~{::orders-scmdb-modal-body})}">
+        <th:block th:ref="orders-scmdb-modal-body">
+            <div class="krt-modal-body">
+                <div class="form-group">
+                    <label for="scmdb-import-text" th:text="#{orders.create.scmdb.label}">scmdb.net Export</label>
+                    <textarea id="scmdb-import-text" rows="8" th:placeholder="#{orders.create.scmdb.placeholder}"></textarea>
+                </div>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                        data-modal-id="orders-scmdb-modal" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn-outline" data-trigger="orders-import-scmdb"
+                        data-testid="orders-scmdb-import" th:text="#{orders.create.scmdb.button}">Materialien extrahieren</button>
+            </div>
+        </th:block>
+    </th:block>
+
+    <select id="minquality-options-template" hidden>
         <th:block th:replace="~{fragments/quality-tier :: floorOptionsSelected(${qualityTiers}, ${qualityTiers.?[active() and minQuality() == 650].isEmpty() ? null : 650})}"></th:block>
     </select>
 
-    <select id="item-quality-options-template" class="krtm-display-none-5790">
+    <select id="item-quality-options-template" hidden>
         <th:block th:replace="~{fragments/quality-tier :: codeOptions(${qualityTiers})}"></th:block>
     </select>
 
-    <select id="item-options-template" class="krtm-display-none-5790">
+    <select id="item-options-template" hidden>
         <option value="" th:text="#{orders.create.item.select}">-- Item wählen --</option>
     </select>
 </main>
@@ -205,7 +241,6 @@
     const MSG_CREATE_FAILED = /*[[#{error.joborder.create.failed}]]*/ 'Create failed.';
     const MSG_UPDATE_FAILED = /*[[#{error.joborder.update.failed}]]*/ 'Update failed.';
 </script>
-<script th:src="@{/js/escape-html.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/orders-create.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

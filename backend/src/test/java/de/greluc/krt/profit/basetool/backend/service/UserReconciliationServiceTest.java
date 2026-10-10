@@ -39,17 +39,17 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
-import de.greluc.krt.profit.basetool.backend.event.MemberDepartedEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.PartialRoleScopeProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
@@ -100,6 +100,7 @@ class UserReconciliationServiceTest {
   @Mock private KeycloakService keycloakService;
   @Mock private UserDeletionService userDeletionService;
   @Mock private ObjectProvider<UserRegistrationService> selfProvider;
+  @Mock private OrgUnitSeatNotifier seatNotifier;
 
   private UserRegistrationService userRegistrationService;
   private UserReconciliationService userReconciliationService;
@@ -136,6 +137,7 @@ class UserReconciliationServiceTest {
             userRegistrationService,
             userService,
             partialRoleScopeProperties,
+            List.of(seatNotifier),
             meterRegistry);
     lenient()
         .when(userService.getUserIdFromJwt(any(Jwt.class)))
@@ -719,6 +721,7 @@ class UserReconciliationServiceTest {
           Set.of("KRT Member"),
           roleNames(existing.getRoles()),
           "a complete claim must still be able to remove a role");
+      verify(seatNotifier).onRolesChanged(USER_ID, existing.getRoles());
     }
 
     /**

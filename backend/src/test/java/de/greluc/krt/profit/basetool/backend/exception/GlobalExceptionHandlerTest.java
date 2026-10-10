@@ -30,9 +30,10 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
-import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
@@ -960,7 +961,7 @@ class GlobalExceptionHandlerTest {
         "the caller must still be told why");
 
     java.lang.reflect.Method origin =
-        java.util.Arrays.stream(GlobalExceptionHandler.class.getDeclaredMethods())
+        java.util.Arrays.stream(ApplicationProblemHandlers.class.getDeclaredMethods())
             .filter(m -> "originOf".equals(m.getName()))
             .findFirst()
             .orElseThrow();

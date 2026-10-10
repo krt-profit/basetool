@@ -1,290 +1,305 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
-    label {
-        display: block;
-        margin-bottom: 0.5rem;
+    .op-kpis .kpi-value {
+        font-size: 1.6rem;
+    }
+    .op-kpis .kpi-value .is-neg {
+        color: var(--color-danger-text);
+    }
+    .op-kpis .kpi-unit {
+        margin-left: 0.15rem;
+        color: var(--color-gray-2-text);
         font-family: var(--font-body);
-        font-size: 0.9rem;
-        font-weight: bold;
-    }
-    input[type='text'],
-    input[type='url'],
-    select,
-    textarea {
-        width: 100%;
-        padding: 0.8rem;
-        background-color: var(--color-surface-input);
-        border: 1px solid var(--color-gray-3);
-        color: var(--color-gray-1);
-        font-family: var(--font-body);
-        box-sizing: border-box;
-    }
-    input:focus,
-    select:focus,
-    textarea:focus {
-        outline: none;
-        border-color: var(--color-primary);
-        box-shadow: 0 0 5px rgba(231, 126, 35, 0.3);
-    }
-    .form-row {
-        display: flex;
-        gap: 1rem;
-        flex-wrap: wrap;
-    }
-    .form-row > .form-group {
-        flex: 1;
-        min-width: 250px;
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-regular);
     }
 
-    html,
-    body {
-        margin: 0;
-        overflow-x: hidden;
+    .op-tabs {
+        margin: var(--space-6) 0 var(--space-4);
+        padding: 0;
+        background-color: transparent;
     }
-    .page-wrapper {
-        width: 100%;
-        max-width: 1800px;
-        margin: 0 auto;
-        overflow-x: clip;
-        box-sizing: border-box;
-        padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
-    }
-    .mission-head-sticky {
-        position: sticky;
-        top: 0;
-        z-index: 900;
-        background-color: var(--color-bg-black);
-    }
-    .mission-head {
-        background-color: var(--color-bg-dark-gray);
-        border-bottom: var(--border-hairline);
-        padding: 12px 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
-    .mission-head-title {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        flex-wrap: wrap;
-        min-width: 0;
-    }
-    .mission-head-title h1 {
-        font-family: var(--font-headline);
-        font-weight: var(--fw-bold);
-        color: var(--color-primary);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-size: 1.05rem;
-        margin: 0;
-        display: inline;
-    }
-    .mission-head-actions {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-    .tab-panes {
-        padding: 14px 16px 18px;
-    }
+
     .tab-pane {
         display: none;
         flex-direction: column;
-        gap: 12px;
+        gap: var(--space-4);
     }
     .tab-pane.on {
         display: flex;
     }
 
-    .pane-grid-2 {
+    .op-overview {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
+        gap: var(--space-4);
         align-items: start;
     }
-    .pane-col {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        min-width: 0;
-    }
-    @media (width <= 980px) {
-        .pane-grid-2 {
-            grid-template-columns: 1fr;
+    @media (width <= 1024px) {
+        .op-overview {
+            grid-template-columns: minmax(0, 1fr);
         }
     }
 
-    .kpanel {
-        background-color: var(--color-bg-dark-gray);
-        border: var(--border-hairline);
-        min-width: 0;
-    }
-    .kpanel-head {
-        padding: 8px 12px;
-        background-color: var(--color-surface-input);
-        border-left: 4px solid var(--color-primary);
-        border-bottom: var(--border-hairline);
-        font-family: var(--font-body);
-        font-size: 0.72rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-weight: var(--fw-bold);
-        color: var(--color-gray-1);
+    .op-card-head,
+    .op-pane-head {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 8px;
         flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
     }
-    .kpanel-body {
-        padding: 12px;
+    .op-card-head {
+        padding: var(--space-3) var(--space-4);
+        border-bottom: var(--border-hairline);
     }
-    .kpanel-body > .table-responsive {
-        width: 100%;
-        overflow-x: auto;
-    }
-    .btn-xs2 {
-        min-height: 32px;
-        padding: 0.25rem 0.6rem;
-        font-size: 0.68rem;
-    }
-    .desc {
-        font-size: 0.85rem;
-        font-weight: 300;
-        color: var(--color-gray-1);
-        margin: 0;
-        line-height: 1.55;
-        max-width: 80ch;
-    }
-    .ph-extra {
+    .op-unit {
         color: var(--color-gray-2-text);
-        font-weight: var(--fw-bold);
-        text-transform: none;
-        font-variant-numeric: tabular-nums;
+        font-size: var(--fs-xs);
     }
-    #pane-op-fin details.hud-details,
-    #pane-op-ueb details.hud-details {
-        background-color: var(--color-bg-dark-gray);
-        border: var(--border-hairline);
-        padding: 12px 14px;
-    }
-    .op-mission-result-link {
+
+    .op-result-row {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(4rem, 1.5fr) auto 16px;
+        align-items: center;
+        gap: var(--space-4);
+        min-height: 52px;
+        padding: var(--space-2) var(--space-4);
+        border-bottom: var(--border-hairline);
         color: var(--color-gray-1);
         text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
+        transition: background-color 0.2s;
     }
-    .op-mission-result-link:hover {
-        color: var(--color-primary);
+    .op-result-row:last-child {
+        border-bottom: 0;
     }
-
-    .sumstrip {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
+    .op-result-row:hover {
+        background-color: var(--color-gray-3);
     }
-    @media (width <= 880px) {
-        .sumstrip {
-            grid-template-columns: repeat(2, 1fr);
-        }
+    .op-result-row:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: -2px;
     }
-    .sum {
-        background-color: var(--color-bg-dark-gray);
-        border: var(--border-hairline);
-        padding: 10px 14px;
-    }
-    .sum.is-total {
-        border-top: 3px solid var(--color-primary);
-    }
-    .sum .sk {
-        font-size: 0.62rem;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: var(--color-gray-2-text);
+    .op-result-name {
+        overflow: hidden;
+        color: var(--color-white);
         font-weight: var(--fw-bold);
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
-    .sum .sv {
-        font-family: var(--font-headline);
-        font-weight: var(--fw-bold);
-        font-size: 1.15rem;
+    .op-result-value {
         color: var(--color-white);
         font-variant-numeric: tabular-nums;
-        margin-top: 2px;
+        font-weight: var(--fw-bold);
+        text-align: right;
     }
-    .sum .sv.pos {
-        color: var(--color-success);
-    }
-    .sum .sv.neg {
+    .op-result-value.is-neg,
+    .op-fin-value.is-neg {
         color: var(--color-danger-text);
     }
-    .sum .sv.donate {
-        color: var(--color-dept-profit);
-    }
-    .sum .sd {
-        font-size: 0.66rem;
-        color: var(--color-gray-2-text);
-        margin-top: 2px;
+    @media (width <= 768px) {
+        .op-result-row {
+            grid-template-columns: minmax(0, 1fr) auto 16px;
+            row-gap: var(--space-2);
+        }
+        .op-result-meter {
+            grid-column: 1 / -1;
+            grid-row: 2;
+        }
     }
 
-    .holder-row {
+    .op-payout-card {
         display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 5px 0;
+        flex-direction: column;
+        gap: var(--space-3);
     }
-    .holder-name {
-        flex: 0 0 38%;
-        min-width: 0;
-        font-size: 0.8rem;
-        color: var(--color-gray-1);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+    .op-payout-progress {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--space-2);
     }
-    .holder-bar {
-        flex: 1;
-        height: 8px;
-        background: var(--color-surface-input);
-        border: 1px solid var(--color-gray-3);
-        overflow: hidden;
-    }
-    .holder-bar i {
-        display: block;
-        height: 100%;
-        background: var(--color-success);
-    }
-    .holder-value {
-        flex: 0 0 auto;
+    .op-payout-ratio {
+        color: var(--color-white);
+        font-family: var(--font-headline);
+        font-size: 1.6rem;
         font-variant-numeric: tabular-nums;
         font-weight: var(--fw-bold);
-        color: var(--color-success);
-        font-size: 0.82rem;
     }
-    .holder-sum {
+    .op-payout-ratio-label,
+    .op-muted {
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+    }
+    .op-muted {
+        margin: 0;
+    }
+    .op-payout-meter {
+        height: 8px;
+    }
+    .op-payout-facts {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        margin: 0;
+    }
+    .op-payout-facts > div {
         display: flex;
         justify-content: space-between;
-        gap: 10px;
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: var(--border-hairline);
-        font-weight: var(--fw-bold);
+        gap: var(--space-3);
+    }
+    .op-payout-facts dt {
         color: var(--color-gray-1);
-        font-size: 0.85rem;
+    }
+    .op-payout-facts dd {
+        margin: 0;
+        color: var(--color-white);
+        font-variant-numeric: tabular-nums;
+        font-weight: var(--fw-bold);
     }
 
+    .op-disclosure,
+    .op-fin-item {
+        border-bottom: var(--border-hairline);
+    }
+    .op-disclosure {
+        padding: var(--space-3) var(--space-4);
+        background-color: var(--color-bg-dark-gray);
+        border: var(--border-hairline);
+    }
+    .op-disclosure > summary,
+    .op-fin-item > summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-3);
+        min-height: var(--touch-target);
+        cursor: pointer;
+        color: var(--color-gray-1);
+        font-weight: var(--fw-bold);
+    }
+    .op-disclosure > .markdown-content {
+        margin-top: var(--space-3);
+    }
+
+    .op-fin-item:last-child {
+        border-bottom: 0;
+    }
+    .op-fin-item > summary {
+        padding: var(--space-2) var(--space-4);
+    }
+    .op-fin-item > summary:hover {
+        background-color: var(--color-gray-3);
+    }
+    .op-fin-name {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--color-white);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .op-fin-value {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+    .op-finance-detail-body {
+        padding: 0 var(--space-4) var(--space-3);
+    }
+    .op-fin-note {
+        margin: 0;
+        padding-top: var(--space-2);
+        color: var(--color-gray-1);
+        font-size: var(--fs-xs);
+    }
+    .op-fin-error {
+        color: var(--color-danger-text);
+    }
+    .op-fin-link {
+        color: var(--color-dept-profit);
+        text-decoration: underline;
+    }
+
+    .payout-table tfoot {
+        position: sticky;
+        bottom: var(--krt-footer-height, 0);
+        z-index: 2;
+    }
+    .payout-table tfoot td {
+        background-color: var(--color-surface-input);
+        border-top: var(--border-heading);
+        border-bottom: 0;
+    }
+    .payout-table .payout-paid-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin: 0;
+        cursor: pointer;
+    }
+    .payout-table .payout-paid-checkbox {
+        flex: 0 0 auto;
+        width: 20px;
+        height: 20px;
+        margin: 0;
+        cursor: pointer;
+        accent-color: var(--color-primary);
+    }
+    .payout-table .payout-paid-status {
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+        line-height: 1.2;
+    }
+    .payout-table tbody tr:has(.payout-paid-checkbox:checked),
+    .payout-table tbody tr:has(.payout-paid-yes) {
+        background-color: color-mix(in srgb, var(--color-success) 6%, transparent);
+    }
+    @media (width <= 768px) {
+        .payout-table tfoot {
+            display: block;
+            bottom: var(--krt-tabbar-height);
+        }
+        .payout-table tfoot tr {
+            background-color: var(--color-surface-input);
+            border-top: var(--border-heading);
+        }
+        .payout-table tfoot td {
+            background-color: transparent;
+            border-top: 0;
+        }
+    }
+
+    .op-edit-form label {
+        display: block;
+        margin-bottom: var(--space-2);
+        font-weight: var(--fw-bold);
+    }
+    .op-edit-form :is(input[type='text'], select, textarea) {
+        width: 100%;
+    }
+    .op-md-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        margin-bottom: var(--space-2);
+    }
+    .op-md-head > label {
+        margin: 0;
+    }
+    .op-md-views {
+        padding: 0;
+        background-color: transparent;
+        border-bottom: 0;
+    }
     .md-toolbar {
         display: flex;
-        gap: 6px;
         flex-wrap: wrap;
-        margin-bottom: 8px;
+        gap: 6px;
+        margin-bottom: var(--space-2);
     }
-    .md-toolbar .btn-xs2 {
+    .md-toolbar .btn {
         min-width: 34px;
     }
     .md-input {
@@ -296,7 +311,7 @@
     }
     .md-preview {
         min-height: 200px;
-        padding: 12px;
+        padding: var(--space-3);
         background: var(--color-surface-input);
         border: 1px solid var(--color-gray-3);
     }
@@ -305,145 +320,9 @@
         color: var(--color-gray-2-text);
         font-style: italic;
     }
-
-    .payout-table {
-        margin-top: 1rem;
-    }
-    .payout-table th:last-child,
-    .payout-table td:last-child {
-        text-align: center;
-        white-space: nowrap;
-    }
-    .payout-table th.payout-user-col,
-    .payout-table td.payout-user-cell {
-        text-align: left;
-        font-weight: 600;
-    }
-    .payout-table th.payout-percentage-col,
-    .payout-table td.payout-percentage-cell {
-        text-align: right;
-        white-space: nowrap;
-        font-variant-numeric: tabular-nums;
-        color: var(--color-gray-2-text);
-    }
-    .payout-table th.payout-preference-col,
-    .payout-table td.payout-preference-cell {
-        text-align: left;
-        white-space: nowrap;
-    }
-    .payout-preference-badge {
-        display: inline-block;
-        padding: 0.18rem 0.65rem;
-        border: 1px solid currentColor;
-        border-radius: 999px;
-        font-size: 0.78em;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        line-height: 1.4;
-    }
-    .payout-preference-badge--payout {
-        color: var(--color-primary);
-        background-color: rgba(231, 126, 35, 0.12);
-    }
-    .payout-preference-badge--donate {
-        color: var(--color-dept-marine);
-        background-color: rgba(122, 94, 150, 0.14);
-    }
-    .payout-table th.payout-amount-col,
-    .payout-table td.payout-amount-cell {
-        text-align: right;
-        white-space: nowrap;
-        font-variant-numeric: tabular-nums;
-        min-width: 11em;
-    }
-    .payout-table .payout-amount-value {
-        display: block;
-        font-weight: 600;
-        color: var(--color-gray-1);
-    }
-    .payout-table .payout-amount-reimbursement,
-    .payout-table .payout-amount-transferfee,
-    .payout-table .payout-amount-donation {
-        display: block;
-        font-size: 0.78em;
-        color: var(--color-gray-2-text);
-        font-style: italic;
-        margin-top: 0.2rem;
-    }
-    .payout-donation-total {
-        margin: 1rem 0 0;
-        text-align: right;
-        font-family: 'Lato', sans-serif;
-        font-weight: 700;
-        color: var(--color-dept-profit);
-    }
-    .payout-table th.payout-paid-col,
-    .payout-table td.payout-paid-cell {
-        text-align: center;
-        white-space: nowrap;
-        min-width: 9em;
-    }
-    .payout-table .payout-paid-label {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.55rem;
-        cursor: pointer;
-        margin: 0;
-        font-weight: normal;
-        color: inherit;
-    }
-    .payout-table .payout-paid-checkbox {
-        width: 20px;
-        height: 20px;
-        cursor: pointer;
-        accent-color: var(--color-primary);
-        flex: 0 0 auto;
-        margin: 0;
-    }
-    .payout-table .payout-paid-status {
-        font-size: 0.78em;
-        color: var(--color-gray-2-text);
-        line-height: 1.2;
-    }
-    .payout-table .payout-paid-yes {
-        color: var(--color-dept-profit);
-        font-weight: 600;
-    }
-    .payout-table .payout-paid-no {
-        color: var(--color-gray-2-text);
-    }
-    .payout-table tbody tr:has(.payout-paid-checkbox:checked),
-    .payout-table tbody tr:has(.payout-paid-yes) {
-        background-color: rgba(35, 158, 51, 0.06);
-    }
-    .payout-table tbody tr:has(.payout-paid-checkbox:checked) td.payout-paid-cell,
-    .payout-table tbody tr:has(.payout-paid-yes) td.payout-paid-cell {
-        box-shadow: inset 3px 0 0 var(--color-dept-profit);
-    }
-    @media (width <= 768px) {
-        .payout-table th,
-        .payout-table td {
-            padding: 0.75rem 0.6rem;
-        }
-    }
-
-    .footacts {
-        display: flex;
-        gap: 8px;
-        justify-content: flex-end;
-        align-items: center;
-        flex-wrap: wrap;
-        border-top: var(--border-hairline);
-        padding-top: 12px;
-    }
-    .manager-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background: var(--color-surface-input);
-        border: var(--border-hairline);
-        padding: 0.2rem 0.5rem;
+    .md-toolbar[hidden],
+    .md-input[hidden],
+    .md-preview[hidden] {
+        display: none;
     }
 }

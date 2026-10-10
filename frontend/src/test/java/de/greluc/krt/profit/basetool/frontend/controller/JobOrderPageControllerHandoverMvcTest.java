@@ -78,7 +78,7 @@ class JobOrderPageControllerHandoverMvcTest {
     UUID inventoryItemId = UUID.randomUUID();
 
     when(backendApiClient.post(
-            eq("/api/v1/orders/" + orderId + "/handovers"), any(), eq(JobOrderHandoverDto.class)))
+            eq("/api/v1/orders/{id}/handovers"), any(), eq(JobOrderHandoverDto.class), eq(orderId)))
         .thenReturn(null);
 
     mockMvc
@@ -98,9 +98,10 @@ class JobOrderPageControllerHandoverMvcTest {
         ArgumentCaptor.forClass(JobOrderHandoverCreateDto.class);
     verify(backendApiClient)
         .post(
-            eq("/api/v1/orders/" + orderId + "/handovers"),
+            eq("/api/v1/orders/{id}/handovers"),
             dtoCaptor.capture(),
-            eq(JobOrderHandoverDto.class));
+            eq(JobOrderHandoverDto.class),
+            eq(orderId));
 
     JobOrderHandoverCreateDto sent = dtoCaptor.getValue();
     assertThat(sent.recipientHandle()).isEqualTo("RecipientUser");
@@ -118,7 +119,7 @@ class JobOrderPageControllerHandoverMvcTest {
     UUID inventoryItemId = UUID.randomUUID();
 
     when(backendApiClient.post(
-            eq("/api/v1/orders/" + orderId + "/handovers"), any(), eq(JobOrderHandoverDto.class)))
+            eq("/api/v1/orders/{id}/handovers"), any(), eq(JobOrderHandoverDto.class), eq(orderId)))
         .thenThrow(new BackendServiceException("Conflict", null, 409));
 
     mockMvc
@@ -151,6 +152,7 @@ class JobOrderPageControllerHandoverMvcTest {
         .andExpect(flash().attribute("errorToast", "error.joborder.handover.noitems"));
 
     verify(backendApiClient, never())
-        .post(eq("/api/v1/orders/" + orderId + "/handovers"), any(), eq(JobOrderHandoverDto.class));
+        .post(
+            eq("/api/v1/orders/{id}/handovers"), any(), eq(JobOrderHandoverDto.class), eq(orderId));
   }
 }

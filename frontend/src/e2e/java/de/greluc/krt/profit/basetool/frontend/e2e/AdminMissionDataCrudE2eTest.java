@@ -58,11 +58,14 @@ class AdminMissionDataCrudE2eTest {
   /** Distinctive (unique) shorthand for the created squadron. */
   private static final String SQUADRON_SHORTHAND = "E2EMD";
 
-  /** Each include-inactive checkbox id paired with the fragment its section swaps. */
+  /**
+   * Each include-inactive checkbox id paired with the fragment its section swaps and the master row
+   * that shows the section.
+   */
   private static final String[][] FILTERS = {
-    {"includeInactiveSquadrons", "squadrons-results"},
-    {"includeInactiveJobTypes", "jobtypes-results"},
-    {"includeInactiveFrequencyTypes", "freqtypes-results"},
+    {"includeInactiveSquadrons", "squadrons-results", "md-kind-squadrons"},
+    {"includeInactiveJobTypes", "jobtypes-results", "md-kind-jobtypes"},
+    {"includeInactiveFrequencyTypes", "freqtypes-results", "md-kind-freqtypes"},
   };
 
   private static Playwright playwright;
@@ -148,7 +151,7 @@ class AdminMissionDataCrudE2eTest {
   }
 
   /**
-   * Toggles the include-inactive checkbox of the squadrons, job-types and frequency-types sections
+   * Selects each data kind in the master list, toggles the include-inactive checkbox of its section
    * and asserts that each one re-renders through its own {@code fragment=} swap, with no main-frame
    * navigation request and the no-reload marker intact once the network is idle.
    */
@@ -170,10 +173,13 @@ class AdminMissionDataCrudE2eTest {
             });
 
         for (String[] filter : FILTERS) {
+          page.locator("#" + filter[2]).click();
+          assertThat(page.locator("#" + filter[1])).isVisible();
           Locator checkbox = page.locator("#" + filter[0]);
+          Locator toggle = page.locator("label.switch[for='" + filter[0] + "']");
           boolean before = checkbox.isChecked();
           page.waitForResponse(
-              response -> response.url().contains("fragment=" + filter[1]), checkbox::click);
+              response -> response.url().contains("fragment=" + filter[1]), toggle::click);
           page.waitForLoadState(LoadState.NETWORKIDLE);
 
           assertEquals(!before, checkbox.isChecked(), filter[0] + " must keep its toggled state");

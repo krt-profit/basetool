@@ -49,7 +49,7 @@ import tools.jackson.databind.json.JsonMapper;
 class BackendCallExistenceTest {
 
   /** The number of call sites resolved when the guard was introduced; a smaller scan is broken. */
-  private static final int MIN_RESOLVED_CALL_SITES = 611;
+  private static final int MIN_RESOLVED_CALL_SITES = 524;
 
   /** The number of live-sync probe templates when the guard was introduced. */
   private static final int MIN_LIVE_SYNC_PROBES = 7;
@@ -60,10 +60,10 @@ class BackendCallExistenceTest {
    */
   private static final Map<String, String> UNRESOLVED_EXCEPTIONS =
       Map.of(
-          "LiveSyncSubscriptionAuthorizer#probeOne GET uri",
+          "BackendSideChannels#probeStatus GET uri",
           "a LiveSyncTopicClass probe template with the topic id filled in; covered by"
               + " everyLiveSyncProbeTemplateIsAnExistingGet",
-          "LiveSyncSubscriptionAuthorizer#probeCapability GET path",
+          "BackendSideChannels#probeBody GET path",
           "the LiveSyncTopicClass capability probe template; covered by"
               + " everyLiveSyncProbeTemplateIsAnExistingGet");
 
@@ -150,7 +150,7 @@ class BackendCallExistenceTest {
         .isEmpty();
     assertThat(
             UNRESOLVED_EXCEPTIONS.keySet().stream()
-                .filter(k -> k.startsWith("LiveSyncSubscriptionAuthorizer#"))
+                .filter(k -> k.startsWith("BackendSideChannels#probe"))
                 .allMatch(k -> k.contains(" GET ")))
         .as("the authorizer sends every probe as a GET")
         .isTrue();

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialMatrixItemDto;
@@ -26,9 +27,9 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MatrixGridDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -43,7 +44,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -152,25 +153,14 @@ public class MaterialsPageController {
     }
   }
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the materials, their prices and the trade matrix. */
+  private final CatalogueBackendClient catalogueClient;
 
   /**
    * Limits concurrent page-walks of uncached filtered matrix slices to three, so bursts of distinct
    * filters cannot exhaust the heap; callers block until a permit is free.
    */
   private final Semaphore filteredMatrixFetchGuard = new Semaphore(3);
-
-  /** Response type for the materials price-overview page fetch backing the accordion. */
-  private static final ParameterizedTypeReference<PageResponse<MaterialPriceOverviewDto>>
-      MATERIAL_PRICE_OVERVIEW_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for the full trade-matrix projection fetch feeding the virtual-scroll grid. */
-  private static final ParameterizedTypeReference<PageResponse<MaterialMatrixItemDto>>
-      MATERIAL_MATRIX_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for a material's per-terminal price list on the detail page. */
-  private static final ParameterizedTypeReference<PageResponse<MaterialPriceDto>>
-      MATERIAL_PRICE_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
   /**
    * Renders the materials overview ({@code /materials}), grouped by category; uncategorised
@@ -183,10 +173,7 @@ public class MaterialsPageController {
   @GetMapping
   public String listMaterials(Model model) {
     try {
-      PageResponse<MaterialPriceOverviewDto> page =
-          backendApiClient.get(
-              "/api/v1/materials/prices-overview?size=10000&sort=name,asc",
-              MATERIAL_PRICE_OVERVIEW_PAGE_TYPE);
+      PageResponse<MaterialPriceOverviewDto> page = catalogueClient.materialPriceOverview();
 
       List<MaterialPriceOverviewDto> materials = new ArrayList<>();
       if (page != null && page.content() != null) {
@@ -201,7 +188,7 @@ public class MaterialsPageController {
                     && !mat.category().name().isBlank()
                 ? mat.category().name()
                 : "Unsortiert";
-        materialsByKind.computeIfAbsent(kind, k -> new ArrayList<>()).add(mat);
+        materialsByKind.computeIfAbsent(kind, _ -> new ArrayList<>()).add(mat);
       }
       materialsByKind
           .values()
@@ -228,12 +215,13 @@ public class MaterialsPageController {
    * star-system filter lists; the grid itself comes from {@link #getMatrixData}.
    *
    * @param model Thymeleaf model populated with the {@code materialNames} and {@code starSystems}
-   *     filter source lists
+   *     filter source lists and the {@code uexAge} freshness hint
    * @return the {@code materials-overview} view name
    */
   @NotNull
   @GetMapping("/overview")
   public String getMatrixOverview(Model model) {
+    model.addAttribute("uexAge", uexAge());
     try {
       List<MaterialMatrixItemDto> items = fetchMatrixItems();
       model.addAttribute(
@@ -295,8 +283,7 @@ public class MaterialsPageController {
    */
   @NotNull
   private List<MaterialMatrixItemDto> fetchMatrixItems() {
-    PageResponse<MaterialMatrixItemDto> page =
-        backendApiClient.getCached(CachedCatalog.MATERIALS_MATRIX, MATERIAL_MATRIX_PAGE_TYPE);
+    PageResponse<MaterialMatrixItemDto> page = catalogueClient.materialsMatrix();
     if (page == null || page.content() == null) {
       return new ArrayList<>();
     }
@@ -317,21 +304,16 @@ public class MaterialsPageController {
       List<String> materials, List<String> systems, boolean loadingDock, boolean autoLoad) {
     try {
       filteredMatrixFetchGuard.acquire();
-    } catch (InterruptedException e) {
+    } catch (InterruptedException _) {
       Thread.currentThread().interrupt();
       log.warn("Interrupted while waiting to fetch a filtered materials matrix slice");
       return new ArrayList<>();
     }
     try {
-      List<Object> uriVariables = new ArrayList<>();
-      String template =
-          filteredMatrixTemplate(materials, systems, loadingDock, autoLoad, uriVariables);
-      Object[] variables = uriVariables.toArray();
+      CatalogueBackendClient.MatrixFilter filter =
+          new CatalogueBackendClient.MatrixFilter(materials, systems, loadingDock, autoLoad);
       CatalogPages.CompleteCatalog<MaterialMatrixItemDto> walked =
-          CatalogPages.fetchAll(
-              page ->
-                  backendApiClient.get(
-                      template + "&page=" + page, MATERIAL_MATRIX_PAGE_TYPE, variables));
+          CatalogPages.fetchAll(page -> catalogueClient.filteredMatrixPage(filter, page));
       if (walked.truncated()) {
         log.warn(
             "Filtered materials matrix hit the page-walk safety cap of {} pages — the grid slice is"
@@ -342,46 +324,6 @@ public class MaterialsPageController {
     } finally {
       filteredMatrixFetchGuard.release();
     }
-  }
-
-  /**
-   * Builds the backend matrix URI template for a filtered fetch, with one {@code {fN}} placeholder
-   * per material or star-system value, appending the values to {@code uriVariables} in order.
-   *
-   * @param materials material names to keep, or empty/absent for all
-   * @param systems star-system names to keep, or empty/absent for all
-   * @param loadingDock {@code true} to keep only terminals with a loading dock
-   * @param autoLoad {@code true} to keep only terminals with automatic cargo loading
-   * @param uriVariables mutable sink the placeholder values are appended to, in placeholder order
-   * @return the backend request URI template carrying the filter selection
-   */
-  @NotNull
-  private static String filteredMatrixTemplate(
-      List<String> materials,
-      List<String> systems,
-      boolean loadingDock,
-      boolean autoLoad,
-      @NotNull List<Object> uriVariables) {
-    StringBuilder uri = new StringBuilder(CachedCatalog.MATERIALS_MATRIX.getUri());
-    if (!isEmptySelection(materials)) {
-      for (String material : materials) {
-        uri.append("&materialNames={f").append(uriVariables.size()).append('}');
-        uriVariables.add(material);
-      }
-    }
-    if (!isEmptySelection(systems)) {
-      for (String system : systems) {
-        uri.append("&starSystems={f").append(uriVariables.size()).append('}');
-        uriVariables.add(system);
-      }
-    }
-    if (loadingDock) {
-      uri.append("&hasLoadingDock=true");
-    }
-    if (autoLoad) {
-      uri.append("&isAutoLoad=true");
-    }
-    return uri.toString();
   }
 
   /**
@@ -433,7 +375,7 @@ public class MaterialsPageController {
                   && !item.category().name().isBlank()
               ? item.category().name()
               : "Unsortiert");
-      boolean[] flags = flagsByMaterial.computeIfAbsent(material, k -> new boolean[3]);
+      boolean[] flags = flagsByMaterial.computeIfAbsent(material, _ -> new boolean[3]);
       if (Boolean.TRUE.equals(item.isIllegal())) {
         flags[0] = true;
       }
@@ -444,7 +386,7 @@ public class MaterialsPageController {
         flags[2] = true;
       }
       pricesByMaterial
-          .computeIfAbsent(material, k -> new HashMap<>())
+          .computeIfAbsent(material, _ -> new HashMap<>())
           .put(item.terminalName(), new MatrixGridDto.Cell(item.priceBuy(), item.priceSell()));
     }
 
@@ -485,7 +427,7 @@ public class MaterialsPageController {
       String material = entry.getKey();
       boolean[] flags = flagsByMaterial.getOrDefault(material, new boolean[3]);
       rowsByKind
-          .computeIfAbsent(kindByMaterial.get(material), k -> new ArrayList<>())
+          .computeIfAbsent(kindByMaterial.get(material), _ -> new ArrayList<>())
           .add(new MatrixGridDto.Row(material, flags[0], flags[1], flags[2], entry.getValue()));
     }
     rowsByKind
@@ -506,28 +448,24 @@ public class MaterialsPageController {
 
   /**
    * Renders the material detail page ({@code /materials/{id}}) with the complete price list across
-   * all backend pages (REQ-UI-015). On backend failure the model stays empty.
+   * all backend pages (REQ-UI-015), the terminal rows sorted by sale price and the four price
+   * figures. On backend failure the model stays empty.
    *
    * @param id material id
-   * @param model Thymeleaf model populated with {@code material} and {@code prices}
+   * @param model Thymeleaf model populated with {@code material}, {@code prices}, {@code
+   *     terminalRows}, {@code priceSummary} and {@code uexAge}
    * @return the {@code material-detail} view name
    */
   @NotNull
   @GetMapping("/{id}")
   public String getMaterialDetail(@PathVariable @NotNull UUID id, Model model) {
+    model.addAttribute("uexAge", uexAge());
     try {
-      MaterialDto material = backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
+      MaterialDto material = catalogueClient.material(id);
       model.addAttribute("material", material);
 
       CatalogPages.CompleteCatalog<MaterialPriceDto> prices =
-          CatalogPages.fetchAll(
-              page ->
-                  backendApiClient.get(
-                      "/api/v1/materials/"
-                          + id
-                          + "/prices?size=10000&sort=terminal.name,asc&page="
-                          + page,
-                      MATERIAL_PRICE_PAGE_TYPE));
+          CatalogPages.fetchAll(page -> catalogueClient.materialPricePage(id, page));
       if (prices.truncated()) {
         log.warn(
             "Material {} price list hit the page-walk safety cap of {} pages — the detail table is"
@@ -535,14 +473,53 @@ public class MaterialsPageController {
             id,
             CatalogPages.MAX_CATALOG_PAGES);
       }
-      model.addAttribute("prices", new ArrayList<>(prices.items()));
-
+      List<MaterialPriceDto> priceList = new ArrayList<>(prices.items());
+      model.addAttribute("prices", priceList);
+      List<MaterialTerminalPrices.Row> rows =
+          MaterialTerminalPrices.rows(priceList, matrixItemsOf(id));
+      model.addAttribute("terminalRows", rows);
+      model.addAttribute("priceSummary", MaterialTerminalPrices.summarize(rows));
     } catch (Exception e) {
       log.error("Error loading material detail for id {}", id, e);
       model.addAttribute("error", "error.material.details.load");
       model.addAttribute("material", null);
       model.addAttribute("prices", new ArrayList<>());
+      model.addAttribute("terminalRows", List.of());
+      model.addAttribute("priceSummary", MaterialTerminalPrices.summarize(List.of()));
     }
     return "material-detail";
+  }
+
+  /**
+   * The cached price-matrix rows of one material, which carry each terminal's location; a failure
+   * yields no rows, so the detail table only loses its locations.
+   *
+   * @param id the material
+   * @return the material's matrix rows, never {@code null}
+   */
+  @NotNull
+  private List<MaterialMatrixItemDto> matrixItemsOf(@NotNull UUID id) {
+    try {
+      return MaterialTerminalPrices.forMaterial(fetchMatrixItems(), id);
+    } catch (Exception e) {
+      log.warn("Price matrix unavailable for the locations of material {}", id, e);
+      return List.of();
+    }
+  }
+
+  /**
+   * How long ago the last UEX sweep ran, read from the cached terminal catalogue.
+   *
+   * @return the age, or {@code null} when the catalogue is unavailable or carries no sweep time
+   */
+  @Nullable
+  private UexAge uexAge() {
+    try {
+      PageResponse<TerminalDto> terminals = catalogueClient.terminalCatalogue();
+      return UexAge.of(UexAge.latestSync(terminals), Instant.now());
+    } catch (Exception e) {
+      log.warn("Terminal catalogue unavailable for the UEX freshness hint", e);
+      return null;
+    }
   }
 }

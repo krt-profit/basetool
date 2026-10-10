@@ -318,7 +318,7 @@ snapshotted, exactly as the bank trail snapshots holder handles).
 
 **Details payload format & the `AuditDetails` builder (S8, #914).** The common `details` shape is a
 space-separated list of `key=value` pairs (e.g. `section=full status=PLANNED`). Those payloads are
-composed through the shared [`support.AuditDetails`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/AuditDetails.java)
+composed through the shared [`audit.api.AuditDetails`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/audit/api/AuditDetails.java)
 builder — `AuditDetails.of("section", "full").with("status", status)` — instead of being
 hand-concatenated at each call site. The builder fixes the one-space separator and the `key=value`
 grammar in one place and validates that keys carry no `=` or whitespace, so a copy-paste can no
@@ -374,8 +374,9 @@ by reading the `AuditEventDto.eventType` enum out of the committed `openapi.json
 
 **Enforced by:** `AuditServiceTest`, `AuditQueryIntegrationTest`, `AuditAdminControllerSecurityTest`,
 `RoleServiceTest`, `AdminAuditLogPageControllerTest`,
-per-domain emission assertions in the service tests · **Code:** `service/AuditService`,
-`model/AuditEvent`, `model/AuditDomain`, `model/AuditEventType`, `controller/AuditAdminController`,
+per-domain emission assertions in the service tests · **Code:** `audit/api/AuditRecorder`,
+`service/AuditService`, `model/AuditEvent`, `audit/api/AuditDomain`, `audit/api/AuditEventType`,
+`controller/AuditAdminController`,
 `db/migration/V179` · **Decision:** [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md)
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
@@ -432,7 +433,7 @@ forwarding (defense-in-depth).
 - [ ] An inverted period is rejected (400); both export endpoints are admin-gated.
 
 **Enforced by:** `AuditReportServiceTest`, `BankAuditReportServiceTest`, `AuditAdminControllerSecurityTest`
-· **Code:** `service/AuditReportService`, `service/BankAuditReportService`,
+· **Code:** `service/AuditReportService`, `bank/internal/BankAuditReportService`,
 `service/pdf/AuditLogPdfFormat`, `controller/AuditReportProxyController`
 
 ### REQ-AUDIT-004 — Admin retention purge (delete entries older than a cutoff)
@@ -471,8 +472,8 @@ sweep"; that was true when written and is no longer.
   vanishing without a manual purge do not read as data loss.
 
 **Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `AuditAdminControllerSecurityTest` ·
-**Code:** `service/AuditService#purgeBefore`, `service/BankAuditService#purgeBefore`,
-`controller/AuditAdminController`, `controller/BankAdminController`, `model/dto/AuditPurgeResultDto`,
+**Code:** `service/AuditService#purgeBefore`, `bank/internal/BankAuditService#purgeBefore`,
+`controller/AuditAdminController`, `bank/web/BankAdminController`, `model/dto/AuditPurgeResultDto`,
 `templates/admin/audit-log.html`, `static/js/audit-log.js` · **Decision:**
 [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md)
 
@@ -511,7 +512,7 @@ unreviewed, externally-chosen string into the one table whose value rests on car
 same instinct as the "no user free text, no PII in the details payload" rule above — and would grow
 an unbounded metric label on the other consumer (REQ-OBS-006).
 
-**One mapping, two consumers.** The bounded vocabulary is `support.ClientAttribution`, shared with
+**One mapping, two consumers.** The bounded vocabulary is `platform.api.ClientAttribution`, shared with
 the `client_id` label of `basetool_api_client_requests_total` (REQ-OBS-018). They must agree: an
 operator who sees a burst on that counter and then filters the audit log for the same client is
 joining two answers that only mean the same thing if one rule produced both. Two copies of the
@@ -567,9 +568,9 @@ than a feature, so the viewer offers the identical list everywhere.
 **Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `ClientAttributionTest`,
 `AuditQueryIntegrationTest`, `BankAuditQueryIntegrationTest`, `AdminAuditLogPageControllerTest`,
 `AdminAuditLogModalRenderMvcTest`, `ApiClientMetricsFilterTest`, `AuditLogE2eTest` · **Code:**
-`support/ClientAttribution`, `service/AuditService#record`, `service/BankAuditService#record`,
-`model/AuditEvent#clientId`, `model/BankAuditEvent#clientId`, `controller/AuditAdminController`,
-`controller/BankAdminController`, `controller/AdminAuditLogPageController`,
+`platform/api/ClientAttribution`, `service/AuditService#record`, `bank/internal/BankAuditService#record`,
+`model/AuditEvent#clientId`, `bank/internal/BankAuditEvent#clientId`, `controller/AuditAdminController`,
+`bank/web/BankAdminController`, `controller/AdminAuditLogPageController`,
 `db/migration/V237`, `db/migration/V238` · **Decision:**
 [ADR-0152](../adr/0152-the-audit-row-records-which-client-a-mutation-came-through.md),
 [ADR-0153](../adr/0153-the-bank-trail-records-the-client-through-the-same-seam.md) ·
@@ -637,6 +638,9 @@ and swallowed there, so the scheduler thread survives a bad run.
   marker.
 - [x] A domain whose purge throws is logged and the remaining domains — and the bank trail — are
   still purged.
+- [x] The bank trail joins the sweep as an `audit.api.RetentionParticipant` that the bank module
+  implements; every participant is purged after the activity domains, and a failing one is logged
+  without stopping the others.
 - [x] The cutoff is `now - max-age`; the job reports the deleted count as its `items` metric.
 - [x] The sweep is disabled under the `test` profile.
 - [x] A `max-age` under `P30D` (including `P0D` and negative values) or an `interval` under `PT1M`
@@ -644,9 +648,10 @@ and swallowed there, so the scheduler thread survives a bad run.
 
 **Enforced by:** `AuditRetentionServiceTest`, `AuditRetentionTaskTest`,
 `BackendPropertiesValidationTest` (the floors) · **Code:**
-`service/AuditRetentionService`, `task/AuditRetentionTask`, `support/AuditRetentionProperties`, `metrics/ScheduledJob#AUDIT_RETENTION`,
+`service/AuditRetentionService`, `audit/api/RetentionParticipant`, `task/AuditRetentionTask`, `audit/internal/AuditRetentionProperties`, `metrics/ScheduledJob#AUDIT_RETENTION`,
 `repository/AuditEventRepository#existsByDomainAndOccurredAtBefore`,
-`repository/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/admin/audit-log.html` ·
+`bank/internal/BankAuditService#holdsRowsBefore`,
+`bank/internal/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/admin/audit-log.html` ·
 **Decision:** [ADR-0179](../adr/0179-both-audit-trails-are-swept-on-a-retention-ceiling.md),
 amending [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md) ·
 **Record:** [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md)
@@ -694,4 +699,4 @@ current principal and no request is bound.
   after-commit or asynchronous methods, 14 listener methods, 0 observer SPIs.
 
 **Enforced by:** `ListenerAndObserverRulesTest` · **Code:** `annotation/ObserverSpi`,
-`service/AuditService`, `service/BankAuditService`
+`service/AuditService`, `bank/internal/BankAuditService`

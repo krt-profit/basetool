@@ -50,7 +50,11 @@ noticed.
 **Closing it** is decided: Error Prone with NullAway checks the annotations at compile time,
 starting with the module `api` packages and widening package by package
 ([ADR-0237](../adr/0237-error-prone-and-nullaway-check-the-nullness-annotations-at-compile-time.md),
-2026-10-01). Until a package is covered, this entry holds for it.
+2026-10-01). Until a package is covered, this entry holds for it. Since 2026-10-10 the backend's `compileJava` runs Error Prone
+2.50.0 with NullAway 0.14.2 over the 18 module `api` packages and their sub-packages and over the
+whole `joborder`, `refinery`, `materialexchange` and `mission` modules, with NullAway findings as
+errors;
+outside them this entry still holds.
 
 ## 11.5 One host, no failover
 
@@ -361,6 +365,18 @@ domain with a published API, Spring Modulith and a frozen ArchUnit baseline in t
 that make every name-keyed gate fail loudly before anything moves, and later Gradle modules for the
 exchange and the bank. Its decisions are recorded as ADR-0231 (the module cut), ADR-0232 (how modules
 interact), ADR-0233 (enforcement), ADR-0234 (the API's hard cut), ADR-0235 (the error model) and
-ADR-0236 (access policies per domain); the rules are §8.14. Status on 2026-10-02: the defects found
-along the way are fixed (Phase −1, merged 2026-10-01), the guards of Phase 0 are being built, and no
-class has moved.
+ADR-0236 (access policies per domain); the rules are §8.14. Status on 2026-10-04: the defects found
+along the way are fixed (Phase −1, merged 2026-10-01), the guards of Phase 0 are on `main`, and
+Phase 1 has begun: `audit.api`, `kernel`, `orgunit.api`/`orgunit.web` and the publishers'
+`api.events` packages exist, the former `support` package is split into the kernel, the
+`platform` module and the modules' `api`/`internal` packages, and the frozen module baseline has
+shrunk from 138 to 110 class edges. Phase 2 has begun (2026-10-05): `dashboard`, `orgchart`
+and `admin` are the first domains moved whole into their module packages. `operation` followed
+with the first access policy out of the scope hub and the first mission command. `promotion` moved
+with its own access policy (`promotionAccessPolicy`), `personalinventory` without one (it had no
+scope gate), then `exchange` and the bank as packages (2026-10-10), which enter their "must stay green"
+boundary before their Gradle extraction. Phase 3 began with `materialexchange` (2026-10-10), the
+Lager reaching it only through its own `StockChangeObserver` and `StockOfferLookup`, then `refinery`
+with the second module access policy, `joborder` with the third and `mission` with the fourth;
+the inventory follows in five parts, the first taking its access policy out of the scope hub. The
+baseline is at 79 class edges.

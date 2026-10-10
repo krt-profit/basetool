@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -42,6 +43,12 @@ public final class BankAccountDetailSupport {
 
   /** The default booking-history look-back when the caller has not picked a period: 90 days. */
   public static final int DEFAULT_HISTORY_DAYS = 90;
+
+  /** The short booking-history look-back offered as the first segment: 30 days. */
+  public static final int SHORT_HISTORY_DAYS = 30;
+
+  /** The booking-history segment value of a period that matches no preset. */
+  public static final String HISTORY_PRESET_CUSTOM = "custom";
 
   /** The chart range keys, in display order; each maps to a {@code bank.chart.range.*} label. */
   public static final List<String> CHART_RANGES = List.of("30d", "90d", "365d", "all");
@@ -84,6 +91,40 @@ public final class BankAccountDetailSupport {
     Instant fromInstant = fromDate.atStartOfDay(ZoneOffset.UTC).toInstant();
     Instant toInstant = toDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().minusMillis(1);
     return new HistoryPeriod(fromDate, toDate, fromInstant, toInstant);
+  }
+
+  /**
+   * Names the booking-history segment a resolved period matches: {@code 30d} or {@code 90d} for a
+   * period of that many days ending on {@code today}, otherwise {@code custom}.
+   *
+   * @param period the resolved booking-history period
+   * @param today the current UTC calendar day
+   * @return {@code 30d}, {@code 90d} or {@code custom}
+   */
+  @NotNull
+  public static String historyPreset(@NotNull HistoryPeriod period, @NotNull LocalDate today) {
+    if (!today.equals(period.toDate())) {
+      return HISTORY_PRESET_CUSTOM;
+    }
+    long days = ChronoUnit.DAYS.between(period.fromDate(), period.toDate());
+    if (days == SHORT_HISTORY_DAYS) {
+      return "30d";
+    }
+    if (days == DEFAULT_HISTORY_DAYS) {
+      return "90d";
+    }
+    return HISTORY_PRESET_CUSTOM;
+  }
+
+  /**
+   * Names the booking-history segment a resolved period matches, relative to the current UTC day.
+   *
+   * @param period the resolved booking-history period
+   * @return {@code 30d}, {@code 90d} or {@code custom}
+   */
+  @NotNull
+  public static String historyPreset(@NotNull HistoryPeriod period) {
+    return historyPreset(period, LocalDate.now(ZoneOffset.UTC));
   }
 
   /**
@@ -132,7 +173,7 @@ public final class BankAccountDetailSupport {
     }
     try {
       return LocalDate.parse(value.trim());
-    } catch (DateTimeParseException e) {
+    } catch (DateTimeParseException _) {
       return fallback;
     }
   }

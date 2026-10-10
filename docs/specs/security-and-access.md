@@ -20,7 +20,7 @@ read/write is isolated to the calling user unless the caller is privileged.
 > ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-081** (corrected 2026-10-03: REQ-SEC-073…080 went to the
+> allocated. The next free id is **REQ-SEC-083** (corrected 2026-10-03: REQ-SEC-073…080 went to the
 > Phase 0 guard packages of the modularisation plan) — re-check `origin/main` and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
@@ -48,7 +48,7 @@ default bare `WWW-Authenticate`-only 401 or empty-body 403 (see
 
 Role codes (`Role.code`, matching the Keycloak realm role names minus their `ROLE_` prefix) and
 the fine-grained permission strings a role's `permissions` collection carries are centralised in
-`support.Roles` / `support.Permissions` (S3, #909) rather than repeated as raw string literals.
+`kernel.Roles` / `kernel.Permissions` (S3, #909) rather than repeated as raw string literals.
 `SecurityConfig` (the `roleHierarchy()` chain and every `hasRole`/`hasAnyRole`/`hasAuthority`/
 `hasAnyAuthority` call in the `authorizeHttpRequests` matrix — these are plain Java method calls,
 not SpEL, so passing a `String` constant is a zero-risk substitution) and `DataInitializer` (the
@@ -323,6 +323,7 @@ class rename, a moved bean or a changed signature therefore has to fail the buil
 
 **Enforced by:** `SecurityExpressionBeanResolutionTest`, `SecurityExpressionRulesTest`,
 `SecurityExpressionAnalyzerTest` · **Code:** the explicit names on `OwnerScopeService`,
+`OperationAccessPolicy`,
 `MissionSecurityService`, `AuthHelperService`, `OrgRoleManagementSecurityService`,
 `BankSecurityService`, `SpecialCommandSecurityService`, `ExchangeGate`, `ConnectedAppsGate` ·
 **Related:** REQ-SEC-002, REQ-OBS-020, plan guard G-04
@@ -390,7 +391,8 @@ REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
 The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory`, `POST
 /api/v1/refinery-orders` (its `owner` override) and the per-item receiver of `POST
 /api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, through
-`OwnerScopeService.canManageUserInventory(...)` / `canManageUserRefineryOrders(...)`, and MUST NOT
+`InventoryAccessPolicy.canManageUserInventory(...)` (published as `BookInPolicy.mayBookInFor`) /
+`RefineryAccessPolicy.canManageUserRefineryOrders(...)`, and MUST NOT
 substitute a bare `AuthHelperService.isLogisticianOrAbove()` for it. All three did until the
 2026-08-30 audit, which made them cross-tenant writes by construction; the fourth entry point,
 `POST /api/v1/refinery-orders/users/{userId}`, had been closed in PR #808 and is the shape the other
@@ -1142,7 +1144,7 @@ so a bare id was not an authorization secret.
   `X-Guest-Edit-Token`) that hashed to the stored hash, OR (b) held a mission-management role in
   scope (`canManageMission`). Only branch (b) survives, and it is now unconditional.
 - **The token proves *which row*, never *whether the mission is still open*.** Branch (a) MUST
-  additionally require `OwnerScopeService.canSeeMission(missionId)`. Without it the capability
+  additionally require `MissionAccessPolicy.canSeeMission(missionId)`. Without it the capability
   outlived the surface that granted it: a guest who signed up while the mission was public kept
   `PUT` / `DELETE` / check-in on their row after the mission was flipped to `isInternal = true` and
   after it reached `COMPLETED` / `CANCELLED`. Because `OperationPayoutService` recomputes the time
@@ -1845,22 +1847,23 @@ from this response blanks a legal document on a build nobody can redeploy.
   refused with a terminal close code the client stops reconnecting on.
 - [x] A gated background read navigates to the consent page and disarms its timer, instead of
   re-fetching the refusal on every tick or freezing on its last value.
-  *`HandRolledFetchGateContractTest`, `TermsAcceptanceGateFilterTest`.*
+  *`BackgroundReadGateContractTest`, `TermsAcceptanceGateFilterTest`.*
 
 **Enforced by:** `TermsAcceptanceAccessFilterTest` (refusal, both exemptions, non-UUID subjects),
 `TermsAcceptanceGateFilterTest` (redirect, the AJAX header, the SSE `terms-gate` handoff and that it
 fires only while the gate is closed, the WebSocket mark and that a plain request to the same
 path is still redirected, the readable-documents exemption, fail-open, cache bound),
-`HandRolledFetchGateContractTest` (the client half of every read that bypasses `krtFetch`: the XHR
-marker, the `krtTermsGate` handoff, no `res.ok` shortcut, self-disarm — pinned against the shipped
-JS), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
+`BackgroundReadGateContractTest` (the client half: every read goes through `krtFetch.get`, which
+sends the XHR marker, offers the answer to `krtTermsGate` and refuses a redirect; no raw request in
+any script or template; the polls disarm on a gated answer — pinned against the shipped JS and
+templates; REQ-FE-031), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
 version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`, `TermsVersionParityTest`,
 `AdminTermsPageControllerTest`, `TermsDocumentStructureTest`,
 `LiveSyncSyncHandshakeInterceptorTest` + `LiveSyncWebSocketHandlerTest` +
 `LiveSyncCloseCodeWireParityTest` (the WebSocket handoff: the mark is relayed, the socket is closed
 with `4003` and the consent URL, the refusal costs no per-user socket slot, and the code cannot
 drift from the client's) · **Code:** `TermsVersionProvider`, `TermsAcceptanceService`,
-`support.TermsConsentCheck` (the leaf interface that keeps `config` and `service` acyclic per
+`identity.api.TermsConsentCheck` (the leaf interface that keeps `config` and `service` acyclic per
 ADR-0047), `support.TermsGateHandoff` (the leaf that does the same for the frontend's `config` →
 `websocket` handoff), `TermsController`, `AdminTermsController` · **Monitoring:**
 `basetool_terms_acceptances_total`, `basetool_terms_accepted_users`,
@@ -3029,7 +3032,8 @@ anonymous status of every admitted path), `EdgeProbeBackendStatusTest`, `EdgeAdm
 `POST /api/v1/refinery-orders/{id}/store` takes a `userId` per stored item that names the
 **receiving stock owner**. Because it decides whose ledger the output lands in, it MUST be
 authorized against **the caller and that target together**: naming somebody else requires
-`@ownerScopeService.canManageUserInventory(<receiver>)` — admin, self, or at least one shared
+`BookInPolicy.mayBookInFor(<receiver>)` (the inventory access policy's `canManageUserInventory`) —
+admin, self, or at least one shared
 **editable** org unit with the receiver — and any other value is refused with `403`. The check runs
 on the **requested** id and **before** the user is loaded, so an unauthorised caller cannot
 distinguish an existing member id from an unknown one.
@@ -3113,8 +3117,9 @@ asserts that a redaction method is *called*, never that the redaction is *comple
 - [x] ~~The strict outsider level inherits the pass from the member-peer level.~~ Retired with the
   outsider tier (ADR-0159); there is one level left.
 - [x] A unit with no assigned ship redacts without error.
+- [x] A walk over the types, not a list of cases: every record reachable from `MissionDto` is filled with sentinel values, peer redaction runs, and every `UserDto` left anywhere in the result holds only the public tuple (`id`, `username`, `displayName`, `effectiveName`, `rank`, `inKeycloak`, `version`); the owner and managers are hidden from a reader; no other type reachable from a mission declares a private member component (PRV-10). Proven able to fail with a planted `email`.
 
-**Enforced by:** `MissionPeerRedactorTest` · **Code:** `MissionPeerRedactor#cleanupUnitForPeer`,
+**Enforced by:** `MissionPeerRedactorTest`, `MissionPeerRedactionSentinelTest` · **Code:** `MissionPeerRedactor#cleanupUnitForPeer`,
 `#cleanupShipForPeer` · **Related:** REQ-SEC-007, REQ-SEC-009, ADR-0159 (supersedes ADR-0034)
 
 ### REQ-SEC-041 — The mission description is gated on membership, not on authentication
@@ -3157,7 +3162,7 @@ a caller who may manage the mission (ADMIN; an OFFICER / MISSION_MANAGER whose o
 covers it; the owner or a co-manager) may book for any of its participants, and every other member
 may book **only against their own participant row** on that mission.
 
-It MUST NOT be gated on `OwnerScopeService#canSeeMission`, which deliberately grants the
+It MUST NOT be gated on `MissionAccessPolicy#canSeeMission`, which deliberately grants the
 cross-squadron **public escape** on a non-internal mission. That is the correct rule for a read and
 the wrong one for a write: combined with a service that checked only that the participant belonged
 to the mission, any member could post income/expense rows into another squadron's payout ledger and
@@ -3344,8 +3349,19 @@ on `hasRole('LOGISTICIAN') and canEditJobOrder(#id)`; a flag built on the scope 
 offer editing to a plain member whose own Staffel owns the order, which the endpoint refuses.
 `StockViewerAccess#mayEditJobOrder` therefore answers with both halves.
 
-**The mapper reaches the gate through a leaf interface** (`StockViewerAccess` in `support`,
-implemented in `service`), for the ADR-0047 reason `MissionViewerAccess` already exists: a
+> [!note] Amended 2026-10-04 — the Lager row flag answers both gates too
+> `InventoryItemDto.canEdit` was built on `canEditInventoryItem` alone, the scope half: a plain
+> member read `true` on every other member's shared row of their unit, while the per-row Lager
+> writes then refuse a non-owner below Logistician — book-out, Umbuchen, the note and the delivered
+> flag, and the „gestohlen" marker and the allocations with #2417 (REQ-INV-053, REQ-INV-027). The
+> Android app gated
+> its row actions on the flag and offered writes that answered `403`.
+> `StockViewerAccess#mayEditInventoryItem` now answers with both halves: the scope gate, then the
+> row's owner or `isLogisticianOrAbove()`. The web read the flag only where both already held, so it
+> renders unchanged.
+
+**The mapper reaches the gate through a leaf interface** (`StockViewerAccess` in `inventory.api`,
+implemented in `service`; in `support` until P1-9 split that package on 2026-10-04), for the ADR-0047 reason `MissionViewerAccess` already exists: a
 `mapper → service` edge would close a package cycle, and mappers may touch neither
 `SecurityContextHolder` (ArchUnit `mapperLayerShouldNotReachIntoSecurityContext`) nor the service
 layer directly.
@@ -3356,10 +3372,15 @@ layer directly.
   three and an officer for the first two (`MeControllerTest`).
 - [x] The job-order row flag is false for a caller who passes the scope check but holds no
   Logistician-or-above role.
+- [x] The Lager row flag is false for a caller who passes the scope check on another member's row
+  but holds no Logistician-or-above role, and true for that row's owner and for a Logistician in
+  scope.
 - [ ] Walked on a device with an admin account: outstanding.
 
-**Enforced by:** `MeControllerTest` · **Code:** `MeController`, `StockViewerAccess`,
-`StockViewerAccessService`, `AccessGateService#mayEditJobOrder`, `InventoryItemMapper`,
+**Enforced by:** `MeControllerTest`, `StockViewerAccessServiceTest`, `InventoryItemMapperTest` ·
+**Code:** `MeController`, `StockViewerAccess`, `StockViewerAccessService`,
+`EarmarkTargetPolicy#mayEditJobOrderEarmarks` (implemented by `JobOrderAccessPolicy`),
+`InventoryAccessPolicy#canEditInventoryItem`, `InventoryItemMapper`,
 `JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047, and the Android counterpart REQ-APP-AUTH-014
 (`basetool-android` `docs/specs/auth.md`)
 
@@ -3673,13 +3694,29 @@ Redis, which three services reach (APPSEC-05, improvement audit 2026-09-22).
 | `com.nimbusds.oauth2.sdk.util.OrderedJSONObject` — exact name | a token-response JSON object as the Nimbus OAuth 2.0 SDK parses it, inside the stored authorized client (added 2026-09-23: under `enforce` its refusal dropped `AUTHORIZED_CLIENTS` and looped every E2E login) |
 | `org.springframework.security.*` | security context, OAuth2 login and authorized-client state, CSRF token, saved request (the Security Jackson modules add their own exact types on top) |
 | `org.springframework.web.servlet.FlashMap`, `java.util.concurrent.CopyOnWriteArrayList`, `org.springframework.util.LinkedMultiValueMap` — exact names; direct members of `org.springframework.validation` | a redirect's flash attributes, in the `CopyOnWriteArrayList` Spring's `SessionFlashMapManager` stores them in (added 2026-09-26); `validation.beanvalidation` and the rest of `java.util.concurrent` are **not** covered |
-| `de.greluc.krt.profit.basetool.frontend.model.*` | the application's own forms and DTOs, flashed across a redirect |
+| `SessionTypeAllowList.SESSION_BOUND_TYPES` — exact names, 21 on 2026-10-04 | the application's own forms and DTOs flashed across a redirect, with their nested types and enums; derived from the code by `SessionBoundTypeClosureTest` (REQ-FE-027). Until 2026-10-04 the prefix `de.greluc.krt.profit.basetool.frontend.model.` admitted every class of that package (325); no application class is admitted by a prefix any more (D-10) |
 | `CONTAINER_WRITTEN_FINAL_SESSION_TYPES` | Tomcat's WebSocket binding listener (REQ-SEC-049) |
 
-A new session attribute of a type outside the list is a change to this table, in the same PR.
+A new session attribute of a type outside the list is a change to this table, in the same PR — and
+for an application type, an entry in `SESSION_BOUND_TYPES` in the same PR.
 `SessionBoundTypeClosureTest` derives every session-bound type from the compiled code and fails the
-build when one falls outside the list, and `SessionTypeAllowListBreadthTest` refuses an entry
-broader than a model or session package (REQ-FE-027).
+build when the derived application types and `SESSION_BOUND_TYPES` differ in either direction (a
+missing entry or a stale one), and `SessionTypeAllowListBreadthTest` refuses any prefix other than
+`org.springframework.security.` and any `SESSION_BOUND_TYPES` entry that is not one plain frontend
+class name (REQ-FE-027).
+
+**What a refused value costs a session written by an older release.** The narrowing ships in its
+own release, before any frontend class moves (D-10). A session written by the release before it can
+hold only types that release's code stores, and the list is derived from that same code, so no
+stored value is newly refused by the switch. Were one refused anyway, it would take the same path as
+every refusal under `enforce`: `FaultTolerantSessionSerializer` turns that one attribute into an
+`UnreadableSessionValue`, `SessionAttributeDiagnosticMapper` logs and drops it, the session repair
+removes it on the same request (REQ-SEC-050), and it is counted on
+`basetool_session_type_refused_total{mode="enforce"}` and
+`basetool_session_value_dropped_total{cause="InvalidTypeIdException"}`. The login is not touched:
+the security context and the authorized clients are Spring Security and JDK types, which the list
+still admits; the member loses at most the flash attributes of one redirect (a toast or a
+re-shown form).
 
 > [!warning] Corrected 2026-09-23 — the first list refused every signed-in member under `enforce`
 > The list as merged (PR #2018) had no `java.lang`, `java.math` or `java.net` entry and not the
@@ -3724,6 +3761,10 @@ touches no stored session and needs no migration.
   instantiated, dropped as an unreadable attribute and counted on both counters.
 - [ ] Under `report` that same value is read and reported; under `off` it is read and not reported.
 - [ ] A subpackage of an allowed JDK or Spring package is not allowed by the parent entry.
+- [x] A class of `frontend.model` that is not on `SESSION_BOUND_TYPES` (`InventoryBookOutForm`) is
+  refused under `enforce`, dropped and counted exactly like any other outsider, while a listed form
+  reads back (`SessionTypeAllowListTest#aModelPackageClassOffTheExactList_isRefusedDroppedAndCountedLikeAnyOutsider`,
+  2026-10-04).
 - [x] A missing or mistyped mode falls back to `enforce`, never to a failed startup or a weaker
   check; `application.yml`, the `@Value` default, `docker-compose.yml` and the Quadlet env template
   all default to it (`SessionTypeAllowListTest#theShippedDefaultIsEnforce`).
@@ -3815,6 +3856,15 @@ proxy seam, it is a `400` from Spring's type conversion, handled by `GlobalExcep
   state; a catalogue name carrying `&` or `=` opens no second query parameter on the backend call.
 - [ ] The audit tab list has exactly one definition in the frontend, so the page and its
   export/purge proxy cannot disagree about which tabs exist.
+- [x] Every `BackendApiClient` write verb (`post`, `put`, `patch`, `delete`, with or without a
+  body) has a URI-template twin that encodes each variable, and every write call passes its runtime
+  values through it; the only reviewed concatenation is the UEX override's entity kind, narrowed to
+  its allow-list first (`WriteUriTemplateTest`, 2026-10-04).
+- [x] Every `BackendApiClient` read (`get`, with a `Class` or a `ParameterizedTypeReference`
+  response) and every `execute(…)` request passes its runtime values as URI-template variables,
+  with no reviewed exception; a value with reserved characters keeps its
+  `UriComponentsBuilder.queryParam` encoding with only the path variable left in the template
+  (`ReadUriTemplateTest`, plan F3, 2026-10-05).
 - [ ] The mission and operation list pages relay `search`, `start` and `end` as `WebClient`
   URI-template variables, never concatenated into the URI: a search carrying `&`, `#`, `+`, `{…}` or
   `%` reaches the backend as one decoded `query`, and a period reaches it decoded exactly once so it
@@ -3836,7 +3886,8 @@ allowlist, `MARKET` included) · `MaterialProxyControllerTest` (a star-system na
 `AdminPersonalBlueprintsPageController`, `AdminSyncReportsPageController`,
 `MaterialboersePageController`, `MissionPageController#listMissions`,
 `OperationPageController#listOperations` · **Enforced also by:** `ListSearchRelayParamsTest` (exact
-template + variables, and the query a `MockWebServer` backend actually receives) · **ADR:**
+template + variables, and the query a `MockWebServer` backend actually receives) ·
+`WriteUriTemplateTest`, `ReadUriTemplateTest` (no verb concatenates a runtime value) · **ADR:**
 [ADR-0158](../adr/0158-a-relayed-request-parameter-is-bound-to-the-backends-own-type.md)
 
 **The active-OrgUnit switcher redirects only on-site (FE-SEC-02, 2026-09-22).** `POST
@@ -4252,7 +4303,7 @@ and siblings, so the Spring-apps dashboard's cache panels and the `CacheHitRatio
 **Enforced by:** `BackendPropertiesValidationTest` (default, both bounds, and the ceiling accepted
 exactly) · `CustomJwtGrantedAuthoritiesConverterTest` (the converter builds against the real
 properties; the session key, the claims fingerprint, the `azp` split, the `iat` fallback and the
-cache meters) · `FirstLoginAuthoritiesIntegrationTest` · `ArchitectureTest` (`supportPackageMustStayADependencyLeaf`,
+cache meters) · `FirstLoginAuthoritiesIntegrationTest` · `ArchitectureTest` (`leafHelpersMustStayDependencyLeaves`,
 `backendPackagesShouldBeFreeOfDependencyCycles`) · **Code:** `AuthoritiesCacheProperties`,
 `CustomJwtGrantedAuthoritiesConverter`, `application.yml`, `docker-compose.yml`,
 `quadlet/env.d/backend.env.tmpl` · **Decision:**
@@ -4501,7 +4552,7 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 > wrote the three columns out for itself, and a `DataExportService` Javadoc claimed a
 > `HandleSpellingCoverageTest` held them together while no such class existed.
 >
-> `support.HandleSpellings` is that list now, and the test exists: every searched `app_user`
+> `privacy.internal.HandleSpellings` is that list now, and the test exists: every searched `app_user`
 > name column is a spelling or is declared `NOT_A_SPELLING` with a reason, and the projection
 > yields exactly one value per declared column. Since `PersonSearchCoverageTest` sweeps
 > `information_schema`, a new name column cannot reach the schema without being registered for
@@ -4601,8 +4652,8 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 **Enforced by:** `DataExportIntegrationTest`, `DataExportParticipantSectionsIntegrationTest`,
 `DataExportScrubCoverageTest`, `DataExportPdfFieldLabelCoverageTest`,
 `DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`, `HandleScrubberTest`,
-`DataExportControllerSecurityTest` · **Code:** `support/DataExportSections`,
-`support/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
+`DataExportControllerSecurityTest` · **Code:** `privacy/internal/DataExportSections`,
+`kernel/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
 `service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
 `controller/AdminDataExportController`, frontend `controller/DataExportProxyController`,
 `templates/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
@@ -4816,7 +4867,7 @@ aggregates.
 - [x] The audit event records the term's length and never the term.
 
 **Enforced by:** `PersonSearchCoverageTest`, `AdminPersonSearchControllerSecurityTest` · **Code:**
-`support/PersonSearchTargets`, `service/PersonSearchService`,
+`privacy/internal/PersonSearchTargets`, `service/PersonSearchService`,
 `controller/AdminPersonSearchController`, `model/dto/PersonSearchHitDto`,
 `frontend/controller/AdminPersonSearchPageController`, `templates/admin/person-search.html`,
 `static/js/admin-person-search.js` · **Decision:**
@@ -4921,8 +4972,8 @@ from a statute rather than from operational taste.
 `BusinessMetricsCollectorTest` · **Code:** `model/DeletionRequest`,
 `model/DeletionRequestStatus`, `repository/DeletionRequestRepository`,
 `service/DeletionRequestService`, `controller/DeletionRequestController`,
-`controller/AdminDeletionRequestController`, `event/AccountDeletionRequestedEvent`,
-`event/AccountDeletionRequestDeclinedEvent`, `db/migration/V242`, `db/migration/V243`,
+`controller/AdminDeletionRequestController`, `privacy/api/events/AccountDeletionRequestedEvent`,
+`privacy/api/events/AccountDeletionRequestDeclinedEvent`, `db/migration/V242`, `db/migration/V243`,
 `frontend/controller/DeletionRequestProxyController`,
 `frontend/controller/AdminDeletionRequestsPageController`,
 `templates/fragments/profile-deletion-card.html`, `templates/admin/deletion-requests.html`,
@@ -5049,11 +5100,11 @@ it.
 - [x] Nothing is deleted: row counts, timestamps, event types, amounts and subjects are unchanged.
 
 **Enforced by:** `HandleAnonymisationServiceTest`, `HandleErasureCoverageTest` · **Code:**
-`service/HandleAnonymisationService`, `support/HandleAnonymisation`, `support/HandleErasureCoverage`,
+`service/HandleAnonymisationService`, `kernel/HandleAnonymisation`, `privacy/internal/HandleErasureCoverage`,
 `repository/AuditEventRepository#anonymiseActorHandle`,
-`repository/BankAuditEventRepository#anonymiseActorHandle`,
-`repository/BankTransactionRepository#anonymiseCounterpartyHandle`,
-`repository/BankBookingRequestRepository#anonymiseHandles`,
+`bank/internal/BankAuditEventRepository#anonymiseActorHandle`,
+`bank/internal/BankTransactionRepository#anonymiseCounterpartyHandle`,
+`bank/internal/BankBookingRequestRepository#anonymiseHandles`,
 `repository/JobOrderHandoverRepository#anonymiseRecipientHandle`,
 `repository/JobOrderItemHandoverRepository#anonymiseRecipientHandle`,
 `frontend/support/HandleDisplay` · **Decision:**
@@ -5067,7 +5118,7 @@ requirement stated it.*
 Each module emits a fixed set of security response headers from its Spring Security chain, and the
 set is shaped by what the module serves.
 
-- **Frontend (HTML)** — `SecurityHeaders.frontend(issuerUri)`: a per-request
+- **Frontend (HTML)** — `SecurityHeaders.frontend(issuerUri, trustedTypes)`: a per-request
   `Content-Security-Policy` whose `script-src` is `'nonce-…' 'strict-dynamic'` and whose `style-src`
   is `'self' 'nonce-…'`, with `style-src-attr 'none'` (no inline `style=""` attributes, ADR-0093 /
   REQ-UI in [`ui-design-system.md`](ui-design-system.md)), `object-src 'none'`, `base-uri 'self'`,
@@ -5077,6 +5128,20 @@ set is shaped by what the module serves.
   strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy`
   `same-origin`, HSTS (one year, `includeSubDomains`, `preload`), a `Permissions-Policy` that denies
   every listed feature, and `X-Content-Type-Options: nosniff`.
+- **Frontend Trusted Types (ADR-0239)** — the directives `require-trusted-types-for 'script';
+  trusted-types krt-html krt-fragment` make every DOM script sink take a value of one of the two
+  named policies (REQ-FE-022) and forbid any other policy, a `default` one included.
+  `app.security.trusted-types` (`APP_SECURITY_TRUSTED_TYPES`, parsed by `TrustedTypesMode`) places
+  them: `report` (the default, and the fallback for a blank or unknown value) sends them as a
+  separate `Content-Security-Policy-Report-Only` header, so a violation is reported — the
+  client-error beacon's `securitypolicyviolation` listener counts it as
+  `basetool_client_error_total{kind="csp_violation"}` with the directive as its message — and the
+  page keeps working; `enforce` appends them to the enforced `Content-Security-Policy` and sends no
+  report-only header, so an unconverted sink throws. The effective mode is the gauge
+  `basetool_trusted_types_mode{mode}`. Switching production to `enforce` is a production
+  configuration change the owner approves after a quiet period in which the dialog page walk and
+  production report no violation ([`deployment.md` → *Trusted Types: report, then
+  enforce*](../deployment.md#trusted-types-report-then-enforce)).
 - **Backend and ingest (JSON only)** — `Content-Security-Policy: default-src 'none';
   frame-ancestors 'none'; base-uri 'none'; form-action 'none'`, because neither serves a document,
   plus `X-Frame-Options: DENY` and HSTS; the backend additionally sends the frontend's
@@ -5087,20 +5152,32 @@ set is shaped by what the module serves.
 
 A new inline script or style in a template MUST carry the request nonce rather than widening the
 policy; `'unsafe-inline'` and `'unsafe-eval'` are never added. Widening any directive is a change to
-this requirement first.
+this requirement first. An inline script is only ever a data bootstrap (REQ-FE-023,
+`InlineScriptDataOnlyTest`), and a new Trusted Types policy name is such a widening.
+
+> [!note] Amended 2026-10-04 — Trusted Types (ADR-0239)
+> The frontend sends the Trusted Types directives, report-only by default; the enforced mode is a
+> configuration switch. The only step left is the owner-approved switch of production to `enforce`.
 
 **Acceptance**
 
 - [x] A frontend page carries the nonce-gated CSP with `style-src-attr 'none'` and the Keycloak
   `form-action` origin, and every static header above.
+- [x] A frontend page carries the Trusted Types directives: report-only by default, in the enforced
+  policy with `app.security.trusted-types=enforce`.
+- [ ] Production runs `enforce`. _(Pending the owner's approval after a quiet period with no
+  `csp_violation` report; see `deployment.md`.)_
 - [x] An API response carries the `default-src 'none'` policy and the static headers.
 - [x] The public edge sends HSTS on its first response; its absence raises `EdgeHstsHeaderMissing`.
 
-**Enforced by:** `SecurityHeadersTest` (frontend and backend), ingest `SecurityConfigTest`, the
-`blackbox-hsts*` probes behind `EdgeHstsHeaderMissing` · **Code:** `frontend/…/config/SecurityHeaders`,
-`frontend/…/config/CspNonceFilter`, the `headers(...)` blocks of the backend and ingest
+**Enforced by:** `SecurityHeadersTest` (frontend and backend),
+`TrustedTypesModeTest`, the Trusted Types collector of `DialogA11yE2eTest`, ingest
+`SecurityConfigTest`, the `blackbox-hsts*` probes behind `EdgeHstsHeaderMissing` · **Code:**
+`frontend/…/config/SecurityHeaders`, `frontend/…/config/TrustedTypesMode`,
+`frontend/…/config/TrustedTypesModeMetric`, `frontend/…/config/CspNonceFilter`, the `headers(...)` blocks of the backend and ingest
 `SecurityConfig`, `docker/edge/conf.d/00-maps.conf` · **ADR:**
-[ADR-0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md)
+[ADR-0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md),
+[ADR-0239](../adr/0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md)
 
 ### REQ-SEC-066 — The Keycloak login form works with password managers, and "remember me" is opt-in
 
@@ -5330,7 +5407,10 @@ production rollout reaches step by step:
   (`WebClientConfig`), its backend readiness probe (`BackendHealthIndicator`) and the ingest relay
   (`RestClientConfig`) verify the backend's hostname, which ADR-0204 §6 had switched off for the
   relay. The backend's Keycloak client, the edge, Prometheus and the blackbox exporter verified
-  already. `dev` and `test` are unaffected.
+  already. `dev` and `test` are unaffected. The ingest jar defaults the check to on
+  (`app.ingest.verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:true}`, and its `dev` profile
+  sets `false` explicitly), so a jar started outside compose or Quadlet under `prod` checks the name
+  too (ING-SEC-04); the frontend jar's default is still `false`.
 - **Shipped in two releases.** The first was inert: every per-service mount fell back to the shared
   keystore and `INTERNAL_TLS_VERIFY_HOSTNAME` defaulted to `false`. The second — rollout step 3 —
   bakes the Quadlet units to `/var/iri/secrets/tls/<service>.p12` and the CA-only truststore and
@@ -5564,6 +5644,79 @@ consent.
 `PathControlInventoryTest`, `AnonymousSurfaceSweepTest` · **Code:** `PendingApprovalAccessFilter`,
 `TermsAcceptanceAccessFilter`, `ActingMemberFilter` · **Related:** REQ-SEC-017, REQ-SEC-028,
 REQ-SEC-053, REQ-XCH-009
+
+### REQ-SEC-081 — The external-integration clients reach external addresses only
+
+The backend's clients for third parties (UEX and SC Wiki) are built from the `externalRestClientBuilder`
+of `RestClientConfig`. Its JDK client carries Spring Boot's `InetAddressFilter.externalAddresses()`,
+which checks the address a name resolves to before a connection is opened and refuses loopback,
+private, link-local and other special-purpose ranges with a `FilteredHostException`; the fail-soft
+fetch counts it like any other transport error. The client follows no redirect. The unqualified,
+primary builder, which the Keycloak admin client uses, has no filter: the internal clients must reach
+internal hosts. A base URL pointing at an internal host therefore stops working for UEX and SC Wiki.
+
+Each of the two clients also carries `@ConcurrencyLimit` at class level (UEX 4, SC Wiki 2, the maximum
+pool size of its executor), enabled by `AsyncConfig`; further callers wait. The find-or-create retry
+stays an explicit loop, not an annotation.
+
+**Acceptance**
+
+- [x] The external builder refuses a connection to a loopback address and the primary builder still
+  reaches it (`RestClientConfigTest`).
+- [x] The external request factory follows no redirect (`RestClientConfigTest`).
+- [x] Calls in flight through the UEX client never exceed its limit, and both clients declare theirs
+  (`ExternalClientConcurrencyLimitTest`).
+
+**Enforced by:** `RestClientConfigTest`, `ExternalClientConcurrencyLimitTest` · **Code:**
+`RestClientConfig`, `AsyncConfig`, `UexClient`, `ScWikiClient` · **Related:** REQ-OBS-009, ADR-0204
+
+---
+
+### REQ-SEC-082 — Admin accounts need a second factor, and the realm's session windows are one reviewed file
+
+Three realm-wide hardening steps of [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md)
+(D-26 of the modularisation plan) are code, not console clicks: `scripts/harden-keycloak-realm.py`,
+dry run by default, with a rollback file, never deleting.
+
+- **OTP for holders of `Admin` (step 11).** The realm binds a copy of the built-in browser flow,
+  `browser-admin-otp`, whose `forms` flow ends in a conditional sub-flow: the user holds the realm
+  role `Admin` **and** no OTP was presented in this login yet **and** an OTP Form is required. An
+  admin with a device is asked once, by the built-in second-factor step; an admin without one is
+  made to set one up at that login. The required action **Configure OTP** is registered and enabled
+  (without it such an admin is refused with *credential setup required*). The Discord identity
+  provider's *post login flow* is a small top-level flow of its own (`Admin` role, OTP Form), never
+  the browser copy: a brokered login must not run the username and password pages again.
+- **Forgot password (step 2).** The switch and the realm's own SMTP sender are one decision: a link
+  that cannot be answered with a mail is not offered.
+- **Session windows (step 12).** The four SSO windows are `keycloak/session-windows.json`, profile
+  `active`. The realm provisioner and the hardening script read the same file, so neither puts the
+  other's numbers back.
+
+**Acceptance**
+
+- [x] On a real Keycloak 26.8 with the sandbox realm, after the script: an admin without a device is
+  forced to set one up and the login then completes; the next login asks for the code, once; a wrong
+  code is refused; a member signs in with the password alone; a second admin is forced too
+  (`harden-keycloak-realm.integration.py`).
+- [x] The same run: the realm carries the session windows of the chosen profile, and "Forgot
+  password" hands a reset mail with an action token to the realm's SMTP sender (a test sink).
+- [x] A dry run changes nothing and writes no rollback file; a second run finds nothing to do; a
+  broken or misplaced block is repaired, not duplicated; `--rollback` binds the built-in flow again,
+  restores the windows and unbinds the post login flow, and deletes no flow
+  (`harden-keycloak-realm.py --selftest`, run in CI by `keycloak-provisioner.yml`).
+- [x] The provisioner's session windows are the file's `active` profile
+  (`harden-keycloak-realm.py --selftest`).
+- [ ] A login that comes in through Discord is gated: **not testable in the repository** (the test
+  realm has no Discord provider); the owner checks it at the production run
+  ([`OWNER_STEPS_2026-10.md`](../OWNER_STEPS_2026-10.md) § 7).
+
+**Enforced by:** `scripts/harden-keycloak-realm.py --selftest`,
+`scripts/harden-keycloak-realm.integration.py` (needs Docker; run before changing the script) ·
+**Code:** `scripts/harden-keycloak-realm.py`, `scripts/keycloak/session-windows.json`,
+`scripts/keycloak/hardening_probe.py` · **Related:** REQ-SEC-052, REQ-SEC-053, ADR-0159, ADR-0202,
+[`OWNER_STEPS_2026-10.md`](../OWNER_STEPS_2026-10.md)
+
+---
 
 ## Out of scope
 

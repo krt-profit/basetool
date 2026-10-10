@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.service.ShipTypeService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.util.Set;
 import java.util.UUID;
@@ -56,11 +56,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ShipTypeController {
 
   private final ShipTypeService shipTypeService;
-  private final ShipMapper shipMapper;
+  private final ShipTypeMapper shipTypeMapper;
 
   /**
-   * Paged list with whitelist-enforced sort. Uses the slim {@code shipTypeToDto} projection to
-   * avoid exposing the heavy fields needed elsewhere.
+   * Paged list with whitelist-enforced sort. Uses the slim {@link ShipTypeMapper#toDto} projection
+   * to avoid exposing the heavy fields needed elsewhere.
    *
    * @return paged ship-type DTOs
    */
@@ -73,7 +73,7 @@ public class ShipTypeController {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
     Page<ShipType> p = shipTypeService.getAllShipTypes(pageable, includeHidden);
-    return PageResponse.of(p.map(shipMapper::shipTypeToDto));
+    return PageResponse.of(p.map(shipTypeMapper::toDto));
   }
 
   /**
@@ -84,7 +84,7 @@ public class ShipTypeController {
    */
   @GetMapping("/{id}")
   public ShipTypeDto getShipType(@PathVariable @NotNull UUID id) {
-    return shipMapper.shipTypeToDto(shipTypeService.getShipType(id));
+    return shipTypeMapper.toDto(shipTypeService.getShipType(id));
   }
 
   /**
@@ -98,6 +98,6 @@ public class ShipTypeController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public ShipTypeDto updateShipTypeVisibility(
       @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {
-    return shipMapper.shipTypeToDto(shipTypeService.updateShipTypeVisibility(id, hidden));
+    return shipTypeMapper.toDto(shipTypeService.updateShipTypeVisibility(id, hidden));
   }
 }

@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.CityMapper;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.dto.CityDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.CityService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil.PageCeiling;
 import java.util.Set;

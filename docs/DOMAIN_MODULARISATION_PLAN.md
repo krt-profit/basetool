@@ -1,9 +1,13 @@
 > **Doc type:** Living plan — the direction was decided by the owner on 2026-09-29, every
-> open decision on 2026-10-01. **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312);
-> Phase 0 done (2026-10-03, merged as one chain of pull requests, #2350 … #2353): the decision
-> records (ADR-0231 … ADR-0239 and the amendments of §14) and every guard of §6.1 that Phase 0 owns;
-> the app's re-read of the version policy waits for the app release (basetool-android#209). No
-> class has moved yet. Last reviewed: 2026-10-03.
+> open decision on 2026-10-01, the delivery of the remaining phases on 2026-10-04 (D-23 … D-27).
+> **Status:** Phase −1 done (merged 2026-10-01, PRs #2299–#2312); Phase 0 done (2026-10-03,
+> merged as one chain of pull requests, #2350 … #2353): the decision records (ADR-0231 … ADR-0239
+> and the amendments of §14) and every guard of §6.1 that Phase 0 owns; the app's re-read of the
+> version policy shipped with app v0.5.0 (basetool-android#209, published 2026-10-03). Phase 1:
+> the error model (P1-12) is done (2026-10-04) — the first classes moved into module packages;
+> the module declarations (P1-13) are in place for every module package on `main` (2026-10-04)
+> and grow with each move.
+> Last reviewed: 2026-10-04.
 > **Owner area:** BE · FE · API · SEC · **Related ADRs:** ADR-0020, ADR-0028, ADR-0032, ADR-0047,
 > ADR-0060, ADR-0065, ADR-0069, ADR-0130, ADR-0135, ADR-0136, ADR-0205, ADR-0206, ADR-0212,
 > ADR-0214, ADR-0216, ADR-0219, ADR-0223, ADR-0229, ADR-0231 … ADR-0239 · **Specs:**
@@ -71,6 +75,11 @@ refuses code that reaches past that API. It is the report of a whole-repository 
 | D-20 | **`MissionParticipant.orgUnits` becomes lazy** (was O-11, decided 2026-10-01) | Loaded through an entity graph where it is needed, the load paths pinned by N+1 tests. |
 | D-21 | **CI reuses the configuration cache** (was O-12, decided 2026-10-01) | The owner adds the encryption key as a repository secret; pull requests read the cache, `main` writes it; the workflow change follows the secret. |
 | D-22 | **The raw evidence is kept** (was O-13, decided 2026-10-01) | Reports, finding data and scripts, sanitised, in [`docs/archive/domain-modularisation-audit-2026-09/`](archive/domain-modularisation-audit-2026-09/README.md). |
+| D-23 | **No soak before Phase 5** (decided 2026-10-04) | `exchange` and `bank` become Gradle modules right after Phases 2–4, without waiting for their package boundary to stay green for some releases; the Phase 0 guards and the frozen module baseline hold the boundary meanwhile (§7.7). |
+| D-24 | **One combined API cut** (decided 2026-10-04) | The REST waves of §7.9 land on `main` together and ship as one backend release with one app release that uses every new path, so members take one forced update instead of one per wave; the release-bound floor (D-11) rises with that release. |
+| D-25 | **The terms text stays** (decided 2026-10-04) | The terms keep their wording (they still mention guests and list five areas), because any change forces every member to consent again (ADR-0127); D1981-TERMS is closed as kept. |
+| D-26 | **Keycloak hardening steps 2, 11 and 12 are in scope** (decided 2026-10-04) | SMTP and forgotten password, OTP for admins, session windows (`docs/KEYCLOAK_HARDENING_RUNBOOK.md`); each realm write still needs the owner's yes per action. **Prepared 2026-10-10:** `scripts/harden-keycloak-realm.py` (REQ-SEC-082), its integration test on a throwaway Keycloak, and every owner-only step with command, expected output, rollback and approval in [`OWNER_STEPS_2026-10.md`](OWNER_STEPS_2026-10.md); nothing was executed against a host or realm. Production and repository-settings work (CI-SEC-16, OPS-SEC-08, the S-09 restore drill) is built in code and executed per approved action. |
+| D-27 | **The 29 ADRs accepted in #1981 are ratified** (decided 2026-10-04) | The owner confirms the status changes of the documentation audit; D1981-ADR is closed. |
 
 ## 3 Summary
 
@@ -189,7 +198,8 @@ reference DTOs).
 - **URIs.** Of 624 `BackendApiClient` call sites, 356 build the backend path by string
   concatenation and 41 through URI templates.
 - **Package-keyed couplings.** The session deserializer admits application classes by the prefix
-  `…frontend.model.` (production enforces it since 2026-09-25); 172 `T(…support.Roles)` references in
+  `…frontend.model.` (production enforces it since 2026-09-25; replaced by the exact list on
+  2026-10-04, F2); 172 `T(…support.Roles)` references in
   22 templates resolve only at render time; three DTO contract tests are keyed on the `model.dto`
   package; the authorization gate test checks classes, not handlers.
 - **Assets.** 100 scripts, 64 stylesheets and 120 templates map onto the domains (19 core + 81 domain
@@ -233,7 +243,7 @@ the modules its row allows; a dependency upward is inverted through an SPI or an
 
 | Rank | Modules | Role |
 | --- | --- | --- |
-| 0 | `kernel`, `platform` | `kernel`: `AbstractEntity`, `PageResponse`, `Entities`, `OptimisticLock`, `StringNormalization`, `LikePatterns`, validation constraints, the error-model base (§5.5), handle anonymisation, `UserRef`/`OrgUnitRef` value types, SCU rounding. `platform`: web, logging, metrics infrastructure and the access core (`AuthHelperService`, `AuthenticatedSubject`, `Roles`, `Permissions`). Closed to domain meaning, like `logging-support` (ADR-0205). |
+| 0 | `kernel`, `platform` | `kernel`: `AbstractEntity`, `PageResponse`, `Entities`, `OptimisticLock`, `StringNormalization`, `LikePatterns`, validation constraints, the error-model base (§5.5), handle anonymisation, `UserRef`/`OrgUnitRef` value types (`OrgUnitRef` only once `OrgUnitKind` is a kernel type, §7.3), SCU rounding. `platform`: web, logging, metrics infrastructure and the access core (`AuthHelperService`, `AuthenticatedSubject`, `ClientAttribution`); `Roles`, `Permissions`, `RequestMemo` and `ProblemResponseFactory` are kernel types (corrected 2026-10-04, P1-9). Closed to domain meaning, like `logging-support` (ADR-0205). |
 | 1 | `audit`, `notification`, `livesync` | Platform services every domain may call; they depend upward only through SPIs. |
 | 2 | `catalogue` | Materials, items, locations, ship types, refining methods, job and frequency types, and the UEX, SC Wiki and P4K imports — including the recipe graph (`model.scwiki.Blueprint`). |
 | 3 | `identity` | Users, registration, profile, terms consent, and the GDPR orchestration, which calls the other modules through identity-owned SPIs. |
@@ -353,6 +363,22 @@ values as a documented list. `GlobalExceptionHandler` and `ErrorDisclosurePolicy
 place that decides what a response discloses. Rejected: keep every exception type in the kernel
 package and seal it (no domain ownership, no code documentation).
 
+**Implemented 2026-10-04 (P1-12).** `AppException` permits the eight existing generic kinds
+(`BadRequest`, `NotFound`, `BusinessConflict`, `DuplicateEntity`, `EntityInUse`, `ExternalService`,
+`ReportGeneration`, `RateLimitExceeded`) and `DomainProblem`; no new "access" kind was added,
+because nothing throws one — access refusals stay Spring Security's `AccessDeniedException`, which
+the handler maps. The six module exceptions moved, names unchanged, into
+`backend.<module>.api` (bank, exchange, inventory, joborder, refinery, scope — the layout of §5.2),
+with one `ProblemCode` enum each (`BankProblemCode`, `ExchangeProblemCode`, `InventoryProblemCode`,
+`JobOrderProblemCode`, `RefineryProblemCode`, `ScopeProblemCode`); `CoreProblemCode` keeps the 27
+kernel codes, wire values unchanged. `ACTING_MEMBER_REFUSED` went to the exchange enum, because its
+producer `ActingMemberFilter` belongs to the exchange module in the domain map. The documented list
+is now collected from every registry enum and sorted by code. Correction, 2026-10-04: the "six
+kernel → domain edges" of the sealed family were never in the ArchUnit baseline — `jdeps` counts a
+`PermittedSubclasses` attribute, ArchUnit does not (REQ-MOD-004 already said so); the baseline
+shrank instead by the two `kernel → platform` edges to `ErrorDisclosurePolicy`, which the domain
+map now assigns to the kernel as part of the exception contract (138 → 136 edges).
+
 ### 5.6 Persistence
 
 - **One schema, one Flyway location, one global `V<n>` sequence** in `backend`, also after the
@@ -375,7 +401,7 @@ package and seal it (no domain ownership, no code documentation).
 
 | Layer | Tool | What it checks |
 | --- | --- | --- |
-| Module boundaries | Spring Modulith 2.1.1 `ApplicationModules.verify()` in test scope, `explicitly-annotated` detection, `@ApplicationModule(allowedDependencies = …)` per `package-info`, `@NamedInterface` for `api` | No cycles between modules, no access to another module's internals, only allowed dependencies |
+| Module boundaries | Spring Modulith 2.1.1 `ApplicationModules.verify()` in test scope, `explicitly-annotated` detection, `@ApplicationModule(allowedDependencies = …)` per `package-info` (the `<module>::api` of every declared module the domain map's ranks and `allow` rows permit), `@NamedInterface("api")` on the `api` package and on each package below it; only the annotations (`spring-modulith-api`) are on the main compile classpath, `compileOnly` | No cycles between modules, no access to another module's internals, only allowed dependencies |
 | Frozen baseline | ArchUnit `modules()` rule over the domain map, wrapped in `FreezingArchRule` | Today's 150 violating edges are recorded and may only shrink; security rules are never frozen |
 | Security and structure | The existing ArchUnit rules, re-keyed (§6) | Gates on every endpoint, no `SecurityContextHolder` outside the seam, no entities on the wire, the bank seam, the exchange's reduced authority, audit writes |
 | What neither sees | Targeted tests (§6, G-01…G-24) | SpEL bean references, spliced JPQL scope fragments, JPQL strings, Thymeleaf `T(…)`, native-SQL GDPR registries, database triggers, path-keyed security lists |
@@ -596,8 +622,9 @@ step is its own pull request or a short series, independently shippable and reve
 
 ### 7.1 Phase −1 — the defects of §9, fixed separately
 
-**Done** — merged 2026-10-01 in PRs #2299–#2312 (released with v1.13.5). C-03 is a
-repository-settings change for the owner and is not part of those pull requests.
+**Done** — merged 2026-10-01 in PRs #2299–#2312 (released with v1.13.5). C-03, a
+repository-settings change, is done too: `Self-tests` and `Container checks` are required checks
+on `main` (*corrected 2026-10-04*).
 
 Small, independent pull requests before anything else (D-07). They remove traps the refactor would
 otherwise trigger (the URL-rule-only gates, the dual-use refinery DTO) and close the defects the
@@ -613,7 +640,7 @@ audit found.
 | 0.4 Frontend guards — **done 2026-10-03** | G-13 … G-17; `ParallelPageLoader` on `ContextSnapshotFactory` (fixes the missing locale relay); the three kernel shapes (byte download with headers and per-call timeout, multipart upload, `Flux`) so the eleven bypassing controllers return to the kernel | Typed clients and the package move inherit whatever the kernel does |
 | 0.5 Exchange guards — **done 2026-10-03** | G-18; ingest re-package by concern (§5.11); keycloak-spi registrations test | The only contract that must not move |
 | 0.6 Build and CI guards — **done 2026-10-03** | G-20, G-21; `@SpringBootTest` profile unification (BLD-PERF-03, 191 of 231 classes carry `@ActiveProfiles("test")` although Gradle forces it) | Test-context count and coverage floors decide how painful every later step is |
-| 0.7 API machinery — **done 2026-10-03** except the app's re-read, which ships with basetool-android#209 | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the exchange fence (the relay surface in its own internal OpenAPI document, REQ-XCH-039); the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
+| 0.7 API machinery — **done 2026-10-03**; the app's re-read shipped with app v0.5.0 (basetool-android#209, published 2026-10-03) | G-23 (the app's call list first, then the declared-break ledger), then G-08; one OpenAPI tag per domain; unique schema names; generator assertions; error-code registry; mandatory contract baseline on `main`; the exchange fence (the relay surface in its own internal OpenAPI document, REQ-XCH-039); the app re-reads the version policy on resume and after an unexpected 404, shipped **before** the first cut (D-11) | The first hard-cut wave depends on all of it |
 
 ### 7.3 Phase 1 — behaviour-free inversions and re-homings
 
@@ -623,14 +650,147 @@ Cheap moves that break many cycles without changing behaviour:
   into `identity`; handle anonymisation into the kernel; the exchange row records into their owners'
   repositories; a catalogue `ShipTypeMapper`; `AuthHelperService`'s four delegations to
   `OwnerScopeService` removed (callers use the scope API); `AuditService.record` returns nothing
-  instead of the entity.
+  instead of the entity — **done 2026-10-04** (P1-7): no caller used the row; the two
+  `UexRefinerySyncService` calls that handed it through `SyncChunkWriter.inNewTransaction(Supplier)`
+  now use `runInNewTransaction(Runnable)`.
+  The re-homings P1-1 … P1-6 are **done 2026-10-04**, and `kernel` (base package, allowed by bare
+  name) and `orgunit` (`orgunit.api` its named interface, `orgunit.web` internal) are declared
+  Spring Modulith modules under REQ-MOD-006; the module baseline shrank by 9 edges, from
+  136 to 127 (37 module pairs):
+  - P1-1: `BereichLeadershipRole` moved to `orgunit.api`, `GrandAdmiralRequest` and
+    `AddBereichLeaderRequest` to `orgunit.web` (the latter had to move with the enum, or
+    `model ⇄ orgunit` would have closed a package cycle). The Leitung view (`Leitung*`) is now
+    assigned to `orgchart`; it was mapped to `orgunit`. The org chart sits behind the observer SPI
+    `orgunit.api.MembershipChangeObserver` (`@ObserverSpi`), which `OrgChartService` implements with
+    its nine `MANDATORY` mirror methods, so `OrgUnitMembershipService` and `KommandoGroupService` no
+    longer know it (−2 edges). *Correction:* `AreaLeadershipDto` cannot move alone — it nests
+    `OrgChartNodeDto` and is nested by `OrgChartDto`/`BereichChartDto`, so a lone move closes a
+    `model ⇄ orgchart` package cycle; it moves with the org chart's DTOs in Phase 2 and stays
+    assigned to `orgchart` by its `class` rule until then.
+  - P1-2: `PayoutPreference` stays in `model`, assigned to `identity` by its `class` rule.
+    *Correction:* a physical move to `identity.api` closes an `identity ⇄ model` package cycle
+    (the `User` entity uses it, and `identity.api.events` uses `model` types), so it moves with
+    `User` in Phase 4.
+  - P1-3: `HandleAnonymisation` and `HandleScrubber` moved to `kernel`. *Correction:*
+    `HandleSpellings` reads the `User` entity, so the kernel cannot hold it; it stays a `privacy`
+    class until the GDPR participants of §7.6.
+  - P1-4: the five exchange row records are nested in the repositories that produce them
+    (`ShipRepository`, `BlueprintRepository`, `GameItemRepository`, `LocationRepository`,
+    `InventoryItemRepository`); the JPQL constructor expressions name the binary nested-class name
+    (`…Repository$ExchangeShipRow`) (−5 edges).
+  - P1-5: catalogue `ShipTypeMapper`; `ShipMapper` and `MissionMapper` use it, `HangarService`
+    no longer needs `ShipMapper` (−1 edge).
+  - P1-6: `AuthHelperService` lost `currentSquadronId`, `canSeeSquadron`, `canEditSquadron`,
+    `canEditOrgUnit` and its `ApplicationContext` lookup (−1 edge). *Correction:* none of the 18
+    `@authHelperService` SpEL references used them (all are `isMemberOrAbove()`), so no SpEL and no
+    authorization-matrix line changed. `JobOrderService` and `MaterialClaimService` call
+    `OwnerScopeService` directly; `UserController`'s cross-squadron check moved into
+    `UserService.isCrossSquadronForNonAdmin`, because a controller call would have added an
+    `identity -> scope` edge.
 - The platform SPIs of §5.3 (`ActorHandleResolver`, `RetentionParticipant`, `RecipientDirectory`,
   `LiveSyncTopicAuthorizer`, `ActiveOrgUnitProvider`) — they remove 21 upward edges.
+  **Done 2026-10-04** (P1-8). The module baseline shrank by 15 edges, from 127 (after the error
+  model and the re-homings) to **112 edges**, and from 37 to 30 module pairs (`platform -> scope`
+  left entirely, its other edge having gone with the `AuthHelperService` delegations): `ActorHandleResolver` 2 (`audit -> identity`), `RetentionParticipant` 2
+  (`audit -> bank`), the recipient directories 8 (`notification -> bank` 4, `-> identity` 3,
+  `-> orgunit` 1), `LiveSyncTopicAuthorizer` 2 (`livesync -> scope`, `-> bank`),
+  `ActiveOrgUnitProvider` 1 (`platform -> scope`). **Correction:** 15 edges, not 21. The 21 are
+  all upward edges of the rank-0 and rank-1 modules in the baseline, and six of them are not SPI
+  cases: `notification -> orgunit: OrgUnitRef -> OrgUnitKind` waits for a kernel `OrgUnitKind`
+  (P1-11), `platform -> scope: AuthHelperService -> OwnerScopeService` leaves with the removal of
+  its four delegations, the two `platform -> exchange` edges of `ClientAttribution` need their
+  own move, and the two `kernel -> platform` edges left with the error model (§5.5).
+  `RecipientDirectory` is three interfaces in `notification.api`, one per implementing module (`RoleRecipientDirectory` identity, `OrgUnitRecipientDirectory` orgunit,
+  `AccountRecipientDirectory` bank); the role-code check of `NotificationRuleService` uses the
+  first, which removed two edges §5.3 had not listed. `ActiveOrgUnitProvider` lives in the
+  `service` package beside `AuthHelperService` (a `logging` package would close a
+  `logging -> service -> logging` layer cycle). None of the SPIs is an observer, so the G-12 rules
+  do not select them; the audit and retention calls keep their transactions (`record` stays
+  `MANDATORY`, each purge its own transaction).
 - `support` split into the kernel (`RequestMemo`, `StringNormalization`, `OptimisticLock`,
   `LikePatterns`, `ProblemResponseFactory`, `Roles`, `Permissions`) and per-domain internal packages;
   the ArchUnit leaf rule's message stops sending shared logic there.
+  **Done 2026-10-04** (P1-9). All 61 classes left `support`; the package is gone (two test-only
+  fixtures, `BoundProperties` and `QualityTierFixtures`, keep the test package `support`). The
+  kernel took the seven named classes plus `Quality` (already kernel in the domain map) and
+  `AppProblemProperties`, which `ProblemResponseFactory` reads — without it the factory would
+  have added a `kernel -> platform` edge. A new `platform` module package took the access core
+  and the request settings (`platform.api`: `AuthenticatedSubject`, `SubjectAuthentication`,
+  `OrgUnitContextualAuthority`, `ClientAttribution`, `RefusedSubjectWindow`,
+  `ResilientRedisMessageListenerContainer`, `AuthoritiesCacheProperties`,
+  `PartialRoleScopeProperties`, `RateLimitProperties`; `platform.internal`:
+  `ApiClientMetricsProperties`, `RequestBodyLimitProperties`). Every other class went to
+  `<module>.internal`, or to `<module>.api` when another module uses it (inventory, livesync,
+  identity, joborder, orgunit, exchange, catalogue). Two more module packages followed:
+  `catalogue` (`api.QuantityTypeRounding`, internal UEX helpers) and `mission` (section versions,
+  peer redaction, viewer-access SPI — all internal). Seventeen modules are declared now.
+  `ClientAttribution`'s two `platform -> exchange` edges were inverted through a platform SPI,
+  `platform.api.ClientDirectory`, implemented by `exchange.internal.ExchangeClientDirectory`,
+  because a declared `platform` module may not reach the exchange: the module baseline shrank
+  from **112 to 110 edges** and from 30 to 29 module pairs. No other class changed its module,
+  so no other line moved. The ArchUnit leaf rule is re-keyed by class literal
+  (`ArchitectureTest.LEAF_HELPER_CLASSES`, floor 63 = the 61 moved classes and the two SPI
+  types) with the same allow-list (the helpers, the entity model, the repositories); arrays of a
+  helper count as the helper, which the package-keyed rule had matched implicitly.
+  **Corrections:** (1) §5.1 places `Roles`, `Permissions` and the request memo in `platform`,
+  this step in the kernel; the code follows this step — they are constants and a
+  request-attribute memo with no domain meaning, and every module may depend on either rank-0
+  module, so the choice moved no edge. (2) `mission` has no module API yet, so it is the first
+  module that publishes nothing: `ModularityTest` requires every type below its base package and
+  outside an `api` package and keeps it out of every `allowedDependencies`, instead of demanding
+  an empty `api` package. (3) `catalogue`, `mission` and `platform` had no package before; each
+  enters the allowed dependencies of every module above it (`platform::api` everywhere,
+  `catalogue::api` from rank 3 up).
 - `audit.api` created (enum and recorder moved, names unchanged); event records moved into their
-  publishers' `api.events` packages; the error model of §5.5.
+  publishers' `api.events` packages; the error model of §5.5 — **done 2026-10-04** (P1-12, see
+  §5.5).
+  `audit.api` is **done 2026-10-04** (P1-10): `AuditEventType`, `AuditDomain` and `AuditDetails`
+  moved unchanged; the recorder is the interface `audit.api.AuditRecorder` (`record`,
+  `recordedSince`), implemented by `AuditService`, which stays internal with the entity, repository,
+  viewer and purge. Moving the class itself would have carried its two `audit -> identity` edges
+  (actor handle) into the API; they leave with `ActorHandleResolver`. All 57 recording classes
+  outside the audit module inject `AuditRecorder`; the listener and controller audit rules key on
+  `AuditRecorder` as well, without which the move would have disarmed them. The module baseline
+  stayed at 138 edges: the moved types were already assigned to `audit` by name, and audit's own
+  edges sit in `AuditService` and `AuditRetentionService`. The `@ApplicationModule` declarations
+  followed with P1-13 (below), once `spring-modulith-api` was a `compileOnly` dependency.
+  The event records are **done 2026-10-04** (P1-11): the 19 types of the central `event` package
+  moved, names unchanged, into the `api.events` package of the module of the service that publishes
+  them — `identity` (`DiscordRegistrationPendingEvent`, `UserApprovalDecidedEvent`,
+  `MemberDepartedEvent`), `privacy` (the three `AccountDeletionRequest…Event`s, published by
+  `DeletionRequestService`), `bank` (the booking-request interface and its four records),
+  `joborder`, `materialexchange` and `exchange` (two each), and `notification` (`NotificationEvent`
+  and `OrgUnitRef`). The `event` package is gone. **Correction to §5.1:** `OrgUnitRef` does not go
+  into the kernel yet: it carries `OrgUnitKind` (orgunit, rank 4), so a kernel `OrgUnitRef` would
+  replace the frozen `notification -> orgunit` edge with a new `kernel -> orgunit` one, and an
+  `orgunit.api` one would add two edges from `NotificationEvent` and `RuleEvaluationService`. It
+  stays with the notification contract until `OrgUnitKind` itself is a kernel type. The domain map
+  trades six class rules for one `package <module> <module>` rule per new module package; every
+  type keeps its module, so the baseline stays at 138 edges. The ArchUnit event-payload rule
+  (`eventLayerShouldNotDependOnServiceLayer`, floor 19) is re-keyed from the package tree of
+  `NotificationEvent` to every module's `api.events` tree — left on the anchor, it would have
+  selected two classes and failed its floor — and `event` left the layer-package names.
+- The Spring Modulith module declarations (P1-13, §5.2, §5.7) are **done 2026-10-04 for every
+  module package on `main`**, and the step grows with each later move: a move that creates a module
+  package adds its declarations in the same pull request, and `ModularityTest` fails until it does.
+  `spring-modulith-api` is a `compileOnly` dependency of the backend's main source set — annotations
+  only, absent from the boot jar, the image and the SBOM, so D-02's "test scope only" holds for
+  everything that runs. Eleven modules are declared: `audit`, `bank`, `exchange`, `identity`,
+  `inventory`, `joborder`, `materialexchange`, `notification`, `privacy`, `refinery` and `scope`.
+  Each root `package-info` carries `@ApplicationModule` (closed), each `api` package
+  `@NamedInterface("api")`. `allowedDependencies` is exact for every module: the `<module>::api` of
+  each declared module that the domain map's ranks and `allow` rows permit, so `audit` and
+  `notification` (rank 1) allow nothing, and `ModularityTest` fails when a declaration differs from
+  what the domain map derives. `verify()` is green on six real cross-module edges today (bank,
+  exchange, identity, joborder, materialexchange and privacy → `notification::api`, the
+  `NotificationEvent` contract). The module baseline is unchanged at 138 edges: no class moved.
+  **Corrections to §5.2 and §5.7**, found with the planted fixture: `@NamedInterface` on a package
+  covers that package only — its `propagate` attribute applies to annotated types — so every package
+  below `api` (today the seven `api.events`) carries `@NamedInterface("api")` too, which Modulith
+  merges into the one `api` interface; an allowed dependency written as the bare module name admits
+  only the module's unnamed interface, so a module with an `api` interface is allowed as
+  `<module>::api`; and an allowed dependency that names an undeclared module makes Modulith throw,
+  so `kernel` and the other rank-0 modules enter the lists only once they are declared.
 
 **Pros** many cycles gone before any domain moves; each step is small. **Cons** broad, shallow
 churn. **Risks** SpEL bean names and FQCN references (guards G-01, G-04 catch them). **Effort** M.
@@ -643,13 +803,360 @@ hub where it has one: `dashboard` (0 inbound edges), `admin` (4), `promotion` (1
 mission detach command), then `exchange` (11) and `bank` (18) as packages. Exchange and bank enter
 their "must stay green" period here (D-01).
 
+- `dashboard` — **done 2026-10-05** (P2-1). The announcement banner moved out of the layer
+  packages: `dashboard.web` holds `AnnouncementController`, `AnnouncementDto` and
+  `AnnouncementMapper`, `dashboard.internal` the `Announcement` entity, its repository and
+  `AnnouncementService`. The module publishes nothing (no other class uses it), so it is declared
+  like `mission`: closed, no named interface, in no other module's `allowedDependencies`. The
+  domain map's `name ^Announcement` rule became the `package dashboard` rule; the module baseline is
+  unchanged at 110 edges, because dashboard had no edge in it. Entity name, table, bean names, REST
+  paths, schema names, the authorization matrix and the OpenAPI document are unchanged; the one
+  visible difference is the persistent class name in the log context of an announcement 409,
+  which is now `dashboard.internal.Announcement`. The module has no access policy: its gates are
+  the role annotations `isAuthenticated()` and `hasRole('ADMIN')`, nothing of the scope hub.
+  **Correction to §5.2:** a mechanical move cannot satisfy `web`'s "no `@Transactional`, no
+  entity" — `AnnouncementController` keeps its class-level transaction and maps the entity in the
+  controller, as before. Those two rules are the target of the module's REST wave, which moves the
+  transaction boundary and the mapping into the module; a move keeps both where they are, because
+  either change alters the transaction boundary.
+- `orgchart` — **done 2026-10-05.** All 24 classes moved: the controllers `OrgChartController` and
+  `LeitungController` into `orgchart.web`, the rest (entity `OrgChartPosition`, its repository, the
+  enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`
+  and the 14 DTOs, `AreaLeadershipDto` with them as §7.3 P1-1 deferred) into `orgchart.internal`.
+  The module is declared (floor 19, after `dashboard`) and publishes nothing: no other module uses
+  it, and orgunit reaches it only through `MembershipChangeObserver`. The domain map trades its two `name` rules
+  and the `AreaLeadershipDto` class rule for one `package` rule. No access policy left the scope
+  hub — the org chart has none: its reads are `isAuthenticated()`, its writes `hasRole('ADMIN')`,
+  and neither touches `OwnerScopeService` or `AccessGateService`. The module baseline is unchanged
+  at 110 edges: the org chart had no frozen edge left after P1-1. `OrgChartModuleContractTest`
+  pins its endpoints and the observer before and after the move. **Correction to §5.2:** the
+  `web` package cannot hold the REST DTOs yet — the services return them, so `internal -> web`
+  would close a layer cycle inside the module (ADR-0047); they stay in `internal` until the module
+  API returns its own records.
+- `admin` — **done 2026-10-05** (P2-2). The admin building blocks of §5.1 — the runtime system
+  settings, the Android version policy and the liveness probe — moved out of the layer packages:
+  `admin.web` holds `SystemSettingController`, `AppVersionPolicyController`, `SystemController`,
+  `AppVersionPolicyDto` and `PingResponse`; `admin.internal` the `SystemSetting` entity, its
+  repository, `SystemSettingService`, `SystemSettingMapper`, the setting records the service returns,
+  `AndroidClientProperties` and `AndroidVersionPolicyReport`. The `/admin` endpoints of other
+  domains are not part of it; they move with their domains. The module's four inbound edges (bank
+  transfer fee, operation payout, the default-blueprint bootstrap's entity and repository) now go
+  through one API type, `admin.api.SystemSettings` (`getSettingValue`, and `putSettingValue` for
+  the bootstrap's seed flag, the same find-or-create-and-save inside the caller's transaction),
+  implemented by `SystemSettingService`; every declared module of a higher rank allows
+  `admin::api`. The module baseline is unchanged at 110 edges (none of the four was a violation);
+  the authorization matrix and the OpenAPI document are unchanged. No access policy: every gate is
+  a role annotation. The setting records stay in `internal` beside the service that returns them, as
+  for `orgchart`. **Finding:**
+  the selection floor of `ArchitectureTest`'s `squadron_id` join-column rule counts the legacy
+  `model` package tree as well as every entity by role, so each move of `model.dto` records lowers
+  it (by 4 here) without the rule checking any entity less.
+- `operation` — **done 2026-10-05.** Three steps, each green on its own:
+  1. *Access policy out of the scope hub* (§5.4, ADR-0236): `OperationAccessPolicy`, bean
+     `operationAccessPolicy`, holds `canSeeOperation`, `canSeeOperationLedger` and
+     `canEditOperation` verbatim, on the scope kernel's `canSeeSquadron`/`canEditSquadron`. The
+     eight operation endpoints, the operation live-sync room and the payout ledger check ask it;
+     `OwnerScopeService` and `AccessGateService` lost the three methods and `AccessGateService` its
+     `OperationRepository`. The authorization matrix changed on exactly those eight lines, in
+     expression text only. `OperationAccessPolicyDifferentialTest` compared the old and the new
+     gate over 22 callers (admin unpinned and pinned to either unit; members of zero, one and two
+     units; a member pinned to an own and to a foreign unit; a Bereich lead reaching a child Staffel
+     by cascade; guests below member — each with and without the participant escape), five
+     operations (either unit, a child unit, ownerless, unknown) and the three gates, 330 verdicts,
+     before the old methods went; it keeps comparing against a verbatim copy of them. Proven able
+     to fail by dropping the participant escape. `TenancyGuardTest` counts the policy as a scope
+     gate type.
+  2. *The mission detach command* (§5.3, write family 10): `mission.api.MissionCommands#
+     detachFromOperation`, implemented by `MissionService` with `MANDATORY`; the operation delete
+     calls it instead of writing `Mission` rows. Same transaction, same order, no counter moves,
+     `OPERATION_DELETED` still recorded after the delete. `mission` now publishes an `api` package,
+     so every declared module above rank 9 allows `mission::api`.
+  3. *Move*: `OperationController` into `operation.web`; the five services, the policy,
+     `OperationPayoutStatus` with its repository and eight DTOs into `operation.internal`. The
+     module is declared (floor 21) and publishes nothing.
+  The module baseline shrank by the two `scope -> operation` edges, **110 → 108**.
+  `OperationModuleContractTest` pins the endpoints per caller, the delete, the command's
+  transaction rule and that the scoped list and the per-row gate admit the same operations.
+  **Corrections:** (1) the `Operation` entity, `OperationStatus`, `OperationRepository`,
+  `OperationMapper` and `OperationDto`, `OperationCreateDto`, `OperationReferenceDto` cannot leave
+  the layer packages yet: `Mission`, `MissionDto`/`MissionListDto`, `MissionMapper`,
+  `MissionService` and `BusinessMetricsCollector` use them, so a move closes a package cycle with
+  `model`, `mapper`, `repository`, `service` or `task`. They stay assigned to `operation` by the
+  `^Operation` name rule and move with P3-8, when `Mission.operation` becomes an id. (2) So the
+  policy does not yet own the operation's JPQL scope fragment (§5.4): `OPERATION_SCOPE_PREDICATE`
+  stays in `ScopeSpecifications`, used by `OperationRepository`; that the list query and the gate
+  still widen together is now tested end to end instead. (3) The detach command removes the
+  foreign write, not the `mission -> operation` edges: those are the association and the DTO
+  embedding of (1), and leave with P3-8 and the `OperationSummaryProvider` SPI.
+- `promotion` — **done 2026-10-05** (P2-3), the second module, after `operation`, to take its access
+  policy out of the scope hub. `PromotionAccessPolicy` (bean `promotionAccessPolicy`, `promotion.internal`) owns
+  the per-Staffel feature flag, the read gate and the feature assertion; the three methods left
+  `OwnerScopeService` and `RequestScopeResolver`. The generic Staffel gates the promotion services
+  also use (`currentSquadronId`, `canSeeSquadron`, `canEditSquadron`, `hasAmbiguousStaffelContext`)
+  stay in the scope kernel, because other modules use them. No SpEL referenced the moved methods,
+  so the authorization matrix did not change. The differential verdict test
+  (`PromotionAccessPolicyVerdictTest`, 17 cases) ran the policy and the hub side by side over the
+  rows of §5.4 that apply to this gate and now keeps the recorded verdicts; the per-row escapes of
+  §5.4 do not apply, because the per-row checks are the unchanged kernel `canSeeSquadron` /
+  `canEditSquadron`. Controllers moved to `promotion.web`, everything else to `promotion.internal`.
+  The GDPR deletion reaches the module through `MemberEvaluationErasure` (`MANDATORY`), which sits
+  in the `service` package beside `UserDeletionService`, assigned to `promotion` by a `class` rule.
+  **Correction to §5.2:** a module cannot publish a type in `<module>.api` while the caller sits in
+  a layer package the module itself depends on — `service → promotion.api` plus `promotion →
+  service` closes a top-level package cycle; the type is carried into Phase 4 and replaced by the GDPR
+  participant SPIs of §7.6.
+  With that, `promotion` publishes nothing. The move removes no baseline edge (108).
+- `personalinventory` — **done 2026-10-05** (P2-4). Mein Inventar moved out of the layer
+  packages: the member, admin and UEX location-picker controllers into `personalinventory.web`, the
+  item entity, the location-type enum, the repository, the service, the mapper and the records into
+  `personalinventory.internal`. The module never consulted the scope hub — its gate is the owner
+  (`@CurrentUserId`) and the role annotations — so no access policy moved. Its one inbound edge,
+  the GDPR deletion's bulk delete, goes through `personalinventory.api.PersonalInventoryErasure`
+  (`MANDATORY`), which the module publishes as its `api`; unlike promotion the module depends on
+  nothing in `service`, so no package cycle forces the type out of its module. It is carried into
+  Phase 4 like `MemberEvaluationErasure` (§7.6). Every declared module of a higher rank allows
+  `personalinventory::api`. The move removes no baseline edge (108).
+- `exchange` (as a package) — **done 2026-10-10.** Its "must stay green" period starts here
+  (D-01); Phase 5 extracts it next (D-23).
+  1. *Characterise*: the relay contract was already pinned (G-18 wire contract and golden answers,
+     `ExchangeRelaySeamParityTest`, the relay OpenAPI document, the authorization matrix);
+     `BlueprintUploadPreviewServiceTest` was added for the one exchange path a lower module used.
+  2. *Inversions* (5 baseline edges, **108 → 103**; the `blueprint -> exchange` and
+     `scope -> exchange` pairs are gone): the blueprint upload preview hands the envelope to the
+     blueprint-owned SPI `service.BlueprintEnvelopeReader` (implemented by
+     `ExchangeBlueprintEnvelopeReader`, same binding, validation and draft resolution in the
+     caller's transaction); `PersonalBlueprintService`, `CustomJwtGrantedAuthoritiesConverter` and
+     `UserDeletionService` ask `platform.api.ClientDirectory` (`displayNames`, `isGatewayClient`,
+     `isGatewayServiceAccount`); the display-name projection is nested in
+     `ExchangeClientRepository` (the P1-4 pattern).
+  3. *Move*: 152 classes. `exchange.web` holds the eleven controllers, `exchange.internal.dto` the
+     34 relay wire records, `exchange.internal` everything else — including `ActingMemberFilter`,
+     `SandboxProfileGuard` (its `spring.factories` entry follows), the change-source transaction
+     manager and its configuration from `config`, and `DatabaseActingMemberAuthorities`.
+  No access policy left the scope hub: the exchange has none there. Its gates are its own
+  (`exchangeGate`, `connectedAppsGate`); the one scope-hub call, `canViewJobOrders` in
+  `ExchangeDemandService`, is the job-order gate the exchange asks as a caller.
+  **Corrections:** (1) the move needed two more inversions than the eleven inbound edges show,
+  because once the exchange depends on the service layer any `config -> exchange` edge closes a
+  `config -> exchange -> service -> config` package cycle: `SecurityConfig` takes the filter from
+  the new SPI `platform.api.ActingMemberFilterProvider` (same constructor arguments, same place
+  in the chain, the approval filter anchored on the filter's runtime class), `ActingMemberHeader`
+  moved to `platform.api` (the metrics filter reads the client header) and `KeycloakSyncProperties`
+  to `identity.api` (`FirstPartyClientIds` reads it). (2) The exchange's ArchUnit rules were keyed
+  on the package segment `exchange` and on the service package tree; both would have changed
+  meaning. The relay-controller rules now select controllers mapped under `/api/v1/exchange/`
+  (still 8 classes, 14 methods), the reduced-authority rule every non-web exchange class
+  (52 → 160), and the service-layer `SecurityContextHolder` and read-only-transaction rules also
+  select the exchange's non-web classes, so the 28 helpers that left the service package tree stay
+  checked. (3) §5.2's `web` cannot hold the relay DTOs, as with the org chart; they sit in
+  `internal.dto`, which keeps the `exchangeDtosStayInTheExchangeLayer` selection (34) unchanged.
+- `bank` as a package — **done 2026-10-10** (P2-5). All 126 bank classes of the layer packages moved:
+  the nine controllers (eight Kartellbank, `OrgUnitBankController`) into `bank.web`, everything else
+  — entities, repositories, services, mappers, records, the PDF formats, the ledger-integrity task
+  and the org-unit side behind `OrgUnitBankAccessService` — into `bank.internal`; `BankAmounts` and
+  `BankBookingRequestType` joined `bank.api`, because the published events and
+  `BankConflictException` carry them. Three steps, each green on its own:
+  1. *Access out of the scope hub* (§5.4): the bank's gates were already the bank's —
+     `bankSecurityService` for the Kartellbank and the `OrgUnitBankAccessService` seam for the org-unit
+     side. What the hub still held for the bank left it: the `AREA_MEMBERS` cascade
+     (`currentUserIsMemberOfAreaCascade`, REQ-BANK-048) is decided in the seam from the kernel's direct
+     memberships; `OrgUnitBankAreaCascadeDifferentialTest` compared it with the hub method over 480
+     verdicts (authenticated or anonymous, admin or not, unpinned or pinned, eight membership sets,
+     five target units) and keeps a verbatim copy; dropping the child-unit clause fails it.
+     `currentOwnLevelOversightScope` (REQ-BANK-022) and `currentUserHasAreaOrOlOversight`
+     (REQ-BANK-028) had no production caller left after REQ-BANK-039 and REQ-BANK-037 and were
+     removed. `AccessGateService` held no bank gate. No SpEL changed.
+  2. *Inversions* (§5.3): `OrgUnitMembershipService` and `UserDeletionService` snapshot and record
+     the responsible holders through `orgunit.api.ResponsibleHolderTracker`; `UserSyncService` runs
+     the holder reconciliation through `identity.api.UserSyncFollowUp`; the GDPR handle anonymisation
+     reaches the bank tables and the bank audit marker through `BankHandleSnapshots` (`MANDATORY`).
+     The module baseline shrank by `identity -> bank` and `orgunit -> bank`, **103 → 101** (re-derived after the exchange move).
+  3. *Move*, with the seam rules re-keyed to the module (§5.4): `BANK_DOMAIN` is the `bank`
+     package tree minus `ORG_UNIT_BANK_SIDE` (class literals), plus `BANK_CLASSES`, which now names
+     only the bank types outside the package; the bridge set is still exactly
+     `OrgUnitBankAccessService`. Like `EXCHANGE_NON_WEB`, `BANK_NON_WEB` keeps the bank's
+     non-controller classes in the security-context and read-only-transaction rules after they left
+     the `service` tree (floors 495 and 498). `BankAuditService`, `bank_audit_event`, the lock order
+     and the money arithmetic are untouched.
+  **Corrections:** (1) §5.4 expected bank gates in `OwnerScopeService`/`AccessGateService`; there was
+  one membership query and two dead methods. (2) Like `MemberEvaluationErasure`,
+  `BankHandleSnapshots` cannot sit in `bank.api` while its caller lives in the `service` package the
+  bank depends on; it stays there, registered in `BANK_CLASSES` and assigned by a `class` rule, and
+  is carried into Phase 4 with the GDPR participants (§7.6). (3) `BusinessMetricsCollector` (`app`)
+  still reads the booking-request repository directly; it leaves with the per-module gauges of §5.1.
+
 ### 7.5 Phase 3 — the business core
 
 In dependency order, each with its command API, its observer SPIs, its access policy and its REST
 wave: `materialexchange` (the offer ratchet as `StockChangeObserver`), `refinery`, `joborder`,
 `mission`, `inventory` (`StockCommands`, the earmark target SPI, the lot-lock protocol of ADR-0229
-moved into inventory), `hangar`, `blueprint`. The eight business associations become id references
+moved into inventory, and `MaterialExchangeOffer.inventoryItem` as an id), `hangar`, `blueprint`. The eight business associations become id references
 as each pair is decoupled.
+
+- `materialexchange` — **done 2026-10-10.**
+  1. *Characterise*: the ratchet's audit rows were pinned (`MaterialExchangeOfferRatchetDataTest`,
+     `ExchangeStockWriteControllerTest`); `MaterialExchangeStockLinksDataTest` adds the two other
+     reads the Lager made of the Materialbörse — the stolen-split floor and the merge refusal.
+  2. *Observer SPI* (§5.3, write family 3): `inventory.api.StockChangeObserver` (`@ObserverSpi`:
+     `lower`, `beforeDelete`, `beforeWipe`, `beforeUserPurge`), implemented unchanged by
+     `MaterialExchangeOfferRatchet` (every method `MANDATORY`, same clamps, same
+     `MARKET_OFFER_REDUCED`/`REMOVED` rows before the cascading delete); the reason codes and the
+     effects record moved with it as `StockChangeReason` and `StockChangeEffects` (codes
+     unchanged). A second inventory-owned SPI, `StockOfferLookup` (`isOffered`,
+     `activeOfferedAmount`), answers the two reads. The Lager, the three job-order handover and
+     production services, the exchange's stock writes and the account deletion use only these.
+     Baseline **103 → 98** (the `inventory -> materialexchange` pair is gone).
+  3. *Move*: the two controllers into `materialexchange.web`, the 8 entities and enums, 13 DTOs,
+     4 repositories, 5 services and the lookup into `materialexchange.internal`.
+  No access policy left the scope hub: the boards are gated by `hasRole('KRT_MEMBER')` and decide
+  ownership inside their services; their only scope-hub call is `currentOrgUnit` for stamping.
+  No command API is published yet: no other module writes an offer or a request. **Corrections:**
+  (1) `beforeWipe` takes the three scope components instead of `ScopePredicate`, which lives in
+  the `service` package, so `inventory.api` depends on no layer package; `beforeUserPurge` stays on
+  the stock observer rather than a GDPR participant until §7.6 introduces those. (2)
+  `MaterialExchangeOffer.inventoryItem` stays an association for now: converting it rewrites the
+  fetch plan of eight queries and two entity graphs, and nothing needs the id until `InventoryItem`
+  leaves `model` with the inventory move (P3-5), where it belongs. **Tracked for P3-5:** convert
+  `MaterialExchangeOffer.inventoryItem` to the item id when `InventoryItem` moves. (3)
+  `ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE` is public, because the offer board's JPQL
+  splices it from another package.
+- `refinery` — **done 2026-10-10.**
+  1. *Characterise*: `RefineryModuleContractTest` pins that create, update and cancel each record
+     their audit event in the command's transaction, and that a member of another org unit is
+     refused on every per-order entry point (read, update, cancel, store) and a logistician of
+     another org unit on every on-behalf entry point (the "403 per foreign entry point" of the
+     risk table).
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `RefineryAccessPolicy` (bean
+     `refineryAccessPolicy`) holds `canSeeRefineryOrder` (id and entity), `canEditRefineryOrder`,
+     `canViewUserRefineryOrders` and `canManageUserRefineryOrders`. The scope kernel publishes the
+     two blocks those gates shared privately, unchanged: `permitsOwnedRow` (owner escape, ownerless
+     rule, org-unit scope) and `canActOnTargetUser`. The eight refinery-order endpoints, the
+     controller's on-behalf owner check and the live-sync room ask the policy; the authorization
+     matrix changed on exactly those eight lines, in expression text. The differential verdict
+     test compared old and new over 9 callers × (7 orders × 2 gates + 5 target members × 2
+     gates) = 216 verdicts before the old methods went (proven able to fail by dropping the owner
+     from the edit gate) and keeps comparing against a restatement on the kernel primitives.
+  3. *Inversions*: the blueprint craftability asks its own SPI `CraftabilityYieldSource` (with its
+     own `YieldSlice` record, so the SPI adds no `blueprint -> inventory` edge), implemented by
+     `RefineryOrderService`; the exchange's refinery draft asks the published
+     `refinery.api.RefineryDraftBuilder`.
+  4. *Move*: controllers into `refinery.web`; the extract and draft records into `refinery.api`
+     (the exchange uses them); the two services, the policy, the live-sync authorizer, the import
+     settings and the store requests into `refinery.internal`.
+  Baseline **96 → 92** (`scope -> refinery` 3, `blueprint -> refinery` 1).
+  **Corrections:** (1) like the operation, `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`,
+  `RefineryOrderRepository` (with `RefineryMissionProfitAggregate`), `RefineryOrderMapper` and
+  `RefineryOrderDto`/`RefineryGoodDto`/`RefineryOrderListDto` stay in the layer packages: `Mission`,
+  `MissionFinanceSummaryDto`, `MissionService`, `MissionFinanceEntryService`, `LocationService` and
+  `UserDeletionService` use them, so a move closes a package cycle. They move with P3-8 (the
+  `mission -> refinery` association and the `MissionFinanceContributor` SPI), where
+  `RefineryOrder.mission` becomes an id. So the policy does not own the refinery's JPQL scope
+  fragment yet either. (2) No command API: no other module writes a refinery order. The
+  store still creates Lager rows itself (write family 2 of the evidence appendix); that write
+  becomes a call of the Lager's `StockCommands` with P3-5.
+- `joborder` — **done 2026-10-10.**
+  1. *Characterise*: `JobOrderModuleContractTest` pins that create, priority change, assignee add,
+     status change and delete each record their audit event in the command's transaction, and that
+     a member of another org unit is refused on every per-order read and write entry point (the
+     "403 per foreign entry point" of the risk table).
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `JobOrderAccessPolicy` (bean
+     `jobOrderAccessPolicy`) holds `canSeeJobOrder` (id and entity), `canEditJobOrder`,
+     `canSeeJobOrderBlueprintOwners`, `canSeeJobOrderInventoryOwners`, `canSeeJobOrderAsRequester`
+     and `canEditJobOrderAsRequester`, on the kernel's `canViewJobOrders`, `canSeeSquadron`,
+     `canEditSquadron` and `currentUserIsMemberOfOrgUnit`; the queue capabilities
+     (`canViewJobOrders`, `canViewOwnJobOrders`) stay in the kernel, which identity and the
+     exchange ask too. The Lager's row flag for earmarked stock asks its own SPI
+     `inventory.api.EarmarkTargetPolicy` (`mayEditJobOrderEarmarks`), which the policy implements,
+     so the earmark target SPI of P3-5 starts here. The order, claim, item-stock and
+     material-collection endpoints, the order query and the live-sync room ask the policy; the
+     authorization matrix changed on exactly 28 lines, in expression text. The differential verdict
+     test compared old and new over 28 callers × 21 orders × 7 gates = 4116 verdicts before the old
+     methods went (proven able to fail by dropping the Spezialkommando escape) and keeps comparing
+     against a restatement on the kernel primitives. Baseline **92 → 87**
+     (`scope -> joborder` is gone).
+  3. *Inversion*: the order's stock projection asks `service.ClaimBucketSource` for the
+     Spezialkommando claim view, implemented by `MaterialClaimService`, so the claim service moves.
+  4. *Move*: the four controllers into `joborder.web`; the order, assignee, priority, item
+     production, handover, handover-report, blueprint-owner, integrity, demand and claim services,
+     the policy, the live-sync authorizer, the org-unit resolver, the integrity task, the item,
+     material and handover-item repositories and the request DTOs into `joborder.internal`.
+  The move leaves the baseline at **87**: the 18 edges still into the job order are the Lager's
+  (17, the earmark and its reads, P3-5) and the assignee redaction in identity (1).
+  **Corrections:** (1) `JobOrder` and its items, materials, handovers and claims, their
+  repositories, `JobOrderMapper`, `JobOrderHandoverMapper`, `JobOrderItemHandoverMapper`, the
+  response DTOs, `JobOrderItemService`, `JobOrderStockProjectionService`,
+  `JobOrderMaterialRequirementResolver` and `QualityBucketAllocator` stay in the layer packages:
+  the Lager's earmark (`InventoryJobOrderAllocation`) holds the job-order association, and the Lager, the refinery, the exchange's
+  demand board, the GDPR services and the business metrics read them, so a move closes a package
+  cycle. They move once the earmark becomes an id with P3-5. (2) No command API: no other module
+  writes a job order; the exchange only reads the demand. (3) The earmark caller rule of the risk
+  table (the ungated order-linked stock query callable only from joborder) is P3-5's: that query
+  is the Lager's and still has no module to be guarded from.
+- `mission` — **done 2026-10-10.**
+  1. *Characterise*: `MissionModuleContractTest` pins that create, step add, core patch, join and
+     delete each record their audit event in the command's transaction; that a member of another
+     org unit is refused on every per-mission read entry point of an internal mission (detail, the
+     three finance reads, join); and that a mission manager of another org unit is refused on the
+     write entry points of a public mission while still reading it.
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `MissionAccessPolicy` (bean
+     `missionAccessPolicy`) holds `canSeeMission` (the parent-chain walk, the public escape, the
+     ownerless rule) and `canEditMission`, on the kernel's `canSeeSquadron`/`canEditSquadron` and
+     `isMemberOrAbove`. `MissionSecurityService` keeps the finer write gates (manage, owner change,
+     participant access, finance entries) and asks the policy for the edit scope. The seven read
+     gates, the live-sync room and those five checks switched; the authorization matrix changed
+     on exactly seven lines. The differential verdict test compared the policy, the live scope hub
+     and a restatement over 18 callers × 25 missions × 2 gates = 900 verdicts before the old
+     methods went (proven able to fail by stopping the parent walk at the mission itself) and
+     keeps comparing against the restatement. Baseline **87 → 85** (`scope -> mission` is gone).
+  3. *Inversions* (write families 8 and 9): `hangar.api.ShipDeletionObserver`, implemented by
+     `MissionUnitShipRelease` (the unit drops the ship and records `MISSION_UNIT_UPDATED`, as
+     before), and `catalogue.api.JobTypeDesignationObserver`, implemented by
+     `MissionLeadDesignationRelease` (the participants' lead flags are cleared with the same
+     query). `hangar` becomes a declared module with only its `api` package. Baseline **85 → 81**.
+  4. *Move*: the two controllers into `mission.web`; the mission, structure, participant,
+     timeline and finance services, the security service, the policy, the viewer-access service,
+     the participant-target resolver, the live-sync authorizer, the crew, frequency, objective,
+     step and unit repositories and the 30 request DTOs into `mission.internal`.
+  **Corrections:** (1) `Mission` and its children, `MissionRepository` with its authorization
+  fragment, the participant, finance-entry and ownership repositories, the finance aggregates,
+  `MissionMapper` and the response DTOs stay in the layer packages: the Lager (earmarks and the
+  sale entries, write family 7), the refinery, the operation's finance and payout services and the
+  GDPR services use them. They follow with P3-5 (`StockSoldForTarget`, the earmark id) and P3-8
+  (the `Mission.operation`, `Mission.refineryOrders` and `MissionUnit.ship` associations, the
+  `MissionFinanceContributor` and `OperationSummaryProvider` SPIs). (2) The mapper's viewer-access
+  seam `MissionViewerAccess` moves from `mission.internal` to `mapper`, beside `MissionMapper`,
+  because a `mapper -> mission` edge would close a package cycle with the moved services. (3) No
+  new command API: no other module writes a mission beyond `detachFromOperation`. (4) Peer
+  redaction (BE-SIMP-05) already lived in `mission.internal.MissionPeerRedactor`; the section
+  counters are kept verbatim (`@DynamicUpdate`, no ADR needed). (5) `TenancyGuardRules` counts a
+  caller of an `@ObserverSpi` whose implementation writes tenant data as a writer, so moving a
+  write behind an observer does not shrink what the guard checks.
+- `inventory` — in five parts, each its own pull request and releasable on its own (owner
+  decision 2026-10-10): **5a** the contract test and the access policy; **5b**
+  `inventory.api.StockCommands` with the ADR-0229 lot-lock protocol moved in, for the exchange's
+  stock write and undo; **5c** the job-order and refinery Lager writes through `StockCommands`,
+  with the APPSEC-01 book-in check once, before any lookup; **5d** the earmarks
+  (`InventoryJobOrderAllocation.jobOrder`, `InventoryMissionAllocation.mission`) and
+  `MaterialExchangeOffer.inventoryItem` as ids, and `StockSoldForTarget` for the sale entries
+  (write family 7), which also settles P3-13 by inversion instead of a rank swap; **5e** the move,
+  NullAway and the idioms.
+  - **5a — done 2026-10-10.** `InventoryModuleContractTest` pins that create, note update,
+    personal rebook and book-out each record their audit event in the command's transaction, and
+    that a logistician of another org unit is refused on every per-row write entry point (book-out,
+    personal rebook, note, org unit, stolen, delivered, the three allocation verbs), each with a
+    body that passes validation. `InventoryAccessPolicy` (bean `inventoryAccessPolicy`) holds
+    `canSeeInventoryItem` and `canEditInventoryItem` on the kernel's `permitsOwnedRow`, and
+    `canManageUserInventory` on `canActOnTargetUser`; it implements `inventory.api.BookInPolicy`
+    (`mayBookInFor`), which the job-order production and the refinery store ask instead of the
+    scope hub. The nine row-write gates switched (the authorization matrix changed on exactly
+    those nine lines), and so did the Lager row flag of `StockViewerAccessService` and the two
+    on-behalf checks of `InventoryItemService`. The differential verdict test compared the policy,
+    the live scope hub and a restatement over 9 callers × (7 rows × 2 gates + 5 target members)
+    = 171 verdicts before the old methods went (proven able to fail by dropping the owner from the
+    edit gate) and keeps comparing against the restatement. Baseline **81 → 79**
+    (`scope -> inventory` is gone). *Correction:* the read and edit scopes coincide over this
+    matrix, as for the refinery, so swapping the edit gate's scope for the read scope is not
+    caught; the owner escape and the ownerless rule are.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -666,10 +1173,14 @@ as each pair is decoupled.
 run `MANDATORY` inside the orchestrator's one transaction, and the deletion and anonymisation audit
 rows stay in the orchestrator — and `catalogue`, whose caches switch to read models. Identity's REST
 surface sheds the six domains it hosts today.
+Carried into this phase from Phase 2: `service.MemberEvaluationErasure` (promotion) and
+`personalinventory.api.PersonalInventoryErasure` are the interim erasure commands `UserDeletionService`
+calls; both are replaced by `UserErasureParticipant` implementations here, and
+`MemberEvaluationErasure` leaves the `service` package with that step (P2-3); `service.BankHandleSnapshots` (bank) goes the same way (P2-5).
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
-When the package boundary of each has been green for some releases: `build-logic` convention
+Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-logic` convention
 plugins, typed per-module settings, then `backend-exchange` and `backend-bank` (§5.8). Every other
 domain stays a package.
 
@@ -678,15 +1189,88 @@ domain stays a package.
 | Step | Content |
 | --- | --- |
 | F0 | Guards (Phase 0.4) |
-| F1 | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
-| F2 | Exact session allow-list in its own release (D-10) |
-| F3 | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
+| F1 — **done 2026-10-04** | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
+| F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
+| F3 — **done 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
 
+*F1 as built (2026-10-04).* `service.BackendErrorMapper` classifies every failed call into one case
+of its sealed `Outcome` (`Problem`, `Reauthentication`, `CircuitOpen`, `BulkheadFull`, `Timeout`,
+`Unexpected`) and maps it in one exhaustive switch, writing to `BackendApiClient`'s logger so log
+categories, levels, messages, statuses, problem codes and the `basetool_backend_client_errors_total`
+labels are unchanged; `BackendErrorResponses` parses raw refusals through it. Every write verb has a
+URI-template twin, and the 235 write calls that concatenated an id, plus the bank proxies' helper
+calls, pass their values as template variables; `WriteUriTemplateTest` (with a planted fixture and
+a floor of 344 write sites) keeps them there, with one reviewed exception, the UEX override's
+allow-listed entity kind. The two remaining `WebClient` holders outside the kernel — the SSE relay
+and the live-sync probe — now call `service.BackendSideChannels`, so `WebClientConfinementTest`
+names only kernel classes and `ArchitectureTest#noControllerHoldsARawWebClient` has no allow-list.
+Corrections: the eleven bypassing controllers had already returned to the kernel with Phase 0.4,
+so F1 only verified it; the "zero" in this row was reached by moving the two named
+exceptions into the kernel, not by removing them; the 130 concatenating GET call sites are left for
+F3, where the typed clients replace them.
+
+*F3 as built, part 1 (2026-10-05).* The six small domains call typed clients:
+`audit.client.AuditBackendClient`, `notification.client.NotificationBackendClient`,
+`settings.client.SettingsBackendClient`, `dashboard.client.DashboardBackendClient`,
+`exchange.client.ExchangeBackendClient` and `orgchart.client.OrgChartBackendClient` — `@Service`
+classes over `BackendApiClient` in the `<domain>.client` packages of §5.9, so F4 moves only the
+controllers. A client owns its domain's paths and returns typed records; the announcement and the
+org-chart position relays, untyped `Map`s before, are `AnnouncementDto`/`AnnouncementRequest` and
+`OrgChartPosition{Create,Update}Request`/`OrgChartPositionDto`. Catalogue evictions go through the
+kernel's `CatalogueCacheEviction`. `TypedBackendClientTest` confines `BackendApiClient` to the
+kernel packages and the client packages (the controllers not yet moved are an exact list that
+only shrinks) and checks the client rules (no `URI`/`UriBuilderFactory` parameter, no cache
+annotation, `@Service`, `*BackendClient`) against planted fixtures. Every `get` and `execute(…)`
+passes its runtime values as template variables — `ReadUriTemplateTest` with a floor and a
+planted fixture, so with `WriteUriTemplateTest` no verb concatenates; `BackendApiClient` gained the
+`Class`-typed template `get`. Each client's requests are pinned against a MockWebServer through
+`BackendClientHarness`. Corrections: the "130 GET call sites" were 114 methods with a
+concatenated `get` (113 seen by the F1 scanner) and 8 with a concatenated `execute(…)` when the
+guard was introduced, all converted without a reviewed exception and without changing the bytes
+sent (a repeated placeholder takes the next value, pinned in `BackendApiClientHappyPathTest`); the F1 scanner under-reported, because a `String` parameter without an in-class caller
+folded to nothing inside a conditional, so `/api/v1/audit/" + (domain or "BANK")` read as the
+literal `BANK` branch only (`AdminAuditLogPageController#auditLog`), and a builder chain longer
+than ten links did not fold at all — both fixed, and a switch expression now folds too. A
+controller's typed client is the one of its own domain, page-composition reads of other backend
+roots included (the audit page reads the exchange registry, the settings page the squadron and
+Spezialkommando lists), so a page never needs a second domain's client; the duplicated reads are
+two lines each. Typed clients consolidate repeated call sites, so the write-site floor of
+`WriteUriTemplateTest` and the resolved-site floor of `BackendCallExistenceTest` fall with each
+domain (the four settings PUTs, written twice, are one `write` now).
+
+*F3 as built, parts 2–4 (2026-10-05).* Fifteen more clients bring the count to 21, one per frontend
+domain of the evidence table (`identity`, `orgunit`, `leadership`, `hangar`, `promotion`,
+`catalogue`, `blueprint`, `personalinventory`, `materialexchange`, `mission`, `operation`, `bank`,
+`joborder`, `inventory`, `refinery`); every controller calls only its own domain's client and
+`TypedBackendClientTest` holds no allow-list. Each call moved verbatim (verb, template,
+variables, body, response type), so the controller tests kept stubbing `BackendApiClient` around
+the real client; each client's requests are pinned against a MockWebServer. The UEX override's
+concatenated entity kind became an exhaustive switch over the allow-list, so `WriteUriTemplateTest`
+has no reviewed exception left and no backend call concatenates for any verb. The untyped relays
+became records mirrored from the backend: the identity, org-unit, Leitung, promotion, hangar,
+catalogue, material-exchange, job-order, bank and mission bodies and answers. Corrections and
+what stays open: the "large four" were not a fixed set — the domains moved in four stacked
+parts by size; the call-site floors fell from 611 resolved / 344 write sites to 524 / 289 as the
+clients merged duplicate calls; a typed relay now refuses a malformed browser value at the
+frontend's own binding (400) instead of relaying it for the backend's 400, and its answer is
+re-serialised from the record (additive keys, `BigDecimal` scale kept). The cached `TERMINALS`
+catalogue is read as `TerminalDto` rows. Two relays stay untyped by design, not as open work: the
+org-unit bank path-only writes, because the backend endpoint binds no request body (the browser
+body is relayed as sent, only the answer is typed), and the refinery import's extract, a
+`JsonNode` passed through unchanged because the extractor's file is its own JSON contract
+(ADR-0008) that the backend validates. The blueprint
+import's file part goes out as `application/json` for a `.json` file although the builder names
+`application/octet-stream` — unchanged by the move, now pinned. The next step for the clients is
+F4 (the controllers move next to them) and, per domain with its REST cut, the HTTP interface of
+§5.9.
+
 ### 7.9 REST API track
 
-Each wave is one domain's cut ([appendix](modularisation/rest-api-cut.md)), shipped together with the
+**Delivery decided 2026-10-04 (D-24):** the waves below are built and merged one by one, but ship
+together as one backend release and one app release, so the paragraph's per-wave release cadence
+is replaced by a single cut. Each wave is one domain's cut ([appendix](modularisation/rest-api-cut.md)), shipped together with the
 backend and frontend change of that domain in one release (frontend and backend deploy in one
 restart window), with a new app release published first and the minimum version raised once the
 re-cut release is verified healthy — or, once the floor is release-bound (D-11), by the release itself.
@@ -712,18 +1296,18 @@ features only, no preview flags) stands; every proposal below uses final feature
 
 | Proposal | Pros | Cons and risks | Guard | Effort |
 | --- | --- | --- | --- | --- |
-| **Exhaustive enum switches.** Checkstyle's `MissingSwitchDefault` forces a `default` into all 20 switch statements; on nine of them every constant is already covered, so the `default` hides the next constant. Write them as switch expressions or with `case null ->`, which javac 25 checks for exhaustiveness and Checkstyle 14.3.0 accepts (probed). Policy: no `default` on a switch over a project enum unless it handles a deliberate subset (decided, D-15) | A new `BankAccountType`, `OrgUnitKind` or `SelectorKind` breaks the build at every decision site instead of shipping a 400, an exception or a silent no-op | `case null ->` is an unfamiliar idiom | The compiler; existing service tests | S |
-| **Enum predicates instead of `==` chains.** `OrgUnitKind` is compared 43 times in 19 files; add behaviour on the enum as `switch (this)` without `default` (precedent `OperationStatus.canTransitionTo`), with a `values()` test per predicate; the same for `FinanceType` in payout arithmetic | Tenancy rules stated once, as the kernel's API | Each site's current fail-open or fail-closed behaviour must be kept exactly — one predicate per rule, never two rules merged | Access-gate and scope tests | M |
-| **Sealed types where they are legal.** Exhaustive `switch` over the exchange's private sealed `Planned` types (two are read with `if/else` without `else`, so a new variant is silently dropped); name the last constant instead of `default` in three exchange switches; the exchange's resource and operation vocabulary as one enum mapped at the boundary (the mass-change capability is chosen from a string with `default -> HANGAR_WRITE` today, which Bean Validation happens to shield) | No silently dropped external write; no path can default to a capability | Must keep the external contract byte-identical | Exchange contract tests; a test that an unknown value never reaches the capability choice | S |
+| **Exhaustive enum switches** — **done 2026-10-10** (nine dead `default` arms became `case null`; the deliberate subsets keep theirs; ADR-0238 *Implementation*). *Correction:* the 20 statements of the audit are 51 `default` arms across `main` today, nine of them dead. Checkstyle's `MissingSwitchDefault` forces a `default` into all 20 switch statements; on nine of them every constant is already covered, so the `default` hides the next constant. Write them as switch expressions or with `case null ->`, which javac 25 checks for exhaustiveness and Checkstyle 14.3.0 accepts (probed). Policy: no `default` on a switch over a project enum unless it handles a deliberate subset (decided, D-15) | A new `BankAccountType`, `OrgUnitKind` or `SelectorKind` breaks the build at every decision site instead of shipping a 400, an exception or a silent no-op | `case null ->` is an unfamiliar idiom | The compiler; existing service tests | S |
+| **Enum predicates instead of `==` chains** — **done 2026-10-10** for the multi-constant rules: `OrgUnitKind.isTenantUnit()` (three sites) and `FinanceType.signed` (payout totals). *Correction:* of the 43 `OrgUnitKind` comparisons only three are chains; the rest compare one constant, which a predicate would only rename. `OrgUnitKind` is compared 43 times in 19 files; add behaviour on the enum as `switch (this)` without `default` (precedent `OperationStatus.canTransitionTo`), with a `values()` test per predicate; the same for `FinanceType` in payout arithmetic | Tenancy rules stated once, as the kernel's API | Each site's current fail-open or fail-closed behaviour must be kept exactly — one predicate per rule, never two rules merged | Access-gate and scope tests | M |
+| **Sealed types where they are legal** — **done 2026-10-10**: the blueprint and stock write loops switch over `Planned` (the ship loop already did); the resolve status, the journal labels and the undo refresh name their last constant; `ExchangeResource` carries the mass-change name, the write capability and the metric tag, and the mass-change service maps the request's name to it before the capability is chosen (`ExchangeMassChangeServiceResourceTest`); the ship operation names `remove` and refuses any other value instead of defaulting to a removal. Exhaustive `switch` over the exchange's private sealed `Planned` types (two are read with `if/else` without `else`, so a new variant is silently dropped); name the last constant instead of `default` in three exchange switches; the exchange's resource and operation vocabulary as one enum mapped at the boundary (the mass-change capability is chosen from a string with `default -> HANGAR_WRITE` today, which Bean Validation happens to shield) | No silently dropped external write; no path can default to a capability | Must keep the external contract byte-identical | Exchange contract tests; a test that an unknown value never reaches the capability choice | S |
 | **Never seal across packages or entities.** Sealed hierarchies stay inside one package (class-path rule) and never cover JPA entities (a Hibernate proxy cannot subclass a sealed class) | Avoids a refactor dead end | — | javac | — |
-| **Unnamed variables `_`** (final since 22) for 107 unused lambda parameters, meaningless catch parameters and unused pattern components; empty catches too, with the ADR-0214 amendment and the Checkstyle `EmptyCatchBlock` pattern change this needs (decided, D-14); descriptive names stay where the name states intent; not in keycloak-spi (Java 21 bytecode) | The compiler forbids accidental use | About 260 edits in `main` | Compile and Checkstyle | S–M |
-| **`ScopedValue`** (final in 25) for the backend's `ChangeSource.ON_BEHALF` `ThreadLocal`, which attributes exchange writes in the change feed; the frontend holders stay `ThreadLocal` (ADR-0223 decision 4) | A binding cannot leak into a reused thread | ADR-0223 amendment | `ChangeSourceTransactionManager` integration test | S |
-| **Records** for the last three `@Data` request classes and one hand-written carrier; defensive `List.copyOf` only for records that become cached, shared or module-API values; redaction DTOs keep their canonical constructors | Immutability where values cross a boundary | `List.copyOf` rejects `null` elements | Contract tests; `toString` ratchet (G-22) | S |
-| **Small idioms**: `Math.clamp` for 11 constant bounds, `getFirst()` in frontend and ingest, `Environment.matchesProfiles`, `Optional` chains instead of `isPresent()`/`get()`, text blocks for the 47 concatenated `@Query` strings and test JSON; keep `trim()`/`strip()` and `Collections.unmodifiable*` where they are deliberate | Consistency with the 90 % that already uses the modern form | Diff churn — batch into files the refactor touches anyway | Compile, tests | S |
+| **Unnamed variables `_`** — **done 2026-10-10** in `main` (225 sites: 114 catch, 110 lambda, 1 pattern; descriptive names kept; ADR-0214 amendment) (final since 22) for 107 unused lambda parameters, meaningless catch parameters and unused pattern components; empty catches too, with the ADR-0214 amendment and the Checkstyle `EmptyCatchBlock` pattern change this needs (decided, D-14); descriptive names stay where the name states intent; not in keycloak-spi (Java 21 bytecode) | The compiler forbids accidental use | About 260 edits in `main` | Compile and Checkstyle | S–M |
+| **`ScopedValue`** — **done 2026-10-10** (final in 25) for the backend's `ChangeSource.ON_BEHALF` `ThreadLocal`, which attributes exchange writes in the change feed; the frontend holders stay `ThreadLocal` (ADR-0223 decision 4) | A binding cannot leak into a reused thread | ADR-0223 amendment | `ChangeSourceTransactionManager` integration test | S |
+| **Records** — **done 2026-10-10** (`AnnouncementRequest`, `UserAttributesRequest`, `UserDescriptionRequest`, `ShipTypeMatcher.TokenView`; their frontend mirrors are now paired by `DtoMirrorConsistencyTest`) — for the last three `@Data` request classes and one hand-written carrier; defensive `List.copyOf` only for records that become cached, shared or module-API values; redaction DTOs keep their canonical constructors | Immutability where values cross a boundary | `List.copyOf` rejects `null` elements | Contract tests; `toString` ratchet (G-22) | S |
+| **Small idioms** — **done 2026-10-10**, the job-order, refinery and Materialbörse code with the job-order move (2 more `Math.clamp`, 9 more `@Query` text blocks; the two Materialbörse `max(0, min(offered, stock))` stay, because their bounds can cross); elsewhere (`Math.clamp` 9 sites, `getFirst()` 9, `Environment.matchesProfiles` 4, 27 `@Query` text blocks, 6 `isPresent() && get()` pairs as `Optional.filter`; a query that mixes literals with a constant or splits a token keeps its concatenation; `isPresent()` used as a plain boolean stays). *Correction:* of the 68 `isPresent()` calls only these few are followed by `get()`: `Math.clamp` for 11 constant bounds, `getFirst()` in frontend and ingest, `Environment.matchesProfiles`, `Optional` chains instead of `isPresent()`/`get()`, text blocks for the 47 concatenated `@Query` strings and test JSON; keep `trim()`/`strip()` and `Collections.unmodifiable*` where they are deliberate | Consistency with the 90 % that already uses the modern form | Diff churn — batch into files the refactor touches anyway | Compile, tests | S |
 | **Do not adopt** Markdown documentation comments (`///`, JEP 467): Checkstyle 14.3.0 does not treat them as Javadoc; gatherers: no loop here is clearer as one | — | — | — | — |
-| **ADR-0223 corrections**: JDK 26 does add a final library feature (JEP 517, HTTP/3 for the HTTP client); JEP 510 (KDF) is final in 25; Checkstyle already enforces the module-import and compact-source bans in `main` (not in `test`/`e2e`); there are 42 `super(…)` calls, not 34; a `--enable-preview` gate is still missing | The decision record stays authoritative | — | Review | S |
+| **ADR-0223 corrections** — **done 2026-10-10** (the corrections were recorded in the ADR on 2026-10-02; the missing gate is `scripts/check-final-java-only.py`, REQ-OPS-043): JDK 26 does add a final library feature (JEP 517, HTTP/3 for the HTTP client); JEP 510 (KDF) is final in 25; Checkstyle already enforces the module-import and compact-source bans in `main` (not in `test`/`e2e`); there are 42 `super(…)` calls, not 34; a `--enable-preview` gate is still missing | The decision record stays authoritative | — | Review | S |
 
-**Nullness.** Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
+**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move, `mission` with its own). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
 annotations by simple name; Spring Framework builds itself with the same pair. Starting with the new
 module API packages, it would turn the annotations into a checked contract and close arc42 §11.4
 ("derived nullity annotations have no gate"). Cost: a compile-time dependency, about ten javac
@@ -734,13 +1318,13 @@ JSpecify stays out for now (ADR-0192).
 
 | Proposal | Pros | Cons and risks | Guard |
 | --- | --- | --- | --- |
-| **Document the browser baseline — decided: "Baseline 2025", ES2025** (D-16). The features already shipped imply Chrome 105, Firefox 121, Safari 16.4; the decided floor is at least Chrome 122, Firefox 131, Safari/iOS 18.4 (iterator helpers; `Promise.try`, `RegExp.escape` and `Float16Array` need newer releases), which brings Set methods, iterator helpers, popover and same-document view transitions. Raise the type check's `lib`/`target` and ESLint's `ecmaVersion` from 2023 to 2025 once TypeScript 7 is proven to accept the `ES2025` lib; write the floor into `ui-design-system.md` and REQ-FE-018 | Every other modern-feature decision needs this answer; today a newer API in an unchecked file passes every gate | Members who cannot update iOS to 18.4 or later lose functions; the rejected alternative was "Baseline widely available" (ES2024, Safari 17.4) | `typecheckJs`, `lintJs`, the E2E browser matrix |
-| **ESLint core autofix rules** (`prefer-template` for 664 concatenations, `prefer-arrow-callback`, `prefer-object-has-own`, `radix`, `logical-assignment-operators`); `?.`/`??` by hand while a file opts into `@ts-check` (the semantics differ for falsy values) | Consistent modern code with no new dependency | About 1,800 sites; conflicts with in-flight branches | `lintJs`, `typecheckJs`, E2E |
+| **Document the browser baseline — decided: "Baseline 2025", ES2025** (D-16). **Done 2026-10-04**: TypeScript 7.0.2 accepts the `ES2025` lib (proven by a planted checked file), `tsconfig.json` and `eslint.config.mjs` are at 2025, the floor is in `ui-design-system.md` and REQ-FE-018, and ESLint rejects the three ES2025 APIs above the floor, which the `ES2025` lib declares. The features already shipped imply Chrome 105, Firefox 121, Safari 16.4; the decided floor is at least Chrome 122, Firefox 131, Safari/iOS 18.4 (iterator helpers; `Promise.try`, `RegExp.escape` and `Float16Array` need newer releases), which brings Set methods, iterator helpers, popover and same-document view transitions. Raise the type check's `lib`/`target` and ESLint's `ecmaVersion` from 2023 to 2025 once TypeScript 7 is proven to accept the `ES2025` lib; write the floor into `ui-design-system.md` and REQ-FE-018 | Every other modern-feature decision needs this answer; today a newer API in an unchecked file passes every gate | Members who cannot update iOS to 18.4 or later lose functions; the rejected alternative was "Baseline widely available" (ES2024, Safari 17.4) | `typecheckJs`, `lintJs`, the E2E browser matrix |
+| **ESLint core autofix rules** — **done 2026-10-04**: all five are errors for the browser and Node scripts, autofix applied (1,345 arrow callbacks, 723 template literals, 9 logical assignments, 1 `Object.hasOwn`; 5 `parseInt` radixes and 3 `||=` by hand); `?.`/`??` stay a by-hand change in `@ts-check` files (`prefer-template` for 664 concatenations, `prefer-arrow-callback`, `prefer-object-has-own`, `radix`, `logical-assignment-operators`); `?.`/`??` by hand while a file opts into `@ts-check` (the semantics differ for falsy values) | Consistent modern code with no new dependency | About 1,800 sites; conflicts with in-flight branches | `lintJs`, `typecheckJs`, E2E |
 | **Type-check ratchet per domain folder**; the three largest scripts (mission detail, bank, order detail — 20 % of all JavaScript) split before they are checked | Null safety reaches the files that change most | Cast churn in DOM-heavy code | A folder is "migrated" only when fully checked |
-| **Finish ADR-0069**: the 70 inline script blocks (1,860 lines, never linted) move into modules; one page puts eleven `[[#{…}]]` markers into a script without `th:inline` (a likely i18n defect) | Lintable, checkable code | Timing of inline versus module code | `InlineScriptLoadOrderTest`, E2E |
-| **One read path**: `krtFetch.get`/`getJson` with re-authentication, the terms gate, refusal of redirected or non-JSON answers and `AbortController`; then forbid `fetch(` outside the transport and ban `XMLHttpRequest` | 56 raw reads behave the same way on session loss | Pickers that silently emptied now send the user to the login — the intended contract | A new E2E for a picker after session loss |
-| **Trusted Types**, report-only first through the existing `csp_violation` beacon, then enforced: two named policies, a tagged-template HTML builder, no default policy | DOM-XSS becomes a browser-enforced property | Every future sink must use the helpers; under enforcement even `innerHTML = ''` throws | A violation collector in the dialog page-walk E2E |
-| **CSS**: lint the 54 page stylesheets with the standard config; a custom-property existence test (it finds an undefined token that makes the material-demand search header transparent); `color-mix()` for alpha variants; a z-index scale; container queries and nesting only where a design decision asks for them | One lint standard; tokens as the single colour source | Visual changes | `CascadeLayerOrderTest`, screenshot review |
+| **Finish ADR-0069**: the 70 inline script blocks (1,860 lines, never linted) move into modules; one page puts eleven `[[#{…}]]` markers into a script without `th:inline` (a likely i18n defect). **Done 2026-10-04** (ADR-0069 amendment): on that day 67 blocks with 1,645 lines remained, 55 of them already pure data bootstraps; the eleven blocks with code moved into their modules (one new, `org-unit-bank.js`), five empty error-page blocks were deleted. Every inline script is now a `th:inline="javascript"` bootstrap of literals, checked against a grammar by `InlineScriptDataOnlyTest` (planted fixture, floors of 100 templates / 55 blocks); the head's `krtEvents` stub is its one listed exception. *Correction:* the eleven-marker defect had already been fixed (B-04); what was still broken was the `'[[#{…}]]'` form inside inlined string literals on the mission-data and special-commands admin pages, which rendered the texts in quotes — fixed by the move | Lintable, checkable code | Timing of inline versus module code | `InlineScriptLoadOrderTest`, `InlineScriptDataOnlyTest`, E2E |
+| **One read path**: `krtFetch.get`/`getJson` with re-authentication, the terms gate, refusal of redirected or non-JSON answers and `AbortController`; then forbid `fetch(` outside the transport and ban `XMLHttpRequest`. **Done 2026-10-04** (REQ-FE-031): 61 raw reads in 33 scripts plus one inline read in `members.html` migrated, `swap` reads through `get` too; ESLint bans `fetch`/`XMLHttpRequest`, and `BackgroundReadGateContractTest` pins the same for templates, which ESLint never sees | 56 raw reads behave the same way on session loss | Pickers that silently emptied now send the user to the login — the intended contract | A new E2E for a picker after session loss |
+| **Trusted Types**, report-only first through the existing `csp_violation` beacon, then enforced: two named policies, a tagged-template HTML builder, no default policy. **Done 2026-10-04 except the production switch** (ADR-0239): `krt-html` behind the `krtHtml` builder, `krt-fragment` inside `krt-fetch.js`; 42 builder sites, 26 clears and one `DOMParser` read migrated, `escape-html.js` removed; ESLint bans every sink and policy outside the two helpers; the report-only header is the default of `APP_SECURITY_TRUSTED_TYPES` (`report` / `enforce`), with the gauge `basetool_trusted_types_mode`. **The only remaining step** is switching production to `enforce`, a production configuration change the owner approves after a quiet period (`deployment.md` → *Trusted Types: report, then enforce*) | DOM-XSS becomes a browser-enforced property | Every future sink must use the helpers; under enforcement even `innerHTML = ''` throws | A violation collector in the dialog page-walk E2E (proven by a planted violation), `:frontend:testEslintBans`, `:frontend:testTrustedTypesJs`, `TrustedTypesModeTest` |
+| **CSS** — **done 2026-10-04** (ADR-0243): lint the page stylesheets with the standard config (74 by then, not 54; 66 findings fixed without visual change); a custom-property existence test (it finds an undefined token that makes the material-demand search header transparent; B-03 was already fixed in Phase −1, and the test now also reads templates and scripts); `color-mix()` for alpha variants (120 hand-written token copies replaced, `ColourTokenCopyTest`); a z-index scale (18 `--z-*` tokens with the numbers they replaced, `ZIndexScaleTest`); container queries and nesting only where a design decision asks for them (none asked) | One lint standard; tokens as the single colour source | Visual changes | `CascadeLayerOrderTest`, screenshot review; a computed-style comparison of every touched declaration against `main` |
 | **One layout fragment** carrying head, sidebar, header and toast (83 pages copy the header in five variants) — native Thymeleaf, no Layout Dialect dependency | Chrome changes once | Touches 83–90 templates | Render tests, E2E |
 | **ES modules** only after the global-scope and inline-script work, and only behind a server-rendered import map (unversioned asset URLs are cached immutably for a year) | Explicit dependencies, lint-enforced boundaries | Import-map and nonce plumbing | Every specifier must be in the map |
 | **No bundler** | — | A compromised bundler release would be site-wide script injection the nonce CSP cannot stop; the served file would no longer be the checked file (ADR-0125) | — |
@@ -748,29 +1332,34 @@ JSpecify stays out for now (ADR-0192).
 ### 8.3 SQL, persistence, platform
 
 - **PostgreSQL 18**: `RETURNING OLD/NEW` where a native bulk update needs the old value for its audit
-  row; review multicolumn indexes against skip scan with `EXPLAIN`; temporal `WITHOUT OVERLAPS` only
+  row (**checked 2026-10-10, nothing to adopt**: the backend has no native bulk `UPDATE`; its bulk
+  updates are JPQL and its native statements are retention `DELETE`s that write no audit row); review multicolumn indexes against skip scan with `EXPLAIN`; temporal `WITHOUT OVERLAPS` only
   with the leadership redesign (needs `btree_gist`). **No `uuidv7` ids** for anything whose id
   appears in a URL or an export without a privacy decision — they reveal creation times.
 - **Hibernate 7.4**: do not adopt `@Audited` (it would keep full row history, personal data included,
   outside the GDPR deletion flow) or Jakarta Data stateless repositories (they do not fit the
   `@Version` concurrency rules); write a characterisation test before touching
-  `fail_on_pagination_over_collection_fetch`.
+  `fail_on_pagination_over_collection_fetch` (**done 2026-10-10**: `PagedFindersNoCollectionFetchTest`
+  pins both halves, the shape the gate refuses and the shape it lets through).
 - **Spring Framework 7**: `@ConcurrencyLimit` for the backend's outbound fan-out to UEX and SC Wiki,
-  which virtual threads no longer bound; keep the find-or-create retry explicit. Spring's built-in API
+  which virtual threads no longer bound; keep the find-or-create retry explicit (**done 2026-10-10**,
+  REQ-SEC-081: 4 for UEX, 2 for SC Wiki, enabled by `AsyncConfig`; nothing else changed). Spring's built-in API
   versioning adds nothing under a hard cut; its standard deprecation headers only if
   `@ApiDeprecation` is ever used again.
 - **Spring Boot 4.1**: an `InetAddressFilter` restricting the external-integration HTTP clients (UEX,
   SC Wiki, Discord) to external addresses — a defence against redirects into internal networks; never
-  on the internal clients.
+  on the internal clients (**done 2026-10-10**, REQ-SEC-081, ADR-0204 amendment 3: UEX and SC Wiki use
+  the external builder; the backend has no Discord client, that federation lives in `keycloak-spi`).
 - **Jackson 3** reads unknown JSON properties tolerantly by default. That stays: the frontend and
   backend deploy together and are checked by the contract tests, and the exchange's tolerant reading
-  is part of its frozen behaviour. The policy is written into the API conventions.
+  is part of its frozen behaviour. The policy is written into the API conventions (**done 2026-10-10**, REQ-API-022,
+  `JacksonTolerantReadingTest`).
 
 ### 8.4 Gradle and CI
 
 Typed per-module build settings now; an included `build-logic` with convention plugins before the
 first Gradle extraction (it also prepares Gradle's isolated projects); `java-test-fixtures` for
-module-owned test fixtures; the configuration cache on for local builds; a decision whether CI reuses
+module-owned test fixtures; the configuration cache on for local builds (done 2026-10-04, #2387); a decision whether CI reuses
 configuration-cache entries (it never does today, because `setup-gradle` gets no encryption key).
 
 ## 9 Defects found along the way — fixed first, in separate pull requests
@@ -803,7 +1392,7 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 | --- | --- | --- | --- |
 | B-01 | A stored refinery order can be set back from COMPLETED to OPEN with `PUT` and **stored again**, which duplicates its inventory rows and its `INVENTORY_RECEIVED_FROM_REFINERY` / `REFINERY_ORDER_STORED` audit events; `store` also skips the "the job order needs this material" check that `POST /inventory` applies (REQ-ORDERS-018) | Low (own inventory only), but the audit trail records a second receipt | Refuse to reopen or re-store a stored order (a stored marker, not the status alone); apply the same material check as the inventory path |
 | B-02 | The Android app (v0.3.1) creates operations with `POST /api/v1/operations`, which the edge's API allow-list does not admit, so the call answers 404; whether v0.4.0 still sends it is unknown | Functional | Admit and freeze it, or remove the call from the app — decided with the operation domain's wave |
-| B-03 | `var(--color-black)` does not exist (the token is `--color-bg-black`), so the sticky search header of the material-demand page is transparent; `var(--color-text)` in `bank.css` is undefined too | UI | Correct the tokens | A custom-property existence test |
+| B-03 | `var(--color-black)` does not exist (the token is `--color-bg-black`), so the sticky search header of the material-demand page is transparent; `var(--color-text)` in `bank.css` is undefined too | UI | Correct the tokens (re-verified 2026-10-04: neither occurs any more) | A custom-property existence test |
 | B-04 | `templates/members.html` puts eleven `[[#{…}]]` message markers into a script without `th:inline` — wrong-context escaping at best, literal markers in three dialogs at worst | UI/i18n, to confirm with a render | A `th:inline="javascript"` dictionary | A render test of `/members` |
 | B-05 | A personal-inventory sort with a direction is double-encoded and never works (no page sends one today) | Functional, latent | Route through `RelayParams` and a template variable | MockWebServer path assertion |
 | B-06 | `OrgUnitMembershipService.removeOlMember` pattern-matches on an `OrgUnit` that can be a Hibernate proxy, so the Grand Admiral pointer is not cleared in that case (display only; no authorization reads it) | Low | Unproxy, or dispatch on the kind | An integration test that reproduces the proxy case |
@@ -816,7 +1405,7 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 | --- | --- | --- | --- |
 | C-01 | Production promotion re-tags each of the five artefacts to `:stable` in its own fail-fast matrix job without rollback, and `deploy.sh` resolves each tag separately every five minutes — a partial or in-progress promotion can deploy a mixed release; per-image signatures do not catch mixing | Medium (operational) — severe once APIs are re-cut | G-21 |
 | C-02 | The scheduled mutation-testing run lets its gate pass on a partial report when the backend leg is cancelled at the job timeout | Low (CI signal) | Gate on PIT's completion line; raise the timeout |
-| C-03 | The repo-lint jobs `Self-tests` and `Container checks` (Prometheus rule unit tests, monitoring configuration checks, deploy-seam self-tests) are not required status checks | Low–medium | Add both to the ruleset — a repository-settings write by the owner |
+| C-03 | The repo-lint jobs `Self-tests` and `Container checks` (Prometheus rule unit tests, monitoring configuration checks, deploy-seam self-tests) are not required status checks | Low–medium | Add both to the ruleset — a repository-settings write by the owner; **done** (both required on `main`, checked 2026-10-04) |
 | C-04 | The only crash-loop alert has no absence guard for its Podman series | Low | An `absent()` rule or a conformance entry |
 
 ### 9.4 To investigate
@@ -844,7 +1433,7 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 | Hibernate `@Audited`, Jakarta Data repositories | Reject | Personal data outside the GDPR flow; stateless repositories do not fit the concurrency rules |
 | Generated client DTOs (openapi-generator) | Reject for production code | The generator emits mutable classes, not records, and hand mirrors are an output allow-list; generation stays in the test source set for the agreement test |
 | A JavaScript bundler | Reject | Supply-chain risk for every shipped asset; breaks "served equals checked" |
-| Trusted Types | Adopt, report-only first | No dependency; the existing CSP-violation beacon provides the report-only phase |
+| Trusted Types | Adopt, report-only first — **report-only since 2026-10-04**; enforcing in production waits for the owner | No dependency; the existing CSP-violation beacon provides the report-only phase |
 | `oasdiff` or another external API-diff tool | Reject | An unverified binary outside Gradle's dependency verification; the ingest's `SchemaCompatibility` helper generalises instead |
 
 ## 11 Previous audits re-evaluated
@@ -875,7 +1464,7 @@ Full tables, per finding with status, evidence and verdict:
   PR #1256, issues #1250–#1255 and PRs #1257–#1262. Every finding shipped and holds, all nine
   service splits included, with three gaps: `HangarPageModelLoader` was never built,
   `CachedCatalogListLoader` has one consumer, and the per-family split of `GlobalExceptionHandler`
-  is open. Its diagnosis — "the architecture is sound, the debt is size inside
+  was open (done 2026-10-10: a chain of family classes under the one advice). Its diagnosis — "the architecture is sound, the debt is size inside
   correct layers" — holds for layers and not for domains (files over 600 lines grew from 49 of 1,477
   to 53 of 2,044). **14 of its 15 rejected simplifications still hold** (Mission section counters,
   `…WithinTransaction` hops, the find-or-create retry, bulk updates after loops, no generic CRUD base,
@@ -950,6 +1539,12 @@ Full tables, per finding with status, evidence and verdict:
   read models), REQ-DATA-010 (one scope fragment per aggregate), REQ-AUDIT-001 (the audit contract
   per command), REQ-XCH-009/011/026 (domain APIs; build-time contract test), REQ-FE-018 (baseline and
   counts — done 2026-10-02), REQ-OBS (event-publication metrics, only if an outbox is ever adopted).
+  **Status 2026-10-10:** done — REQ-API-002 (the enforced rules, in place of the convention),
+  REQ-API-007 (the annotation sentence corrected to what the build requires), REQ-DATA-001 (one
+  location, one sequence; it keeps the plan's "REQ-DATA" row). Waiting for a later move — REQ-DATA-010
+  (the fragment per aggregate moves into each module with its repository, Phase 3), REQ-AUDIT-001
+  (the per-command contract, P3-11), REQ-XCH-009/011 (they name the domain APIs the exchange calls,
+  which exist when blueprint, inventory and hangar publish theirs, Phase 3).
 - **arc42:** §4.1, §4.2, §5.3 and §5.5 (corrected with this plan), §5.2 and §5.3 rewritten per
   module as the moves land, §8 (module rules, interaction styles — §8.14, done 2026-10-02), §11.9
   (the domain coupling as debt, opened with this plan; its decisions linked 2026-10-02).
@@ -975,9 +1570,9 @@ same session as this plan, and in the repository where this plan touches the doc
 | `docs/specs/security-and-access.md` REQ-SEC-031 | a member record is the only personal data the API serves | admin export, person search and registrations serve personal data and are not in the `no-store` families |
 | `docs/specs/frontend-ajax-mutations.md` REQ-FE-018, `docs/TYPESCRIPT_MIGRATION_PLAN.md` | 40 of 96 files type-checked; `type=module` would change the execution order | 44 of 100; 120 of 121 scripts are already `defer` — **corrected 2026-10-02** in both |
 | ADR-0223 | see §8.1 | **corrected 2026-10-02** (amendment) |
-| ADR-0069, ADR-0130, ADR-0212 | "no IIFE wrapping"; `scripts/**/*.mjs` in the lint globs; "with a comment naming what it beats" | half the scripts are IIFE-wrapped; the Gradle lint tasks do not read `scripts/`; ADR-0214 forbids the comment — **corrected 2026-10-02** (an amendment each; the `scripts/` lint gate itself is still open) |
+| ADR-0069, ADR-0130, ADR-0212 | "no IIFE wrapping"; `scripts/**/*.mjs` in the lint globs; "with a comment naming what it beats" | half the scripts are IIFE-wrapped; the Gradle lint tasks do not read `scripts/`; ADR-0214 forbids the comment — **corrected 2026-10-02** (an amendment each); the `scripts/` lint gate is done too — `lintJs` reads `scripts/**/*.mjs` (`frontend/build.gradle.kts`, checked 2026-10-04) |
 | backend `ArchitectureTest` messages | ask for "a code comment" in three places | ADR-0214 |
-| `config/owasp/dependency-check-suppressions.xml` | its header described how a suppression is renewed | the header went with the ADR-0214 sweep; no document describes the renewal now, and all nine suppressions expire on the same day |
+| `config/owasp/dependency-check-suppressions.xml` | its header described how a suppression is renewed | the header went with the ADR-0214 sweep; no document describes the renewal now, and all nine suppressions expire on the same day — **corrected 2026-10-04** (#2387): CONTRIBUTING → *OWASP suppressions expire* |
 
 ## 16 Method, sources and limits
 

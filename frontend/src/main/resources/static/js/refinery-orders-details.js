@@ -39,7 +39,7 @@ let refinerySeam = null;
 
 /** The refinery-order:{id} room this page publishes to, or null before the id bootstrap ran. */
 function refineryTopic() {
-    return window.refineryOrderId ? 'refinery-order:' + window.refineryOrderId : null;
+    return window.refineryOrderId ? `refinery-order:${window.refineryOrderId}` : null;
 }
 
 /** True while the Einlagern dialog is on screen, i.e. the user is mid-edit in it. */
@@ -61,7 +61,7 @@ function refineryStoreModalOpen() {
         keys: { refreshErrorKey: 'refineryorder.section.refresh.error' },
         sections: REFINERY_ORDER_SECTIONS,
         pageUrl() {
-            return window.refineryOrderId ? '/refinery-orders/' + window.refineryOrderId : null;
+            return window.refineryOrderId ? `/refinery-orders/${window.refineryOrderId}` : null;
         },
         broadcast(keys) {
             const topic = refineryTopic();
@@ -116,7 +116,7 @@ function _submitRefinery(options) {
     window.krtFetch.submitForm({
         form,
         submitter: options.submitter,
-        serialize: 'refinery-order:' + window.refineryOrderId,
+        serialize: `refinery-order:${window.refineryOrderId}`,
         toast: options.successMessage !== undefined,
         successMessage: options.successMessage,
         errorMessage: options.errorMessage,
@@ -128,14 +128,14 @@ function _submitRefinery(options) {
 
 function calcScu(index) {
     const unitInput = /** @type {HTMLInputElement | null} */ (
-        document.getElementById('outputQuantity_' + index)
+        document.getElementById(`outputQuantity_${index}`)
     );
     const scuInput = /** @type {HTMLInputElement | null} */ (
-        document.getElementById('outputQuantityScu_' + index)
+        document.getElementById(`outputQuantityScu_${index}`)
     );
     if (unitInput && scuInput) {
         const valStr = unitInput.value.replace(/\./g, '').replace(',', '.');
-        const val = parseInt(valStr);
+        const val = parseInt(valStr, 10);
         if (!isNaN(val)) {
             const scu = val / 100.0;
             scuInput.value = scu.toLocaleString('de-DE', {
@@ -306,12 +306,10 @@ document.addEventListener('change', (e) => {
     }
     if (!sel.id.startsWith('storeUser_')) return;
     const index = sel.id.substring('storeUser_'.length);
-    const orgSelect = document.getElementById('storeOrgUnit_' + index);
+    const orgSelect = document.getElementById(`storeOrgUnit_${index}`);
     if (!orgSelect || !sel.value) return;
-    fetch('/refinery-orders/users/' + encodeURIComponent(sel.value) + '/org-units', {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    })
-        .then((r) => (r.ok ? r.json() : []))
+    window.krtFetch
+        .getJson(`/refinery-orders/users/${encodeURIComponent(sel.value)}/org-units`)
         .then((opts) => rebuildOrgUnitOptions(orgSelect, Array.isArray(opts) ? opts : []))
         .catch(() => rebuildOrgUnitOptions(orgSelect, []));
 });
@@ -372,15 +370,19 @@ function initRefineryOrderSection() {
     window.krtRefineryYield.refreshAll();
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     initRefineryOrderSection();
     initRefineryStoreSection();
+    openStoreFromLink();
+    window.setInterval(revealRefineryStoreWhenReady, 30000);
 });
 
-document.addEventListener('krt:swapped', function (ev) {
+document.addEventListener('krt:swapped', (ev) => {
     const container = ev && ev.detail && ev.detail.container;
     if (!container) return;
     if (container.id === 'refinery-order-results') {
+        syncRefineryStatusBadge();
+        revealRefineryStoreWhenReady();
         initRefineryOrderSection();
         window.krtRefineryYield.onLocationChange(
             /** @type {KrtRefineryControl | null} */ (document.getElementById('locationId')),
@@ -447,22 +449,23 @@ function addMaterialRow() {
 
     const title = template.querySelector('.material-entry-title');
     if (title) {
-        title.textContent = MATERIAL_ENTRY_TITLE_LABEL + ' #' + (count + 1);
+        title.textContent = `${MATERIAL_ENTRY_TITLE_LABEL} #${count + 1}`;
     }
 
     if (!template.querySelector('.remove-btn')) {
-        const header = template.querySelector('.material-entry-header');
-        if (header) {
+        const actions = template.querySelector('.rod-good__actions');
+        if (actions) {
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
-            removeBtn.className = 'btn btn-quiet-danger remove-btn btn-icon';
-            removeBtn.style.cssText = 'padding: 0.25rem 0.5rem; font-size: 0.8rem;';
+            removeBtn.className = 'btn btn-ghost btn-icon remove-btn';
             removeBtn.setAttribute('data-trigger', 'rod-remove-material');
             removeBtn.setAttribute('title', MATERIAL_REMOVE_LABEL);
             removeBtn.setAttribute('aria-label', MATERIAL_REMOVE_LABEL);
-            removeBtn.innerHTML =
-                '<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>';
-            header.appendChild(removeBtn);
+            krtHtml.set(
+                removeBtn,
+                krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>`,
+            );
+            actions.appendChild(removeBtn);
         }
     }
 
@@ -471,10 +474,10 @@ function addMaterialRow() {
     );
     inputs.forEach((input) => {
         if (input.id) {
-            input.id = input.id.replace(/_\d+$/, '_' + count);
+            input.id = input.id.replace(/_\d+$/, `_${count}`);
         }
         if (input.name) {
-            input.name = input.name.replace(/\[\d+\]/, '[' + count + ']');
+            input.name = input.name.replace(/\[\d+\]/, `[${count}]`);
         }
         if (input.hasAttribute('data-index')) {
             input.setAttribute('data-index', String(count));
@@ -490,14 +493,14 @@ function addMaterialRow() {
         template.querySelector('span[id^="outputMaterialDisplay_"]')
     );
     if (displaySpan) {
-        displaySpan.id = displaySpan.id.replace(/_\d+$/, '_' + count);
+        displaySpan.id = displaySpan.id.replace(/_\d+$/, `_${count}`);
         displaySpan.innerText = '-';
         displaySpan.style.opacity = '0.7';
     }
 
     const yieldBadge = template.querySelector('span[id^="yieldBonus_"]');
     if (yieldBadge) {
-        yieldBadge.id = 'yieldBonus_' + count;
+        yieldBadge.id = `yieldBonus_${count}`;
         yieldBadge.remove();
     }
 
@@ -505,7 +508,7 @@ function addMaterialRow() {
     labels.forEach((label) => {
         const forAttr = label.getAttribute('for');
         if (forAttr) {
-            label.setAttribute('for', forAttr.replace(/_\d+$/, '_' + count));
+            label.setAttribute('for', forAttr.replace(/_\d+$/, `_${count}`));
         }
     });
 
@@ -528,10 +531,10 @@ function removeMaterialRow(button) {
         );
         inputs.forEach((input) => {
             if (input.id) {
-                input.id = input.id.replace(/_\d+$/, '_' + index);
+                input.id = input.id.replace(/_\d+$/, `_${index}`);
             }
             if (input.name) {
-                input.name = input.name.replace(/\[\d+\]/, '[' + index + ']');
+                input.name = input.name.replace(/\[\d+\]/, `[${index}]`);
             }
             if (input.hasAttribute('data-index')) {
                 input.setAttribute('data-index', String(index));
@@ -539,21 +542,21 @@ function removeMaterialRow(button) {
         });
         const displaySpan = entry.querySelector('span[id^="outputMaterialDisplay_"]');
         if (displaySpan) {
-            displaySpan.id = displaySpan.id.replace(/_\d+$/, '_' + index);
+            displaySpan.id = displaySpan.id.replace(/_\d+$/, `_${index}`);
         }
         const yieldBadge = entry.querySelector('span[id^="yieldBonus_"]');
         if (yieldBadge) {
-            yieldBadge.id = 'yieldBonus_' + index;
+            yieldBadge.id = `yieldBonus_${index}`;
         }
         const title = entry.querySelector('.material-entry-title');
         if (title) {
-            title.textContent = MATERIAL_ENTRY_TITLE_LABEL + ' #' + (index + 1);
+            title.textContent = `${MATERIAL_ENTRY_TITLE_LABEL} #${index + 1}`;
         }
         const labels = entry.querySelectorAll('label');
         labels.forEach((label) => {
             const forAttr = label.getAttribute('for');
             if (forAttr) {
-                label.setAttribute('for', forAttr.replace(/_\d+$/, '_' + index));
+                label.setAttribute('for', forAttr.replace(/_\d+$/, `_${index}`));
             }
         });
     });
@@ -584,9 +587,9 @@ function updateMethodRatings() {
             speedVal.innerText =
                 SPEED_LEVELS[selectedOption.getAttribute('data-speed') || ''] || '-';
         }
-        ratingsDiv.style.display = 'flex';
+        ratingsDiv.hidden = false;
     } else {
-        ratingsDiv.style.display = 'none';
+        ratingsDiv.hidden = true;
     }
 }
 
@@ -607,8 +610,8 @@ function updateEndsAt() {
     if (!startedAtInput || !durationHoursInput || !durationMinutesInput || !endsAtDisplay) return;
 
     const startedAt = startedAtInput.value;
-    const hours = parseInt(durationHoursInput.value) || 0;
-    const minutes = parseInt(durationMinutesInput.value) || 0;
+    const hours = parseInt(durationHoursInput.value, 10) || 0;
+    const minutes = parseInt(durationMinutesInput.value, 10) || 0;
 
     if (startedAt) {
         const startDate = new Date(startedAt);
@@ -632,8 +635,22 @@ function updateEndsAt() {
 }
 
 /**
- * Updates the read-only profit/loss preview as oreSales - expenses - otherExpenses; the server
- * computes the stored value.
+ * Fills the `{0}`, `{1,number,integer}`, ... placeholders of a message pattern.
+ *
+ * @param {string} pattern the raw message pattern
+ * @param {string[]} args the values in placeholder order
+ * @returns {string} the filled message
+ */
+function fillRefineryPattern(pattern, args) {
+    return pattern.replace(/\{(\d+)(?:,[^}]*)?\}/g, (match, index) => {
+        const value = args[Number(index)];
+        return value === undefined ? match : value;
+    });
+}
+
+/**
+ * Updates the profit/loss card as oreSales - expenses - otherExpenses with its calculation line;
+ * the server computes the stored value.
  */
 function updateProfitPreview() {
     const expensesEl = /** @type {HTMLInputElement | null} */ (document.getElementById('expenses'));
@@ -641,22 +658,95 @@ function updateProfitPreview() {
         document.getElementById('otherExpenses')
     );
     const oreSalesEl = /** @type {HTMLInputElement | null} */ (document.getElementById('oreSales'));
-    const preview = /** @type {HTMLInputElement | null} */ (
-        document.getElementById('profitPreview')
-    );
+    const preview = document.getElementById('profitPreview');
     if (!preview) return;
     const expenses = parseFloat((expensesEl && expensesEl.value) || '') || 0;
     const otherExpenses = parseFloat((otherExpensesEl && otherExpensesEl.value) || '') || 0;
     const oreSales = parseFloat((oreSalesEl && oreSalesEl.value) || '') || 0;
+    const locale = document.documentElement.lang || undefined;
     const profit = Math.round(oreSales - expenses - otherExpenses);
-    preview.value = profit.toLocaleString();
-    preview.classList.toggle('text-danger', profit < 0);
-    preview.classList.toggle('text-muted', profit >= 0);
+    const sign = profit > 0 ? '+ ' : profit < 0 ? '− ' : '';
+    preview.textContent = sign + Math.abs(profit).toLocaleString(locale);
+    preview.classList.toggle('rod-profit--neg', profit < 0);
+    preview.classList.toggle('rod-profit--pos', profit >= 0);
+    const breakdown = document.getElementById('profitBreakdown');
+    const template = breakdown ? breakdown.getAttribute('data-template') : null;
+    if (breakdown && template) {
+        breakdown.textContent = fillRefineryPattern(template, [
+            Math.round(oreSales).toLocaleString(locale),
+            Math.round(expenses + otherExpenses).toLocaleString(locale),
+        ]);
+    }
 }
+
+/**
+ * Copies the run state of the swapped order section into the page head's status badge.
+ */
+function syncRefineryStatusBadge() {
+    const badge = document.getElementById('rod-status-badge');
+    const layout = document.querySelector('#refinery-order-results .rod-layout');
+    if (!badge || !layout) return;
+    const label = layout.getAttribute('data-rod-state-label');
+    const stateClass = layout.getAttribute('data-rod-state-class');
+    if (!label || !stateClass) return;
+    badge.textContent = label;
+    badge.className = `status-badge ${stateClass}`;
+}
+
+/**
+ * Reveals the store action once the run's end has passed.
+ */
+function revealRefineryStoreWhenReady() {
+    const store = /** @type {HTMLElement | null} */ (
+        document.querySelector('[data-trigger="rod-open-store"][data-ready-at]')
+    );
+    if (!store || !store.hidden) return;
+    const readyAt = Number(store.getAttribute('data-ready-at'));
+    if (isFinite(readyAt) && Date.now() >= readyAt) store.hidden = false;
+}
+
+/**
+ * Opens the store dialog when the page was reached through a list row's "Einlagern"
+ * (`?store=open`), then drops the parameter from the address bar.
+ */
+function openStoreFromLink() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('store') !== 'open') return;
+    params.delete('store');
+    const query = params.toString();
+    try {
+        window.history.replaceState(
+            null,
+            '',
+            window.location.pathname + (query ? `?${query}` : '') + window.location.hash,
+        );
+    } catch (_e) {}
+    const store = /** @type {HTMLElement | null} */ (
+        document.querySelector('[data-trigger="rod-open-store"]')
+    );
+    if (store && !store.hidden) openStoreModal();
+}
+
+/**
+ * Shows the unsaved-changes hint of the sticky action bar while the order form holds edits.
+ *
+ * @param {Event} event the input or change event
+ */
+function markRefineryFormDirty(event) {
+    const target = /** @type {Element | null} */ (
+        event.target instanceof Element ? event.target : null
+    );
+    if (!target || !target.closest('#refineryOrderMainForm')) return;
+    const hint = document.getElementById('rod-unsaved');
+    if (hint) hint.hidden = false;
+}
+
+document.addEventListener('input', markRefineryFormDirty);
+document.addEventListener('change', markRefineryFormDirty);
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('input', 'rod-update-profit', updateProfitPreview);
-    window.krtEvents.on('focusout', 'rod-update-profit', function (el) {
+    window.krtEvents.on('focusout', 'rod-update-profit', (el) => {
         const field = /** @type {HTMLInputElement} */ (el);
         if (field.value.trim() === '') {
             field.value = '0';
@@ -666,24 +756,25 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'rod-set-started-now', setStartedAtNow);
     window.krtEvents.on('change', 'rod-update-method', updateMethodRatings);
     window.krtEvents.on('click', 'rod-add-material', addMaterialRow);
-    window.krtEvents.on('click', 'rod-remove-material', function (el) {
+    window.krtEvents.on('click', 'rod-remove-material', (el) => {
         removeMaterialRow(el);
     });
-    window.krtEvents.on('change', 'rod-update-output', function (el) {
+    window.krtEvents.on('change', 'rod-update-output', (el) => {
         updateOutputMaterial(el);
     });
-    window.krtEvents.on('change', 'rod-location-change', function (el) {
+    window.krtEvents.on('change', 'rod-location-change', (el) => {
         window.krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
     });
-    window.krtEvents.on('input', 'rod-calc-scu', function (el) {
+    window.krtEvents.on('input', 'rod-calc-scu', (el) => {
         calcScu(el.getAttribute('data-index'));
     });
     window.krtEvents.on('click', 'rod-open-store', openStoreModal);
+    window.krtEvents.on('click', 'rod-discard', discardRefineryEdits);
     window.krtEvents.on('click', 'rod-close-store', closeStoreModal);
-    window.krtEvents.on('click', 'rod-duplicate-store', function (el) {
+    window.krtEvents.on('click', 'rod-duplicate-store', (el) => {
         duplicateStoreItem(el);
     });
-    window.krtEvents.on('submit', 'rod-disable-submit', function (el) {
+    window.krtEvents.on('submit', 'rod-disable-submit', (el) => {
         const btn = /** @type {HTMLButtonElement | null} */ (
             el.querySelector('button[type=submit]')
         );
@@ -697,6 +788,14 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             }
         }
     });
+}
+
+/**
+ * Drops the unsaved edits of the order form by re-rendering its section from the server.
+ */
+function discardRefineryEdits() {
+    if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+    if (refinerySeam) refinerySeam.refresh(['order'], { broadcast: false });
 }
 
 function submitRefineryMainForm(form, submitter) {
@@ -770,13 +869,13 @@ function refineryStoreJobOrderIds(form) {
 function crossPublishStoredStock(jobOrderIds) {
     if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
     jobOrderIds.forEach((jobOrderId) => {
-        window.krtLiveSync.sendChanged('order:' + jobOrderId, ['materials', 'aggregated']);
+        window.krtLiveSync.sendChanged(`order:${jobOrderId}`, ['materials', 'aggregated']);
     });
 }
 
 document.addEventListener(
     'submit',
-    function (e) {
+    (e) => {
         const form = /** @type {HTMLFormElement} */ (e.target);
         if (!form || !form.id) return;
         if (form.id === 'refineryOrderMainForm') {

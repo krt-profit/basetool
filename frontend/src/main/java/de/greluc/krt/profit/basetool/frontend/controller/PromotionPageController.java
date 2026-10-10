@@ -25,9 +25,10 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionEligibilityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionRequirementCheckDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -40,7 +41,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -59,63 +59,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 @PreAuthorize("isAuthenticated()")
 public class PromotionPageController {
 
-  /** Response type for the {@code /promotion/topics/all} list of promotion topics. */
-  private static final ParameterizedTypeReference<List<PromotionTopicDto>> TOPIC_LIST_TYPE =
-      new ParameterizedTypeReference<List<PromotionTopicDto>>() {};
-
-  /** Response type for the {@code /promotion/categories/by-topic/{id}/all} category list. */
-  private static final ParameterizedTypeReference<List<PromotionCategoryDto>> CATEGORY_LIST_TYPE =
-      new ParameterizedTypeReference<List<PromotionCategoryDto>>() {};
-
-  /** Response type for the paged {@code /promotion/categories} listing of all categories. */
-  private static final ParameterizedTypeReference<PageResponse<PromotionCategoryDto>>
-      CATEGORY_PAGE_TYPE = new ParameterizedTypeReference<PageResponse<PromotionCategoryDto>>() {};
-
-  /**
-   * Response type for the {@code /promotion/level-contents/by-category/{id}} level-content list.
-   */
-  private static final ParameterizedTypeReference<List<PromotionLevelContentDto>>
-      LEVEL_CONTENT_LIST_TYPE = new ParameterizedTypeReference<List<PromotionLevelContentDto>>() {};
-
-  /** Response type for the paged {@code /promotion/rank-requirements} listing. */
-  private static final ParameterizedTypeReference<PageResponse<RankRequirementDto>>
-      RANK_REQUIREMENT_PAGE_TYPE =
-          new ParameterizedTypeReference<PageResponse<RankRequirementDto>>() {};
-
-  /** Response type for the {@code /users/me} single-user lookup used to read the caller's rank. */
-  private static final ParameterizedTypeReference<
-          de.greluc.krt.profit.basetool.frontend.model.dto.UserDto>
-      USER_TYPE =
-          new ParameterizedTypeReference<
-              de.greluc.krt.profit.basetool.frontend.model.dto.UserDto>() {};
-
-  /** Response type for the {@code /promotion/evaluations/my} personal evaluation list. */
-  private static final ParameterizedTypeReference<List<MemberEvaluationDto>>
-      MEMBER_EVALUATION_LIST_TYPE = new ParameterizedTypeReference<List<MemberEvaluationDto>>() {};
-
-  /** Response type for the paged {@code /promotion/evaluations/all} evaluation listing. */
-  private static final ParameterizedTypeReference<PageResponse<MemberEvaluationDto>>
-      MEMBER_EVALUATION_PAGE_TYPE =
-          new ParameterizedTypeReference<PageResponse<MemberEvaluationDto>>() {};
-
-  /** Response type for the paged {@code /promotion/evaluations/members} squadron-member listing. */
-  private static final ParameterizedTypeReference<
-          PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto>>
-      USER_PAGE_TYPE =
-          new ParameterizedTypeReference<
-              PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto>>() {};
-
-  /** Response type for the {@code /promotion/eligibility} promotion-eligibility lists. */
-  private static final ParameterizedTypeReference<List<PromotionEligibilityDto>>
-      ELIGIBILITY_LIST_TYPE = new ParameterizedTypeReference<List<PromotionEligibilityDto>>() {};
-
   /**
    * Page size of the {@link CatalogPages#fetchAll page walks} feeding the evaluation matrix; a
    * chunk size, not a cap (REQ-PROMO-001).
    */
   private static final int MATRIX_FETCH_PAGE_SIZE = 1000;
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the promotion catalogue, the evaluations and the eligibility. */
+  private final PromotionBackendClient promotionClient;
 
   /**
    * Throws {@link AccessDeniedException}, answered with 403, when the promotion feature is disabled
@@ -137,7 +88,8 @@ public class PromotionPageController {
    * Renders the promotion-system overview for every signed-in user.
    *
    * <p>Passes the caller's current rank, or {@code null} when unknown, so the template can mark the
-   * caller's next rank step.
+   * caller's next rank step, and {@code rankSteps}, the requirements per rank step in career order
+   * (highest {@code fromRank} first).
    */
   @NotNull
   @GetMapping("/overview")
@@ -166,14 +118,21 @@ public class PromotionPageController {
         .forEach(
             req -> {
               String key = req.fromRank() + "_" + req.toRank();
-              groupedRankRequirements.computeIfAbsent(key, k -> new ArrayList<>()).add(req);
+              groupedRankRequirements.computeIfAbsent(key, _ -> new ArrayList<>()).add(req);
             });
 
     model.addAttribute("topics", topics);
     model.addAttribute("topicCategoryMap", topicCategoryMap);
     model.addAttribute("categoryContentMap", categoryContentMap);
+    List<List<RankRequirementDto>> rankSteps = new ArrayList<>(groupedRankRequirements.values());
+    rankSteps.sort(
+        java.util.Comparator.comparingInt(
+                (List<RankRequirementDto> step) -> step.getFirst().fromRank())
+            .reversed());
+
     model.addAttribute("rankRequirements", rankRequirements);
     model.addAttribute("groupedRankRequirements", groupedRankRequirements);
+    model.addAttribute("rankSteps", rankSteps);
     model.addAttribute("currentUserRank", fetchCurrentUserRank());
     return "promotion-overview";
   }
@@ -217,14 +176,77 @@ public class PromotionPageController {
     }
 
     List<PromotionEligibilityDto> eligibilities = fetchMyEligibility();
+    Integer currentUserRank = fetchCurrentUserRank();
+    PromotionEligibilityDto nextEligibility = findNextStep(eligibilities, currentUserRank);
+    List<PromotionEligibilityDto> eligibilitySteps = new ArrayList<>();
+    if (nextEligibility != null) {
+      eligibilitySteps.add(nextEligibility);
+    }
+    for (PromotionEligibilityDto eligibility : eligibilities) {
+      if (eligibility != nextEligibility) {
+        eligibilitySteps.add(eligibility);
+      }
+    }
 
     model.addAttribute("topics", topics);
     model.addAttribute("topicCategoryMap", topicCategoryMap);
     model.addAttribute("evaluationByCategoryId", evaluationByCategoryId);
     model.addAttribute("eligibilities", eligibilities);
+    model.addAttribute("eligibilitySteps", eligibilitySteps);
+    model.addAttribute("nextEligibility", nextEligibility);
+    model.addAttribute("nextProgressPercent", progressPercent(nextEligibility));
     model.addAttribute("requiredLevelByCategory", requiredLevelByCategory);
-    model.addAttribute("currentUserRank", fetchCurrentUserRank());
+    model.addAttribute("currentUserRank", currentUserRank);
     return "promotion-my-evaluations";
+  }
+
+  /**
+   * Finds the eligibility of the rank step the caller takes next, the one starting at their rank.
+   *
+   * @param eligibilities the caller's eligibility per configured rank step
+   * @param currentUserRank the caller's rank, or {@code null} when unknown
+   * @return the next step's eligibility, or {@code null} when the rank is unknown or no step starts
+   *     at it
+   */
+  @Nullable
+  static PromotionEligibilityDto findNextStep(
+      @NotNull List<PromotionEligibilityDto> eligibilities, @Nullable Integer currentUserRank) {
+    if (currentUserRank == null) {
+      return null;
+    }
+    for (PromotionEligibilityDto eligibility : eligibilities) {
+      if (eligibility != null && eligibility.fromRank() == currentUserRank) {
+        return eligibility;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Computes how far a rank step's requirements are met, counting each check at most up to its
+   * required count.
+   *
+   * @param eligibility the rank step, or {@code null}
+   * @return the share of the required counts achieved, 0 to 100; 100 for an eligible step without
+   *     checks, 0 for a missing step
+   */
+  static int progressPercent(@Nullable PromotionEligibilityDto eligibility) {
+    if (eligibility == null) {
+      return 0;
+    }
+    long required = 0;
+    long achieved = 0;
+    if (eligibility.checks() != null) {
+      for (PromotionRequirementCheckDto check : eligibility.checks()) {
+        int needed = Math.max(0, check.requiredCount());
+        required += needed;
+        achieved += Math.min(needed, Math.max(0, check.achievedCount()));
+      }
+    }
+    if (required == 0) {
+      return eligibility.eligible() ? 100 : 0;
+    }
+    return (int) (achieved * 100 / required);
   }
 
   /**
@@ -328,13 +350,24 @@ public class PromotionPageController {
     return "promotion-manage";
   }
 
-  /** Schritt 8: Admin-Bereich – Themenbereiche, Kategorien & Stufeninhalte verwalten. */
+  /**
+   * Renders the topic editor: topics as the master list, the selected topic's categories and level
+   * contents as the detail pane.
+   *
+   * @param promotionFeatureEnabled per-squadron feature flag; {@code false} answers 403
+   * @param fragment {@code "topicsResults"} renders only the master-detail fragment
+   * @param selectedTopic the {@code topic} parameter, id of the topic to select; an unknown or
+   *     missing id selects the first topic
+   * @param model model populated with the topics, their categories and level contents
+   * @return the view name, or its fragment selector
+   */
   @NotNull
   @GetMapping("/admin/topics")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public String adminTopics(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled,
       @RequestParam(required = false) String fragment,
+      @RequestParam(name = "topic", required = false) @Nullable String selectedTopic,
       Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
     List<PromotionTopicDto> topics = fetchTopics();
@@ -351,6 +384,7 @@ public class PromotionPageController {
     model.addAttribute("topics", topics);
     model.addAttribute("topicCategoryMap", topicCategoryMap);
     model.addAttribute("categoryContentMap", categoryContentMap);
+    model.addAttribute("selectedTopicId", selectTopicId(topics, selectedTopic));
     if ("topicsResults".equals(fragment)) {
       return "promotion-admin-topics :: topicsResults";
     }
@@ -384,7 +418,7 @@ public class PromotionPageController {
         .forEach(
             req -> {
               String key = req.fromRank() + "_" + req.toRank();
-              groupedRequirements.computeIfAbsent(key, k -> new ArrayList<>()).add(req);
+              groupedRequirements.computeIfAbsent(key, _ -> new ArrayList<>()).add(req);
             });
 
     List<PromotionTopicDto> topics = fetchTopics();
@@ -393,8 +427,22 @@ public class PromotionPageController {
       categoriesByTopic.put(topic.id().toString(), fetchCategoriesByTopic(topic.id().toString()));
     }
 
+    Map<String, List<RankRequirementDto>> requirementsByCell = new LinkedHashMap<>();
+    Map<String, String> highestLevelByCell = new LinkedHashMap<>();
+    for (RankRequirementDto req : requirements) {
+      String cell = matrixCellKey(req);
+      requirementsByCell.computeIfAbsent(cell, _ -> new ArrayList<>()).add(req);
+      String existing = highestLevelByCell.get(cell);
+      if (req.minimumLevel() != null
+          && (existing == null || compareLevels(req.minimumLevel(), existing) > 0)) {
+        highestLevelByCell.put(cell, req.minimumLevel());
+      }
+    }
+
     model.addAttribute("requirements", requirements);
     model.addAttribute("groupedRequirements", groupedRequirements);
+    model.addAttribute("requirementsByCell", requirementsByCell);
+    model.addAttribute("highestLevelByCell", highestLevelByCell);
     model.addAttribute("topics", topics);
     model.addAttribute("categories", fetchAllCategories());
     model.addAttribute("categoriesByTopic", categoriesByTopic);
@@ -404,10 +452,49 @@ public class PromotionPageController {
     return "promotion-admin-rank-requirements";
   }
 
+  /**
+   * Builds the key of a requirement's cell in the rank-step × topic matrix.
+   *
+   * @param req the requirement
+   * @return {@code "<from>_<to>_<topicId>"}, or {@code "<from>_<to>_global"} for a rule without a
+   *     topic
+   */
+  @NotNull
+  static String matrixCellKey(@NotNull RankRequirementDto req) {
+    return req.fromRank()
+        + "_"
+        + req.toRank()
+        + "_"
+        + (req.topicId() != null ? req.topicId().toString() : "global");
+  }
+
+  /**
+   * Resolves the topic the editor shows: the requested one when it is in the list, otherwise the
+   * first topic.
+   *
+   * @param topics the topics in display order
+   * @param requested the requested topic id, as the browser sent it
+   * @return the selected topic's id, or {@code null} when there are no topics
+   */
+  @Nullable
+  static String selectTopicId(@NotNull List<PromotionTopicDto> topics, @Nullable String requested) {
+    if (topics.isEmpty()) {
+      return null;
+    }
+    if (requested != null) {
+      for (PromotionTopicDto topic : topics) {
+        if (topic.id() != null && topic.id().toString().equals(requested)) {
+          return requested;
+        }
+      }
+    }
+    PromotionTopicDto first = topics.getFirst();
+    return first.id() != null ? first.id().toString() : null;
+  }
+
   private List<PromotionTopicDto> fetchTopics() {
     try {
-      List<PromotionTopicDto> result =
-          backendApiClient.get("/api/v1/promotion/topics/all", TOPIC_LIST_TYPE);
+      List<PromotionTopicDto> result = promotionClient.topics();
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch promotion topics", e);
@@ -417,9 +504,7 @@ public class PromotionPageController {
 
   private List<PromotionCategoryDto> fetchCategoriesByTopic(String topicId) {
     try {
-      List<PromotionCategoryDto> result =
-          backendApiClient.get(
-              "/api/v1/promotion/categories/by-topic/" + topicId + "/all", CATEGORY_LIST_TYPE);
+      List<PromotionCategoryDto> result = promotionClient.categoriesByTopic(topicId);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch categories for topic {}", topicId, e);
@@ -429,8 +514,7 @@ public class PromotionPageController {
 
   private List<PromotionCategoryDto> fetchAllCategories() {
     try {
-      PageResponse<PromotionCategoryDto> result =
-          backendApiClient.get("/api/v1/promotion/categories?size=1000", CATEGORY_PAGE_TYPE);
+      PageResponse<PromotionCategoryDto> result = promotionClient.allCategories();
       return result != null && result.content() != null ? result.content() : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch all categories", e);
@@ -440,10 +524,7 @@ public class PromotionPageController {
 
   private List<PromotionLevelContentDto> fetchLevelContents(String categoryId) {
     try {
-      List<PromotionLevelContentDto> result =
-          backendApiClient.get(
-              "/api/v1/promotion/level-contents/by-category/" + categoryId,
-              LEVEL_CONTENT_LIST_TYPE);
+      List<PromotionLevelContentDto> result = promotionClient.levelContents(categoryId);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch level contents for category {}", categoryId, e);
@@ -453,10 +534,7 @@ public class PromotionPageController {
 
   private List<RankRequirementDto> fetchAllRankRequirements() {
     try {
-      PageResponse<RankRequirementDto> result =
-          backendApiClient.get(
-              "/api/v1/promotion/rank-requirements?size=1000&sort=fromRank",
-              RANK_REQUIREMENT_PAGE_TYPE);
+      PageResponse<RankRequirementDto> result = promotionClient.rankRequirements();
       return result != null && result.content() != null ? result.content() : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch rank requirements", e);
@@ -472,8 +550,7 @@ public class PromotionPageController {
   @Nullable
   private Integer fetchCurrentUserRank() {
     try {
-      de.greluc.krt.profit.basetool.frontend.model.dto.UserDto me =
-          backendApiClient.get("/api/v1/users/me", USER_TYPE);
+      de.greluc.krt.profit.basetool.frontend.model.dto.UserDto me = promotionClient.currentUser();
       return me != null ? me.rank() : null;
     } catch (Exception e) {
       log.warn("Failed to fetch current user rank for promotion overview", e);
@@ -483,8 +560,7 @@ public class PromotionPageController {
 
   private List<MemberEvaluationDto> fetchMyEvaluations() {
     try {
-      List<MemberEvaluationDto> result =
-          backendApiClient.get("/api/v1/promotion/evaluations/my", MEMBER_EVALUATION_LIST_TYPE);
+      List<MemberEvaluationDto> result = promotionClient.myEvaluations();
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch my evaluations", e);
@@ -501,13 +577,7 @@ public class PromotionPageController {
   private CompleteCatalog<MemberEvaluationDto> fetchAllEvaluations() {
     try {
       return CatalogPages.fetchAll(
-          page ->
-              backendApiClient.get(
-                  "/api/v1/promotion/evaluations/all?size="
-                      + MATRIX_FETCH_PAGE_SIZE
-                      + "&page="
-                      + page,
-                  MEMBER_EVALUATION_PAGE_TYPE));
+          page -> promotionClient.allEvaluations(MATRIX_FETCH_PAGE_SIZE, page));
     } catch (Exception e) {
       log.error("Failed to fetch all evaluations", e);
       return CompleteCatalog.empty();
@@ -524,13 +594,7 @@ public class PromotionPageController {
   private CompleteCatalog<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> fetchMembers() {
     try {
       return CatalogPages.fetchAll(
-          page ->
-              backendApiClient.get(
-                  "/api/v1/promotion/evaluations/members?size="
-                      + MATRIX_FETCH_PAGE_SIZE
-                      + "&page="
-                      + page,
-                  USER_PAGE_TYPE));
+          page -> promotionClient.evaluatableMembers(MATRIX_FETCH_PAGE_SIZE, page));
     } catch (Exception e) {
       log.error("Failed to fetch evaluatable members", e);
       return CompleteCatalog.empty();
@@ -539,8 +603,7 @@ public class PromotionPageController {
 
   private List<PromotionEligibilityDto> fetchMyEligibility() {
     try {
-      List<PromotionEligibilityDto> result =
-          backendApiClient.get("/api/v1/promotion/eligibility/my", ELIGIBILITY_LIST_TYPE);
+      List<PromotionEligibilityDto> result = promotionClient.myEligibility();
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch personal promotion eligibility", e);
@@ -550,9 +613,7 @@ public class PromotionPageController {
 
   private List<PromotionEligibilityDto> fetchEligibilityForUser(UUID userId) {
     try {
-      List<PromotionEligibilityDto> result =
-          backendApiClient.get(
-              "/api/v1/promotion/eligibility/user/" + userId, ELIGIBILITY_LIST_TYPE);
+      List<PromotionEligibilityDto> result = promotionClient.eligibilityOf(userId);
       return result != null ? result : new ArrayList<>();
     } catch (Exception e) {
       log.error("Failed to fetch promotion eligibility for member {}", userId, e);

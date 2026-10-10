@@ -1,0 +1,65 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .audit-tabs {
+        margin-bottom: var(--space-4);
+    }
+
+    .audit-event-filter {
+        flex: 0 1 280px;
+        min-width: 0;
+    }
+
+    .audit-event-filter select {
+        width: 100%;
+        min-height: 40px;
+        margin: 0;
+    }
+
+    .audit-details {
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--color-gray-2-text);
+    }
+
+    .audit-purge-warning {
+        display: flex;
+        gap: 0.6rem;
+        align-items: flex-start;
+    }
+
+    .audit-purge-warning .krt-icon {
+        flex: 0 0 auto;
+        margin-top: 0.1rem;
+    }
+
+    .audit-purge-warning p {
+        margin: 0;
+    }
+
+    .audit-purge-success {
+        margin: 0.4rem 0 0;
+        color: var(--color-success-text);
+        font-size: 0.85rem;
+    }
+
+    @media (width <= 1024px) {
+        .audit-event-filter select {
+            min-height: var(--touch-target);
+        }
+    }
+
+    @media (width <= 768px) {
+        .audit-event-filter {
+            flex: 1 1 100%;
+            order: 3;
+        }
+
+        .audit-details {
+            max-width: none;
+            white-space: normal;
+        }
+    }
+}

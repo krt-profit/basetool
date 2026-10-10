@@ -1,16 +1,13 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
-    .data-section {
-        margin-bottom: 3rem;
-    }
     .form-group label {
         display: block;
         margin-bottom: 0.5rem;
         font-family: var(--font-body);
         font-size: 0.8rem;
     }
-    .form-group input:where(:not([type='checkbox']):not([type='radio'])),
+    .form-group input:where(:not([type='checkbox'], [type='radio'])),
     .form-group select,
     .form-group textarea {
         width: 100%;

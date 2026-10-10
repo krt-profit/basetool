@@ -24,17 +24,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankSecurityService;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsGate;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.Analysis;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.BeanCall;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionSources.Declared;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
-import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService;
-import de.greluc.krt.profit.basetool.backend.service.exchange.ConnectedAppsGate;
-import de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeGate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -54,34 +59,44 @@ class SecurityExpressionRulesTest {
   private static final int EXPRESSION_FLOOR = 441;
 
   /**
-   * Bean references per security bean on 2026-10-02. A count below its floor means a gate lost a
-   * bean check; a count above it is new coverage, and the floor is raised with it.
+   * Bean references per security bean. A count below its floor means a gate lost a bean check; a
+   * count above it is new coverage, and the floor is raised with it.
    */
   private static final Map<String, Integer> REFERENCE_FLOORS =
-      Map.of(
-          "ownerScopeService", 66,
-          "missionSecurityService", 40,
-          "authHelperService", 17,
-          "exchangeGate", 14,
-          "orgRoleManagementSecurityService", 13,
-          "bankSecurityService", 10,
-          "specialCommandSecurityService", 5,
-          "connectedAppsGate", 1);
+      Map.ofEntries(
+          Map.entry("ownerScopeService", 6),
+          Map.entry("operationAccessPolicy", 8),
+          Map.entry("refineryAccessPolicy", 8),
+          Map.entry("missionSecurityService", 40),
+          Map.entry("authHelperService", 17),
+          Map.entry("exchangeGate", 14),
+          Map.entry("orgRoleManagementSecurityService", 13),
+          Map.entry("bankSecurityService", 10),
+          Map.entry("specialCommandSecurityService", 5),
+          Map.entry("connectedAppsGate", 1),
+          Map.entry("jobOrderAccessPolicy", 29),
+          Map.entry("missionAccessPolicy", 7),
+          Map.entry("inventoryAccessPolicy", 9));
 
   /**
    * The classes that carry the security beans' explicit names; a bean referenced from SpEL must be
    * named by its class, so a class rename cannot rename the bean.
    */
   private static final Map<String, Class<?>> NAMED_SECURITY_BEANS =
-      Map.of(
-          "ownerScopeService", OwnerScopeService.class,
-          "missionSecurityService", MissionSecurityService.class,
-          "authHelperService", AuthHelperService.class,
-          "exchangeGate", ExchangeGate.class,
-          "orgRoleManagementSecurityService", OrgRoleManagementSecurityService.class,
-          "bankSecurityService", BankSecurityService.class,
-          "specialCommandSecurityService", SpecialCommandSecurityService.class,
-          "connectedAppsGate", ConnectedAppsGate.class);
+      Map.ofEntries(
+          Map.entry("ownerScopeService", OwnerScopeService.class),
+          Map.entry("operationAccessPolicy", OperationAccessPolicy.class),
+          Map.entry("refineryAccessPolicy", RefineryAccessPolicy.class),
+          Map.entry("missionSecurityService", MissionSecurityService.class),
+          Map.entry("authHelperService", AuthHelperService.class),
+          Map.entry("exchangeGate", ExchangeGate.class),
+          Map.entry("orgRoleManagementSecurityService", OrgRoleManagementSecurityService.class),
+          Map.entry("bankSecurityService", BankSecurityService.class),
+          Map.entry("specialCommandSecurityService", SpecialCommandSecurityService.class),
+          Map.entry("connectedAppsGate", ConnectedAppsGate.class),
+          Map.entry("jobOrderAccessPolicy", JobOrderAccessPolicy.class),
+          Map.entry("missionAccessPolicy", MissionAccessPolicy.class),
+          Map.entry("inventoryAccessPolicy", InventoryAccessPolicy.class));
 
   @Test
   @DisplayName("every security expression follows the constant-SpEL rules")

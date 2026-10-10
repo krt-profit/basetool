@@ -53,23 +53,23 @@
      * @returns {HTMLElement|null} the section, or null when the page has no such picker
      */
     function sectionOf(prefix) {
-        return document.querySelector('[data-herkunft="' + prefix + '"]');
+        return document.querySelector(`[data-herkunft="${prefix}"]`);
     }
 
     /**
-     * Reports whether a picker is live: not krtm-hidden and inside no display:none subtree. An
-     * inactive picker neither gates its submit button nor contributes a plan.
+     * Reports whether a picker is live: neither it nor an ancestor is hidden or carries an inline
+     * display:none. An inactive picker neither gates its submit button nor contributes a plan.
      *
      * @param {HTMLElement} section the picker section
      * @returns {boolean} true when the picker is visible and should be enforced
      */
     function isActive(section) {
-        if (!section || section.classList.contains('krtm-hidden')) {
+        if (!section) {
             return false;
         }
         let el = section;
         while (el) {
-            if (el.style && el.style.display === 'none') {
+            if (el.hidden || (el.style && el.style.display === 'none')) {
                 return false;
             }
             el = el.parentElement;
@@ -181,7 +181,7 @@
      * @returns {object|null} the dimension descriptor, or null when the row has no such split
      */
     function readDimension(leaf, field) {
-        const split = leaf.querySelector('.assoc-split[data-assoc-field="' + field + '"]');
+        const split = leaf.querySelector(`.assoc-split[data-assoc-field="${field}"]`);
         if (!split) {
             return null;
         }
@@ -189,7 +189,7 @@
         const isPiece = split.getAttribute('data-piece') === 'true';
         const tags = [];
         let sumAllocated = 0;
-        split.querySelectorAll('[data-assoc-chip]').forEach(function (chip) {
+        split.querySelectorAll('[data-assoc-chip]').forEach((chip) => {
             const targetId = chip.getAttribute('data-target-id');
             if (!targetId) {
                 return;
@@ -235,13 +235,11 @@
         const block =
             scope.matches && scope.matches('[data-herkunft-dim]')
                 ? scope
-                : scope.querySelector('[data-herkunft-dim="' + field + '"]');
+                : scope.querySelector(`[data-herkunft-dim="${field}"]`);
         if (!block) {
             return null;
         }
-        return block.querySelector(
-            '[data-herkunft-input][data-herkunft-target="' + targetId + '"]',
-        );
+        return block.querySelector(`[data-herkunft-input][data-herkunft-target="${targetId}"]`);
     }
 
     /**
@@ -265,7 +263,7 @@
         cap.textContent = dim.field === 'JOB_ORDER' ? strings.order : strings.mission;
         block.appendChild(cap);
 
-        dim.tags.forEach(function (tag) {
+        dim.tags.forEach((tag) => {
             const row = document.createElement('label');
             row.className = 'herkunft-tag';
 
@@ -291,7 +289,7 @@
 
             const max = document.createElement('span');
             max.className = 'herkunft-tag-max';
-            max.textContent = '/ ' + fmtAmount(tag.allocated, dim.isPiece);
+            max.textContent = `/ ${fmtAmount(tag.allocated, dim.isPiece)}`;
 
             row.appendChild(name);
             row.appendChild(input);
@@ -314,7 +312,8 @@
         rest.setAttribute('data-herkunft-rest', '');
         restLine.appendChild(rest);
         const warn = document.createElement('span');
-        warn.className = 'herkunft-warn krtm-hidden';
+        warn.className = 'herkunft-warn';
+        warn.hidden = true;
         warn.setAttribute('data-herkunft-warn', '');
         restLine.appendChild(warn);
         block.appendChild(restLine);
@@ -324,7 +323,8 @@
             sectionOf(prefix).hasAttribute('data-herkunft-sell-amount-id')
         ) {
             const proceeds = document.createElement('div');
-            proceeds.className = 'herkunft-proceeds krtm-hidden';
+            proceeds.className = 'herkunft-proceeds';
+            proceeds.hidden = true;
             proceeds.setAttribute('data-herkunft-proceeds', '');
             block.appendChild(proceeds);
         }
@@ -371,7 +371,7 @@
 
         let assigned = 0;
         let tagOver = false;
-        dim.tags.forEach(function (tag) {
+        dim.tags.forEach((tag) => {
             const input = tagInput(section, dim.field, tag.targetId);
             let v = input ? parseFloat(input.value) : 0;
             if (isNaN(v) || v < 0) {
@@ -415,7 +415,7 @@
      * @param {{sellAmount: number}|null} sell the SELL context, or null
      */
     function updateDimUi(section, dim, state, strings, sell) {
-        const block = section.querySelector('[data-herkunft-dim="' + dim.field + '"]');
+        const block = section.querySelector(`[data-herkunft-dim="${dim.field}"]`);
         if (!block) {
             return;
         }
@@ -443,9 +443,9 @@
                     '{0}',
                     fmtAmount(state.minRequired, dim.isPiece),
                 );
-                warnEl.classList.remove('krtm-hidden');
+                warnEl.hidden = false;
             } else {
-                warnEl.classList.add('krtm-hidden');
+                warnEl.hidden = true;
             }
         }
         updateProceeds(block, dim, state, sell, strings);
@@ -467,7 +467,7 @@
             return;
         }
         if (dim.field !== 'MISSION' || !sell || !state.hasDeducted) {
-            el.classList.add('krtm-hidden');
+            el.hidden = true;
             el.textContent = '';
             return;
         }
@@ -478,7 +478,7 @@
         el.appendChild(title);
 
         let assignedToMissions = 0;
-        dim.tags.forEach(function (tag) {
+        dim.tags.forEach((tag) => {
             const input = tagInput(block, dim.field, tag.targetId);
             let r = input ? parseFloat(input.value) : 0;
             if (isNaN(r) || r <= 0) {
@@ -489,7 +489,7 @@
             const credit = sell.sellAmount * (r / state.target);
             const line = document.createElement('div');
             line.className = 'herkunft-proceeds-line';
-            line.textContent = tag.name + ': ' + formatAuec(credit) + ' ' + strings.auec;
+            line.textContent = `${tag.name}: ${formatAuec(credit)} ${strings.auec}`;
             el.appendChild(line);
         });
 
@@ -499,10 +499,10 @@
         pLine.className = 'herkunft-proceeds-line herkunft-proceeds-personal';
         pLine.textContent = strings.personal.replace(
             '{0}',
-            formatAuec(personalCredit) + ' ' + strings.auec,
+            `${formatAuec(personalCredit)} ${strings.auec}`,
         );
         el.appendChild(pLine);
-        el.classList.remove('krtm-hidden');
+        el.hidden = false;
     }
 
     /**
@@ -528,7 +528,7 @@
         const deducted = deductedOf(prefix);
         const sell = sellContext(prefix);
         let allValid = true;
-        ctx.dims.forEach(function (dim) {
+        ctx.dims.forEach((dim) => {
             syncDetermined(section, dim, deducted);
             const state = dimState(section, dim, deducted);
             if (!state.valid) {
@@ -559,11 +559,11 @@
             body.textContent = '';
         }
         const leaf = itemId
-            ? document.querySelector('.tree-row--leaf[data-item-id="' + itemId + '"]')
+            ? document.querySelector(`.tree-row--leaf[data-item-id="${itemId}"]`)
             : null;
         const dims = [];
         if (leaf) {
-            ['JOB_ORDER', 'MISSION'].forEach(function (field) {
+            ['JOB_ORDER', 'MISSION'].forEach((field) => {
                 const dim = readDimension(leaf, field);
                 if (dim && dim.tags.length > 0) {
                     dims.push(dim);
@@ -572,12 +572,12 @@
         }
         registry[prefix] = { itemId, dims };
         if (dims.length === 0) {
-            section.classList.add('krtm-hidden');
+            section.hidden = true;
             recompute(prefix);
             return;
         }
-        section.classList.remove('krtm-hidden');
-        dims.forEach(function (dim) {
+        section.hidden = false;
+        dims.forEach((dim) => {
             if (body) {
                 body.appendChild(buildDimBlock(prefix, dim));
             }
@@ -600,9 +600,9 @@
         if (!section || !ctx || ctx.dims.length === 0 || !isActive(section)) {
             return out;
         }
-        ctx.dims.forEach(function (dim) {
+        ctx.dims.forEach((dim) => {
             const list = [];
-            dim.tags.forEach(function (tag) {
+            dim.tags.forEach((tag) => {
                 const input = tagInput(section, dim.field, tag.targetId);
                 let v = input ? parseFloat(input.value) : 0;
                 if (isNaN(v) || v <= 0) {
@@ -646,7 +646,7 @@
             delete registry[prefix];
             const section = sectionOf(prefix);
             if (section) {
-                section.classList.add('krtm-hidden');
+                section.hidden = true;
                 const body = section.querySelector('[data-herkunft-body]');
                 if (body) {
                     body.textContent = '';
@@ -656,7 +656,7 @@
     };
 
     function onAnyChange() {
-        Object.keys(registry).forEach(function (prefix) {
+        Object.keys(registry).forEach((prefix) => {
             const section = sectionOf(prefix);
             if (section && isActive(section)) {
                 recompute(prefix);

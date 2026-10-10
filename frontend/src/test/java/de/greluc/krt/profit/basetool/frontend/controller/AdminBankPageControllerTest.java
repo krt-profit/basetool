@@ -28,6 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
@@ -48,7 +49,7 @@ class AdminBankPageControllerTest {
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    controller = new AdminBankPageController(backendApiClient);
+    controller = new AdminBankPageController(new BankBackendClient(backendApiClient));
   }
 
   @Test

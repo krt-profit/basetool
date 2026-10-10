@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -113,7 +114,8 @@ class ItemCollectionRenderTest {
             List.of(
                 new JobOrderItemStockEntryDto(
                     entryId, 7L, "Alice", ownerId, "Lorville", locationId, 4L, 3L, false)));
-    when(backendApiClient.get(contains("/item-stock"), anyTypeRef())).thenReturn(List.of(group));
+    when(backendApiClient.get(contains("/item-stock"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of(group));
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of(new LocationReferenceDto(locationId, "Lorville")));
 
@@ -129,7 +131,24 @@ class ItemCollectionRenderTest {
             .getContentAsString();
 
     assertThat(html).as("collection table").contains("id=\"item-collection-table\"");
-    assertThat(html).as("game-item name in the Item column").contains("Cirrus Optic Scope");
+    assertThat(html)
+        .as("list pattern: page head with the back link to the order, stacked table, no HUD box")
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*href=\"/orders/" + orderId + "\"")
+        .containsPattern("<h1>Itemsammelübersicht</h1>")
+        .contains("class=\"data-table data-table--stack collection-table\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("btn--cta");
+    assertThat(html)
+        .as("game-item name in the group row")
+        .containsPattern("class=\"collection-group__title\">Cirrus Optic Scope<");
+    assertThat(html)
+        .as("collection progress over all groups and per group")
+        .contains("data-collection-progress=\"total\"")
+        .contains(">0 % geliefert<")
+        .contains(">0 von 3 geliefert<")
+        .contains("data-allocated=\"3\"");
     assertThat(html).as("owner seeded into the combobox").contains("Alice");
     assertThat(html).as("total-stock context").contains("von 4 im Bestand");
     assertThat(html)
@@ -144,7 +163,8 @@ class ItemCollectionRenderTest {
   void itemCollection_emptyStock_rendersEmptyState() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    when(backendApiClient.get(contains("/item-stock"), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(contains("/item-stock"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
 
@@ -160,5 +180,10 @@ class ItemCollectionRenderTest {
             .getContentAsString();
 
     assertThat(html).as("empty state, no table").doesNotContain("id=\"item-collection-table\"");
+    assertThat(html)
+        .as("empty state with title and sentence, no progress bar")
+        .contains("data-testid=\"empty-state\"")
+        .contains("Kein Item-Bestand für diesen Auftrag vorhanden.")
+        .doesNotContain("data-collection-progress");
   }
 }

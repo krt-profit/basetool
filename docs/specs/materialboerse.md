@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
 > **Owner area:** MARKET · **Related ADRs:** [ADR-0082](../adr/0082-materialboerse-offer-model.md),
 > [ADR-0086](../adr/0086-materialboerse-partial-offer-amount.md),
 > [ADR-0087](../adr/0087-materialboerse-item-offers.md),
@@ -41,9 +41,10 @@ Markdown description, an optional minimum quality (0–1000, for both kinds) and
 so none of the offer's stock-derived rules apply (no clamp-on-read, no ratchet, no
 one-active-per-row). Other members signal "Ich kann liefern" and the requester is notified; the
 supplier names stay owner-only exactly like the interessenten of an offer. Requests live on the same
-`/materialboerse` page under two extra tabs ("Alle Gesuche" / "Meine Gesuche"), and the two CTAs
-relabel from "Material anbieten" / "Item anbieten" to "Material suchen" / "Item suchen" when a
-Gesuche tab is active. The request model is a **sibling aggregate** (`MaterialExchangeRequest`, its
+`/materialboerse` page as the second of two tabs („Angebote" / „Gesuche"), each narrowed by the
+scope segment „Alle · Meine", and the page head's one create menu reads „Angebot erstellen" (entries
+„Material anbieten" / „Item anbieten") on the Angebote and „Gesuch erstellen" („Material suchen" /
+„Item suchen") on the Gesuche (REQ-MARKET-009/-018). The request model is a **sibling aggregate** (`MaterialExchangeRequest`, its
 own table) rather than a discriminator on the offer, recorded in ADR-0116; the requirements are
 REQ-MARKET-015…020.
 
@@ -87,7 +88,7 @@ with the SCU unit — the amount unit follows `Material.quantityType`, matching 
 ### REQ-MARKET-002 — Release a Lager row (whole or partial, with a Markdown remark)
 
 A member releases one of **their own** Lager rows via the "Für Börse freigeben" checkbox on Mein
-Lager or the "Material anbieten" CTA on the board. Release opens the offer dialog: a read-only fact
+Lager or the "Material anbieten" entry of the board's „Angebot erstellen" menu. Release opens the offer dialog: a read-only fact
 strip (material · quality as a plain number), an **editable offered-quantity field** ("Menge
 anbieten" in the material's own unit — SCU or Stück/piece, #1182 — defaulting to the row's full stock
 with an "Alles" shortcut) + a Markdown textarea (≤ 20 000 characters, live counter). When started
@@ -157,7 +158,8 @@ via an atomic conditional update (`ACTIVE` offers only; only when the stored val
 is **kind-aware** (REQ-MARKET-014, ADR-0108): a **material** offer clamps its `offeredAmount`
 (`MaterialExchangeOfferRepository.clampOfferedAmountToStock`), a **stock-backed item** offer clamps its
 whole-unit `itemQuantity` (`clampItemQuantityToStock`). Every decrement site runs both through one
-component, `MaterialExchangeOfferRatchet#lower`: the book-out / transfer / rebooking sites in
+component, `MaterialExchangeOfferRatchet#lower`, which the decrement sites reach only through the
+Lager's observer SPI `inventory.api.StockChangeObserver` (plan §5.3): the book-out / transfer / rebooking sites in
 `InventoryCheckoutService`, a **material** handover (`JobOrderHandoverService`), an **item** delivery
 (`JobOrderItemHandoverService`, REQ-ORDERS-030), booking production against an item order
 (`JobOrderItemProductionService`, REQ-ORDERS-025), and a connected application's stock write
@@ -195,7 +197,8 @@ the new stock (book-out, transfer, rebooking, handover / item delivery, producti
 `MARKET_OFFER_REMOVED`, on every path above, with the path's `reason`.
 
 **Enforced by:** `MaterialExchangeOfferClampDataTest`, `MaterialExchangeOfferRatchetTest`,
-`MaterialExchangeOfferRatchetDataTest`, `InventoryItemServiceBookOutTest` · **Code:**
+`MaterialExchangeOfferRatchetDataTest`, `MaterialExchangeStockLinksDataTest`,
+`InventoryItemServiceBookOutTest` · **Code:** `StockChangeObserver`, `StockOfferLookup`,
 `MaterialExchangeOfferRatchet`, `MaterialExchangeOfferRepository#clampOfferedAmountToStock` /
 `#clampItemQuantityToStock`, `InventoryCheckoutService#bookOutInventoryItem` / `#rebookPersonal` /
 `#bulkCheckout` / `#bulkRebook` / `#deleteAllGlobalInventory` / transfer path,
@@ -259,7 +262,7 @@ negotiation; a member cannot register interest in their own offer. Registration 
 ### REQ-MARKET-007 — Offer lifecycle (edit / deactivate), owner-only, optimistic-locked
 
 Only the owner may edit an offer's **offered amount and remark** ("Angebot bearbeiten",
-version-guarded via `support.OptimisticLock`, 409 on mismatch; a raised amount is re-validated
+version-guarded via `kernel.OptimisticLock`, 409 on mismatch; a raised amount is re-validated
 against the item's current stock, 400 if it exceeds it) or deactivate it (from the board detail or
 by un-checking the Lager checkbox). A deactivated offer is retained for the audit trail but never
 listed.
@@ -296,11 +299,22 @@ carries the area's generic `MARKET_AUDIT_EXPORTED` / `MARKET_AUDIT_PURGED` event
 ### REQ-MARKET-009 — UI: locked master-detail, live update, DS-only
 
 `/materialboerse` renders the locked master-detail layout of the design proposal (lean list left,
-full offer right) using only design-system classes/tokens; `materialboerse.css` is page composition
-only. Tabs "Alle Angebote" / "Meine Angebote" carry counts (board totals, filter-independent). Filters:
-search (material or player), min. quality, min. quantity (on the **effective** amount = offered,
-capped at current stock), sort (Qualität ↓ · Menge ↓ · Material A–Z · Neueste zuerst — no "nur ohne
-Interessenten"). The release/edit modal
+full offer right) using only design-system classes/tokens; `materialboerse.css` and
+`pages/materialboerse.css` are page composition only. The page head (REQ-UI-027) carries **one**
+create action, an outline menu button „Angebot erstellen ▾" whose overflow-menu panel offers
+„Material anbieten" and „Item anbieten" (on the Gesuche tab the same slot is „Gesuch erstellen ▾",
+REQ-MARKET-018). Below it the tabs „Angebote (n)" / „Gesuche (n)" (board totals, filter-independent)
+and a toolbar: the scope segment „Alle n · Meine n" (the active view's totals), the always-visible
+search (material or player), the „Filter" popover with min. quality, min. quantity (on the
+**effective** amount = offered, capped at current stock) and „Ohne gestohlene" — each active one
+shown as a removable chip with „Alle zurücksetzen" — and, on the right, a compact sort menu (Qualität
+↓ · Menge ↓ · Name A–Z · Neueste zuerst — no "nur ohne Interessenten"). A master row shows the name,
+the anbieter with affiliation badges, „Q <quality>" and the quantity right-aligned; the detail shows
+three figures (Qualität — „Art: Item" for an item offer —, Menge, Interessenten), the remark, the
+owner-only names, and the action „Interesse anmelden" with the privacy note beside it. The view and
+scope are addressable as `?view=offers|requests&scope=all|mine` and written back to the address bar
+on every switch; the older `mode=requests` / `tab=mein` parameters are honoured when the new ones are
+absent, so existing links keep working. The release/edit modal
 carries the editable "Menge anbieten" field (default = full stock, "Alles" shortcut, client-bounded
 by the item's amount and server-validated) so a member can offer only a part of a row. Every
 interaction updates the DOM in place through `krtFetch` (no full-page reload on success), the remark
@@ -308,14 +322,24 @@ renders server-side via the `@markdown` bean into `.markdown-content`, and there
 dialogs (KRT modal + `showKrtConfirm` + toasts).
 Complies with `docs/specs/frontend-ajax-mutations.md` (REQ-FE-001…014).
 
+*Amended 2026-10-03 (website overhaul phase 3): the four tabs „Alle/Meine Angebote/Gesuche" became
+two tabs plus the scope segment, the four create buttons one menu per tab, the filter row a toolbar
+with a filter popover, chips and a sort menu; `view`/`scope` parameters added, `mode`/`tab` kept as
+fallbacks.*
+
 **Acceptance**
-- [ ] Filter/tab/sort changes and writes never trigger a full-page reload.
+- [ ] Filter/tab/segment/sort changes and writes never trigger a full-page reload.
+- [ ] `?view=requests&scope=mine` opens the own requests; `?mode=requests&tab=mein` opens the same
+  view when `view`/`scope` are absent.
+- [ ] The page head holds exactly one create menu for the active tab; its entries open the existing
+  release / item / request dialogs.
 - [ ] The remark is server-rendered Markdown; the CTA/modal use no `confirm/alert/prompt`.
 - [ ] Master-list rows are native `<button>`s stripped of UA button chrome — no light `buttonface` fill on unselected rows and no beveled/white border around entries (#1184).
 
-**Enforced by:** `MaterialboersePageControllerMvcTest`, CI Playwright (e2e) · **Code:**
-`materialboerse.html`, `fragments/materialboerse-modal.html`, `materialboerse.js`,
-`materialboerse-release.js`, `materialboerse.css`
+**Enforced by:** `MaterialboersePageControllerMvcTest`, `MaterialboersePatternRenderTest`, CI
+Playwright (e2e) · **Code:** `MaterialboersePageController#board`, `materialboerse.html`,
+`fragments/materialboerse-modal.html`, `materialboerse.js`, `materialboerse-release.js`,
+`materialboerse.css`, `pages/materialboerse.css`
 
 ### REQ-MARKET-010 — Live multi-user board sync
 
@@ -380,7 +404,7 @@ EN + base bundles, `{interessent}`/`{material}` placeholders).
 **Enforced by:** `MaterialExchangeServiceTest`, `RuleEvaluationServiceTest`,
 `MessageBundleConsistencyTest` · **Code:**
 `MaterialExchangeService#registerInterestInNewTransaction`,
-`event/MaterialExchangeInterestRegisteredEvent`, `model/NotificationEventType`,
+`materialexchange/api/events/MaterialExchangeInterestRegisteredEvent`, `model/NotificationEventType`,
 `model/NotificationType`, `db/migration/V211__seed_material_exchange_interest_notification_rule.sql`
 
 ### REQ-MARKET-012 — Offer a craftable item (blueprint product) with a stated quantity
@@ -391,8 +415,8 @@ EN + base bundles, `{interessent}`/`{material}` placeholders).
 > (REQ-MARKET-014, ADR-0108). The two are flavours of the one `ITEM` kind; everything below still holds
 > for the free-stated flavour, and the free-stated flavour remains fully supported.
 
-A member may list a **craftable item** on the board via the "Item anbieten" CTA (a second CTA beside
-"Material anbieten"). Only items **an active blueprint produces** are offerable: the item picker is
+A member may list a **craftable item** on the board via the "Item anbieten" entry of the
+„Angebot erstellen" menu (beside "Material anbieten"). Only items **an active blueprint produces** are offerable: the item picker is
 the blueprint-product type-ahead, and the release is rejected server-side unless the chosen
 normalized `productKey` resolves through `BlueprintProductService.resolveByProductKey(...)` (#1185).
 Because a free-stated item offer has **no** backing Lager row, the member **states the quantity** (a
@@ -520,8 +544,8 @@ quantity + releasable picker), `InventoryCheckoutService#ratchetBoardOffersToSto
 
 ### REQ-MARKET-015 — Post a request (Gesuch) for a material or item
 
-A `KRT_MEMBER` posts a wanted-listing via the "Material suchen" / "Item suchen" CTAs (shown when a
-Gesuche tab is active). A request is one of two kinds (`MaterialExchangeRequestKind` ∈
+A `KRT_MEMBER` posts a wanted-listing via the "Material suchen" / "Item suchen" entries of the
+„Gesuch erstellen" menu (shown when the Gesuche tab is active). A request is one of two kinds (`MaterialExchangeRequestKind` ∈
 `{MATERIAL, ITEM}`, a **sibling aggregate** to the offer, ADR-0116): a **material** request names a
 catalogue `Material` (picked from the material-catalogue type-ahead, not the caller's Lager) and a
 desired quantity in the material's own unit (SCU or Stück per `Material.quantityType`); an **item**
@@ -555,7 +579,7 @@ non-whole item quantity is rejected (400).
 ### REQ-MARKET-016 — Request lifecycle (edit / deactivate), owner-only, optimistic-locked
 
 Only the owner may edit a request's **desired quantity, minimum quality and description** ("Gesuch
-bearbeiten", version-guarded via `support.OptimisticLock`, 409 on mismatch; a material request
+bearbeiten", version-guarded via `kernel.OptimisticLock`, 409 on mismatch; a material request
 re-validates the amount as positive, an item request as a positive whole number) or deactivate it
 ("Gesuch zurückziehen"). A deactivated request is retained for the audit trail but never listed. The
 subject (material / item) itself is fixed once posted — an edit changes only quantity/quality/remark.
@@ -587,13 +611,20 @@ duplicate is an idempotent success, never a 500.
 `MaterialRequestService#signalFulfillment`/`#withdrawFulfillment`, `MaterialRequestBoardService#detailDto`,
 `MaterialExchangeRequestInterest`
 
-### REQ-MARKET-018 — UI: one board, four tabs, mode-aware CTAs, live update, live multi-user sync
+### REQ-MARKET-018 — UI: one board, two tabs and a scope segment, mode-aware create menu, live update, live multi-user sync
 
-`/materialboerse` renders offers and requests as two modes of **one** master-detail board with a
-shared four-tab bar ("Alle Angebote" / "Meine Angebote" / "Alle Gesuche" / "Meine Gesuche", each with
-a filter-independent count). The two CTAs relabel to "Material suchen" / "Item suchen" in requests
-mode. Filters mirror the offers board (search, min quality on the request's stated floor, min desired
-quantity, sort); the create/edit modal carries the Material/Item radio, the catalogue pickers
+`/materialboerse` renders offers and requests as two views of **one** master-detail board: the tabs
+„Angebote (n)" / „Gesuche (n)" pick the view and the toolbar segment „Alle n · Meine n" the scope, so
+the former four combinations stay reachable (`?view=offers|requests&scope=all|mine`, REQ-MARKET-009).
+All counts are filter-independent board totals; the segment shows the active view's. On the Gesuche
+the page head's create menu reads „Gesuch erstellen" with the entries „Material suchen" / „Item
+suchen". One toolbar serves both views (search, min quality on the request's stated floor, min
+desired quantity, sort); „Ohne gestohlene" is offers-only and is hidden and disabled on the Gesuche.
+Each view keeps its own stored filters (REQ-UI-017), written back into the shared toolbar on a tab
+switch. A request row shows the subject, the requester with badges, „Q≥ <min quality>" when set and
+the desired quantity; the detail shows when it was posted, three figures (Min. Qualität, Menge,
+Lieferanten) and „Ich kann liefern". The
+create/edit modal carries the Material/Item radio, the catalogue pickers
 (material search + blueprint product), the optional min-quality field (both kinds) and the desired
 quantity (SCU/Stück, no stock cap). Every interaction updates the DOM in place through `krtFetch`
 (REQ-FE-001…014, no full-page reload); the description renders server-side via `@markdown`; no native
@@ -604,16 +635,19 @@ mirror points at once (acting-client broadcast ↔ `LiveSyncTopicClass.MATERIALB
 receiving-client apply map, REQ-FE-010) and pinned by `LiveSyncSectionMapParityTest`. The receiver
 refreshes only the visible board (the `requests` key never re-pulls the offers list and vice-versa).
 
+*Amended 2026-10-03 (website overhaul phase 3): four tabs → two tabs and the scope segment; two
+relabelled CTAs → one create menu per tab; one shared toolbar with per-view stored filters.*
+
 **Acceptance**
-- [ ] Switching tabs, filters, sort and every write never triggers a full-page reload; the CTAs
-relabel per mode.
+- [ ] Switching tabs, the scope segment, filters, sort and every write never triggers a full-page
+reload; the create menu follows the active tab.
 - [ ] A request create/deactivate/fulfilment by one member refreshes the Gesuche board of another
 member viewing it, with no description body, supplier identity or location crossing the socket.
 - [ ] The `MATERIALBOARD` whitelist is exactly `{board, requests}` and every `sendChanged` key across
 the materialboerse modules is whitelisted (parity test).
 
-**Enforced by:** `MaterialgesuchPageControllerMvcTest`, `LiveSyncSectionMapParityTest`,
-`MaterialboardRequestModalE2eTest`, CI Playwright · **Code:** `materialboerse.html`,
+**Enforced by:** `MaterialgesuchPageControllerMvcTest`, `MaterialboersePatternRenderTest`,
+`LiveSyncSectionMapParityTest`, `MaterialboardRequestModalE2eTest`, CI Playwright · **Code:** `materialboerse.html`,
 `fragments/materialgesuch-board.html`, `fragments/materialgesuch-modal.html`, `materialboerse.js`,
 `materialgesuch-modal.js`, `LiveSyncTopicClass.MATERIALBOARD`
 
@@ -655,7 +689,7 @@ EN + base bundles, `{lieferant}`/`{material}` placeholders).
 
 **Enforced by:** `MaterialRequestServiceTest`, `MessageBundleConsistencyTest` · **Code:**
 `MaterialRequestService#signalFulfillmentInNewTransaction`,
-`event/MaterialRequestFulfillmentSignalledEvent`, `model/NotificationEventType`,
+`materialexchange/api/events/MaterialRequestFulfillmentSignalledEvent`, `model/NotificationEventType`,
 `model/NotificationType`,
 `db/migration/V225__seed_material_exchange_request_fulfillment_notification_rule.sql`
 

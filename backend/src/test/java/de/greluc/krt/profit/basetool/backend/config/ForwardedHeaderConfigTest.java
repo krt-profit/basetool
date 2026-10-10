@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.backend.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.filter.ClientIpContextFilter;
+import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
-import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;

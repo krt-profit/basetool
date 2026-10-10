@@ -39,11 +39,13 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.Formula;
 
 /** Refinery Order JPA entity. */
 @TenantScoped("owningOrgUnit")
@@ -77,7 +79,19 @@ public class RefineryOrder extends AbstractEntity<UUID> {
 
   private Instant startedAt;
 
+  /** When the order-ready notice was raised, or {@code null} (REQ-REFINERY-023). */
+  @Column(name = "ready_notified_at")
+  private Instant readyNotifiedAt;
+
   @PositiveOrZero private Long durationMinutes;
+
+  /**
+   * End of the run, {@code startedAt + durationMinutes}, computed by the database so the order
+   * lists can filter and sort on it (REQ-REFINERY-019); {@code null} when either part is unset.
+   */
+  @Formula("(started_at + make_interval(0, 0, 0, 0, 0, 0, duration_minutes * 60))")
+  @Setter(AccessLevel.NONE)
+  private Instant endsAt;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "refining_method_id")

@@ -14,6 +14,28 @@
       {
         "message": "No hex fallback in var(): every design token is defined in styles.css, and a fallback only hides a renamed or missing token (FE-MOD-01, ui-design-system.md)."
       }
+    ],
+    "media-feature-name-value-allowed-list": [
+      {
+        "width": [
+          "768px",
+          "1024px",
+          "1440px"
+        ],
+        "min-width": [
+          "768px",
+          "1024px",
+          "1440px"
+        ],
+        "max-width": [
+          "768px",
+          "1024px",
+          "1440px"
+        ]
+      },
+      {
+        "message": "Breakpoints are only 768px, 1024px and 1440px, the device classes of REQ-UI-009 (DS-11). A component that has to react to its own width uses a container query."
+      }
     ]
   },
   "overrides": [

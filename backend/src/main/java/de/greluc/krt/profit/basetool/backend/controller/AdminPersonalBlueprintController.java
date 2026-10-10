@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportApplyRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportResultDto;
@@ -32,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRe
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintUploadPreviewService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -49,6 +49,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -247,8 +248,11 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "400", description = "Validation failed."),
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
+  @Transactional
   public BlueprintImportResultDto applyImportForUser(
       @PathVariable UUID userId, @NotNull @Valid @RequestBody BlueprintImportApplyRequest request) {
-    return importService.applyImport(userId, request.resolutions());
+    BlueprintImportResultDto result = importService.applyImport(userId, request.resolutions());
+    service.announceImportByAdmin(userId, result);
+    return result;
   }
 }

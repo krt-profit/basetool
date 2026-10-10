@@ -19,12 +19,26 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryNotices;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
@@ -47,20 +61,16 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +81,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -83,8 +94,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Inventory is append-only: a transfer or rebooking inserts a new row and decrements or deletes
  * the source, and only {@link #mergeStockIfRequested} folds rows together. Partial moves {@code
  * saveAndFlush} the reduced source so its {@code @Version} stays current (REQ-FE-003). Every
- * reduced or deleted row passes through {@link MaterialExchangeOfferRatchet}, which lowers or
- * audits the removal of the Materialbörse offers on it.
+ * reduced or deleted row passes through {@link StockChangeObserver}, which lowers or audits the
+ * removal of the Materialbörse offers on it.
  */
 @Slf4j
 @Service
@@ -107,16 +118,20 @@ public class InventoryCheckoutService {
   /** Separator used when a stock merge concatenates the distinct notes of the folded rows. */
   private static final String NOTE_MERGE_SEPARATOR = "\n";
 
+  /** Name shown in a transfer notification for a member without one. */
+  private static final String UNKNOWN_NAME = "—";
+
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
   private final MissionFinanceEntryRepository missionFinanceEntryRepository;
   private final MissionParticipantRepository missionParticipantRepository;
-  private final MaterialExchangeOfferRepository materialExchangeOfferRepository;
-  private final MaterialExchangeOfferRatchet offerRatchet;
+  private final StockOfferLookup stockOfferLookup;
+  private final StockChangeObserver stockChangeObserver;
   private final InventoryItemMapper inventoryItemMapper;
   private final OwnerScopeService ownerScopeService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Discards, transfers or sells part of an inventory item, deleting the row when the remainder
@@ -152,9 +167,8 @@ public class InventoryCheckoutService {
    */
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
-  public MaterialExchangeOfferRatchet.Effects bookOutForClient(
-      UUID id, InventoryItemBookOutDto dto, UUID memberId) {
-    return bookOut(id, dto, memberId, false, MaterialExchangeOfferRatchet.Reason.STOCK).offers();
+  public StockChangeEffects bookOutForClient(UUID id, InventoryItemBookOutDto dto, UUID memberId) {
+    return bookOut(id, dto, memberId, false, StockChangeReason.STOCK).offers();
   }
 
   /**
@@ -175,7 +189,7 @@ public class InventoryCheckoutService {
       InventoryItemBookOutDto dto,
       UUID currentUserId,
       boolean isAdmin,
-      MaterialExchangeOfferRatchet.@Nullable Reason offerReason) {
+      @Nullable StockChangeReason offerReason) {
     InventoryItem item =
         Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
 
@@ -237,15 +251,22 @@ public class InventoryCheckoutService {
       return bookOutTransfer(
           item,
           dto,
+          currentUserId,
           remainingAmount,
           sourceId,
           sourceLabel,
           materialName,
           depleted,
-          offerReason != null ? offerReason : MaterialExchangeOfferRatchet.Reason.TRANSFER);
+          offerReason != null ? offerReason : StockChangeReason.TRANSFER);
     }
-    final MaterialExchangeOfferRatchet.Reason reason =
-        offerReason != null ? offerReason : MaterialExchangeOfferRatchet.Reason.CHECKOUT;
+    final StockChangeReason reason = offerReason != null ? offerReason : StockChangeReason.CHECKOUT;
+    final TransferredLot bookedOutLot =
+        new TransferredLot(
+            materialName,
+            dto.amount(),
+            requiresWholeUnits(item),
+            item.getQuality(),
+            item.getLocation() != null ? item.getLocation().getName() : null);
 
     Map<UUID, Double> orderReductions =
         AllocationReductions.resolveReductionPlan(
@@ -261,7 +282,7 @@ public class InventoryCheckoutService {
     AllocationReductions.applyPlan(item, missionReductions, false);
 
     if (remainingAmount <= QUANTITY_EPSILON) {
-      int removed = offerRatchet.beforeDelete(List.of(sourceId), reason);
+      final int removed = stockChangeObserver.beforeDelete(List.of(sourceId), reason);
       inventoryItemRepository.delete(item);
       recordBookOutTail(
           checkoutType,
@@ -272,14 +293,15 @@ public class InventoryCheckoutService {
           dto,
           0.0,
           financeEntryIds);
-      return new BookOut(null, new MaterialExchangeOfferRatchet.Effects(0, removed));
+      announceBookedOutByOther(checkoutType, sourceId, sourceOwnerId, currentUserId, bookedOutLot);
+      return new BookOut(null, new StockChangeEffects(0, removed));
     } else {
       item.setAmount(remainingAmount);
       if (!InventoryAllocations.fits(item)) {
         throw new OverAllocationException();
       }
       InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-      int reduced = offerRatchet.lower(sourceId, remainingAmount, reason);
+      int reduced = stockChangeObserver.lower(sourceId, remainingAmount, reason);
       recordBookOutTail(
           checkoutType,
           sourceId,
@@ -289,17 +311,19 @@ public class InventoryCheckoutService {
           dto,
           remainingAmount,
           financeEntryIds);
-      return new BookOut(
-          inventoryItemMapper.toDto(saved), new MaterialExchangeOfferRatchet.Effects(reduced, 0));
+      announceBookedOutByOther(checkoutType, sourceId, sourceOwnerId, currentUserId, bookedOutLot);
+      return new BookOut(inventoryItemMapper.toDto(saved), new StockChangeEffects(reduced, 0));
     }
   }
 
   /**
    * Books out a {@code TRANSFER}: inserts a new row for {@code dto.amount()} at the target,
-   * decrements or deletes the source, and records the audit event.
+   * decrements or deletes the source, records the audit event and announces an owner change to the
+   * new and the previous owner (REQ-INV-055).
    *
    * @param item the managed source row
    * @param dto the book-out request (target user/location/org-unit and amount)
+   * @param actorId the member making the transfer
    * @param remainingAmount the source's post-decrement amount (already rounded)
    * @param sourceId the source row id snapshot
    * @param sourceLabel the source row's {@code material @ location} label snapshot
@@ -314,12 +338,15 @@ public class InventoryCheckoutService {
   private BookOut bookOutTransfer(
       @NotNull InventoryItem item,
       InventoryItemBookOutDto dto,
+      @NotNull UUID actorId,
       double remainingAmount,
       UUID sourceId,
       String sourceLabel,
       String materialName,
       boolean depleted,
-      MaterialExchangeOfferRatchet.@NotNull Reason offerReason) {
+      @NotNull StockChangeReason offerReason) {
+    final User sourceUser = item.getUser();
+    final Location sourceLocation = item.getLocation();
     User targetUser = item.getUser();
     if (dto.targetUserId() != null && !dto.targetUserId().equals(item.getUser().getId())) {
       targetUser =
@@ -336,7 +363,7 @@ public class InventoryCheckoutService {
 
     if (targetUser.getId().equals(item.getUser().getId())
         && targetLocation.getId().equals(item.getLocation().getId())) {
-      throw new BadRequestException("Transfer must change either the user or the location");
+      throw new BadRequestException("error.inventory.transfer.unchanged");
     }
 
     final OrgUnit targetOwningOrgUnit =
@@ -363,11 +390,11 @@ public class InventoryCheckoutService {
     final InventoryItem savedNew = inventoryItemRepository.save(newItem);
     AllocationReductions.applyPlan(item, orderReductions, true);
     AllocationReductions.applyPlan(item, missionReductions, false);
-    final MaterialExchangeOfferRatchet.Effects offers;
+    final StockChangeEffects offers;
     if (remainingAmount <= QUANTITY_EPSILON) {
       offers =
-          new MaterialExchangeOfferRatchet.Effects(
-              0, offerRatchet.beforeDelete(List.of(sourceId), offerReason));
+          new StockChangeEffects(
+              0, stockChangeObserver.beforeDelete(List.of(sourceId), offerReason));
       inventoryItemRepository.delete(item);
     } else {
       item.setAmount(remainingAmount);
@@ -376,10 +403,10 @@ public class InventoryCheckoutService {
       }
       inventoryItemRepository.saveAndFlush(item);
       offers =
-          new MaterialExchangeOfferRatchet.Effects(
-              offerRatchet.lower(sourceId, remainingAmount, offerReason), 0);
+          new StockChangeEffects(
+              stockChangeObserver.lower(sourceId, remainingAmount, offerReason), 0);
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_TRANSFERRED,
         sourceId,
         sourceLabel,
@@ -389,6 +416,17 @@ public class InventoryCheckoutService {
             .with("toLoc", targetLocation != null ? targetLocation.getName() : "—")
             .with("newRow", newItem.getId())
             .with("depleted", depleted));
+    publishTransferNotifications(
+        actorId,
+        List.of(
+            TransferMove.of(
+                item,
+                sourceId,
+                sourceUser,
+                targetUser,
+                InventoryItem.roundToScuScale(dto.amount()),
+                sourceLocation,
+                targetLocation)));
     final InventoryItem mergedTarget =
         mergeStockIfRequested(savedNew, Boolean.TRUE.equals(dto.mergeStock()));
     return new BookOut(inventoryItemMapper.toDto(mergedTarget), offers);
@@ -492,6 +530,34 @@ public class InventoryCheckoutService {
   }
 
   /**
+   * Tells the owner of a row that somebody else discarded or sold part of it (REQ-INV-056). Nothing
+   * happens when the owner acted.
+   *
+   * @param type the resolved checkout type, {@code DISCARD} or {@code SELL}
+   * @param sourceId the booked-out row
+   * @param ownerId the row owner's id
+   * @param actorId the member who booked out
+   * @param lot the lot the action took
+   */
+  private void announceBookedOutByOther(
+      @NotNull CheckoutType type,
+      @NotNull UUID sourceId,
+      @NotNull UUID ownerId,
+      @NotNull UUID actorId,
+      @NotNull TransferredLot lot) {
+    if (ownerId.equals(actorId)) {
+      return;
+    }
+    eventPublisher.publishEvent(
+        InventoryNotices.bookedOutByOther(
+            ownerId,
+            sourceId,
+            new ActorRef(actorId, actorName(actorId, List.of())),
+            type == CheckoutType.SELL ? "SOLD" : "DISCARDED",
+            List.of(lot)));
+  }
+
+  /**
    * Records the audit event of a {@code DISCARD} or {@code SELL} book-out; a sale carries terminal,
    * amount and finance entries, a discard the consumed and remaining amounts.
    *
@@ -515,7 +581,7 @@ public class InventoryCheckoutService {
       List<UUID> financeEntryIds) {
     boolean rowDepleted = remaining <= QUANTITY_EPSILON;
     if (type == CheckoutType.SELL) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_ITEM_SOLD,
           sourceId,
           sourceLabel,
@@ -533,7 +599,7 @@ public class InventoryCheckoutService {
                       .orElse("-"))
               .with("depleted", rowDepleted));
     } else {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_ITEM_CONSUMED,
           sourceId,
           sourceLabel,
@@ -623,7 +689,7 @@ public class InventoryCheckoutService {
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
 
     if (depleted) {
-      offerRatchet.beforeDelete(List.of(sourceId), MaterialExchangeOfferRatchet.Reason.REBOOK);
+      stockChangeObserver.beforeDelete(List.of(sourceId), StockChangeReason.REBOOK);
       inventoryItemRepository.delete(item);
     } else {
       item.setAmount(remainingAmount);
@@ -631,10 +697,10 @@ public class InventoryCheckoutService {
         throw new OverAllocationException();
       }
       inventoryItemRepository.saveAndFlush(item);
-      offerRatchet.lower(sourceId, remainingAmount, MaterialExchangeOfferRatchet.Reason.REBOOK);
+      stockChangeObserver.lower(sourceId, remainingAmount, StockChangeReason.REBOOK);
     }
 
-    auditService.record(
+    auditRecorder.record(
         targetPersonal
             ? AuditEventType.INVENTORY_ITEM_PERSONALIZED
             : AuditEventType.INVENTORY_ITEM_DEPERSONALIZED,
@@ -677,7 +743,7 @@ public class InventoryCheckoutService {
     if (!autoMerge && !clientRequestedMerge) {
       return row;
     }
-    if (materialExchangeOfferRepository.existsByInventoryItemId(row.getId())) {
+    if (stockOfferLookup.isOffered(row.getId())) {
       return row;
     }
 
@@ -724,7 +790,7 @@ public class InventoryCheckoutService {
     inventoryItemRepository.deleteAll(victims);
     inventoryItemRepository.saveAndFlush(row);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_MERGED,
         row.getId(),
         InventoryAuditLabels.label(row),
@@ -820,7 +886,8 @@ public class InventoryCheckoutService {
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
         scope.memberOrgUnitIds().size());
-    offerRatchet.beforeWipe(scope);
+    stockChangeObserver.beforeWipe(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     int removed =
         inventoryItemRepository.deleteAllNonPersonal(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
@@ -829,7 +896,7 @@ public class InventoryCheckoutService {
         removed,
         scope.adminAllScope(),
         scope.activeOrgUnitId());
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_WIPED,
         null,
         null,
@@ -873,11 +940,11 @@ public class InventoryCheckoutService {
       toDelete.add(itemId);
     }
 
-    offerRatchet.beforeDelete(toDelete, MaterialExchangeOfferRatchet.Reason.BULK_CHECKOUT);
+    stockChangeObserver.beforeDelete(toDelete, StockChangeReason.BULK_CHECKOUT);
     inventoryItemRepository.deleteAllById(toDelete);
     log.info(
         "Bulk checkout completed: {} items removed for user {}", toDelete.size(), currentUserId);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_BULK_CHECKED_OUT,
         null,
         null,
@@ -917,7 +984,7 @@ public class InventoryCheckoutService {
     final boolean mergeStock = Boolean.TRUE.equals(request.mergeStock());
     final BulkRebookResultDto result =
         switch (request.mode()) {
-          case LOCATION -> bulkRebookToTarget(rows, request, owner, mergeStock);
+          case LOCATION -> bulkRebookToTarget(rows, request, owner, mergeStock, currentUserId);
           case PERSONALIZE -> bulkRebookPersonalMarker(rows, request, true, mergeStock);
           case DEPERSONALIZE -> bulkRebookPersonalMarker(rows, request, false, mergeStock);
         };
@@ -929,7 +996,7 @@ public class InventoryCheckoutService {
         result.rebooked(),
         result.skipped());
     if (result.rebooked() > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_BULK_REBOOKED,
           null,
           null,
@@ -977,19 +1044,25 @@ public class InventoryCheckoutService {
   /**
    * The {@link BulkRebookMode#LOCATION} branch of {@link #bulkRebook}: moves every row to the
    * requested target user / location, keeping each row's own value for whichever of the two the
-   * request left blank. Rows already sitting at the target are skipped.
+   * request left blank. Rows already sitting at the target are skipped. The rows that changed owner
+   * are announced in one notification per recipient (REQ-INV-055).
    *
    * @param rows the locked, owned source rows
    * @param request the bulk request (read for the two targets and the org-unit pick)
    * @param owner the rows' owner, the membership gate when the request keeps the current owner
    * @param mergeStock the per-action stock-merge opt-in
+   * @param actorId the member making the rebooking
    * @return the moved / skipped counts
    * @throws BadRequestException when neither a target user nor a target location was given
    * @throws NotFoundException when the target user or location is unknown
    */
   @NotNull
   private BulkRebookResultDto bulkRebookToTarget(
-      List<InventoryItem> rows, BulkRebookRequest request, User owner, boolean mergeStock) {
+      List<InventoryItem> rows,
+      BulkRebookRequest request,
+      User owner,
+      boolean mergeStock,
+      @NotNull UUID actorId) {
     if (request.targetUserId() == null && request.targetLocationId() == null) {
       throw new BadRequestException("Bulk transfer requires a target user or a target location");
     }
@@ -1011,6 +1084,7 @@ public class InventoryCheckoutService {
 
     int rebooked = 0;
     int skipped = 0;
+    final List<TransferMove> moves = new ArrayList<>();
     for (InventoryItem item : rows) {
       final User rowTargetUser = targetUser != null ? targetUser : item.getUser();
       final Location rowTargetLocation =
@@ -1019,6 +1093,15 @@ public class InventoryCheckoutService {
         skipped++;
         continue;
       }
+      moves.add(
+          TransferMove.of(
+              item,
+              item.getId(),
+              item.getUser(),
+              rowTargetUser,
+              InventoryItem.roundToScuScale(item.getAmount() != null ? item.getAmount() : 0.0),
+              item.getLocation(),
+              rowTargetLocation));
       rebookWholeRow(
           item,
           rowTargetUser,
@@ -1028,7 +1111,95 @@ public class InventoryCheckoutService {
           mergeStock);
       rebooked++;
     }
+    publishTransferNotifications(actorId, moves);
     return new BulkRebookResultDto(rebooked, skipped);
+  }
+
+  /**
+   * Announces the owner changes of one transfer action (REQ-INV-055): one {@link
+   * InventoryTransferredToUserEvent} per new owner and one {@link
+   * InventoryTransferredFromUserEvent} per previous owner and new owner, each listing its lots in
+   * booking order. Moves that keep the owner announce nothing, and the actor is never a recipient.
+   *
+   * @param actorId the member making the transfer
+   * @param moves the rows the action moved, in booking order
+   */
+  private void publishTransferNotifications(
+      @NotNull UUID actorId, @NotNull List<TransferMove> moves) {
+    final Map<UUID, List<TransferMove>> toNewOwner = new LinkedHashMap<>();
+    final Map<List<UUID>, List<TransferMove>> fromPreviousOwner = new LinkedHashMap<>();
+    for (TransferMove move : moves) {
+      final UUID fromId = move.from().getId();
+      final UUID toId = move.to().getId();
+      if (fromId.equals(toId)) {
+        continue;
+      }
+      if (!toId.equals(actorId)) {
+        toNewOwner.computeIfAbsent(toId, _ -> new ArrayList<>()).add(move);
+      }
+      if (!fromId.equals(actorId)) {
+        fromPreviousOwner.computeIfAbsent(List.of(fromId, toId), _ -> new ArrayList<>()).add(move);
+      }
+    }
+    if (toNewOwner.isEmpty() && fromPreviousOwner.isEmpty()) {
+      return;
+    }
+    final String actorName = actorName(actorId, moves);
+    toNewOwner.forEach(
+        (newOwnerId, owned) ->
+            eventPublisher.publishEvent(
+                new InventoryTransferredToUserEvent(
+                    newOwnerId,
+                    actorId,
+                    actorName,
+                    owned.getFirst().sourceRowId(),
+                    owned.stream().map(TransferMove::toLot).toList())));
+    fromPreviousOwner.forEach(
+        (pair, owned) ->
+            eventPublisher.publishEvent(
+                new InventoryTransferredFromUserEvent(
+                    pair.getFirst(),
+                    actorId,
+                    actorName,
+                    effectiveName(owned.getFirst().to()),
+                    owned.getFirst().sourceRowId(),
+                    owned.stream().map(TransferMove::fromLot).toList())));
+  }
+
+  /**
+   * Resolves the actor's effective name, from the moved rows' owners when the actor is one of them
+   * and from the user table otherwise.
+   *
+   * @param actorId the member making the transfer
+   * @param moves the moves of the action
+   * @return the actor's effective name, or an em dash when the actor is unknown
+   */
+  @NotNull
+  private String actorName(@NotNull UUID actorId, @NotNull List<TransferMove> moves) {
+    for (TransferMove move : moves) {
+      if (move.from().getId().equals(actorId)) {
+        return effectiveName(move.from());
+      }
+      if (move.to().getId().equals(actorId)) {
+        return effectiveName(move.to());
+      }
+    }
+    return userRepository
+        .findById(actorId)
+        .map(InventoryCheckoutService::effectiveName)
+        .orElse(UNKNOWN_NAME);
+  }
+
+  /**
+   * A member's name as notifications show it.
+   *
+   * @param user the member
+   * @return the effective name, or an em dash when the member has none
+   */
+  @NotNull
+  private static String effectiveName(@NotNull User user) {
+    return Objects.requireNonNullElse(
+        StringNormalization.trimToNull(user.getEffectiveName()), UNKNOWN_NAME);
   }
 
   /**
@@ -1148,7 +1319,7 @@ public class InventoryCheckoutService {
         AllocationReductions.resolveReductionPlan(source, null, amount, false);
     applyTransferInherit(source, newItem, orderReductions, missionReductions);
     final InventoryItem savedNew = inventoryItemRepository.save(newItem);
-    offerRatchet.beforeDelete(List.of(source.getId()), MaterialExchangeOfferRatchet.Reason.REBOOK);
+    stockChangeObserver.beforeDelete(List.of(source.getId()), StockChangeReason.REBOOK);
     inventoryItemRepository.delete(source);
 
     mergeStockIfRequested(savedNew, mergeStock);
@@ -1189,7 +1360,7 @@ public class InventoryCheckoutService {
             "Job-order allocation not found for this inventory item");
     slice.setDelivered(request.delivered());
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED,
         item.getId(),
         InventoryAuditLabels.label(item),
@@ -1208,6 +1379,83 @@ public class InventoryCheckoutService {
    *     depleted discard or sale
    * @param offers the Materialbörse offers the book-out lowered and removed
    */
-  private record BookOut(
-      @Nullable InventoryItemDto item, MaterialExchangeOfferRatchet.@NotNull Effects offers) {}
+  private record BookOut(@Nullable InventoryItemDto item, @NotNull StockChangeEffects offers) {}
+
+  /**
+   * One row a transfer action moved, snapshotted before the source row is reduced or deleted.
+   *
+   * @param sourceRowId the moved source row
+   * @param from the row's owner before the move
+   * @param to the row's owner after the move
+   * @param name the row's catalogue name
+   * @param amount the moved amount
+   * @param piece whether the amount counts pieces
+   * @param quality the row's quality, or {@code null}
+   * @param fromLocation the source location's name, or {@code null}
+   * @param toLocation the target location's name, or {@code null}
+   */
+  private record TransferMove(
+      @NotNull UUID sourceRowId,
+      @NotNull User from,
+      @NotNull User to,
+      @NotNull String name,
+      double amount,
+      boolean piece,
+      @Nullable Integer quality,
+      @Nullable String fromLocation,
+      @Nullable String toLocation) {
+
+    /**
+     * Snapshots a move of {@code item}.
+     *
+     * @param item the source row, read before it is reduced or deleted
+     * @param sourceRowId the source row's id
+     * @param from the row's owner before the move
+     * @param to the row's owner after the move
+     * @param amount the moved amount
+     * @param fromLocation the source location, or {@code null}
+     * @param toLocation the target location, or {@code null}
+     * @return the move
+     */
+    @NotNull
+    static TransferMove of(
+        @NotNull InventoryItem item,
+        @NotNull UUID sourceRowId,
+        @NotNull User from,
+        @NotNull User to,
+        double amount,
+        @Nullable Location fromLocation,
+        @Nullable Location toLocation) {
+      return new TransferMove(
+          sourceRowId,
+          from,
+          to,
+          catalogName(item),
+          amount,
+          requiresWholeUnits(item),
+          item.getQuality(),
+          fromLocation != null ? fromLocation.getName() : null,
+          toLocation != null ? toLocation.getName() : null);
+    }
+
+    /**
+     * The lot as the new owner sees it, at its target location.
+     *
+     * @return the lot
+     */
+    @NotNull
+    TransferredLot toLot() {
+      return new TransferredLot(name, amount, piece, quality, toLocation);
+    }
+
+    /**
+     * The lot as the previous owner sees it, at its source location.
+     *
+     * @return the lot
+     */
+    @NotNull
+    TransferredLot fromLot() {
+      return new TransferredLot(name, amount, piece, quality, fromLocation);
+    }
+  }
 }

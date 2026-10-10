@@ -31,11 +31,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
@@ -49,13 +53,11 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebo
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,6 +69,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -90,13 +93,14 @@ class InventoryItemServicePersonalRebookTest {
   @Mock private MissionRepository missionRepository;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
-  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockOfferLookup stockOfferLookup;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService service;
 
   private static final UUID ITEM_ID = UUID.randomUUID();
@@ -251,7 +255,7 @@ class InventoryItemServicePersonalRebookTest {
       assertEquals(6.0, item.getAmount(), "source keeps the remainder");
       verify(inventoryItemRepository).saveAndFlush(item);
       verify(inventoryItemRepository, never()).delete(any());
-      verify(offerRatchet).lower(ITEM_ID, 6.0, MaterialExchangeOfferRatchet.Reason.REBOOK);
+      verify(offerRatchet).lower(ITEM_ID, 6.0, StockChangeReason.REBOOK);
 
       verify(auditService)
           .record(
@@ -299,8 +303,7 @@ class InventoryItemServicePersonalRebookTest {
       verify(inventoryItemRepository).save(saveCaptor.capture());
       assertFalse(saveCaptor.getValue().getPersonal());
       assertEquals(5.0, saveCaptor.getValue().getAmount());
-      verify(offerRatchet)
-          .beforeDelete(List.of(ITEM_ID), MaterialExchangeOfferRatchet.Reason.REBOOK);
+      verify(offerRatchet).beforeDelete(List.of(ITEM_ID), StockChangeReason.REBOOK);
       verify(inventoryItemRepository).delete(item);
       verify(inventoryItemRepository, never()).saveAndFlush(any());
       verify(auditService)

@@ -19,19 +19,76 @@
 
 /* global MISSION_MSG, MISSION_CONFLICT, MISSION_TITLES */
 
+const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
+
+/**
+ * Returns the data kind whose list the detail pane shows.
+ *
+ * @returns {string} one of MISSION_KINDS
+ */
+function selectedMissionKind() {
+    const active = document.querySelector('.md-kind-row[aria-selected="true"]');
+    const kind = active ? active.getAttribute('data-md-kind') : null;
+    return kind && MISSION_KINDS.indexOf(kind) !== -1 ? kind : MISSION_KINDS[0];
+}
+
 function missionFilterParams() {
     function checked(id) {
         const el = document.getElementById(id);
         return el ? el.checked : false;
     }
-    return (
-        'includeInactiveSquadrons=' +
-        checked('includeInactiveSquadrons') +
-        '&includeInactiveJobTypes=' +
-        checked('includeInactiveJobTypes') +
-        '&includeInactiveFrequencyTypes=' +
-        checked('includeInactiveFrequencyTypes')
-    );
+    return `includeInactiveSquadrons=${checked(
+        'includeInactiveSquadrons',
+    )}&includeInactiveJobTypes=${checked(
+        'includeInactiveJobTypes',
+    )}&includeInactiveFrequencyTypes=${checked(
+        'includeInactiveFrequencyTypes',
+    )}&kind=${selectedMissionKind()}`;
+}
+
+/**
+ * Shows the list of one data kind, marks its master row and records the choice in the address bar
+ * and the page's stored preference.
+ *
+ * @param {string | null} kind one of MISSION_KINDS; anything else selects the first
+ * @param {boolean} focusRow whether the selected master row takes the focus
+ */
+function selectMissionKind(kind, focusRow) {
+    const want = kind && MISSION_KINDS.indexOf(kind) !== -1 ? kind : MISSION_KINDS[0];
+    document.querySelectorAll('.md-kind-row').forEach((row) => {
+        const on = row.getAttribute('data-md-kind') === want;
+        row.classList.toggle('is-active', on);
+        row.setAttribute('aria-selected', String(on));
+        row.setAttribute('tabindex', on ? '0' : '-1');
+        const pane = document.getElementById(row.getAttribute('aria-controls'));
+        if (pane) pane.hidden = !on;
+        if (on && focusRow) row.focus();
+    });
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('kind', want);
+        window.history.replaceState(window.history.state, '', url.pathname + url.search);
+    } catch (_e) {}
+    persistMissionFilters();
+}
+
+function onMissionKindKeydown(e) {
+    const list = e.target && e.target.closest ? e.target.closest('#md-kind-list') : null;
+    if (!list) return;
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') {
+        return;
+    }
+    e.preventDefault();
+    const rows = Array.from(list.querySelectorAll('.md-kind-row'));
+    const current = rows.findIndex((r) => {
+        return r.getAttribute('aria-selected') === 'true';
+    });
+    let idx;
+    if (e.key === 'ArrowDown') idx = Math.min(rows.length - 1, current + 1);
+    else if (e.key === 'ArrowUp') idx = Math.max(0, current - 1);
+    else if (e.key === 'Home') idx = 0;
+    else idx = rows.length - 1;
+    selectMissionKind(rows[idx].getAttribute('data-md-kind'), true);
 }
 
 function missionSectionForAction(action) {
@@ -45,8 +102,8 @@ function reswapMissionSection(action) {
     const section = missionSectionForAction(action);
     if (section && window.krtFetch) {
         window.krtFetch.swap({
-            url: '/admin/mission-data?' + missionFilterParams(),
-            container: '#' + section,
+            url: `/admin/mission-data?${missionFilterParams()}`,
+            container: `#${section}`,
             fragmentValue: section,
             history: false,
         });
@@ -70,7 +127,7 @@ function missionWrite(form, successMessage, onSuccess) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const sqModal = document.getElementById('squadron-modal');
     const sqForm = document.getElementById('squadron-form');
     const sqTitle = document.getElementById('squadron-modal-title');
@@ -92,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const btn = e.target.closest('.edit-squadron-btn');
         if (!btn) return;
         sqForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), sqForm.action);
@@ -163,7 +220,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const btn = e.target.closest('.edit-jobtype-btn');
         if (!btn) return;
         jtForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), jtForm.action);
@@ -202,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', (e) => {
         const btn = e.target.closest('.edit-freqtype-btn');
         if (!btn) return;
         ftForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), ftForm.action);
@@ -225,7 +282,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteClose = document.querySelectorAll('.close-delete-modal');
 
     if (deleteModal) {
-        document.addEventListener('click', function (e) {
+        document.addEventListener('click', (e) => {
             const btn = e.target.closest('.delete-btn');
             if (!btn) return;
             deleteForm.action = window.safeSameOriginUrl(
@@ -241,39 +298,26 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         });
 
-        window.addEventListener('click', function (event) {
+        window.addEventListener('click', (event) => {
             if (event.target === deleteModal) {
                 window.krtModal.close(deleteModal);
             }
         });
     }
 
-    ['squadrons-box', 'jobtypes-box', 'freqtypes-box'].forEach((boxId) => {
-        const isCollapsed = localStorage.getItem(boxId + '-collapsed') === 'true';
-        if (isCollapsed) {
-            const box = document.getElementById(boxId);
-            if (box) {
-                const content = box.querySelector('.box-content');
-                const icon = box.querySelector('.toggle-icon');
-                if (content && icon) {
-                    content.style.display = 'none';
-                    icon.textContent = '+';
-                }
-            }
-        }
-    });
+    document.addEventListener('keydown', onMissionKindKeydown);
 
     function wireModalSave(form, modal) {
         if (!form) {
             return;
         }
-        form.addEventListener('submit', function (e) {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
             if (!window.krtFetch) {
                 form.submit();
                 return;
             }
-            missionWrite(form, MISSION_MSG.saved, function () {
+            missionWrite(form, MISSION_MSG.saved, () => {
                 if (modal) {
                     window.krtModal.close(modal);
                 }
@@ -285,13 +329,13 @@ document.addEventListener('DOMContentLoaded', function () {
     wireModalSave(ftForm, ftModal);
 
     if (deleteForm) {
-        deleteForm.addEventListener('submit', function (e) {
+        deleteForm.addEventListener('submit', (e) => {
             e.preventDefault();
             if (!window.krtFetch) {
                 deleteForm.submit();
                 return;
             }
-            missionWrite(deleteForm, MISSION_MSG.deleted, function () {
+            missionWrite(deleteForm, MISSION_MSG.deleted, () => {
                 if (deleteModal) {
                     window.krtModal.close(deleteModal);
                 }
@@ -299,7 +343,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    document.addEventListener('submit', function (e) {
+    document.addEventListener('submit', (e) => {
         const actForm = e.target.closest('form[action*="/activate"]');
         if (!actForm) {
             return;
@@ -313,39 +357,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-function toggleBox(event, boxId) {
-    if (
-        event.target.closest('button') ||
-        event.target.closest('form') ||
-        event.target.closest('input') ||
-        event.target.closest('label')
-    ) {
-        return;
-    }
-    const box = document.getElementById(boxId);
-    if (!box) return;
-    const content = box.querySelector('.box-content');
-    const icon = box.querySelector('.toggle-icon');
-    if (content && icon) {
-        if (window.getComputedStyle(content).display === 'none') {
-            content.style.display = 'block';
-            icon.textContent = '-';
-            localStorage.setItem(boxId + '-collapsed', 'false');
-        } else {
-            content.style.display = 'none';
-            icon.textContent = '+';
-            localStorage.setItem(boxId + '-collapsed', 'true');
-        }
-    }
-}
-
 function setupDragAndDrop(containerId, reorderUrl) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
     let draggedRow = null;
 
-    container.addEventListener('dragstart', function (e) {
+    container.addEventListener('dragstart', (e) => {
         draggedRow = e.target.closest('tr.draggable-row');
         if (!draggedRow) return;
         draggedRow.style.opacity = '0.5';
@@ -353,7 +371,7 @@ function setupDragAndDrop(containerId, reorderUrl) {
         e.dataTransfer.setData('text/plain', draggedRow.dataset.id);
     });
 
-    container.addEventListener('dragend', function (_e) {
+    container.addEventListener('dragend', (_e) => {
         if (!draggedRow) return;
         draggedRow.style.opacity = '1';
 
@@ -363,7 +381,7 @@ function setupDragAndDrop(containerId, reorderUrl) {
         const reswapFreqTypes = function () {
             if (window.krtFetch) {
                 window.krtFetch.swap({
-                    url: '/admin/mission-data?' + missionFilterParams(),
+                    url: `/admin/mission-data?${missionFilterParams()}`,
                     container: '#freqtypes-results',
                     fragmentValue: 'freqtypes-results',
                     history: false,
@@ -395,7 +413,7 @@ function setupDragAndDrop(containerId, reorderUrl) {
         draggedRow = null;
     });
 
-    container.addEventListener('dragover', function (e) {
+    container.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         const targetRow = e.target.closest('tr.draggable-row');
@@ -410,7 +428,7 @@ function setupDragAndDrop(containerId, reorderUrl) {
         }
     });
 
-    container.addEventListener('drop', function (e) {
+    container.addEventListener('drop', (e) => {
         e.preventDefault();
     });
 }
@@ -420,8 +438,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'mission-data-toggle-box', function (el, event) {
-        toggleBox(event, el.getAttribute('data-box-id'));
+    window.krtEvents.on('click', 'mission-data-select-kind', (el) => {
+        selectMissionKind(el.getAttribute('data-md-kind'), false);
     });
 }
 
@@ -449,6 +467,7 @@ function persistMissionFilters() {
                 squadrons: checked('includeInactiveSquadrons'),
                 jobTypes: checked('includeInactiveJobTypes'),
                 frequencyTypes: checked('includeInactiveFrequencyTypes'),
+                kind: selectedMissionKind(),
             }),
         );
     } catch (_e) {}
@@ -458,11 +477,11 @@ if (window.krtFetch) {
     const wireFilter = function (checkboxId, sectionId) {
         const cb = document.getElementById(checkboxId);
         if (!cb) return;
-        cb.addEventListener('change', function () {
+        cb.addEventListener('change', () => {
             persistMissionFilters();
             window.krtFetch.swap({
-                url: '/admin/mission-data?' + missionFilterParams(),
-                container: '#' + sectionId,
+                url: `/admin/mission-data?${missionFilterParams()}`,
+                container: `#${sectionId}`,
                 fragmentValue: sectionId,
                 history: true,
             });
@@ -481,18 +500,26 @@ if (window.krtFetch) {
         if (!document.getElementById(toggles[0].id)) {
             return;
         }
+        const saved = readMissionFilterPref();
+        if (
+            !/[?&]kind=/.test(window.location.search) &&
+            saved !== null &&
+            typeof saved.kind === 'string' &&
+            saved.kind !== selectedMissionKind()
+        ) {
+            selectMissionKind(saved.kind, false);
+        }
         if (
             /[?&]includeInactive(Squadrons|JobTypes|FrequencyTypes)=/.test(window.location.search)
         ) {
             persistMissionFilters();
             return;
         }
-        const saved = readMissionFilterPref();
         if (saved === null) {
             return;
         }
         const changed = [];
-        toggles.forEach(function (toggle) {
+        toggles.forEach((toggle) => {
             const el = document.getElementById(toggle.id);
             const want = saved[toggle.pref] === true;
             if (el && el.checked !== want) {
@@ -500,7 +527,7 @@ if (window.krtFetch) {
                 changed.push(el);
             }
         });
-        changed.forEach(function (el) {
+        changed.forEach((el) => {
             el.dispatchEvent(new Event('change'));
         });
     })();

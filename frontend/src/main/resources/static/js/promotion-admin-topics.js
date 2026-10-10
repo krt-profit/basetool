@@ -33,17 +33,86 @@ function openModal(id) {
     window.krtModal.open(id);
 }
 
+let paSelectedTopicId = null;
+
+function paTopicsUrl() {
+    return `/promotion/admin/topics${
+        paSelectedTopicId ? `?topic=${encodeURIComponent(paSelectedTopicId)}` : ''
+    }`;
+}
+
 function paRefreshTopics() {
     if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
         window.location.reload();
         return Promise.resolve(false);
     }
     return window.krtFetch.swap({
-        url: '/promotion/admin/topics',
+        url: paTopicsUrl(),
         container: '#pa-topics-results',
         fragmentValue: 'topicsResults',
         errorMessage: MSG_REFRESH_FAILED,
     });
+}
+
+/**
+ * Shows the detail pane of one topic, marks its master row as selected and records the choice in
+ * the address bar so a reload or a shared link reopens the same topic.
+ *
+ * @param {string | null} topicId id of the topic to show; null keeps the first one
+ * @param {boolean} focusRow whether the selected master row takes the focus
+ */
+function paSelectTopic(topicId, focusRow) {
+    const rows = Array.from(document.querySelectorAll('.pa-topic-row'));
+    if (rows.length === 0) {
+        paSelectedTopicId = null;
+        return;
+    }
+    let target = rows.find((r) => {
+        return r.getAttribute('data-pa-select-topic') === topicId;
+    });
+    if (!target) target = rows[0];
+    const id = target.getAttribute('data-pa-select-topic');
+    rows.forEach((r) => {
+        const on = r === target;
+        r.classList.toggle('is-active', on);
+        r.setAttribute('aria-selected', String(on));
+        r.setAttribute('tabindex', on ? '0' : '-1');
+    });
+    document.querySelectorAll('.pa-topic-pane').forEach((pane) => {
+        pane.hidden = pane.getAttribute('data-pa-topic-id') !== id;
+    });
+    paSelectedTopicId = id;
+    if (focusRow) target.focus();
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('topic', id);
+        window.history.replaceState(window.history.state, '', url.pathname + url.search);
+    } catch (_e) {}
+}
+
+function paSyncSelectionFromDom() {
+    const active = document.querySelector('.pa-topic-row[aria-selected="true"]');
+    paSelectTopic(active ? active.getAttribute('data-pa-select-topic') : null, false);
+}
+
+function paOnTopicListKeydown(e) {
+    const list = e.target && e.target.closest ? e.target.closest('#pa-topic-list') : null;
+    if (!list) return;
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') {
+        return;
+    }
+    const rows = Array.from(list.querySelectorAll('.pa-topic-row'));
+    if (rows.length === 0) return;
+    e.preventDefault();
+    const current = rows.findIndex((r) => {
+        return r.getAttribute('aria-selected') === 'true';
+    });
+    let idx;
+    if (e.key === 'ArrowDown') idx = Math.min(rows.length - 1, current + 1);
+    else if (e.key === 'ArrowUp') idx = Math.max(0, current - 1);
+    else if (e.key === 'Home') idx = 0;
+    else idx = rows.length - 1;
+    paSelectTopic(rows[idx].getAttribute('data-pa-select-topic'), true);
 }
 
 function apiCall(url, method, body) {
@@ -71,7 +140,7 @@ function apiCall(url, method, body) {
                 return true;
             },
         })
-        .then(function (result) {
+        .then((result) => {
             if (!result.ok) {
                 return null;
             }
@@ -99,8 +168,9 @@ function createTopic() {
         description: document.getElementById('ct-desc').value || null,
         sortOrder: parseInt(document.getElementById('ct-sort').value, 10) || 0,
     };
-    apiCall('/api/proxy/promotion/topics', 'POST', body).then(function (data) {
+    apiCall('/api/proxy/promotion/topics', 'POST', body).then((data) => {
         if (!data) return;
+        if (data.id) paSelectedTopicId = String(data.id);
         toastSuccess(MSG_SAVED);
         closeModal('modal-create-topic');
         paRefreshTopics();
@@ -114,7 +184,7 @@ function updateTopic() {
         description: document.getElementById('et-desc').value || null,
         sortOrder: parseInt(document.getElementById('et-sort').value, 10) || 0,
     };
-    apiCall('/api/proxy/promotion/topics/' + id, 'PUT', body).then(function (data) {
+    apiCall(`/api/proxy/promotion/topics/${id}`, 'PUT', body).then((data) => {
         if (!data) return;
         toastSuccess(MSG_SAVED);
         closeModal('modal-edit-topic');
@@ -131,10 +201,11 @@ function deleteTopic(btn) {
         MSG_DELETE_TOPIC_MSG.replace('{name}', name),
         MSG_OK,
         MSG_CANCEL,
-    ).then(function (ok) {
+    ).then((ok) => {
         if (!ok) return;
-        apiCall('/api/proxy/promotion/topics/' + id, 'DELETE', null).then(function (data) {
+        apiCall(`/api/proxy/promotion/topics/${id}`, 'DELETE', null).then((data) => {
             if (!data) return;
+            if (paSelectedTopicId === id) paSelectedTopicId = null;
             toastSuccess(MSG_DELETED);
             paRefreshTopics();
         });
@@ -164,7 +235,7 @@ function createCategory() {
         description: document.getElementById('cc-desc').value || null,
         sortOrder: parseInt(document.getElementById('cc-sort').value, 10) || 0,
     };
-    apiCall('/api/proxy/promotion/categories', 'POST', body).then(function (data) {
+    apiCall('/api/proxy/promotion/categories', 'POST', body).then((data) => {
         if (!data) return;
         toastSuccess(MSG_SAVED);
         closeModal('modal-create-category');
@@ -180,7 +251,7 @@ function updateCategory() {
         description: document.getElementById('ec-desc').value || null,
         sortOrder: parseInt(document.getElementById('ec-sort').value, 10) || 0,
     };
-    apiCall('/api/proxy/promotion/categories/' + id, 'PUT', body).then(function (data) {
+    apiCall(`/api/proxy/promotion/categories/${id}`, 'PUT', body).then((data) => {
         if (!data) return;
         toastSuccess(MSG_SAVED);
         closeModal('modal-edit-category');
@@ -197,9 +268,9 @@ function deleteCategory(btn) {
         MSG_DELETE_CATEGORY_MSG.replace('{name}', name),
         MSG_OK,
         MSG_CANCEL,
-    ).then(function (ok) {
+    ).then((ok) => {
         if (!ok) return;
-        apiCall('/api/proxy/promotion/categories/' + id, 'DELETE', null).then(function (data) {
+        apiCall(`/api/proxy/promotion/categories/${id}`, 'DELETE', null).then((data) => {
             if (!data) return;
             toastSuccess(MSG_DELETED);
             paRefreshTopics();
@@ -208,7 +279,7 @@ function deleteCategory(btn) {
 }
 
 function paReadCardBody(card, trigger) {
-    const btn = card.querySelector('[data-trigger="' + trigger + '"]');
+    const btn = card.querySelector(`[data-trigger="${trigger}"]`);
     if (!btn) return null;
     const version = parseInt(btn.getAttribute('data-pa-version'), 10);
     if (!Number.isFinite(version)) return null;
@@ -244,24 +315,24 @@ function swapSort(currentCard, otherCard, putUrl, kind) {
     b.sortOrder = aSort;
     const aId = currentCard.getAttribute(idAttr);
     const bId = otherCard.getAttribute(idAttr);
-    return apiCall(putUrl + '/' + aId, 'PUT', a).then(function (r1) {
+    return apiCall(`${putUrl}/${aId}`, 'PUT', a).then((r1) => {
         if (!r1) return null;
-        return apiCall(putUrl + '/' + bId, 'PUT', b);
+        return apiCall(`${putUrl}/${bId}`, 'PUT', b);
     });
 }
 function findAdjacentSibling(card, direction) {
     const sel = card.tagName.toLowerCase();
-    const siblings = card.parentElement.querySelectorAll(':scope > ' + sel);
+    const siblings = card.parentElement.querySelectorAll(`:scope > ${sel}`);
     const arr = Array.from(siblings);
     const idx = arr.indexOf(card);
     const target = direction === 'up' ? arr[idx - 1] : arr[idx + 1];
     return target || null;
 }
 function moveTopic(btn, direction) {
-    const card = btn.closest('.admin-topic-card');
+    const card = btn.closest('.pa-topic-pane');
     const other = findAdjacentSibling(card, direction);
     if (!other) return;
-    swapSort(card, other, '/api/proxy/promotion/topics', 'topic').then(function (r) {
+    swapSort(card, other, '/api/proxy/promotion/topics', 'topic').then((r) => {
         if (r === null) return;
         toastSuccess(MSG_SAVED);
         paRefreshTopics();
@@ -271,7 +342,7 @@ function moveCategory(btn, direction) {
     const card = btn.closest('.pa-category-card');
     const other = findAdjacentSibling(card, direction);
     if (!other) return;
-    swapSort(card, other, '/api/proxy/promotion/categories', 'category').then(function (r) {
+    swapSort(card, other, '/api/proxy/promotion/categories', 'category').then((r) => {
         if (r === null) return;
         toastSuccess(MSG_SAVED);
         paRefreshTopics();
@@ -310,7 +381,7 @@ function paSaveLevelContent(textarea) {
             level,
             description,
         };
-        p = apiCall('/api/proxy/promotion/level-contents/' + lcId, 'PUT', body);
+        p = apiCall(`/api/proxy/promotion/level-contents/${lcId}`, 'PUT', body);
     } else {
         p = apiCall('/api/proxy/promotion/level-contents', 'POST', {
             categoryId,
@@ -318,7 +389,7 @@ function paSaveLevelContent(textarea) {
             description,
         });
     }
-    return p.then(function (data) {
+    return p.then((data) => {
         if (!data) return null;
         if (data.id) textarea.setAttribute('data-lc-id', data.id);
         if (data.version !== undefined)
@@ -335,7 +406,7 @@ function paSaveLevelContentFromButton(btn) {
     if (!row) return;
     const textarea = row.querySelector('textarea.lc-textarea');
     if (!textarea) return;
-    paSaveLevelContent(textarea).then(function (data) {
+    paSaveLevelContent(textarea).then((data) => {
         if (data) toastSuccess(MSG_SAVED);
     });
 }
@@ -343,24 +414,24 @@ function paSaveAll() {
     const snapshot = Array.from(paDirtyTextareas);
     if (snapshot.length === 0) return;
     let chain = Promise.resolve(true);
-    snapshot.forEach(function (ta) {
-        chain = chain.then(function (alive) {
+    snapshot.forEach((ta) => {
+        chain = chain.then((alive) => {
             if (!alive) return false;
-            return paSaveLevelContent(ta).then(function (data) {
+            return paSaveLevelContent(ta).then((data) => {
                 return data !== null;
             });
         });
     });
-    chain.then(function () {
+    chain.then(() => {
         toastSuccess(MSG_SAVED);
     });
 }
 function paDiscardAll() {
     const fn = window.showKrtConfirm;
     if (typeof fn !== 'function') return;
-    fn(MSG_DELETE_TOPIC_TITLE, MSG_DIRTY_LEAVE, MSG_OK, MSG_CANCEL).then(function (ok) {
+    fn(MSG_DELETE_TOPIC_TITLE, MSG_DIRTY_LEAVE, MSG_OK, MSG_CANCEL).then((ok) => {
         if (!ok) return;
-        paDirtyTextareas.forEach(function (ta) {
+        paDirtyTextareas.forEach((ta) => {
             ta.value = ta.getAttribute('data-original') || '';
             ta.classList.remove('pa-dirty');
         });
@@ -369,13 +440,7 @@ function paDiscardAll() {
     });
 }
 
-function paToggleAllTopics(open) {
-    document.querySelectorAll('.admin-topic-card').forEach(function (d) {
-        d.open = open;
-    });
-}
-
-window.addEventListener('beforeunload', function (e) {
+window.addEventListener('beforeunload', (e) => {
     if (paDirtyTextareas.size > 0) {
         e.preventDefault();
         e.returnValue = '';
@@ -383,7 +448,7 @@ window.addEventListener('beforeunload', function (e) {
     }
 });
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('click', 'pa-open-create-topic', openCreateTopicModal);
         window.krtEvents.on('click', 'pa-edit-topic', openEditTopicModal);
@@ -397,21 +462,21 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtEvents.on('click', 'pa-create-category', createCategory);
         window.krtEvents.on('click', 'pa-update-category', updateCategory);
 
-        window.krtEvents.on('click', 'pa-close-modal', function (btn) {
+        window.krtEvents.on('click', 'pa-close-modal', (btn) => {
             const id = btn.getAttribute('data-pa-modal');
             if (id) closeModal(id);
         });
 
-        window.krtEvents.on('click', 'pa-move-topic-up', function (btn) {
+        window.krtEvents.on('click', 'pa-move-topic-up', (btn) => {
             moveTopic(btn, 'up');
         });
-        window.krtEvents.on('click', 'pa-move-topic-down', function (btn) {
+        window.krtEvents.on('click', 'pa-move-topic-down', (btn) => {
             moveTopic(btn, 'down');
         });
-        window.krtEvents.on('click', 'pa-move-cat-up', function (btn) {
+        window.krtEvents.on('click', 'pa-move-cat-up', (btn) => {
             moveCategory(btn, 'up');
         });
-        window.krtEvents.on('click', 'pa-move-cat-down', function (btn) {
+        window.krtEvents.on('click', 'pa-move-cat-down', (btn) => {
             moveCategory(btn, 'down');
         });
 
@@ -420,18 +485,19 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtEvents.on('click', 'pa-save-all', paSaveAll);
         window.krtEvents.on('click', 'pa-discard-all', paDiscardAll);
 
-        window.krtEvents.on('click', 'pa-expand-all-topics', function () {
-            paToggleAllTopics(true);
-        });
-        window.krtEvents.on('click', 'pa-collapse-all-topics', function () {
-            paToggleAllTopics(false);
+        window.krtEvents.on('click', 'pa-select-topic', (row) => {
+            paSelectTopic(row.getAttribute('data-pa-select-topic'), false);
         });
     }
 
-    document.addEventListener('krt:swapped', function (e) {
+    document.addEventListener('keydown', paOnTopicListKeydown);
+    paSyncSelectionFromDom();
+
+    document.addEventListener('krt:swapped', (e) => {
         if (e.detail && e.detail.container && e.detail.container.id === 'pa-topics-results') {
             paDirtyTextareas.clear();
             paUpdateSaveAllBanner();
+            paSyncSelectionFromDom();
         }
     });
 });

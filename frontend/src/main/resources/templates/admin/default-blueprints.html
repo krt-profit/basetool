@@ -4,6 +4,7 @@
     <title th:text="#{admin.defaultBlueprints.title}">Admin: Standard-Blueprints</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/personal-inventory.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/admin-default-blueprints.css}">
     </th:block>
 </head>
 <body>
@@ -12,15 +13,11 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="krt-admin-banner" th:text="#{admin.defaultBlueprints.bannerMode}">ADMIN MODE</div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.admin.defaultBlueprints},
+        count=${defaults != null ? #lists.size(defaults) : null}, countId='krt-dbp-count', countFor='krt-dbp-list-host')}"></th:block>
 
-    <div class="greeting hud-box krt-personal-inventory-header">
-        <h1 th:text="#{admin.defaultBlueprints.title}">Admin: Standard-Blueprints</h1>
-        <p class="krt-subtitle" th:text="#{admin.defaultBlueprints.subtitle}">Standard-Blueprints verwalten</p>
-    </div>
-
-    <div class="hud-box krt-personal-inventory mt-2">
-        <h2 class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.add.heading}">Standard-Blueprint hinzuf&uuml;gen</h2>
+    <section class="card krt-personal-inventory dbp-section" aria-labelledby="krt-dbp-add-heading">
+        <h2 id="krt-dbp-add-heading" class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.add.heading}">Standard-Blueprint hinzuf&uuml;gen</h2>
 
         <div class="form-group krt-pi-typeahead krt-bp-search">
             <label for="krt-dbp-search-input" th:text="#{admin.defaultBlueprints.add.search}">Blueprints suchen</label>
@@ -43,44 +40,47 @@
                 </div>
             </div>
         </form>
-    </div>
+    </section>
 
-    <div class="hud-box krt-personal-inventory mt-2">
-        <h2 class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.list.heading}">Aktuelle Standard-Blueprints</h2>
-        <div id="krt-dbp-list-host" class="table-responsive krt-pi-table-wrapper">
+    <section class="dbp-section" aria-labelledby="krt-dbp-list-heading">
+        <h2 id="krt-dbp-list-heading" class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.list.heading}">Aktuelle Standard-Blueprints</h2>
+        <div id="krt-dbp-list-host" class="card card--flush">
             <th:block th:fragment="rows">
-            <table class="krt-table krt-pi-table">
-                <thead>
-                <tr>
-                    <th th:text="#{admin.defaultBlueprints.table.product}">Produkt</th>
-                    <th th:text="#{admin.defaultBlueprints.table.actions}">Aktionen</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:if="${#lists.isEmpty(defaults)}">
-                    <td colspan="2" class="krt-pi-empty" th:text="#{admin.defaultBlueprints.empty}">Keine Standard-Blueprints.</td>
-                </tr>
-                <tr th:each="d : ${defaults}" th:attr="data-product-key=${d.productKey}">
-                    <td th:text="${d.productName}">Produkt</td>
-                    <td>
-                        <form th:id="${'krt-dbp-del-' + d.id}"
-                              th:action="@{/admin/default-blueprints/{id}/delete(id=${d.id})}"
-                              method="post" class="krt-dbp-del-form">
-                            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                            <button type="button" class="btn btn-quiet-danger btn-icon"
-                                    data-trigger="dbp-open-delete"
-                                    th:attr="data-form=${'krt-dbp-del-' + d.id},
-                                             data-name=${d.productName}"
-                                    th:title="#{admin.defaultBlueprints.action.remove}"
-                                    th:aria-label="#{admin.defaultBlueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                        </form>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(defaults)}">
+                <table class="data-table data-table--stack"
+                       th:data-list-total="${#lists.size(defaults)}">
+                    <thead>
+                    <tr>
+                        <th th:text="#{admin.defaultBlueprints.table.product}">Produkt</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.defaultBlueprints.table.actions}">Aktionen</span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="d : ${defaults}" th:attr="data-product-key=${d.productKey}">
+                        <td><span class="cell-title" th:text="${d.productName}">Produkt</span></td>
+                        <td class="cell-actions">
+                            <form th:id="${'krt-dbp-del-' + d.id}"
+                                  th:action="@{/admin/default-blueprints/{id}/delete(id=${d.id})}"
+                                  method="post" class="krt-dbp-del-form">
+                                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                <button type="button" class="btn btn-quiet-danger btn-icon"
+                                        data-trigger="dbp-open-delete"
+                                        th:attr="data-form=${'krt-dbp-del-' + d.id},
+                                                 data-name=${d.productName}"
+                                        th:title="#{admin.defaultBlueprints.action.remove}"
+                                        th:aria-label="#{admin.defaultBlueprints.action.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <th:block th:if="${#lists.isEmpty(defaults)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.defaultBlueprints.empty', textKey='admin.defaultBlueprints.empty.text')}"></th:block>
+            </th:block>
             </th:block>
         </div>
-    </div>
+    </section>
 </main>
 
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-dbp-delete-modal', titleKey='admin.defaultBlueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='dbp-close-delete', body=~{::krt-dbp-delete-modal-body})}">
@@ -90,7 +90,7 @@
         </div>
         <div class="krt-modal-foot">
             <button type="button" class="btn btn-ghost" data-trigger="dbp-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
-            <button type="button" id="krt-dbp-delete-confirm" class="btn krt-danger" th:text="#{admin.defaultBlueprints.action.remove}">Entfernen</button>
+            <button type="button" id="krt-dbp-delete-confirm" class="btn btn-danger" th:text="#{admin.defaultBlueprints.action.remove}">Entfernen</button>
         </div>
     </th:block>
 </th:block>

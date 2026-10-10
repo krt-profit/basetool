@@ -1,14 +1,24 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
     .dr-actions {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
+        justify-content: flex-end;
     }
     .dr-when {
         color: var(--color-gray-2-text);
         font-size: 0.85rem;
+    }
+    .dr-note {
+        display: flex;
+        gap: 0.6rem;
+        align-items: flex-start;
+    }
+    .dr-note .krt-icon {
+        flex: 0 0 auto;
+        margin-top: 0.1rem;
+    }
+    .dr-note p {
+        margin: 0;
     }
     #decline-note {
         width: 100%;

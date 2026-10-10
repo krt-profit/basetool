@@ -22,10 +22,10 @@ package de.greluc.krt.profit.basetool.backend.config;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
-import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
-import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
+import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
@@ -221,7 +221,7 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
         && !tryConsume(
             request,
             response,
-            exportBuckets.get(subject.get(), key -> newExportBucket()),
+            exportBuckets.get(subject.get(), _ -> newExportBucket()),
             MetricNames.BUCKET_SUBJECT_EXPORT,
             properties.subject().export().capacity(),
             properties.subject().export().refillPeriod())) {
@@ -231,7 +231,7 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
         && !tryConsume(
             request,
             response,
-            buckets.get(subject.get(), key -> newBucket()),
+            buckets.get(subject.get(), _ -> newBucket()),
             MetricNames.BUCKET_SUBJECT,
             properties.subject().capacity(),
             properties.subject().refillPeriod())) {

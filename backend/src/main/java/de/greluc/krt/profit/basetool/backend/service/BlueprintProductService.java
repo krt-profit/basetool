@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.mapper.BlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintIdNameRow;
@@ -28,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeRe
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -83,7 +83,7 @@ public class BlueprintProductService {
   @NotNull
   public List<BlueprintProductDto> searchProducts(
       @Nullable String query, int limit, @NotNull UUID ownerUserId) {
-    int cap = Math.max(1, Math.min(limit, MAX_LIMIT));
+    int cap = Math.clamp(limit, 1, MAX_LIMIT);
     String q = query == null ? "" : query.trim();
 
     List<ProductAccumulator> products = new ArrayList<>(buildProductMap(q).values());
@@ -300,7 +300,7 @@ public class BlueprintProductService {
       if (productKey.isEmpty()) {
         continue;
       }
-      index.computeIfAbsent(tagKey, k -> new LinkedHashSet<>()).add(productKey);
+      index.computeIfAbsent(tagKey, _ -> new LinkedHashSet<>()).add(productKey);
     }
     return index;
   }

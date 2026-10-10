@@ -20,25 +20,28 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import jakarta.persistence.EntityManager;
@@ -48,9 +51,11 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -63,12 +68,14 @@ class HangarServiceTest {
   @Mock private ShipRepository shipRepository;
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private LocationRepository locationRepository;
-  @Mock private MissionUnitRepository missionUnitRepository;
+  @Mock private ShipDeletionObserver shipDeletionObserver;
   @Mock private EntityManager entityManager;
   @Mock private de.greluc.krt.profit.basetool.backend.repository.UserRepository userRepository;
   @Mock private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService ownerScopeService;
-  @Mock private ShipMapper shipMapper;
+  @Mock private ShipTypeMapper shipTypeMapper;
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private UserService userService;
 
   @InjectMocks private HangarService hangarService;
 
@@ -96,16 +103,16 @@ class HangarServiceTest {
   }
 
   @Test
-  void getMyShipsFiltered_delegatesToRepositoryWithTrimmedSearch() {
+  void getMyShipsFiltered_delegatesToRepositoryWithTrimmedSearchAndFittedFilter() {
     UUID userId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 50);
     Page<Ship> page = new PageImpl<>(List.of(new Ship()));
-    when(shipRepository.findByOwnerIdFiltered(userId, "Cutlass", pageable)).thenReturn(page);
+    when(shipRepository.findByOwnerIdFiltered(userId, "Cutlass", true, pageable)).thenReturn(page);
 
-    Page<Ship> result = hangarService.getMyShipsFiltered(userId, "  Cutlass  ", pageable);
+    Page<Ship> result = hangarService.getMyShipsFiltered(userId, "  Cutlass  ", true, pageable);
 
     assertEquals(page, result);
-    verify(shipRepository).findByOwnerIdFiltered(userId, "Cutlass", pageable);
+    verify(shipRepository).findByOwnerIdFiltered(userId, "Cutlass", true, pageable);
   }
 
   @Test
@@ -113,11 +120,11 @@ class HangarServiceTest {
     UUID userId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 50);
     Page<Ship> page = new PageImpl<>(List.of());
-    when(shipRepository.findByOwnerIdFiltered(userId, null, pageable)).thenReturn(page);
+    when(shipRepository.findByOwnerIdFiltered(userId, null, null, pageable)).thenReturn(page);
 
-    hangarService.getMyShipsFiltered(userId, "   ", pageable);
+    hangarService.getMyShipsFiltered(userId, "   ", null, pageable);
 
-    verify(shipRepository).findByOwnerIdFiltered(userId, null, pageable);
+    verify(shipRepository).findByOwnerIdFiltered(userId, null, null, pageable);
   }
 
   @Test
@@ -131,33 +138,23 @@ class HangarServiceTest {
     Ship ship2 = new Ship();
     ship2.setId(shipId2);
 
-    Mission mission = new Mission();
-    mission.setId(UUID.randomUUID());
-    mission.setName("Op Aurora");
-    de.greluc.krt.profit.basetool.backend.model.MissionUnit unit =
-        new de.greluc.krt.profit.basetool.backend.model.MissionUnit();
-    unit.setShip(ship1);
-    unit.setMission(mission);
-
     when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship1, ship2));
-    when(missionUnitRepository.findByShipId(shipId1)).thenReturn(List.of(unit));
-    when(missionUnitRepository.findByShipId(shipId2)).thenReturn(List.of());
+    when(shipDeletionObserver.beforeShipDelete(shipId1)).thenReturn(1);
+    when(shipDeletionObserver.beforeShipDelete(shipId2)).thenReturn(0);
 
     hangarService.deleteAllShipsForUser(userId);
 
-    verify(missionUnitRepository, times(1)).save(unit);
-    assertNull(unit.getShip(), "MissionUnit.ship should be null after unlink");
+    verify(shipDeletionObserver).beforeShipDelete(shipId1);
+    verify(shipDeletionObserver).beforeShipDelete(shipId2);
     verify(entityManager, times(1)).flush();
     verify(shipRepository, times(1)).deleteAll(List.of(ship1, ship2));
     verify(auditService)
         .record(
-            eq(AuditEventType.MISSION_UNIT_UPDATED),
-            eq(mission.getId()),
-            eq("Op Aurora"),
+            eq(AuditEventType.HANGAR_EMPTIED),
             isNull(),
-            any());
-    verify(auditService)
-        .record(eq(AuditEventType.HANGAR_EMPTIED), isNull(), isNull(), eq(userId), any());
+            isNull(),
+            eq(userId),
+            argThat(d -> d.toString().contains("detachedUnits=1")));
   }
 
   @Test
@@ -167,7 +164,7 @@ class HangarServiceTest {
 
     hangarService.deleteAllShipsForUser(userId);
 
-    verify(missionUnitRepository, never()).findByShipId(any());
+    verify(shipDeletionObserver, never()).beforeShipDelete(any());
     verify(shipRepository, never()).deleteAll(anyList());
     verify(entityManager, never()).flush();
     verifyNoInteractions(auditService);
@@ -183,7 +180,6 @@ class HangarServiceTest {
     ship.setId(shipId);
 
     when(shipRepository.findByOwnerId(userId)).thenReturn(List.of(ship));
-    when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of());
 
     hangarService.deleteAllShipsForUser(userId);
 
@@ -260,27 +256,12 @@ class HangarServiceTest {
     ship.setOwner(owner);
     ship.setShipType(type);
     ship.setName("Private free-text name");
-    Mission mission = new Mission();
-    mission.setId(UUID.randomUUID());
-    mission.setName("Op Aurora");
-    de.greluc.krt.profit.basetool.backend.model.MissionUnit unit =
-        new de.greluc.krt.profit.basetool.backend.model.MissionUnit();
-    unit.setId(UUID.randomUUID());
-    unit.setShip(ship);
-    unit.setMission(mission);
     when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
-    when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of(unit));
+    when(shipDeletionObserver.beforeShipDelete(shipId)).thenReturn(1);
 
     hangarService.deleteShip(userId, shipId);
 
-    assertNull(unit.getShip());
-    verify(auditService)
-        .record(
-            eq(AuditEventType.MISSION_UNIT_UPDATED),
-            eq(mission.getId()),
-            eq("Op Aurora"),
-            isNull(),
-            any());
+    verify(shipDeletionObserver).beforeShipDelete(shipId);
     verify(auditService)
         .record(
             eq(AuditEventType.HANGAR_SHIP_DELETED),
@@ -290,11 +271,94 @@ class HangarServiceTest {
             argThat(d -> d.toString().contains("detachedUnits=1")));
   }
 
+  private static final ActorRef ACTOR = new ActorRef(UUID.randomUUID(), "Ada");
+
+  private List<NoticeEvent> published(int expected) {
+    ArgumentCaptor<Object> captured = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, times(expected)).publishEvent(captured.capture());
+    return captured.getAllValues().stream().map(NoticeEvent.class::cast).toList();
+  }
+
+  @Test
+  void resettingTheFittedMarksTellsEachOwnerOnceWithTheirCount() {
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    ShipRepository.OwnerShipCount a = org.mockito.Mockito.mock(ShipRepository.OwnerShipCount.class);
+    ShipRepository.OwnerShipCount b = org.mockito.Mockito.mock(ShipRepository.OwnerShipCount.class);
+    when(a.getOwnerId()).thenReturn(first);
+    when(a.getShipCount()).thenReturn(3L);
+    when(b.getOwnerId()).thenReturn(second);
+    when(b.getShipCount()).thenReturn(1L);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(shipRepository.countFittedByOwnerScoped(false, null, Set.of())).thenReturn(List.of(a, b));
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(4);
+    when(userService.currentActor()).thenReturn(ACTOR);
+
+    hangarService.resetAllFittedStatus();
+
+    List<NoticeEvent> sent = published(2);
+    assertEquals(first, sent.get(0).contextRecipientUserId());
+    assertEquals("3", sent.get(0).renderParams().get("count"));
+    assertEquals(second, sent.get(1).contextRecipientUserId());
+    assertEquals(NotificationEventType.HANGAR_FITTED_RESET_FOR_OWNER, sent.get(1).eventType());
+  }
+
+  @Test
+  void anAdminsShipChangesTellTheMember() {
+    UUID member = UUID.randomUUID();
+    UUID shipId = UUID.randomUUID();
+    ShipType type = new ShipType();
+    type.setName("Cutlass Black");
+    Ship ship = new Ship();
+    ship.setId(shipId);
+    ship.setShipType(type);
+    HangarService spied = org.mockito.Mockito.spy(hangarService);
+    org.mockito.Mockito.doReturn(ship).when(spied).addShip(any(), any());
+    org.mockito.Mockito.doReturn(ship).when(spied).updateShip(any(), any(), any());
+    org.mockito.Mockito.doReturn(0).when(spied).deleteShip(any(), any());
+    when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
+    when(userService.currentActor()).thenReturn(ACTOR);
+    ShipRequestDto dto =
+        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, null);
+
+    spied.addShipByAdmin(member, dto);
+    spied.updateShipByAdmin(member, shipId, dto);
+    spied.deleteShipByAdmin(member, shipId);
+
+    List<NoticeEvent> sent = published(3);
+    assertEquals(
+        List.of("ADDED", "UPDATED", "DELETED"),
+        sent.stream().map(e -> e.renderParams().get("changeCode")).toList());
+    assertEquals(member, sent.getFirst().contextRecipientUserId());
+    assertEquals("Cutlass Black", sent.getFirst().renderParams().get("shipType"));
+    assertEquals("Ada", sent.getFirst().renderParams().get("actor"));
+  }
+
+  @Test
+  void anAdminChangingTheirOwnHangarTellsNobody() {
+    UUID shipId = UUID.randomUUID();
+    Ship ship = new Ship();
+    ship.setId(shipId);
+    ShipType type = new ShipType();
+    type.setName("Cutlass Black");
+    ship.setShipType(type);
+    HangarService spied = org.mockito.Mockito.spy(hangarService);
+    org.mockito.Mockito.doReturn(ship).when(spied).addShip(any(), any());
+    when(userService.currentActor()).thenReturn(ACTOR);
+
+    spied.addShipByAdmin(
+        ACTOR.id(), new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, null));
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
   @Test
   void resetAllFittedStatus_recordsOnlyWhenShipsChanged() {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(0, 4);
+    org.mockito.Mockito.lenient().when(userService.currentActor()).thenReturn(ACTOR);
 
     hangarService.resetAllFittedStatus();
     verifyNoInteractions(auditService);
@@ -399,7 +463,7 @@ class HangarServiceTest {
     inScopeShip.setFitted(true);
     when(shipRepository.findByShipTypeInScoped(List.of(fighter), false, squadronId, Set.of()))
         .thenReturn(List.of(inScopeShip));
-    when(shipMapper.shipTypeToDto(any())).thenReturn(null);
+    when(shipTypeMapper.toDto(any())).thenReturn(null);
 
     var page = hangarService.getSquadronOverview(pageable, true, null);
 

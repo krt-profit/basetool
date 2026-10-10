@@ -10,8 +10,9 @@ specific SC Wiki blueprint. To plan who can actually build the order, the proces
 squadron/SK needs to know **which of its members already own the blueprints** for the
 ordered items — and, per member, **which** of those blueprints they hold.
 
-This spec governs the **blueprint-coverage view** rendered in the item-order detail page,
-directly after the *Bearbeiter* (assignees) section. It bridges three existing concepts: the
+This spec governs the **blueprint-coverage view** rendered in the item-order detail page as its
+own tab *Hersteller* (between *Materialien* and *Übergaben*, `REQ-ORDERS-026`; called *Blaupausen*
+until 2026-10-03 and *Herstellung* until 2026-10-04). It bridges three existing concepts: the
 order's required item lines (`JobOrderItem.blueprint` → output name), the per-user blueprint
 ownership of the personal-inventory feature (`PersonalBlueprint`, keyed by the normalized
 `product_key`, see [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md)),
@@ -90,7 +91,7 @@ squadron/SK** (and to admins, who hold system-wide oversight). This is **stricte
 order's own visibility: an SK-responsible order is publicly readable by every profit-eligible
 member ([`security-and-access.md`](security-and-access.md)), but the named per-member coverage
 is restricted to members of that SK. The gate is
-`@ownerScopeService.canSeeJobOrderBlueprintOwners`, which evaluates the standard org-unit
+`@jobOrderAccessPolicy.canSeeJobOrderBlueprintOwners`, which evaluates the standard org-unit
 scope predicate against the order's responsible org unit (so a non-admin matches only org
 units in their own membership set, with no SK-public escape). A non-member who can otherwise
 open a public SK order's detail page receives HTTP 403 from the endpoint, and the frontend
@@ -105,9 +106,8 @@ this gate — it changes only which owners are counted *inside* the view, never 
 - [ ] An admin receives the coverage view for any order.
 
 **Enforced by:** `OwnerScopeServiceTest` (canSeeJobOrderBlueprintOwners),
-`JobOrderControllerTest` (getItemBlueprintOwners auth) · **Code:**
-`OwnerScopeService.canSeeJobOrderBlueprintOwners` (delegating to
-`AccessGateService.canSeeJobOrderBlueprintOwners`) · **Issues:** —
+`JobOrderAccessPolicyDifferentialTest`, `JobOrderControllerTest` (getItemBlueprintOwners auth) ·
+**Code:** `JobOrderAccessPolicy.canSeeJobOrderBlueprintOwners` · **Issues:** —
 
 ### REQ-ORDERS-021 — Per-order toggle: count blueprint coverage with or without variants
 
@@ -123,7 +123,7 @@ default **true**) that governs how its blueprint-coverage view (`REQ-ORDERS-015`
 The flag is **persisted on the order** and applies for **every** viewer (it is a property of the
 order, not a per-viewer view preference), so a lead who needs the strict count for a one-specific-
 variant order sets it once. The flag is toggled **live** from the coverage panel: a control visible
-only to editors (`hasRole('LOGISTICIAN')` + the order's edit scope, `@ownerScopeService.canEditJobOrder`)
+only to editors (`hasRole('LOGISTICIAN')` + the order's edit scope, `@jobOrderAccessPolicy.canEditJobOrder`)
 PATCHes the order and re-renders the coverage panel **in place** (no full-page reload, per
 `REQ-FE-001`); the order's optimistic-lock `version` guards the write (a stale version yields HTTP 409),
 and the bumped version is propagated to the order's other version-carrying controls so a subsequent edit

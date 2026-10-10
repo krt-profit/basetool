@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -142,6 +143,102 @@ class AdminQualityTiersPageControllerMvcTest {
         .andExpect(content().string(containsString("alert-danger")));
   }
 
+  /**
+   * The page renders on the list pattern: the title from the bundle under the "Stammdaten" eyebrow,
+   * the create button as the only primary action in the page head, the tiers in a stacked data
+   * table whose total feeds the count chip, the in-use hint as an alert, no HUD box.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void thePageRendersTheListPattern() throws Exception {
+    when(backendApiClient.get(eq(BACKEND_BASE), anyTypeRef())).thenReturn(catalogue());
+
+    String html =
+        mockMvc
+            .perform(get(PAGE).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern("<h1>Qualitätsstufen</h1>")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>2<")
+        .contains("data-list-count-for=\"qt-results\"")
+        .doesNotContain("??admin.qualityTiers")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+    assertThat(main.split("btn--cta", -1)).hasSize(2);
+    assertThat(main)
+        .containsPattern("class=\"page-actions\">\\s*<button[^>]*id=\"qt-add-btn\"")
+        .doesNotContain("colspan")
+        .contains("class=\"alert alert-info\"")
+        .contains("id=\"qt-results\" class=\"card card--flush\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .contains("data-list-total=\"2\"")
+        .containsPattern("class=\"cell-title data-value\">GOOD<")
+        .contains("class=\"chip chip--success\">aktiv<");
+  }
+
+  /**
+   * The create/edit dialog lays its six fields out on the form grid, offers the status as an
+   * active/inactive segment posting the same {@code active} name with active preselected, and keeps
+   * the ids the page script binds.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theTierDialogRendersTheFormGrid() throws Exception {
+    when(backendApiClient.get(eq(BACKEND_BASE), anyTypeRef())).thenReturn(catalogue());
+
+    String html =
+        mockMvc
+            .perform(get(PAGE).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    String dialog =
+        html.substring(html.indexOf("id=\"qt-modal\""), html.indexOf("id=\"qt-delete-modal\""));
+    assertThat(dialog)
+        .contains("krt-modal--wide")
+        .contains("<form id=\"qt-form\" class=\"qt-form\"")
+        .contains("<div class=\"form-grid\">")
+        .doesNotContain("qt-form-grid")
+        .doesNotContain("type=\"checkbox\"")
+        .contains("id=\"qt-code\"")
+        .contains("id=\"qt-min-quality\"")
+        .contains("id=\"qt-label-de\"")
+        .contains("id=\"qt-label-en\"")
+        .contains("id=\"qt-sort-order\"")
+        .contains("id=\"qt-base-hint\"")
+        .contains("class=\"segmented segmented--block segmented--lg\"")
+        .contains("data-testid=\"segment-active-true\"")
+        .contains("data-testid=\"segment-active-false\"")
+        .containsPattern("name=\"active\" value=\"true\" checked")
+        .doesNotContain("value=\"false\" checked")
+        .contains(">aktiv<")
+        .contains(">inaktiv<")
+        .contains("Stufe speichern");
+    assertThat(dialog.split("btn--cta", -1)).hasSize(2);
+  }
+
+  /** An empty catalogue renders the empty state in the results fragment, without a table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void anEmptyCatalogueRendersTheEmptyState() throws Exception {
+    when(backendApiClient.get(eq(BACKEND_BASE), anyTypeRef())).thenReturn(List.of());
+
+    mockMvc
+        .perform(get(PAGE).param("fragment", "results").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(containsString("Noch keine Qualitätsstufen vorhanden.")))
+        .andExpect(content().string(not(containsString("id=\"qt-table\""))));
+  }
+
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void aMemberIsRefused() throws Exception {
@@ -188,7 +285,8 @@ class AdminQualityTiersPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void updateRelaysTheVersionAndEvictsTheCatalogue() throws Exception {
-    when(backendApiClient.put(eq(BACKEND_BASE + "/" + GOOD_ID), any(), eq(QualityTierDto.class)))
+    when(backendApiClient.put(
+            eq("/api/v1/admin/quality-tiers/{id}"), any(), eq(QualityTierDto.class), eq(GOOD_ID)))
         .thenReturn(new QualityTierDto(GOOD_ID, "GOOD", 650, "Gut", "Good", 10, false, 4L));
 
     mockMvc
@@ -205,7 +303,11 @@ class AdminQualityTiersPageControllerMvcTest {
 
     ArgumentCaptor<QualityTierWriteDto> body = ArgumentCaptor.forClass(QualityTierWriteDto.class);
     verify(backendApiClient)
-        .put(eq(BACKEND_BASE + "/" + GOOD_ID), body.capture(), eq(QualityTierDto.class));
+        .put(
+            eq("/api/v1/admin/quality-tiers/{id}"),
+            body.capture(),
+            eq(QualityTierDto.class),
+            eq(GOOD_ID));
     assertThat(body.getValue().version()).isEqualTo(3L);
     assertThat(body.getValue().active()).isFalse();
     verify(backendApiClient).evict(CacheDomain.QUALITY_TIER);
@@ -214,7 +316,8 @@ class AdminQualityTiersPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteRelaysToTheBackendAndEvictsTheCatalogue() throws Exception {
-    when(backendApiClient.delete(BACKEND_BASE + "/" + GOOD_ID, Void.class)).thenReturn(null);
+    when(backendApiClient.delete("/api/v1/admin/quality-tiers/{id}", Void.class, GOOD_ID))
+        .thenReturn(null);
 
     mockMvc
         .perform(
@@ -223,14 +326,14 @@ class AdminQualityTiersPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).delete(BACKEND_BASE + "/" + GOOD_ID, Void.class);
+    verify(backendApiClient).delete("/api/v1/admin/quality-tiers/{id}", Void.class, GOOD_ID);
     verify(backendApiClient).evict(CacheDomain.QUALITY_TIER);
   }
 
   @Test
   @WithMockUser(roles = "ADMIN")
   void aTierInUseIsRelayedAs409WithoutEviction() throws Exception {
-    when(backendApiClient.delete(BACKEND_BASE + "/" + GOOD_ID, Void.class))
+    when(backendApiClient.delete("/api/v1/admin/quality-tiers/{id}", Void.class, GOOD_ID))
         .thenThrow(
             new BackendServiceException(
                 "in use", null, 409, "ENTITY_IN_USE", null, List.of(), "in use"));
@@ -249,7 +352,8 @@ class AdminQualityTiersPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void aStaleVersionIsRelayedAs409() throws Exception {
-    when(backendApiClient.put(eq(BACKEND_BASE + "/" + GOOD_ID), any(), eq(QualityTierDto.class)))
+    when(backendApiClient.put(
+            eq("/api/v1/admin/quality-tiers/{id}"), any(), eq(QualityTierDto.class), eq(GOOD_ID)))
         .thenThrow(
             new BackendServiceException(
                 "stale", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "stale"));

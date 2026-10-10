@@ -34,6 +34,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncFollowUp;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -62,7 +63,7 @@ class UserSyncServiceTest {
 
   @Mock private UserReconciliationService userReconciliationService;
 
-  @Mock private BankHolderReconciliationService bankHolderReconciliationService;
+  @Mock private UserSyncFollowUp userSyncFollowUp;
 
   /** A real registry: a mock cannot record a counter, and the failure assertions read one back. */
   private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
@@ -73,10 +74,7 @@ class UserSyncServiceTest {
   void setUp() {
     userSyncService =
         new UserSyncService(
-            keycloakService,
-            userReconciliationService,
-            bankHolderReconciliationService,
-            meterRegistry);
+            keycloakService, userReconciliationService, userSyncFollowUp, meterRegistry);
   }
 
   @Test
@@ -91,7 +89,7 @@ class UserSyncServiceTest {
     verify(userReconciliationService).syncUser(user1);
     verify(userReconciliationService).syncUser(user2);
     verify(userReconciliationService).markMissingUsers(anySet());
-    verify(bankHolderReconciliationService).reconcileAll();
+    verify(userSyncFollowUp).reconcileAll();
   }
 
   @Test
@@ -104,7 +102,7 @@ class UserSyncServiceTest {
     verify(keycloakService).fetchUsers(anyCollection(), anySet());
     verify(userReconciliationService, never()).syncUser(any(KeycloakUserDto.class));
     verify(userReconciliationService, never()).markMissingUsers(anySet());
-    verifyNoInteractions(bankHolderReconciliationService);
+    verifyNoInteractions(userSyncFollowUp);
   }
 
   @Test
@@ -120,7 +118,7 @@ class UserSyncServiceTest {
     verify(userReconciliationService).syncUser(user1);
     verify(userReconciliationService).syncUser(user2);
     verify(userReconciliationService).markMissingUsers(anySet());
-    verify(bankHolderReconciliationService).reconcileAll();
+    verify(userSyncFollowUp).reconcileAll();
   }
 
   /**
@@ -187,16 +185,14 @@ class UserSyncServiceTest {
   void syncFromKeycloak_swallowsABankReconcileFailureAfterASuccessfulRosterSync() {
     KeycloakUserDto user1 = user("user1");
     when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user1));
-    doThrow(new RuntimeException("bank hiccup"))
-        .when(bankHolderReconciliationService)
-        .reconcileAll();
+    doThrow(new RuntimeException("bank hiccup")).when(userSyncFollowUp).reconcileAll();
 
     int count = userSyncService.syncFromKeycloak();
 
     assertEquals(1, count);
     verify(userReconciliationService).syncUser(user1);
     verify(userReconciliationService).markMissingUsers(anySet());
-    verify(bankHolderReconciliationService).reconcileAll();
+    verify(userSyncFollowUp).reconcileAll();
   }
 
   @Test

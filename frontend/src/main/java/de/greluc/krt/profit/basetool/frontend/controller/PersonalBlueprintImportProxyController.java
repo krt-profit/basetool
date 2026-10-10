@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportApplyRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResolutionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.HandoffKind;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
@@ -35,12 +35,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -50,7 +47,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -65,10 +61,9 @@ import org.springframework.web.server.ResponseStatusException;
 @Slf4j
 public class PersonalBlueprintImportProxyController {
 
-  /** Backend path of the import preview. */
-  private static final String PREVIEW_URI = "/api/v1/personal-blueprints/import/preview";
+  /** Sends the import preview and apply requests. */
+  private final BlueprintBackendClient blueprintClient;
 
-  private final BackendApiClient backendApiClient;
   private final IngestHandoffService ingestHandoffService;
 
   /** Resolves the localised refusals this proxy decides itself. */
@@ -149,33 +144,10 @@ public class PersonalBlueprintImportProxyController {
     }
     String filename =
         file.getOriginalFilename() != null ? file.getOriginalFilename() : "blueprints.json";
-    MultipartBodyBuilder builder = new MultipartBodyBuilder();
-    builder
-        .part(
-            "file",
-            new ByteArrayResource(bytes) {
-              @Override
-              public String getFilename() {
-                return filename;
-              }
-            })
-        .contentType(MediaType.APPLICATION_OCTET_STREAM);
-
     return BackendErrorResponses.relay(
         log,
         "Blueprint import preview",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.execute(
-                    HttpMethod.POST,
-                    PREVIEW_URI,
-                    webClient ->
-                        webClient
-                            .post()
-                            .uri(PREVIEW_URI)
-                            .contentType(MediaType.MULTIPART_FORM_DATA)
-                            .body(BodyInserters.fromMultipartData(builder.build())),
-                    spec -> spec.bodyToMono(BlueprintImportPreviewDto.class))));
+        () -> ResponseEntity.ok(blueprintClient.importPreview(filename, bytes)));
   }
 
   /**
@@ -194,10 +166,7 @@ public class PersonalBlueprintImportProxyController {
         "Blueprint import apply for " + list.size() + " resolution(s)",
         () -> {
           BlueprintImportResultDto result =
-              backendApiClient.post(
-                  "/api/v1/personal-blueprints/import/apply",
-                  new BlueprintImportApplyRequest(list),
-                  BlueprintImportResultDto.class);
+              blueprintClient.importApply(new BlueprintImportApplyRequest(list));
           return ResponseEntity.ok(
               result == null ? new BlueprintImportResultDto(0, 0, 0, 0, 0) : result);
         });

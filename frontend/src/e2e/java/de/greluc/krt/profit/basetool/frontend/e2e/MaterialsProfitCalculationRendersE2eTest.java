@@ -39,8 +39,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Verifies that the {@code /materials/profit-calculation} results table renders a status row
- * without a {@code style-src-attr} CSP violation (ADR-0093).
+ * Verifies that the {@code /materials/profit-calculation} results table settles into its rows or
+ * its state line without a {@code style-src-attr} CSP violation (ADR-0093), and that a ready row
+ * names the buy and the sell terminal of its route.
  *
  * <p>Read-only; runs as {@code test-admin}. Without seeded ships only the console guard runs.
  */
@@ -77,7 +78,8 @@ class MaterialsProfitCalculationRendersE2eTest {
   /**
    * Loads {@code /materials/profit-calculation}, drives the ship selector to render the
    * client-built results rows, and asserts the results body populates without any {@code
-   * style-src-attr} CSP violation — the failure mode the ADR-0093 JS fix addresses.
+   * style-src-attr} CSP violation — the failure mode the ADR-0093 JS fix addresses. A ready table's
+   * first row must name a buy and a sell terminal.
    */
   @Test
   void profitCalculationRowsRenderWithoutCspViolation() {
@@ -97,8 +99,18 @@ class MaterialsProfitCalculationRendersE2eTest {
 
         if (page.locator("#shipSelect option").count() > 1) {
           page.locator("#shipSelect").selectOption(new SelectOption().setIndex(1));
-          assertThat(page.locator("#profitBody tr").first())
+          assertThat(
+                  page.locator(
+                      "#profitResults[data-state='ready'], #profitResults[data-state='empty'],"
+                          + " #profitResults[data-state='error']"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
+          if (page.locator("#profitResults[data-state='ready']").count() > 0) {
+            assertThat(
+                    page.locator("[data-testid='profit-row']")
+                        .first()
+                        .locator("[data-testid='profit-route-terminal']"))
+                .hasCount(2);
+          }
         }
 
         List<String> cspStyleViolations =

@@ -31,6 +31,8 @@ import java.util.UUID;
  * @param createdAtDisplay the creation instant formatted for display (UTC)
  * @param entityType originating aggregate type tag, or {@code null}
  * @param entityId originating aggregate id, or {@code null}
+ * @param href same-origin path of the page the notification is about, or {@code null} when the web
+ *     app has no page the recipient can open for it
  */
 public record NotificationViewDto(
     UUID id,
@@ -38,4 +40,5 @@ public record NotificationViewDto(
     boolean read,
     String createdAtDisplay,
     String entityType,
-    UUID entityId) {}
+    UUID entityId,
+    String href) {}

@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -156,8 +156,10 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE AuditEvent e SET e.actorHandle = :sentinel"
-          + " WHERE e.actorUserId = :userId AND e.actorHandle <> :sentinel")
+      """
+      UPDATE AuditEvent e SET e.actorHandle = :sentinel
+      WHERE e.actorUserId = :userId AND e.actorHandle <> :sentinel
+      """)
   int anonymiseActorHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
 
   /**
@@ -173,7 +175,9 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
    */
   @Modifying
   @Query(
-      "UPDATE AuditEvent e SET e.subjectLabel = :sentinel"
-          + " WHERE lower(e.subjectLabel) = lower(:handle) AND e.subjectLabel <> :sentinel")
+      """
+      UPDATE AuditEvent e SET e.subjectLabel = :sentinel
+      WHERE lower(e.subjectLabel) = lower(:handle) AND e.subjectLabel <> :sentinel
+      """)
   int anonymiseSubjectLabel(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

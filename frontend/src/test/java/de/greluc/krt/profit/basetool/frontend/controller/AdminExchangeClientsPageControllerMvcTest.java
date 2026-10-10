@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -52,6 +53,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -150,7 +152,7 @@ class AdminExchangeClientsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/exchange-clients"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("class=\"xc-members\">7<")))
+        .andExpect(content().string(matchesPattern("(?s).*class=\"xc-members\"[^>]*>7<.*")))
         .andExpect(content().string(containsString("27.09.2026 09:30 UTC")))
         .andExpect(
             content()
@@ -170,7 +172,7 @@ class AdminExchangeClientsPageControllerMvcTest {
         .perform(get("/admin/exchange-clients"))
         .andExpect(status().isOk())
         .andExpect(model().attributeDoesNotExist("error"))
-        .andExpect(content().string(containsString("class=\"xc-members\">0<")))
+        .andExpect(content().string(matchesPattern("(?s).*class=\"xc-members\"[^>]*>0<.*")))
         .andExpect(content().string(containsString(">VerseKit<")));
   }
 
@@ -199,8 +201,50 @@ class AdminExchangeClientsPageControllerMvcTest {
         .perform(get("/admin/exchange-clients").param("fragment", "registry"))
         .andExpect(status().isOk())
         .andExpect(model().attribute("error", "admin.exchangeClients.error.load"))
-        .andExpect(content().string(containsString("class=\"text-danger\"")))
-        .andExpect(content().string(not(containsString("id=\"xc-switch\""))));
+        .andExpect(content().string(containsString("class=\"alert alert-danger\"")))
+        .andExpect(content().string(not(containsString("id=\"xc-switch\""))))
+        .andExpect(content().string(not(containsString("id=\"xc-empty\""))));
+  }
+
+  /**
+   * The page renders on the list pattern (REQ-UI-027): page head with the system eyebrow, the count
+   * and the one primary action, no hud-box, the stacked tables in flush cards, the translated
+   * status, and the run list's empty state instead of a colspan row.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void thePageRendersTheListPattern() throws Exception {
+    stubRegistry();
+
+    String html =
+        mockMvc
+            .perform(get("/admin/exchange-clients").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    String head =
+        html.substring(
+            html.indexOf("data-testid=\"page-head\""), html.indexOf("id=\"xc-registry-host\""));
+    assertThat(head)
+        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .contains("data-list-count-for=\"xc-registry-host\"")
+        .contains("data-xc-new");
+    assertThat(head.split("btn--cta", -1)).hasSize(2);
+    assertThat(html)
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("colspan")
+        .contains("id=\"xc-table\" class=\"data-table data-table--stack\"")
+        .contains("data-list-total=\"1\"")
+        .containsPattern(
+            "class=\"cell-status\">\\s*<span class=\"chip chip--success\">Freigegeben<")
+        .doesNotContain(">ACTIVE<")
+        .contains("id=\"xc-undo-runs-empty\"");
   }
 
   @Test
@@ -244,9 +288,10 @@ class AdminExchangeClientsPageControllerMvcTest {
 
     verify(backendApiClient)
         .post(
-            "/api/v1/admin/exchange-clients/" + ID + "/suspend",
+            "/api/v1/admin/exchange-clients/{id}/suspend",
             new ExchangeClientStatusRequest(3L),
-            ExchangeClientDto.class);
+            ExchangeClientDto.class,
+            ID);
   }
 
   @Test
@@ -272,7 +317,7 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void oneClientIsReturnedForTheEditForm() throws Exception {
     stubRegistry();
-    when(backendApiClient.get("/api/v1/admin/exchange-clients/" + ID, ExchangeClientDto.class))
+    when(backendApiClient.get("/api/v1/admin/exchange-clients/{id}", ExchangeClientDto.class, ID))
         .thenReturn(
             new ExchangeClientDto(
                 ID,
@@ -364,12 +409,13 @@ class AdminExchangeClientsPageControllerMvcTest {
     ExchangeBulkUndoRequest scope =
         new ExchangeBulkUndoRequest(Instant.parse("2026-09-27T12:00:00Z"), null, "SHIP");
     when(backendApiClient.post(
-            "/api/v1/admin/exchange-clients/" + ID + "/undo/preview",
+            "/api/v1/admin/exchange-clients/{id}/undo/preview",
             scope,
-            ExchangeBulkUndoPreviewDto.class))
+            ExchangeBulkUndoPreviewDto.class,
+            ID))
         .thenReturn(new ExchangeBulkUndoPreviewDto(scope.since(), 3, 12L, true));
     when(backendApiClient.post(
-            "/api/v1/admin/exchange-clients/" + ID + "/undo", scope, ExchangeBulkUndoRunDto.class))
+            "/api/v1/admin/exchange-clients/{id}/undo", scope, ExchangeBulkUndoRunDto.class, ID))
         .thenReturn(run("RUNNING"));
     String body = "{\"since\":\"2026-09-27T12:00:00Z\",\"resource\":\"SHIP\"}";
 
@@ -398,9 +444,10 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void aSecondRunIsRelayedAsAConflict() throws Exception {
     when(backendApiClient.post(
-            eq("/api/v1/admin/exchange-clients/" + ID + "/undo"),
+            eq("/api/v1/admin/exchange-clients/{id}/undo"),
             any(),
-            eq(ExchangeBulkUndoRunDto.class)))
+            eq(ExchangeBulkUndoRunDto.class),
+            eq(ID)))
         .thenThrow(new BackendServiceException("running", null, 409));
 
     mockMvc
@@ -417,12 +464,13 @@ class AdminExchangeClientsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void theInstallationsAndARunsSkippedEntriesAreRelayed() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/admin/exchange-clients/" + ID + "/undo/installations?since={since}"),
+            eq("/api/v1/admin/exchange-clients/{id}/undo/installations?since={since}"),
             anyTypeRef(),
+            eq(ID),
             eq("2026-09-27T12:00:00Z")))
         .thenReturn(List.of());
     when(backendApiClient.get(
-            "/api/v1/admin/exchange-undo-runs/" + RUN, ExchangeBulkUndoRunDetailDto.class))
+            "/api/v1/admin/exchange-undo-runs/{runId}", ExchangeBulkUndoRunDetailDto.class, RUN))
         .thenReturn(
             new ExchangeBulkUndoRunDetailDto(
                 run("COMPLETED"),

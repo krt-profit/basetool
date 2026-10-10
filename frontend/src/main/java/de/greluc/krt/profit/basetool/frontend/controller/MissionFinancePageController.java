@@ -23,12 +23,13 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryCreateDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionFinanceEntryForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,7 +67,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class MissionFinancePageController {
 
-  private final BackendApiClient backendApiClient;
+  /** The mission domain's typed backend client. */
+  private final MissionBackendClient missionClient;
+
+  /** Re-renders the mission detail inline on a validation failure. */
   private final MissionPageController missionPageController;
 
   /**
@@ -93,14 +97,9 @@ public class MissionFinancePageController {
       return missionPageController.missionDetail(id, model, principal, null);
     }
     try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("missionId", id);
-      body.put("participantId", form.getParticipantId());
-      body.put("note", form.getNote());
-      body.put("type", form.getType());
-      body.put("amount", form.getAmount());
-
-      backendApiClient.post("/api/v1/finance-entries", body, Void.class);
+      missionClient.addFinanceEntry(
+          new MissionFinanceEntryCreateDto(
+              id, form.getParticipantId(), form.getNote(), form.getType(), form.getAmount()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "addFinanceEntry", id, e);
@@ -140,13 +139,10 @@ public class MissionFinancePageController {
       return missionPageController.missionDetail(id, model, principal, null);
     }
     try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("note", form.getNote());
-      body.put("type", form.getType());
-      body.put("amount", form.getAmount());
-      body.put("version", form.getVersion());
-
-      backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Void.class);
+      missionClient.updateFinanceEntry(
+          entryId,
+          new MissionFinanceEntryUpdateDto(
+              form.getNote(), form.getType(), form.getAmount(), form.getVersion()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "updateFinanceEntry", entryId, e);
@@ -175,7 +171,7 @@ public class MissionFinancePageController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class);
+      missionClient.deleteFinanceEntry(entryId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "deleteFinanceEntry", entryId, e);
@@ -201,14 +197,16 @@ public class MissionFinancePageController {
   @ResponseBody
   public ResponseEntity<Object> addFinanceEntryAjax(
       @PathVariable @NotNull UUID id,
-      @RequestBody Map<String, Object> body,
+      @RequestBody MissionFinanceEntryCreateDto body,
       @AuthenticationPrincipal OidcUser principal) {
     return relay(
         log,
         "add finance entry (ajax) for mission " + id,
         () -> {
-          body.put("missionId", id);
-          Object result = backendApiClient.post("/api/v1/finance-entries", body, Object.class);
+          MissionFinanceEntryDto result =
+              missionClient.addFinanceEntryJson(
+                  new MissionFinanceEntryCreateDto(
+                      id, body.participantId(), body.note(), body.type(), body.amount()));
           return ResponseEntity.ok(result);
         });
   }
@@ -227,13 +225,12 @@ public class MissionFinancePageController {
   public ResponseEntity<Object> updateFinanceEntryAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID entryId,
-      @RequestBody Map<String, Object> body) {
+      @RequestBody MissionFinanceEntryUpdateDto body) {
     return relay(
         log,
         "update finance entry (ajax) for mission " + id + " entry " + entryId,
         () -> {
-          Object result =
-              backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Object.class);
+          MissionFinanceEntryDto result = missionClient.updateFinanceEntryJson(entryId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -254,7 +251,7 @@ public class MissionFinancePageController {
         log,
         "delete finance entry (ajax) for mission " + id + " entry " + entryId,
         () -> {
-          backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class);
+          missionClient.deleteFinanceEntry(entryId);
           return ResponseEntity.noContent().build();
         });
   }

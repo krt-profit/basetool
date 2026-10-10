@@ -28,43 +28,48 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.GateReport;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.HandlerKey;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.controller.HangarController;
 import de.greluc.krt.profit.basetool.backend.controller.InventoryItemController;
-import de.greluc.krt.profit.basetool.backend.controller.MemberEvaluationController;
-import de.greluc.krt.profit.basetool.backend.controller.MissionController;
-import de.greluc.krt.profit.basetool.backend.controller.MissionFinanceEntryController;
-import de.greluc.krt.profit.basetool.backend.controller.OperationController;
-import de.greluc.krt.profit.basetool.backend.controller.PromotionCategoryController;
-import de.greluc.krt.profit.basetool.backend.controller.PromotionLevelContentController;
-import de.greluc.krt.profit.basetool.backend.controller.PromotionTopicController;
-import de.greluc.krt.profit.basetool.backend.controller.RankRequirementController;
-import de.greluc.krt.profit.basetool.backend.controller.RefineryOrderController;
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandController;
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandMembershipController;
 import de.greluc.krt.profit.basetool.backend.controller.UserController;
-import de.greluc.krt.profit.basetool.backend.model.BankAccount;
-import de.greluc.krt.profit.basetool.backend.model.BankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
+import de.greluc.krt.profit.basetool.backend.mission.web.MissionController;
+import de.greluc.krt.profit.basetool.backend.mission.web.MissionFinanceEntryController;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
-import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
-import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeRequest;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
-import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
-import de.greluc.krt.profit.basetool.backend.model.RankRequirement;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.operation.web.OperationController;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPosition;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
+import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirement;
+import de.greluc.krt.profit.basetool.backend.promotion.web.MemberEvaluationController;
+import de.greluc.krt.profit.basetool.backend.promotion.web.PromotionCategoryController;
+import de.greluc.krt.profit.basetool.backend.promotion.web.PromotionLevelContentController;
+import de.greluc.krt.profit.basetool.backend.promotion.web.PromotionTopicController;
+import de.greluc.krt.profit.basetool.backend.promotion.web.RankRequirementController;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
 import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService;
@@ -98,6 +103,11 @@ class TenancyGuardTest {
       Set.of(
           OwnerScopeService.class,
           AccessGateService.class,
+          OperationAccessPolicy.class,
+          RefineryAccessPolicy.class,
+          JobOrderAccessPolicy.class,
+          MissionAccessPolicy.class,
+          InventoryAccessPolicy.class,
           MissionSecurityService.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class);

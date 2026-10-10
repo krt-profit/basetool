@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.*;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -50,6 +51,12 @@ class InventoryPageControllerTest {
    */
   private static final ParallelPageLoader PARALLEL = new ParallelPageLoader();
 
+  private static final String MATERIAL_DRILLDOWN =
+      "/api/v1/inventory/material/{id}?page={page}&size={size}";
+
+  private static final String GAME_ITEM_DRILLDOWN =
+      "/api/v1/inventory/game-item/{id}?page={page}&size={size}";
+
   private BackendApiClient backendApiClient;
   private InventoryPageController controller;
   private InventoryWriteController writeController;
@@ -70,8 +77,9 @@ class InventoryPageControllerTest {
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    controller = new InventoryPageController(backendApiClient, PARALLEL, ROLE_HIERARCHY);
-    writeController = new InventoryWriteController(backendApiClient, controller);
+    InventoryBackendClient inventoryClient = new InventoryBackendClient(backendApiClient);
+    controller = new InventoryPageController(inventoryClient, PARALLEL, ROLE_HIERARCHY);
+    writeController = new InventoryWriteController(inventoryClient, controller);
   }
 
   @Test
@@ -79,7 +87,7 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewAggregatedInventory(null, null, null, null, model);
 
@@ -91,7 +99,7 @@ class InventoryPageControllerTest {
   @Test
   void viewAggregatedInventory_shouldHandleException() {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(anyString(), anyTypeRef()))
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenThrow(new RuntimeException("Backend error"));
 
     String view = controller.viewAggregatedInventory(null, null, null, null, model);
@@ -105,7 +113,7 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewAggregatedInventory(null, null, null, "results", model);
 
@@ -118,7 +126,7 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewMaterialInventory(materialId, null, null, null, model);
 
@@ -129,18 +137,40 @@ class InventoryPageControllerTest {
     assertEquals(materialId, model.getAttribute("selectedMaterialId"));
   }
 
+  /**
+   * The material drilldown names its material for the page head from the catalog when the current
+   * page holds no row to read it from.
+   */
+  @Test
+  void viewMaterialInventory_namesTheMaterialFromTheCatalogWhenThePageIsEmpty() {
+    Model model = new ConcurrentModel();
+    UUID materialId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
+    when(backendApiClient.getCached(any(), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU"),
+                new MaterialReferenceDto(materialId, "Quantanium", "SCU")));
+
+    controller.viewMaterialInventory(materialId, null, null, null, model);
+
+    assertEquals("Quantanium", model.getAttribute("materialName"));
+  }
+
   @Test
   void viewMaterialInventory_forwardsPageAndWhitelistedSizeToBackend() {
     Model model = new ConcurrentModel();
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 3, 100, 350, 4, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     controller.viewMaterialInventory(materialId, 3, 100, null, model);
 
     verify(backendApiClient)
-        .get(eq("/api/v1/inventory/material/" + materialId + "?page=3&size=100"), anyTypeRef());
+        .get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(3), eq(100));
   }
 
   @Test
@@ -149,12 +179,12 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     controller.viewMaterialInventory(materialId, -1, 1000, null, model);
 
     verify(backendApiClient)
-        .get(eq("/api/v1/inventory/material/" + materialId + "?page=0&size=50"), anyTypeRef());
+        .get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(0), eq(50));
   }
 
   @Test
@@ -163,13 +193,13 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 1, 50, 120, 3, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewMaterialInventory(materialId, 1, null, "results", model);
 
     assertEquals("inventory-material :: inventoryMaterialResults", view);
     verify(backendApiClient, never()).getCached(any(), anyTypeRef());
-    verify(backendApiClient, times(1)).get(anyString(), anyTypeRef());
+    verify(backendApiClient, times(1)).get(anyString(), anyTypeRef(), any(Object[].class));
   }
 
   @Test
@@ -178,7 +208,7 @@ class InventoryPageControllerTest {
     UUID gameItemId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 2, 100, 250, 3, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewGameItemInventory(gameItemId, 2, 100, null, model);
 
@@ -188,7 +218,7 @@ class InventoryPageControllerTest {
     assertEquals(List.of(50, 100, 200), model.getAttribute("pageSizes"));
     assertEquals(gameItemId, model.getAttribute("selectedGameItemId"));
     verify(backendApiClient)
-        .get(eq("/api/v1/inventory/game-item/" + gameItemId + "?page=2&size=100"), anyTypeRef());
+        .get(eq(GAME_ITEM_DRILLDOWN), anyTypeRef(), eq(gameItemId), eq(2), eq(100));
   }
 
   @Test
@@ -197,32 +227,35 @@ class InventoryPageControllerTest {
     UUID gameItemId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String view = controller.viewGameItemInventory(gameItemId, null, 1000, "results", model);
 
     assertEquals("inventory-game-item :: inventoryGameItemResults", view);
     verify(backendApiClient)
-        .get(eq("/api/v1/inventory/game-item/" + gameItemId + "?page=0&size=50"), anyTypeRef());
+        .get(eq(GAME_ITEM_DRILLDOWN), anyTypeRef(), eq(gameItemId), eq(0), eq(50));
   }
 
   @Test
   void viewMaterialInventory_clampsOutOfRangePageToLastPage() {
     Model model = new ConcurrentModel();
     UUID materialId = UUID.randomUUID();
-    String base = "/api/v1/inventory/material/" + materialId;
     PageResponse<InventoryItemDto> overrun =
         new PageResponse<>(List.of(), 5, 50, 40, 1, Collections.emptyList());
     PageResponse<InventoryItemDto> lastPage =
         new PageResponse<>(List.of(), 0, 50, 40, 1, Collections.emptyList());
-    when(backendApiClient.get(eq(base + "?page=5&size=50"), anyTypeRef())).thenReturn(overrun);
-    when(backendApiClient.get(eq(base + "?page=0&size=50"), anyTypeRef())).thenReturn(lastPage);
+    when(backendApiClient.get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(5), eq(50)))
+        .thenReturn(overrun);
+    when(backendApiClient.get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(0), eq(50)))
+        .thenReturn(lastPage);
 
     controller.viewMaterialInventory(materialId, 5, null, null, model);
 
     assertSame(lastPage, model.getAttribute("inventoryMaterialPage"));
-    verify(backendApiClient).get(eq(base + "?page=5&size=50"), anyTypeRef());
-    verify(backendApiClient).get(eq(base + "?page=0&size=50"), anyTypeRef());
+    verify(backendApiClient)
+        .get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(5), eq(50));
+    verify(backendApiClient)
+        .get(eq(MATERIAL_DRILLDOWN), anyTypeRef(), eq(materialId), eq(0), eq(50));
   }
 
   @Test
@@ -231,18 +264,17 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
 
     controller.viewMaterialInventory(materialId, 0, null, null, model);
 
-    verify(backendApiClient, times(1)).get(anyString(), anyTypeRef());
+    verify(backendApiClient, times(1)).get(anyString(), anyTypeRef(), any(Object[].class));
   }
 
   @Test
   void viewGameItemInventory_clampsOverrunPageAndResolvesTitleFromLastPage() {
     Model model = new ConcurrentModel();
     UUID gameItemId = UUID.randomUUID();
-    String base = "/api/v1/inventory/game-item/" + gameItemId;
     PageResponse<InventoryItemDto> overrun =
         new PageResponse<>(List.of(), 3, 50, 20, 1, Collections.emptyList());
     InventoryItemDto row =
@@ -267,8 +299,10 @@ class InventoryPageControllerTest {
             null);
     PageResponse<InventoryItemDto> lastPage =
         new PageResponse<>(List.of(row), 0, 50, 20, 1, Collections.emptyList());
-    when(backendApiClient.get(eq(base + "?page=3&size=50"), anyTypeRef())).thenReturn(overrun);
-    when(backendApiClient.get(eq(base + "?page=0&size=50"), anyTypeRef())).thenReturn(lastPage);
+    when(backendApiClient.get(eq(GAME_ITEM_DRILLDOWN), anyTypeRef(), eq(gameItemId), eq(3), eq(50)))
+        .thenReturn(overrun);
+    when(backendApiClient.get(eq(GAME_ITEM_DRILLDOWN), anyTypeRef(), eq(gameItemId), eq(0), eq(50)))
+        .thenReturn(lastPage);
 
     controller.viewGameItemInventory(gameItemId, 3, null, null, model);
 
@@ -584,7 +618,8 @@ class InventoryPageControllerTest {
     when(bindingResult.hasErrors()).thenReturn(false);
     RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String view =
         writeController.bookOutInventoryItem(
@@ -603,7 +638,7 @@ class InventoryPageControllerTest {
     when(bindingResult.hasErrors()).thenReturn(false);
     RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class)))
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
         .thenThrow(new RuntimeException("Update error"));
 
     String view =
@@ -625,7 +660,8 @@ class InventoryPageControllerTest {
     when(bindingResult.hasErrors()).thenReturn(false);
     RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
-    when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
+        .thenReturn(null);
 
     String referer =
         "https://example.org/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222&fragment=true";
@@ -709,7 +745,7 @@ class InventoryPageControllerTest {
             null,
             null);
     when(backendApiClient.put(
-            eq("/api/v1/inventory/" + id + "/note"), eq(request), eq(InventoryItemDto.class)))
+            eq("/api/v1/inventory/{id}/note"), eq(request), eq(InventoryItemDto.class), eq(id)))
         .thenReturn(updated);
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
@@ -726,7 +762,8 @@ class InventoryPageControllerTest {
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
         new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
             "Backend service returned error: 409 CONFLICT", null, 409);
-    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(ex);
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
         writeController.updateInventoryItemNote(id, request);
@@ -741,7 +778,8 @@ class InventoryPageControllerTest {
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
         new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
             "Backend service returned error: 403 FORBIDDEN", null, 403);
-    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(ex);
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
         writeController.updateInventoryItemNote(id, request);
@@ -753,7 +791,7 @@ class InventoryPageControllerTest {
   void updateInventoryItemNote_shouldReturn500OnGenericException() {
     UUID id = UUID.randomUUID();
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
-    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class)))
+    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
         .thenThrow(new RuntimeException("boom"));
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
@@ -779,7 +817,7 @@ class InventoryPageControllerTest {
             null,
             null);
     when(backendApiClient.post(
-            eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
+            eq("/api/v1/inventory/{id}/book-out"), eq(dto), eq(InventoryItemDto.class), eq(id)))
         .thenReturn(null);
 
     org.springframework.http.ResponseEntity<Object> response =
@@ -826,7 +864,7 @@ class InventoryPageControllerTest {
             null,
             null);
     when(backendApiClient.post(
-            eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
+            eq("/api/v1/inventory/{id}/book-out"), eq(dto), eq(InventoryItemDto.class), eq(id)))
         .thenReturn(remaining);
 
     org.springframework.http.ResponseEntity<Object> response =
@@ -861,7 +899,8 @@ class InventoryPageControllerTest {
             null,
             java.util.List.of(),
             null);
-    when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+    when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(ex);
 
     org.springframework.http.ResponseEntity<Object> response =
         writeController.transferInventoryItem(id, dto);
@@ -900,7 +939,10 @@ class InventoryPageControllerTest {
             null,
             null);
     when(backendApiClient.patch(
-            eq("/api/v1/inventory/" + id + "/delivered"), eq(request), eq(InventoryItemDto.class)))
+            eq("/api/v1/inventory/{id}/delivered"),
+            eq(request),
+            eq(InventoryItemDto.class),
+            eq(id)))
         .thenReturn(updated);
 
     org.springframework.http.ResponseEntity<Object> response =
@@ -924,7 +966,9 @@ class InventoryPageControllerTest {
             null,
             java.util.List.of(),
             null);
-    when(backendApiClient.patch(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+    when(backendApiClient.patch(
+            anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(ex);
 
     org.springframework.http.ResponseEntity<Object> response =
         writeController.updateDelivered(id, request);
@@ -963,9 +1007,10 @@ class InventoryPageControllerTest {
             null,
             null);
     when(backendApiClient.post(
-            eq("/api/v1/inventory/" + id + "/personal-rebook"),
+            eq("/api/v1/inventory/{id}/personal-rebook"),
             eq(dto),
-            eq(InventoryItemDto.class)))
+            eq(InventoryItemDto.class),
+            eq(id)))
         .thenReturn(newRow);
 
     org.springframework.http.ResponseEntity<Object> response =
@@ -975,9 +1020,10 @@ class InventoryPageControllerTest {
     assertSame(newRow, response.getBody());
     verify(backendApiClient)
         .post(
-            eq("/api/v1/inventory/" + id + "/personal-rebook"),
+            eq("/api/v1/inventory/{id}/personal-rebook"),
             eq(dto),
-            eq(InventoryItemDto.class));
+            eq(InventoryItemDto.class),
+            eq(id));
   }
 
   @Test
@@ -993,7 +1039,8 @@ class InventoryPageControllerTest {
             null,
             java.util.List.of(),
             null);
-    when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+    when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class), any(Object[].class)))
+        .thenThrow(ex);
 
     org.springframework.http.ResponseEntity<Object> response =
         writeController.rebookPersonalInventoryItem(id, dto);

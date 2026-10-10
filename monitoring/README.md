@@ -306,6 +306,7 @@ section above.
 | **BulkheadNearSaturation** | A bulkhead (`name` label) has had fewer than 5 free slots for 10 minutes; in the frontend, page renders are about to queue behind the parallel backend fan-out. Check backend latency and concurrent load. The gateway's `exchangeLargeChangeSets` bulkhead is left out: it has four slots by design and alerts as **ExchangeLargeChangeSetsBusy**. |
 | **RetryRateElevated / BackendCallFailureSustained** | Frontend→backend calls succeed only after a retry (above 0.2/s), or keep failing (above 0.5/s), for 10 minutes while the breaker may still be closed. Check backend health and the frontend→backend network path. |
 | **FrontendBackendFanoutHigh** | The frontend made more than 10 backend calls per inbound request for 15 minutes — a page or fragment lost its read gating. Check recent frontend controller changes for an ungated backend fan-out. |
+| **HttpUriTagCapNear** | An application reports 900 distinct `uri` values on `http.server.requests` or `http.client.requests` (`meter` label), 90 % of its `max-uri-tags` cap of 1000. Past the cap Micrometer drops every new route without a metric, so it silently leaves the 5xx and latency alerts. Raise `management.metrics.web.*.max-uri-tags` in the module's `application.yml` together with `UriTagCapacityTest`, or find the raw path leaking into the tag. |
 | **CacheSizeEvictionsHigh / CacheHitRatioLow** | A cache (`cache` label) evicts live entries at its size cap, or serves under 50 % hits at real traffic. Raise the cap or find the key explosion (an unbounded pageable-keyed cache); otherwise the database is re-hit. |
 | **HealthContributorHanging** | A Spring Boot health contributor took more than 10 s; readiness and the container health check (5 s timeout) fail while the app looks alive. The log line names the contributor — usually Redis or the database behind it. |
 | **FrontendKeycloakBackchannelFailing** | The frontend logs a sustained rate of `PrematureCloseException` against Keycloak's token endpoint — refresh grants are lost and logins may fail. Check the frontend→Keycloak path (the internal alias, the edge) and the re-auth rate on `07`. |
@@ -319,7 +320,7 @@ section above.
 | **NoRoleBlockSpike** | More than three distinct accounts refused with `403 NO_ROLE` in 15 minutes (REQ-SEC-053). One or two is an admin who has not assigned a role yet; more is a realm-side role rename, a hand edit or tokens from the wrong realm — check the Keycloak role index line in the sync summary. |
 | **TermsConsentRolloutStalled** | At least three members have been refused by the consent gate for an hour and nobody accepted in two hours — the consent path is broken and they are locked out of the tool and the extractor. Check `/admin/terms` and the frontend log for failures on `POST /terms/accept`. |
 | **AuditSilenceAnomaly** | An audited area has gone unexpectedly quiet. Verify the audit pipeline is recording; a silent area may mean logging broke, not that activity stopped. Carries `keep_firing_for: 15m` so the nightly 04:15 backup quiesce does not produce a RESOLVED + FIRING pair every night. |
-| **AuditDomainSilenceAnomaly** | One audit domain recorded nothing for 30d while others stay active — it may have lost its audit wiring (REQ-AUDIT-001). Check the domain's `auditService.record` calls. `ROLE`/`PROMOTION`/`PERSONAL_INVENTORY`/`MARKET`/`HANGAR`/`BLUEPRINT`/`CONNECTED_APPS` are excluded; review their volume on the `07` per-domain tables. Same `keep_firing_for: 15m` hold. |
+| **AuditDomainSilenceAnomaly** | One audit domain recorded nothing for 30d while others stay active — it may have lost its audit wiring (REQ-AUDIT-001). Check the domain's `auditRecorder.record` calls. `ROLE`/`PROMOTION`/`PERSONAL_INVENTORY`/`MARKET`/`HANGAR`/`BLUEPRINT`/`CONNECTED_APPS` are excluded; review their volume on the `07` per-domain tables. Same `keep_firing_for: 15m` hold. |
 | **BankAuditSilenceAnomaly** | The bank audit trail recorded nothing for 60d while the backend is up. Verify bank mutations still write `bank_audit_event` rows. Same hold. |
 | **RegistrationApprovalOverdue / BankBookingApprovalOverdue** | An approval queue is aging past SLA. Notify the approvers; clear the backlog. |
 | **DeletionRequestOverdue** | A member's Art. 17 erasure request has been pending more than 14 days. Art. 12(3) gives one month, so this is a warning with headroom: decide it in Administration -> Löschanträge. A refusal needs a written reason (REQ-SEC-061). |
@@ -343,7 +344,7 @@ section above.
 | **SessionTypeOutsideAllowList** | A session value names a class outside `SessionTypeAllowList` (the frontend WARN names it once per lifetime). `mode=report`: nothing broke, but enforcing would drop it — add a legitimate class to the list and keep reporting until this stays silent. `mode=enforce`: the attribute was refused, correct for a foreign class and a defect for a legitimate one (REQ-SEC-067). |
 | **RedisFanoutUnsubscribed** | A backend cross-instance pub/sub container has not been listening for 10 minutes; the backend stays healthy while cross-instance delivery is dead. Check the `redis` unit and `net-redis-backend`. |
 | **CsrfRejectionSpike** | CSRF rejections >0.1/s for 15m — likely a CSRF-wiring regression. Check recent security/template changes. |
-| **ClientErrorSpike** | The browser error beacon reports one `kind` at >20/h and >3x its 24h average. Check the last frontend deploy; raise `ClientErrorReportController` to DEBUG for the message and script URL (for `csp_violation`: the violated directive and the blocked origin). |
+| **ClientErrorSpike** | The browser error beacon reports one `kind` at >20/h and >3x its 24h average. Check the last frontend deploy; raise `ClientErrorReportController` to DEBUG for the message and script URL (for `csp_violation`: the violated directive and the blocked origin; a Trusted Types sink shows as `require-trusted-types-for Element innerHTML`, ADR-0239). |
 | **DiscordPrecheckUnauthorizedSpike / DiscordPrecheckDisabledOnProd** | The Discord precheck is answering 401 at an elevated rate (secret guessing), or 503 with a blank secret (config drift — the SPI then fails open). |
 | **RateLimitRejectionRatioHigh** | More than 1% of rate-limit evaluations on one module/bucket are rejected. Check the source and whether the limit needs tuning. |
 | **KeycloakLoginErrorSpike / KeycloakErrorRateHigh / KeycloakEventMetricsAbsent** | Login errors jumped, Keycloak is logging ERRORs (check the fail-open Discord SPI path first), or the event counter is missing while Keycloak serves token traffic (check `KC_METRICS_ENABLED=true` in `.env` — the generated template defaults it to off). |
@@ -618,7 +619,9 @@ the rule keeps parsing, keeps deploying and can never fire again. It was verifie
 2026-09-22** (steps 1–3 below, plus the stream check on production:
 `{app=~"(backend|frontend|ingest)-stdout"}` present in Loki under the Podman journald path) and
 **again on `…@sha256:2ca9adf4…` on 2026-09-25**, the digest `docker/app/Dockerfile` pins since #2035
-(steps 1–5; the #2035 bump itself had skipped it). The next digest bump owes it again.
+(steps 1–5; the #2035 bump itself had skipped it) and **again on `…@sha256:3c0a9084…` (Temurin
+25.0.4.1+1) on 2026-10-04**, the digest `docker/app/Dockerfile` pins now (steps 1–3 and 5; wording
+unchanged). The next digest bump owes it again.
 
 On a workstation, never on production:
 
@@ -936,9 +939,9 @@ done
 docker rm -f bb-lint
 
 # Alloy — format check + validate. `validate` exits 0 even on failure: read its output.
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.20.0 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.20.1 \
   fmt --test /cfg/config.alloy
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.20.0 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.20.1 \
   validate /cfg/config.alloy
 # The shipper-side masks (CI: repo-lint -> alloy-log-masking)
 python3 scripts/check-alloy-log-masking.py

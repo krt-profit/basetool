@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,9 +28,9 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Optional;
@@ -46,9 +45,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 
 /**
- * Unit tests for {@link RequestScopeResolver#currentUserListScopeSquadronIds()} and {@link
- * RequestScopeResolver#currentUserIsMemberOfAreaCascade(UUID)}, using a resolver built from mocks
- * with request memoisation disabled.
+ * Unit tests for {@link RequestScopeResolver#currentUserListScopeSquadronIds()}, using a resolver
+ * built from mocks with request memoisation disabled.
  */
 @ExtendWith(MockitoExtension.class)
 class RequestScopeResolverScopeTest {
@@ -71,14 +69,6 @@ class RequestScopeResolverScopeTest {
     OrgUnitMembership m = new OrgUnitMembership();
     m.setId(new OrgUnitMembershipId(userId, orgUnitId));
     m.setKind(OrgUnitKind.SQUADRON);
-    return m;
-  }
-
-  /** Returns a membership row of the given kind pointing the given user at the given org unit. */
-  private static OrgUnitMembership membership(UUID userId, UUID orgUnitId, OrgUnitKind kind) {
-    OrgUnitMembership m = new OrgUnitMembership();
-    m.setId(new OrgUnitMembershipId(userId, orgUnitId));
-    m.setKind(kind);
     return m;
   }
 
@@ -168,43 +158,6 @@ class RequestScopeResolverScopeTest {
           .thenReturn(List.of());
 
       assertNull(resolver.currentUserListScopeSquadronIds());
-    }
-  }
-
-  @Nested
-  class CurrentUserIsMemberOfAreaCascadeTests {
-
-    private static final UUID BEREICH_ID = UUID.randomUUID();
-    private static final UUID CHILD_STAFFEL_ID = UUID.randomUUID();
-
-    @Test
-    void memberOfBereichItself_true() {
-      when(orgUnitRepository.findChildOrgUnitIds(BEREICH_ID)).thenReturn(List.of(CHILD_STAFFEL_ID));
-      when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(CALLER_ID))
-          .thenReturn(List.of(membership(CALLER_ID, BEREICH_ID, OrgUnitKind.BEREICH)));
-
-      assertTrue(resolver.currentUserIsMemberOfAreaCascade(BEREICH_ID));
-    }
-
-    @Test
-    void memberOfChildStaffel_true() {
-      when(orgUnitRepository.findChildOrgUnitIds(BEREICH_ID)).thenReturn(List.of(CHILD_STAFFEL_ID));
-      when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(CALLER_ID))
-          .thenReturn(List.of(staffelMembership(CALLER_ID, CHILD_STAFFEL_ID)));
-
-      assertTrue(resolver.currentUserIsMemberOfAreaCascade(BEREICH_ID));
-    }
-
-    @Test
-    void memberOfUnrelatedUnit_false() {
-      when(orgUnitRepository.findChildOrgUnitIds(BEREICH_ID)).thenReturn(List.of(CHILD_STAFFEL_ID));
-      when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(CALLER_ID))
-          .thenReturn(List.of(staffelMembership(CALLER_ID, SQUADRON_A_ID)));
-
-      assertFalse(resolver.currentUserIsMemberOfAreaCascade(BEREICH_ID));
     }
   }
 }

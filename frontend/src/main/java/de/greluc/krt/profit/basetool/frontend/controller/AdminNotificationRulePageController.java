@@ -24,14 +24,13 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -48,8 +47,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * Admin page and AJAX relay for the data-driven notification rules (REQ-NOTIF-007), proxied through
- * {@link BackendApiClient}. Backend failures are relayed as {@code application/problem+json}; after
- * a write the rules table is re-fetched in place (REQ-FE-001).
+ * {@link NotificationBackendClient}. Backend failures are relayed as {@code
+ * application/problem+json}; after a write the rules table is re-fetched in place (REQ-FE-001).
  */
 @Controller
 @UsesLayoutModel
@@ -58,10 +57,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 @Slf4j
 public class AdminNotificationRulePageController {
-
-  private static final String BACKEND_BASE = "/api/v1/notification-rules";
-  private static final ParameterizedTypeReference<List<NotificationRuleDto>> LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
 
   /** The {@code fragment} value that renders only the rules table, for the in-place swap. */
   static final String RULES_FRAGMENT = "rules";
@@ -84,7 +79,65 @@ public class AdminNotificationRulePageController {
           "ACCOUNT_DELETION_REQUEST_DECLINED",
           "ACCOUNT_DELETION_REQUEST_RESOLVED",
           "EXCHANGE_INSTALLATION_CONNECTED",
-          "EXCHANGE_BULK_UNDO_APPLIED");
+          "EXCHANGE_BULK_UNDO_APPLIED",
+          "INVENTORY_TRANSFERRED_TO_USER",
+          "INVENTORY_TRANSFERRED_FROM_USER",
+          "DISCORD_REGISTRATION_DECIDED",
+          "JOB_ORDER_CLOSED",
+          "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER",
+          "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED",
+          "MISSION_RESCHEDULED",
+          "MISSION_CANCELLED",
+          "MISSION_DELETED",
+          "MISSION_REMINDER_DUE",
+          "MISSION_STARTED",
+          "MISSION_CHECKED_IN",
+          "MISSION_PARTICIPANT_ADDED",
+          "MISSION_PARTICIPANT_REMOVED",
+          "MISSION_PARTICIPANT_LEFT",
+          "MISSION_NEVER_ENDED",
+          "MISSION_END_RECORDED",
+          "MISSION_RESPONSIBILITY_ASSIGNED",
+          "OPERATION_PAYOUT_MARKED",
+          "OPERATION_PAYOUT_UNMARKED",
+          "OPERATION_COMPLETED",
+          "OPERATION_COMPLETED_UNOWNED",
+          "JOB_ORDER_REASSIGNED",
+          "JOB_ORDER_FINISHED",
+          "JOB_ORDER_ASSIGNEE_ADDED",
+          "JOB_ORDER_ASSIGNEE_REMOVED",
+          "JOB_ORDER_CLAIM_WITHDRAWN",
+          "REFINERY_ORDER_READY",
+          "REFINERY_ORDER_CHANGED_BY_OTHER",
+          "REFINERY_ORDER_READY_CLEARED",
+          "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE",
+          "MATERIAL_REQUEST_UNAVAILABLE",
+          "INVENTORY_BOOKED_OUT_BY_OTHER",
+          "BANK_BOOKING_REQUEST_APPROVED",
+          "BANK_BOOKING_REQUEST_APPROVAL_REVOKED",
+          "BANK_GRANT_CHANGED",
+          "BANK_GRANT_REVOKED",
+          "BANK_PAYOUT_BOOKED",
+          "BANK_HOLDER_TRANSFER_BOOKED",
+          "BANK_ACCOUNT_DEBITED",
+          "BANK_HOLDER_DEACTIVATED_WITH_BALANCE",
+          "BANK_HOLDER_NOTICE_CLEARED",
+          "ORG_LEADERSHIP_ROLE_MISMATCH",
+          "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED",
+          "ORG_MEMBER_DEPARTED",
+          "HANGAR_SHIP_ASSIGNED_TO_UNIT",
+          "HANGAR_SHIP_UNASSIGNED_FROM_UNIT",
+          "HANGAR_SHIP_DELETED_FROM_MISSION",
+          "HANGAR_FITTED_RESET_FOR_OWNER",
+          "HANGAR_CHANGED_BY_ADMIN",
+          "BLUEPRINT_CHANGED_BY_ADMIN",
+          "BLUEPRINT_PURGED_BY_ADMIN",
+          "EXCHANGE_CLIENT_SUSPENDED",
+          "EXCHANGE_CLIENT_ACTIVATED",
+          "EXCHANGE_CLIENT_UPDATE_REQUIRED",
+          "EXCHANGE_CLIENT_CAPABILITY_REMOVED",
+          "EXCHANGE_SWITCHED_OFF",
+          "EXCHANGE_SWITCHED_ON");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -104,11 +157,56 @@ public class AdminNotificationRulePageController {
           "ACCOUNT_DELETION_REQUESTED",
           "ACCOUNT_DELETION_REQUEST_DECLINED",
           "EXCHANGE_INSTALLATION_CONNECTED",
-          "EXCHANGE_BULK_UNDO_APPLIED");
+          "EXCHANGE_BULK_UNDO_APPLIED",
+          "INVENTORY_TRANSFERRED_TO_USER",
+          "INVENTORY_TRANSFERRED_FROM_USER",
+          "BANK_BOOKING_REQUEST_UPDATED",
+          "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED",
+          "MISSION_RESCHEDULED",
+          "MISSION_CANCELLED",
+          "MISSION_DELETED",
+          "MISSION_REMINDER",
+          "MISSION_CHECKIN_OPEN",
+          "MISSION_PARTICIPANT_ADDED_BY_OTHER",
+          "MISSION_PARTICIPANT_REMOVED_BY_OTHER",
+          "MISSION_PARTICIPANT_LEFT",
+          "MISSION_NEVER_ENDED",
+          "MISSION_RESPONSIBILITY_ASSIGNED",
+          "OPERATION_PAYOUT_PAID_OUT",
+          "OPERATION_COMPLETED",
+          "JOB_ORDER_REASSIGNED",
+          "JOB_ORDER_FINISHED",
+          "JOB_ORDER_ASSIGNED",
+          "JOB_ORDER_CLAIM_WITHDRAWN",
+          "REFINERY_ORDER_READY",
+          "REFINERY_ORDER_CHANGED_BY_OTHER",
+          "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE",
+          "MATERIAL_REQUEST_UNAVAILABLE",
+          "INVENTORY_BOOKED_OUT_BY_OTHER",
+          "BANK_BOOKING_REQUEST_APPROVED",
+          "BANK_GRANT_CHANGED",
+          "BANK_GRANT_REVOKED",
+          "BANK_PAYOUT_RECEIVED",
+          "BANK_HOLDER_TRANSFER_RECEIVED",
+          "BANK_ACCOUNT_DEBITED",
+          "BANK_HOLDER_DEACTIVATED_WITH_BALANCE",
+          "ORG_LEADERSHIP_ROLE_MISMATCH",
+          "ORG_MEMBER_DEPARTED",
+          "HANGAR_SHIP_ASSIGNED",
+          "HANGAR_SHIP_REMOVED_FROM_UNIT",
+          "HANGAR_FITTED_RESET",
+          "HANGAR_CHANGED_BY_ADMIN",
+          "BLUEPRINT_CHANGED_BY_ADMIN",
+          "BLUEPRINT_PURGED_BY_ADMIN",
+          "EXCHANGE_CLIENT_SUSPENDED",
+          "EXCHANGE_CLIENT_ACTIVATED",
+          "EXCHANGE_CLIENT_UPDATE_REQUIRED",
+          "EXCHANGE_CLIENT_CAPABILITY_REMOVED",
+          "EXCHANGE_SWITCHED_OFF");
 
   /**
-   * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. The
-   * last three read no selector field — the account or recipient comes from the event.
+   * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but
+   * the first three read no selector field — the recipients come from the event.
    */
   static final List<String> SELECTOR_KINDS =
       List.of(
@@ -117,14 +215,18 @@ public class AdminNotificationRulePageController {
           "ORG_RELATIVE_ROLE",
           "ACCOUNT_GRANT",
           "EVENT_RECIPIENT",
-          "ACCOUNT_RESPONSIBLE");
+          "ACCOUNT_RESPONSIBLE",
+          "MISSION_PARTICIPANTS",
+          "MISSION_LEADERSHIP",
+          "EXCHANGE_CLIENT_HOLDERS",
+          "EVENT_RECIPIENTS");
 
   /**
    * {@code OrgRelativeRole} codes, labelled via {@code
    * admin.notificationRules.selector.orgRelativeRole}.
    */
   static final List<String> ORG_RELATIVE_ROLES =
-      List.of("OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER");
+      List.of("OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER", "UNIT_LEADERSHIP");
 
   /**
    * {@code NotificationContextRole} codes, labelled via {@code
@@ -142,7 +244,7 @@ public class AdminNotificationRulePageController {
       List.of(
           Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT);
 
-  private final BackendApiClient backendApiClient;
+  private final NotificationBackendClient notificationClient;
 
   /**
    * Renders the rules admin page, or with {@code fragment=rules} only the rules table for the
@@ -157,7 +259,7 @@ public class AdminNotificationRulePageController {
   @GetMapping
   public String page(@RequestParam(required = false) String fragment, Model model) {
     try {
-      List<NotificationRuleDto> rules = backendApiClient.get(BACKEND_BASE, LIST_TYPE);
+      List<NotificationRuleDto> rules = notificationClient.rules();
       model.addAttribute("rules", rules == null ? List.of() : rules);
     } catch (Exception e) {
       log.debug("Failed to load notification rules", e);
@@ -188,8 +290,7 @@ public class AdminNotificationRulePageController {
         log,
         "load notification rule " + id + " (ajax)",
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.get(BACKEND_BASE + "/" + id, NotificationRuleDto.class));
+          return ResponseEntity.ok(notificationClient.rule(id));
         });
   }
 
@@ -206,8 +307,7 @@ public class AdminNotificationRulePageController {
         log,
         "create notification rule (ajax)",
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.post(BACKEND_BASE, request, NotificationRuleDto.class));
+          return ResponseEntity.ok(notificationClient.createRule(request));
         });
   }
 
@@ -226,8 +326,7 @@ public class AdminNotificationRulePageController {
         log,
         "update notification rule " + id + " (ajax)",
         () -> {
-          return ResponseEntity.ok(
-              backendApiClient.put(BACKEND_BASE + "/" + id, request, NotificationRuleDto.class));
+          return ResponseEntity.ok(notificationClient.updateRule(id, request));
         });
   }
 
@@ -244,7 +343,7 @@ public class AdminNotificationRulePageController {
         log,
         "delete notification rule " + id + " (ajax)",
         () -> {
-          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          notificationClient.deleteRule(id);
           return ResponseEntity.noContent().build();
         });
   }

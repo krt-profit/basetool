@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeRequest;
@@ -49,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryStolenMarkService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -783,7 +783,7 @@ public class InventoryItemController {
    * @return the persisted DTO or 204
    */
   @PostMapping("/{id}/book-out")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public ResponseEntity<InventoryItemDto> bookOutInventoryItem(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -820,7 +820,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
   })
   @PostMapping("/{id}/personal-rebook")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto rebookPersonal(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -836,7 +836,7 @@ public class InventoryItemController {
    * locking is enforced via the {@code version} field in the request.
    */
   @PutMapping("/{id}/note")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto updateInventoryItemNote(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -898,7 +898,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
   })
   @PostMapping("/{id}/org-unit")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto changeOrgUnit(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -939,7 +939,7 @@ public class InventoryItemController {
   /**
    * Sets or removes the „gestohlen" marker on a row or on a part of it (REQ-INV-053). A part is
    * split off as a new row; it and a flipped whole row merge into a stack of the new identity where
-   * the merge rules allow. Whoever may edit the row may change its marker.
+   * the merge rules allow. The row's owner and logisticians or above may change its marker.
    *
    * @param jwt the caller's token
    * @param id the row
@@ -957,7 +957,9 @@ public class InventoryItemController {
     @ApiResponse(
         responseCode = "400",
         description = "Amount not positive, larger than the row, or fractional on whole units"),
-    @ApiResponse(responseCode = "403", description = "Access denied - the caller may not edit it"),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Access denied - another member's row and not a logistician"),
     @ApiResponse(responseCode = "404", description = "Inventory item not found"),
     @ApiResponse(
         responseCode = "409",
@@ -965,12 +967,13 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "422", description = "The rest could not carry its earmarks")
   })
   @PostMapping("/{id}/stolen")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto markStolen(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid InventoryItemStolenMarkDto dto) {
-    return inventoryStolenMarkService.mark(id, dto, userService.getUserIdFromJwt(jwt));
+    return inventoryStolenMarkService.mark(
+        id, dto, userService.getUserIdFromJwt(jwt), authHelperService.isLogisticianOrAbove());
   }
 
   /**
@@ -1049,7 +1052,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
   })
   @PatchMapping("/{id}/delivered")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto updateDelivered(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -1065,6 +1068,7 @@ public class InventoryItemController {
    * independently of the other dimension. The request echoes the entry's {@code version}; the write
    * force-increments it so the response carries the version the client must echo next.
    *
+   * @param jwt the caller's token
    * @param id the inventory entry id.
    * @param dto the allocation write payload (dimension, target, amount, version).
    * @return the updated entry DTO (new version + both refreshed slice lists).
@@ -1082,22 +1086,28 @@ public class InventoryItemController {
     @ApiResponse(
         responseCode = "400",
         description = "Personal entry, wrong material, or bad amount"),
-    @ApiResponse(responseCode = "403", description = "Access denied"),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Access denied - another member's entry and not a logistician"),
     @ApiResponse(responseCode = "404", description = "Entry, job order or mission not found"),
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict"),
     @ApiResponse(responseCode = "422", description = "Over-allocation (dimension Σ exceeds amount)")
   })
   @PostMapping("/{id}/allocation")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto addAllocation(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
-    return inventoryItemService.addAllocation(id, dto);
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid InventoryAllocationWriteDto dto) {
+    return inventoryItemService.addAllocation(
+        id, dto, userService.getUserIdFromJwt(jwt), authHelperService.isLogisticianOrAbove());
   }
 
   /**
    * Changes the amount of an existing quantity slice (Variante C, REQ-INV-027). Same version echo /
    * force-increment as {@link #addAllocation}.
    *
+   * @param jwt the caller's token
    * @param id the inventory entry id.
    * @param dto the allocation write payload (dimension, target, new amount, version).
    * @return the updated entry DTO.
@@ -1112,16 +1122,21 @@ public class InventoryItemController {
         responseCode = "200",
         description = "Allocation changed; the updated entry returned"),
     @ApiResponse(responseCode = "400", description = "Personal entry or bad amount"),
-    @ApiResponse(responseCode = "403", description = "Access denied"),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Access denied - another member's entry and not a logistician"),
     @ApiResponse(responseCode = "404", description = "Entry or allocation not found"),
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict"),
     @ApiResponse(responseCode = "422", description = "Over-allocation (dimension Σ exceeds amount)")
   })
   @PatchMapping("/{id}/allocation")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto changeAllocation(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
-    return inventoryItemService.changeAllocation(id, dto);
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid InventoryAllocationWriteDto dto) {
+    return inventoryItemService.changeAllocation(
+        id, dto, userService.getUserIdFromJwt(jwt), authHelperService.isLogisticianOrAbove());
   }
 
   /**
@@ -1129,6 +1144,7 @@ public class InventoryItemController {
    * (Variante C, REQ-INV-027). The {@code amount} field of the payload is ignored. Same version
    * echo / force-increment as {@link #addAllocation}.
    *
+   * @param jwt the caller's token
    * @param id the inventory entry id.
    * @param dto the allocation write payload (dimension, target, version).
    * @return the updated entry DTO.
@@ -1140,15 +1156,20 @@ public class InventoryItemController {
     @ApiResponse(
         responseCode = "200",
         description = "Allocation removed; the updated entry returned"),
-    @ApiResponse(responseCode = "403", description = "Access denied"),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Access denied - another member's entry and not a logistician"),
     @ApiResponse(responseCode = "404", description = "Entry or allocation not found"),
     @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
   })
   @DeleteMapping("/{id}/allocation")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  @PreAuthorize("isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)")
   public InventoryItemDto removeAllocation(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
-    return inventoryItemService.removeAllocation(id, dto);
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid InventoryAllocationWriteDto dto) {
+    return inventoryItemService.removeAllocation(
+        id, dto, userService.getUserIdFromJwt(jwt), authHelperService.isLogisticianOrAbove());
   }
 
   /**

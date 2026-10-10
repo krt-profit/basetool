@@ -30,6 +30,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.controller.AdminUexPageController.StarSystemGroup;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OutpostDto;
@@ -38,10 +39,9 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.SpaceStationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -51,7 +51,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
  * Mockito tests for {@link AdminUexPageController}: the override dispatcher's backend URL per
- * kind/action, {@code listData}'s parsing and "latest UEX sync" header, and the hierarchy builder's
+ * kind/action, {@code listData}'s totals and "latest UEX sync" header, and the hierarchy builder's
  * placement of terminals, including orphans.
  */
 class AdminUexPageControllerTest {
@@ -59,7 +59,7 @@ class AdminUexPageControllerTest {
   @Test
   void updateLoadingDockOverride_routesYesActionForCity() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
 
@@ -67,13 +67,13 @@ class AdminUexPageControllerTest {
 
     assertEquals("redirect:/admin/uex-data", view);
     verify(client)
-        .patch(eq("/api/v1/cities/" + id + "/loading-dock?value=true"), any(), eq(Void.class));
+        .patch(eq("/api/v1/cities/{id}/loading-dock?value=true"), any(), eq(Void.class), eq(id));
   }
 
   @Test
   void updateLoadingDockOverride_routesNoActionForSpaceStation() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
 
@@ -81,53 +81,54 @@ class AdminUexPageControllerTest {
 
     verify(client)
         .patch(
-            eq("/api/v1/space-stations/" + id + "/loading-dock?value=false"),
+            eq("/api/v1/space-stations/{id}/loading-dock?value=false"),
             any(),
-            eq(Void.class));
+            eq(Void.class),
+            eq(id));
   }
 
   @Test
   void updateLoadingDockOverride_routesUexActionForOutpost() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
 
     controller.updateLoadingDockOverride("outposts", id, "uex", attrs);
 
-    verify(client).delete("/api/v1/outposts/" + id + "/loading-dock-override", Void.class);
+    verify(client).delete("/api/v1/outposts/{id}/loading-dock-override", Void.class, id);
   }
 
   @Test
   void updateLoadingDockOverride_routesYesActionForPoi() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
 
     controller.updateLoadingDockOverride("pois", id, "yes", attrs);
 
     verify(client)
-        .patch(eq("/api/v1/pois/" + id + "/loading-dock?value=true"), any(), eq(Void.class));
+        .patch(eq("/api/v1/pois/{id}/loading-dock?value=true"), any(), eq(Void.class), eq(id));
   }
 
   @Test
   void updateLoadingDockOverride_routesYesActionForTerminal() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
 
     controller.updateLoadingDockOverride("terminals", id, "yes", attrs);
 
     verify(client)
-        .patch(eq("/api/v1/terminals/" + id + "/loading-dock?value=true"), any(), eq(Void.class));
+        .patch(eq("/api/v1/terminals/{id}/loading-dock?value=true"), any(), eq(Void.class), eq(id));
   }
 
   @Test
   void updateLoadingDockOverride_rejectsUnknownKindWithoutBackendCall() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
 
@@ -138,12 +139,21 @@ class AdminUexPageControllerTest {
         .patch(ArgumentMatchers.<String>any(), any(), ArgumentMatchers.<Class<?>>any());
     verify(client, never())
         .delete(ArgumentMatchers.<String>any(), ArgumentMatchers.<Class<?>>any());
+    verify(client, never())
+        .patch(
+            ArgumentMatchers.<String>any(),
+            any(),
+            ArgumentMatchers.<Class<?>>any(),
+            any(Object[].class));
+    verify(client, never())
+        .delete(
+            ArgumentMatchers.<String>any(), ArgumentMatchers.<Class<?>>any(), any(Object[].class));
   }
 
   @Test
   void updateLoadingDockOverride_rejectsUnknownActionWithoutBackendCall() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
 
@@ -153,85 +163,84 @@ class AdminUexPageControllerTest {
         .patch(ArgumentMatchers.<String>any(), any(), ArgumentMatchers.<Class<?>>any());
     verify(client, never())
         .delete(ArgumentMatchers.<String>any(), ArgumentMatchers.<Class<?>>any());
+    verify(client, never())
+        .patch(
+            ArgumentMatchers.<String>any(),
+            any(),
+            ArgumentMatchers.<Class<?>>any(),
+            any(Object[].class));
+    verify(client, never())
+        .delete(
+            ArgumentMatchers.<String>any(), ArgumentMatchers.<Class<?>>any(), any(Object[].class));
   }
 
   @Test
   void updateTerminalAutoLoadOverride_yesPatchesTrue() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
 
     controller.updateTerminalAutoLoadOverride(id, "yes", attrs);
 
     verify(client)
-        .patch(eq("/api/v1/terminals/" + id + "/auto-load?value=true"), any(), eq(Void.class));
+        .patch(eq("/api/v1/terminals/{id}/auto-load?value=true"), any(), eq(Void.class), eq(id));
   }
 
   @Test
   void updateTerminalAutoLoadOverride_uexCallsDelete() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
 
     controller.updateTerminalAutoLoadOverride(id, "uex", attrs);
 
-    verify(client).delete("/api/v1/terminals/" + id + "/auto-load-override", Void.class);
+    verify(client).delete("/api/v1/terminals/{id}/auto-load-override", Void.class, id);
   }
 
   @Test
   void toggleTerminalVisibility_evictsTerminalDomainAfterWrite() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
     UUID id = UUID.randomUUID();
-    when(client.get("/api/v1/terminals/" + id, TerminalDto.class))
+    when(client.get("/api/v1/terminals/{id}", TerminalDto.class, id))
         .thenReturn(terminalIn("Lorville TDD", "Stanton", "Lorville", null));
 
     String view = controller.toggleTerminalVisibility(id, true, attrs);
 
     assertEquals("redirect:/admin/uex-data", view);
-    verify(client).put(eq("/api/v1/terminals/" + id), any(), eq(Void.class));
+    verify(client).put(eq("/api/v1/terminals/{id}"), any(), eq(Void.class), eq(id));
     verify(client).evict(CacheDomain.TERMINAL);
   }
 
   @Test
   void toggleTerminalVisibilityAjax_evictsTerminalDomainAfterWrite() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
     UUID id = UUID.randomUUID();
-    when(client.get("/api/v1/terminals/" + id, TerminalDto.class))
+    when(client.get("/api/v1/terminals/{id}", TerminalDto.class, id))
         .thenReturn(terminalIn("Area 18 TDD", "Stanton", "Area 18", null));
 
     ResponseEntity<Object> response = controller.toggleTerminalVisibilityAjax(id);
 
     assertTrue(
         response.getStatusCode().is2xxSuccessful(), "ajax toggle must return 2xx on success");
-    verify(client).put(eq("/api/v1/terminals/" + id), any(), eq(Void.class));
+    verify(client).put(eq("/api/v1/terminals/{id}"), any(), eq(Void.class), eq(id));
     verify(client).evict(CacheDomain.TERMINAL);
   }
 
   @Test
-  void listData_parsesUexMirrorFields_andComputesLatestSyncAttribute() {
+  void listData_computesLatestSyncAttribute() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
 
     Instant olderSync = Instant.parse("2026-05-16T08:00:00Z");
     Instant newerSync = Instant.parse("2026-05-16T12:30:00Z");
 
-    Map<String, Object> termOlder = new HashMap<>();
-    termOlder.put("id", UUID.randomUUID().toString());
-    termOlder.put("name", "Lorville TDD");
-    termOlder.put("starSystemName", "Stanton");
-    termOlder.put("cityName", "Lorville");
-    termOlder.put("uexSyncedAt", olderSync.toString());
-    Map<String, Object> termNewer = new HashMap<>();
-    termNewer.put("id", UUID.randomUUID().toString());
-    termNewer.put("name", "Area 18 TDD");
-    termNewer.put("starSystemName", "Stanton");
-    termNewer.put("cityName", "Area 18");
-    termNewer.put("uexSyncedAt", newerSync.toString());
+    TerminalDto termOlder = syncedTerminal("Lorville TDD", "Stanton", "Lorville", olderSync);
+    TerminalDto termNewer = syncedTerminal("Area 18 TDD", "Stanton", "Area 18", newerSync);
 
     stubEmptyPage(client, "/api/v1/cities?size=10000&sort=name,asc");
     stubEmptyPage(client, "/api/v1/space-stations?size=10000&sort=name,asc");
@@ -250,25 +259,19 @@ class AdminUexPageControllerTest {
   @Test
   void listData_concatenatesTerminalPages_andDerivesTotalsFromTotalElements() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
+    AdminUexPageController controller = newController(client);
 
-    Map<String, Object> first = new HashMap<>();
-    first.put("id", UUID.randomUUID().toString());
-    first.put("name", "Baijini Point TDD");
-    first.put("starSystemName", "Stanton");
-    Map<String, Object> second = new HashMap<>();
-    second.put("id", UUID.randomUUID().toString());
-    second.put("name", "Everus Harbor TDD");
-    second.put("starSystemName", "Stanton");
+    TerminalDto first = terminalIn("Baijini Point TDD", "Stanton", null, null);
+    TerminalDto second = terminalIn("Everus Harbor TDD", "Stanton", null, null);
 
     stubEmptyPage(client, "/api/v1/cities?size=10000&sort=name,asc");
     stubEmptyPage(client, "/api/v1/space-stations?size=10000&sort=name,asc");
     stubEmptyPage(client, "/api/v1/outposts?size=10000&sort=name,asc");
     stubEmptyPage(client, "/api/v1/pois?size=10000&sort=name,asc");
     String terminalsBase = "/api/v1/terminals?size=10000&sort=name,asc";
-    when(client.get(eq(terminalsBase + "&page=0"), anyTypeRef()))
+    when(client.get(eq(terminalsBase + "&page={page}"), anyTypeRef(), eq(0)))
         .thenReturn(new PageResponse<>(List.of(first), 0, 10000, 5, 2, List.of()));
-    when(client.get(eq(terminalsBase + "&page=1"), anyTypeRef()))
+    when(client.get(eq(terminalsBase + "&page={page}"), anyTypeRef(), eq(1)))
         .thenReturn(new PageResponse<>(List.of(second), 1, 10000, 5, 2, List.of()));
 
     ConcurrentModel model = new ConcurrentModel();
@@ -292,11 +295,8 @@ class AdminUexPageControllerTest {
   @Test
   void listData_latestSyncIsNull_whenNoTerminalHasBeenSyncedYet() {
     BackendApiClient client = mock(BackendApiClient.class);
-    AdminUexPageController controller = new AdminUexPageController(client);
-    Map<String, Object> row = new HashMap<>();
-    row.put("id", UUID.randomUUID().toString());
-    row.put("name", "Unsynced");
-    row.put("uexSyncedAt", null);
+    AdminUexPageController controller = newController(client);
+    TerminalDto row = terminalIn("Unsynced", null, null, null);
 
     stubEmptyPage(client, "/api/v1/cities?size=10000&sort=name,asc");
     stubEmptyPage(client, "/api/v1/space-stations?size=10000&sort=name,asc");
@@ -312,7 +312,7 @@ class AdminUexPageControllerTest {
 
   @Test
   void buildHierarchy_matchesTerminalsToCityAndStationByName() {
-    AdminUexPageController controller = new AdminUexPageController(mock(BackendApiClient.class));
+    AdminUexPageController controller = newController(mock(BackendApiClient.class));
 
     CityDto lorville =
         new CityDto(UUID.randomUUID(), "Lorville", "Stanton", "Hurston", true, false);
@@ -345,7 +345,7 @@ class AdminUexPageControllerTest {
 
   @Test
   void buildHierarchy_matchesCaseInsensitively() {
-    AdminUexPageController controller = new AdminUexPageController(mock(BackendApiClient.class));
+    AdminUexPageController controller = newController(mock(BackendApiClient.class));
 
     CityDto lorville =
         new CityDto(UUID.randomUUID(), "Lorville", "Stanton", "Hurston", null, false);
@@ -360,7 +360,7 @@ class AdminUexPageControllerTest {
 
   @Test
   void buildHierarchy_freeFloatingTerminalsGoToOrphans() {
-    AdminUexPageController controller = new AdminUexPageController(mock(BackendApiClient.class));
+    AdminUexPageController controller = newController(mock(BackendApiClient.class));
 
     TerminalDto orphan = terminalIn("Free Float Trade", "Pyro", null, null);
 
@@ -376,7 +376,7 @@ class AdminUexPageControllerTest {
 
   @Test
   void buildHierarchy_groupsAcrossMultipleStarSystems() {
-    AdminUexPageController controller = new AdminUexPageController(mock(BackendApiClient.class));
+    AdminUexPageController controller = newController(mock(BackendApiClient.class));
 
     CityDto stantonCity =
         new CityDto(UUID.randomUUID(), "Lorville", "Stanton", "Hurston", null, false);
@@ -398,7 +398,7 @@ class AdminUexPageControllerTest {
 
   @Test
   void buildHierarchy_terminalWithoutMatchingParentRecordGoesToOrphans() {
-    AdminUexPageController controller = new AdminUexPageController(mock(BackendApiClient.class));
+    AdminUexPageController controller = newController(mock(BackendApiClient.class));
 
     TerminalDto term = terminalIn("Lorville TDD", "Stanton", "Lorville", null);
 
@@ -432,15 +432,39 @@ class AdminUexPageControllerTest {
         false);
   }
 
-  private static void stubEmptyPage(BackendApiClient client, String uri) {
-    PageResponse<Map<String, Object>> empty = new PageResponse<>(List.of(), 0, 10, 0, 0, List.of());
-    when(client.get(eq(uri + "&page=0"), anyTypeRef())).thenReturn(empty);
+  private static AdminUexPageController newController(BackendApiClient client) {
+    return new AdminUexPageController(
+        new CatalogueBackendClient(client), new CatalogueCacheEviction(client));
   }
 
-  @SafeVarargs
-  private static void stubPage(BackendApiClient client, String uri, Map<String, Object>... rows) {
-    PageResponse<Map<String, Object>> page =
-        new PageResponse<>(List.of(rows), 0, 10, rows.length, 1, List.of());
-    when(client.get(eq(uri + "&page=0"), anyTypeRef())).thenReturn(page);
+  private static TerminalDto syncedTerminal(
+      String name, String starSystem, String cityName, Instant syncedAt) {
+    return new TerminalDto(
+        UUID.randomUUID(),
+        name,
+        null,
+        starSystem,
+        null,
+        cityName,
+        null,
+        null,
+        null,
+        false,
+        false,
+        null,
+        null,
+        syncedAt,
+        false);
+  }
+
+  private static void stubEmptyPage(BackendApiClient client, String uri) {
+    PageResponse<Object> empty = new PageResponse<>(List.of(), 0, 10, 0, 0, List.of());
+    when(client.get(eq(uri + "&page={page}"), anyTypeRef(), eq(0))).thenReturn(empty);
+  }
+
+  private static void stubPage(BackendApiClient client, String uri, TerminalDto... rows) {
+    PageResponse<Object> page =
+        new PageResponse<>(List.of((Object[]) rows), 0, 10, rows.length, 1, List.of());
+    when(client.get(eq(uri + "&page={page}"), anyTypeRef(), eq(0))).thenReturn(page);
   }
 }

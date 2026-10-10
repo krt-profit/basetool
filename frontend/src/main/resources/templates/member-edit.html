@@ -10,87 +10,118 @@
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
 
 <th:block th:replace="~{fragments/header :: header}" />
-<main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{members.edit.title}">Mitglied bearbeiten</h1>
-        <p th:text="${user.effectiveName}">Username</p>
+<main th:with="fromProfile=${memberEditForm.source == 'profile'},
+               backHref=${fromProfile ? '/profile' : '/members'},
+               descriptionLength=${memberEditForm.description != null ? memberEditForm.description.length() : 0}">
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey=${fromProfile ? 'nav.profile' : 'nav.members'},
+        eyebrowHref=@{${backHref}}, titleText=${user.effectiveName})}"></th:block>
+
+    <div class="tab-nav member-edit-tabs" role="tablist" th:aria-label="#{members.edit.title}" data-testid="member-edit-tabs">
+        <button class="tab active" id="member-tab-profile" type="button" role="tab" aria-selected="true"
+                aria-controls="member-panel-profile" data-tab="profile" data-testid="member-tab-profile"
+                th:text="#{members.edit.tab.profile}">Stammdaten</button>
+        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                class="tab" id="member-tab-memberships" type="button" role="tab" aria-selected="false" tabindex="-1"
+                aria-controls="member-panel-memberships" data-tab="memberships" data-testid="member-tab-memberships"
+            ><span th:text="#{members.memberships.title}">Mitgliedschaften</span>
+            <span class="tab-count" th:text="${memberMemberships != null ? memberMemberships.size() : 0}">0</span></button>
+        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                class="tab" id="member-tab-export" type="button" role="tab" aria-selected="false" tabindex="-1"
+                aria-controls="member-panel-export" data-tab="export" data-testid="member-tab-export"
+                th:text="#{members.export.title}">Datenauskunft</button>
     </div>
 
-    <div class="hud-box mt-2">
-        
-        <form id="member-edit-form" data-member-edit="true"
-              th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
-            <input type="hidden" name="version" th:field="*{version}">
-            <input type="hidden" name="source" th:field="*{source}">
-            <input type="hidden" name="staffelDetailLoaded" th:field="*{staffelDetailLoaded}">
-            <div class="form-group">
-                <label th:text="#{profile.rank}">Rang</label>
-                <select name="rank">
-                    <option th:each="i : ${#numbers.sequence(1, 20)}" 
-                            th:value="${i}" 
-                            th:text="${i}" 
-                            th:selected="${i == memberEditForm.rank}">
-                    </option>
-                </select>
-                <div th:if="${#fields.hasErrors('rank')}" th:errors="*{rank}" class="field-error"></div>
-            </div>
+    <form id="member-edit-form" data-member-edit="true" class="form-layout card"
+          th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
+        <input type="hidden" name="version" th:field="*{version}">
+        <input type="hidden" name="source" th:field="*{source}">
+        <input type="hidden" name="staffelDetailLoaded" th:field="*{staffelDetailLoaded}">
 
-            <div class="form-group">
-                <label th:text="#{profile.display_name}">Anzeigename</label>
-                <input type="text" name="displayName" th:value="*{displayName}" />
-                <div class="field-error" data-error-for="displayName"
-                     th:text="${#fields.hasErrors('displayName') ? #fields.errors('displayName')[0] : ''}"></div>
-            </div>
+        <div id="member-panel-profile" class="member-edit-panel" role="tabpanel" aria-labelledby="member-tab-profile">
+            <fieldset class="form-section">
+                <legend class="form-section__head" th:text="|1 · #{members.edit.section.profile}|">1 · Profil</legend>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="member-rank" th:text="#{profile.rank}">Rang</label>
+                        <select id="member-rank" name="rank">
+                            <option th:each="i : ${#numbers.sequence(1, 20)}"
+                                    th:value="${i}"
+                                    th:text="${i}"
+                                    th:selected="${i == memberEditForm.rank}">
+                            </option>
+                        </select>
+                        <div th:if="${#fields.hasErrors('rank')}" th:errors="*{rank}" class="field-error"></div>
+                    </div>
 
-            <div class="form-group">
-                <label for="memberRsiHandle" th:text="#{members.rsiHandle.label}">RSI-Handle</label>
-                <input type="text" id="memberRsiHandle" readonly
-                       data-testid="member-rsi-handle"
-                       th:value="${memberRsiHandle}"
-                       th:placeholder="#{members.rsiHandle.none}" />
-                <p class="form-hint" th:text="#{members.rsiHandle.hint}">Vom Mitglied im Profil gepflegt; hier nur lesbar.</p>
-            </div>
+                    <div class="form-group">
+                        <label for="member-join-date" th:text="#{member.join_date}">Beitrittsdatum</label>
+                        <input type="date" id="member-join-date" name="joinDate" th:value="*{joinDate}" />
+                    </div>
 
-            <div class="form-group">
-                <label th:text="#{profile.description}">Beschreibung</label>
-                <textarea name="description" rows="5" th:text="*{description}"></textarea>
-                <div class="field-error" data-error-for="description"
-                     th:text="${#fields.hasErrors('description') ? #fields.errors('description')[0] : ''}"></div>
-            </div>
-            
-            <div class="form-group">
-                <label th:text="#{member.join_date}">Beitrittsdatum</label>
-                <input type="date" name="joinDate"
-                       th:value="*{joinDate}"
-                       class="krtm-min-height-44px-1df5" />
-            </div>
+                    <div class="form-group">
+                        <label for="member-display-name" th:text="#{profile.display_name}">Anzeigename</label>
+                        <input type="text" id="member-display-name" name="displayName" th:value="*{displayName}" />
+                        <div class="field-error" data-error-for="displayName"
+                             th:text="${#fields.hasErrors('displayName') ? #fields.errors('displayName')[0] : ''}"></div>
+                    </div>
 
-            <div class="form-group" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="staffel-section">
-                <label th:text="#{members.staffel.title}">Staffeln</label>
+                    <div class="form-group">
+                        <label for="memberRsiHandle" th:text="#{members.rsiHandle.label}">RSI-Handle</label>
+                        <input type="text" id="memberRsiHandle" readonly
+                               data-testid="member-rsi-handle"
+                               th:value="${memberRsiHandle}"
+                               th:placeholder="#{members.rsiHandle.none}" />
+                        <p class="form-hint" th:text="#{members.rsiHandle.hint}">Vom Mitglied im Profil gepflegt; hier nur lesbar.</p>
+                    </div>
+                </div>
+            </fieldset>
 
-                <p class="field-error" th:unless="${memberEditForm.staffelDetailLoaded}"
-                   th:text="#{members.staffel.detail_unavailable}">Staffel-Daten konnten nicht geladen werden.</p>
+            <fieldset class="form-section">
+                <legend class="form-section__head"><span th:text="|2 · #{profile.description}|">2 · Beschreibung</span>
+                    <span class="opt" th:text="|· #{form.optional}|">· optional</span></legend>
+                <div class="form-group">
+                    <label for="member-description" class="visually-hidden" th:text="#{profile.description}">Beschreibung</label>
+                    <textarea id="member-description" name="description" rows="5" maxlength="2000"
+                              aria-describedby="member-description-count" data-char-counter="member-description-count"
+                              th:text="*{description}"></textarea>
+                    <p class="char-counter" id="member-description-count" aria-live="polite"
+                       ><span data-char-count th:text="${descriptionLength}">0</span> / 2000</p>
+                    <div class="field-error" data-error-for="description"
+                         th:text="${#fields.hasErrors('description') ? #fields.errors('description')[0] : ''}"></div>
+                </div>
+            </fieldset>
+        </div>
+
+        <div id="member-panel-memberships" class="member-edit-panel" role="tabpanel" aria-labelledby="member-tab-memberships" hidden
+             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+            <fieldset class="form-section" id="staffel-section">
+                <legend class="form-section__head" th:text="|1 · #{members.staffel.title}|">1 · Staffeln</legend>
+
+                <div class="alert alert-warning" role="alert" th:unless="${memberEditForm.staffelDetailLoaded}"
+                     th:text="#{members.staffel.detail_unavailable}">Staffel-Daten konnten nicht geladen werden.</div>
 
                 <th:block th:if="${memberEditForm.staffelDetailLoaded}">
-                <div class="staffel-slot hud-box krtm-padding-1rem-margin-bottom-0-75rem-cbd2">
-                    <label for="staffel1-select" th:text="#{members.staffel.slot1}">Staffel 1</label>
-                    <select id="staffel1-select" class="staffel-select krtm-min-height-44px-1df5" name="staffel1Id">
-                        <option value=""
-                                th:selected="${memberEditForm.staffel1Id == null}"
-                                th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
-                        <option th:each="sq : ${availableSquadrons}"
-                                th:value="${sq.id()}"
-                                th:selected="${memberEditForm.staffel1Id != null and memberEditForm.staffel1Id == sq.id()}"
-                                th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
-                    </select>
-                    <div class="krtm-display-flex-flex-direction-column-gap-0-5re-4fed">
-                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
+                <div class="staffel-slot" id="staffel-slot-1">
+                    <div class="form-group">
+                        <label for="staffel1-select" th:text="#{members.staffel.slot1}">Staffel 1</label>
+                        <select id="staffel1-select" class="staffel-select" name="staffel1Id">
+                            <option value=""
+                                    th:selected="${memberEditForm.staffel1Id == null}"
+                                    th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
+                            <option th:each="sq : ${availableSquadrons}"
+                                    th:value="${sq.id()}"
+                                    th:selected="${memberEditForm.staffel1Id != null and memberEditForm.staffel1Id == sq.id()}"
+                                    th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                        </select>
+                    </div>
+                    <div class="staffel-flags" role="group" th:aria-label="#{members.staffel.flags}">
+                        <label class="check-row">
                             <input type="hidden" name="_staffel1Logistician" value="on" />
                             <input type="checkbox" name="staffel1Logistician"
                                    th:checked="${memberEditForm.staffel1Logistician}" />
                             <span th:text="#{members.is_logistician}">Logistiker</span>
                         </label>
-                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
+                        <label class="check-row">
                             <input type="hidden" name="_staffel1MissionManager" value="on" />
                             <input type="checkbox" name="staffel1MissionManager"
                                    th:checked="${memberEditForm.staffel1MissionManager}" />
@@ -99,53 +130,96 @@
                     </div>
                 </div>
 
-                <div id="staffel-slot-2" class="staffel-slot hud-box krtm-pad-1rem-mb-075"
-                     th:classappend="${memberEditForm.staffel2Id == null} ? 'krtm-hidden' : ''">
-                    <label for="staffel2-select" th:text="#{members.staffel.slot2}">Staffel 2</label>
-                    <select id="staffel2-select" class="staffel-select krtm-min-height-44px-1df5" name="staffel2Id">
-                        <option value=""
-                                th:selected="${memberEditForm.staffel2Id == null}"
-                                th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
-                        <option th:each="sq : ${availableSquadrons}"
-                                th:value="${sq.id()}"
-                                th:selected="${memberEditForm.staffel2Id != null and memberEditForm.staffel2Id == sq.id()}"
-                                th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
-                    </select>
-                    <div class="krtm-display-flex-flex-direction-column-gap-0-5re-4fed">
-                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
+                <div id="staffel-slot-2" class="staffel-slot" th:hidden="${memberEditForm.staffel2Id == null}">
+                    <div class="form-group">
+                        <label for="staffel2-select" th:text="#{members.staffel.slot2}">Staffel 2</label>
+                        <select id="staffel2-select" class="staffel-select" name="staffel2Id">
+                            <option value=""
+                                    th:selected="${memberEditForm.staffel2Id == null}"
+                                    th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
+                            <option th:each="sq : ${availableSquadrons}"
+                                    th:value="${sq.id()}"
+                                    th:selected="${memberEditForm.staffel2Id != null and memberEditForm.staffel2Id == sq.id()}"
+                                    th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                        </select>
+                    </div>
+                    <div class="staffel-flags" role="group" th:aria-label="#{members.staffel.flags}">
+                        <label class="check-row">
                             <input type="hidden" name="_staffel2Logistician" value="on" />
                             <input type="checkbox" name="staffel2Logistician"
                                    th:checked="${memberEditForm.staffel2Logistician}" />
                             <span th:text="#{members.is_logistician}">Logistiker</span>
                         </label>
-                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
+                        <label class="check-row">
                             <input type="hidden" name="_staffel2MissionManager" value="on" />
                             <input type="checkbox" name="staffel2MissionManager"
                                    th:checked="${memberEditForm.staffel2MissionManager}" />
                             <span th:text="#{members.is_mission_manager}">Missions-Manager</span>
                         </label>
                     </div>
-                    <button type="button" class="btn btn-ghost krtm-margin-top-0-75rem-3666" id="staffel-remove-2"
+                    <button type="button" class="btn btn-quiet-danger btn-xs staffel-remove" id="staffel-remove-2"
                             th:text="#{members.staffel.remove}">Entfernen</button>
                 </div>
 
-                <button type="button" class="btn btn-ghost" id="staffel-add-2"
-                        th:classappend="${memberEditForm.staffel2Id != null} ? 'krtm-hidden' : ''"
-                        th:text="#{members.staffel.add_second}">Zweite Staffel hinzufügen</button>
+                <button type="button" class="btn btn-ghost staffel-add" id="staffel-add-2"
+                        th:hidden="${memberEditForm.staffel2Id != null}"
+                        ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                    <span th:text="#{members.staffel.add_second}">Zweite Staffel hinzufügen</span></button>
                 </th:block>
-            </div>
+            </fieldset>
 
-            <div class="form-actions">
-                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
-                <a th:href="@{/members}" class="btn btn-ghost" th:text="#{profile.back}">Zurück</a>
-            </div>
-        </form>
-    </div>
+            <section class="form-section" aria-labelledby="member-memberships-head">
+                <h2 class="form-section__head" id="member-memberships-head"
+                    th:text="|2 · #{members.edit.section.memberships}|">2 · Alle Mitgliedschaften</h2>
+                <th:block th:if="${memberMemberships == null or memberMemberships.isEmpty()}">
+                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='members.memberships.none', textKey='members.memberships.empty.text')}"></th:block>
+                </th:block>
+                <table th:if="${memberMemberships != null and !memberMemberships.isEmpty()}"
+                       class="data-table data-table--stack" data-testid="member-memberships-table">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{members.memberships.col.unit}">Einheit</th>
+                        <th scope="col" th:text="#{members.memberships.col.kind}">Art</th>
+                        <th scope="col" class="cell-actions"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="m : ${memberMemberships}" data-testid="member-membership-row">
+                        <td>
+                            <span class="membership-unit">
+                                <span class="squadron-badge"
+                                      th:classappend="${m.kind() == 'SPECIAL_COMMAND' ? ' squadron-badge-sk' : ''}"
+                                      th:text="${m.orgUnitShorthand() != null ? m.orgUnitShorthand() : m.orgUnitName()}">IRI</span>
+                                <span class="cell-title" th:text="${m.orgUnitName()}">IRIDIUM</span>
+                            </span>
+                        </td>
+                        <td th:attr="data-label=#{members.memberships.col.kind}">
+                            <span class="chip chip--muted"
+                                  th:text="${m.kind() == 'SPECIAL_COMMAND'} ? #{orgUnit.kind.specialCommand.short} : #{orgUnit.kind.squadron.short}">Staffel</span>
+                        </td>
+                        <td class="cell-actions">
+                            <a th:if="${m.kind() == 'SPECIAL_COMMAND'}"
+                               th:href="@{/organisation/special-commands/{id}(id=${m.orgUnitId()})}"
+                               class="btn btn-ghost btn-xs" data-testid="member-membership-manage"
+                               th:text="#{members.memberships.manage}">Verwalten</a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+        </div>
 
-    <div class="hud-box mt-2" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
-        <h2 th:text="#{members.export.title}">Datenauskunft</h2>
-        <p class="form-hint" th:text="#{members.export.hint}">F&uuml;r eine Auskunftsanfrage eines Mitglieds, das sich nicht anmelden kann. Namen anderer Mitglieder sind entfernt.</p>
-        <div class="acct-actions">
+        <div class="form-actions--sticky">
+            <a th:href="@{${backHref}}" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</a>
+            <button type="submit" class="btn btn--cta" data-testid="member-edit-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.edit.save}">Änderungen speichern</span></button>
+        </div>
+    </form>
+
+    <section id="member-panel-export" class="card member-export stack" role="tabpanel" aria-labelledby="member-tab-export" hidden
+             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+        <h2 class="member-export__title" th:text="#{members.export.title}">Datenauskunft</h2>
+        <div class="alert alert-info" th:text="#{members.export.hint}">F&uuml;r eine Auskunftsanfrage eines Mitglieds, das sich nicht anmelden kann. Namen anderer Mitglieder sind entfernt.</div>
+        <div class="cluster">
             <a th:href="@{/admin/members/{id}/export/pdf(id=${user.id})}" class="btn btn-outline"
                data-testid="member-export-pdf">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
@@ -157,151 +231,19 @@
                 <span th:text="#{members.export.json}">Als JSON</span>
             </a>
         </div>
-    </div>
-
-    <div class="hud-box mt-2" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
-        <h2 th:text="#{members.memberships.title}">Mitgliedschaften</h2>
-        <p th:if="${memberMemberships == null or memberMemberships.isEmpty()}"
-           th:text="#{members.memberships.none}">Keine Mitgliedschaften.</p>
-        <ul th:if="${memberMemberships != null and !memberMemberships.isEmpty()}"
-            class="memberships-list krtm-list-style-none-padding-left-0-b13a">
-            <li th:each="m : ${memberMemberships}" class="krtm-margin-0-4rem-0-display-flex-gap-0-6rem-alig-9fe8">
-                <span class="squadron-badge"
-                      th:classappend="${m.kind() == 'SPECIAL_COMMAND' ? ' squadron-badge-sk' : ''}"
-                      th:text="${m.orgUnitShorthand() != null ? m.orgUnitShorthand() : m.orgUnitName()}">IRI</span>
-                <span th:text="${m.orgUnitName()}">IRIDIUM</span>
-                <span class="badge-kind"
-                      th:if="${m.kind() == 'SPECIAL_COMMAND'}"
-                      th:text="#{orgUnit.kind.specialCommand.short}">SK</span>
-                <span class="badge-kind"
-                      th:if="${m.kind() != 'SPECIAL_COMMAND'}"
-                      th:text="#{orgUnit.kind.squadron.short}">Staffel</span>
-                <a th:if="${m.kind() == 'SPECIAL_COMMAND'}"
-                   th:href="@{/organisation/special-commands/{id}(id=${m.orgUnitId()})}"
-                   th:text="#{members.memberships.manage}"
-                   class="btn-link">Verwalten</a>
-            </li>
-        </ul>
-    </div>
+    </section>
 </main>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', function () {
-        'use strict';
-        var form = document.getElementById('member-edit-form');
-        if (!form || form.getAttribute('data-member-edit') === null || !window.krtFetch || !window.krtCsrf) {
-            return;
-        }
-        var i18n = {
-            saved: /*[[#{notification.success.save}]]*/ 'Saved.',
-            error: /*[[#{error.member.update.failed}]]*/ 'Update failed.',
-            conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
-            conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
-            conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
-            conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?',
-            conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
-        };
-
-        function clearErrors() {
-            form.querySelectorAll('.field-error[data-error-for]').forEach(function (slot) {
-                slot.textContent = '';
-            });
-        }
-
-        function renderErrors(errors) {
-            clearErrors();
-            if (!errors) {
-                return;
-            }
-            Object.keys(errors).forEach(function (field) {
-                var slot = form.querySelector('.field-error[data-error-for="' + field + '"]');
-                if (slot) {
-                    slot.textContent = errors[field];
-                }
-            });
-        }
-
-        function syncVersion(version) {
-            if (version == null) {
-                return;
-            }
-            form.querySelectorAll('input[name="version"]').forEach(function (input) {
-                input.value = String(version);
-            });
-        }
-
-        form.addEventListener('submit', function (event) {
-            event.preventDefault();
-            window.krtFetch.submitForm({
-                form: form,
-                submitter: form.querySelector('button[type="submit"]'),
-                successMessage: i18n.saved,
-                errorMessage: i18n.error,
-                conflict: {
-                    title: i18n.conflictTitle,
-                    reloadLabel: i18n.conflictReload,
-                    dismissLabel: i18n.conflictDismiss,
-                    reloadQuestion: i18n.conflictQuestion,
-                    reloadDetailFallback: i18n.conflictDetail,
-                },
-                onError: function (status, body) {
-                    if (status === 422) {
-                        renderErrors(body || {});
-                        return true;
-                    }
-                    return false;
-                },
-                onSuccess: function (body) {
-                    clearErrors();
-                    syncVersion(body ? body.version : null);
-                },
-            });
-        });
-    });
+    window.krtMemberEditI18n = {
+        saved: /*[[#{notification.success.save}]]*/ 'Saved.',
+        error: /*[[#{error.member.update.failed}]]*/ 'Update failed.',
+        conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
+        conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
+        conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
+        conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?',
+        conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
+    };
 </script>
-<script th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', function () {
-        'use strict';
-        var sel1 = document.getElementById('staffel1-select');
-        var sel2 = document.getElementById('staffel2-select');
-        var slot2 = document.getElementById('staffel-slot-2');
-        var addBtn = document.getElementById('staffel-add-2');
-        var removeBtn = document.getElementById('staffel-remove-2');
-        if (!sel1 || !sel2 || !slot2 || !addBtn || !removeBtn) {
-            return;
-        }
-        function showSlot2(show) {
-            slot2.classList.toggle('krtm-hidden', !show);
-            addBtn.classList.toggle('krtm-hidden', show);
-        }
-        function clearSlot2() {
-            sel2.value = '';
-            slot2.querySelectorAll('input[type=checkbox]').forEach(function (c) {
-                c.checked = false;
-            });
-        }
-        function syncDuplicateOptions() {
-            var v1 = sel1.value;
-            var v2 = sel2.value;
-            Array.prototype.forEach.call(sel2.options, function (o) {
-                o.disabled = (o.value !== '' && o.value === v1);
-            });
-            Array.prototype.forEach.call(sel1.options, function (o) {
-                o.disabled = (o.value !== '' && o.value === v2);
-            });
-        }
-        addBtn.addEventListener('click', function () {
-            showSlot2(true);
-            syncDuplicateOptions();
-        });
-        removeBtn.addEventListener('click', function () {
-            clearSlot2();
-            showSlot2(false);
-            syncDuplicateOptions();
-        });
-        sel1.addEventListener('change', syncDuplicateOptions);
-        sel2.addEventListener('change', syncDuplicateOptions);
-        syncDuplicateOptions();
-    });
-</script>
+<script th:src="@{/js/member-edit.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

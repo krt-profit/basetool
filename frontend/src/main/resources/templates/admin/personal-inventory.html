@@ -4,6 +4,7 @@
     <title th:text="#{admin.personalInventory.title}">Admin: Persoenliches Inventar</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/personal-inventory.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/admin-personal-inventory.css}">
     </th:block>
 </head>
 <body>
@@ -12,102 +13,95 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="krt-admin-banner" th:text="#{admin.personalInventory.bannerMode}">ADMIN MODE</div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.personalInventory.title},
+        count=${page != null ? page.totalElements() : null}, countId='pi-count', countFor='pi-results')}"></th:block>
 
-    <div class="greeting hud-box krt-personal-inventory-header">
-        <h1 th:text="#{admin.personalInventory.title}">Admin: Persoenliches Inventar</h1>
-        <p class="krt-subtitle" th:text="#{admin.personalInventory.subtitle}">Verwaltung fremder Bestaende</p>
+    <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-userform no-track">
+        <label for="krt-pi-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
+        <select id="krt-pi-user-select" name="userSub" data-krt-combobox="remote-users">
+            <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
+            <option th:if="${selectedUser != null}"
+                    th:value="${selectedUser.id}"
+                    th:selected="true"
+                    th:text="${selectedUser.effectiveName != null ? selectedUser.effectiveName : selectedUser.username}">User</option>
+        </select>
+    </form>
+
+    <div id="pi-results" class="stack gap-3">
+    <th:block th:fragment="results">
+    <div th:if="${selectedUserSub == null or #strings.isEmpty(selectedUserSub)}" class="card card--flush">
+        <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.personalInventory.userSelect.emptyTitle', textKey='admin.personalInventory.userSelect.empty')}"></th:block>
     </div>
 
-    <div class="hud-box krt-personal-inventory mt-2">
-
-        <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-userform no-track">
-            <label for="krt-pi-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
-            <select id="krt-pi-user-select" name="userSub" data-krt-combobox="remote-users">
-                <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
-                <option th:if="${selectedUser != null}"
-                        th:value="${selectedUser.id}"
-                        th:selected="true"
-                        th:text="${selectedUser.effectiveName != null ? selectedUser.effectiveName : selectedUser.username}">User</option>
-            </select>
-        </form>
-
-        <div id="pi-results">
-        <th:block th:fragment="results">
-        <div th:if="${selectedUserSub == null or #strings.isEmpty(selectedUserSub)}" class="krt-pi-empty"
-             th:text="#{admin.personalInventory.userSelect.empty}">Bitte zunaechst ein Mitglied auswaehlen.</div>
-
-        <div th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
-            <div class="krt-pi-actionbar">
+    <th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}"
+              th:with="piBase=${'/admin/personal-inventory?userSub=' + selectedUserSub
+                       + (#strings.isEmpty(filterQuery) ? '' : '&amp;q=' + #uris.escapeQueryParam(filterQuery))}">
+        <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-filter no-track">
+            <input type="hidden" name="userSub" th:value="${selectedUserSub}">
+            <div class="toolbar">
+                <th:block th:replace="~{fragments/components :: toolbarSearch('krt-pi-q', 'q', ${filterQuery}, 'personalInventory.filter.search')}"></th:block>
+                <span class="toolbar__spacer"></span>
                 <button type="button" class="btn btn--cta krt-pi-create"
                         th:attr="data-action=@{'/admin/personal-inventory/' + ${selectedUserSub} + '/add'}"
                         data-trigger="pi-open-create"
                         th:text="#{personalInventory.action.create}">Eintrag anlegen</button>
-
-                <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-filter no-track">
-                    <input type="hidden" name="userSub" th:value="${selectedUserSub}">
-                    <label for="krt-pi-q" class="visually-hidden" th:text="#{personalInventory.filter.search}">Suche</label>
-                    <input id="krt-pi-q" type="search" name="q" th:value="${filterQuery}"
-                           th:placeholder="#{personalInventory.filter.search}"
-                           class="krt-pi-search-input">
-                    <button type="submit" class="btn btn-ghost" th:text="#{personalInventory.filter.apply}">Filtern</button>
-                </form>
             </div>
+        </form>
 
-            <div class="table-responsive krt-pi-table-wrapper">
-                <table class="krt-table krt-pi-table">
+        <div class="card card--flush">
+            <div class="table-responsive" th:if="${!#lists.isEmpty(items)}">
+                <table class="data-table data-table--stack krt-pi-table">
                     <thead>
                     <tr>
                         <th th:text="#{personalInventory.field.name}">Name</th>
                         <th th:text="#{personalInventory.field.location}">Ort</th>
-                        <th th:text="#{personalInventory.field.quantity}">Menge</th>
+                        <th class="num" th:text="#{personalInventory.field.quantity}">Menge</th>
                         <th th:text="#{personalInventory.field.note}">Notiz</th>
-                        <th th:text="#{personalInventory.field.actions}">Aktionen</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{personalInventory.field.actions}">Aktionen</span></th>
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:if="${#lists.isEmpty(items)}">
-                        <td colspan="5" class="krt-pi-empty" th:text="#{personalInventory.empty}">Keine Eintraege.</td>
-                    </tr>
                     <tr th:each="item : ${items}" th:attr="data-item-id=${item.id}">
-                        <td th:text="${item.name}">Name</td>
-                        <td>
+                        <td><span class="cell-title" th:text="${item.name}">Name</span></td>
+                        <td th:attr="data-label=#{personalInventory.field.location}">
                             <span class="krt-pi-location-marker"
                                   th:classappend="${item.locationType?.name() == 'CITY'} ? ' krt-pi-loc-city' : ' krt-pi-loc-station'"></span>
                             <span th:text="${item.locationName}">Ort</span>
                         </td>
-                        <td th:text="${item.quantity}">1</td>
-                        <td class="krt-pi-note" th:text="${item.note}">Notiz</td>
-                        <td>
-                            <div class="krt-pi-actions">
-                                <button type="button" class="btn btn-ghost btn-icon"
-                                        th:attr="data-action=@{'/admin/personal-inventory/' + ${selectedUserSub} + '/' + ${item.id} + '/update'},
-                                                 data-id=${item.id},
-                                                 data-version=${item.version},
-                                                 data-name=${item.name},
-                                                 data-note=${item.note},
-                                                 data-quantity=${item.quantity},
-                                                 data-location-uex-id=${item.locationUexId},
-                                                 data-location-type=${item.locationType?.name()},
-                                                 data-location-name=${item.locationName}"
-                                        data-trigger="pi-open-edit"
-                                        th:title="#{personalInventory.action.edit}"
-                                        th:aria-label="#{personalInventory.action.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                                <button type="button" class="btn btn-quiet-danger btn-icon"
-                                        th:attr="data-action=@{'/admin/personal-inventory/' + ${selectedUserSub} + '/' + ${item.id} + '/delete'},
-                                                 data-name=${item.name}"
-                                        data-trigger="pi-open-delete"
-                                        th:title="#{personalInventory.action.delete}"
-                                        th:aria-label="#{personalInventory.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                            </div>
+                        <td class="num" th:attr="data-label=#{personalInventory.field.quantity}" th:text="${item.quantity}">1</td>
+                        <td class="krt-pi-note" th:attr="data-label=#{personalInventory.field.note}" th:text="${item.note}">Notiz</td>
+                        <td class="cell-actions">
+                            <button type="button" class="btn btn-ghost btn-icon"
+                                    th:attr="data-action=@{'/admin/personal-inventory/' + ${selectedUserSub} + '/' + ${item.id} + '/update'},
+                                             data-id=${item.id},
+                                             data-version=${item.version},
+                                             data-name=${item.name},
+                                             data-note=${item.note},
+                                             data-quantity=${item.quantity},
+                                             data-location-uex-id=${item.locationUexId},
+                                             data-location-type=${item.locationType?.name()},
+                                             data-location-name=${item.locationName}"
+                                    data-trigger="pi-open-edit"
+                                    th:title="#{personalInventory.action.edit}"
+                                    th:aria-label="#{personalInventory.action.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button type="button" class="btn btn-quiet-danger btn-icon"
+                                    th:attr="data-action=@{'/admin/personal-inventory/' + ${selectedUserSub} + '/' + ${item.id} + '/delete'},
+                                             data-name=${item.name}"
+                                    data-trigger="pi-open-delete"
+                                    th:title="#{personalInventory.action.delete}"
+                                    th:aria-label="#{personalInventory.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </td>
                     </tr>
                     </tbody>
                 </table>
             </div>
+            <th:block th:if="${#lists.isEmpty(items)}">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.personalInventory.empty.title', textKey='admin.personalInventory.empty.text')}"></th:block>
+            </th:block>
+            <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${page}, baseUrl=${piBase})}"></th:block>
         </div>
-        </th:block>
-        </div>
+    </th:block>
+    </th:block>
     </div>
 </main>
 

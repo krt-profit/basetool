@@ -19,27 +19,26 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
-import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkStolenMarkRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkStolenMarkResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
-import de.greluc.krt.profit.basetool.backend.support.InventoryProperties;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -68,23 +67,26 @@ public class InventoryStolenMarkService {
   private static final double QUANTITY_EPSILON = 1e-9;
 
   private final InventoryItemRepository inventoryItemRepository;
-  private final MaterialExchangeOfferRepository materialExchangeOfferRepository;
+  private final StockOfferLookup stockOfferLookup;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryItemMapper inventoryItemMapper;
   private final InventoryProperties inventoryProperties;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Sets or removes the marker on a row or on part of it. A row that already carries the requested
    * marker is left as it is and nothing is recorded.
    *
-   * @param itemId the row; the caller's edit right on it is checked by the controller
+   * @param itemId the row; the caller's scope on it is checked by the controller
    * @param dto the version, the requested marker and the amount to change, {@code null} for the
    *     whole row
    * @param callerId the authenticated caller, recorded as the actor
+   * @param isLogistician whether the caller is a logistician or above and so may mark another
+   *     member's row
    * @return the row carrying the requested marker, or the merge survivor it was folded into
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the row is
    *     unknown
+   * @throws AccessDeniedException when the caller neither owns the row nor is a logistician
    * @throws BusinessConflictException when marking is switched off, or a split would leave the row
    *     below the amount it offers on the Materialbörse
    * @throws BadRequestException when the amount is not positive, exceeds the row or is fractional
@@ -95,12 +97,19 @@ public class InventoryStolenMarkService {
    */
   @Transactional
   public @NotNull InventoryItemDto mark(
-      @NotNull UUID itemId, @NotNull InventoryItemStolenMarkDto dto, @NotNull UUID callerId) {
+      @NotNull UUID itemId,
+      @NotNull InventoryItemStolenMarkDto dto,
+      @NotNull UUID callerId,
+      boolean isLogistician) {
     requireEnabled();
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForRebook(itemId),
             () -> "Inventory item not found: " + itemId);
+    boolean isOwner = item.getUser() != null && callerId.equals(item.getUser().getId());
+    if (!isOwner && !isLogistician) {
+      throw new AccessDeniedException("You are not allowed to mark this inventory item: " + itemId);
+    }
     OptimisticLock.checkOptionalClient(
         item.getVersion(), dto.version(), InventoryItem.class, itemId);
     boolean target = Boolean.TRUE.equals(dto.stolen());
@@ -157,7 +166,7 @@ public class InventoryStolenMarkService {
     }
     int skipped = rows.size() - changed;
     if (changed > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_BULK_STOLEN_CHANGED,
           null,
           null,
@@ -186,7 +195,7 @@ public class InventoryStolenMarkService {
       @NotNull InventoryItem item, boolean target, @NotNull UUID callerId) {
     item.setStolen(target);
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-    auditService.record(
+    auditRecorder.record(
         target ? AuditEventType.INVENTORY_STOLEN_MARKED : AuditEventType.INVENTORY_STOLEN_UNMARKED,
         saved.getId(),
         InventoryAuditLabels.label(saved),
@@ -218,7 +227,7 @@ public class InventoryStolenMarkService {
       throw new BadRequestException("error.inventory.stolen.wholeUnits");
     }
     double remaining = InventoryItem.roundToScuScale(rowAmount - amount);
-    double offered = offeredAmount(item.getId());
+    double offered = stockOfferLookup.activeOfferedAmount(item.getId());
     if (remaining + QUANTITY_EPSILON < offered) {
       throw new BusinessConflictException("error.inventory.stolen.belowOffer");
     }
@@ -241,41 +250,13 @@ public class InventoryStolenMarkService {
     }
     inventoryItemRepository.saveAndFlush(item);
 
-    auditService.record(
+    auditRecorder.record(
         target ? AuditEventType.INVENTORY_STOLEN_MARKED : AuditEventType.INVENTORY_STOLEN_UNMARKED,
         item.getId(),
         InventoryAuditLabels.label(item),
         callerId,
         AuditDetails.of("amount", amount).with("split", true).with("newRow", savedPart.getId()));
     return inventoryCheckoutService.mergeStockIfRequested(savedPart, false);
-  }
-
-  /**
-   * Returns how much of a row an active Materialbörse offer promises: its SCU for a material offer,
-   * its whole units for an item offer, {@code 0} without an active offer.
-   *
-   * @param itemId the Lager row
-   * @return the offered amount
-   */
-  private double offeredAmount(@NotNull UUID itemId) {
-    return materialExchangeOfferRepository
-        .findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE)
-        .map(InventoryStolenMarkService::offered)
-        .orElse(0.0);
-  }
-
-  /**
-   * Reads the promised amount of one offer.
-   *
-   * @param offer the active offer
-   * @return its SCU for a material offer, its units for an item offer, {@code 0} when neither is
-   *     set
-   */
-  private static double offered(@NotNull MaterialExchangeOffer offer) {
-    if (offer.getOfferedAmount() != null) {
-      return offer.getOfferedAmount();
-    }
-    return offer.getItemQuantity() != null ? offer.getItemQuantity() : 0.0;
   }
 
   /**

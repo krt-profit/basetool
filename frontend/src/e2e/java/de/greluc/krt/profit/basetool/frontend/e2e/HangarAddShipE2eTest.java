@@ -92,7 +92,7 @@ class HangarAddShipE2eTest {
         page.getByTestId("hangar-add-ship").click();
 
         page.locator("#ship-type").selectOption(new SelectOption().setLabel("E2E Ship Type"));
-        page.locator("#ship-insurance").selectOption("LTI");
+        page.getByTestId("segment-insuranceKind-lti").click();
 
         page.evaluate("window.__krtNoReload = true;");
         page.evaluate(

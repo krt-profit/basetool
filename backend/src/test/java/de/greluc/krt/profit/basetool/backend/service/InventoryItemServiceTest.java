@@ -26,9 +26,13 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeStockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -46,13 +50,11 @@ import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -63,6 +65,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -82,15 +85,17 @@ class InventoryItemServiceTest {
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private InventoryItemMapper inventoryItemMapper;
 
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private InventoryAccessPolicy inventoryAccessPolicy;
 
   @Mock private JobOrderItemService jobOrderItemService;
 
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   private InventoryItemService inventoryItemService;
 
   private InventoryAggregationService realAggregationService;
@@ -115,11 +120,12 @@ class InventoryItemServiceTest {
             locationRepository,
             missionFinanceEntryRepository,
             missionParticipantRepository,
-            materialExchangeOfferRepository,
+            new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
             offerRatchet,
             inventoryItemMapper,
             ownerScopeService,
-            auditService);
+            auditService,
+            eventPublisher);
     inventoryItemService =
         new InventoryItemService(
             inventoryItemRepository,
@@ -131,11 +137,12 @@ class InventoryItemServiceTest {
             missionRepository,
             inventoryItemMapper,
             ownerScopeService,
+            inventoryAccessPolicy,
             jobOrderItemService,
             auditService,
             realAggregationService,
             realCheckoutService,
-            new de.greluc.krt.profit.basetool.backend.support.InventoryProperties(false));
+            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false));
   }
 
   @Test
@@ -645,11 +652,12 @@ class InventoryItemServiceTest {
             missionRepository,
             inventoryItemMapper,
             ownerScopeService,
+            inventoryAccessPolicy,
             jobOrderItemService,
             auditService,
             realAggregationService,
             realCheckoutService,
-            new de.greluc.krt.profit.basetool.backend.support.InventoryProperties(true));
+            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(true));
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1085,13 +1093,13 @@ class InventoryItemServiceTest {
             null,
             null,
             null);
-    when(ownerScopeService.canManageUserInventory(foreignUserId)).thenReturn(false);
+    when(inventoryAccessPolicy.canManageUserInventory(foreignUserId)).thenReturn(false);
 
     assertThrows(
         AccessDeniedException.class,
         () -> inventoryItemService.createInventoryItem(dto, currentUserId));
 
-    verify(ownerScopeService).canManageUserInventory(foreignUserId);
+    verify(inventoryAccessPolicy).canManageUserInventory(foreignUserId);
     verify(userRepository, never()).findById(any());
   }
 
@@ -1116,7 +1124,7 @@ class InventoryItemServiceTest {
             null,
             null,
             null);
-    when(ownerScopeService.canManageUserInventory(foreignUserId)).thenReturn(true);
+    when(inventoryAccessPolicy.canManageUserInventory(foreignUserId)).thenReturn(true);
 
     assertThrows(
         AccessDeniedException.class,
@@ -1150,7 +1158,7 @@ class InventoryItemServiceTest {
             null);
     User target = new User();
     target.setId(targetUserId);
-    when(ownerScopeService.canManageUserInventory(targetUserId)).thenReturn(true);
+    when(inventoryAccessPolicy.canManageUserInventory(targetUserId)).thenReturn(true);
     when(userRepository.findById(targetUserId)).thenReturn(Optional.of(target));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(new Location()));

@@ -1,0 +1,107 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .demand-toolbar .filter-popover__panel {
+        right: auto;
+        left: 0;
+    }
+
+    .demand-toolbar .demand-filter-field .multi-select-container {
+        width: 100%;
+    }
+
+    .demand-group .demand-group-title {
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: var(--border-hairline);
+    }
+
+    .demand-table tr[hidden],
+    .demand-group[hidden] {
+        display: none;
+    }
+
+    .demand-table th.num .demand-sort-btn {
+        justify-content: flex-end;
+    }
+
+    .demand-table .demand-orders-toggle {
+        min-height: var(--touch-target);
+        padding: 0;
+        border: 0;
+    }
+
+    .demand-table .demand-orders-cell {
+        height: auto;
+        padding: 0 var(--space-4) var(--space-3);
+    }
+
+    .demand-orders-table {
+        margin: 0;
+    }
+
+    .demand-orders-table th {
+        background: transparent;
+    }
+
+    .demand-coverage-head,
+    .demand-table td.demand-coverage {
+        width: 160px;
+    }
+
+    .demand-table td.demand-coverage {
+        white-space: nowrap;
+    }
+
+    .demand-bar {
+        display: inline-flex;
+        vertical-align: middle;
+        width: 96px;
+        height: 6px;
+        margin-right: var(--space-2);
+        overflow: hidden;
+        background: var(--color-surface-input);
+        border: var(--border-hairline);
+    }
+
+    .demand-bar > i {
+        display: block;
+        height: 100%;
+    }
+
+    .demand-bar__booked {
+        background: var(--color-success);
+    }
+
+    .demand-bar__claimed {
+        background: var(--color-warning);
+    }
+
+    .demand-bar__value {
+        font-size: var(--fs-xs);
+        font-variant-numeric: tabular-nums;
+        color: var(--color-gray-2-text);
+    }
+
+    @media (width <= 768px) {
+        .demand-toolbar .filter-popover__panel {
+            right: 0;
+        }
+
+        .demand-table td.demand-coverage {
+            order: 5;
+            flex-basis: 100%;
+            width: auto;
+            margin-right: 0;
+        }
+
+        .demand-table td.demand-orders-cell {
+            flex-basis: 100%;
+            padding: 0;
+        }
+
+        .demand-bar {
+            width: 60%;
+        }
+    }
+}

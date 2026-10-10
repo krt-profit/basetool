@@ -1,0 +1,25 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .bank-grants-filter {
+        flex: 1 1 260px;
+        max-width: 420px;
+    }
+
+    .bank-grants-filter select {
+        width: 100%;
+        margin: 0;
+    }
+
+    .bank-grants-flag-col {
+        width: 1%;
+        text-align: center;
+    }
+
+    @media (width <= 768px) {
+        .bank-grants-flag-col {
+            width: auto;
+            text-align: left;
+        }
+    }
+}

@@ -36,17 +36,19 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionEligibilityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionRequirementCheckDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.frontend.promotion.client.PromotionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ConcurrentModel;
@@ -63,7 +65,12 @@ class PromotionPageControllerTest {
 
   @Mock private BackendApiClient backendApiClient;
 
-  @InjectMocks private PromotionPageController controller;
+  private PromotionPageController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller = new PromotionPageController(new PromotionBackendClient(backendApiClient));
+  }
 
   private static PromotionTopicDto topic(UUID id, String name, int sortOrder) {
     return new PromotionTopicDto(id, 0L, name, null, sortOrder, null, null, null);
@@ -162,6 +169,9 @@ class PromotionPageControllerTest {
     assertEquals("19_18", keys.get(0));
     assertEquals("20_19", keys.get(1));
     assertEquals(2, grouped.get("20_19").size());
+    List<List<RankRequirementDto>> steps =
+        (List<List<RankRequirementDto>>) model.getAttribute("rankSteps");
+    assertEquals(List.of(List.of(r1, r2), List.of(r3)), steps, "career order, 20→19 first");
   }
 
   @Test
@@ -198,7 +208,8 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(t));
-    when(backendApiClient.get(contains("/api/v1/promotion/categories/by-topic/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(c));
     when(backendApiClient.get(contains("/api/v1/promotion/evaluations/my"), anyTypeRef()))
         .thenReturn(List.of(eval));
@@ -280,11 +291,14 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic(topic1, "T1", 0), topic(topic2, "T2", 1)));
-    when(backendApiClient.get(contains("/categories/by-topic/" + topic1 + "/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/categories/by-topic/{topicId}/all"), anyTypeRef(), eq(topic1.toString())))
         .thenReturn(List.of(c1a, c1b));
-    when(backendApiClient.get(contains("/categories/by-topic/" + topic2 + "/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/categories/by-topic/{topicId}/all"), anyTypeRef(), eq(topic2.toString())))
         .thenReturn(List.of(c2a));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
     when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
@@ -307,7 +321,8 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(e1), 0, 10000, 1, 1, List.of()));
     when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
@@ -334,7 +349,8 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(oldA, newB, midA), 0, 10000, 3, 1, List.of()));
     when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
@@ -361,9 +377,11 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/members"), anyTypeRef(), any(Object[].class)))
         .thenReturn(
             new PageResponse<>(
                 List.of(member(id1, "a", 20), member(id2, "b", 19), nullIdMember),
@@ -372,9 +390,11 @@ class PromotionPageControllerTest {
                 3,
                 1,
                 List.of()));
-    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/" + id1), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/promotion/eligibility/user/{userId}"), anyTypeRef(), eq(id1)))
         .thenReturn(List.of(elig1));
-    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/" + id2), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/promotion/eligibility/user/{userId}"), anyTypeRef(), eq(id2)))
         .thenReturn(List.of(elig2));
     Model model = new ConcurrentModel();
 
@@ -386,14 +406,15 @@ class PromotionPageControllerTest {
     assertEquals(List.of(elig1), byUser.get(id1.toString()));
     assertEquals(List.of(elig2), byUser.get(id2.toString()));
     verify(backendApiClient, times(2))
-        .get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef());
+        .get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef(), any(Object[].class));
   }
 
   @Test
   void manage_emptyMembers_yieldsEmptyEligibilityMap() {
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/all"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
     when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef())).thenReturn(null);
     Model model = new ConcurrentModel();
@@ -419,13 +440,14 @@ class PromotionPageControllerTest {
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(t));
-    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(c));
-    when(backendApiClient.get(contains("/level-contents/by-category/"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/level-contents/by-category/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(lc));
     Model model = new ConcurrentModel();
 
-    String view = controller.adminTopics(true, null, model);
+    String view = controller.adminTopics(true, null, null, model);
 
     assertEquals("promotion-admin-topics", view);
     Map<String, List<PromotionCategoryDto>> topicCats =
@@ -449,7 +471,8 @@ class PromotionPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(r1, r2), 0, 1000, 2, 1, List.of()));
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(t));
-    when(backendApiClient.get(contains("/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
+    when(backendApiClient.get(
+            contains("/categories/by-topic/{topicId}/all"), anyTypeRef(), eq(topicId.toString())))
         .thenReturn(List.of(c));
     when(backendApiClient.get(contains("/api/v1/promotion/categories?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(c), 0, 1000, 1, 1, List.of()));
@@ -478,5 +501,144 @@ class PromotionPageControllerTest {
     assertEquals("promotion-overview", view);
     assertTrue(((List<?>) model.getAttribute("topics")).isEmpty());
     assertNull(model.getAttribute("currentUserRank"));
+  }
+
+  /** The topic editor selects the requested topic and falls back to the first for an unknown id. */
+  @Test
+  void adminTopics_selectsTheRequestedTopicOrTheFirst() {
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
+        .thenReturn(List.of(topic(first, "A", 0), topic(second, "B", 1)));
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
+
+    Model requested = new ConcurrentModel();
+    controller.adminTopics(true, null, second.toString(), requested);
+    Model unknown = new ConcurrentModel();
+    controller.adminTopics(true, null, "not-a-topic", unknown);
+
+    assertEquals(second.toString(), requested.getAttribute("selectedTopicId"));
+    assertEquals(first.toString(), unknown.getAttribute("selectedTopicId"));
+    assertNull(PromotionPageController.selectTopicId(List.of(), first.toString()));
+  }
+
+  /** The rank matrix groups requirements per step and topic and keeps each cell's highest level. */
+  @Test
+  void adminRankRequirements_buildsTheMatrixCells() {
+    UUID topicId = UUID.randomUUID();
+    RankRequirementDto global = requirement(20, 19, null, "LEVEL_A", 1);
+    RankRequirementDto low = topicRequirement(20, 19, topicId, "LEVEL_A");
+    RankRequirementDto high = topicRequirement(20, 19, topicId, "LEVEL_C");
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(global, low, high), 0, 1000, 3, 1, List.of()));
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
+        .thenReturn(List.of(topic(topicId, "T", 0)));
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
+    when(backendApiClient.get(contains("/api/v1/promotion/categories?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
+    Model model = new ConcurrentModel();
+
+    controller.adminRankRequirements(true, null, model);
+
+    Map<String, List<RankRequirementDto>> cells =
+        (Map<String, List<RankRequirementDto>>) model.getAttribute("requirementsByCell");
+    Map<String, String> levels = (Map<String, String>) model.getAttribute("highestLevelByCell");
+    assertEquals(List.of(global), cells.get("20_19_global"));
+    assertEquals(List.of(low, high), cells.get("20_19_" + topicId));
+    assertEquals("LEVEL_C", levels.get("20_19_" + topicId));
+    assertEquals("LEVEL_A", levels.get("20_19_global"));
+  }
+
+  /** My evaluations put the step starting at the caller's rank first and measure its progress. */
+  @Test
+  void myEvaluations_putsTheNextStepFirstWithItsProgress() {
+    PromotionEligibilityDto lower = new PromotionEligibilityDto("u", 21, 20, true, true, List.of());
+    PromotionEligibilityDto next =
+        new PromotionEligibilityDto(
+            "u", 20, 19, false, true, List.of(check(2, 1, false), check(1, 3, true)));
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
+        .thenReturn(List.of());
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/my"), anyTypeRef()))
+        .thenReturn(List.of());
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
+    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/my"), anyTypeRef()))
+        .thenReturn(List.of(lower, next));
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
+        .thenReturn(member(UUID.randomUUID(), "self", 20));
+    Model model = new ConcurrentModel();
+
+    controller.myEvaluations(true, model);
+
+    assertEquals(next, model.getAttribute("nextEligibility"));
+    assertEquals(List.of(next, lower), model.getAttribute("eligibilitySteps"));
+    assertEquals(66, model.getAttribute("nextProgressPercent"));
+  }
+
+  /** Progress counts each check at most up to its required count and handles the edge cases. */
+  @Test
+  void progressPercent_capsEachCheckAndHandlesStepsWithoutChecks() {
+    assertEquals(0, PromotionPageController.progressPercent(null));
+    assertEquals(
+        100,
+        PromotionPageController.progressPercent(
+            new PromotionEligibilityDto("u", 20, 19, true, false, List.of())));
+    assertEquals(
+        50,
+        PromotionPageController.progressPercent(
+            new PromotionEligibilityDto(
+                "u", 20, 19, false, true, List.of(check(2, 5, true), check(2, 0, false)))));
+    assertNull(PromotionPageController.findNextStep(List.of(), null));
+  }
+
+  /**
+   * A requirement scoped to a whole topic.
+   *
+   * @param fromRank the rank the step starts at
+   * @param toRank the rank the step leads to
+   * @param topicId the topic the rule covers
+   * @param level the minimum level
+   * @return the requirement
+   */
+  private static RankRequirementDto topicRequirement(
+      int fromRank, int toRank, UUID topicId, String level) {
+    return new RankRequirementDto(
+        UUID.randomUUID(),
+        0L,
+        fromRank,
+        toRank,
+        topicId,
+        "T",
+        null,
+        null,
+        level,
+        1,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * A requirement check of an eligibility.
+   *
+   * @param required the required count
+   * @param achieved the achieved count
+   * @param satisfied whether the check is met
+   * @return the check
+   */
+  private static PromotionRequirementCheckDto check(int required, int achieved, boolean satisfied) {
+    return new PromotionRequirementCheckDto(
+        UUID.randomUUID(),
+        null,
+        null,
+        UUID.randomUUID(),
+        "C",
+        "LEVEL_A",
+        required,
+        achieved,
+        satisfied,
+        null);
   }
 }

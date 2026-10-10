@@ -24,6 +24,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.io.IOException;
+import java.time.Duration;
+import java.util.concurrent.locks.LockSupport;
+import java.util.function.Supplier;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -41,6 +44,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 @SpringBootTest
 @TestPropertySource(
@@ -187,19 +192,17 @@ class WebClientResilienceTest {
         "After a 4xx storm the call must still reach the backend (breaker stayed CLOSED)");
   }
 
+  /**
+   * Verifies that the time limiter ends a slow read once its window passes on virtual time, after
+   * the request has reached the backend.
+   */
   @Test
   void timeLimiter_ShouldTimeoutSlowResponses() {
-    int before = server.getRequestCount();
-    long start = System.currentTimeMillis();
-    try {
-      termsDocumentClient.get().uri("/api/v1/slow").retrieve().bodyToMono(String.class).block();
-      fail("Expected timeout due to slow response");
-    } catch (Exception ignored) {
-    }
-    long duration = System.currentTimeMillis() - start;
-    int after = server.getRequestCount();
-    assertTrue(duration < 2000, "Call should time out quickly");
-    assertTrue(after >= before + 1, "A request should have been attempted");
+    circuitBreakerRegistry.circuitBreaker("backendApi").reset();
+
+    assertTimesOutOnVirtualTime(
+        () -> termsDocumentClient.get().uri("/api/v1/slow").retrieve().bodyToMono(String.class),
+        "GET");
   }
 
   /**
@@ -211,22 +214,48 @@ class WebClientResilienceTest {
   @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
   void timeLimiter_ShouldTimeoutSlowResponses_OnWriteVerbs(String method) {
     circuitBreakerRegistry.circuitBreaker("backendApi").reset();
+
+    assertTimesOutOnVirtualTime(
+        () ->
+            termsDocumentClient
+                .method(HttpMethod.valueOf(method))
+                .uri("/api/v1/slow")
+                .retrieve()
+                .bodyToMono(String.class),
+        method);
+  }
+
+  /**
+   * Subscribes to {@code call} on a virtual clock, waits until the backend has received the
+   * request, then advances the clock past every time-limiter window and expects the call to fail.
+   *
+   * @param call builds the request; it runs inside the virtual-time scope
+   * @param method the HTTP verb, for the failure messages
+   */
+  private static void assertTimesOutOnVirtualTime(Supplier<Mono<String>> call, String method) {
     int before = server.getRequestCount();
-    long start = System.currentTimeMillis();
-    try {
-      termsDocumentClient
-          .method(HttpMethod.valueOf(method))
-          .uri("/api/v1/slow")
-          .retrieve()
-          .bodyToMono(String.class)
-          .block();
-      fail("Expected timeout for " + method + " due to slow response");
-    } catch (Exception ignored) {
+    StepVerifier.withVirtualTime(call)
+        .expectSubscription()
+        .then(() -> awaitRequestCount(before + 1, method))
+        .thenAwait(Duration.ofSeconds(10))
+        .expectError()
+        .verify(Duration.ofSeconds(10));
+  }
+
+  /**
+   * Waits on the wall clock until the mock backend has received {@code expected} requests.
+   *
+   * @param expected the request count to reach
+   * @param method the HTTP verb, for the failure message
+   */
+  private static void awaitRequestCount(int expected, String method) {
+    long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+    while (server.getRequestCount() < expected) {
+      if (System.nanoTime() > deadline) {
+        fail("A " + method + " request should have reached the backend");
+      }
+      LockSupport.parkNanos(Duration.ofMillis(5).toNanos());
     }
-    long duration = System.currentTimeMillis() - start;
-    int after = server.getRequestCount();
-    assertTrue(duration < 2000, method + " should time out quickly, took " + duration + "ms");
-    assertTrue(after >= before + 1, "A " + method + " request should have been attempted");
   }
 
   /**

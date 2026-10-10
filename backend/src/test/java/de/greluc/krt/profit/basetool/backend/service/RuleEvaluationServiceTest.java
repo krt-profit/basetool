@@ -21,15 +21,15 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
-import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.event.JobOrderCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.event.OrgUnitRef;
-import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.SelectorKind;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
 import java.math.BigDecimal;
 import java.util.List;
@@ -499,5 +500,159 @@ class RuleEvaluationServiceTest {
 
     assertThat(result.get(NotificationType.JOB_ORDER_CREATED))
         .containsExactlyInAnyOrder(OFFICER_A, ADMIN_B);
+  }
+
+  private static NotificationRule ruleOf(SelectorKind kind, boolean excludeActor) {
+    return jobOrderRule(
+        NotificationType.JOB_ORDER_CREATED,
+        excludeActor,
+        NotificationRuleSelector.builder().kind(kind).build());
+  }
+
+  private void givenRules(NotificationRule... rules) {
+    when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
+            NotificationEventType.JOB_ORDER_CREATED))
+        .thenReturn(List.of(rules));
+  }
+
+  @Test
+  void missionParticipantsSelectorReadsTheMissionTheEventCarries() {
+    UUID mission = UUID.randomUUID();
+    givenRules(ruleOf(SelectorKind.MISSION_PARTICIPANTS, true));
+    when(recipientResolutionService.resolveMissionParticipants(mission, false))
+        .thenReturn(Set.of(OFFICER_A, ACTOR));
+
+    Map<NotificationType, Set<UUID>> result =
+        service.resolveRecipients(
+            StubNotificationEvent.builder().actorSub(ACTOR).contextMissionId(mission).build());
+
+    assertThat(result.get(NotificationType.JOB_ORDER_CREATED)).containsExactly(OFFICER_A);
+  }
+
+  @Test
+  void missionParticipantsSelectorNarrowsToTheNotCheckedInWhenTheEventSaysSo() {
+    UUID mission = UUID.randomUUID();
+    givenRules(ruleOf(SelectorKind.MISSION_PARTICIPANTS, false));
+    when(recipientResolutionService.resolveMissionParticipants(mission, true))
+        .thenReturn(Set.of(ADMIN_B));
+
+    Map<NotificationType, Set<UUID>> result =
+        service.resolveRecipients(
+            StubNotificationEvent.builder()
+                .contextMissionId(mission)
+                .contextMissionOnlyNotCheckedIn(true)
+                .build());
+
+    assertThat(result.get(NotificationType.JOB_ORDER_CREATED)).containsExactly(ADMIN_B);
+  }
+
+  @Test
+  void missionSelectorsResolveToNobodyWhenTheEventCarriesNoMission() {
+    givenRules(
+        ruleOf(SelectorKind.MISSION_PARTICIPANTS, false),
+        ruleOf(SelectorKind.MISSION_LEADERSHIP, false));
+
+    assertThat(service.resolveRecipients(StubNotificationEvent.builder().build())).isEmpty();
+    verify(recipientResolutionService, never()).resolveMissionLeadership(any());
+    verify(recipientResolutionService, never()).resolveMissionParticipants(any(), anyBoolean());
+  }
+
+  @Test
+  void missionLeadershipSelectorReadsOwnerAndManagersOfTheMission() {
+    UUID mission = UUID.randomUUID();
+    givenRules(ruleOf(SelectorKind.MISSION_LEADERSHIP, true));
+    when(recipientResolutionService.resolveMissionLeadership(mission))
+        .thenReturn(Set.of(OFFICER_A, ACTOR));
+
+    Map<NotificationType, Set<UUID>> result =
+        service.resolveRecipients(
+            StubNotificationEvent.builder().actorSub(ACTOR).contextMissionId(mission).build());
+
+    assertThat(result.get(NotificationType.JOB_ORDER_CREATED)).containsExactly(OFFICER_A);
+  }
+
+  @Test
+  void exchangeClientHoldersSelectorReadsTheClientTheEventCarries() {
+    UUID client = UUID.randomUUID();
+    givenRules(ruleOf(SelectorKind.EXCHANGE_CLIENT_HOLDERS, false));
+    when(recipientResolutionService.resolveExchangeClientHolders(client))
+        .thenReturn(Set.of(ADMIN_B));
+
+    Map<NotificationType, Set<UUID>> result =
+        service.resolveRecipients(
+            StubNotificationEvent.builder().contextExchangeClientId(client).build());
+
+    assertThat(result.get(NotificationType.JOB_ORDER_CREATED)).containsExactly(ADMIN_B);
+  }
+
+  @Test
+  void exchangeClientHoldersSelectorReachesEveryHolderForAnExchangeWideEvent() {
+    givenRules(ruleOf(SelectorKind.EXCHANGE_CLIENT_HOLDERS, false));
+    when(recipientResolutionService.resolveExchangeClientHolders(null))
+        .thenReturn(Set.of(OFFICER_A, ADMIN_B));
+
+    Map<NotificationType, Set<UUID>> result =
+        service.resolveRecipients(
+            StubNotificationEvent.builder().contextAllExchangeClients(true).build());
+
+    assertThat(result.get(NotificationType.JOB_ORDER_CREATED))
+        .containsExactlyInAnyOrder(OFFICER_A, ADMIN_B);
+  }
+
+  @Test
+  void exchangeClientHoldersSelectorResolvesToNobodyWithoutAClientOrTheWideFlag() {
+    givenRules(ruleOf(SelectorKind.EXCHANGE_CLIENT_HOLDERS, false));
+
+    assertThat(service.resolveRecipients(StubNotificationEvent.builder().build())).isEmpty();
+    verify(recipientResolutionService, never()).resolveExchangeClientHolders(any());
+  }
+
+  @Test
+  void eventRecipientsSelectorReachesTheWholeSetAndDropsTheActor() {
+    givenRules(ruleOf(SelectorKind.EVENT_RECIPIENTS, true));
+
+    Map<NotificationType, Set<UUID>> result =
+        service.resolveRecipients(
+            StubNotificationEvent.builder()
+                .actorSub(ACTOR)
+                .contextRecipientUserIds(Set.of(OFFICER_A, ADMIN_B, ACTOR))
+                .build());
+
+    assertThat(result.get(NotificationType.JOB_ORDER_CREATED))
+        .containsExactlyInAnyOrder(OFFICER_A, ADMIN_B);
+  }
+
+  @Test
+  void eventRecipientsSelectorResolvesToNobodyWhenTheEventListsNoOne() {
+    givenRules(ruleOf(SelectorKind.EVENT_RECIPIENTS, false));
+
+    assertThat(service.resolveRecipients(StubNotificationEvent.builder().build())).isEmpty();
+  }
+
+  @Test
+  void unitLeadershipRoleResolvesThroughTheContextOrgUnit() {
+    givenRules(
+        jobOrderRule(
+            NotificationType.JOB_ORDER_CREATED,
+            false,
+            NotificationRuleSelector.builder()
+                .kind(SelectorKind.ORG_RELATIVE_ROLE)
+                .orgRelativeRole(OrgRelativeRole.UNIT_LEADERSHIP)
+                .contextRole(NotificationContextRole.RESPONSIBLE)
+                .build()));
+    when(recipientResolutionService.resolveOrgRelative(
+            OrgRelativeRole.UNIT_LEADERSHIP, RESPONSIBLE))
+        .thenReturn(Set.of(OFFICER_A));
+
+    Map<NotificationType, Set<UUID>> result =
+        service.resolveRecipients(
+            StubNotificationEvent.builder()
+                .contextOrgUnits(
+                    Map.of(
+                        NotificationContextRole.RESPONSIBLE,
+                        new OrgUnitRef(RESPONSIBLE, OrgUnitKind.SQUADRON)))
+                .build());
+
+    assertThat(result.get(NotificationType.JOB_ORDER_CREATED)).containsExactly(OFFICER_A);
   }
 }

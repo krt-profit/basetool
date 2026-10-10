@@ -21,18 +21,17 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.NotificationRuleMapper;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
-import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.SelectorKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequest;
+import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -60,7 +59,7 @@ public class NotificationRuleService {
   private final NotificationRuleRepository notificationRuleRepository;
 
   /** Resolves a {@code ROLE} selector's {@code roleCode} against the catalogue (REQ-SEC-053). */
-  private final RoleRepository roleRepository;
+  private final RoleRecipientDirectory roleRecipientDirectory;
 
   private final NotificationRuleMapper notificationRuleMapper;
 
@@ -152,8 +151,8 @@ public class NotificationRuleService {
   private void applySelectors(
       @NotNull NotificationRule rule, @NotNull NotificationRuleWriteRequest request) {
     for (NotificationRuleSelectorWriteRequest selectorRequest : request.selectors()) {
-      Role resolvedRole = validateSelector(selectorRequest);
-      if (readsOnlyTheEvent(selectorRequest.kind())) {
+      String resolvedRoleCode = validateSelector(selectorRequest);
+      if (selectorRequest.kind().readsOnlyTheEvent()) {
         rule.addSelector(NotificationRuleSelector.builder().kind(selectorRequest.kind()).build());
         continue;
       }
@@ -161,7 +160,7 @@ public class NotificationRuleService {
           NotificationRuleSelector.builder()
               .kind(selectorRequest.kind())
               .userId(selectorRequest.userId())
-              .roleCode(resolvedRole != null ? resolvedRole.getCode() : null)
+              .roleCode(resolvedRoleCode)
               .orgRelativeRole(selectorRequest.orgRelativeRole())
               .contextRole(selectorRequest.contextRole())
               .build());
@@ -169,16 +168,16 @@ public class NotificationRuleService {
   }
 
   /**
-   * Validates one selector and, for a {@code ROLE} selector, returns the catalogue row it names.
+   * Validates one selector and, for a {@code ROLE} selector, returns the catalogue code it names.
    *
    * @param selector the submitted selector
-   * @return the resolved {@link Role} for a {@code ROLE} selector, {@code null} for every other
+   * @return the catalogue's role code for a {@code ROLE} selector, {@code null} for every other
    *     kind
    * @throws IllegalArgumentException when the selector is incomplete, or names a role the catalogue
    *     does not know
    */
   @Nullable
-  private Role validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
+  private String validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
     switch (selector.kind()) {
       case SPECIFIC_USER -> {
         if (selector.userId() == null) {
@@ -190,8 +189,8 @@ public class NotificationRuleService {
         if (roleCode == null) {
           throw new IllegalArgumentException("ROLE selector requires roleCode");
         }
-        return roleRepository
-            .findByCodeIgnoreCase(roleCode)
+        return roleRecipientDirectory
+            .catalogueRoleCode(roleCode)
             .orElseThrow(
                 () ->
                     new IllegalArgumentException(
@@ -203,25 +202,16 @@ public class NotificationRuleService {
               "ORG_RELATIVE_ROLE selector requires orgRelativeRole and contextRole");
         }
       }
-      case ACCOUNT_GRANT, EVENT_RECIPIENT, ACCOUNT_RESPONSIBLE -> {}
-      default ->
-          throw new IllegalArgumentException("Unsupported selector kind: " + selector.kind());
+      case ACCOUNT_GRANT,
+          EVENT_RECIPIENT,
+          ACCOUNT_RESPONSIBLE,
+          MISSION_PARTICIPANTS,
+          MISSION_LEADERSHIP,
+          EXCHANGE_CLIENT_HOLDERS,
+          EVENT_RECIPIENTS -> {}
+      case null -> throw new NullPointerException("selector kind");
     }
     return null;
-  }
-
-  /**
-   * Tells whether a selector kind resolves its recipients purely from the event and reads no
-   * selector columns.
-   *
-   * @param kind the selector kind
-   * @return {@code true} for {@code ACCOUNT_GRANT}, {@code EVENT_RECIPIENT} and {@code
-   *     ACCOUNT_RESPONSIBLE}
-   */
-  private static boolean readsOnlyTheEvent(@NotNull SelectorKind kind) {
-    return kind == SelectorKind.ACCOUNT_GRANT
-        || kind == SelectorKind.EVENT_RECIPIENT
-        || kind == SelectorKind.ACCOUNT_RESPONSIBLE;
   }
 
   @NotNull

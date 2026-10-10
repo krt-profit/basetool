@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -119,14 +119,14 @@ public class LiveSyncRelayService {
       return Outcome.NO_KNOWN_SECTIONS;
     }
     if (!subjectBuckets
-        .get(sub, key -> newBucket(SUBJECT_BURST, SUBJECT_REFILL_PER_SECOND))
+        .get(sub, _ -> newBucket(SUBJECT_BURST, SUBJECT_REFILL_PER_SECOND))
         .tryConsume(1)) {
       count(MetricNames.LIVESYNC_PUBLISH_REJECTED, MetricNames.REASON_SUBJECT_BUCKET, topicClass);
       log.debug("Live-sync publish refused: per-subject bucket exhausted for {}", sub);
       return Outcome.SUBJECT_RATE_LIMITED;
     }
     if (!topicBuckets
-        .get(topic.canonical(), key -> newBucket(TOPIC_BURST, TOPIC_REFILL_PER_SECOND))
+        .get(topic.canonical(), _ -> newBucket(TOPIC_BURST, TOPIC_REFILL_PER_SECOND))
         .tryConsume(1)) {
       count(MetricNames.LIVESYNC_PUBLISH_REJECTED, MetricNames.REASON_TOPIC_BUCKET, topicClass);
       log.debug("Live-sync publish refused: per-topic bucket exhausted for {}", topic.canonical());

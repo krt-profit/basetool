@@ -2,90 +2,197 @@
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
  * SPDX-License-Identifier: GPL-3.0-only
- *
- * Page-specific layout for the delegated Leitung page (epic #800, REQ-ROLE-004). The HUD vocabulary
- * (hud-box, card, chip, krt-table, btn, section-title) comes from styles.css; this only adds the
- * page's own composition (tier spacing, the Kommandogruppen grid, the rank-row controls).
  */
 
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
-    .leitung-intro {
-        margin: 0.5rem 0 0;
+    .leitung-md {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-height: 480px;
     }
 
-    .leitung-error {
-        color: var(--color-danger-text);
-    }
-
-    .leitung-tier {
-        margin-top: 2rem;
-    }
-
-    .leitung-unit-head {
+    .leitung-tree {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1rem;
+        flex-direction: column;
+        min-width: 0;
+        padding: var(--space-2) 0;
+        border-right: var(--border-hairline);
     }
 
-    .leitung-unit-title {
-        margin: 0;
+    .leitung-tree__search {
+        padding: var(--space-1) var(--space-3) var(--space-2);
     }
 
-    .leitung-subhead {
-        margin: 1.25rem 0 0.5rem;
+    .leitung-tree__search .toolbar__search {
+        max-width: none;
+    }
+
+    .leitung-tree__nav {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .leitung-tree__group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .leitung-tree__group[hidden] {
+        display: none;
+    }
+
+    .leitung-tree__label {
+        padding: var(--space-3) var(--space-4) var(--space-1);
+        font-size: var(--fs-2xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.12em;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-size: 0.85rem;
         color: var(--color-gray-2-text);
     }
 
-    .leitung-empty,
-    .leitung-empty-all {
-        color: var(--color-gray-2-text);
-        padding: 0.75rem 0;
+    .leitung-tree__row {
+        justify-content: flex-start;
+        gap: var(--space-2);
+        min-height: 36px;
+        padding: 0 var(--space-4) 0 1.25rem;
+        border-bottom: 0;
+        border-left: 3px solid transparent;
+        font-size: var(--fs-sm);
+        text-decoration: none;
     }
 
-    .leitung-col-action {
-        text-align: right;
+    .leitung-tree__row:hover {
+        color: var(--color-white);
+    }
+
+    .leitung-tree__row.is-active {
+        border-left-color: var(--color-primary);
+        background: var(--color-surface-input);
+        color: var(--color-white);
+    }
+
+    .leitung-tree__name {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .leitung-rank-table select {
-        min-width: 12rem;
-    }
-
-    .leitung-group-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 1rem;
-    }
-
-    .leitung-group,
-    .leitung-group-add {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.75rem;
-    }
-
-    .leitung-group-name,
-    .leitung-new-group-name {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
-
-    .leitung-group-actions {
-        display: flex;
-        gap: 0.25rem;
+    .leitung-tree__count {
         flex: 0 0 auto;
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-regular);
+        font-variant-numeric: tabular-nums;
+        color: var(--color-gray-2-text);
+    }
+
+    .leitung-tree__nomatch {
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        font-size: var(--fs-xs);
+        color: var(--color-gray-2-text);
+    }
+
+    .leitung-dept {
+        flex: 0 0 auto;
+        width: 8px;
+        height: 8px;
+        background: var(--color-gray-3);
+    }
+
+    .leitung-dept--ol {
+        background: var(--color-primary);
+    }
+
+    .leitung-dept--profit {
+        background: var(--color-dept-profit);
+    }
+
+    .leitung-dept--sub-radar {
+        background: var(--color-dept-sub-radar);
+    }
+
+    .leitung-dept--raumueberlegenheit {
+        background: var(--color-dept-raumueberlegenheit);
+    }
+
+    .leitung-dept--forschung {
+        background: var(--color-dept-forschung);
+    }
+
+    .leitung-dept--marinekorps {
+        background: var(--color-dept-marinekorps);
+    }
+
+    .leitung-dept--search-rescue {
+        background: var(--color-dept-search-rescue);
+    }
+
+    .leitung-detail {
+        min-width: 0;
+        padding: var(--space-4) var(--space-6);
+    }
+
+    .leitung-pane {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .leitung-pane[hidden] {
+        display: none;
+    }
+
+    .leitung-group-name {
+        width: 100%;
+        max-width: 24rem;
+        margin: 0;
+    }
+
+    .leitung-group-add {
+        align-items: center;
+    }
+
+    .leitung-new-group-name {
+        flex: 1 1 14rem;
+        max-width: 24rem;
+        margin: 0;
     }
 
     .leitung-modal-unit {
         color: var(--color-gray-2-text);
         margin: 0 0 1rem;
+    }
+
+    @media (width <= 1024px) {
+        .leitung-md {
+            grid-template-columns: minmax(0, 1fr);
+            min-height: 0;
+        }
+
+        .leitung-tree {
+            max-height: 45vh;
+            overflow-y: auto;
+            border-right: 0;
+            border-bottom: var(--border-hairline);
+        }
+
+        .leitung-tree__row {
+            min-height: var(--touch-target);
+        }
+
+        .leitung-detail {
+            padding: var(--space-4);
+        }
+    }
+
+    @media (width <= 768px) {
+        .leitung-rank-table td:has(> select) {
+            flex: 1 1 100%;
+            margin-right: 0;
+        }
     }
 }

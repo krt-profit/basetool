@@ -72,6 +72,7 @@ class DtoMirrorConsistencyTest {
           entry("NotificationCountResponse", "NotificationUnreadCountDto"),
           entry("PersonSearchResultDto", "PersonSearchResult"),
           entry("PersonalBlueprintBatchResultDto", "PersonalBlueprintBatchResult"),
+          entry("UserAttributesUpdateDto", "UserAttributesRequest"),
           entry("PersonalBlueprintBulkDeleteResultDto", "PersonalBlueprintBulkDeleteResult"),
           entry("PersonalBlueprintDto", "PersonalBlueprintResponse"),
           entry("PersonalBlueprintRecipeDto", "PersonalBlueprintRecipeResponse"),
@@ -102,10 +103,7 @@ class DtoMirrorConsistencyTest {
           entry(
               "OrganisationsleitungCreateRequest",
               "write subset of OrganisationsleitungDto; the backend assigns the rest"),
-          entry("StagedHandoff", "mirror of the ingest gateway's Redis value, not of the backend"),
-          entry(
-              "UserAttributesUpdateDto",
-              "body of UserController.UserAttributesRequest, a class rather than a record"));
+          entry("StagedHandoff", "mirror of the ingest gateway's Redis value, not of the backend"));
 
   /**
    * Per-DTO whitelist of backend-only record components the frontend deliberately does not mirror.

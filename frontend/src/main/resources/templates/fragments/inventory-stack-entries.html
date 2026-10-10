@@ -3,9 +3,7 @@
 <body>
 
 <th:block th:fragment="stackEntriesMy">
-    <div th:if="${error}" class="hud-box hud-box-error krtm-margin-0-5rem-2-5rem-25ef">
-        <p th:text="#{__${error}__}">Fehler</p>
-    </div>
+    <div th:if="${error}" class="alert alert-danger stack-entries-alert" role="alert" th:text="#{__${error}__}">Fehler</div>
     <th:block th:each="entry : ${entries}">
         <th:block th:if="${entry.gameItem == null}">
         <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
@@ -42,7 +40,7 @@
                                         data-trigger="inv-my-assoc-add-open"
                                         th:aria-label="#{inventory.assoc.add.order}"
                                         th:text="#{inventory.assoc.add}">+ Zuordnen</button>
-                                <div class="assoc-pop krtm-hidden" data-assoc-pop>
+                                <div class="assoc-pop" hidden data-assoc-pop>
                                     <div data-assoc-pop-pick>
                                         <select data-krt-combobox
                                                 data-trigger="inv-my-assoc-pick"
@@ -55,7 +53,7 @@
                                                     th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(orderNeed, 1, 'NONE') : #numbers.formatDecimal(orderNeed, 1, 'NONE', 3, 'DEFAULT')) + ' ' + (entry.material.quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu'))})})"></option>
                                         </select>
                                     </div>
-                                    <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
+                                    <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
                                         <label th:text="#{inventory.assoc.amount}">Menge</label>
                                         <div class="assoc-menge-row">
                                             <input type="number" min="0" step="0.001"
@@ -64,7 +62,7 @@
                                             <button type="button" class="btn btn-primary btn-xs"
                                                     data-trigger="inv-my-assoc-save"
                                                     th:text="#{general.save}">Speichern</button>
-                                            <button type="button" class="btn btn-quiet-danger btn-xs krtm-hidden"
+                                            <button type="button" class="btn btn-quiet-danger btn-xs" hidden
                                                     data-trigger="inv-my-assoc-remove"
                                                     th:text="#{inventory.assoc.remove}">Entfernen</button>
                                         </div>
@@ -101,7 +99,7 @@
                                         data-trigger="inv-my-assoc-add-open"
                                         th:aria-label="#{inventory.assoc.add.mission}"
                                         th:text="#{inventory.assoc.add}">+ Zuordnen</button>
-                                <div class="assoc-pop krtm-hidden" data-assoc-pop>
+                                <div class="assoc-pop" hidden data-assoc-pop>
                                     <div data-assoc-pop-pick>
                                         <select data-krt-combobox
                                                 data-trigger="inv-my-assoc-pick"
@@ -113,7 +111,7 @@
                                                     th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"></option>
                                         </select>
                                     </div>
-                                    <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
+                                    <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
                                         <label th:text="#{inventory.assoc.amount}">Menge</label>
                                         <div class="assoc-menge-row">
                                             <input type="number" min="0" step="0.001"
@@ -122,7 +120,7 @@
                                             <button type="button" class="btn btn-primary btn-xs"
                                                     data-trigger="inv-my-assoc-save"
                                                     th:text="#{general.save}">Speichern</button>
-                                            <button type="button" class="btn btn-quiet-danger btn-xs krtm-hidden"
+                                            <button type="button" class="btn btn-quiet-danger btn-xs" hidden
                                                     data-trigger="inv-my-assoc-remove"
                                                     th:text="#{inventory.assoc.remove}">Entfernen</button>
                                         </div>
@@ -158,7 +156,7 @@
                           th:classappend="${released} ? 'chip--primary' : 'chip--muted'"
                           th:text="${released} ? #{materialboerse.inventory.forExchange.on} : #{materialboerse.inventory.forExchange.private}">privat</span>
                 </label>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
                         th:data-version="${entry.version}"
@@ -170,7 +168,7 @@
                         th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
                         th:data-version="${entry.version}"
@@ -186,7 +184,7 @@
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:if="${entry.personal}"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
@@ -197,7 +195,7 @@
                         th:title="#{inventory.orgUnitChange.action}" th:aria-label="#{inventory.orgUnitChange.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:if="${canMarkStolen == true and entry.canEdit == true}"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
@@ -265,7 +263,7 @@
                                         data-trigger="inv-my-assoc-add-open"
                                         th:aria-label="#{inventory.assoc.add.order}"
                                         th:text="#{inventory.assoc.add}">+ Zuordnen</button>
-                                <div class="assoc-pop krtm-hidden" data-assoc-pop>
+                                <div class="assoc-pop" hidden data-assoc-pop>
                                     <div data-assoc-pop-pick>
                                         <select data-krt-combobox
                                                 data-trigger="inv-my-assoc-pick"
@@ -278,7 +276,7 @@
                                                     th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${orderNeed + ' ' + #messages.msg('material.quantity.piece')})})"></option>
                                         </select>
                                     </div>
-                                    <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
+                                    <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
                                         <label th:text="#{inventory.assoc.amount}">Menge</label>
                                         <div class="assoc-menge-row">
                                             <input type="number" min="0" step="1"
@@ -287,7 +285,7 @@
                                             <button type="button" class="btn btn-primary btn-xs"
                                                     data-trigger="inv-my-assoc-save"
                                                     th:text="#{general.save}">Speichern</button>
-                                            <button type="button" class="btn btn-quiet-danger btn-xs krtm-hidden"
+                                            <button type="button" class="btn btn-quiet-danger btn-xs" hidden
                                                     data-trigger="inv-my-assoc-remove"
                                                     th:text="#{inventory.assoc.remove}">Entfernen</button>
                                         </div>
@@ -322,7 +320,7 @@
                           th:classappend="${released} ? 'chip--primary' : 'chip--muted'"
                           th:text="${released} ? #{materialboerse.inventory.forExchange.on} : #{materialboerse.inventory.forExchange.private}">privat</span>
                 </label>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
                         th:data-version="${entry.version}"
@@ -334,7 +332,7 @@
                         th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
                         th:data-version="${entry.version}"
@@ -349,7 +347,7 @@
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:if="${entry.personal}"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
@@ -359,7 +357,7 @@
                         th:title="#{inventory.orgUnitChange.action}" th:aria-label="#{inventory.orgUnitChange.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:if="${canMarkStolen == true and entry.canEdit == true}"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
@@ -394,17 +392,17 @@
         </th:block>
     </th:block>
     <div class="tree-row" th:if="${#lists.isEmpty(entries)}">
-        <div class="tree-cell text-muted krtm-grid-column-1-1-padding-left-3rem-2793" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>
+        <div class="tree-cell text-muted stack-entries-empty" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>
     </div>
-    <div th:if="${entriesPage != null and entriesPage.totalPages() > 1}" class="stack-entries-pagination krtm-display-flex-gap-0-75rem-align-items-center-c051">
-        <button type="button" class="btn btn-ghost krtm-padding-0-2rem-0-6rem-font-size-0-8rem-452c"
+    <div th:if="${entriesPage != null and entriesPage.totalPages() > 1}" class="stack-entries-pagination">
+        <button type="button" class="btn btn-ghost btn-xs"
                 data-trigger="inv-my-stack-page"
                 th:data-page="${entriesPage.page() - 1}"
                 th:disabled="${entriesPage.page() <= 0}"
                 th:text="#{general.pagination.previous}">Zurück</button>
-        <span class="krtm-color-var-color-gray-2-font-size-0-85rem-b3ad"
+        <span class="stack-entries-page"
               th:text="|${entriesPage.page() + 1} / ${entriesPage.totalPages()}|">1 / 3</span>
-        <button type="button" class="btn btn-ghost krtm-padding-0-2rem-0-6rem-font-size-0-8rem-452c"
+        <button type="button" class="btn btn-ghost btn-xs"
                 data-trigger="inv-my-stack-page"
                 th:data-page="${entriesPage.page() + 1}"
                 th:disabled="${entriesPage.page() + 1 >= entriesPage.totalPages()}"
@@ -413,9 +411,7 @@
 </th:block>
 
 <th:block th:fragment="stackEntriesAdmin">
-    <div th:if="${error}" class="hud-box hud-box-error krtm-margin-0-5rem-2-5rem-25ef">
-        <p th:text="#{__${error}__}">Fehler</p>
-    </div>
+    <div th:if="${error}" class="alert alert-danger stack-entries-alert" role="alert" th:text="#{__${error}__}">Fehler</div>
     <th:block th:each="entry : ${entries}">
         <th:block th:if="${entry.gameItem == null}">
         <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
@@ -449,7 +445,7 @@
                                             data-trigger="inv-admin-assoc-add-open"
                                             th:aria-label="#{inventory.assoc.add.order}"
                                             th:text="#{inventory.assoc.add}">+ Zuordnen</button>
-                                    <div class="assoc-pop krtm-hidden" data-assoc-pop>
+                                    <div class="assoc-pop" hidden data-assoc-pop>
                                         <div data-assoc-pop-pick>
                                             <select data-krt-combobox
                                                     data-trigger="inv-admin-assoc-pick"
@@ -462,7 +458,7 @@
                                                         th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(orderNeed, 1, 'NONE') : #numbers.formatDecimal(orderNeed, 1, 'NONE', 3, 'DEFAULT')) + ' ' + (entry.material.quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu'))})})"></option>
                                             </select>
                                         </div>
-                                        <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
+                                        <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
                                             <label th:text="#{inventory.assoc.amount}">Menge</label>
                                             <div class="assoc-menge-row">
                                                 <input type="number" min="0" step="0.001"
@@ -471,7 +467,7 @@
                                                 <button type="button" class="btn btn-primary btn-xs"
                                                         data-trigger="inv-admin-assoc-save"
                                                         th:text="#{general.save}">Speichern</button>
-                                                <button type="button" class="btn btn-quiet-danger btn-xs krtm-hidden"
+                                                <button type="button" class="btn btn-quiet-danger btn-xs" hidden
                                                         data-trigger="inv-admin-assoc-remove"
                                                         th:text="#{inventory.assoc.remove}">Entfernen</button>
                                             </div>
@@ -518,7 +514,7 @@
                                             data-trigger="inv-admin-assoc-add-open"
                                             th:aria-label="#{inventory.assoc.add.mission}"
                                             th:text="#{inventory.assoc.add}">+ Zuordnen</button>
-                                    <div class="assoc-pop krtm-hidden" data-assoc-pop>
+                                    <div class="assoc-pop" hidden data-assoc-pop>
                                         <div data-assoc-pop-pick>
                                             <select data-krt-combobox
                                                     data-trigger="inv-admin-assoc-pick"
@@ -530,7 +526,7 @@
                                                         th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"></option>
                                             </select>
                                         </div>
-                                        <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
+                                        <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
                                             <label th:text="#{inventory.assoc.amount}">Menge</label>
                                             <div class="assoc-menge-row">
                                                 <input type="number" min="0" step="0.001"
@@ -539,7 +535,7 @@
                                                 <button type="button" class="btn btn-primary btn-xs"
                                                         data-trigger="inv-admin-assoc-save"
                                                         th:text="#{general.save}">Speichern</button>
-                                                <button type="button" class="btn btn-quiet-danger btn-xs krtm-hidden"
+                                                <button type="button" class="btn btn-quiet-danger btn-xs" hidden
                                                         data-trigger="inv-admin-assoc-remove"
                                                         th:text="#{inventory.assoc.remove}">Entfernen</button>
                                             </div>
@@ -567,7 +563,7 @@
                 <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
             </div>
             <div class="tree-cell tree-cell--actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)">
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
                         th:data-version="${entry.version}"
@@ -579,7 +575,7 @@
                         th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
                         th:data-version="${entry.version}"
@@ -594,7 +590,7 @@
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:if="${canMarkStolen == true and entry.canEdit == true}"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
@@ -659,7 +655,7 @@
                                             data-trigger="inv-admin-assoc-add-open"
                                             th:aria-label="#{inventory.assoc.add.order}"
                                             th:text="#{inventory.assoc.add}">+ Zuordnen</button>
-                                    <div class="assoc-pop krtm-hidden" data-assoc-pop>
+                                    <div class="assoc-pop" hidden data-assoc-pop>
                                         <div data-assoc-pop-pick>
                                             <select data-krt-combobox
                                                     data-trigger="inv-admin-assoc-pick"
@@ -672,7 +668,7 @@
                                                         th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${orderNeed + ' ' + #messages.msg('material.quantity.piece')})})"></option>
                                             </select>
                                         </div>
-                                        <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
+                                        <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
                                             <label th:text="#{inventory.assoc.amount}">Menge</label>
                                             <div class="assoc-menge-row">
                                                 <input type="number" min="0" step="1"
@@ -681,7 +677,7 @@
                                                 <button type="button" class="btn btn-primary btn-xs"
                                                         data-trigger="inv-admin-assoc-save"
                                                         th:text="#{general.save}">Speichern</button>
-                                                <button type="button" class="btn btn-quiet-danger btn-xs krtm-hidden"
+                                                <button type="button" class="btn btn-quiet-danger btn-xs" hidden
                                                         data-trigger="inv-admin-assoc-remove"
                                                         th:text="#{inventory.assoc.remove}">Entfernen</button>
                                             </div>
@@ -708,7 +704,7 @@
                 <span><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
             </div>
             <div class="tree-cell tree-cell--actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)">
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
                         th:data-version="${entry.version}"
@@ -720,7 +716,7 @@
                         th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
                         th:data-version="${entry.version}"
@@ -733,7 +729,7 @@
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
-                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                <button type="button" class="btn btn-ghost btn-xs btn-icon"
                         th:if="${canMarkStolen == true and entry.canEdit == true}"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
@@ -768,17 +764,17 @@
         </th:block>
     </th:block>
     <div class="tree-row" th:if="${#lists.isEmpty(entries)}">
-        <div class="tree-cell text-muted krtm-grid-column-1-1-padding-left-3rem-2793" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>
+        <div class="tree-cell text-muted stack-entries-empty" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>
     </div>
-    <div th:if="${entriesPage != null and entriesPage.totalPages() > 1}" class="stack-entries-pagination krtm-display-flex-gap-0-75rem-align-items-center-c051">
-        <button type="button" class="btn btn-ghost krtm-padding-0-2rem-0-6rem-font-size-0-8rem-452c"
+    <div th:if="${entriesPage != null and entriesPage.totalPages() > 1}" class="stack-entries-pagination">
+        <button type="button" class="btn btn-ghost btn-xs"
                 data-trigger="inv-admin-stack-page"
                 th:data-page="${entriesPage.page() - 1}"
                 th:disabled="${entriesPage.page() <= 0}"
                 th:text="#{general.pagination.previous}">Zurück</button>
-        <span class="krtm-color-var-color-gray-2-font-size-0-85rem-b3ad"
+        <span class="stack-entries-page"
               th:text="|${entriesPage.page() + 1} / ${entriesPage.totalPages()}|">1 / 3</span>
-        <button type="button" class="btn btn-ghost krtm-padding-0-2rem-0-6rem-font-size-0-8rem-452c"
+        <button type="button" class="btn btn-ghost btn-xs"
                 data-trigger="inv-admin-stack-page"
                 th:data-page="${entriesPage.page() + 1}"
                 th:disabled="${entriesPage.page() + 1 >= entriesPage.totalPages()}"

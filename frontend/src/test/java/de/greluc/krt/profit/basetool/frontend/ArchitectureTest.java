@@ -128,14 +128,13 @@ class ArchitectureTest {
   /**
    * Verifies that no controller holds a raw {@code WebClient}: a backend call from a controller
    * goes through {@code BackendApiClient}, whose error mapping, re-authentication signal and {@code
-   * basetool_backend_client_errors_total} accounting a raw client bypasses. The notification page,
-   * which opens the long-lived SSE relay on its own client, is the one exception.
+   * basetool_backend_client_errors_total} accounting a raw client bypasses, or through {@code
+   * BackendSideChannels}.
    */
   @Test
   void noControllerHoldsARawWebClient() {
     List<String> offenders =
         controllers().stream()
-            .filter(c -> !RAW_WEB_CLIENT_CONTROLLERS.contains(c.getSimpleName()))
             .filter(
                 c ->
                     c.getAllFields().stream()
@@ -147,14 +146,7 @@ class ArchitectureTest {
     assertThat(offenders)
         .as("controllers that inject a WebClient instead of BackendApiClient")
         .isEmpty();
-    assertThat(controllers().stream().map(JavaClass::getSimpleName).toList())
-        .as("the raw-WebClient allow-list names only controllers that exist")
-        .containsAll(RAW_WEB_CLIENT_CONTROLLERS);
   }
-
-  /** The controllers allowed to depend on a raw {@code WebClient}: the SSE relay page. */
-  private static final Set<String> RAW_WEB_CLIENT_CONTROLLERS =
-      Set.of("NotificationPageController");
 
   /**
    * Verifies that every view controller opts into the layout model via {@code @UsesLayoutModel}.

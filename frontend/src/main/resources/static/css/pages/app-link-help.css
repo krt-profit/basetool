@@ -1,0 +1,28 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .app-link-help .lead {
+        margin-top: 0;
+    }
+
+    .app-link-reassurance {
+        margin-bottom: 0;
+    }
+
+    .app-link-cards {
+        --min: 320px;
+    }
+
+    .app-link-cards .card + .card {
+        margin-top: 0;
+    }
+
+    .app-link-steps {
+        margin: 0;
+        padding-left: var(--space-6);
+    }
+
+    .app-link-steps li + li {
+        margin-top: var(--space-2);
+    }
+}

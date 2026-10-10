@@ -19,14 +19,21 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.AppException;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
@@ -62,12 +69,6 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
-import de.greluc.krt.profit.basetool.backend.support.InventoryProperties;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -104,8 +105,9 @@ public class InventoryItemService {
   private final MissionRepository missionRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final OwnerScopeService ownerScopeService;
+  private final InventoryAccessPolicy inventoryAccessPolicy;
   private final JobOrderItemService jobOrderItemService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final InventoryAggregationService inventoryAggregationService;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryProperties inventoryProperties;
@@ -445,7 +447,7 @@ public class InventoryItemService {
       @NotNull InventoryItemCreateDto dto, UUID currentUserId) {
     UUID targetUserId = dto.userId() != null ? dto.userId() : currentUserId;
     final boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
-    if (onBehalfOfSomeoneElse && !ownerScopeService.canManageUserInventory(targetUserId)) {
+    if (onBehalfOfSomeoneElse && !inventoryAccessPolicy.canManageUserInventory(targetUserId)) {
       throw new AccessDeniedException(
           "You are not allowed to create inventory items for other users");
     }
@@ -543,7 +545,7 @@ public class InventoryItemService {
     }
 
     InventoryItem saved = inventoryItemRepository.save(item);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_CREATED,
         item.getId(),
         InventoryAuditLabels.label(item),
@@ -591,7 +593,7 @@ public class InventoryItemService {
       UUID owningOrgUnitId) {
     UUID targetUserId = userId != null ? userId : currentUserId;
     boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
-    if (onBehalfOfSomeoneElse && !ownerScopeService.canManageUserInventory(targetUserId)) {
+    if (onBehalfOfSomeoneElse && !inventoryAccessPolicy.canManageUserInventory(targetUserId)) {
       throw new AccessDeniedException(
           "You are not allowed to inspect inventory items of other users");
     }
@@ -637,8 +639,11 @@ public class InventoryItemService {
    *
    * @param id the inventory entry id
    * @param dto dimension, target, amount and echoed entry version
+   * @param currentUserId the authenticated caller
+   * @param isLogistician whether the caller is a logistician or above
    * @return the updated entry with its new version
    * @throws NotFoundException when the entry, job order or mission is unknown
+   * @throws AccessDeniedException when the caller neither owns the entry nor is a logistician
    * @throws BadRequestException when the entry is personal, the material is not required, the
    *     amount is invalid, or the target is already allocated
    * @throws OverAllocationException when the dimension total would exceed the entry's amount
@@ -646,8 +651,9 @@ public class InventoryItemService {
    *     is stale
    */
   @Transactional
-  public InventoryItemDto addAllocation(UUID id, InventoryAllocationWriteDto dto) {
-    InventoryItem item = loadForAllocationWrite(id, dto);
+  public InventoryItemDto addAllocation(
+      UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
+    InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     assertNotPersonal(item);
     double amount = requireWriteAmount(dto, item);
     switch (dto.field()) {
@@ -695,7 +701,7 @@ public class InventoryItemService {
             mission.getName(),
             amount);
       }
-      default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
+      case null -> throw new NullPointerException("allocation dimension");
     }
     return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
@@ -706,16 +712,20 @@ public class InventoryItemService {
    *
    * @param id the inventory entry id
    * @param dto dimension, target, new amount and echoed entry version
+   * @param currentUserId the authenticated caller
+   * @param isLogistician whether the caller is a logistician or above
    * @return the updated entry
    * @throws NotFoundException when the entry or the target slice is unknown
+   * @throws AccessDeniedException when the caller neither owns the entry nor is a logistician
    * @throws BadRequestException when the entry is personal or the amount is invalid
    * @throws OverAllocationException when the dimension total would exceed the entry's amount
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
    *     is stale
    */
   @Transactional
-  public InventoryItemDto changeAllocation(UUID id, InventoryAllocationWriteDto dto) {
-    InventoryItem item = loadForAllocationWrite(id, dto);
+  public InventoryItemDto changeAllocation(
+      UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
+    InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     assertNotPersonal(item);
     double amount = requireWriteAmount(dto, item);
     switch (dto.field()) {
@@ -748,7 +758,7 @@ public class InventoryItemService {
             slice.getMission().getName(),
             amount);
       }
-      default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
+      case null -> throw new NullPointerException("allocation dimension");
     }
     return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
@@ -759,14 +769,18 @@ public class InventoryItemService {
    *
    * @param id the inventory entry id
    * @param dto dimension, target and echoed entry version; amount is ignored
+   * @param currentUserId the authenticated caller
+   * @param isLogistician whether the caller is a logistician or above
    * @return the updated entry
    * @throws NotFoundException when the entry or the target slice is unknown
+   * @throws AccessDeniedException when the caller neither owns the entry nor is a logistician
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
    *     is stale
    */
   @Transactional
-  public InventoryItemDto removeAllocation(UUID id, InventoryAllocationWriteDto dto) {
-    InventoryItem item = loadForAllocationWrite(id, dto);
+  public InventoryItemDto removeAllocation(
+      UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
+    InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     switch (dto.field()) {
       case JOB_ORDER -> {
         InventoryJobOrderAllocation slice = findJobOrderSlice(item, dto.targetId());
@@ -786,7 +800,7 @@ public class InventoryItemService {
         item.getMissionAllocations().remove(slice);
         recordAllocation(AuditEventType.INVENTORY_ALLOCATION_REMOVED, item, dto.field(), ref, null);
       }
-      default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
+      case null -> throw new NullPointerException("allocation dimension");
     }
     return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
@@ -806,20 +820,30 @@ public class InventoryItemService {
   }
 
   /**
-   * Loads an entry under a forced version increment and checks the echoed version, making the
-   * entry's {@code @Version} the concurrency token for its allocation slices.
+   * Loads an entry under a forced version increment, refuses a caller who neither owns it nor is a
+   * logistician, and checks the echoed version, making the entry's {@code @Version} the concurrency
+   * token for its allocation slices.
    *
    * @param id the inventory entry id
    * @param dto the write payload carrying the echoed version
+   * @param currentUserId the authenticated caller
+   * @param isLogistician whether the caller is a logistician or above
    * @return the managed entry
    * @throws NotFoundException when the entry is unknown
+   * @throws AccessDeniedException when the caller neither owns the entry nor is a logistician
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
    *     is stale
    */
-  private InventoryItem loadForAllocationWrite(UUID id, InventoryAllocationWriteDto dto) {
+  private InventoryItem loadForAllocationWrite(
+      UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForAllocationWrite(id), "Inventory item not found");
+    boolean isOwner = item.getUser() != null && item.getUser().getId().equals(currentUserId);
+    if (!isOwner && !isLogistician) {
+      throw new AccessDeniedException(
+          "You are not allowed to change the allocations of this inventory item");
+    }
     OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
     return item;
   }
@@ -963,7 +987,7 @@ public class InventoryItemService {
     if (amount != null) {
       details = details.with("qty", amount);
     }
-    auditService.record(
+    auditRecorder.record(
         type, item.getId(), InventoryAuditLabels.label(item), item.getUser().getId(), details);
   }
 
@@ -1083,7 +1107,7 @@ public class InventoryItemService {
     item.setNote(normalizedNote);
 
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_NOTE_UPDATED,
         item.getId(),
         InventoryAuditLabels.label(item),

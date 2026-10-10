@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
@@ -29,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionAllocationDto;
-import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
@@ -45,7 +45,8 @@ public abstract class InventoryItemMapper {
   @Autowired protected StockViewerAccess stockAccess;
 
   /**
-   * Resolves the caller-dependent {@code canEdit} projection of one Lager row.
+   * Resolves the caller-dependent {@code canEdit} projection of one Lager row: the row's scope
+   * gate, and then owner or Logistician-or-above.
    *
    * @param inventoryItem the row being mapped; {@code null} or id-less yields {@code false}.
    * @return whether the current caller may write to it.
@@ -53,7 +54,9 @@ public abstract class InventoryItemMapper {
   protected boolean resolveCanEdit(InventoryItem inventoryItem) {
     return inventoryItem != null
         && inventoryItem.getId() != null
-        && stockAccess.canEditInventoryItem(inventoryItem.getId());
+        && stockAccess.mayEditInventoryItem(
+            inventoryItem.getId(),
+            inventoryItem.getUser() == null ? null : inventoryItem.getUser().getId());
   }
 
   /**

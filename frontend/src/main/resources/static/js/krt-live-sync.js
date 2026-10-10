@@ -12,12 +12,9 @@
     }
 
     function anyModalOpen() {
-        return Array.prototype.some.call(
-            document.querySelectorAll('.krt-modal-overlay'),
-            function (o) {
-                return window.getComputedStyle(o).display !== 'none';
-            },
-        );
+        return Array.prototype.some.call(document.querySelectorAll('.krt-modal-overlay'), (o) => {
+            return window.getComputedStyle(o).display !== 'none';
+        });
     }
 
     const syncSocket = (function () {
@@ -40,7 +37,7 @@
 
         function socketUrl() {
             const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            return proto + '//' + window.location.host + '/ws/sync';
+            return `${proto}//${window.location.host}/ws/sync`;
         }
 
         function isOpen() {
@@ -78,12 +75,12 @@
             ws.addEventListener('open', onOpen);
             ws.addEventListener('message', onMessage);
             ws.addEventListener('close', onClose);
-            ws.addEventListener('error', function () {});
+            ws.addEventListener('error', () => {});
         }
 
         function onOpen() {
             reconnectDelay = RECONNECT_BASE_MS;
-            Object.keys(topics).forEach(function (t) {
+            Object.keys(topics).forEach((t) => {
                 if (topics[t].state !== 'denied' || topics[t].deniedAttempts > 0) {
                     topics[t].deniedAttempts = 0;
                     topics[t].state = 'pending';
@@ -111,7 +108,7 @@
             );
             entry.deniedAttempts += 1;
             const wait = RESUBSCRIBE_BASE_MS + Math.random() * ceiling;
-            entry.resubscribeTimer = window.setTimeout(function () {
+            entry.resubscribeTimer = window.setTimeout(() => {
                 entry.resubscribeTimer = null;
                 if (topics[topic] !== entry || entry.state !== 'idle' || !isOpen()) {
                     return;
@@ -182,7 +179,7 @@
             if (ev && ev.code === SOCKET_CAP_CLOSE_CODE) {
                 reconnectDelay = RECONNECT_MAX_MS;
             }
-            Object.keys(topics).forEach(function (t) {
+            Object.keys(topics).forEach((t) => {
                 clearResubscribe(topics[t]);
                 if (topics[t].state !== 'denied') {
                     topics[t].state = 'pending';
@@ -198,7 +195,7 @@
                 return;
             }
             const wait = Math.random() * Math.min(RECONNECT_MAX_MS, reconnectDelay);
-            reconnectTimer = window.setTimeout(function () {
+            reconnectTimer = window.setTimeout(() => {
                 reconnectTimer = null;
                 reconnectDelay = Math.min(RECONNECT_MAX_MS, reconnectDelay * 2);
                 ensureSocket();
@@ -210,14 +207,12 @@
                 if (!topic) {
                     return { unsubscribe() {} };
                 }
-                const entry =
-                    topics[topic] ||
-                    (topics[topic] = {
-                        state: 'idle',
-                        ackedOnce: false,
-                        deniedAttempts: 0,
-                        resubscribeTimer: null,
-                    });
+                const entry = (topics[topic] ||= {
+                    state: 'idle',
+                    ackedOnce: false,
+                    deniedAttempts: 0,
+                    resubscribeTimer: null,
+                });
                 entry.handlers = handlers || {};
                 ensureSocket();
                 if (isOpen()) {
@@ -249,7 +244,7 @@
                 rawSend({ type, topic, sectionKey });
             },
             subscribedTopics() {
-                return Object.keys(topics).filter(function (t) {
+                return Object.keys(topics).filter((t) => {
                     return topics[t].state === 'subscribed';
                 });
             },
@@ -266,7 +261,7 @@
         const extraBusyTest = cfg && cfg.busyTest;
 
         const sectionContainers = {};
-        Object.keys(sections).forEach(function (sectionKey) {
+        Object.keys(sections).forEach((sectionKey) => {
             sectionContainers[sectionKey] = containerSelector(sections[sectionKey]);
         });
         const allSections = Object.keys(sectionContainers);
@@ -321,9 +316,9 @@
             pill.type = 'button';
             pill.className = pillClassName;
             pill.textContent = label;
-            pill.addEventListener('click', function () {
+            pill.addEventListener('click', () => {
                 const ready = [];
-                Object.keys(deferred).forEach(function (k) {
+                Object.keys(deferred).forEach((k) => {
                     if (sectionBusy(k)) {
                         return;
                     }
@@ -338,7 +333,7 @@
 
         function deferAllVisibleSections() {
             let anyVisible = false;
-            allSections.forEach(function (sectionKey) {
+            allSections.forEach((sectionKey) => {
                 const sel = sectionContainers[sectionKey];
                 if (!sel || !document.querySelector(sel)) {
                     return;
@@ -354,12 +349,12 @@
         function flushTimer() {
             timer = null;
             const keys = Object.keys(pendingNow);
-            keys.forEach(function (k) {
+            keys.forEach((k) => {
                 delete pendingNow[k];
             });
             const ready = [];
             let nowDeferred = false;
-            keys.forEach(function (k) {
+            keys.forEach((k) => {
                 if (sectionBusy(k)) {
                     deferred[k] = true;
                     nowDeferred = true;
@@ -388,7 +383,7 @@
                     ? incomingSections
                     : allSections;
             let anyDeferred = false;
-            keys.forEach(function (sectionKey) {
+            keys.forEach((sectionKey) => {
                 const sel = sectionContainers[sectionKey];
                 if (!sel || !document.querySelector(sel)) {
                     return;
@@ -407,12 +402,12 @@
 
         const events = (cfg && cfg.events) || {};
         if (events.changed) {
-            document.addEventListener(events.changed, function (ev) {
+            document.addEventListener(events.changed, (ev) => {
                 apply(ev && ev.detail ? ev.detail.sections : null);
             });
         }
         if (events.resync) {
-            document.addEventListener(events.resync, function () {
+            document.addEventListener(events.resync, () => {
                 apply(null);
             });
         }

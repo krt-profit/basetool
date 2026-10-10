@@ -1,14 +1,105 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
+    .collection-select {
+        width: 100%;
+        min-width: 140px;
+        min-height: 44px;
+        padding: 0.4rem 0.5rem;
+        background-color: var(--color-surface-input);
+        border: var(--border-hairline);
+        color: var(--color-gray-1);
+    }
     .krt-select:focus {
         outline: 2px solid var(--color-primary);
         outline-offset: 1px;
     }
+    .delivered-checkbox {
+        width: 22px;
+        height: 22px;
+        margin: 0;
+        cursor: pointer;
+        accent-color: var(--color-primary);
+    }
+
+    .collection-progress {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        padding: var(--space-4);
+        border-bottom: var(--border-hairline);
+    }
+    .collection-progress__label {
+        font-size: var(--fs-sm);
+        color: var(--color-gray-1);
+        font-variant-numeric: tabular-nums;
+    }
+    .collection-progress__track {
+        display: block;
+        height: 8px;
+        background: var(--color-surface-input);
+        border: var(--border-hairline);
+        overflow: hidden;
+    }
+    .collection-progress__fill {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: var(--color-success);
+    }
+    .collection-progress--group {
+        flex: 0 1 220px;
+        gap: var(--space-1);
+        padding: 0;
+        border: 0;
+    }
+    .collection-progress--group .collection-progress__label {
+        font-size: var(--fs-xs);
+        color: var(--color-gray-2-text);
+        text-align: right;
+    }
+    .collection-progress--group .collection-progress__track {
+        height: 4px;
+    }
+
+    .collection-group__head th {
+        height: auto;
+        padding: 0.6rem var(--space-4);
+        background: var(--color-surface-input);
+        border-bottom: var(--border-hairline);
+        color: var(--color-white);
+        font-size: var(--fs-sm);
+        letter-spacing: normal;
+        text-transform: none;
+        white-space: normal;
+    }
+    .collection-table tbody tr.collection-group__head:hover {
+        background: none;
+    }
+    .collection-group__title {
+        font-weight: var(--fw-bold);
+    }
+
     @media (width <= 768px) {
-        .table-responsive {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
+        .collection-group__head th {
+            display: block;
+            width: 100%;
+        }
+        .collection-table tr.collection-group__head {
+            padding: 0;
+        }
+        .collection-table td.collection-location {
+            flex: 1 1 100%;
+            margin-right: 0;
+        }
+        .collection-table td.collection-location::after {
+            content: none;
+        }
+        .collection-progress--group {
+            flex-basis: 100%;
+        }
+        .collection-progress--group .collection-progress__label {
+            text-align: left;
         }
     }
 }

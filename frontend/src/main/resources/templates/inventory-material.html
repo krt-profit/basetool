@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title>Material Details - Profit Basetool</title>
+    <title th:text="${materialName ?: #messages.msg('inventory.material.drilldown.title')} + ' - ' + ${appTitle}">Material - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <link rel="stylesheet" th:href="@{/css/pages/inventory-material.css}">
     </th:block>
@@ -12,59 +12,59 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box flex-between">
-        <h1>Detailansicht Material</h1>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.inventory', eyebrowHref=@{/inventory},
+        titleText=${materialName ?: #messages.msg('inventory.material.drilldown.title')},
+        count=${inventoryMaterialPage != null ? inventoryMaterialPage.totalElements() : null},
+        countId='inventory-material-count', countFor='inventory-material-results', actions=null)}"></th:block>
+
+    <div class="toolbar drill-toolbar">
+        <label for="materialSelect" class="form-label-xs" th:text="#{inventory.material.switch}">Anderes Material</label>
+        <select id="materialSelect" class="material-select" data-trigger="navigate-select" data-url-template="/inventory/material/{value}" data-krt-combobox="remote-materials">
+            <option th:each="mat : ${materials}" th:if="${mat.id == selectedMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:selected="${mat.id == selectedMaterialId}"></option>
+        </select>
     </div>
 
-    <div class="hud-box mt-2">
-        <div class="actions-bar">
-            <a th:href="@{/inventory}" class="btn btn-ghost">&laquo; Zurück zur Übersicht</a>
-            
-            <div class="krtm-margin-left-auto-display-flex-gap-0-5rem-ali-7023">
-                <label for="materialSelect" class="krtm-font-family-var-font-body-font-size-0-8rem-8675">Anderes Material:</label>
-                <select id="materialSelect" class="material-select" data-trigger="navigate-select" data-url-template="/inventory/material/{value}" data-krt-combobox="remote-materials">
-                    <option th:each="mat : ${materials}" th:if="${mat.id == selectedMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:selected="${mat.id == selectedMaterialId}"></option>
-                </select>
-            </div>
-        </div>
-
-        <div id="inventory-material-results">
+    <div id="inventory-material-results" class="card card--flush">
         <th:block th:fragment="inventoryMaterialResults">
-        <div class="overflow-x-auto">
-            <div class="table-responsive">
-            <table class="krt-table">
+        <div th:if="${error}" class="alert alert-danger drill-alert" role="alert" th:text="#{__${error}__}">Fehler</div>
+
+        <div class="table-responsive" th:if="${!#lists.isEmpty(items)}">
+            <table class="data-table data-table--stack">
                 <thead>
                     <tr>
-                        <th>Nutzer</th>
-                        <th>Ort</th>
-                        <th>Qualität</th>
-                        <th>Menge</th>
+                        <th th:text="#{inventory.user}">Nutzer</th>
+                        <th th:text="#{inventory.location}">Standort</th>
+                        <th class="num" th:text="#{inventory.quality}">Qualit&auml;t</th>
+                        <th class="num" th:text="#{inventory.amount}">Menge</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="item : ${items}">
-                        <td th:text="${item.user.effectiveName}">Username</td>
-                        <td th:text="${item.location.name}">Ort</td>
-                        <td th:text="${item.quality}">100</td>
-                        <td th:switch="${item.material.quantityType}">
-                            <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
+                    <tr th:each="item : ${items}" data-testid="inventory-material-row">
+                        <td><span class="cell-title" th:text="${item.user.effectiveName}">Username</span></td>
+                        <td th:attr="data-label=#{inventory.location}" th:text="${item.location.name}">Ort</td>
+                        <td class="num" th:attr="data-label=#{inventory.quality}" th:text="${item.quality}">100</td>
+                        <td class="num" th:attr="data-label=#{inventory.amount}" th:switch="${item.material.quantityType}">
+                            <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 St&uuml;ck</span>
                             <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
                         </td>
                     </tr>
-                    <tr th:if="${#lists.isEmpty(items)}">
-                        <td colspan="4" class="text-center text-muted">Keine Einträge für dieses Material gefunden.</td>
-                    </tr>
                 </tbody>
             </table>
-            </div>
         </div>
-        <div class="pagination-controls" th:if="${inventoryMaterialPage != null}"
+
+        <th:block th:if="${#lists.isEmpty(items)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='inventory.material.drilldown.empty', textKey='inventory.drilldown.empty.text')}"></th:block>
+        </th:block>
+
+        <div class="list-foot" th:if="${inventoryMaterialPage != null and inventoryMaterialPage.totalElements() > 0}"
+             th:data-list-total="${inventoryMaterialPage.totalElements()}"
              th:with="matBase=${'/inventory/material/' + selectedMaterialId}">
+            <span data-testid="list-count"
+                  th:text="#{list.countOf(${inventoryMaterialPage.page() * inventoryMaterialPage.size() + 1}, ${inventoryMaterialPage.page() * inventoryMaterialPage.size() + #lists.size(inventoryMaterialPage.content())}, ${inventoryMaterialPage.totalElements()})}">1–50 von 120</span>
             <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${inventoryMaterialPage}, baseUrl=${matBase}, sizes=${pageSizes})}"></nav>
             <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${inventoryMaterialPage}, baseUrl=${matBase})}"></nav>
         </div>
         </th:block>
-        </div>
     </div>
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />

@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
-import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -177,9 +177,9 @@ class GlobalExceptionHandlerAdviceOrderTest {
       Method winner = resolveAcrossAdvice(advice, exceptionType);
 
       assertNotNull(winner, "no advice declared a handler for " + exceptionType.getName());
-      assertEquals(
-          GlobalExceptionHandler.class,
-          winner.getDeclaringClass(),
+      assertTrue(
+          winner.getDeclaringClass().isAssignableFrom(GlobalExceptionHandler.class)
+              && ProblemSupport.class.isAssignableFrom(winner.getDeclaringClass()),
           exceptionType.getName()
               + " must be handled by GlobalExceptionHandler, not by Spring's advice — otherwise the"
               + " response loses code/correlationId/fieldErrors and the detail is untranslated");

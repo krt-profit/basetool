@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+
+<div th:fragment="detailHead(acct, eyebrowKey, eyebrowHref, noTestId, actions)" class="page-head bank-detail-head"
+     data-testid="page-head">
+    <div class="page-head__main">
+        <a class="page-eyebrow" th:href="${eyebrowHref}" data-testid="page-eyebrow"
+          ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
+          ><span th:text="#{__${eyebrowKey}__}">Bank</span></a>
+        <div class="page-title">
+            <h1 th:text="${acct.name()}">IRI Betriebskonto</h1>
+            <span class="chip chip--data" th:attr="data-testid=${noTestId}" th:text="${acct.accountNo()}">KB-0001</span>
+            <span class="chip chip--data" th:text="#{'bank.account.type.' + ${acct.type()}}">Org-Einheit</span>
+            <span class="chip chip--muted" th:if="${acct.status() != 'ACTIVE'}" data-testid="bank-account-status"
+                  th:text="#{'bank.account.status.' + ${acct.status()}}">Geschlossen</span>
+        </div>
+    </div>
+    <div th:if="${actions != null}" class="page-actions">
+        <th:block th:replace="${actions}"></th:block>
+    </div>
+</div>
+
+<div th:fragment="kpis(acct, delta, bookingCount, balanceTestId, targetTestId)" class="kpi-grid bank-kpis"
+     th:with="hasTarget=${acct.balanceTarget() != null and acct.balanceTarget().signum() > 0},
+              pct=${(acct.balanceTarget() != null and acct.balanceTarget().signum() > 0) ? (acct.balance().doubleValue() / acct.balanceTarget().doubleValue() * 100.0) : 0.0}">
+    <div class="kpi-total">
+        <div class="kpi-label" th:text="#{bank.detail.balance}">Kontosaldo</div>
+        <div class="kpi-value" th:attr="data-testid=${balanceTestId}"
+             th:text="${#numbers.formatInteger(@moneyFormat.round(acct.balance()), 1, 'POINT')} + ' aUEC'">3.148.200 aUEC</div>
+    </div>
+    <div class="kpi-total" th:attr="data-testid=${targetTestId}">
+        <th:block th:if="${hasTarget}">
+            <div class="kpi-label"
+                 th:text="#{bank.detail.kpi.target(${#numbers.formatInteger(@moneyFormat.round(acct.balanceTarget()), 1, 'POINT')})}">Ziel 5.000.000</div>
+            <div class="meter bank-kpi-meter" aria-hidden="true">
+                <i class="meter__fill--warning" th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></i>
+            </div>
+            <div class="kpi-sub"
+                 th:text="#{bank.detail.kpi.targetReached(${#numbers.formatInteger(pct, 1, 'POINT')})}">63 % erreicht</div>
+        </th:block>
+        <th:block th:unless="${hasTarget}">
+            <div class="kpi-label" th:text="#{bank.chart.legend.target}">Ziel</div>
+            <div class="kpi-value bank-kpi-empty" th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</div>
+        </th:block>
+    </div>
+    <div class="kpi-total">
+        <div class="kpi-label" th:text="#{bank.detail.delta30}">&#177; 30 Tage</div>
+        <div class="kpi-value"
+             th:classappend="${delta.signum() > 0} ? ' bank-amount--pos' : (${delta.signum() < 0} ? ' bank-amount--neg' : '')"
+             th:text="${delta.signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(delta), 1, 'POINT')}">+412.600</div>
+    </div>
+    <div class="kpi-total">
+        <div class="kpi-label" th:text="#{bank.detail.bookings}">Buchungen</div>
+        <div class="kpi-value" th:text="${bookingCount}">148</div>
+    </div>
+</div>
+
+<div th:fragment="tabNav(idPrefix, testIdPrefix, bookingCount, secondTab, secondLabelKey, secondTestId, storageKey, tabsLabel)"
+     class="tab-nav bank-detail-tabs" role="tablist" data-bank-detail-tabs
+     th:attr="data-tab-storage=${storageKey},aria-label=${tabsLabel}">
+    <button type="button" class="tab active" role="tab" aria-selected="true" data-tab="history"
+            th:id="${idPrefix + '-tab-history'}"
+            th:attr="aria-controls=${idPrefix + '-panel-history'},data-testid=${testIdPrefix + '-tab-history'}">
+        <span th:text="#{bank.detail.bookings}">Buchungen</span>
+        <span class="tab-count" th:text="${bookingCount}">148</span>
+    </button>
+    <button type="button" class="tab" role="tab" aria-selected="false"
+            th:id="${idPrefix + '-tab-' + secondTab}"
+            th:attr="data-tab=${secondTab},aria-controls=${idPrefix + '-panel-' + secondTab},data-testid=${secondTestId}">
+        <span th:text="#{__${secondLabelKey}__}">Konto-Info</span>
+    </button>
+</div>
+
+<section th:fragment="infoCard(acct)" class="card bank-info-card" data-testid="bank-info-panel">
+    <dl class="bank-info-list">
+        <div>
+            <dt th:text="#{bank.detail.info.no}">Kontonummer</dt>
+            <dd th:text="${acct.accountNo()}">KB-0001</dd>
+        </div>
+        <div>
+            <dt th:text="#{bank.detail.info.type}">Typ</dt>
+            <dd th:text="#{'bank.account.type.' + ${acct.type()}}">Org-Einheit</dd>
+        </div>
+        <div th:if="${acct.orgUnit() != null}">
+            <dt th:text="#{bank.detail.info.orgUnit}">Org-Einheit</dt>
+            <dd th:text="${acct.orgUnit().name()}">IRIDIUM</dd>
+        </div>
+        <div th:if="${acct.areaName() != null}">
+            <dt th:text="#{bank.detail.info.area}">Bereich</dt>
+            <dd th:text="${acct.areaName()}">Logistik</dd>
+        </div>
+        <div>
+            <dt th:text="#{bank.detail.info.status}">Status</dt>
+            <dd th:text="#{'bank.account.status.' + ${acct.status()}}">Aktiv</dd>
+        </div>
+        <div>
+            <dt th:text="#{bank.detail.info.created}">Angelegt</dt>
+            <dd><span class="utc-time" th:text="${acct.createdAt()}">2026-01-15T10:00:00Z</span></dd>
+        </div>
+    </dl>
+</section>
+
+<form th:fragment="historyFilter(idPrefix, testIdPrefix, resultsId, fragmentName)"
+      class="bank-history-filter no-track" method="get" th:action="@{${historyBaseUrl}}" data-bank-history-filter
+      th:attr="data-results=${'#' + resultsId},data-fragment=${fragmentName}">
+    <th:block th:replace="~{fragments/components :: segmented(name='historyPeriod', labelKey='bank.chart.range.label',
+        selected=${historyPreset},
+        options=${ {{value: '30d', labelKey: 'bank.chart.range.30d'},
+                    {value: '90d', labelKey: 'bank.chart.range.90d'},
+                    {value: 'custom', labelKey: 'bank.history.period.custom'}} })}"></th:block>
+    <div class="bank-history-range" data-bank-history-range th:hidden="${historyPreset != 'custom'}">
+        <div class="bank-history-filter-field">
+            <label th:for="${idPrefix + '-from'}" th:text="#{bank.filter.period.from}">Von</label>
+            <input type="date" th:id="${idPrefix + '-from'}" name="from" th:value="${historyFrom}"
+                   th:attr="data-testid=${testIdPrefix + '-from'}">
+        </div>
+        <div class="bank-history-filter-field">
+            <label th:for="${idPrefix + '-to'}" th:text="#{bank.filter.period.to}">Bis</label>
+            <input type="date" th:id="${idPrefix + '-to'}" name="to" th:value="${historyTo}"
+                   th:attr="data-testid=${testIdPrefix + '-to'}">
+        </div>
+    </div>
+    <input type="hidden" name="size" th:value="${bookings != null ? bookings.size() : 50}">
+</form>
+
+<th:block th:fragment="bookingsTable(staff, rowTestId, testIdPrefix, emptyTestId)">
+    <th:block th:if="${bookings == null or #lists.isEmpty(bookings.content())}">
+        <div class="bank-bookings-empty" th:attr="data-testid=${emptyTestId}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.detail.history.emptyTitle',
+                textKey='bank.detail.history.empty')}"></th:block>
+        </div>
+    </th:block>
+    <div class="table-responsive">
+        <table class="data-table data-table--stack bank-bookings-table"
+               th:unless="${bookings == null or #lists.isEmpty(bookings.content())}">
+            <thead>
+            <tr>
+                <th th:text="#{bank.booking.date}">Datum</th>
+                <th th:text="#{bank.request.field.type}">Vorgang</th>
+                <th th:text="#{bank.booking.party}">Gegenpartei</th>
+                <th class="num" th:text="#{bank.booking.amount}">Betrag</th>
+                <th class="num" th:text="#{bank.booking.balanceAfter}">Saldo nach Buchung</th>
+                <th:block th:if="${staff}">
+                    <th class="cell-actions"
+                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)"><span
+                            class="visually-hidden" th:text="#{bank.request.col.actions}">Aktionen</span></th>
+                </th:block>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="b : ${bookings.content()}" class="bank-booking-row"
+                th:with="after=${balancesAfter != null ? balancesAfter.get(b.postingId()) : null}"
+                th:attr="data-testid=${rowTestId},data-transaction-id=${b.transactionId()}">
+                <td class="bank-booking-date"><span class="utc-time" th:text="${b.createdAt()}">2026-10-02T18:30:00Z</span></td>
+                <td class="cell-status" th:switch="${b.type()}">
+                    <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
+                    <span th:case="'WITHDRAWAL'" class="chip chip--danger" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
+                    <span th:case="'TRANSFER'" class="chip chip--info" th:text="#{bank.type.TRANSFER}">Transfer</span>
+                    <span th:case="'REVERSAL'" class="chip chip--warning" th:text="#{bank.type.REVERSAL}">Storno</span>
+                    <span th:case="*" class="chip chip--muted" th:text="#{'bank.type.' + ${b.type()}}">Wipe-Reset</span>
+                </td>
+                <td class="bank-booking-party" th:attr="data-testid=${testIdPrefix + '-counterparty'}">
+                    <span class="cell-title" th:if="${b.type() == 'TRANSFER' and b.counterAccountNo() != null}"
+                          th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + (${b.counterAccountName() != null} ? ${b.counterAccountName()} + ' (' + ${b.counterAccountNo()} + ')' : ${b.counterAccountNo()})">&#8594; KRT-Konto (KB-0002)</span>
+                    <span class="cell-title" th:if="${!(b.type() == 'TRANSFER' and b.counterAccountNo() != null) and b.counterpartyHandle() != null}"
+                          th:text="${@handles.display(b.counterpartyHandle())} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">vexx (IRIDIUM)</span>
+                    <span class="cell-title bank-party-none" th:if="${!(b.type() == 'TRANSFER' and b.counterAccountNo() != null) and b.counterpartyHandle() == null}">&ndash;</span>
+                    <span class="cell-sub" th:if="${!#strings.isEmpty(b.justification())}"
+                          th:attr="data-testid=${testIdPrefix + '-justification'}" th:text="${b.justification()}">Erl&ouml;s Quantanium-Verkauf</span>
+                    <span class="cell-sub" th:if="${!#strings.isEmpty(b.note())}"><span class="bank-sub-label"
+                            th:text="#{bank.booking.note}">Notiz</span> <span th:text="${b.note()}">Missionsertrag</span></span>
+                    <span class="cell-sub" th:if="${!#strings.isEmpty(b.staffNote())}"
+                          th:attr="data-testid=${testIdPrefix + '-staff-note'}"><span class="bank-sub-label"
+                            th:text="#{bank.booking.staffNote}">Notiz Bankmitarbeiter</span> <span th:text="${b.staffNote()}">Nach R&uuml;cksprache</span></span>
+                    <span class="cell-sub" th:if="${staff}" th:attr="data-testid=${testIdPrefix + '-holder'}"><span class="bank-sub-label"
+                            th:text="#{bank.booking.holder}">Halter</span> <span
+                            th:text="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null} ? ${@handles.display(b.holderHandle())} + ' &#8594; ' + ${@handles.display(b.counterHolderHandle())} : ${@handles.display(b.holderHandle())}">greluc</span></span>
+                </td>
+                <td class="num bank-booking-amount">
+                    <span class="bank-amount"
+                          th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
+                          th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+240.000</span>
+                    <span class="cell-sub bank-fee-note" th:attr="data-testid=${testIdPrefix + '-fee'}"
+                          th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
+                          th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975</span>
+                </td>
+                <td class="num bank-balance-after" th:attr="data-label=#{bank.booking.balanceAfter}"
+                    th:text="${after != null} ? ${#numbers.formatInteger(@moneyFormat.round(after), 1, 'POINT')} : '&ndash;'">3.148.200</td>
+                <th:block th:if="${staff}">
+                    <td class="cell-actions"
+                        sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
+                        <button type="button" class="btn btn-ghost btn-xs bank-reverse-btn"
+                                th:if="${(b.type() == 'DEPOSIT' or b.type() == 'WITHDRAWAL' or b.type() == 'TRANSFER') and b.reversedTransactionId() == null}"
+                                data-trigger="open-modal-display" data-modal-id="bank-reverse-modal"
+                                th:attr="data-field-_id=${b.transactionId()}"
+                                data-testid="bank-reverse-open"
+                                th:text="#{bank.action.reverse}">Stornieren</button>
+                    </td>
+                </th:block>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination-controls bank-bookings-foot" th:if="${bookings != null and bookings.totalElements() > 0}">
+        <nav th:replace="~{fragments/pagination :: pageSizePicker(${bookings}, ${paginationBaseUrl}, ${pageSizes})}"></nav>
+        <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+    </div>
+</th:block>
+
+</body>
+</html>

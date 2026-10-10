@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeLocationRow;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,7 +54,8 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeLocationRow(
+      SELECT new
+      de.greluc.krt.profit.basetool.backend.repository.LocationRepository$ExchangeLocationRow(
       l.name, c.idCity, s.idSpaceStation) FROM Location l LEFT JOIN l.city c
       LEFT JOIN l.spaceStation s WHERE l.hidden = false ORDER BY l.name
       """)
@@ -126,8 +126,10 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
    * @return the locations
    */
   @Query(
-      "SELECT l FROM Location l JOIN l.city c WHERE c.idCity = :idCity AND l.hidden = false"
-          + " ORDER BY l.name ASC")
+      """
+      SELECT l FROM Location l JOIN l.city c WHERE c.idCity = :idCity AND l.hidden = false
+      ORDER BY l.name ASC
+      """)
   List<Location> findExchangeByCity(@Param("idCity") Integer idCity);
 
   /**
@@ -137,8 +139,10 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
    * @return the locations
    */
   @Query(
-      "SELECT l FROM Location l JOIN l.spaceStation s WHERE s.idSpaceStation = :idSpaceStation"
-          + " AND l.hidden = false ORDER BY l.name ASC")
+      """
+      SELECT l FROM Location l JOIN l.spaceStation s WHERE s.idSpaceStation = :idSpaceStation
+      AND l.hidden = false ORDER BY l.name ASC
+      """)
   List<Location> findExchangeBySpaceStation(@Param("idSpaceStation") Integer idSpaceStation);
 
   /**
@@ -148,4 +152,13 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
    * @return the location, or empty
    */
   Optional<Location> findFirstByNameAndHiddenFalseOrderByIdAsc(String name);
+
+  /**
+   * One non-hidden location as the exchange catalogue reads it from the database.
+   *
+   * @param name the location name
+   * @param uexCityId the UEX id of the linked city, or {@code null}
+   * @param uexSpaceStationId the UEX id of the linked space station, or {@code null}
+   */
+  record ExchangeLocationRow(String name, Integer uexCityId, Integer uexSpaceStationId) {}
 }

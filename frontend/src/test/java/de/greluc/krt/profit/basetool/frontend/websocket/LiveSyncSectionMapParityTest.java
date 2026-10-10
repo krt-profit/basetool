@@ -179,7 +179,7 @@ class LiveSyncSectionMapParityTest {
   void refineryOrderCrossPublishes_onlyEverSendWhitelistedKeys() throws IOException {
     String js = readResource("/static/js/refinery-orders-details.js");
     assertSendChangedKeysWhitelisted(
-        js, "'order:' \\+ jobOrderId", LiveSyncTopicClass.ORDER.allowedSections());
+        js, "`order:\\$\\{jobOrderId\\}`", LiveSyncTopicClass.ORDER.allowedSections());
     assertThat(js)
         .as("the refinery detail page must not duplicate the server-side inventory/queue publishes")
         .doesNotContain("sendChanged('inventory'")

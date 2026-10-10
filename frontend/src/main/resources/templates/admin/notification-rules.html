@@ -15,147 +15,166 @@
     <span id="rule-i18n" hidden
           th:attr="data-confirm-delete-title=#{admin.notificationRules.confirmDelete.title},data-confirm-delete-body=#{admin.notificationRules.confirmDelete.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-saved=#{admin.notificationRules.success.saved},data-deleted=#{admin.notificationRules.success.deleted},data-error=#{notification.error.title},data-unknown-value=#{admin.notificationRules.selector.unknown}"></span>
 
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.notificationRules.title}">Benachrichtigungsregeln</h1>
-        <p th:text="#{admin.notificationRules.subtitle}">Wer wird bei welchem Ereignis benachrichtigt.</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.notificationRules.title},
+        count=${rules != null ? rules.size() : null}, countId='rules-count', countFor='rules-host', actions=null)}"></th:block>
 
-    <div class="hud-box mt-2">
-        <h2 th:text="#{admin.notificationRules.existing}">Vorhandene Regeln</h2>
-        <div class="table-responsive" id="rules-host">
+    <div id="rules-host" class="card card--flush">
         <th:block th:fragment="rules">
-        <table id="rules-table">
-            <thead>
-            <tr>
-                <th th:text="#{admin.notificationRules.eventType}">Ereignis</th>
-                <th th:text="#{admin.notificationRules.notificationType}">Benachrichtigungstyp</th>
-                <th th:text="#{admin.notificationRules.enabled}">Aktiv</th>
-                <th th:text="#{admin.notificationRules.selectors}">Empfänger-Selektoren</th>
-                <th th:text="#{admin.notificationRules.description}">Beschreibung</th>
-                <th th:text="#{admin.notificationRules.actions}">Aktion</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="r : ${rules}" th:attr="data-rule-id=${r.id}">
-                <td th:text="${#messages.msgOrNull('admin.notificationRules.eventType.' + r.eventType) ?: r.eventType}">Auftrag angelegt</td>
-                <td th:text="${#messages.msgOrNull('admin.notificationRules.notificationType.' + r.notificationType) ?: r.notificationType}">Auftrag angelegt</td>
-                <td th:text="${r.enabled} ? '✓' : '–'">✓</td>
-                <td th:text="${#lists.size(r.selectors)}">4</td>
-                <td th:text="${r.description}">…</td>
-                <td>
-                    <button type="button" class="btn btn-icon" data-rule-edit
-                            th:title="#{admin.notificationRules.edit}" th:aria-label="#{admin.notificationRules.edit}">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>
-                    </button>
-                    <button type="button" class="btn btn-quiet-danger btn-icon" data-rule-delete
-                            th:title="#{admin.notificationRules.delete}" th:aria-label="#{admin.notificationRules.delete}">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"></use></svg>
-                    </button>
-                </td>
-            </tr>
-            <tr th:if="${error}">
-                <td colspan="6" class="text-danger" th:text="#{${error}}">Fehler beim Laden.</td>
-            </tr>
-            <tr th:if="${error == null and #lists.isEmpty(rules)}">
-                <td colspan="6" th:text="#{admin.notificationRules.empty}">Noch keine Regeln.</td>
-            </tr>
-            </tbody>
-        </table>
-        </th:block>
+        <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
+        <div class="table-responsive" th:if="${!#lists.isEmpty(rules)}">
+            <table id="rules-table" class="data-table data-table--stack"
+                   th:data-list-total="${#lists.size(rules)}">
+                <thead>
+                <tr>
+                    <th th:text="#{admin.notificationRules.eventType}">Ereignis</th>
+                    <th th:text="#{admin.notificationRules.notificationType}">Benachrichtigungstyp</th>
+                    <th class="num" th:text="#{admin.notificationRules.selectors}">Empfänger-Selektoren</th>
+                    <th class="cell-status" th:text="#{admin.notificationRules.enabled}">Aktiv</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.notificationRules.actions}">Aktion</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="r : ${rules}" th:attr="data-rule-id=${r.id}" data-testid="rule-row">
+                    <td>
+                        <span class="cell-title" th:text="${#messages.msgOrNull('admin.notificationRules.eventType.' + r.eventType) ?: r.eventType}">Auftrag angelegt</span>
+                        <span class="cell-sub" th:if="${r.description != null and !#strings.isEmpty(r.description)}" th:text="${r.description}">…</span>
+                    </td>
+                    <td th:attr="data-label=#{admin.notificationRules.notificationType}"
+                        th:text="${#messages.msgOrNull('admin.notificationRules.notificationType.' + r.notificationType) ?: r.notificationType}">Auftrag angelegt</td>
+                    <td class="num" th:attr="data-label=#{admin.notificationRules.selectors}" th:text="${#lists.size(r.selectors)}">4</td>
+                    <td class="cell-status">
+                        <span th:if="${r.enabled}" class="chip chip--success" th:text="#{admin.notificationRules.status.enabled}">Aktiv</span>
+                        <span th:unless="${r.enabled}" class="chip chip--muted" th:text="#{admin.notificationRules.status.disabled}">Inaktiv</span>
+                    </td>
+                    <td class="cell-actions">
+                        <button type="button" class="btn btn-ghost btn-icon" data-rule-edit
+                                th:title="#{admin.notificationRules.edit}" th:aria-label="#{admin.notificationRules.edit}">
+                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>
+                        </button>
+                        <button type="button" class="btn btn-quiet-danger btn-icon" data-rule-delete
+                                th:title="#{admin.notificationRules.delete}" th:aria-label="#{admin.notificationRules.delete}">
+                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"></use></svg>
+                        </button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
         </div>
+        <th:block th:if="${error == null and #lists.isEmpty(rules)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.notificationRules.empty.title', textKey='admin.notificationRules.empty')}"></th:block>
+        </th:block>
+        </th:block>
     </div>
 
-    <div class="hud-box mt-2">
-        <h2 id="rule-form-title" th:text="#{admin.notificationRules.create}">Regel anlegen</h2>
-        <form id="rule-form" data-rule-id="">
+    <section class="card admin-rule-editor" aria-labelledby="rule-form-title">
+        <div class="card-head">
+            <h2 id="rule-form-title" class="card-title" th:text="#{admin.notificationRules.create}">Regel anlegen</h2>
+        </div>
+        <form id="rule-form" class="form-layout" data-rule-id="">
             <input type="hidden" id="rule-version" value="">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="rule-eventType" th:text="#{admin.notificationRules.eventType}">Ereignis</label>
-                    <select id="rule-eventType">
-                        <option th:each="code : ${eventTypes}" th:value="${code}"
-                                th:text="#{admin.notificationRules.eventType.__${code}__}">Auftrag angelegt</option>
-                    </select>
+            <fieldset class="form-section" data-testid="rule-section-event">
+                <legend class="form-section__head" th:text="|1 · #{admin.notificationRules.eventType}|">1 · Ereignis</legend>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="rule-eventType" class="form-label" th:text="#{admin.notificationRules.eventType}">Ereignis</label>
+                        <select id="rule-eventType">
+                            <option th:each="code : ${eventTypes}" th:value="${code}"
+                                    th:text="#{admin.notificationRules.eventType.__${code}__}">Auftrag angelegt</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="rule-notificationType" class="form-label" th:text="#{admin.notificationRules.notificationType}">Benachrichtigungstyp</label>
+                        <select id="rule-notificationType">
+                            <option th:each="code : ${notificationTypes}" th:value="${code}"
+                                    th:text="#{admin.notificationRules.notificationType.__${code}__}">Auftrag angelegt</option>
+                        </select>
+                    </div>
+                    <div class="form-group span-all">
+                        <label for="rule-description" class="form-label">
+                            <span th:text="#{admin.notificationRules.description}">Beschreibung</span>
+                            <span class="opt" th:text="|· #{form.optional}|">· optional</span>
+                        </label>
+                        <input type="text" id="rule-description" maxlength="255">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="rule-notificationType" th:text="#{admin.notificationRules.notificationType}">Benachrichtigungstyp</label>
-                    <select id="rule-notificationType">
-                        <option th:each="code : ${notificationTypes}" th:value="${code}"
-                                th:text="#{admin.notificationRules.notificationType.__${code}__}">Auftrag angelegt</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="rule-description" th:text="#{admin.notificationRules.description}">Beschreibung</label>
-                    <input type="text" id="rule-description" maxlength="255">
-                </div>
-            </div>
-            <div class="form-grid mt-2">
-                <div class="form-group">
-                    <label><input type="checkbox" id="rule-enabled" checked>
-                        <span th:text="#{admin.notificationRules.enabled}">Aktiv</span></label>
-                </div>
-                <div class="form-group">
-                    <label><input type="checkbox" id="rule-excludeActor" checked>
-                        <span th:text="#{admin.notificationRules.excludeActor}">Ersteller ausnehmen</span></label>
-                </div>
-            </div>
+            </fieldset>
 
-            <h3 class="mt-2" th:text="#{admin.notificationRules.selectors}">Empfänger-Selektoren</h3>
-            <div id="selectors-container"></div>
-            <button type="button" class="btn btn-secondary" id="add-selector"
-                    th:text="#{admin.notificationRules.addSelector}">Selektor hinzufügen</button>
+            <fieldset class="form-section" data-testid="rule-section-recipients">
+                <legend class="form-section__head" th:text="|2 · #{admin.notificationRules.section.recipients}|">2 · Empfänger</legend>
+                <div class="selector-row selector-row--head" aria-hidden="true">
+                    <span class="selector-row__kind" th:text="#{admin.notificationRules.selector.kind}">Art</span>
+                    <span class="selector-row__value" th:text="#{admin.notificationRules.selector.value}">Auswahl</span>
+                    <span class="selector-row__context" th:text="#{admin.notificationRules.selector.contextRole}">Kontext-Einheit</span>
+                </div>
+                <div id="selectors-container" class="selector-list"></div>
+                <button type="button" class="btn btn-ghost selector-add" id="add-selector"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{admin.notificationRules.addSelector}">Selektor hinzufügen</span></button>
+            </fieldset>
 
-            <div class="mt-2">
-                <button type="submit" class="btn btn--cta" th:text="#{admin.notificationRules.save}">Speichern</button>
-                <button type="button" class="btn btn-secondary" id="rule-cancel"
+            <fieldset class="form-section" data-testid="rule-section-options">
+                <legend class="form-section__head" th:text="|3 · #{admin.notificationRules.section.options}|">3 · Optionen</legend>
+                <div class="form-grid">
+                    <label class="switch" for="rule-enabled">
+                        <input type="checkbox" id="rule-enabled" checked>
+                        <span class="switch__track" aria-hidden="true"></span>
+                        <span th:text="#{admin.notificationRules.enabled}">Aktiv</span>
+                    </label>
+                    <label class="switch" for="rule-excludeActor">
+                        <input type="checkbox" id="rule-excludeActor" checked>
+                        <span class="switch__track" aria-hidden="true"></span>
+                        <span th:text="#{admin.notificationRules.excludeActor}">Ersteller ausnehmen</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <div class="form-actions--sticky">
+                <button type="button" class="btn btn-ghost" id="rule-cancel"
                         th:text="#{general.cancel}">Abbrechen</button>
+                <button type="submit" class="btn btn--cta" data-testid="rule-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{admin.notificationRules.saveRule}">Regel speichern</span></button>
             </div>
         </form>
-    </div>
+    </section>
 
     <template id="selector-row-template">
         <div class="selector-row" data-selector-row>
-            <div class="form-group">
-                <label th:text="#{admin.notificationRules.selector.kind}">Art</label>
-                <select data-selector-kind>
+            <div class="form-group selector-row__kind">
+                <label class="selector-row__label" th:text="#{admin.notificationRules.selector.kind}">Art</label>
+                <select data-selector-kind th:aria-label="#{admin.notificationRules.selector.kind}">
                     <option th:each="code : ${selectorKinds}" th:value="${code}"
                             th:text="#{admin.notificationRules.selector.kind.__${code}__}">Bestimmter Nutzer</option>
                 </select>
             </div>
-            <div class="form-group" data-field="orgRelativeRole">
-                <label th:text="#{admin.notificationRules.selector.orgRelativeRole}">Org-relative Rolle</label>
-                <select data-selector-orgRelativeRole>
+            <div class="form-group selector-row__value" data-field="orgRelativeRole">
+                <label class="selector-row__label" th:text="#{admin.notificationRules.selector.orgRelativeRole}">Org-relative Rolle</label>
+                <select data-selector-orgRelativeRole th:aria-label="#{admin.notificationRules.selector.orgRelativeRole}">
                     <option th:each="code : ${orgRelativeRoles}" th:value="${code}"
                             th:text="#{admin.notificationRules.selector.orgRelativeRole.__${code}__}">Offizier</option>
                 </select>
             </div>
-            <div class="form-group" data-field="contextRole">
-                <label th:text="#{admin.notificationRules.selector.contextRole}">Kontext-Einheit</label>
-                <select data-selector-contextRole>
+            <div class="form-group selector-row__context" data-field="contextRole">
+                <label class="selector-row__label" th:text="#{admin.notificationRules.selector.contextRole}">Kontext-Einheit</label>
+                <select data-selector-contextRole th:aria-label="#{admin.notificationRules.selector.contextRole}">
                     <option th:each="code : ${contextRoles}" th:value="${code}"
                             th:text="#{admin.notificationRules.selector.contextRole.__${code}__}">Zuständige Einheit</option>
                 </select>
             </div>
-            <div class="form-group" data-field="roleCode">
-                <label th:text="#{admin.notificationRules.selector.roleCode}">Rollencode</label>
-                <select data-selector-roleCode>
+            <div class="form-group selector-row__value" data-field="roleCode">
+                <label class="selector-row__label" th:text="#{admin.notificationRules.selector.roleCode}">Rollencode</label>
+                <select data-selector-roleCode th:aria-label="#{admin.notificationRules.selector.roleCode}">
                     <option th:each="code : ${roleCodes}" th:value="${code}"
                             th:text="#{admin.notificationRules.selector.roleCode.__${code}__}">Admin</option>
                 </select>
             </div>
-            <div class="form-group" data-field="fromEvent">
+            <div class="form-group selector-row__value selector-row__value--wide" data-field="fromEvent">
                 <p class="form-hint" th:text="#{admin.notificationRules.selector.fromEvent}">Die Empfänger ergeben sich aus dem Ereignis.</p>
             </div>
-            <div class="form-group" data-field="userId">
-                <label th:text="#{admin.notificationRules.selector.userId}">Benutzer</label>
-                <select data-selector-userId data-krt-combobox="remote-users">
+            <div class="form-group selector-row__value" data-field="userId">
+                <label class="selector-row__label" th:text="#{admin.notificationRules.selector.userId}">Benutzer</label>
+                <select data-selector-userId data-krt-combobox="remote-users" th:aria-label="#{admin.notificationRules.selector.userId}">
                     <option value="" th:text="#{admin.notificationRules.selector.userId.placeholder}">-- Nutzer wählen --</option>
                 </select>
             </div>
-            <div class="form-group">
-                <button type="button" class="btn btn-quiet-danger" data-selector-remove
-                        th:text="#{admin.notificationRules.removeSelector}">Entfernen</button>
-            </div>
+            <button type="button" class="btn btn-quiet-danger btn-icon selector-row__remove" data-selector-remove
+                    th:title="#{admin.notificationRules.removeSelector}" th:aria-label="#{admin.notificationRules.removeSelector}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
         </div>
     </template>
 </main>

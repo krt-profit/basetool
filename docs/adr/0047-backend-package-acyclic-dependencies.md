@@ -1,10 +1,10 @@
 # ADR-0047 — Backend packages form an acyclic dependency graph
 
-- **Status:** Accepted — amended 2026-10-02 (see below)
+- **Status:** Accepted — amended 2026-10-02 and 2026-10-04 (see below)
 - **Date:** 2026-06-27
 - **Deciders:** @greluc
-- **Amended:** 2026-10-02 — `support` is an allow-list leaf, the layer rules select by role, the layers inside each module are acyclic, and module cycles sit in a frozen baseline (REQ-SEC-073, see the Amendment section below)
-- **Related:** [`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java) (`backendPackagesShouldBeFreeOfDependencyCycles`, `supportPackageMustStayADependencyLeaf`, `mapperLayerShouldNotReachIntoSecurityContext`) · ADR-0012 (layering)
+- **Amended:** 2026-10-02 — `support` is an allow-list leaf, the layer rules select by role, the layers inside each module are acyclic, and module cycles sit in a frozen baseline (REQ-SEC-073, see the Amendment section below); 2026-10-04 — `support` is split into the kernel, the `platform` module and the modules' `api`/`internal` packages, and the leaf rule selects its helpers by class literal (second Amendment section)
+- **Related:** [`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java) (`backendPackagesShouldBeFreeOfDependencyCycles`, `leafHelpersMustStayDependencyLeaves`, `mapperLayerShouldNotReachIntoSecurityContext`) · ADR-0012 (layering)
 
 ## Context
 
@@ -144,3 +144,14 @@ strongly connected component) — get a cycle gate of their own:
   and the store makes every removal visible.
 
 The leaf-SPI inversion of the decision above is also how an upward module edge is broken (ADR-0232).
+
+## Amendment — 2026-10-04: the `support` package is split
+
+The domain modularisation plan (§7.3, P1-9) dissolves `support`: its domain-free helpers are
+kernel types, the access core and the request settings form the `platform` module, and every
+other helper lives in its module's `internal` package, or in its `api` package when another
+module uses it. The helpers stay dependency leaves. Because they no longer share a package,
+`leafHelpersMustStayDependencyLeaves` selects them by class literal
+(`ArchitectureTest.LEAF_HELPER_CLASSES`, their nested classes and arrays of them) and keeps the
+allow-list: the other leaf helpers, the model, the repositories and classes outside the backend.
+A new leaf helper is added to that list.

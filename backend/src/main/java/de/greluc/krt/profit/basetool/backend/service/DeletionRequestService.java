@@ -19,21 +19,22 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestDeclinedEvent;
-import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestResolvedEvent;
-import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestedEvent;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestDeclinedEvent;
+import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestResolvedEvent;
+import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestedEvent;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.repository.DeletionRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.HandleSpellings;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Collection;
@@ -70,7 +71,7 @@ public class DeletionRequestService {
   private final UserDeletionService userDeletionService;
   private final HandleAnonymisationService handleAnonymisationService;
   private final KeycloakService keycloakService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final AuthHelperService authHelperService;
   private final ApplicationEventPublisher eventPublisher;
   private final MeterRegistry meterRegistry;
@@ -136,7 +137,7 @@ public class DeletionRequestService {
     final DeletionRequest saved =
         deletionRequestRepository.saveAndFlush(new DeletionRequest(userId, eraseHistoryRequested));
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ACCOUNT_DELETION_REQUESTED,
         userId,
         null,
@@ -167,7 +168,7 @@ public class DeletionRequestService {
     request.setDecidedAt(Instant.now());
     deletionRequestRepository.save(request);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ACCOUNT_DELETION_REQUEST_WITHDRAWN,
         userId,
         null,
@@ -202,7 +203,7 @@ public class DeletionRequestService {
     request.setDecisionNote(note);
     deletionRequestRepository.save(request);
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ACCOUNT_DELETION_REQUEST_DECLINED,
         request.getUserId(),
         null,
@@ -289,7 +290,7 @@ public class DeletionRequestService {
   public void recordKeycloakDeleteFailure(
       @NotNull UUID requestId, @NotNull UUID userId, @NotNull RuntimeException failure) {
     meterRegistry.counter(MetricNames.ACCOUNT_DELETION_KEYCLOAK_FAILURES).increment();
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED,
         userId,
         null,
@@ -322,7 +323,7 @@ public class DeletionRequestService {
           userId, HandleSpellings.of(user).filter(Objects::nonNull).toList());
     }
 
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ACCOUNT_DELETION_REQUEST_EXECUTED,
         userId,
         null,

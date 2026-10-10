@@ -28,11 +28,11 @@ import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -174,10 +174,7 @@ public class OrgUnitMembershipQueryService {
     List<OrgUnitMembershipOptionDto> options = new ArrayList<>(rows.size());
     for (OrgUnitMembership row : rows) {
       OrgUnit unit = units.get(row.getId().getOrgUnitId());
-      if (unit == null
-          || unit.getKind() != row.getKind()
-          || (row.getKind() != OrgUnitKind.SQUADRON
-              && row.getKind() != OrgUnitKind.SPECIAL_COMMAND)) {
+      if (unit == null || unit.getKind() != row.getKind() || !row.getKind().isTenantUnit()) {
         continue;
       }
       options.add(

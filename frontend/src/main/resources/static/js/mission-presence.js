@@ -6,12 +6,12 @@
 
     function i18n(key) {
         const dict = window.MISSION_PRESENCE_I18N || {};
-        return window.krtI18nText(dict[key], 'MISSION_PRESENCE_I18N[' + key + ']');
+        return window.krtI18nText(dict[key], `MISSION_PRESENCE_I18N[${key}]`);
     }
 
     function MissionPresence(missionId, currentUserId) {
         this.missionId = missionId;
-        this.topic = 'mission:' + missionId;
+        this.topic = `mission:${missionId}`;
         this.currentUserId = currentUserId || null;
         this.subscription = null;
         this.heartbeatTimer = null;
@@ -153,11 +153,11 @@
         const allPanels = document.querySelectorAll(SECTION_SELECTOR);
         const state = this.lastState || {};
         const self = this;
-        allPanels.forEach(function (panel) {
+        allPanels.forEach((panel) => {
             const key = panel.getAttribute('data-panel-key');
             const header = panel.querySelector('.col-header') || panel;
             let indicator = header.querySelector('.krt-presence-indicator');
-            const editors = (state[key] || []).filter(function (e) {
+            const editors = (state[key] || []).filter((e) => {
                 return !self.currentUserId || e.userId !== self.currentUserId;
             });
             if (editors.length === 0) {
@@ -183,17 +183,17 @@
                 label.textContent = String(editors.length);
             }
             const names = editors
-                .map(function (e) {
+                .map((e) => {
                     return e.displayName || '';
                 })
                 .filter(Boolean);
             let tooltip;
             if (editors.length === 1) {
                 tooltip = i18n('mission.presence.editing.solo');
-                tooltip = tooltip + ' ' + (names[0] || '');
+                tooltip = `${tooltip} ${names[0] || ''}`;
             } else {
                 tooltip = i18n('mission.presence.editing.multi');
-                tooltip = tooltip + ' ' + names.join(', ');
+                tooltip = `${tooltip} ${names.join(', ')}`;
             }
             indicator.setAttribute('title', tooltip);
             if (dot) {
@@ -203,4 +203,13 @@
     };
 
     window.MissionPresence = MissionPresence;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!window.missionId || window.missionPresenceUserId == null) {
+            return;
+        }
+        const presence = new MissionPresence(window.missionId, window.missionPresenceUserId);
+        presence.start();
+        window.missionPresence = presence;
+    });
 })();

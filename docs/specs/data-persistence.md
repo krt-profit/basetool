@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
 > **Owner area:** DB/DATA · **Migration conventions:** [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md)
 
 # Data & persistence
@@ -12,7 +12,7 @@ prod and test run identical, reviewed DDL. Queries avoid N+1 by construction.
 > than here, because they are "read this before you touch multi-step transactions" guidance that
 > must load where an agent starts: the two cross-cutting rules (`@Version` echo, lock as
 > fine-grained as the data allows) in the root `CLAUDE.md` → "Concurrency", and the full landmine
-> list in [`backend/CLAUDE.md`](../../backend/CLAUDE.md) — the `support.OptimisticLock` helpers
+> list in [`backend/CLAUDE.md`](../../backend/CLAUDE.md) — the `kernel.OptimisticLock` helpers
 > (`check` / `checkOptionalClient` / `checkRequired`), `Mission`'s DB-enforced section counters
 > ([ADR-0080](../adr/0080-mission-section-lock-db-enforcement.md)), pessimistic locking for bulk
 > reorders, the `…WithinTransaction` pattern, bulk-updates-inside-loops and the find-or-create
@@ -28,6 +28,14 @@ everywhere — never `update` or `create`.** Full conventions (destructive-ops t
 rule, data-migration patterns, performance/locking, test caveats, pre-merge checklist) live
 in [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md) — read
 it before adding a migration.
+
+**One schema, one Flyway location, one `V<n>` sequence.** The backend is the only module that
+migrates: `spring.flyway.locations` is `classpath:db/migration` in every profile, and the numbering
+is one global line across every domain, so a migration is never named for the module that owns its
+tables (that is REQ-DATA-020's map). A Gradle module extracted later (exchange, bank; plan §5.8)
+puts its migrations into that same location on the backend's class path, not into a location of its
+own, and the backend stays the application that runs Flyway. The CI job *Check migration version
+numbering* refuses a duplicate or out-of-order version.
 
 ### REQ-DATA-002 — Startup seeding
 
@@ -78,7 +86,7 @@ Staffel-membership lookup so its three derived-field resolvers share one query (
 direct query outside an HTTP request). The delegated appointment verdicts
 (`OrgRoleManagementSecurityService`) read the caller's membership rows once per request the same way,
 because the Leitung view asks them for every Bereich, Staffel and Spezialkommando (BE-PERF-15).
-Every such memo goes through **`support.RequestMemo`** with a typed `RequestMemo.Key<T>` (BE-SIMP-09,
+Every such memo goes through **`kernel.RequestMemo`** with a typed `RequestMemo.Key<T>` (BE-SIMP-09,
 2026-09-23): `get(request, key, supplier)` on a request the caller holds, `getIfBound(key, supplier)`
 on the thread-bound one (answering `null` outside a request). The one unchecked cast lives in the
 key; a new memo does not hand-roll a request attribute.
@@ -106,7 +114,7 @@ materials), a `JOIN FETCH` into the current persistence context
 inside the caller's transaction. With `open-in-view` off, no mapping may happen after the
 transaction that loaded the entity — every controller that maps these aggregates runs in its own
 `@Transactional`. **An entity that enters a Caffeine cache is completed first**:
-`support.CachedEntityGraphs` initialises the lazy to-ones of `Material` (the whole
+`catalogue.internal.CachedEntityGraphs` initialises the lazy to-ones of `Material` (the whole
 `refinedMaterial` chain with categories), `Location`, `ShipType` and `JobType` inside the cached
 method's own read-only transaction, because a cached entity outlives its session and is handed to
 every later reader on any thread. `LazyToOneReadPathsTest` drives the hot reads through the real

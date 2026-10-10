@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,12 +35,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.FrequencyTypeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,79 +80,42 @@ class AdminMissionDataPageControllerMvcTest {
 
   /**
    * Stubs the three backend catalogue calls (squadrons / job-types / frequency-types) with one row
-   * each in the raw {@code Map} wire shape the controller parses, so every section table renders.
+   * each, so every section table renders.
    */
   private void stubAllThree() {
-    PageResponse<Map<String, Object>> squadrons =
+    PageResponse<SquadronDto> squadrons =
         new PageResponse<>(
             List.of(
-                Map.of(
-                    "id",
-                    UUID.randomUUID().toString(),
-                    "name",
-                    "Frag SQ",
-                    "shorthand",
-                    "FSQ",
-                    "description",
-                    "d",
-                    "active",
-                    true,
-                    "isPromotionEnabled",
-                    true,
-                    "isProfitEligible",
-                    false,
-                    "version",
-                    0)),
+                new SquadronDto(UUID.randomUUID(), "Frag SQ", "FSQ", "d", true, true, false, 0L)),
             0,
             1000,
             1L,
             1,
             List.of());
-    PageResponse<Map<String, Object>> jobTypes =
+    PageResponse<JobTypeDto> jobTypes =
         new PageResponse<>(
             List.of(
-                Map.of(
-                    "id",
-                    UUID.randomUUID().toString(),
-                    "name",
-                    "Frag JT",
-                    "description",
-                    "d",
-                    "archetype",
-                    "MISSION",
-                    "active",
-                    true,
-                    "isLeadershipRole",
-                    false,
-                    "version",
-                    0)),
+                new JobTypeDto(
+                    UUID.randomUUID(), "Frag JT", "d", "MISSION", null, true, false, null, 0L)),
             0,
             1000,
             1L,
             1,
             List.of());
-    PageResponse<Map<String, Object>> freqTypes =
+    PageResponse<FrequencyTypeDto> freqTypes =
         new PageResponse<>(
-            List.of(
-                Map.of(
-                    "id",
-                    UUID.randomUUID().toString(),
-                    "name",
-                    "Frag FT",
-                    "description",
-                    "d",
-                    "active",
-                    true,
-                    "version",
-                    0)),
+            List.of(new FrequencyTypeDto(UUID.randomUUID(), "Frag FT", "d", true, null, 0L)),
             0,
             1000,
             1L,
             1,
             List.of());
-    when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef())).thenReturn(squadrons);
-    when(backendApiClient.get(contains("/api/v1/job-types"), anyTypeRef())).thenReturn(jobTypes);
-    when(backendApiClient.get(contains("/api/v1/frequency-types"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(squadrons);
+    when(backendApiClient.get(contains("/api/v1/job-types"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(jobTypes);
+    when(backendApiClient.get(
+            contains("/api/v1/frequency-types"), anyTypeRef(), any(Object[].class)))
         .thenReturn(freqTypes);
   }
 
@@ -166,6 +133,86 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"freqtypes-results\"")));
   }
 
+  /**
+   * The page follows the master-detail pattern (REQ-UI-027): page head with the admin eyebrow and
+   * no primary action, the three data kinds as master rows with counts, and one detail pane per
+   * kind with its switch, its create button as the pane's primary action and its stacked table.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_fullPage_rendersThePatternBasics() throws Exception {
+    stubAllThree();
+
+    String html =
+        mockMvc
+            .perform(get("/admin/mission-data").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String main = html.substring(html.indexOf("<main"), html.indexOf("id=\"squadron-modal\""));
+
+    assertThat(html)
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .doesNotContain("class=\"page-actions\"")
+        .contains("id=\"add-squadron-btn\" class=\"btn btn--cta\"")
+        .contains("id=\"add-jobtype-btn\" class=\"btn btn--cta\"")
+        .contains("id=\"add-freqtype-btn\" class=\"btn btn--cta\"")
+        .contains("class=\"switch\" for=\"includeInactiveSquadrons\"")
+        .contains("class=\"switch\" for=\"includeInactiveJobTypes\"")
+        .contains("class=\"switch\" for=\"includeInactiveFrequencyTypes\"")
+        .contains(">Einsatz<")
+        .contains(">Nein<")
+        .doesNotContain(">MISSION<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("md-box__toggle");
+    assertThat(main)
+        .contains("class=\"master-detail md-md\"")
+        .containsPattern(
+            "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-squadrons\"")
+        .containsPattern("data-list-count-for=\"squadrons-results\"\\s*>1<")
+        .containsPattern("id=\"squadrons-box\"[^>]*role=\"tabpanel\"[^>]*>")
+        .containsPattern("id=\"jobtypes-box\"[^>]*hidden")
+        .containsPattern("id=\"freqtypes-box\"[^>]*hidden")
+        .doesNotContainPattern("id=\"squadrons-box\"[^>]*hidden")
+        .contains("data-list-total=\"1\"")
+        .doesNotContain("krtm-");
+    assertThat(main.split("btn--cta", -1)).hasSize(4);
+    assertThat(main.split("data-table data-table--stack", -1)).hasSize(4);
+  }
+
+  /** The {@code kind} parameter opens that data kind's pane, an unknown value the first. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_kindParameter_selectsThePane() throws Exception {
+    stubAllThree();
+
+    String freq =
+        mockMvc
+            .perform(get("/admin/mission-data").param("kind", "freqtypes"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String unknown =
+        mockMvc
+            .perform(get("/admin/mission-data").param("kind", "nonsense"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(freq)
+        .contains(
+            "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-freqtypes\"")
+        .containsPattern("id=\"squadrons-box\"[^>]*hidden")
+        .doesNotContainPattern("id=\"freqtypes-box\"[^>]*hidden");
+    assertThat(unknown)
+        .contains(
+            "class=\"master-row md-kind-row is-active\" role=\"tab\" id=\"md-kind-squadrons\"");
+  }
+
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -177,7 +224,7 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
   }
 
   @Test
@@ -251,7 +298,8 @@ class AdminMissionDataPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void deleteJobTypeAjax_withHeader_returns200() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(eq("/api/v1/job-types/" + id), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.delete(eq("/api/v1/job-types/{id}"), eq(Void.class), eq(id)))
+        .thenReturn(null);
 
     mockMvc
         .perform(

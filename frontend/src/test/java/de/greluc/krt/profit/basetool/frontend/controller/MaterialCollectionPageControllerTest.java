@@ -21,15 +21,17 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.view.CollectionProgress;
+import de.greluc.krt.profit.basetool.frontend.view.MaterialCollectionGroup;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.ui.ConcurrentModel;
@@ -37,19 +39,49 @@ import org.springframework.ui.Model;
 
 class MaterialCollectionPageControllerTest {
 
+  /**
+   * A collection entry of the given material.
+   *
+   * @param material the material name
+   * @param allocated the amount earmarked to the order
+   * @param delivered whether the slice is marked delivered
+   * @return the entry
+   */
+  private static MaterialCollectionEntryDto entry(
+      String material, double allocated, boolean delivered) {
+    return new MaterialCollectionEntryDto(
+        UUID.randomUUID(),
+        0L,
+        "Alice",
+        null,
+        null,
+        null,
+        material,
+        500.0,
+        allocated,
+        allocated,
+        delivered);
+  }
+
   @Test
   void viewMaterialCollection_shouldPopulateModelAndReturnTemplate() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialCollectionPageController controller =
-        new MaterialCollectionPageController(backendApiClient);
+        new MaterialCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    List<Map<String, Object>> entries = List.of(Map.of("materialName", "Laranite"));
+    List<MaterialCollectionEntryDto> entries =
+        List.of(
+            entry("Laranite", 2.0, true),
+            entry("Agricium", 1.0, false),
+            entry("Laranite", 6.0, false));
     List<LocationReferenceDto> locations =
         List.of(new LocationReferenceDto(UUID.randomUUID(), "Port Olisar"));
 
-    when(backendApiClient.get(contains("/material-collection"), anyTypeRef())).thenReturn(entries);
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/material-collection"), anyTypeRef(), eq(jobOrderId)))
+        .thenReturn(entries);
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(locations);
 
@@ -58,6 +90,14 @@ class MaterialCollectionPageControllerTest {
     assertEquals("material-collection", viewName);
     assertEquals(jobOrderId, model.getAttribute("jobOrderId"));
     assertEquals(entries, model.getAttribute("entries"));
+    List<?> groups = (List<?>) model.getAttribute("materialGroups");
+    assertNotNull(groups);
+    assertEquals(2, groups.size());
+    MaterialCollectionGroup laranite = (MaterialCollectionGroup) groups.getFirst();
+    assertEquals("Laranite", laranite.materialName());
+    assertEquals(2, laranite.entries().size());
+    assertEquals(new CollectionProgress(2.0, 8.0), laranite.progress());
+    assertEquals(new CollectionProgress(2.0, 9.0), model.getAttribute("collectionProgress"));
     assertNull(model.getAttribute("users"));
     assertEquals(locations, model.getAttribute("locations"));
   }
@@ -66,11 +106,12 @@ class MaterialCollectionPageControllerTest {
   void viewMaterialCollection_shouldReturnFragment_whenFragmentIsResults() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialCollectionPageController controller =
-        new MaterialCollectionPageController(backendApiClient);
+        new MaterialCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/material-collection"), anyTypeRef(), eq(jobOrderId)))
         .thenReturn(List.of());
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
@@ -85,11 +126,12 @@ class MaterialCollectionPageControllerTest {
   void viewMaterialCollection_shouldHandleBackendErrorForEntries() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialCollectionPageController controller =
-        new MaterialCollectionPageController(backendApiClient);
+        new MaterialCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/material-collection"), anyTypeRef(), eq(jobOrderId)))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
@@ -106,11 +148,12 @@ class MaterialCollectionPageControllerTest {
   void viewMaterialCollection_shouldHandleBackendErrorForLocations() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialCollectionPageController controller =
-        new MaterialCollectionPageController(backendApiClient);
+        new MaterialCollectionPageController(new JobOrderBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/material-collection"), anyTypeRef(), eq(jobOrderId)))
         .thenReturn(List.of());
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-05.
 > **Owner area:** ORG · **Related ADRs:** ADR-0029
 
 # Organisation org chart (Funktionsränge)
@@ -12,10 +12,10 @@ Spezialkommandos. It grants no permission — authorization stays with the role 
 org-unit-scoped. An admin edits its free-text holders and structure inline; everyone else reads it.
 The aggregate is the `OrgChartPosition` row (Flyway `V136`, extended by `V138`, `V167`, `V171` and
 `V186`); the read model is assembled by
-[`OrgChartReadService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartReadService.java),
+[`OrgChartReadService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/orgchart/internal/OrgChartReadService.java),
 the write rules and the rank mirror live in
-[`OrgChartService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartService.java),
-behind [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/OrgChartController.java).
+[`OrgChartService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/orgchart/internal/OrgChartService.java),
+behind [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/orgchart/web/OrgChartController.java).
 
 > **Numbering note.** The ORG ids are shared with [`org-unit-tenancy.md`](org-unit-tenancy.md). Four
 > of them had each named one requirement here and a different one there; on 2026-09-22, on the
@@ -32,7 +32,8 @@ behind [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/b
 >
 > **Mirrored from the functional ranks (epic #800, REQ-ROLE-006):** the account-linked chart seats are
 > a descriptive **mirror** of the `org_unit_membership` ranks — written in the same transaction as the
-> rank change by `OrgChartService.mirror*` (called from the appointment flow), never the reverse. A
+> rank change by `OrgChartService`, the org-unit module's `MembershipChangeObserver` (called from
+> the appointment flow), never the reverse. A
 > `COMMAND_LEAD` Kommando node tied to a Kommandogruppe carries the `kommando_group_id` link (Flyway
 > `V186`); legacy admin-authored Kommandos keep a `null` link and stay chart-only. Free-text holders
 > remain admin-edited. The chart still grants nothing (REQ-ORG-010): the mirror only writes the chart,
@@ -56,7 +57,8 @@ rename / vacate / remove) is gated to `ROLE_ADMIN` at the controller.
 the inline editor as an admin) · **Code:** `OrgChartController` · **Issues:** —
 
 > **Amended by epic #800 (REQ-ROLE-006):** account-linked seats are no longer ADMIN-edited here —
-> they are a mirror of the functional ranks, written only by `OrgChartService.mirror*` from the
+> they are a mirror of the functional ranks, written only by `OrgChartService` (the
+> `MembershipChangeObserver` of the org-unit module) from the
 > Leitung appointment flow. The chart write API now **rejects** setting an account holder (a
 > `userId` on create / update) and any edit / vacate / delete of a mirror-managed seat (account-held
 > or `kommando_group`-linked) with `problem.org_chart.account_managed_in_leitung`. The inline editor
@@ -167,8 +169,17 @@ wide chart is usually also tall, its own horizontal scrollbar would sit far down
 fixed footer); a **sticky proxy scrollbar** (`#oc-scrollbar`, org-chart.js) is therefore pinned just
 above the footer and kept in sync with the chart's horizontal scroll, so panning is always reachable
 without scrolling the whole page down — the chart's own bar is suppressed while the proxy is active. The
-"Bearbeiten" toggle — admins only, on the trailing edge of the page title box — exposes its
-state via `aria-pressed` and reveals a legend while editing. The transitional "seats are managed
+"Bearbeiten" toggle — admins only, a ghost button in the page head's actions (REQ-UI-027) — exposes its
+state via `aria-pressed` and reveals a legend while editing. **On the Smartphone class
+(`width <= 768px`) the chart is an indented list instead of a horizontal chart**: every tier and
+every fan stacks vertically, each level indented behind one connector line on its left, the boxes
+take the full width, and nothing scrolls sideways — so the proxy scrollbar is not shown there. The
+tree roles, levels and keyboard model are the same on every class.
+
+Amended 2026-10-03 (website overhaul phase 3): the page wears the page head („Organisation" /
+„Organigramm") instead of the greeting box with its subtitle, the toggle moved into the head, an
+empty chart shows an `.empty-state`, and the phone layout became the indented list above
+(`OrgChartKeyboardA11yE2eTest.phoneShowsTheChartAsAnIndentedList`, `OrgChartPageRenderTest`). The transitional "seats are managed
 under Leitung" banner that once sat above the chart is gone, and the per-node "managed under Leitung"
 marker (REQ-ROLE-006, REQ-ORG-010 amendment) has since been retired too — a mirror-managed
 (account-held or `kommando_group`-linked) seat now reads read-only purely from its absent inline-edit

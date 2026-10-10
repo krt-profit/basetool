@@ -21,10 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ConnectedAppMassChangeRequestDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ConnectedAppMassChangeResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.HandoffKind;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import jakarta.servlet.http.HttpSession;
@@ -69,13 +68,10 @@ public class ConnectedAppsConfirmRelayController {
   /** How long after the gateway staged a change set it can still be previewed or confirmed. */
   static final Duration STAGING_LIFETIME = Duration.ofMinutes(30);
 
-  /** The backend's mass-change endpoints. */
-  private static final String BACKEND = "/api/v1/connected-apps/mass-changes/";
-
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
   private final IngestHandoffService handoffService;
-  private final BackendApiClient backendApiClient;
+  private final ExchangeBackendClient exchangeClient;
   private final Clock clock = Clock.systemUTC();
 
   /**
@@ -115,10 +111,7 @@ public class ConnectedAppsConfirmRelayController {
     return relay(
         log,
         "preview held-back change set (ajax)",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.post(
-                    BACKEND + "preview", request, ConnectedAppMassChangeResultDto.class)));
+        () -> ResponseEntity.ok(exchangeClient.previewMassChange(request)));
   }
 
   /**
@@ -139,10 +132,7 @@ public class ConnectedAppsConfirmRelayController {
     return relay(
         log,
         "confirm held-back change set (ajax)",
-        () ->
-            ResponseEntity.ok(
-                backendApiClient.post(
-                    BACKEND + "confirm", request, ConnectedAppMassChangeResultDto.class)));
+        () -> ResponseEntity.ok(exchangeClient.confirmMassChange(request)));
   }
 
   /**
@@ -213,7 +203,7 @@ public class ConnectedAppsConfirmRelayController {
       return request == null || request.stagedAt() == null || expired(request.stagedAt())
           ? null
           : request;
-    } catch (JacksonException ignored) {
+    } catch (JacksonException _) {
       return null;
     }
   }

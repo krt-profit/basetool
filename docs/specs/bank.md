@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** BANK · **Related ADRs:** ADR-0009, ADR-0010, ADR-0011 (foundation); ADR-0020,
 > ADR-0028, ADR-0043 (org-unit seam, responsibility, visibility); ADR-0021, ADR-0022, ADR-0133
 > (booking requests); ADR-0039, ADR-0040 (holders); ADR-0041, ADR-0052 (transfer fee); ADR-0054
@@ -62,7 +62,7 @@ by partial unique indexes, not by application convention alone.
   `squadron_id` (ArchUnit rule
   `noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities`).
 
-**Enforced by:** `BankAccountServiceTest`, `BankControllerSecurityTest`, `DatabaseIndexMigrationTest` (V150 partial uniques), `BankManagePageControllerOrgUnitPickerMvcTest` (create-account org-unit picker renders names + ids, not `null`) · **Code:** `model/BankAccount`, `service/BankAccountService`, `db/migration/V150`, `controller/BankManagePageController` · **Issues:** #556
+**Enforced by:** `BankAccountServiceTest`, `BankControllerSecurityTest`, `DatabaseIndexMigrationTest` (V150 partial uniques), `BankManagePageControllerOrgUnitPickerMvcTest` (create-account org-unit picker renders names + ids, not `null`) · **Code:** `bank/internal/BankAccount`, `bank/internal/BankAccountService`, `db/migration/V150`, `controller/BankManagePageController` · **Issues:** #556
 
 > **Amended by epic #692 (REQ-BANK-027):** Bereiche are now first-class `org_unit` kinds (REQ-ORG-014),
 > so the `AREA` row's owner reference becomes a link to a `BEREICH` `org_unit` (one `AREA` account per
@@ -92,7 +92,7 @@ and closable** without a migration or restart.
 - [x] Postings on a `CLOSED` account are rejected; reads and statements still work.
 - [x] Reopen restores full booking capability and is audited.
 
-**Enforced by:** `BankAccountServiceTest` (close requires zero balance, reopen) · **Code:** `service/BankAccountService`, `db/migration/V150` · **Issues:** #556
+**Enforced by:** `BankAccountServiceTest` (close requires zero balance, reopen) · **Code:** `bank/internal/BankAccountService`, `db/migration/V150` · **Issues:** #556
 
 ### REQ-BANK-003 — Holder custody: a global dimension, decoupled from accounts
 
@@ -142,7 +142,7 @@ identity).
   username fallback); renaming a user is reflected immediately in the registry, dropdowns, history
   and statements, while a deleted user's rows fall back to the frozen handle snapshot.
 
-**Enforced by:** `BankLedgerServiceTest` (account/holder legs per type, global holder balance), `BankHolderServiceTest`, `BankHolderLiveDisplayNameTest` (live name preferred + rename reflected + deleted-user snapshot fallback, registry & statement), `BankReportServiceTest` (holder column on statements) · **Code:** `model/BankHolder` (`getDisplayName`), `model/BankHolderPosting`, `mapper/BankHolderMapper`, `repository/BankHolderRepository` (`findAllWithUser`), `repository/BankHolderPostingRepository` (`holderTotals` / `findHolderLegsByTransactionIds` live `CASE`), `service/BankHolderService`, `db/migration/V180`, `db/migration/V181` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (account/holder legs per type, global holder balance), `BankHolderServiceTest`, `BankHolderLiveDisplayNameTest` (live name preferred + rename reflected + deleted-user snapshot fallback, registry & statement), `BankReportServiceTest` (holder column on statements) · **Code:** `bank/internal/BankHolder` (`getDisplayName`), `bank/internal/BankHolderPosting`, `bank/internal/BankHolderMapper`, `bank/internal/BankHolderRepository` (`findAllWithUser`), `bank/internal/BankHolderPostingRepository` (`holderTotals` / `findHolderLegsByTransactionIds` live `CASE`), `bank/internal/BankHolderService`, `db/migration/V180`, `db/migration/V181` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-004 — Append-only double-entry ledger
 
@@ -180,7 +180,7 @@ SQL sum of its `bank_posting` rows and a holder's global balance the SQL sum of 
 - [x] A reversal stores a FK to the reversed transaction; reversing twice is rejected.
 - [x] Reversing a `WIPE_RESET` or a `REVERSAL` is rejected (409 `BANK_NOT_REVERSIBLE`).
 
-**Enforced by:** `BankLedgerServiceTest` (append-only, two-ledger legs, reversal mirror, non-reversible targets), `ArchitectureTest` (`bankLedgerRepositoriesMustStayInsertOnly`) · **Code:** `model/BankTransaction`, `model/BankPosting`, `model/BankHolderPosting`, `service/BankLedgerService`, `db/migration/V153`, `db/migration/V180` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (append-only, two-ledger legs, reversal mirror, non-reversible targets), `ArchitectureTest` (`bankLedgerRepositoriesMustStayInsertOnly`) · **Code:** `bank/internal/BankTransaction`, `bank/internal/BankPosting`, `bank/internal/BankHolderPosting`, `bank/internal/BankLedgerService`, `db/migration/V153`, `db/migration/V180` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-005 — Whole-aUEC amounts
 
@@ -226,7 +226,7 @@ coverage; `BANK_HOLDER_OVERDRAFT` is retired.
 - [x] The error response names the account and the available balance — without leaking
   data to callers who cannot see the account (403 takes precedence).
 
-**Enforced by:** `BankLedgerServiceTest` (account overdraft code + concurrency tests, holder-may-go-negative) · **Code:** `service/BankLedgerService` (pessimistic account lock + account-only coverage guard) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (account overdraft code + concurrency tests, holder-may-go-negative) · **Code:** `bank/internal/BankLedgerService` (pessimistic account lock + account-only coverage guard) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-007 — Keycloak roles & hierarchy
 
@@ -289,7 +289,7 @@ the grant table.
 - [x] Bank gates ignore the `X-Active-Org-Unit-Id` pin and contextual org-unit
   authorities (test).
 
-**Enforced by:** `BankSecurityServiceTest`, `ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`) · **Code:** `service/BankSecurityService` · **Issues:** #556
+**Enforced by:** `BankSecurityServiceTest`, `ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`) · **Code:** `bank/internal/BankSecurityService` · **Issues:** #556
 
 ### REQ-BANK-009 — Per-account grants: view + deposit / withdraw / transfer
 
@@ -312,7 +312,7 @@ an org unit is irrelevant (REQ-BANK-008).
   hierarchy) and reject grantees lacking the employee role.
 - [x] Every grant mutation produces exactly one audit event with before/after flags.
 
-**Enforced by:** `BankGrantServiceTest`, `BankControllerSecurityTest` · **Code:** `service/BankGrantService`, `model/BankAccountGrant`, `db/migration/V152` · **Issues:** #556
+**Enforced by:** `BankGrantServiceTest`, `BankControllerSecurityTest` · **Code:** `bank/internal/BankGrantService`, `bank/internal/BankAccountGrant`, `db/migration/V152` · **Issues:** #556
 
 ### REQ-BANK-010 — Visibility matrix
 
@@ -357,7 +357,7 @@ endpoints follow the two-gate model (URL matrix outer, `@PreAuthorize` inner):
 - [x] The sidebar "Bank" group renders only for `BANK_EMPLOYEE`-or-above; the audit-log
   page only for admins.
 
-**Enforced by:** `BankControllerSecurityTest` (member 403, employee/management/admin matrix, admin-only audit) · **Code:** `service/BankSecurityService`, `controller/BankAccountController` · **Issues:** #556
+**Enforced by:** `BankControllerSecurityTest` (member 403, employee/management/admin matrix, admin-only audit) · **Code:** `bank/internal/BankSecurityService`, `bank/web/BankAccountController` · **Issues:** #556
 
 ### REQ-BANK-011 — Account↔account transfer semantics
 
@@ -382,7 +382,7 @@ is the global holder→holder Umbuchung (REQ-BANK-031), not a transfer.
 - [x] The transfer appears in the audit log and the statement PDF with both account legs and
   the involved holders.
 
-**Enforced by:** `BankLedgerServiceTest` (account+holder legs sum zero, same-account reject, source overdraft) · **Code:** `service/BankLedgerService#bookTransfer` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (account+holder legs sum zero, same-account reject, source overdraft) · **Code:** `bank/internal/BankLedgerService#bookTransfer` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-012 — Immutable, complete, admin-only audit log
 
@@ -445,7 +445,7 @@ The audit table is business data, not logging — the `docs/specs/observability.
 - [x] Audit write failures fail the business transaction (same TX — no silent gaps).
 - [x] Non-admin access to the audit endpoints/pages: 403; the page link is hidden.
 
-**Enforced by:** `BankAuditServiceTest`, `BankControllerSecurityTest` (management 403 on audit), `AdminAuditLogPageControllerTest` (every produced type offered + labelled) · **Code:** `service/BankAuditService`, `model/BankAuditEventType`, `controller/BankAdminController`, `db/migration/V154`, `db/migration/V238` · **Issues:** #556
+**Enforced by:** `BankAuditServiceTest`, `BankControllerSecurityTest` (management 403 on audit), `AdminAuditLogPageControllerTest` (every produced type offered + labelled) · **Code:** `bank/internal/BankAuditService`, `bank/internal/BankAuditEventType`, `bank/web/BankAdminController`, `db/migration/V154`, `db/migration/V238` · **Issues:** #556
 
 ### REQ-BANK-013 — Admin wipe reset
 
@@ -469,7 +469,7 @@ is idempotent (a second click on an all-zero bank is a no-op with a notice).
   matching the A1 mockup (`proposals/bank-admin-varianten.html`).
 - [x] The audit log contains the summary event (actor, account count, total zeroed).
 
-**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only) · **Code:** `service/BankLedgerService#resetAllBalances`, `controller/BankAdminController` · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only) · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/web/BankAdminController` · **Issues:** #556
 
 ### REQ-BANK-014 — Account statement PDF (Kontoauszug)
 
@@ -502,7 +502,7 @@ existing Helvetica-based reports predate the rule), and is delivered via the est
 - [x] PDF uses embedded Lato and the KRT page background; no PII beyond the account's
   own data; **no** per-account holder distribution section.
 
-**Enforced by:** `BankReportServiceTest` (statement balances, period filter, distribution, one audit event) · **Code:** `service/BankStatementReportService`, `controller/BankAccountController#downloadStatement` · **Issues:** #556
+**Enforced by:** `BankReportServiceTest` (statement balances, period filter, distribution, one audit event) · **Code:** `bank/internal/BankStatementReportService`, `bank/web/BankAccountController#downloadStatement` · **Issues:** #556
 
 ### REQ-BANK-015 — Management export: all accounts, last three months (PDF)
 
@@ -521,7 +521,7 @@ design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this expor
 - [x] Per-account net change equals the difference of the two balances and the sum of
   the itemized bookings (test-pinned).
 
-**Enforced by:** `BankReportServiceTest` (per-account summaries, audit event) · **Code:** `service/BankManagementReportService`, `controller/BankExportController` · **Issues:** #556
+**Enforced by:** `BankReportServiceTest` (per-account summaries, audit event) · **Code:** `bank/internal/BankManagementReportService`, `bank/web/BankExportController` · **Issues:** #556
 
 ### REQ-BANK-016 — Dashboards
 
@@ -541,6 +541,14 @@ design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this expor
 > filter (REQ-BANK-046) applies across every view.
 >
 > **Amended (2026-07-05) — view options as checkboxes + dashboard Kontobewegung CTA:** the two per-user view options are now **independent checkboxes** (a "Tabellenansicht" toggle and a "Nach Bereich gruppieren" toggle, `bank.dashboard.view.tableToggle` / `.groupToggle`) rather than filled orange segmented buttons — **both unchecked is the default card grid ordered A→Z**; each still persists per user in `localStorage` and replays through the `layout` / `group` query parameters on the `bankGrid` fragment swap (`bank.js` reads their `checked` state on `change`, not a button's `aria-pressed`). The dashboard header additionally gains the shared direct-booking **"Kontobewegung"** CTA + unified movement modal (REQ-BANK-023/-017, shown when an active account exists); a successful booking re-renders the `bankGrid` in place so balances and 30-day deltas refresh without a reload (`bankGrid` refresh target, REQ-FE-005). The **Verwaltung / Berechtigungen** links are removed from the header — they remain reachable from the sidebar (`nav.bank.manage` / `nav.bank.grants`) — while the three-month report stays bank-management-only. `BankPageController#addMovementModalData` assembles the modal's catalogs (active accounts, holders, counterparty users, org units, fee rate) only on the full-page render, not the `bankGrid` fragment swap, and reuses the unchanged `/deposits` · `/withdrawals` · `/transfers` endpoints, so this adds **no new endpoint, audit event or metric**.
+>
+> **Amended 2026-10-03 (website overhaul phase 3):** the dashboard uses the shared page head — the
+> role hint „Ansicht: Bankleitung · n Konten" / „Ansicht: Bank-Mitarbeiter · n berechtigte Konten"
+> (`bank.dashboard.subtitle.*`) is the eyebrow, the title „Kartellbank", the actions the ghost
+> „3-Monats-Report" (management only) and the CTA „Kontobewegung" — and a toolbar below it holds the
+> account-name filter, the two view options and a „Stand <Zeit>" note. The view options render as
+> `.switch` toggles instead of checkboxes; their state, storage and `layout` / `group` swap are
+> unchanged.
 
 The bank landing page (`/bank`) is a **dashboard** in the design system's **D1 card
 grid** layout (`proposals/bank-dashboard-varianten.html`): one `.kpi-card` per visible
@@ -575,14 +583,14 @@ per-account N+1 (REQ-DATA-003).
 - [x] Dashboard renders correctly on all four device classes (REQ-UI responsive rules).
 - [x] A client-side account-name live filter sits beside the view-option checkboxes and hides
   non-matching cards as the user types (REQ-BANK-046).
-- [x] The two view options render as independent checkboxes (both unchecked = the default card grid
-  A→Z); the header carries the direct-booking Kontobewegung CTA + modal (when an active account
+- [x] The two view options render as independent toggles (`.switch` since 2026-10-03; both off = the
+  default card grid A→Z); the header carries the direct-booking Kontobewegung CTA + modal (when an active account
   exists) and no longer the Verwaltung / Berechtigungen links (frontend `BankDashboardFilterMvcTest`).
 
 **Enforced by:** `BankPageControllerTest` (sparkline scaling), `BankAccountOrderTest` (A→Z
 case-insensitive, null-safe, original list untouched), frontend `BankDashboardFilterMvcTest` (filter
 wiring, view-option checkboxes, Kontobewegung CTA/modal, Verwaltung/Berechtigungen absent),
-single-statement repository reads · **Code:** `service/BankDashboardService`,
+single-statement repository reads · **Code:** `bank/internal/BankDashboardService`,
 `controller/BankPageController` (`addMovementModalData`), `controller/BankAccountOrder` (shared
 account ordering for `BankManagePageController` / `BankGrantsPageController` /
 `OrgUnitBankPageController`), `templates/bank-dashboard.html`, `static/js/bank.js`, `static/css/bank.css`
@@ -635,6 +643,25 @@ in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
 > `bank.action.movement`, `bank.modal.movement.title`, `bank.movement.field.sourceAccount(.placeholder/.hint)`.
 >
 > **Amended (2026-07-05) — Kontobewegung modal polish:** three refinements to the shared movement modal. (1) On the account-selectable variant (requests overview + dashboard) the account label follows the movement type (`bank.js` `syncMovementRows`): a **deposit** lands ON the account so its label is **Zielkonto** (a deposit has no source account — money from a source account would be a transfer), while a withdrawal/transfer keeps **Quellkonto**; the label carries per-type `data-label-*` (reusing `bank.field.targetAccount`). (2) The "kein Tool-Account" counterparty toggle (`bank-counterparty.html`) now sits **below** the Einzahler/Empfänger picker (and its external-name alternative) and above the shared Einheit row, matching reading order. (3) The **"?" field-hint tooltip** (`fragments/scu-hint`) no longer clips inside a scrolling `.krt-modal-body` (whose `overflow-y: auto` also clips horizontally): `common-handlers.js` measures the bubble against its clipping ancestor on hover/focus and sets a `--hint-shift` CSS variable that slides it back inside (the arrow counter-shifts to keep pointing at the disc). All three are UI-only — no endpoint, DTO, audit or monitoring change.
+>
+> **Amended 2026-10-03 (website overhaul phase 3) — one account-detail fragment:** both account-detail
+> pages (`bank-account-detail.html`, `org-unit-bank-account-detail.html`) are assembled from
+> `templates/fragments/bank-account-detail.html`: a head (back link as eyebrow, the account name, chips
+> for the account number and the type, a muted status chip when the account is not active, the ghost
+> „Kontoauszug" and the page's one CTA — „Kontobewegung" for bank staff, „Antrag stellen" on the
+> org-unit page), four KPI tiles (Kontosaldo · Ziel with a progress meter or „— kein Ziel" · ± 30 Tage ·
+> Buchungen), the read-only approval limits (REQ-BANK-041), and a tab bar „Buchungen (n)" plus a second
+> tab — „Konto-Info" on the bank-staff page and for a plain org-unit viewer, „Ziel & Sichtbarkeit" for
+> the org-unit account's manager (REQ-BANK-038). The Buchungen tab holds the balance chart as a fixed
+> card (REQ-BANK-049) and the booking history (REQ-BANK-051). The selected tab is remembered per user
+> (`bank_account_tab_<user>` / `org_unit_bank_account_tab_<user>`, REQ-UI-017). This **supersedes** two
+> parts of the 2026-07-03 amendment above on the account-detail pages: the **Konto-Info** collapsible
+> tile is now a tab panel, and a booking row **no longer expands** — the columns are Datum · Vorgang
+> (type chip) · Gegenpartei · Betrag (± coloured) · Saldo nach Buchung (plus „Stornieren" for the
+> Bankleitung), and the Begründung, the Notiz, the Notiz Bankmitarbeiter and, for bank staff, the
+> Halter stand as sub-lines under the Gegenpartei. The request tables of `/bank/requests` and
+> `/org-unit-bank` keep their expandable sub-rows. The collapsible `.bank-panel-head` panels are gone
+> (REQ-BANK-050). UI only — no endpoint, DTO, audit or metric change.
 
 **Acceptance**
 
@@ -642,9 +669,14 @@ in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
 - [x] All confirmation flows (close account, wipe reset, reversal) use KRT modals.
 - [x] Each bank page visually matches its final-draft mockup (dashboard D1, detail K1,
   management W1 + G1/G2, admin A1 + A2) and reuses the design-system bank component
-  classes instead of bespoke CSS.
+  classes instead of bespoke CSS. Since 2026-10-03 the binding reference for the dashboard, both
+  account details, the queue, the Verwaltung, the holder detail and the grants page is the website
+  overhaul hand-off (Bank L1–L5).
+- [x] Both account-detail pages render from the shared fragment: head, four KPI tiles, tabs
+  „Buchungen (n)" + „Konto-Info" / „Ziel & Sichtbarkeit", booking rows with their details as
+  sub-lines (`BankAccountDetailPatternRenderTest`).
 
-**Enforced by:** `:frontend:check` (htmlhint/eslint/stylelint/prettier) over the bank templates · `BankInPlaceFragmentMvcTest` (single Kontobewegung entry point in `accountBody`) · **Code:** `static/css/bank.css`, `templates/bank-*.html`, `templates/fragments/bank-movement-modal.html`, `templates/fragments/scu-hint.html`, `templates/admin/bank*.html`, `static/js/bank.js` · **Issues:** #556, #997
+**Enforced by:** `:frontend:check` (htmlhint/eslint/stylelint/prettier) over the bank templates · `BankInPlaceFragmentMvcTest` (single Kontobewegung entry point in `accountBody`) · `BankAccountDetailPatternRenderTest`, `BankStaffPagesPatternRenderTest` · **Code:** `static/css/bank.css`, `static/css/bank-account-detail.css`, `static/css/pages/bank-*.css`, `templates/bank-*.html`, `templates/fragments/bank-account-detail.html`, `static/js/bank-account-detail.js`, `templates/fragments/bank-movement-modal.html`, `templates/fragments/scu-hint.html`, `templates/admin/bank*.html`, `static/js/bank.js` · **Issues:** #556, #997
 
 ### REQ-BANK-018 — API & persistence conventions
 
@@ -722,7 +754,7 @@ violations as `ERROR` log events with `correlationId`.
 - [x] The integrity job flags a synthetically corrupted ledger in tests, including a
   transaction missing its audit row (the summarized `WIPE_RESET` is excluded).
 
-**Enforced by:** `BankLedgerIntegrityServiceTest` (synthetic corruption incl. missing audit row), `BankReadNoNPlusOneTest` (statement-count bound), `DatabaseIndexMigrationTest` (composite indexes) · **Code:** `service/BankLedgerIntegrityService`, `task/BankLedgerIntegrityTask`, `db/migration/V150`+`V153` indexes · **Issues:** #556
+**Enforced by:** `BankLedgerIntegrityServiceTest` (synthetic corruption incl. missing audit row), `BankReadNoNPlusOneTest` (statement-count bound), `DatabaseIndexMigrationTest` (composite indexes) · **Code:** `bank/internal/BankLedgerIntegrityService`, `bank/internal/BankLedgerIntegrityTask`, `db/migration/V150`+`V153` indexes · **Issues:** #556
 
 ### REQ-BANK-021 — Org-unit officer/lead balance view
 
@@ -781,6 +813,16 @@ org-unit-blind.
 > live outside `#ou-acc-results` but inside the `orgUnitBank` fragment, so the checkbox keeps its
 > state across a layout swap and resets the filter on a request swap. Its `data-ou-view-*` attributes
 > are distinct from the dashboard's `data-bank-view-*` module so the two never cross-fire.
+>
+> **Amended 2026-10-03 (website overhaul phase 3):** the page uses the shared page head (eyebrow
+> „Organisation", title „Bank meiner Org-Einheit", the CTA „Antrag stellen"). The tabs read
+> „Konten (n) · Meine Anträge (n) · Anträge an unsere Konten (n)" — the third renamed from „Fremde
+> Anträge" (`bank.tab.foreignRequests`). In the card view each account is a card: the name as the
+> link plus a chevron, the account number · unit, the balance, the sparkline, the 30-day delta „· 30
+> Tage" and the target as a bar „63 % von 5.000.000" (or „— kein Ziel"); the card view has no separate
+> „Details" button any more, the table view keeps „Details & Verlauf" / „Details & Verwaltung". Below
+> the account list the Konten tab shows **„Laufende Anträge"** — the caller's own and the
+> to-be-approved pending requests with their approval path (REQ-BANK-041).
 
 **Acceptance**
 
@@ -801,7 +843,7 @@ org-unit-blind.
   (no by-Bereich grouping) that swaps the `orgUnitBankAccounts` sub-fragment in place, persisted in
   `localStorage` and re-applied after an `orgUnitBank` swap (frontend `OrgUnitBankPageControllerMvcTest`).
 
-**Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest`, frontend `OrgUnitBankPageControllerMvcTest`, frontend `BankPageControllerTest` (sparkline scaling) · **Code:** `service/OrgUnitBankAccessService`, `service/BankTrendCalculator`, `controller/OrgUnitBankController`, `model/dto/OrgUnitBankBalanceDto`, `repository/BankAccountRepository#findByOrgUnitId`, `repository/BankPostingRepository#postingSlicesSince`, frontend `controller/OrgUnitBankPageController`, frontend `controller/BankSparkline`, `templates/org-unit-bank.html`, `templates/fragments/org-unit-bank-views.html`, `static/js/bank.js` (org-unit view-toggle module), `static/css/bank.css` · **Issues:** #666, #668, #669
+**Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest`, frontend `OrgUnitBankPageControllerMvcTest`, frontend `BankPageControllerTest` (sparkline scaling) · **Code:** `bank/internal/OrgUnitBankAccessService`, `bank/internal/BankTrendCalculator`, `bank/web/OrgUnitBankController`, `bank/internal/OrgUnitBankBalanceDto`, `bank/internal/BankAccountRepository#findByOrgUnitId`, `bank/internal/BankPostingRepository#postingSlicesSince`, frontend `controller/OrgUnitBankPageController`, frontend `controller/BankSparkline`, `templates/org-unit-bank.html`, `templates/fragments/org-unit-bank-views.html`, `static/js/bank.js` (org-unit view-toggle module), `static/css/bank.css` · **Issues:** #666, #668, #669
 
 ### REQ-BANK-022 — Confirm-before-post booking requests: create & cancel
 
@@ -834,7 +876,7 @@ raised against a `CLOSED` account.
 - [x] Request form (no holder field) + own-status list with a cancel action on the slim page,
   AJAX no-reload (frontend `OrgUnitBankPageControllerMvcTest`).
 
-**Enforced by:** `BankBookingRequestServiceTest`, `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTest` · **Code:** `service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `model/BankBookingRequest`, `db/migration/V159`, frontend `controller/OrgUnitBankProxyController`, `templates/org-unit-bank.html`, `static/js/bank.js` · **Issues:** #666, #670, #672
+**Enforced by:** `BankBookingRequestServiceTest`, `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTest` · **Code:** `bank/internal/OrgUnitBankAccessService`, `bank/internal/BankBookingRequestService`, `bank/internal/BankBookingRequest`, `db/migration/V159`, frontend `controller/OrgUnitBankProxyController`, `templates/org-unit-bank.html`, `static/js/bank.js` · **Issues:** #666, #670, #672
 
 ### REQ-BANK-023 — Booking-request confirmation/rejection by bank staff
 
@@ -865,6 +907,44 @@ raised against a `CLOSED` account.
 > since a direct booking is not a request).
 >
 > **Amended (2026-07-05) — status filters as checkboxes:** the parallel status filters render as **independent checkboxes** (Ausstehend / Bestätigt / Abgelehnt / Zurückgezogen) instead of filled orange toggle chips, so an active filter no longer shouts. The behaviour is unchanged — each is independent, the selection persists per user in `localStorage` and replays through the multi-valued `status` query parameter (`NONE` sentinel = all off), defaulting to only Ausstehend — only the control and its styling change (`bank.js` reads each checkbox's `checked` state on `change`, not a button's `aria-pressed`).
+>
+> **Amended 2026-10-03 (website overhaul phase 3) — one status segment, supersedes the two filter
+> amendments above:** the checkboxes are replaced by one segmented control **„Ausstehend n · Bestätigt
+> n · Abgelehnt n · Alle"** (single choice, default Ausstehend; the „Kein Status-Filter aktiv" empty
+> state is gone with the `NONE` sentinel). `status` now names one segment — `PENDING`, `CONFIRMED`,
+> `REJECTED` or `ALL`; `ALL` lists all four states, so withdrawn requests („Zurückgezogen") appear only
+> there. An old multi-valued value is mapped: one of the three counted states selects its segment, any
+> other combination of known states (a lone `CANCELLED` included) selects `ALL`, and a blank, unknown
+> or `NONE` value opens `PENDING`. The choice stays persisted per user under the same key
+> (`bank_request_status_filter_<uid>`); a stored checkbox list migrates by the same mapping
+> (`bank-requests.js`). The Ausstehend count comes from the pending page itself, the other two from one
+> single-entry read each unless their segment is shown. The toolbar's right side counts **„n warten
+> auf dich"**: the pending requests that need no owner approval or already carry it, i.e. the ones a
+> bank employee can decide now (`BankRequestQueuePageController#awaitsTheBank`, counted within the
+> queue's 200-row page). A row shows the type chip, „Einzahler → Konto" / „Konto → Empfänger" /
+> „Konto → Zielkonto", the account number and the quoted **Begründung** as its sub-line, the requester
+> with the time, the amount, the status chip, and in the decision column: for a request that can be
+> decided, a `.btn-success.btn-xs` **„Bestätigen"** and a ghost **„Ablehnen"** (the row carries an
+> accent edge); for one still waiting on an owner approval, **„wartet auf <Kontoverantwortliche |
+> Bankleitung | Organisationsleitung>"** plus a „→ <approver>" warning chip at the amount and a ⋯ menu
+> with **„Bestätigen, Freigabe liegt vor …"** (the confirm dialog with the mandatory approval
+> checkbox of REQ-BANK-041) and „Ablehnen"; for a decided one, the decider. Only Notiz and Notiz
+> Bankmitarbeiter remain in the expandable sub-row. The page-level direct-booking button reads
+> „Kontobewegung erfassen" (outline).
+>
+> **Amended 2026-10-04 — the confirm action follows the caller's capability:** every row of
+> `GET /api/v1/bank/requests` carries **`callerMayConfirm`** (`BankBookingRequestDto`, `null` on every
+> other read of that DTO): `true` exactly when the request is `PENDING` and the caller passes the same
+> capability check the confirm endpoint enforces — `BankSecurityService#canConfirm`, i.e. management,
+> or a grant on the request's account with `can_deposit` / `can_withdraw` / `can_transfer` matching
+> its type. The queue evaluates it through `BankSecurityService#confirmCheck`, one read of the
+> caller's grants per page, so the read stays statement-bounded (REQ-DATA-003). The over-limit
+> attestation stays a confirm-time input and is not part of the flag. The page offers „Bestätigen"
+> (and the attested „Bestätigen, Freigabe liegt vor …") **only where `callerMayConfirm` is true**; a
+> ready row the caller may not confirm says **„wartet auf berechtigte Bankmitarbeiter"** and keeps
+> only „Ablehnen" in its ⋯ menu (rejection still needs visibility alone), loses the accent edge, and
+> no longer counts toward „n warten auf dich" (`BankRequestQueuePageController#awaitsTheCaller`). The
+> confirm endpoint itself is unchanged and still answers 403 when the capability is missing.
 
 A **bank employee** confirms or rejects a `PENDING` request under
 `/api/v1/bank/requests/**` (`BANK_EMPLOYEE` URL+method gate). **Confirmation** records the
@@ -890,16 +970,25 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
 - [x] The queue's account column leads with the account's display name (`accountName`) for
   readability, with the account number shown small underneath; the org-unit shorthand is dropped
   from this column (frontend `BankRequestQueuePageControllerMvcTest`).
-- [x] The queue is one table with parallel status-filter checkboxes (default Ausstehend), the
-  selection saved per user; an empty selection shows a distinct hint, and each request row expands to
-  show its Begründung + Notiz (frontend `BankRequestQueuePageControllerMvcTest`,
-  `BankRequestControllerTest`, `BankBookingRequestServiceTest`).
+- [x] The queue is one table under the status segment „Ausstehend · Bestätigt · Abgelehnt · Alle"
+  (default Ausstehend, counts on the first three, legacy `status` lists mapped onto a segment), the
+  choice saved per user; the Begründung stands in the row, Notiz + Notiz Bankmitarbeiter expand
+  (frontend `BankRequestQueuePageControllerMvcTest`, `BankRequestQueueSegmentTest`,
+  `BankRequestsPatternRenderTest`, `BankRequestControllerTest`, `BankBookingRequestServiceTest`).
+- [x] „n warten auf dich" counts the pending requests without an open owner approval; such a row
+  offers „Bestätigen" / „Ablehnen", a row waiting on an approval names the approver and keeps the
+  attested confirm in its ⋯ menu.
+- [x] Each queue row carries `callerMayConfirm`, decided by the confirm endpoint's own capability
+  check with one grant read per page; the confirm actions render only where it is true, and such a
+  row neither counts as waiting for the caller nor carries the accent edge (`BankSecurityServiceTest`,
+  `BankBookingRequestServiceTest`, `BankRequestControllerTest`, `BankReadNoNPlusOneTest`,
+  `BankRequestsPatternRenderTest`, `BankRequestQueueSegmentTest`).
 - [x] The queue header carries a page-level **Kontobewegung** CTA (when an active account exists) that
   opens the shared unified movement modal with a source-account selector and books directly via the
   existing endpoints — no new endpoint/audit/metric (frontend
   `BankRequestQueuePageControllerMvcTest`).
 
-**Enforced by:** `BankBookingRequestServiceTest`, `BankRequestControllerTest`, frontend `BankRequestQueuePageControllerMvcTest` · **Code:** `service/BankBookingRequestService`, `controller/BankRequestController`, frontend `controller/BankRequestQueuePageController`, `controller/BankProxyController`, `templates/bank-requests.html`, `templates/fragments/bank-movement-modal.html` · **Issues:** #666, #671, #672, #997
+**Enforced by:** `BankBookingRequestServiceTest`, `BankRequestControllerTest`, frontend `BankRequestQueuePageControllerMvcTest` · **Code:** `bank/internal/BankBookingRequestService`, `bank/web/BankRequestController`, frontend `controller/BankRequestQueuePageController`, `controller/BankProxyController`, `templates/bank-requests.html`, `templates/fragments/bank-movement-modal.html` · **Issues:** #666, #671, #672, #997
 
 ### REQ-BANK-024 — Off-ledger requests: audit & ledger-integrity isolation
 
@@ -922,7 +1011,7 @@ sweep.
   `AdminAuditLogPageController.EVENT_TYPES_BY_DOMAIN` + `admin.bank.audit.event.BOOKING_REQUEST_*`
   i18n labels.
 
-**Enforced by:** `db/migration/V159`, `BankBookingRequestServiceTest` (audit on each transition) · **Code:** `model/BankBookingRequest`, `model/BankAuditEventType` · **Issues:** #666, #673
+**Enforced by:** `db/migration/V159`, `BankBookingRequestServiceTest` (audit on each transition) · **Code:** `bank/internal/BankBookingRequest`, `bank/internal/BankAuditEventType` · **Issues:** #666, #673
 
 ### REQ-BANK-025 — Close-account guard & org-unit-feature role matrix
 
@@ -944,10 +1033,16 @@ confirm/reject/queue surface; the audit log stays admin-only.
   officer/lead page. The per-action capability + audit admin-only invariants are additionally
   pinned by the backend tests.
 
-**Enforced by:** `BankAccountServiceTest`, `BankBookingRequestServiceTest`, frontend `OrgUnitBankPageControllerMvcTest` / `BankRequestQueuePageControllerMvcTest`, e2e `BankOrgUnitRequestsE2eTest` · **Code:** `service/BankAccountService#closeAccount`, `exception/BankConflictException` · **Issues:** #666, #673
+**Enforced by:** `BankAccountServiceTest`, `BankBookingRequestServiceTest`, frontend `OrgUnitBankPageControllerMvcTest` / `BankRequestQueuePageControllerMvcTest`, e2e `BankOrgUnitRequestsE2eTest` · **Code:** `bank/internal/BankAccountService#closeAccount`, `exception/BankConflictException` · **Issues:** #666, #673
 
 ### REQ-BANK-026 — Notifications on booking-request lifecycle
 
+> **Amended 2026-10-10 (#2413):** a requester's correction (REQ-BANK-056) replaces the open notices
+> with `BANK_BOOKING_REQUEST_UPDATED` for the same recipients, so the decision events now clear both
+> `…_CREATED` and `…_UPDATED` (`BankBookingRequestEvent.OPEN_REQUEST_NOTICES`). A change of the
+> account's responsible holders moves each open request's notice from the former to the new holders
+> (REQ-BANK-034, REQ-NOTIF-023).
+>
 > **Amended (responsible-holder notifications, REQ-BANK-034, owner request):** the account's
 > **responsible holder** (Kontoverantwortliche) is now also notified when a request on their account
 > is **created or decided**. A new **`ACCOUNT_RESPONSIBLE`** selector resolves the responsible
@@ -1005,9 +1100,9 @@ admin-editable at runtime.
 
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`,
 `NotificationCreationServiceTest` · **Code:**
-`event/BankBookingRequest{Created,Confirmed,Rejected,Cancelled}Event`,
+`bank/api/events/BankBookingRequest{Created,Confirmed,Rejected,Cancelled}Event`,
 `service/RecipientResolutionService#resolveAccountGrantHolders`,
-`service/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
+`bank/internal/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
 `model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`, `db/migration/V160`,
 `db/migration/V161`, `db/migration/V194`;
 lifecycle-close removal in REQ-NOTIF-018 · **Issues:** #666, #673, #1252
@@ -1070,9 +1165,9 @@ foreign-Bereich exclusion, view-based request eligibility per REQ-BANK-039),
 `OwnerScopeServiceTest` (`CurrentOversightScopeTests` cascade, `CurrentOwnLevelOversightScopeTests`,
 `CanAccessBlueprintOverviewTests` Bereich/OL), `BankAccountServiceTest` (AREA→Bereich / CARTEL→OL
 creation + cardinality), `V168BankAreaCartelLinkageMigrationTest` (CHECK relax + one-account-per-org-unit),
-`ArchitectureTest` (both bank pins) · **Code:** `service/OrgUnitBankAccessService`,
-`service/OwnerScopeService` (`currentOversightScope` / `currentOwnLevelOversightScope`),
-`service/BankAccountService`, `db/migration/V168`, `controller/OrgUnitController#listActiveOrgUnitsAllKinds`,
+`ArchitectureTest` (both bank pins) · **Code:** `bank/internal/OrgUnitBankAccessService`,
+`service/OwnerScopeService#currentOversightScope` (the own-level scope was removed 2026-10-10, unused since REQ-BANK-039),
+`bank/internal/BankAccountService`, `db/migration/V168`, `controller/OrgUnitController#listActiveOrgUnitsAllKinds`,
 `templates/bank-manage.html` + `static/js/bank.js`, `templates/org-unit-bank.html` ·
 **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md) · **Issues:** #692, #699.
 
@@ -1089,7 +1184,8 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
   `SPECIAL` account on the page. Special accounts belong to no org unit, so they are matched by **type**
   (not by the oversight cascade) and are strictly **view-only**: `canRequest` is always `false` and the
   F2 create path rejects them (no owning org unit to scope). **Officers and SK leads do not** see
-  special accounts — only Bereich/OL/admin do (`OwnerScopeService.currentUserHasAreaOrOlOversight()`).
+  special accounts — only Bereich/OL/admin do (narrowed by REQ-BANK-037 below; the original
+  `OwnerScopeService.currentUserHasAreaOrOlOversight()` predicate was removed 2026-10-10, unused).
   This widens the *view* only; it grants no deposit/withdrawal/booking-request capability on those
   accounts.
 - **Only active accounts are listed.** The page lists `ACTIVE` accounts exclusively — a `CLOSED`
@@ -1102,7 +1198,8 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
 > members or bank management may **grant** further Sonderkonto visibility (global roles / all members /
 > individual users, REQ-BANK-035), and a Sonderkonto now supports the read-only drill-in + statement
 > (REQ-BANK-038), not just a balance card. The seam helper is `currentUserIsOlMember()` /
-> `currentUserIsBereichsleiter()` (not the broader `currentUserHasAreaOrOlOversight()`).
+> `currentUserIsBereichsleiter()` (the broader `currentUserHasAreaOrOlOversight()` is gone since
+> 2026-10-10).
 
 **Acceptance**
 
@@ -1121,8 +1218,8 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
 **Enforced by:** `OrgUnitBankAccessServiceTest` (special-account view-only + active-only filter),
 `OwnerScopeServiceTest` (`CurrentUserHasAreaOrOlOversightTests`), `OrgUnitBankControllerTest`, frontend
 `OrgUnitBankPageControllerMvcTest`, `ArchitectureTest` (both bank pins) · **Code:**
-`service/OrgUnitBankAccessService#listOverseenOrgUnitBalances`,
-`service/OwnerScopeService#currentUserHasAreaOrOlOversight`, `model/dto/OrgUnitBankBalanceDto`, frontend
+`bank/internal/OrgUnitBankAccessService#listOverseenOrgUnitBalances`,
+`service/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter`, `bank/internal/OrgUnitBankBalanceDto`, frontend
 `templates/org-unit-bank.html` · **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md)
 (amendment) · **Issues:** #666, #692.
 
@@ -1149,7 +1246,7 @@ reconcile; management may still register any tool user as a custodian.
 - [x] The reconcile never hard-deletes a holder and never alters a manual holder's
   `role_managed = false`.
 
-**Enforced by:** `BankHolderReconciliationServiceTest`, `BankHolderServiceTest` · **Code:** `service/BankHolderReconciliationService`, `service/UserSyncService` (sync hook), `task/UserSyncTask`, `repository/UserRepository#findUserIdsByRoleCode`, `model/BankHolder`, `db/migration/V182` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
+**Enforced by:** `BankHolderReconciliationServiceTest`, `BankHolderServiceTest` · **Code:** `bank/internal/BankHolderReconciliationService`, `service/UserSyncService` (sync hook), `task/UserSyncTask`, `repository/UserRepository#findUserIdsByRoleCode`, `bank/internal/BankHolder`, `db/migration/V182` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
 
 ### REQ-BANK-030 — Employee bank-administration access (Sonderkonten + holder menu)
 
@@ -1178,7 +1275,7 @@ Bank **employees** reach the bank-administration page (`/bank/manage`) and its s
   registration / (de)activation and grant management remain 403 for employees.
 - [x] The sidebar shows the management entry to employees; the audit log stays admin-only.
 
-**Enforced by:** `BankControllerSecurityTest`, `BankAccountServiceTest` (employee SPECIAL-only + auto-grant), frontend `BankManagePageControllerTest` · **Code:** `service/BankAccountService`, `service/BankSecurityService`, `controller/BankAccountController`, frontend `controller/BankManagePageController`, `templates/bank-manage.html` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
+**Enforced by:** `BankControllerSecurityTest`, `BankAccountServiceTest` (employee SPECIAL-only + auto-grant), frontend `BankManagePageControllerTest` · **Code:** `bank/internal/BankAccountService`, `bank/internal/BankSecurityService`, `bank/web/BankAccountController`, frontend `controller/BankManagePageController`, `templates/bank-manage.html` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
 
 ### REQ-BANK-031 — Holder→holder Umbuchung (reconciliation)
 
@@ -1219,7 +1316,7 @@ in the unified activity audit (REQ-AUDIT-001).
   holder overdraft); same source/destination holder is rejected.
 - [x] It is reachable by `BANK_EMPLOYEE` without an account grant; a plain member is 403; it writes a `HOLDER_TRANSFER` audit event (detail carries the fee, amounts only).
 
-**Enforced by:** `BankLedgerServiceTest` (tiny fee-free Umbuchung, deactivated/negative allowed), `BankHolderTransferFeeTest` (fee borne by CARTEL, missing/closed/overdraft reject, reversal negates all three legs, integrity sweep sound), `BankControllerSecurityTest` · **Code:** `service/BankLedgerService#bookHolderTransfer`, `service/BankLedgerIntegrityService` + `repository/BankTransactionRepository#findTransferTransactionsWithNonZeroSum` (integrity now covers HOLDER_TRANSFER), `controller/BankHolderController`, `model/dto/request/BankHolderTransferRequest`, `model/BankTransactionType`, `model/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) (amended by #998), [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (amended by #998), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556, #998
+**Enforced by:** `BankLedgerServiceTest` (tiny fee-free Umbuchung, deactivated/negative allowed), `BankHolderTransferFeeTest` (fee borne by CARTEL, missing/closed/overdraft reject, reversal negates all three legs, integrity sweep sound), `BankControllerSecurityTest` · **Code:** `bank/internal/BankLedgerService#bookHolderTransfer`, `bank/internal/BankLedgerIntegrityService` + `bank/internal/BankTransactionRepository#findTransferTransactionsWithNonZeroSum` (integrity now covers HOLDER_TRANSFER), `bank/web/BankHolderController`, `bank/internal/BankHolderTransferRequest`, `bank/internal/BankTransactionType`, `bank/internal/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) (amended by #998), [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (amended by #998), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556, #998
 
 ### REQ-BANK-032 — Holder custody history (own for employees, all for management)
 
@@ -1266,7 +1363,14 @@ bank owes them, so their own money exceeds the entered balance.
   (= the custody total) and the own private money (= balance − custody total) live and client-side;
   nothing is persisted.
 
-**Enforced by:** `BankSecurityServiceTest` (canSeeHolder: management-any / employee-own-only), `BankHolderServiceTest` (account & counter-holder annotation, 404), `BankControllerSecurityTest` (holder-history gate), frontend `BankPageControllerTest` / `BankHolderDetailFragmentMvcTest`, `BankManagePageControllerTest` (selfUserId = OIDC sub, not preferred_username), `BankHolderSelfLinkRenderMvcTest` (employee links own holder only) · **Code:** `service/BankHolderService#getHolder/#getHolderBookings`, `service/BankSecurityService#canSeeHolder`, `controller/BankHolderController`, `repository/BankHolderPostingRepository#findHolderBookings`, `model/projection/BankHolderBookingRow`, `model/dto/BankHolderBookingDto`, frontend `controller/BankPageController`, `controller/BankManagePageController` (holder self-link selfUserId), `templates/bank-holder-detail.html`, `templates/bank-manage.html`, `static/js/bank.js` (balance-split calculator) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
+*Amended 2026-10-03 (website overhaul phase 3):* the holder detail uses the shared page head (eyebrow
+„Verwaltung" linking back to the holder tab, the holder's name as title, chips for active/inactive and
+auto/manual), two KPI tiles („Hält gesamt", „Buchungen") and the calculator as a compact card whose
+result is a `.stack-bar` — „Bank-reserviert" against „Privat (eigenes Geld)", the reserved share
+capped at the entered balance — with both amounts in the legend; the history follows as „Halter-
+Buchungen". Behaviour and gate unchanged.
+
+**Enforced by:** `BankSecurityServiceTest` (canSeeHolder: management-any / employee-own-only), `BankHolderServiceTest` (account & counter-holder annotation, 404), `BankControllerSecurityTest` (holder-history gate), frontend `BankPageControllerTest` / `BankHolderDetailFragmentMvcTest`, `BankManagePageControllerTest` (selfUserId = OIDC sub, not preferred_username), `BankHolderSelfLinkRenderMvcTest` (employee links own holder only) · **Code:** `bank/internal/BankHolderService#getHolder/#getHolderBookings`, `bank/internal/BankSecurityService#canSeeHolder`, `bank/web/BankHolderController`, `bank/internal/BankHolderPostingRepository#findHolderBookings`, `bank/internal/BankHolderBookingRow`, `bank/internal/BankHolderBookingDto`, frontend `controller/BankPageController`, `controller/BankManagePageController` (holder self-link selfUserId), `templates/bank-holder-detail.html`, `templates/bank-manage.html`, `static/js/bank.js` (balance-split calculator figures), `static/js/bank-holder-detail.js` (its bar) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
 ### REQ-BANK-033 — In-game transfer fee on holder-initiated transfers
 
@@ -1349,7 +1453,7 @@ superseding the carve-out model of ADR-0041):
   `BANK_FEE_EXCEEDS_AMOUNT`; a booking request never carries the flag (confirmation books on-top);
   the preview shows "wird abgebucht" and "kommt an" for the selected mode; default is off.
 
-**Enforced by:** `BankLedgerServiceTest` (fee added on top / fee-inclusive debit + amount−fee to destination + BANK_FEE_EXCEEDS_AMOUNT, full amount to destination, overdraft against the actual debit, same-holder + holder-Umbuchung fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding + `totalDebit`), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankInPlaceFragmentMvcTest` (fee-inclusive toggle renders) / `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService` (`feeOn` + `totalDebit`), `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/dto/request/BankWithdrawalRequest` + `BankTransferRequest` (`feeInclusive`), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/fragments/bank-movement-modal.html`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556, #999
+**Enforced by:** `BankLedgerServiceTest` (fee added on top / fee-inclusive debit + amount−fee to destination + BANK_FEE_EXCEEDS_AMOUNT, full amount to destination, overdraft against the actual debit, same-holder + holder-Umbuchung fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding + `totalDebit`), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankInPlaceFragmentMvcTest` (fee-inclusive toggle renders) / `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `bank/internal/BankTransferFeeService` (`feeOn` + `totalDebit`), `bank/internal/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `bank/internal/BankWithdrawalRequest` + `BankTransferRequest` (`feeInclusive`), `bank/internal/BankTransaction#transferFee`, `bank/web/BankBookingController#getTransferFeeRate`, `bank/internal/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/fragments/bank-movement-modal.html`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556, #999
 
 ### REQ-BANK-034 — Per-account responsible holder (derived, "Kontoverantwortliche/r")
 
@@ -1379,7 +1483,8 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > `resolveResponsibleHolderUserIds(CARTEL)` — used only to *notify* — returns **all `OL_MEMBER`s**; the
 > middle-band Bankleitung is a `BANK_MANAGEMENT` Keycloak role (not an org-unit membership) so it is not
 > notified via this seam but picks the request up in its bank-staff queue (ADR-0109). Each approver
-> still sees only its own band in „Fremde Anträge".
+> still sees only its own band in „Anträge an unsere Konten" (the org-unit bank tab called „Fremde
+> Anträge" until 2026-10-03).
 >
 > **Amended by ADR-0070 (responsible-holder change audit):** a **change** of an account's derived
 > responsible holder is now recorded in the admin bank audit log (REQ-BANK-012) as
@@ -1403,8 +1508,20 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > `ON DELETE CASCADE`. The bank stays org-unit-blind for **authorization**: all bank access stays
 > inside the seam (both ArchUnit pins hold), reached from the membership/user services via an
 > `ObjectProvider` to break the constructor cycle.
+>
+> **Amended 2026-10-10 (#2413, notifications on a holder change):** the same diff now also tells the
+> people concerned. Every member who **became** a responsible holder receives
+> `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` („Du bist jetzt für Konto {accountNo} verantwortlich …") with the
+> number of open requests waiting for a responsible holder's approval (`PENDING`, approval required,
+> not yet granted, approver class `RESPONSIBLE_HOLDER`); the actor is excluded (seed V269). Every open
+> request on the account then **follows the holders**: a `BankBookingRequestNoticesReconciledEvent`
+> per request reconciles its open notice for exactly the members who became or stopped being holders
+> against the rules of a newly created request (REQ-NOTIF-023) — a new holder gets the notice, a
+> former holder loses it unless the bank management or an account grant still reaches them, and every
+> other recipient is left alone. A holder change with no added holder (only a departure) tells nobody
+> and only reconciles.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `service/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `service/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserDeletionService#deleteUser`, `repository/BereichRepository#findByDepartment`, `repository/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit + assignment and reconcile events), `NotificationCreationServiceTest` (reconcile), `NotificationRuleEngineIntegrationTest` (V269 rule), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `bank/internal/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `service/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserDeletionService#deleteUser`, `repository/BereichRepository#findByDepartment`, `bank/internal/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
 
 ### REQ-BANK-035 — Configurable balance visibility
 
@@ -1449,7 +1566,7 @@ configurable (Staffel/SK/Bereich/Sonderkonto), without being the responsible hol
 (always all-members) and `CARTEL_BANK` (internal) audiences stay fixed (REQ-BANK-037) — there is nothing
 to configure there, not even for an admin.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (canView per type: oversight / membership-role grant / all-members / individual / global-role for SPECIAL; admin override), `OrgUnitBankPageControllerMvcTest`, `OrgUnitBankVisibilityAudienceLabelMvcTest` (the all-members label names the org unit on ORG_UNIT/AREA and stays org-wide on SPECIAL) · **Code:** `model/BankAccountViewGrant`, `repository/BankAccountViewGrantRepository`, `service/OrgUnitBankAccessService` (authorization), `service/OrgUnitBankVisibilityService` (grant/revoke + audit), `controller/OrgUnitBankController`, `db/migration/V189`, frontend `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (canView per type: oversight / membership-role grant / all-members / individual / global-role for SPECIAL; admin override), `OrgUnitBankPageControllerMvcTest`, `OrgUnitBankVisibilityAudienceLabelMvcTest` (the all-members label names the org unit on ORG_UNIT/AREA and stays org-wide on SPECIAL) · **Code:** `bank/internal/BankAccountViewGrant`, `bank/internal/BankAccountViewGrantRepository`, `bank/internal/OrgUnitBankAccessService` (authorization), `bank/internal/OrgUnitBankVisibilityService` (grant/revoke + audit), `bank/web/OrgUnitBankController`, `db/migration/V189`, frontend `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-036 — Balance target ("Kontostandsziel")
 
@@ -1461,7 +1578,7 @@ it echoes the account's `@Version` (the
 target shares the row's optimistic lock with rename/close — both infrequent) and is audited
 (`BALANCE_TARGET_SET` / `BALANCE_TARGET_CLEARED`). The target enforces nothing; it is a display goal.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (holder-only set, version check), `BankAccountServiceTest` (bank-staff set/clear + audit) · **Code:** `model/BankAccount#balanceTarget`, `service/OrgUnitBankAccessService#setBalanceTarget`, `service/BankAccountService#setBalanceTarget`, `controller/OrgUnitBankController` / `BankAccountController`, `db/migration/V189` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (holder-only set, version check), `BankAccountServiceTest` (bank-staff set/clear + audit) · **Code:** `bank/internal/BankAccount#balanceTarget`, `bank/internal/OrgUnitBankAccessService#setBalanceTarget`, `bank/internal/BankAccountService#setBalanceTarget`, `bank/web/OrgUnitBankController` / `BankAccountController`, `db/migration/V189` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-037 — Fixed cartel/special visibility (KRT account & Sonderkonten)
 
@@ -1476,7 +1593,7 @@ Two account groups have **fixed** (non-holder-configurable) visibility on the or
   **tightens** the prior REQ-BANK-028 rule (which granted SPECIAL to all Bereich oversight ranks):
   Bereichskoordinatoren/-operatoren and officers no longer auto-see Sonderkonten.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `service/OrgUnitBankAccessService#canView`, `service/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/OrgUnitBankAccessService#canView`, `service/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-038 — Read-only account drill-in (history + redacted statement)
 
@@ -1537,8 +1654,22 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 > `visibilityConfigurable` / the approval-limit editor's `canEdit`), and the grid keeps the
 > `org-unit-bank-settings` testid so the `orgUnitBankSettings` swap target and the tests still resolve
 > the region.
+>
+> **Amended 2026-10-03 (website overhaul phase 3) — supersedes the tab names and the untabbed viewer
+> layout above:** the drill-in is built from the shared account-detail fragment (REQ-BANK-017). Every
+> viewer now gets a tab bar: **„Buchungen (n)"** (default, the chart card and the Halter-redacted
+> history) and a second tab — **„Ziel & Sichtbarkeit"** for the manage-capable caller (`settings !=
+> null`; formerly „Verantwortung & Sichtbarkeit", the same three tiles, now `.card`s) or **„Konto-Info"**
+> for a plain viewer (number, type, org unit, Bereich, status, created). A plain viewer's read-only
+> approval limits stand above the tab bar; the KRT ladder card („Freigabe-Stufen", REQ-BANK-047) sits
+> in the second tab. The head carries the ghost „Kontoauszug" (when `canExportStatement`) and the CTA
+> **„Antrag stellen"**, which opens the booking-request dialog for **this account only** (its source
+> list is the drill-in account; deposits for any viewer, withdrawals and transfers when the caller may
+> debit it, with the same limit warning as on `/org-unit-bank`) and refreshes `orgUnitBankSettings` on
+> success. The last tab is remembered per user (`org_unit_bank_account_tab_<user>`). Endpoints,
+> versions, redaction and the swap seams are unchanged.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` (two tabs for a manager; untabbed for a plain viewer with no limits) · **Code:** `service/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `service/BankStatementReportService#generateStatement(..., redactHolders)`, `model/dto/OrgUnitBankAccountDetailDto`, `controller/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` (Buchungen + Ziel & Sichtbarkeit for a manager; Buchungen + Konto-Info, no settings, for a plain viewer), `BankAccountDetailPatternRenderTest` · **Code:** `bank/internal/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `bank/internal/BankStatementReportService#generateStatement(..., redactHolders)`, `bank/internal/OrgUnitBankAccountDetailDto`, `bank/web/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-039 — Booking-request eligibility = view eligibility
 
@@ -1558,7 +1689,7 @@ at all. The bank stays org-unit-blind: eligibility is decided in the `OrgUnitBan
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate replaces own-level on create; a
 view-granted member may request), `ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`) ·
-**Code:** `service/OrgUnitBankAccessService#createBookingRequest` / `#isRequestCapable` ·
+**Code:** `bank/internal/OrgUnitBankAccessService#createBookingRequest` / `#isRequestCapable` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
 
 ### REQ-BANK-040 — User-initiated transfer requests
@@ -1582,8 +1713,8 @@ transfer request to an account they cannot see permanently unconfirmable rather 
 **Enforced by:** `BankBookingRequestServiceTest` (transfer confirm books via `bookTransfer`;
 confirmable even when the employee cannot see the destination; capability gate on the source),
 `OrgUnitBankAccessServiceTest` (transfer carries its destination) · **Code:**
-`model/BankBookingRequestType#TRANSFER`,
-`model/BankBookingRequest#targetAccount`, `service/BankBookingRequestService` (`create` / `confirm`),
+`bank/api/BankBookingRequestType#TRANSFER`,
+`bank/internal/BankBookingRequest#targetAccount`, `bank/internal/BankBookingRequestService` (`create` / `confirm`),
 `db/migration/V193`, frontend `templates/org-unit-bank.html` + `bank-requests.html` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
 
@@ -1668,8 +1799,8 @@ boolean.
 
 **Who configures limits — and where:** the account's responsible holder (REQ-BANK-034), **bank
 management** and **admin** — never a plain bank employee. Configuration happens **exclusively on the
-org-unit bank settings surface** (the *Verantwortung & Sichtbarkeit* tab of the org-unit
-account-detail page, alongside the visibility settings). The **bank-staff account-detail page**
+org-unit bank settings surface** (the *Ziel & Sichtbarkeit* tab — *Verantwortung & Sichtbarkeit*
+until 2026-10-03 — of the org-unit account-detail page, alongside the visibility settings). The **bank-staff account-detail page**
 (`/bank/accounts/{id}`) shows limits **read-only to every viewer**, including management/admin — it
 never offers the editor: the backend assembles that surface's limits with `canEdit = false`
 unconditionally (`BankAccountService#getAccountDetail`). Limits are thus shown read-only in both
@@ -1679,7 +1810,8 @@ ceilings, so the box carries **no management-only gate** on that surface, and it
 **own always-visible tile** above the collapsible Konto-Info panel rather than nested inside it
 (amending the REQ-BANK-017 placement): the Konto-Info tile is `hidden` by default and re-collapses
 on every `accountBody` swap, which buried the one figure the employee needs behind a click they had
-no reason to make.
+no reason to make. *Amended 2026-10-03 (website overhaul phase 3):* Konto-Info is now a tab, and the
+limits tile stands between the KPI tiles and the tab bar, visible on both tabs.
 Setting/clearing a limit is audited (`APPROVAL_LIMIT_SET` / `APPROVAL_LIMIT_CLEARED`).
 
 **Two-step approval.** When a request exceeds the requester's limit — **or when no limit applies to
@@ -1687,7 +1819,8 @@ the requester at all** (amended) — it is flagged `requires_owner_approval`; th
 warning that it must be approved first. **A request by the account's responsible holder is never
 flagged** (amended, ADR-0123), so neither step below runs for them and the request modal shows no
 warning. (1) The
-responsible holder may **grant approval in-app** from the new "Fremde Anträge" tab — the requests
+responsible holder may **grant approval in-app** from the „Anträge an unsere Konten" tab („Fremde
+Anträge" until 2026-10-03) — the requests
 raised against the accounts they are responsible for — recorded as `owner_approval_granted` (with
 who/when) and audited (`BOOKING_REQUEST_OWNER_APPROVAL_GRANTED` / `…_REVOKED`). (2) The bank employee
 sees an explicit warning in the confirmation dialog and must tick a mandatory
@@ -1703,8 +1836,14 @@ came from the employee checkbox alone (step (2) without step (1)) keeps `owner_a
 false` forever, so an action-worded chip would still demand an approval that is long settled. The
 queue's last column is headed **"Entscheidung"** rather than "Aktionen" for the same reason — it holds
 the confirm/reject buttons only while the request is `PENDING` and otherwise names the decider.
+*Amended 2026-10-03 (website overhaul phase 3):* while such a request is still `PENDING` and the
+approval is open, the queue shows instead where it waits — a warning chip „→ <approver>" at the amount
+and „wartet auf <approver>" in the decision column (approver = Kontoverantwortliche, Bankleitung or
+Organisationsleitung, from `requiredApprover`; a missing value reads as Kontoverantwortliche), with
+the employee's attested confirm moved into the row's ⋯ menu (REQ-BANK-023). „Über Limit" (muted) now
+marks only a decided request whose approval never came in-app; „Freigegeben" is unchanged.
 
-**The approver sees the Begründung too ("Fremde Anträge").** Each row of the approval tab carries the
+**The approver sees the Begründung too ("Anträge an unsere Konten", formerly "Fremde Anträge").** Each row of the approval tab carries the
 same **expandable Begründung + Notiz sub-row** as the bank-staff queue (REQ-BANK-023/-045): a leading
 chevron on rows that have either field, revealing an indented detail row with Begründung first. This
 is not cosmetic parity — the approver is the one *deciding*, and on a `CARTEL` / `CARTEL_BANK` /
@@ -1712,8 +1851,22 @@ is not cosmetic parity — the approver is the one *deciding*, and on a `CARTEL`
 approving without it visible would mean signing off blind. It reuses the document-delegated
 `bank-row-expand` handler and the account-detail chevron pattern; no new endpoint, JS module or i18n
 key. The detail id is prefixed `ou-foreign-req-` because a responsible holder who raised the request
-themselves sees that request in **both** tables of `/org-unit-bank` ("Meine Anträge" and "Fremde
-Anträge"), and a shared `bank-req-<id>` would let one row's chevron toggle the other's sub-row.
+themselves sees that request in **both** tables of `/org-unit-bank` ("Meine Anträge" and "Anträge
+an unsere Konten"), and a shared `bank-req-<id>` would let one row's chevron toggle the other's
+sub-row.
+
+**„Laufende Anträge" — the approval path on the Konten tab.** *Added 2026-10-03 (website overhaul
+phase 3).* Below the account list, `/org-unit-bank` lists every **pending** request that is the
+caller's own or awaits the caller's approval (the union of „Meine Anträge" and „Anträge an unsere
+Konten", de-duplicated, newest first; the section is absent when there is none). Each row shows the
+type chip, „Einzahler → Konto" / „Konto → Empfänger" / „Konto → Zielkonto" with the Begründung (else
+the Notiz) under it, the signed amount, and the **approval path** as a step chain: „Eingereicht", then
+— only when the request needs an owner approval — the required approver („Kontoverantwortliche",
+„Bankleitung" or „Organisationsleitung", falling back to „Freigabe" when the request names none), then
+„Bank". Done steps are green, the step the request waits on is bold, later steps are muted; a granted
+approval completes the approver step, so the bank's confirmation becomes current. The chain is
+derived in the frontend from the request's `requiresOwnerApproval` / `requiredApprover` /
+`ownerApprovalGranted` / `status` (`BankRequestSteps`); no new endpoint, field or audit event.
 
 The two approval acts (holder in-app grant, employee checkbox) are on **different surfaces seen by
 different users**, so they are outside the same-surface peer-sync scope (REQ-FE-010 live multi-user
@@ -1738,10 +1891,10 @@ forced `false` even for management,
 `BankAccountDetailLimitsMvcTest` (the read-only box renders for `BANK_EMPLOYEE` and for
 `BANK_MANAGEMENT` alike, outside the collapsed Konto-Info tile, and survives the `accountBody`
 swap) · **Code:**
-`model/BankAccountApprovalLimit`,
-`repository/BankAccountApprovalLimitRepository`, `service/BankApprovalLimitService`,
-`service/OrgUnitBankAccessService` (resolution + authorization), `service/OrgUnitBankApprovalLimitService`
-(upsert/clear + audit), `service/BankBookingRequestService`, `db/migration/V193`, frontend
+`bank/internal/BankAccountApprovalLimit`,
+`bank/internal/BankAccountApprovalLimitRepository`, `bank/internal/BankApprovalLimitService`,
+`bank/internal/OrgUnitBankAccessService` (resolution + authorization), `bank/internal/OrgUnitBankApprovalLimitService`
+(upsert/clear + audit), `bank/internal/BankBookingRequestService`, `db/migration/V193`, frontend
 `templates/fragments/bank-approval-limits.html` + `org-unit-bank.html` + `bank-requests.html` +
 `static/js/bank.js` (the `data-exempt` short-circuit in the live warning) ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md),
@@ -1795,7 +1948,7 @@ withdrawal/transfer, and no approval-limit warning is shown for a deposit.
 without consulting oversight scope or the limit rows; deposit never flags approval; destination
 rejected), `OrgUnitBankPageControllerMvcTest` (deposit picker lists all active accounts; CTA shown),
 `ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`), e2e `BankOrgUnitRequestsE2eTest` ·
-**Code:** `service/OrgUnitBankAccessService#createBookingRequest`, `controller/OrgUnitBankController`,
+**Code:** `bank/internal/OrgUnitBankAccessService#createBookingRequest`, `bank/web/OrgUnitBankController`,
 frontend `controller/OrgUnitBankPageController`, `templates/org-unit-bank.html`, `static/js/bank.js` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) (amendment) ·
 **Issues:** —
@@ -1873,10 +2026,10 @@ entering the bank) and never applies to a withdrawal or transfer.
 **Enforced by:** `BankLedgerSplitDepositTest` (split distribution, largest-remainder, exclude-named,
 100 %, no-targets, too-small, single holder leg), `BankBookingRequestServiceTest` (split request
 snapshot + confirm books a split), `OrgUnitBankAccessServiceTest` (deposit request carries the split)
-· **Code:** `service/BankLedgerService#bookSplitDeposit`,
-`model/dto/request/BankDepositRequest`, `model/dto/request/CreateBankBookingRequest`,
-`model/BankBookingRequest`, `repository/BankAccountRepository#findByTypeAndStatusOrderById`,
-`model/BankAuditEventType#DEPOSIT_SPLIT_BOOKED`, `db/migration/V196`, frontend
+· **Code:** `bank/internal/BankLedgerService#bookSplitDeposit`,
+`bank/internal/BankDepositRequest`, `bank/internal/CreateBankBookingRequest`,
+`bank/internal/BankBookingRequest`, `bank/internal/BankAccountRepository#findByTypeAndStatusOrderById`,
+`bank/internal/BankAuditEventType#DEPOSIT_SPLIT_BOOKED`, `db/migration/V196`, frontend
 `templates/bank-account-detail.html` / `org-unit-bank.html` / `bank-requests.html`,
 `static/js/bank.js` · **Issues:** —
 
@@ -1932,6 +2085,12 @@ user free text) and sets the structured `target_user_id` on `DEPOSIT_BOOKED` / `
 > counterparty, unified exactly as the PDFs already do. The **Begründung + Notiz** move out of their own
 > columns into an **expandable per-booking sub-row** (REQ-BANK-017/-045), reason first.
 >
+> **Amended 2026-10-03 (website overhaul phase 3):** on both account-detail tables the column is headed
+> **„Gegenpartei"** again (`bank.booking.party`; the PDFs keep „Quell-/Zielkonto") and shows the same
+> content — the counter-account with its direction arrow for a transfer, else the counterparty with
+> its unit — with Begründung, Notiz and Notiz Bankmitarbeiter as sub-lines under it instead of an
+> expandable sub-row (REQ-BANK-017).
+>
 > **Amended (2026-07-05, #994, owner-approved — supersedes the "tool user, no free-text" clause of the
 > [ADR-0054](../adr/0054-bank-transaction-counterparty.md) amendment; closes spec Open question #5):**
 > a deposit/withdrawal counterparty may now also be an **external party without a basetool account**,
@@ -1980,11 +2139,11 @@ for org-unit viewers), `OrgUnitMembershipQueryServiceTest` (`listDirectMembershi
 resolution), `BankBookingRequestServiceTest` (confirmed request records the requester + their primary
 org unit), `UserControllerTest`/`UserMembershipsSecurityTest` (`allKinds` delegation; `BANK_EMPLOYEE`
 reaches `/memberships`) · **Code:**
-`model/BankTransaction`, `model/dto/request/Bank{Deposit,Withdrawal}Request`, `service/BankLedgerService`
-(`resolveCounterparty`), `service/BankBookingRequestService`,
-`service/OrgUnitMembershipQueryService#listDirectMembershipOptions`, `model/projection/BankBookingRow`,
-`repository/BankPostingRepository`, `model/dto/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
-`service/OrgUnitBankAccessService#redact`, `controller/UserController`, `config/SecurityConfig`,
+`bank/internal/BankTransaction`, `model/dto/request/Bank{Deposit,Withdrawal}Request`, `bank/internal/BankLedgerService`
+(`resolveCounterparty`), `bank/internal/BankBookingRequestService`,
+`service/OrgUnitMembershipQueryService#listDirectMembershipOptions`, `bank/internal/BankBookingRow`,
+`bank/internal/BankPostingRepository`, `bank/internal/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
+`bank/internal/OrgUnitBankAccessService#redact`, `controller/UserController`, `config/SecurityConfig`,
 `db/migration/V197`, `db/migration/V205` (#994 constraint relax),
 `service/OrgUnitMembershipQueryService#listAllActiveOrgUnitOptionsAllKinds` (#994),
 frontend `controller/BankPageController`, `controller/BankRequestQueuePageController`,
@@ -2037,13 +2196,13 @@ new audited activity.
 blank, persisted when present), `BankBookingRequestServiceTest` (request rejected/optional/persisted by
 source-account type), `OrgUnitBankAccessServiceTest` (justification kept through redaction),
 `BankReportServiceTest` (statement renders it), frontend `BankAccountDetailFragmentMvcTest` (history
-column) · **Code:** `model/BankAccountType#requiresDebitJustification`, `model/BankTransaction`,
-`model/BankBookingRequest`, `model/dto/request/Bank{Withdrawal,Transfer}Request`,
-`model/dto/request/CreateBankBookingRequest`, `service/BankLedgerService`,
-`service/BankBookingRequestService`, `service/OrgUnitBankAccessService`,
-`service/Bank{Statement,Management}ReportService`, `model/projection/BankBookingRow`,
-`repository/BankPostingRepository`, `model/dto/Bank{Booking,BookingRequest}Dto`,
-`exception/BankConflictException`, `db/migration/V198`, frontend `templates/org-unit-bank.html`,
+column) · **Code:** `bank/internal/BankAccountType#requiresDebitJustification`, `bank/internal/BankTransaction`,
+`bank/internal/BankBookingRequest`, `model/dto/request/Bank{Withdrawal,Transfer}Request`,
+`bank/internal/CreateBankBookingRequest`, `bank/internal/BankLedgerService`,
+`bank/internal/BankBookingRequestService`, `bank/internal/OrgUnitBankAccessService`,
+`service/Bank{Statement,Management}ReportService`, `bank/internal/BankBookingRow`,
+`bank/internal/BankPostingRepository`, `model/dto/Bank{Booking,BookingRequest}Dto`,
+`bank/api/BankConflictException`, `db/migration/V198`, frontend `templates/org-unit-bank.html`,
 `templates/bank-account-detail.html`, `templates/bank-requests.html`, `static/js/bank.js`,
 `static/css/bank.css` · **Issues:** —
 
@@ -2051,7 +2210,8 @@ column) · **Code:** `model/BankAccountType#requiresDebitJustification`, `model/
 
 The bank **dashboard** (`/bank`, REQ-BANK-016) and the org-unit **account list** (`/org-unit-bank`
 "Konten" tab, REQ-BANK-021) each carry a **client-side, live account-name filter**. A search box —
-on the dashboard **beside the view-option checkboxes** in the header actions, on the org-unit page
+on the dashboard **beside the view-option toggles** in the toolbar under the page head (in the header
+actions until 2026-10-03), on the org-unit page
 **directly above the account list** — filters the rendered account tiles/rows **in place as the user
 types**: an account whose **name** does not contain the entered term (case-insensitive substring) is
 hidden, matching ones stay. Matching is on the account **name** only (each item carries a
@@ -2142,10 +2302,22 @@ PII). The threshold storage/edit is org-unit-blind (`BankAccountService`, two ac
 amount→approver **resolution** and the band→identity mapping stay in the `OrgUnitBankAccessService`
 seam so the bank stays org-unit-blind (REQ-BANK-008, both ArchUnit pins green). The KRT ladder is shown
 **read-only to every viewer** on the org-unit account-detail page (the bands + who approves, from
-`employeeApprovalCeiling`/`areaLeadApprovalCeiling`).
+`employeeApprovalCeiling`/`areaLeadApprovalCeiling`; since 2026-10-03 the card „Freigabe-Stufen" in
+the drill-in's second tab, REQ-BANK-038).
 
-**Approval surface & confirmation.** The two non-staff approvers act in **Org-Einheits-Bank → „Fremde
-Anträge"**, band-routed: the Bankleitung sees only the `BANK_MANAGEMENT`-band requests, the OL only the
+*Amended 2026-10-03 (website overhaul phase 3):* the KRT-Freigaben tab draws the ladder as a **tier
+bar** — the question „Wer gibt Auszahlungen vom KRT-Konto frei?", three segments „Bankmitarbeiter ·
+Bankleitung · Organisationsleitung" each with its range („bis 250.000", „darüber", „keine
+Selbstfreigabe" / „keine Stufe" for an unset threshold), the two thresholds marked on a scale under
+the bar, the two number fields `T1` / `T2`, an `.alert-info` example („Beispiel: Eine Auszahlung über
+… aUEC braucht die Freigabe der Bankleitung." plus the OL sentence when `T2` is set) and the one
+action „Schwellen speichern". Bar, scale and example follow the fields as you type
+(`bank-manage.js`); the write is the unchanged `PATCH …/approval-tiers`. Each Verwaltung tab has one
+primary action in the page head (Halter: „+ Umbuchung", with „+ Halter registrieren" as a ghost
+button for the Bankleitung; Konten: „+ Konto anlegen" / „+ Sonderkonto anlegen").
+
+**Approval surface & confirmation.** The two non-staff approvers act in **Org-Einheits-Bank → „Anträge
+an unsere Konten"** („Fremde Anträge" until 2026-10-03), band-routed: the Bankleitung sees only the `BANK_MANAGEMENT`-band requests, the OL only the
 `ORGANISATIONSLEITUNG`-band ones (an admin sees **and approves all three bands** — `canApprove` /
 `canSeeForeignRequest` short-circuit on `isAdmin()` before the band check); their in-app grant records
 `owner_approval_granted`
@@ -2174,7 +2346,7 @@ membership-based notification seam; the Bankleitung instead picks the request up
 - [x] A KRT withdrawal/transfer request is stamped `required_approver = null` (≤ T1) /
   `BANK_MANAGEMENT` (T1..T2) / `ORGANISATIONSLEITUNG` (> T2) at creation; a ≤ T1 request needs no
   approval, an over-band request needs the band approver's grant + the confirm checkbox.
-- [x] „Fremde Anträge" routes a KRT band request only to its band approver (Bankleitung / OL); the
+- [x] „Anträge an unsere Konten" routes a KRT band request only to its band approver (Bankleitung / OL); the
   responsible-holder routing for every other account is unchanged.
 - [x] `T1`/`T2` are settable only via `PATCH …/approval-tiers` gated `BANK_MANAGEMENT`, CARTEL-only,
   `T2 ≥ T1`, audited `CARTEL_APPROVAL_TIERS_SET/CLEARED`; the per-audience limit editor is hidden for
@@ -2190,15 +2362,15 @@ membership-based notification seam; the Bankleitung instead picks the request up
 (direct-booking cap for employee, uncapped for management/confirmation), `BankControllerSecurityTest`
 (`approval-tiers` gate), frontend `BankManagePageControllerTest` (KRT tab management-only),
 `OrgUnitBankPageControllerMvcTest` (read-only ladder), `ArchitectureTest` (both bank pins) · **Code:**
-`model/BankAccount#employeeApprovalCeiling/#areaLeadApprovalCeiling`, `model/BankRequestApprover`,
-`model/BankBookingRequest#requiredApprover`, `model/BankAuditEventType#CARTEL_APPROVAL_TIERS_*`,
-`service/BankAccountService#setCartelApprovalTiers`, `service/OrgUnitBankAccessService`
+`bank/internal/BankAccount#employeeApprovalCeiling/#areaLeadApprovalCeiling`, `bank/internal/BankRequestApprover`,
+`bank/internal/BankBookingRequest#requiredApprover`, `bank/internal/BankAuditEventType#CARTEL_APPROVAL_TIERS_*`,
+`bank/internal/BankAccountService#setCartelApprovalTiers`, `bank/internal/OrgUnitBankAccessService`
 (`createBookingRequest` KRT branch, `resolveCartelApprovalRouting`, `raiseCartelDirectBookingRequest`,
 `canApprove`, `listRequestsForResponsibleAccounts`),
-`service/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds` (CARTEL OL set),
-`service/BankBookingGuards#exceedsCartelDirectBookingCeiling`,
-`controller/BankBookingController#bookWithdrawal/#bookTransfer` (202 auto-request),
-`model/dto/BankBookingOutcomeDto`, `controller/BankAccountController#setCartelApprovalTiers`,
+`bank/internal/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds` (CARTEL OL set),
+`bank/internal/BankBookingGuards#exceedsCartelDirectBookingCeiling`,
+`bank/web/BankBookingController#bookWithdrawal/#bookTransfer` (202 auto-request),
+`bank/internal/BankBookingOutcomeDto`, `bank/web/BankAccountController#setCartelApprovalTiers`,
 `db/migration/V203` + `V222` (approver rename), frontend `templates/bank-manage.html` +
 `org-unit-bank-account-detail.html` + `static/js/bank.js` (202 `pendingRequest` notice) +
 `exception/GlobalExceptionHandler` (bank-409 message map) ·
@@ -2217,7 +2389,8 @@ Spezialkommandos — via a new **`AREA_MEMBERS`** value of the shared `BankAccou
 It sits alongside the existing Bereich audiences (`BEREICHSKOORDINATOR` / `BEREICHSOPERATOR` each
 separately, all-Bereichsleitung via `ALL_MEMBERS`, individual users) and is offered **only for AREA
 accounts**. The cascade membership is resolved inside the `OrgUnitBankAccessService` seam
-(`OwnerScopeService.currentUserIsMemberOfAreaCascade(bereichId)` = the caller has any membership on the
+(`OrgUnitBankAccessService#callerIsMemberOfAreaCascade(bereichId)`, since 2026-10-10 in the seam itself,
+built on the scope kernel's direct memberships = the caller has any membership on the
 Bereich or one of its `findChildOrgUnitIds` children — the 3-level hierarchy makes the direct children
 the whole subtree), so the bank stays org-unit-blind. Toggling the grant/limit is an idempotent
 insert/delete audited `BALANCE_VISIBILITY_GRANTED/REVOKED` / `APPROVAL_LIMIT_SET/CLEARED` (tier code
@@ -2240,11 +2413,11 @@ all-member **visibility** (every Kartellmitglied, REQ-BANK-037) is **unchanged**
 **Enforced by:** `OrgUnitBankAccessServiceTest` (AREA_MEMBERS canView + limit tier; cascade vs direct
 members), `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTest`,
 `DatabaseIndexMigrationTest` (V202 CHECK + partial unique indexes) · **Code:**
-`model/BankAccountViewGranteeKind#AREA_MEMBERS`, `service/OwnerScopeService#currentUserIsMemberOfAreaCascade`,
-`service/OrgUnitBankAccessService` (`matchesOrgUnitGrant`, `resolveApplicableLimit`,
-`setAreaMembersVisibility`, `setAreaMembersApprovalLimit`), `service/BankApprovalLimitService#areaMembersSupported`,
-`model/dto/BankApprovalLimitsDto`, `model/dto/OrgUnitBankAccountSettingsDto`,
-`controller/OrgUnitBankController`, `db/migration/V202`, frontend
+`bank/internal/BankAccountViewGranteeKind#AREA_MEMBERS`, `bank/internal/OrgUnitBankAccessService#callerIsMemberOfAreaCascade`,
+`bank/internal/OrgUnitBankAccessService` (`matchesOrgUnitGrant`, `resolveApplicableLimit`,
+`setAreaMembersVisibility`, `setAreaMembersApprovalLimit`), `bank/internal/BankApprovalLimitService#areaMembersSupported`,
+`bank/internal/BankApprovalLimitsDto`, `bank/internal/OrgUnitBankAccountSettingsDto`,
+`bank/web/OrgUnitBankController`, `db/migration/V202`, frontend
 `templates/fragments/bank-approval-limits.html` + `org-unit-bank-account-detail.html` ·
 **ADR:** [ADR-0066](../adr/0066-krt-account-amount-tiered-approval-ladder.md) · **Issues:** —
 
@@ -2282,13 +2455,27 @@ REQ-OBS-011).
 **Enforced by:** `BankBalanceSeriesCalculatorTest`, `BankAccountServiceTest#getBalanceSeries*`,
 `BankControllerSecurityTest#balanceSeries*`, `OrgUnitBankAccessServiceTest`, frontend
 `BankAccountDetailFragmentMvcTest` (balanceChart fragment) + `OrgUnitBankPageControllerMvcTest` ·
-**Code:** `service/BankBalanceSeriesCalculator`, `service/BankAccountService#getBalanceSeries`,
-`service/OrgUnitBankAccessService#getViewableBalanceSeries`, `controller/BankAccountController`,
-`controller/OrgUnitBankController`, `repository/BankPostingRepository#postingSlicesInRange`,
-`model/dto/BankBalanceSeriesDto` + `BankBalancePointDto`, frontend `controller/BankBalanceChart`,
+**Code:** `bank/internal/BankBalanceSeriesCalculator`, `bank/internal/BankAccountService#getBalanceSeries`,
+`bank/internal/OrgUnitBankAccessService#getViewableBalanceSeries`, `bank/web/BankAccountController`,
+`bank/web/OrgUnitBankController`, `bank/internal/BankPostingRepository#postingSlicesInRange`,
+`bank/internal/BankBalanceSeriesDto` + `BankBalancePointDto`, frontend `controller/BankBalanceChart`,
 `controller/BankAccountDetailSupport`, `templates/fragments/bank-balance-chart.html` · **Issues:** —
 
+*Amended 2026-10-03 (website overhaul phase 3):* the chart is a fixed card on the „Buchungen" tab,
+titled „Saldoverlauf · <Zeitraum>" with the range links on the right of its head; it no longer
+collapses (REQ-BANK-050 superseded). Range, series, swap and persistence are unchanged.
+
 ### REQ-BANK-050 — Collapsible chart and booking-history panels (per-user state)
+
+> **Superseded 2026-10-03 (website overhaul phase 3):** neither panel collapses any more. The balance
+> chart is a fixed card („Saldoverlauf · <Zeitraum>") and the booking history a card below it, both on
+> the „Buchungen" tab of the shared account-detail fragment (REQ-BANK-017); the tab bar, not a
+> collapse, is what keeps the page short. The `.bank-panel-head` / `.bank-collapse-head` toggles are
+> gone from both templates; the persisted-collapse module in `bank.js`
+> (`bank_panel_collapse_<uid>`), the `bank-info-collapse` handler and their CSS were removed on
+> 2026-10-04 (website overhaul phase 4). A value a browser still holds under that key is simply
+> ignored. The text below records the retired
+> behaviour.
 
 On both account-detail surfaces the balance chart (REQ-BANK-049) and the booking history are each
 collapsible, **expanded by default**, with the collapsed/expanded state persisted **per user in
@@ -2300,10 +2487,10 @@ family as the dashboard's per-user layout/group toggle (REQ-BANK-016).
 
 **Acceptance**
 
-- [x] Both panels render expanded by default; toggling a panel persists its state per user and
-  survives a reload and an in-place fragment swap.
-- [x] The persistence is per user (keyed by the authenticated user) and local (localStorage), never
-  server-side.
+- [x] ~~Both panels render expanded by default; toggling a panel persists its state per user and
+  survives a reload and an in-place fragment swap.~~ Superseded 2026-10-03: no collapse toggle renders.
+- [x] ~~The persistence is per user (keyed by the authenticated user) and local (localStorage), never
+  server-side.~~ Superseded 2026-10-03.
 
 **Enforced by:** frontend `BankAccountDetailFragmentMvcTest` / `OrgUnitBankPageControllerMvcTest`
 (the collapse toggles render `aria-expanded="true"` by default) · **Code:** frontend
@@ -2335,12 +2522,32 @@ no-JS form submit reloads the page with the same params. The org-unit surface st
 **Enforced by:** `BankControllerSecurityTest`, `BankAccountServiceTest`, `OrgUnitBankAccessServiceTest`,
 frontend `BankAccountDetailFragmentMvcTest` (period filter + page-size picker) + `BankPageControllerTest`
 (pagination base URL carries the period) · **Code:**
-`repository/BankPostingRepository#findBookings(from,to)`, `service/BankAccountService#getBookings`,
-`service/OrgUnitBankAccessService#getViewableAccountBookings`, `controller/BankAccountController`,
-`controller/OrgUnitBankController`, frontend `controller/BankAccountDetailSupport`,
+`bank/internal/BankPostingRepository#findBookings(from,to)`, `bank/internal/BankAccountService#getBookings`,
+`bank/internal/OrgUnitBankAccessService#getViewableAccountBookings`, `bank/web/BankAccountController`,
+`bank/web/OrgUnitBankController`, frontend `controller/BankAccountDetailSupport`,
 `templates/bank-account-detail.html`, `templates/org-unit-bank-account-detail.html` · **Issues:** —
 
+*Amended 2026-10-03 (website overhaul phase 3):* the period is chosen with the segment **„30 Tage · 90
+Tage · Zeitraum …"** above the history (default 90 Tage). A preset fills from/to (from = today minus
+the days, to = today) and re-renders the history at once; „Zeitraum …" reveals the Von/Bis date fields,
+and a date change re-renders at once — the „Anwenden" button is gone. The server marks the segment
+from the resolved period (`BankAccountDetailSupport#historyPreset`: `30d` / `90d` when the period ends
+today and spans exactly that many days, else `custom`), so a deeplinked or paged period shows the
+right segment. The table gains the column **„Saldo nach Buchung"**: the frontend reads the balance at
+the newest posting of the page with one single-instant read of the existing `balance-series` endpoint
+(from = to = that posting's time) and walks the page's amounts backwards (`BankRunningBalance`); a
+failed read leaves the column „–". No new endpoint, audit event or metric. Enforced by
+`BankRunningBalanceTest`, `BankAccountDetailPatternRenderTest`, `OrgUnitBankPageControllerMvcTest`.
+
 ### REQ-BANK-052 — Chart and booking history side by side on ultra-wide screens
+
+> **Superseded 2026-10-03 (website overhaul phase 3):** the chart and the history no longer sit in a
+> `.bank-detail-panels` grid; they stack (chart card above history card) on the „Buchungen" tab at
+> every width, and the second tab holds the account info or settings (REQ-BANK-017). Corrected the same
+> day: the breakpoint below read ≥ 1800px, while `bank.css` switched at ≥ 1440px. The
+> `main.bank-detail` widening (`max-width: min(2200px, 94vw)` at ≥ 1440px) and the grid rules were
+> removed from `bank.css` on 2026-10-04 (website overhaul phase 4); the detail page now stops at
+> `--content-max-data` (1600 px) from 1440 px like every other page. The text below records the retired behaviour.
 
 On both account-detail surfaces the balance chart (REQ-BANK-049) and the booking history stack
 vertically (chart above history) by default, but sit **side by side** (chart left, history right) on
@@ -2428,8 +2635,8 @@ injection-safety), `BankControllerSecurityTest` (query/status/type param binding
 (pagination + size clamp + CARTEL lookup), `BankPageControllerTest` / `BankInPlaceFragmentMvcTest` /
 `BankDashboardMovementModalMvcTest` / `BankRequestQueuePageControllerMvcTest` (pickers preload no
 roster, carry the `remote-bank-accounts` marker), `BankGrantsPageControllerTest` (selected-account
-seed, no roster) · **Code:** `repository/BankAccountRepository#findAllFiltered/#findGrantedToFiltered`,
-`service/BankAccountService#getAccounts`, `controller/BankAccountController#getAccounts`, frontend
+seed, no roster) · **Code:** `bank/internal/BankAccountRepository#findAllFiltered/#findGrantedToFiltered`,
+`bank/internal/BankAccountService#getAccounts`, `bank/web/BankAccountController#getAccounts`, frontend
 `controller/BankProxyController#searchAccounts`, `controller/BankManagePageController`,
 `controller/BankPageController`, `controller/BankGrantsPageController`,
 `controller/BankRequestQueuePageController`, `static/js/krt-bank-account-search.js`, `static/js/bank.js`,
@@ -2465,7 +2672,10 @@ rejected/cancelled request.
 bank-facing eyes*: the bank-staff account-detail booking history, the request queue's expandable
 sub-row, the approval tab's sub-row (REQ-BANK-041), the account-statement PDF and the
 management-export PDF. On each surface it is a third line of the existing detail sub-row, after
-Begründung and Notiz, and its presence alone makes a row expandable.
+Begründung and Notiz, and its presence alone makes a row expandable. *Amended 2026-10-03 (website
+overhaul phase 3):* on the bank-staff account-detail history a booking row no longer expands — the
+note is a labelled sub-line under the Gegenpartei, after Begründung and Notiz (REQ-BANK-017); the
+request queue and the approval tab keep the expandable sub-row.
 
 It is **redacted for org-unit members**, and this is the one place it parts company with the other
 two. `note` and `justification` survive the member-facing redaction because they are not
@@ -2498,11 +2708,11 @@ note/Begründung), `BankBookingRequestServiceTest` (confirmation snapshots it on
 hands it to the ledger), `OrgUnitBankAccessServiceTest` (redaction keeps note/justification and nulls
 the staff note), frontend `BankRequestQueuePageControllerMvcTest` (both entry points offer the field)
 and `OrgUnitBankPageControllerMvcTest` (the approval tab renders it, and it alone makes the row
-expandable) • **Code:** `model/BankTransaction`, `model/BankBookingRequest`,
+expandable) • **Code:** `bank/internal/BankTransaction`, `bank/internal/BankBookingRequest`,
 `model/dto/request/Bank{Deposit,Withdrawal,Transfer}Request`,
-`model/dto/request/ConfirmBankBookingRequest`, `model/projection/BankBookingRow`,
-`model/dto/Bank{Booking,BookingRequest}Dto`, `service/BankPostingWriter`, `service/BankLedgerService`,
-`service/BankBookingRequestService`, `service/OrgUnitBankAccessService`,
+`bank/internal/ConfirmBankBookingRequest`, `bank/internal/BankBookingRow`,
+`model/dto/Bank{Booking,BookingRequest}Dto`, `bank/internal/BankPostingWriter`, `bank/internal/BankLedgerService`,
+`bank/internal/BankBookingRequestService`, `bank/internal/OrgUnitBankAccessService`,
 `service/Bank{Statement,Management}ReportService`, `service/pdf/KrtPdfSupport`, `db/migration/V231`
 
 ### REQ-BANK-055 — Empfänger on a withdrawal request
@@ -2561,16 +2771,16 @@ admit `KRT_MEMBER` (REQ-BANK-044/#1193).
   rather than failing the confirmation.
 - [x] The picker is pre-filled with the requester and rendered only for a withdrawal; both controls
   are disabled while hidden, so a deposit/transfer request omits them from the body.
-- [x] The Empfänger is shown in the expandable detail row of both "Meine Anträge" and "Fremde
-  Anträge".
+- [x] The Empfänger is shown in the expandable detail row of both "Meine Anträge" and "Anträge an
+  unsere Konten" (formerly "Fremde Anträge").
 
 **Enforced by:** `BankBookingRequestServiceTest` (snapshot on create, membership 400, non-withdrawal
 400, confirm prefers the named Empfänger, stale-unit degradation, no-counterparty derivation),
 frontend `OrgUnitBankPageControllerMvcTest`, `BankOrgUnitRequestsE2eTest` (the seeded picker on the
-real UI) · **Code:** `model/BankBookingRequest`, `model/dto/request/CreateBankBookingRequest`,
-`model/dto/BankBookingRequestDto`, `service/BankBookingRequestService`
+real UI) · **Code:** `bank/internal/BankBookingRequest`, `bank/internal/CreateBankBookingRequest`,
+`bank/internal/BankBookingRequestDto`, `bank/internal/BankBookingRequestService`
 (`resolveRequestCounterparty`, `applyCounterparty`, `confirmCounterpartyOrgUnitId`),
-`service/OrgUnitBankAccessService#createBookingRequest`, `db/migration/V232`, frontend
+`bank/internal/OrgUnitBankAccessService#createBookingRequest`, `db/migration/V232`, frontend
 `controller/OrgUnitBankPageController`, `templates/fragments/bank-counterparty.html`
 (`requestCounterpartyBlock`), `templates/org-unit-bank.html`, `static/js/bank.js`
 (`syncRequestCounterparty`)
@@ -2609,10 +2819,17 @@ per-user isolation `cancelOwn` uses, so the endpoint cannot probe which ids exis
 (`BANK_REQUEST_NOT_PENDING`), not-yet-approved, and the echoed `@Version` (409). REQ-BANK-045 still
 binds, so an edit cannot blank a Begründung that the source account mandates.
 
-**Audit:** `BOOKING_REQUEST_UPDATED` (REQ-BANK-012). **Notifications:** an edit deliberately fires
-none — the request was already announced when it was raised and stays in the same queues; the staff
-queue and the approval tab pick the change up through the existing live-sync broadcast, and the
-approval chip flips there without a reload.
+**Audit:** `BOOKING_REQUEST_UPDATED` (REQ-BANK-012). **Notifications:** an edit clears the open
+notices about the request (`BANK_BOOKING_REQUEST_CREATED`, `…_UPDATED`) and tells the same recipients
+again with `BANK_BOOKING_REQUEST_UPDATED` — bank management, the account's grant holders and its
+responsible holder, the requester excluded (`BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER`, seed V269,
+REQ-NOTIF-018). The staff queue and the approval tab still pick the change up through the live-sync
+broadcast, and the approval chip flips there without a reload.
+
+> **Amended 2026-10-10 (#2413):** this paragraph said an edit "deliberately fires none", reasoning
+> that the request was already announced. The announcement went stale, though: the approvers' open
+> notice kept showing the old amount, and they acted on it. The owner decided in #2413 that a
+> correction replaces the notice.
 
 **UI:** a per-row "Bearbeiten" modal in "Meine Anträge", rendered once per editable row rather than
 as a primed singleton. The Empfänger picker is a **remote** combobox, which seeds itself from a
@@ -2633,16 +2850,19 @@ out, detaching it from its row.
   stale version is a 409.
 - [x] An edit cannot blank a Begründung the source account mandates (REQ-BANK-045).
 - [x] The edit action and its modal are withheld once the approval has been granted; cancel stays.
+- [x] An edit publishes `BankBookingRequestUpdatedEvent` with the new amount, which supersedes the
+  open `…_CREATED` / `…_UPDATED` notices and is seeded to the recipients of a new request.
 
-**Enforced by:** `BankBookingRequestServiceTest` (apply + audit, approval re-arming, already-approved
-409, not-pending 409, foreign 404, version 409, mandatory-Begründung guard),
+**Enforced by:** `BankBookingRequestServiceTest` (apply + audit + update event, approval re-arming,
+already-approved 409, not-pending 409, foreign 404, version 409, mandatory-Begründung guard),
+`NotificationRuleEngineIntegrationTest` (V269 rule),
 `OrgUnitBankAccessServiceTest` (re-derivation over/under the limit, foreign 404 before resolving),
 frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, withheld once approved),
-`BankOrgUnitRequestsE2eTest` · **Code:** `model/BankBookingRequest` (relaxed `updatable`),
-`model/dto/request/UpdateBankBookingRequest`, `service/BankBookingRequestService#updateOwn`,
-`service/OrgUnitBankAccessService#updateOwnBookingRequest` / `#resolveApprovalRouting`,
-`controller/OrgUnitBankController`, `exception/BankConflictException`,
-`model/BankAuditEventType`, frontend `controller/OrgUnitBankProxyController`,
+`BankOrgUnitRequestsE2eTest` · **Code:** `bank/internal/BankBookingRequest` (relaxed `updatable`),
+`bank/internal/UpdateBankBookingRequest`, `bank/internal/BankBookingRequestService#updateOwn`,
+`bank/internal/OrgUnitBankAccessService#updateOwnBookingRequest` / `#resolveApprovalRouting`,
+`bank/web/OrgUnitBankController`, `bank/api/BankConflictException`,
+`bank/internal/BankAuditEventType`, frontend `controller/OrgUnitBankProxyController`,
 `controller/AdminAuditLogPageController` (audit filter), `templates/org-unit-bank.html` ·
 **ADR:** [ADR-0133](../adr/0133-editable-pending-booking-requests.md)
 

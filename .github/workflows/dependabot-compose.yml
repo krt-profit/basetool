@@ -36,7 +36,7 @@ jobs:
         run: |
           set -eu
           if ! python3 -c "import yaml" >/dev/null 2>&1; then
-            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
+            pip3 install --disable-pip-version-check --require-hashes -r .github/requirements/pyyaml.txt
           fi
           python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 
@@ -51,6 +51,9 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: python3 .github/scripts/dependabot_compose_followup.py refresh-digests --base "${BASE_SHA}"
+
+      - name: Move the test-support image constants to the compose pins
+        run: python3 .github/scripts/dependabot_compose_followup.py sync-test-images
 
       - name: Regenerate the Quadlet units and the documented monitoring pins
         run: |
@@ -112,6 +115,6 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --branch "${HEAD_REF}" \
             --expected-head-oid "${HEAD_SHA}" \
-            --message "chore(compose): regenerate the Quadlet units for this image bump" \
+            --message "chore(compose): regenerate the Quadlet units and test image pins for this image bump" \
             --trailer "Signed-off-by: basetool-release[bot] <${APP_EMAIL}>" \
             "${files[@]}"

@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -35,19 +38,19 @@ import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
+import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.OrgUnitLabels;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -89,17 +92,16 @@ public class OrgUnitMembershipService {
   private final OrgUnitRepository orgUnitRepository;
   private final KommandoGroupRepository kommandoGroupRepository;
   private final InventoryOrgUnitReconciler inventoryReconciler;
-  private final AuditService auditService;
-  private final OrgChartService orgChartService;
+  private final AuditRecorder auditRecorder;
+  private final MembershipChangeObserver membershipChangeObserver;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
+  private final OrgUnitSeatNotifier seatNotifier;
 
   /**
    * Lazily resolved seam that audits changes to the accounts' responsible holders around each
-   * leadership mutation (REQ-BANK-034); all bank access stays in {@link
-   * OrgUnitBankResponsibilityService}.
+   * leadership mutation (REQ-BANK-034); all bank access stays in {@link ResponsibleHolderTracker}.
    */
-  private final ObjectProvider<OrgUnitBankResponsibilityService>
-      orgUnitBankResponsibilityServiceProvider;
+  private final ObjectProvider<ResponsibleHolderTracker> responsibleHolderTrackerProvider;
 
   /**
    * Adds the user as a member of the Spezialkommando.
@@ -130,7 +132,7 @@ public class OrgUnitMembershipService {
     if (wasMembershipless) {
       inventoryReconciler.onUserGainedFirstOrgUnit(userId, sc);
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MEMBERSHIP_GRANTED,
         sc.getId(),
         OrgUnitLabels.shorthandOrName(sc),
@@ -156,22 +158,20 @@ public class OrgUnitMembershipService {
       throw new NotFoundException("Membership not found");
     }
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(sc.getId());
+        responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(sc.getId());
     membershipRepository.deleteById(id);
-    orgChartService.mirrorRemoveUnitSeat(sc.getId(), userId);
+    membershipChangeObserver.onUnitMembershipRemoved(sc.getId(), userId);
 
     if (membershipRepository.countByIdUserId(userId) == 0) {
       inventoryReconciler.onUserLostLastOrgUnit(userId);
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MEMBERSHIP_REVOKED,
         sc.getId(),
         OrgUnitLabels.shorthandOrName(sc),
         userId,
         "kind=SPECIAL_COMMAND");
-    orgUnitBankResponsibilityServiceProvider
-        .getObject()
-        .recordResponsibleHolderChanges(responsibleBefore);
+    responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
   }
 
   /**
@@ -212,7 +212,7 @@ public class OrgUnitMembershipService {
       m.setJoinedAt(Instant.now());
     }
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
+        responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(bereichId);
     m.setRole(
         switch (role) {
           case LEITER -> MembershipRole.BEREICHSLEITER;
@@ -220,17 +220,17 @@ public class OrgUnitMembershipService {
           case OPERATOR -> MembershipRole.BEREICHSOPERATOR;
         });
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    orgChartService.mirrorBereichRole(bereich.getId(), userId, role);
+    membershipChangeObserver.onBereichRoleGranted(bereich.getId(), userId, role);
     final boolean firstGrant = previousRole == null || previousRole == MembershipRole.MEMBER;
-    auditService.record(
+    auditRecorder.record(
         firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
         bereich.getId(),
         OrgUnitLabels.shorthandOrName(bereich),
         userId,
         firstGrant ? "role=" + saved.getRole() : "from=" + previousRole + " to=" + saved.getRole());
-    orgUnitBankResponsibilityServiceProvider
-        .getObject()
-        .recordResponsibleHolderChanges(responsibleBefore);
+    seatNotifier.seatChanged(
+        userId, unitName(OrgUnitLabels.shorthandOrName(bereich)), saved.getRole(), true, null);
+    responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
 
@@ -248,18 +248,18 @@ public class OrgUnitMembershipService {
         Entities.require(membershipRepository.findById(id), "Bereichsleitung membership not found");
     final MembershipRole previousRole = m.getRole();
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
+        responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(bereichId);
     membershipRepository.delete(m);
-    orgChartService.mirrorRemoveUnitSeat(bereichId, userId);
-    auditService.record(
+    membershipChangeObserver.onUnitMembershipRemoved(bereichId, userId);
+    auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         bereichId,
         orgUnitLabelById(bereichId),
         userId,
         AuditDetails.of("role", previousRole));
-    orgUnitBankResponsibilityServiceProvider
-        .getObject()
-        .recordResponsibleHolderChanges(responsibleBefore);
+    seatNotifier.seatChanged(
+        userId, unitName(orgUnitLabelById(bereichId)), previousRole, false, null);
+    responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
   }
 
   /**
@@ -297,21 +297,21 @@ public class OrgUnitMembershipService {
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     m.setJoinedAt(Instant.now());
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankResponsibilityServiceProvider
+        responsibleHolderTrackerProvider
             .getObject()
             .snapshotResponsibleHolders(organisationsleitungId);
     m.setRole(MembershipRole.OL_MEMBER);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    orgChartService.mirrorOlMember(ol.getId(), userId);
-    auditService.record(
+    membershipChangeObserver.onOlMemberAdded(ol.getId(), userId);
+    auditRecorder.record(
         AuditEventType.ROLE_GRANTED,
         ol.getId(),
         OrgUnitLabels.shorthandOrName(ol),
         userId,
         "role=OL_MEMBER");
-    orgUnitBankResponsibilityServiceProvider
-        .getObject()
-        .recordResponsibleHolderChanges(responsibleBefore);
+    seatNotifier.seatChanged(
+        userId, unitName(OrgUnitLabels.shorthandOrName(ol)), MembershipRole.OL_MEMBER, true, null);
+    responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
 
@@ -330,11 +330,11 @@ public class OrgUnitMembershipService {
             membershipRepository.findById(id), "Organisationsleitung membership not found");
     final MembershipRole previousRole = m.getRole();
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankResponsibilityServiceProvider
+        responsibleHolderTrackerProvider
             .getObject()
             .snapshotResponsibleHolders(organisationsleitungId);
     membershipRepository.delete(m);
-    orgChartService.mirrorRemoveUnitSeat(organisationsleitungId, userId);
+    membershipChangeObserver.onUnitMembershipRemoved(organisationsleitungId, userId);
     orgUnitRepository
         .findById(organisationsleitungId)
         .map(u -> Hibernate.unproxy(u, OrgUnit.class))
@@ -345,15 +345,15 @@ public class OrgUnitMembershipService {
               ((Organisationsleitung) u).setGrandAdmiralUserId(null);
               orgUnitRepository.saveAndFlush(u);
             });
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         organisationsleitungId,
         orgUnitLabelById(organisationsleitungId),
         userId,
         AuditDetails.of("role", previousRole));
-    orgUnitBankResponsibilityServiceProvider
-        .getObject()
-        .recordResponsibleHolderChanges(responsibleBefore);
+    seatNotifier.seatChanged(
+        userId, unitName(orgUnitLabelById(organisationsleitungId)), previousRole, false, null);
+    responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
   }
 
   /**
@@ -382,14 +382,14 @@ public class OrgUnitMembershipService {
     ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
     if (previous != null) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.ROLE_CHANGED,
           ol.getId(),
           OrgUnitLabels.shorthandOrName(ol),
           previous,
           AuditDetails.of("grandAdmiral", false));
     }
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.ROLE_CHANGED,
         ol.getId(),
         OrgUnitLabels.shorthandOrName(ol),
@@ -417,7 +417,7 @@ public class OrgUnitMembershipService {
     ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
     if (previousUser != null) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.ROLE_CHANGED,
           ol.getId(),
           OrgUnitLabels.shorthandOrName(ol),
@@ -530,7 +530,7 @@ public class OrgUnitMembershipService {
       m.setMissionManager(request.isMissionManager());
     }
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.CAPABILITY_FLAGS_CHANGED,
         squadron.getId(),
         OrgUnitLabels.shorthandOrName(squadron),
@@ -597,7 +597,7 @@ public class OrgUnitMembershipService {
       final Map<UUID, Set<UUID>> responsibleBefore = new LinkedHashMap<>();
       for (OrgUnitMembership removed : toRemove) {
         responsibleBefore.putAll(
-            orgUnitBankResponsibilityServiceProvider
+            responsibleHolderTrackerProvider
                 .getObject()
                 .snapshotResponsibleHolders(removed.getId().getOrgUnitId()));
       }
@@ -605,9 +605,10 @@ public class OrgUnitMembershipService {
       membershipRepository.flush();
       for (OrgUnitMembership removed : toRemove) {
         recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
-        orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
+        membershipChangeObserver.onSquadronRankCleared(
+            removed.getId().getOrgUnitId(), user.getId());
       }
-      orgUnitBankResponsibilityServiceProvider
+      responsibleHolderTrackerProvider
           .getObject()
           .recordResponsibleHolderChanges(responsibleBefore);
     }
@@ -637,7 +638,7 @@ public class OrgUnitMembershipService {
         fresh.setMissionManager(wantMissionManager);
         membershipRepository.save(fresh);
         Squadron sq = targetSquadrons.get(squadronId);
-        auditService.record(
+        auditRecorder.record(
             AuditEventType.MEMBERSHIP_GRANTED,
             squadronId,
             OrgUnitLabels.shorthandOrName(sq),
@@ -681,21 +682,23 @@ public class OrgUnitMembershipService {
               + " first (REQ-ORG-017)");
     }
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankResponsibilityServiceProvider
-            .getObject()
-            .snapshotResponsibleHolders(specialCommandId);
+        responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(specialCommandId);
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    orgChartService.mirrorSkLead(specialCommandId, userId, request.isLead());
-    auditService.record(
+    membershipChangeObserver.onSkLeadChanged(specialCommandId, userId, request.isLead());
+    auditRecorder.record(
         request.isLead() ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_REVOKED,
         specialCommandId,
         orgUnitLabelById(specialCommandId),
         userId,
         "role=SK_LEAD");
-    orgUnitBankResponsibilityServiceProvider
-        .getObject()
-        .recordResponsibleHolderChanges(responsibleBefore);
+    seatNotifier.seatChanged(
+        userId,
+        unitName(orgUnitLabelById(specialCommandId)),
+        MembershipRole.SK_LEAD,
+        request.isLead(),
+        null);
+    responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
 
@@ -741,22 +744,21 @@ public class OrgUnitMembershipService {
 
     final MembershipRole previousRole = m.getRole();
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(squadronId);
+        responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(squadronId);
     m.setRole(rank);
     m.setKommandoGroup(group);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    orgChartService.mirrorSquadronRank(squadronId, userId, rank, group);
+    membershipChangeObserver.onSquadronRankAssigned(squadronId, userId, rank, group);
 
     final boolean firstGrant = previousRole == MembershipRole.MEMBER;
-    auditService.record(
+    auditRecorder.record(
         firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
         squadronId,
         orgUnitLabelById(squadronId),
         userId,
         firstGrant ? "role=" + rank : "from=" + previousRole + " to=" + rank);
-    orgUnitBankResponsibilityServiceProvider
-        .getObject()
-        .recordResponsibleHolderChanges(responsibleBefore);
+    seatNotifier.seatChanged(userId, unitName(orgUnitLabelById(squadronId)), rank, true, null);
+    responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
 
@@ -785,20 +787,20 @@ public class OrgUnitMembershipService {
       throw new BadRequestException("Member holds no squadron rank to remove");
     }
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(squadronId);
+        responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(squadronId);
     m.setRole(MembershipRole.MEMBER);
     m.setKommandoGroup(null);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    orgChartService.mirrorRemoveSquadronRank(squadronId, userId);
-    auditService.record(
+    membershipChangeObserver.onSquadronRankCleared(squadronId, userId);
+    auditRecorder.record(
         AuditEventType.ROLE_REVOKED,
         squadronId,
         orgUnitLabelById(squadronId),
         userId,
         AuditDetails.of("role", previousRole));
-    orgUnitBankResponsibilityServiceProvider
-        .getObject()
-        .recordResponsibleHolderChanges(responsibleBefore);
+    seatNotifier.seatChanged(
+        userId, unitName(orgUnitLabelById(squadronId)), previousRole, false, null);
+    responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
 
@@ -1072,7 +1074,7 @@ public class OrgUnitMembershipService {
    */
   private void recordStaffelMembershipRevoked(
       @NotNull UUID squadronOrgUnitId, @NotNull UUID userId) {
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.MEMBERSHIP_REVOKED,
         squadronOrgUnitId,
         orgUnitLabelById(squadronOrgUnitId),
@@ -1090,7 +1092,7 @@ public class OrgUnitMembershipService {
    */
   private void recordCapabilityFlagsChanged(
       @NotNull UUID orgUnitId, @NotNull UUID userId, @NotNull OrgUnitMembership saved) {
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.CAPABILITY_FLAGS_CHANGED,
         orgUnitId,
         orgUnitLabelById(orgUnitId),
@@ -1106,6 +1108,10 @@ public class OrgUnitMembershipService {
    * @param orgUnitId the org unit id; never {@code null}.
    * @return the org unit's shorthand/name label, or {@code null} when it cannot be resolved.
    */
+  private static String unitName(@Nullable String label) {
+    return label == null ? "—" : label;
+  }
+
   private @Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
     return orgUnitRepository.findById(orgUnitId).map(OrgUnitLabels::shorthandOrName).orElse(null);
   }

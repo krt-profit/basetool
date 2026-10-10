@@ -1,3 +1,6 @@
+import net.ltgt.gradle.errorprone.CheckSeverity
+import net.ltgt.gradle.errorprone.errorprone
+
 buildscript {
   dependencies {
     constraints {
@@ -18,6 +21,7 @@ plugins {
   alias(libs.plugins.licensee)
   alias(libs.plugins.spotbugs.base)
   alias(libs.plugins.pitest)
+  alias(libs.plugins.errorprone)
   id("com.diffplug.spotless")
 }
 
@@ -27,6 +31,7 @@ configurations { compileOnly { extendsFrom(configurations.annotationProcessor.ge
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
+  implementation("org.springframework.boot:spring-boot-http-client")
   implementation("tools.jackson.dataformat:jackson-dataformat-cbor")
   implementation("org.springframework.boot:spring-boot-starter-data-jpa") {
     exclude(group = "org.springframework", module = "spring-aspects")
@@ -50,6 +55,9 @@ dependencies {
   implementation(libs.logstash.logback.encoder)
   implementation(project(":logging-support"))
 
+  errorprone(libs.errorprone.core)
+  errorprone(libs.nullaway)
+
   implementation(libs.mapstruct.core)
   annotationProcessor(libs.mapstruct.processor)
 
@@ -58,6 +66,7 @@ dependencies {
   implementation(libs.flyway.postgresql)
 
   implementation(libs.openpdf.core)
+  compileOnly(libs.spring.modulith.api)
   annotationProcessor(libs.lombok.mapstruct.binding)
 
   developmentOnly("org.springframework.boot:spring-boot-devtools")
@@ -92,6 +101,52 @@ idea {
 tasks.named<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   excludeFilter.set(rootProject.file("config/spotbugs/exclude.xml"))
 }
+
+val nullAwayPackages =
+  listOf(
+      "admin",
+      "audit",
+      "bank",
+      "catalogue",
+      "exchange",
+      "hangar",
+      "identity",
+      "inventory",
+      "joborder",
+      "livesync",
+      "materialexchange",
+      "mission",
+      "notification",
+      "orgunit",
+      "personalinventory",
+      "platform",
+      "privacy",
+      "refinery",
+      "scope",
+    )
+    .map { "de.greluc.krt.profit.basetool.backend.$it.api" }
+    .plus(
+      listOf("joborder", "materialexchange", "mission", "refinery").map {
+        "de.greluc.krt.profit.basetool.backend.$it"
+      }
+    )
+    .joinToString(",")
+
+tasks.named<JavaCompile>("compileJava") {
+  options.errorprone {
+    disableWarningsInGeneratedCode.set(true)
+    check("NullAway", CheckSeverity.ERROR)
+    disable("StringConcatToTextBlock")
+    option("NullAway:AnnotatedPackages", nullAwayPackages)
+  }
+}
+
+tasks
+  .withType<JavaCompile>()
+  .matching { it.name != "compileJava" }
+  .configureEach {
+    options.errorprone.enabled.set(false)
+  }
 
 tasks.javadoc {
   options { (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet") }
@@ -141,6 +196,17 @@ tasks.named<Test>("test") {
       rootProject.file(
         "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ObservationPrivacyFilter.java"
       ),
+      rootProject.file(
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/KeycloakTrustSupport.java"
+      ),
+      rootProject.file(
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/assembly/ManagementPortSecurityConfig.java"
+      ),
+      rootProject.file(
+        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ManagementPortSecurityConfig.java"
+      ),
+      rootProject.file("ingest/src/main/resources/application.yml"),
+      rootProject.file("frontend/src/main/resources/application.yml"),
     )
     .withPropertyName("crossModuleParitySources")
     .withPathSensitivity(PathSensitivity.RELATIVE)

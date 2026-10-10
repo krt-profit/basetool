@@ -22,9 +22,9 @@ package de.greluc.krt.profit.basetool.backend.filter;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
-import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
@@ -211,7 +211,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     long tightestRemaining = Long.MAX_VALUE;
     for (BucketSlot slot : slots) {
       Bucket bucket =
-          bucketCache.get(clientKey.key() + "|" + slot.key(), k -> createNewBucket(slot));
+          bucketCache.get(clientKey.key() + "|" + slot.key(), _ -> createNewBucket(slot));
       ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
       meterRegistry
           .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, bucketLabel(slot.key()))

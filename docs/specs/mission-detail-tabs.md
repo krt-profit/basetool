@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** MISSION/UI · **Related ADRs:** [ADR-0044](../adr/0044-mission-ablauf-procedure-steps.md),
 > [ADR-0057](../adr/0057-mission-goals-classified-ordered-children.md)
 
@@ -20,9 +20,12 @@ optimistic-locking versions) and every permission gate of the previous panel lay
 
 ### REQ-MISSION-004 — Tab structure, deeplink, and state
 
-The detail page renders a sticky head (title, owning-squadron badge, status pill, and a full-size
-"Anmelden" CTA — #818 follow-up: the primary action is no longer a `btn-xs2`), a high-signal
-`.facts-bar`, and a `.tab-nav` with up to four tabs. The facts bar (#818 follow-up) shows
+The detail page renders a sticky head on the page-head pattern of REQ-UI-027: the back link
+„← Einsätze" as eyebrow, the mission name as `h1#mission-title`, the owning-squadron badge and a
+translated `.status-badge` (`#mission-status-badge`), and in `.page-actions` a ghost „Bearbeiten"
+(`#mission-edit-btn`, only with `canEdit` or `canManageManagers`), the page's one filled CTA
+„Anmelden" (`#add-participant-btn`) and, for ADMIN, the „⋯" overflow menu holding „Einsatz
+löschen …". Below it a high-signal `.facts-bar` and a `.tab-nav` with three tabs. The facts bar (#818 follow-up) shows
 icon-led facts at larger type — TS meeting time (headset), server join = planned start (clock),
 planned end (clock), the Treffpunkt (map pin, only when set — REQ-MISSION-013), the leader (user —
 the Einsatzleiter with the owner fallback, REQ-MISSION-013) and a combined participants fact (users)
@@ -33,7 +36,7 @@ finance-total fact was dropped (it stays on the Finanzen tab). Its `#facts-ts` /
 `#facts-planned-start` / `#facts-planned-end` / `#facts-leader` / `#facts-registered` /
 `#facts-checked-in` ids are patched in place by the overview / crew / party-lead live-update
 handlers (carried on `#overview-head-meta` + `#crew-count-meta`) so a peer's schedule, party-lead
-or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
+or check-in change never leaves the bar stale (REQ-FE-010). The three tabs, plus the edit mode:
 
 1. **Übersicht** — read-only landing tab, re-split per the final Einsatz design (owner decision
    2026-06-27, superseding the 2026-06-11 consolidated single-`.kv-list` layout; the column sides were
@@ -67,10 +70,13 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
    page content is capped at 1800px — 1.5× the app's regular `--content-max` (1200px), because the
    board and finance grids carry side-by-side columns (owner decision 2026-06-11).
 2. **Teilnehmer & Einheiten** — the crew board (REQ-MISSION-005).
-3. **Finanzen & Auszahlung** — summary strip + finance ledger (member+ gate unchanged), payout
-   table with participation %, and the Wirtschaft `<details>` sections (data-present gate). The
+3. **Finanzen & Auszahlung** — four KPI tiles (`.kpi-grid` of `.kpi-total`: Gesamtergebnis,
+   Einnahmen, Ausgaben, Je Anteil) over two `.card--flush` lists — the finance ledger (member+ gate
+   unchanged, the tab's one CTA „Finanzeintrag hinzufügen" in its card head) and the payout table
+   with participation % — both `.data-table--stack` with an `.empty-state` when empty, and the
+   Wirtschaft `<details>` sections (data-present gate). The
    former public / authenticated-only splits went with the anonymous tier (ADR-0159): every viewer
-   is a signed-in member. The summary strip's totals come from a single
+   is a signed-in member. The KPI tiles' totals come from a single
    aggregate endpoint (`GET /api/v1/missions/{id}/finance-entries/summary`, same member+ /
    `canSeeMission` gate as the ledger), and the ledger table is fetched as a bounded page rather than
    loading every entry — so a live-update finance render costs one small query, not a full-ledger
@@ -78,26 +84,41 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
    in the mission DTO** (#1138): they are fetched with the rest of the finance section from
    `GET /api/v1/refinery-orders/mission/{id}` and `GET /api/v1/inventory/mission/{id}` (both
    member-gated), so the hottest mission GET no longer drags an unbounded, recursive economy payload.
-4. **Verwaltung** — role-gated (`canEdit` or `canManageManagers`); hidden otherwise. The left column is
-   the mission **details** form (the "Link zum Kalendereintrag" sits **last**, after the actual
-   start/end); the right column stacks four cards in the order **Ziele → Ablauf → Organisation →
-   Verwaltungsrechte** (owner decision). "Organisation" holds the party lead, the typed
+4. **Edit mode** (`#pane-verw`, formerly the „Verwaltung" tab; REQ-UI-027: tabs show views only) —
+   role-gated (`canEdit` or `canManageManagers`), not rendered otherwise, and entered through the
+   head's „Bearbeiten" (`aria-pressed` while active) instead of a tab; „Fertig" in its own head bar
+   or any tab leaves it. The left column is the mission **details** form as a `.form-layout.card`
+   with numbered sections **1 · Einsatz** (name, status as a four-option `.segmented`, operation,
+   Treffpunkt, description, calendar link), **2 · Zeitplan** (meeting time, planned and actual
+   start/end) and **3 · Sichtbarkeit** (internal as a `.switch`), disabled as a whole for a caller
+   without `canEdit`, and its one CTA „Änderungen speichern" in a `.form-actions--sticky`; the right
+   column stacks four cards in the order **Ziele → Ablauf → Organisation → Verwaltungsrechte** (owner
+   decision). "Organisation" holds the party lead, the typed
    "Frequenzübersicht" (per-mission values for the global "Frequenztypen") and the custom
    "Weitere Frequenzen" editor (REQ-MISSION-014). "Verwaltungsrechte" carries owner & manager
-   administration, the **owning-org-unit reassignment** control ("Verantwortliche Einheit" — re-homes
-   the mission to a different Staffel/SK/Bereich/OL or to ownerless; REQ-ORG-018), and the delete
-   action (ADMIN only). The reassignment select offers the caller's assignable org units plus "Keine";
+   administration and the **owning-org-unit reassignment** control ("Verantwortliche Einheit" — re-homes
+   the mission to a different Staffel/SK/Bereich/OL or to ownerless; REQ-ORG-018); the delete
+   action (ADMIN only) sits in the head's overflow menu. The reassignment select offers the caller's assignable org units plus "Keine";
    saving it swaps the `#mission-mgmt-results` panel in place and repaints the sticky-head
    owning-squadron badge without a reload (REQ-FE-001).
 
-The active tab synchronises with a `?tab=` URL parameter (`ueb|crew|fin|verw`); `?tab=` takes
-precedence over `#tab=`, then a server-side validation-error hint (re-renders land on Verwaltung),
-then the last tab from `localStorage`, then `ueb`. Browser back/forward re-applies the URL state.
-Tabs use the WAI-ARIA tabs pattern (`role="tablist"/"tab"/"tabpanel"`, `aria-selected`, arrow-key
-navigation). Switching away from a Verwaltung tab with unsaved form input asks for confirmation.
-The create page (`/missions/new`) renders the details form without tabs; it additionally carries the
-optional create-time Ziele + Ablauf editors above the description and a floating Speichern, and on a
-successful create lands the user on the new mission's Verwaltung tab (REQ-MISSION-015).
+The active tab synchronises with a `?tab=` URL parameter (`ueb|crew|fin`, and `verw` for the edit
+mode); `?tab=` takes precedence over `#tab=`, then a server-side validation-error hint (re-renders
+land in the edit mode), then the last view from `localStorage`, then `ueb`. Browser back/forward
+re-applies the URL state. Tabs use the WAI-ARIA tabs pattern (`role="tablist"/"tab"/"tabpanel"`,
+`aria-selected`, arrow-key navigation); in the edit mode no tab is selected and the last view's tab
+stays focusable. Leaving the edit mode with unsaved form input asks for confirmation.
+The create page (`/missions/new`) renders the page head „← Einsätze / Neuer Einsatz" and the details
+form without tabs; it additionally carries the optional create-time sections **4 · Ziele** and
+**5 · Ablauf** and the CTA „Einsatz anlegen", and on a successful create lands the user in the new
+mission's edit mode (`?tab=verw`, REQ-MISSION-015).
+
+Amended 2026-10-03 (website overhaul phase 3): the head moved onto the page-head pattern with
+„Bearbeiten", „Anmelden" and the „⋯" menu; the fourth tab „Verwaltung" became the edit mode behind
+„Bearbeiten" (an old `?tab=verw` link still opens it); the Finanzen tab shows KPI tiles over two
+lists instead of the summary strip; the details form is a numbered `.form-layout`. Guarded by
+`MissionDetailPatternRenderTest`, `MissionTabsMockupCheckE2eTest` and
+`MissionDesignFixesCheckE2eTest`.
 
 ### REQ-MISSION-005 — Crew board replaces the assign-crew modal (same backend)
 
@@ -215,7 +236,8 @@ sub-section (participant / unit incl. crew fallback to the pool / crew / mission
 
 Every `sec:authorize` / `th:if` permission gate of the previous layout carries over 1:1 (finance
 panel member+; payout-select disable logic; participant actions canEdit/own/external; check-in/out
-time-state conditions; Wirtschaft data-present; Verwaltung by edit permission). The former
+time-state conditions; Wirtschaft data-present; the edit mode, formerly the Verwaltung tab, by edit
+permission). The former
 "authenticated-only" gates on participation % and Wirtschaft are moot since ADR-0159 — every
 viewer is authenticated. Backend endpoints, DTOs and the optimistic-locking flow (`version` echo,
 `data-version` DOM sync, 409 handling via `krtFetch`'s conflict path — the transitional
@@ -284,7 +306,7 @@ not excluded from the row lock. Three concrete defects (round-2 audit, epic #110
 **Fix.** Each section's check-and-bump is now a **single DB-enforced atomic conditional**
 `UPDATE Mission … SET xVersion = xVersion + 1 WHERE id = :id AND xVersion = :expected`
 (`MissionRepository.bump*VersionIfMatches`, dispatched by the `MissionSection` enum through
-`support.MissionSectionVersions.enforceSectionVersion`); **0 rows affected → 409**. The statement row-locks
+`mission.internal.MissionSectionVersions.enforceSectionVersion`); **0 rows affected → 409**. The statement row-locks
 the mission, so two racing same-section writers genuinely serialise — the loser blocks, re-reads the
 bumped counter and 409s. This is safe only because **every mutable `Mission` scalar and association is
 `@OptimisticLock(excluded = true)` and the entity is `@DynamicUpdate`**: a section edit dirties only
@@ -358,7 +380,7 @@ per-scalar `@OptimisticLock(excluded = true)`), `MissionRepository.bump*VersionI
 A mission carries an ordered, reorderable list of **Ablauf** steps — a procedure timeline. Each step
 is a persisted `MissionStep` child of the mission (`title` required ≤500 chars, optional free-text
 `meta` "Zeit / Ort" hint ≤200 chars, a shared `done` flag, an explicit `orderIndex`). The Ablauf is
-authored in the **Verwaltung** tab through a drag-sortable editor (`#mission-step-list`: per-row
+authored in the edit mode (**Verwaltung**) through a drag-sortable editor (`#mission-step-list`: per-row
 title + meta inputs, up/down + drag reorder, delete, "Schritt hinzufügen", a live "N Schritte"
 counter) and shown **read-only** in the Übersicht as an `<ol class="ablauf">` checklist whose single
 **current phase** (`step--now`) is *derived* as the first not-done step (never stored). **When no
@@ -388,7 +410,7 @@ mission-create time** (each still recording `MISSION_STEP_ADDED`) — REQ-MISSIO
 ### REQ-MISSION-010 — Rally point (Treffpunkt)
 
 A mission carries the short free-text core-section field **`meetingPoint`** (Treffpunkt, ≤200 chars —
-the rally point), edited in the Verwaltung details form and belonging to the **core** section (guarded
+the rally point), edited in the edit-mode details form and belonging to the **core** section (guarded
 by `coreVersion`, persisted via the existing `/core` patch; no new lock). It is non-PII planning data,
 forwarded through the peer redaction like the units and frequencies. The long Markdown description
 was the one free-text field the **outsider** tier hid; with that tier gone (ADR-0159) every member
@@ -403,21 +425,50 @@ column is already `TEXT`, so the cap moved only on the DTOs / form, no migration
 ### REQ-MISSION-011 — Operation detail page adopts the Variante B tab shell
 
 The operation detail page (`/operations/{id}`) — the umbrella over missions, also an "Einsatz-Seite"
-under #818 — is restructured from the legacy collapsible-column layout to the **same tab shell**
-(sticky head + `.facts-bar` + `.tab-nav`) with five tabs: **Übersicht** (read-only landing: "Operation
-auf einen Blick" status/mission-count/result/donations, an "Ergebnis je Einsatz" proportional result
-bar per linked mission from the operation finance breakdown, an Einsätze preview list, and a
-collapsible Markdown description), **Einsätze** (the paginated linked-missions table — REQ-FE-002 AJAX
-pager unchanged — with an "Einsatz hinzufügen" shortcut that opens `/missions/new?operationId={id}`
-with the operation preselected, editor-only), **Auszahlung** (the operation payout table + paid-out
-toggle, unchanged), **Finanzen** (a summary strip + the per-mission finance breakdown as native
-`<details>`), and **Verwaltung** (the details form — name / status / description — with the delete +
-single Speichern CTA). This is a **frontend-only** restructure: operations have **no** owner or
-per-operation managers (the mockup's owner/manager panels were clones of the mission design and are
-deliberately omitted — edit access stays the role-based `canEdit`), and the read-only details form
-remains visible (disabled) to non-editors as before.
+under #818 — uses a tab shell on the page-head pattern of REQ-UI-027:
 
-The description field gains a **Markdown editor** (editor-only): a B / I / heading / list / link
+- **Head.** The back link „← Operationen" as eyebrow, the name as `h1#operation-title` with a
+  translated `.status-badge` (`#operation-status-badge`), and — editor-only (`canEdit`) — a ghost
+  „Bearbeiten" that opens the edit dialog and, for ADMIN, the „⋯" overflow menu holding „Operation
+  löschen …" (the `--danger` confirm dialog). There is no details tab.
+- **KPI bar.** Four `.kpi-total` tiles under the head: Einsätze (the missions page total),
+  Gesamtergebnis and Davon gespendet (whole aUEC with thousands separators and the unit „aUEC", a
+  negative result in red) and Teilnehmende (the payout row count). The Auszahlung tab no longer
+  carries a count.
+- **Four tabs: Übersicht · Einsätze (n) · Auszahlung · Finanzen.** *Übersicht* holds the „Ergebnis je
+  Einsatz" card — one row link per linked mission with a bar relative to the largest positive mission
+  result, from the operation finance breakdown — beside the „Auszahlung" card („x / y Teilnehmende
+  ausgezahlt", a progress bar, the open amount, the number of members who want to donate, and the
+  Übersicht's one CTA „Zur Auszahlung", which switches to that tab), and under them the collapsible
+  Markdown description. *Einsätze* is the paginated linked-missions table (REQ-FE-002 AJAX pager
+  unchanged) with row links and the editor-only CTA „Einsatz hinzufügen", which opens
+  `/missions/new?operationId={id}` with the operation preselected. *Auszahlung* shows „Vorläufige
+  Werte" as an `.alert.alert-info`, the preference as a chip, the paid-out toggle and a sum row
+  (total amount, total donations, „x / y" paid out) that stays pinned above the footer while the
+  table scrolls; without rows an `.empty-state`. *Finanzen* is only the per-mission finance list as
+  native `<details>` (the totals live in the KPI bar).
+- **Edit dialog.** Name, status and description (with the Markdown editor below) in a
+  `.krt-modal--wide`; „Änderungen speichern" writes in place and closes the dialog, and closing it
+  resets unsaved input. A non-editor sees no form at all — name and status stand in the head, the
+  description in the Übersicht.
+
+The tab synchronises with `?tab=` (`ueb|missions|payout|fin`) and `localStorage`; an unknown value,
+such as an old `?tab=verw` link, lands on Übersicht. A peer's change or the viewer's own paid-out
+toggle re-renders the Übersicht fragment too, which carries the head and KPI values on
+`#operation-head-meta`, so the head, the KPI bar and the payout card never go stale (REQ-FE-010).
+The finance fragment reads only the finance summary — no operation, payout or missions read.
+
+This is a **frontend-only** restructure: operations have **no** owner or per-operation managers (the
+mockup's owner/manager panels were clones of the mission design and are deliberately omitted — edit
+access stays the role-based `canEdit`).
+
+Amended 2026-10-03 (website overhaul phase 3): the five tabs with „Verwaltung" became four tabs plus
+the edit dialog; the facts bar and the Finanzen summary strip became the KPI bar; the Übersicht gained
+the payout card and lost the Einsätze preview list; the payout table gained the sum row. Guarded by
+`OperationPageControllerMvcTest`, `OperationPayoutProgressTest`, `OperationLiveSyncE2eTest` and
+`OperationWritesInPlaceE2eTest`.
+
+The description field carries a **Markdown editor** (editor-only): a B / I / heading / list / link
 formatting toolbar that wraps the textarea selection client-side, and a "Bearbeiten / Vorschau"
 toggle whose preview is rendered **server-side** via `POST /operations/markdown-preview` through the
 same `@markdown` (`MarkdownRenderer`) bean the page uses on save — so the preview is byte-identical to
@@ -437,7 +488,7 @@ classification is one of three kinds — **Hauptziel** (`PRIMARY`), **Nebenziel*
 to bound the scope). A goal has **no** `done` flag (it is a scope statement, not a progress item like
 an Ablauf step) and **no** free-text `meta`.
 
-Goals are authored in the **Verwaltung** tab through a drag-sortable editor (`#mission-objective-list`:
+Goals are authored in the edit mode (**Verwaltung**) through a drag-sortable editor (`#mission-objective-list`:
 per-row title input + a kind `<select>`, up/down + drag reorder, delete, "Ziel hinzufügen", a live "N
 Ziele" counter) and shown **read-only** in the Übersicht as a dedicated **"Ziele" box** — the first
 panel of the left column — that **groups** the goals by kind: all Hauptziele first, then Nebenziele,
@@ -552,7 +603,7 @@ client-version optimistic-lock check (it echoes a `data-version`), so the two pa
 The **value carries the same input limits as the typed frequencies** — up to three integer digits and
 two decimals (0 – 999.99), matching the `precision = 5, scale = 2` column and the frontend
 `^\d{1,3}([.,]\d{1,2})?$` pattern; the label is required and ≤100 chars. Custom channels are authored
-in the **Verwaltung** tab's "Organisation" card under a "Weitere Frequenzen" editor (a list with an
+in the edit mode's (**Verwaltung**) "Organisation" card under a "Weitere Frequenzen" editor (a list with an
 "Frequenz hinzufügen" button plus per-row edit/delete, add/edit through a shared KRT modal — no native
 dialogs) and shown **read-only** in the Übersicht "Funk" panel alongside the typed and per-unit
 channels. They are non-PII planning data, forwarded through the peer redaction like the typed
@@ -574,9 +625,11 @@ carrying only the row id — **never** the free-text label — per REQ-AUDIT-001
 ### REQ-MISSION-015 — Create-time Ziele/Ablauf seeding, Verwaltung landing, and floating Speichern
 
 **Seeding goals + steps at create.** The create form (`/missions/new`) carries the Ziele
-(REQ-MISSION-019) and Ablauf (REQ-MISSION-009) editors **above** the description field so a planner can
+(REQ-MISSION-019) and Ablauf (REQ-MISSION-009) editors as its optional sections **4 · Ziele** and
+**5 · Ablauf**, after Einsatz, Zeitplan and Sichtbarkeit (until 2026-10-03 they sat above the
+description field), so a planner can
 lay out goals and steps in the same action instead of a follow-up per-item call. Both are **optional**
-(an empty section seeds nothing) and can equally be added later through the Verwaltung section editors.
+(an empty section seeds nothing) and can equally be added later through the edit mode's section editors.
 Because the mission has no id yet, these are **client-side rows** — no per-row AJAX, no section version
 — reusing the same `.ae-row` markup, the Klassifizierung `<select>` and the time/place `meta` field as
 the Verwaltung editors. On submit the rows are serialized (blank-title rows dropped) into two hidden
@@ -591,27 +644,29 @@ REQ-AUDIT-001. `CreateMissionRequest` stays the create-path security boundary (a
 `objectives` / `steps` are an explicit, `@Valid`-checked addition (non-blank title, valid kind), and
 the id / orderIndex / step done-state remain server-stamped.
 
-**Landing on Verwaltung after create.** A successful create redirects to the new mission's detail page
-on its **Verwaltung** tab (`redirect:/missions/{newId}?tab=verw`, via the REQ-MISSION-004 `?tab=`
+**Landing in the edit mode after create.** A successful create redirects to the new mission's detail page
+in its edit mode (`redirect:/missions/{newId}?tab=verw`, via the REQ-MISSION-004 `?tab=`
 deeplink), so the planner keeps working (crew, refine goals/steps) instead of being dropped on the
 list. The frontend create handler reads the created mission's id from the backend `MissionDto` response
 for the redirect (replacing the former `redirect:/missions`).
 
-**Sticky action row in Verwaltung.** In the Verwaltung tab — also the sole pane on the create page —
-the whole action row (**Löschen · Speichern · Zurück**) is pinned to the bottom of the viewport
-above the fixed footer while the tiles scroll behind it (owner request 2026-07-03, superseding the
-earlier float-just-the-save-button design). The `.footacts` bar is `position: fixed` above the footer
-(z-index above the footer, below the modal overlay and the sidebar drawer), with a solid bar
-background + top border; the Save keeps its `form="mission-form"` binding (the classic no-JS submit is
-unchanged). The rule is scoped to the **active** Verwaltung pane so it never pins on another tab, and
-the pane reserves extra `padding-bottom` so the last tile is never hidden behind the bar.
+**Sticky action row in the details form.** In the edit mode — also the sole pane on the create
+page — the form's `.form-actions--sticky` (REQ-UI-027 pattern C) stays pinned above the footer while
+the form scrolls: „Änderungen speichern" (create page: „Abbrechen" + „Einsatz anlegen"). The Save
+keeps its `form="mission-form"` binding (the classic no-JS submit is unchanged). Deleting moved to
+the head's overflow menu and the „Zurück" button to the head's back link (2026-10-03, superseding the
+fixed `.footacts` bar of 2026-07-03).
 
-**Full-width Details card on the create page.** The Verwaltung pane's two-column grid (`.pane-grid-2`)
+**Full-width Details card on the create page.** The edit pane's two-column grid (`.pane-grid-2`)
 carries the Details card in the left column and the edit-only editors (Ziele/Ablauf/Organisation/
 Manager, all `th:if="${!isNew}"`) in the right. On the create page the right column has no content, so
 the grid collapses to a **single full-width column** (`.pane-grid--single`, applied only when `isNew`)
-and the empty right column is not rendered — the Details form spans the full page width and stays
-centred beneath the greeting header instead of being stranded in the left half.
+and the empty right column is not rendered — the Details form stays centred beneath the page head
+(at the `.form-layout` measure) instead of being stranded in the left half.
+
+Amended 2026-10-03 (website overhaul phase 3): the create page wears the page head „← Einsätze /
+Neuer Einsatz" and the form pattern C — numbered sections, Ziele and Ablauf as sections 4 and 5, and
+the sticky actions „Abbrechen" + „Einsatz anlegen" — and lands in the edit mode instead of a tab.
 
 **Enforced by:** `MissionTimelineCreateSeedTest` (create-time seeders: contiguous orderIndex, no version
 bump, no re-fetch, id-only / kind-only audit) + `MissionServiceTest` /
@@ -619,7 +674,7 @@ bump, no re-fetch, id-only / kind-only audit) + `MissionServiceTest` /
 **Code:** backend `CreateMissionRequest` (nested `NewObjective` / `NewStep`),
 `MissionService.createMission` / `MissionTimelineService.addObjectiveAtCreate` / `addStepAtCreate`;
 frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
-`MissionWriteController.createMission`, `mission-detail.html` (create editors + floating-save rule),
+`MissionWriteController.createMission`, `mission-detail.html` (create sections + sticky actions),
 `mission-detail.js` (create-form editor module).
 
 ### REQ-MISSION-020 — Manager-only add-by-id for the app

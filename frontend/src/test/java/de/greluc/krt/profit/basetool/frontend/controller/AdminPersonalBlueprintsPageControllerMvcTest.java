@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -112,7 +114,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void view_withMember_rendersTheMembersDialogsTogetherWithTheImportScript() throws Exception {
     PageResponse<UserDto> empty = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
     String html =
         mockMvc
             .perform(
@@ -133,7 +135,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void view_rendersIdPlaceholderToken_inPerRowEndpoints() throws Exception {
     PageResponse<UserDto> empty = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(empty);
 
     mockMvc
         .perform(
@@ -163,7 +165,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
             null);
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1L, 1, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(
@@ -184,7 +186,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     String userSub = UUID.randomUUID().toString();
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     mockMvc
         .perform(
@@ -196,7 +198,13 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    verify(backendApiClient)
+        .get(
+            uriCaptor.capture(),
+            anyTypeRef(),
+            eq(UUID.fromString(userSub)),
+            eq(200),
+            qCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals("Arclight Pistol", qCaptor.getValue());
   }
@@ -207,7 +215,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     String userSub = UUID.randomUUID().toString();
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
 
     String term = "Größe Röhre";
     mockMvc
@@ -220,7 +228,13 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    verify(backendApiClient)
+        .get(
+            uriCaptor.capture(),
+            anyTypeRef(),
+            eq(UUID.fromString(userSub)),
+            eq(200),
+            qCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals(term, qCaptor.getValue());
   }
@@ -260,8 +274,9 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
             null);
     PageResponse<PersonalBlueprintDto> emptyBlueprints =
         new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyClass())).thenReturn(user);
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyBlueprints);
+    when(backendApiClient.get(anyString(), anyClass(), any(Object[].class))).thenReturn(user);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(emptyBlueprints);
 
     mockMvc
         .perform(
@@ -277,7 +292,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void view_rendersGlobalPurgeDangerZone() throws Exception {
     PageResponse<UserDto> users = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(users);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(users);
 
     mockMvc
         .perform(get("/admin/personal-blueprints"))
@@ -286,6 +301,70 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(containsString("data-bp-purge")))
         .andExpect(content().string(containsString("data-confirm-token=\"LOESCHEN\"")))
         .andExpect(content().string(containsString("/admin/personal-blueprints/delete-all-users")));
+  }
+
+  /**
+   * The page follows the list pattern (REQ-UI-027): page head with the admin eyebrow and count, the
+   * purge in the overflow menu, a live search in the toolbar and the stacked table.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_withMember_rendersTheListPattern() throws Exception {
+    PersonalBlueprintDto bp =
+        new PersonalBlueprintDto(
+            UUID.randomUUID(),
+            "arclight",
+            "Arclight Pistol",
+            UUID.randomUUID(),
+            null,
+            "n",
+            true,
+            0L,
+            null,
+            null,
+            null,
+            null,
+            null);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.of(bp), 0, 200, 1L, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/personal-blueprints")
+                    .param("userSub", "00000000-0000-0000-0000-000000000009")
+                    .locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+
+    assertThat(html)
+        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .contains("data-list-count-for=\"bp-results\"")
+        .containsPattern("overflow-menu__item--danger\"[^>]*data-testid=\"bp-purge-open\"")
+        .contains("id=\"krt-bp-q\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .contains("data-list-total=\"1\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("krt-admin-banner")
+        .doesNotContain("colspan");
+    assertThat(main.split("btn--cta", -1)).hasSizeLessThanOrEqualTo(2);
+    assertThat(main).doesNotContain(">Filtern<");
+  }
+
+  /** Without a member the page shows the empty state instead of a bare hint. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_withoutMember_rendersTheEmptyState() throws Exception {
+    mockMvc
+        .perform(get("/admin/personal-blueprints"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(not(containsString("id=\"bp-results\""))));
   }
 
   @Test

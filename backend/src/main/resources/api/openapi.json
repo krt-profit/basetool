@@ -15642,6 +15642,13 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "in" : "query",
+          "name" : "fitted",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
         } ],
         "responses" : {
           "200" : {
@@ -37238,6 +37245,252 @@
         "x-domain" : "notification"
       }
     },
+    "/api/v1/notifications/preferences" : {
+      "get" : {
+        "operationId" : "preferences",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/NotificationPreferenceDto"
+                  }
+                }
+              }
+            },
+            "description" : "The preferences.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List the caller's notification preferences, one entry per type.",
+        "tags" : [ "notification" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "notification"
+      }
+    },
+    "/api/v1/notifications/preferences/{type}" : {
+      "put" : {
+        "operationId" : "setPreference",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "type",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF" ]
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/NotificationPreferenceWriteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationPreferenceDto"
+                }
+              }
+            },
+            "description" : "The preference was stored."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Mute or unmute one notification type for the caller.",
+        "tags" : [ "notification" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "notification"
+      }
+    },
     "/api/v1/notifications/read" : {
       "delete" : {
         "operationId" : "deleteAllRead",
@@ -39566,7 +39819,7 @@
     },
     "/api/v1/orders" : {
       "get" : {
-        "description" : "Returns a paginated list of job orders.",
+        "description" : "Returns a paginated list of job orders. toProcess=true keeps only the orders whose profit-eligible responsible unit is one of the caller's own units.",
         "operationId" : "getAllJobOrders",
         "parameters" : [ {
           "in" : "query",
@@ -39589,6 +39842,14 @@
               "type" : "string",
               "format" : "uuid"
             }
+          }
+        }, {
+          "in" : "query",
+          "name" : "toProcess",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
           }
         }, {
           "in" : "query",
@@ -51895,7 +52156,7 @@
     },
     "/api/v1/personal-blueprints/overview" : {
       "get" : {
-        "description" : "Paginated; the optional product-name search filters before pagination so it spans every entry, not just the requested page.",
+        "description" : "Paginated; the optional search matches the product name or the display name of an in-scope owner and filters before pagination, so it spans every entry, not just the requested page.",
         "operationId" : "listAvailableBlueprints",
         "parameters" : [ {
           "in" : "query",
@@ -58205,6 +58466,20 @@
           }
         }, {
           "in" : "query",
+          "name" : "ready",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
@@ -58713,6 +58988,20 @@
               "type" : "string",
               "enum" : [ "OPEN", "IN_PROGRESS", "COMPLETED", "CANCELED" ]
             }
+          }
+        }, {
+          "in" : "query",
+          "name" : "ready",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         }, {
           "in" : "query",
@@ -71909,6 +72198,9 @@
           "applicableLimit" : {
             "type" : "number"
           },
+          "callerMayConfirm" : {
+            "type" : "boolean"
+          },
           "counterpartyHandle" : {
             "type" : "string"
           },
@@ -77519,6 +77811,9 @@
             "type" : "integer",
             "format" : "int64"
           },
+          "signedUp" : {
+            "type" : "boolean"
+          },
           "status" : {
             "type" : "string"
           },
@@ -77843,6 +78138,32 @@
           }
         }
       },
+      "NotificationPreferenceDto" : {
+        "type" : "object",
+        "description" : "One notification type and whether the caller receives it.",
+        "properties" : {
+          "mutable" : {
+            "type" : "boolean"
+          },
+          "muted" : {
+            "type" : "boolean"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF" ]
+          }
+        }
+      },
+      "NotificationPreferenceWriteRequest" : {
+        "type" : "object",
+        "description" : "Sets whether the caller receives one notification type.",
+        "properties" : {
+          "muted" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "muted" ]
+      },
       "NotificationRuleDto" : {
         "type" : "object",
         "properties" : {
@@ -77858,7 +78179,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "DISCORD_REGISTRATION_DECIDED", "JOB_ORDER_CLOSED", "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER_DUE", "MISSION_STARTED", "MISSION_CHECKED_IN", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_END_RECORDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_MARKED", "OPERATION_PAYOUT_UNMARKED", "OPERATION_COMPLETED", "OPERATION_COMPLETED_UNOWNED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER_READY_CLEARED", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_REVOKED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_BOOKED", "BANK_HOLDER_TRANSFER_BOOKED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER_NOTICE_CLEARED", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED_TO_UNIT", "HANGAR_SHIP_UNASSIGNED_FROM_UNIT", "HANGAR_SHIP_DELETED_FROM_MISSION", "HANGAR_FITTED_RESET_FOR_OWNER", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCHED_ON" ]
           },
           "excludeActor" : {
             "type" : "boolean"
@@ -77869,7 +78190,7 @@
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF" ]
           },
           "selectors" : {
             "type" : "array",
@@ -77900,11 +78221,11 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS" ]
           },
           "orgRelativeRole" : {
             "type" : "string",
-            "enum" : [ "OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER" ]
+            "enum" : [ "OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER", "UNIT_LEADERSHIP" ]
           },
           "roleCode" : {
             "type" : "string"
@@ -77924,11 +78245,11 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS" ]
           },
           "orgRelativeRole" : {
             "type" : "string",
-            "enum" : [ "OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER" ]
+            "enum" : [ "OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER", "UNIT_LEADERSHIP" ]
           },
           "roleCode" : {
             "type" : "string"
@@ -77953,14 +78274,14 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "DISCORD_REGISTRATION_DECIDED", "JOB_ORDER_CLOSED", "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER_DUE", "MISSION_STARTED", "MISSION_CHECKED_IN", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_END_RECORDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_MARKED", "OPERATION_PAYOUT_UNMARKED", "OPERATION_COMPLETED", "OPERATION_COMPLETED_UNOWNED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER_READY_CLEARED", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_REVOKED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_BOOKED", "BANK_HOLDER_TRANSFER_BOOKED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER_NOTICE_CLEARED", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED_TO_UNIT", "HANGAR_SHIP_UNASSIGNED_FROM_UNIT", "HANGAR_SHIP_DELETED_FROM_MISSION", "HANGAR_FITTED_RESET_FOR_OWNER", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCHED_ON" ]
           },
           "excludeActor" : {
             "type" : "boolean"
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF" ]
           },
           "selectors" : {
             "type" : "array",
@@ -81155,8 +81476,8 @@
         "properties" : {
           "code" : {
             "type" : "string",
-            "description" : "The stable reason, one of the values in x-problem-codes (registry CoreProblemCode, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
-            "x-problem-codes" : [ "OPTIMISTIC_LOCK", "PESSIMISTIC_LOCK", "ACCESS_DENIED", "UNAUTHENTICATED", "VALIDATION_FAILED", "CONSTRAINT_VIOLATION", "DUPLICATE_ENTITY", "ILLEGAL_ARGUMENT", "BAD_REQUEST", "TYPE_MISMATCH", "DATA_INTEGRITY_VIOLATION", "NOT_FOUND", "METHOD_NOT_ALLOWED", "UNSUPPORTED_MEDIA_TYPE", "NOT_ACCEPTABLE", "INTERNAL_ERROR", "BUSINESS_CONFLICT", "OVER_ALLOCATION", "PRODUCTION_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "MISSION_PARTICIPANT_REQUIRED", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "REPORT_GENERATION_FAILED", "BANK_OVERDRAFT", "BANK_HOLDER_OVERDRAFT", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ACCOUNT_CLOSED", "BANK_GRANTEE_MISSING_ROLE", "BANK_SELF_TRANSFER", "BANK_ALREADY_REVERSED", "BANK_HOLDER_INACTIVE", "BANK_NOT_REVERSIBLE", "BANK_REQUEST_NOT_PENDING", "BANK_REQUEST_ALREADY_APPROVED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BANK_JUSTIFICATION_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "TERMS_NOT_ACCEPTED", "PENDING_APPROVAL", "NO_ROLE", "ACTING_MEMBER_REFUSED", "SERVICE_UNAVAILABLE", "RATE_LIMIT_EXCEEDED", "REQUEST_BODY_TOO_LARGE", "APP_UPDATE_REQUIRED" ]
+            "description" : "The stable reason, one of the values in x-problem-codes (the ProblemCode registry, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
+            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "APP_UPDATE_REQUIRED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
           },
           "correlationId" : {
             "type" : "string",
@@ -81209,6 +81530,12 @@
       "ProfitCalculationDto" : {
         "type" : "object",
         "properties" : {
+          "buyTerminalLocation" : {
+            "type" : "string"
+          },
+          "buyTerminalName" : {
+            "type" : "string"
+          },
           "fullLoadCost" : {
             "type" : "number"
           },
@@ -81233,6 +81560,12 @@
           },
           "profitPerScu" : {
             "type" : "number"
+          },
+          "sellTerminalLocation" : {
+            "type" : "string"
+          },
+          "sellTerminalName" : {
+            "type" : "string"
           }
         }
       },

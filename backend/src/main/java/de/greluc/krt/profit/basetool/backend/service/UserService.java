@@ -19,27 +19,31 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
+import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
-import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -79,11 +83,30 @@ public class UserService {
   private static final String RSI_HANDLE_TAKEN = "error.user.rsiHandle.taken";
 
   private final UserRepository userRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
+
+  /**
+   * Returns whether the caller is a non-admin who can see none of the user's Staffeln through the
+   * scope API; a user without any Staffel counts as cross-squadron.
+   *
+   * @param userId the target user's id
+   * @return {@code true} if the caller is a non-admin and shares none of the user's Staffeln
+   */
+  public boolean isCrossSquadronForNonAdmin(@NotNull UUID userId) {
+    if (authHelperService.isAdmin()) {
+      return false;
+    }
+    List<UUID> targetSquadronIds =
+        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId);
+    if (targetSquadronIds.isEmpty()) {
+      return true;
+    }
+    return targetSquadronIds.stream().noneMatch(ownerScopeService::canSeeSquadron);
+  }
 
   /**
    * Checks whether any user has this exact name, case-insensitively, as username or display name.
@@ -130,7 +153,7 @@ public class UserService {
 
     try {
       return UUID.fromString(sub);
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException _) {
       log.error(
           "JWT subject is not a valid UUID: '{}'. Refusing the request to avoid identity mix-up.",
           sub);
@@ -272,7 +295,7 @@ public class UserService {
     user.setRsiHandle(candidate);
     try {
       return userRepository.saveAndFlush(user);
-    } catch (DataIntegrityViolationException e) {
+    } catch (DataIntegrityViolationException _) {
       throw new DuplicateEntityException(RSI_HANDLE_TAKEN);
     }
   }
@@ -298,7 +321,7 @@ public class UserService {
     user.setShareBlueprintsGlobally(shareBlueprintsGlobally);
     User saved = userRepository.saveAndFlush(user);
     if (changed) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.BLUEPRINT_SHARING_CHANGED,
           null,
           null,
@@ -443,6 +466,31 @@ public class UserService {
   }
 
   /**
+   * The member who is acting, as a notification event names them.
+   *
+   * @return the caller's id and effective name, or the system actor when nobody is signed in or the
+   *     caller has no row
+   */
+  public @NotNull ActorRef currentActor() {
+    Optional<User> current;
+    try {
+      current = getCurrentUser();
+    } catch (AuthenticationServiceException e) {
+      log.debug("The caller's subject names no member; the event has no actor", e);
+      return ActorRef.system();
+    }
+    return current
+        .map(
+            user ->
+                new ActorRef(
+                    user.getId(),
+                    Objects.requireNonNullElse(
+                        StringNormalization.trimToNull(user.getEffectiveName()),
+                        ActorRef.UNKNOWN_NAME)))
+        .orElseGet(ActorRef::system);
+  }
+
+  /**
    * Parses a subject claim into a member id, refusing anything that is not a UUID.
    *
    * @param subject the caller's non-blank subject claim
@@ -523,9 +571,7 @@ public class UserService {
               userId,
               new MembershipFlagsPatchRequest(
                   change.isLogistician(), change.isMissionManager(), change.version()));
-      default ->
-          throw new IllegalArgumentException(
-              "Unsupported SpecialCommandChange action: " + change.action());
+      case null -> throw new NullPointerException("special-command change action");
     }
   }
 

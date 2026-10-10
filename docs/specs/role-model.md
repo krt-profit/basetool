@@ -88,7 +88,8 @@ Like `SK_LEAD` and the area/OL ranks, a squadron rank also carries the flat back
 `hasRole('LOGISTICIAN')` gates keep working. Every such gate is **owner-scoped**, so the effective
 reach stays own-squadron: the two previously-unscoped per-user refinery endpoints (`GET` / `POST
 /api/v1/refinery-orders/users/{userId}`) were scoped with `@ownerScopeService.canViewUserRefineryOrders`
-/ `canManageUserRefineryOrders` (PR #808 security review) so the flat role can no longer act org-wide
+/ `canManageUserRefineryOrders` (PR #808 security review; since 2026-10-10 the refinery module's
+`@refineryAccessPolicy`, same verdicts) so the flat role can no longer act org-wide
 there.
 
 The `canView/canManageUserRefineryOrders` gate is a **coarse user-level pre-check**: it passes when
@@ -186,13 +187,34 @@ a delegated leader; `LOGISTICIAN` / `MISSION_MANAGER` are deliberately **not** a
 capability-only holder with no appointment reach (empty view) cannot open the surface. The per-unit
 appointment authority remains the delegated verdict above, re-checked on every backend write.
 
+**The page is a master-detail.** On the left a unit tree grouped „Organisationsleitung · Bereiche ·
+Staffeln · Spezialkommandos", each unit with its Bereich colour square and member count, and a
+search over unit names, shorthands and member names; on the right the selected unit — its kind
+and Bereich as eyebrow, its name, „Mitglied hinzufügen" where the caller may add members (OL,
+Bereich, SK — a Staffel's members come from its memberships and have no add here), and the tabs
+„Mitglieder (n)" and, for a Staffel, „Kommandogruppen (n)". `?unit=<id>` selects the unit (an
+unknown id selects the first), `?tab=groups` the second tab; the selection rewrites the address in
+place and the tree moves with the arrow keys. An editable rank or Kommandogruppe is a select that
+**saves on change** — one versioned write per change, a toast on success, the conflict dialog on a
+`409` — with no save button per row; appointing a Grand Admiral, revoking a rank, removing a member
+or deleting a group sits in the row's „⋯" menu behind a confirmation.
+
 In the page's **Spezialkommandos** section the two flags mean different people: `canAppointLead`
 is the Bereichsleiter rung above, `canManageRoster` is
 `SpecialCommandSecurityService.canManageMembers` — admin, or the SK's own `SK_LEAD`, REQ-ORG-005.
-The lead toggle renders only with `canAppointLead`; `canManageRoster` renders a „Mitglieder verwalten"
-link to the SK member page `/organisation/special-commands/{id}`. So an SK lead sees their own SK
-here without being able to touch its lead seat. (Since 2026-09-22; before that an SK was listed only
-for a caller who could appoint its lead, and an SK lead had no web path to their own member list.)
+The SK's roster renders **in place** in the selected unit (the `organisation/unit-detail ::
+skRoster` fragment the SK member page `/organisation/special-commands/{id}` uses as well): name,
+the Logistiker / Einsatzleiter flags as toggles and the lead as a read-only flag. With
+`canManageRoster` the caller adds members, toggles the flags and removes members there; the lead
+toggle is offered in the row menu only with `canAppointLead`. So an SK lead manages their own SK
+here without being able to touch its lead seat. (Since 2026-09-22 an SK lead sees their SK; until
+2026-10-03 `canManageRoster` rendered a „Mitglieder verwalten" link to the SK member page instead
+of the roster.)
+
+Amended 2026-10-03 (website overhaul phase 3): the Leitung page became the master-detail above,
+rank and group selects save on change, and the SK roster moved onto the page; the „Mitglieder
+verwalten" link is gone. Guarded by `LeitungPagePatternRenderTest`, `LeitungPageControllerMvcTest`
+and `SpecialCommandMembersPageControllerMvcTest`.
 
 **Acceptance**
 
@@ -225,8 +247,9 @@ The functional rank on `org_unit_membership` is the source of truth. The org cha
 (REQ-ORG-010); free-text / account-less chart holders stay chart-only. Account-linked chart seats are
 derived from the ranks; the authority cascade never reads the chart.
 
-The mirror is written in the same transaction as the rank change, by `OrgChartService.mirror*`
-called from the appointment flow (never by giving the chart scope awareness): the flat seats
+The mirror is written in the same transaction as the rank change, by `OrgChartService` through
+the org-unit module's `orgunit.api.MembershipChangeObserver` SPI (`MANDATORY`), called from the
+appointment flow (never by giving the chart scope awareness): the flat seats
 (Bereichsleiter / -koordinator / -operator, OL member, SK-Leiter, Staffelleiter) map 1:1 onto a
 chart position keyed by org unit (singletons are reassigned, not duplicated, so the partial unique
 indexes hold), while the in-Kommando ranks project onto the Kommando sub-tree — a `COMMAND_LEAD`
@@ -268,7 +291,7 @@ an OL member's by construction.
   assign-lead / add-child), and creating a child under it is rejected with
   `problem.org_chart.account_managed_in_leitung`.
 
-**Enforced by:** `OrgChartServiceTest` (the `mirror*` cases, `getOrgChart_groupLinkedCommand_projectsKommandoGroupId`, `createPosition_childUnderGroupLinkedKommando_isRejected`), `OrgChartPageRenderTest#groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances`, `OrgChartDtoDeserializationTest`, `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgChartReadService#buildCommand`, `OrgChartService#createPosition`, `CommandChartDto#kommandoGroupId`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgChartServiceTest` (the `mirror*` cases of the `MembershipChangeObserver` methods, `getOrgChart_groupLinkedCommand_projectsKommandoGroupId`, `createPosition_childUnderGroupLinkedKommando_isRejected`), `OrgChartPageRenderTest#groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances`, `OrgChartDtoDeserializationTest`, `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgChartReadService#buildCommand`, `OrgChartService#createPosition`, `CommandChartDto#kommandoGroupId`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
 
 ## Out of scope
 

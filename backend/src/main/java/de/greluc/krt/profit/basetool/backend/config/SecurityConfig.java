@@ -19,18 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
+import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
-import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
-import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
-import de.greluc.krt.profit.basetool.backend.support.Permissions;
-import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
-import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
-import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
-import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
+import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberFilterProvider;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
+import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.servlet.Filter;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -291,6 +291,8 @@ public class SecurityConfig {
    * @param objectMapper serializes those filters' {@code ProblemDetail}s
    * @param meterRegistry counts the identity-provider-unavailable 503
    * @param noRoleRefusedSubjectWindow the window the {@code NO_ROLE} refusals are recorded into
+   * @param actingMemberFilterProvider supplies the acting-member filter, placed after the
+   *     bearer-token filter (ADR-0129)
    * @param clientAttribution bounds the {@code client_id} label of the API client request counter
    * @param retiredOperations the retired Android operations answered ahead of CSRF and
    *     authentication with {@code 410 APP_UPDATE_REQUIRED} (REQ-API-020)
@@ -310,18 +312,18 @@ public class SecurityConfig {
       TermsConsentCheck termsConsentCheck,
       RefusedSubjectWindow refusedSubjectWindow,
       RefusedSubjectWindow noRoleRefusedSubjectWindow,
-      IngestGatewayProperties ingestGatewayProperties,
-      ActingMemberAuthorities actingMemberAuthorities,
+      ActingMemberFilterProvider actingMemberFilterProvider,
       RateLimitProperties rateLimitProperties,
       ClientAttribution clientAttribution,
       RetiredOperations retiredOperations)
       throws Exception {
 
     boolean isTest = env.matchesProfiles("test");
+    Filter actingMemberFilter = actingMemberFilterProvider.actingMemberFilter();
 
     boolean armed =
         !isTest || env.getProperty(TERMS_GATE_ARMED_IN_TEST, Boolean.class, Boolean.FALSE);
-    TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : userId -> true;
+    TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : _ -> true;
 
     if (isTest && !env.getProperty(CSRF_ARMED_IN_TEST, Boolean.class, Boolean.FALSE)) {
       http.csrf(
@@ -465,13 +467,7 @@ public class SecurityConfig {
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         .addFilterAfter(
-            new ActingMemberFilter(
-                ingestGatewayProperties,
-                actingMemberAuthorities,
-                messageSource,
-                problemResponseFactory,
-                objectMapper,
-                meterRegistry),
+            actingMemberFilter,
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         .addFilterAfter(
@@ -481,7 +477,7 @@ public class SecurityConfig {
                 objectMapper,
                 meterRegistry,
                 noRoleRefusedSubjectWindow),
-            ActingMemberFilter.class)
+            actingMemberFilter.getClass())
         .addFilterAfter(
             new TermsAcceptanceAccessFilter(
                 effectiveConsentCheck,

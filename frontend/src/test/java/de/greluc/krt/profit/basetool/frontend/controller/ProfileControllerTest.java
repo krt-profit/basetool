@@ -19,26 +19,34 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyBlueprintSharingRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyBlueprintSharingResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyPayoutPreferenceRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyPayoutPreferenceResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserDescriptionRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileBlueprintSharingForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
@@ -54,9 +62,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * Mockito unit tests for {@link ProfileController}.
  *
  * <ul>
- *   <li>Unauthenticated callers are redirected home.
  *   <li>Backend data overrides OIDC token claims.
- *   <li>Join-date parsing and months-in-squadron computation.
+ *   <li>Join-date and months-in-squadron computation.
  *   <li>POST /profile/description success, validation, optimistic-lock and generic-error branches.
  *   <li>Multi-valued OIDC claims.
  * </ul>
@@ -64,18 +71,52 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @ExtendWith(MockitoExtension.class)
 class ProfileControllerTest {
 
+  private static final String ME = "/api/v1/users/me";
+
   @Mock private BackendApiClient backendApiClient;
   @Mock private OidcUser principal;
   @Mock private RedirectAttributes redirectAttributes;
   @Mock private BindingResult bindingResult;
   @Mock private MessageSource messageSource;
-  @Mock private FrontendAuthHelperService authHelper;
 
-  @InjectMocks private ProfileController controller;
+  private ProfileController controller;
 
   @BeforeEach
-  void wireIssuerUri() {
+  void setUp() {
+    controller =
+        new ProfileController(
+            new IdentityBackendClient(backendApiClient),
+            new NotificationBackendClient(backendApiClient),
+            messageSource);
     ReflectionTestUtils.setField(controller, "issuerUri", "https://kc.example.com/realms/iri");
+  }
+
+  private static UserDto user(
+      Integer rank,
+      String description,
+      String displayName,
+      Long version,
+      LocalDate joinDate,
+      List<SquadronReferenceDto> squadrons) {
+    return new UserDto(
+        UUID.fromString("0b6f7c1e-3a52-4d8e-9f10-2c3d4e5f6a7b"),
+        "jdoe",
+        displayName,
+        displayName,
+        null,
+        rank,
+        description,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        squadrons,
+        version,
+        joinDate,
+        null);
   }
 
   @Test
@@ -86,21 +127,19 @@ class ProfileControllerTest {
     when(principal.getAttribute("description")).thenReturn("From-Token");
     when(principal.getAttribute("displayName")).thenReturn("JD");
 
-    Map<String, Object> backendUser =
-        Map.of(
-            "rank", 7,
-            "description", "From-Backend",
-            "displayName", "Backend-DN",
-            "version", 4L,
-            "joinDate", "2024-01-15");
-    when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
-        .thenReturn(backendUser);
-    when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me/payout-preference"), anyTypeRef()))
-        .thenReturn(Map.of("defaultPayoutPreference", "DONATE", "version", 4L));
-    when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me/blueprint-sharing"), anyTypeRef()))
-        .thenReturn(Map.of("shareBlueprintsGlobally", true, "version", 4L));
+    List<SquadronReferenceDto> squadrons =
+        List.of(
+            new SquadronReferenceDto(
+                UUID.fromString("5a1d2c3b-4e5f-4a6b-8c7d-9e0f1a2b3c4d"), "IRIDIUM", "IRI"));
+    when(backendApiClient.get(ME, UserDto.class))
+        .thenReturn(
+            user(7, "From-Backend", "Backend-DN", 4L, LocalDate.of(2024, 1, 15), squadrons));
+    when(backendApiClient.get(
+            "/api/v1/users/me/payout-preference", MyPayoutPreferenceResponse.class))
+        .thenReturn(new MyPayoutPreferenceResponse("DONATE", 4L));
+    when(backendApiClient.get(
+            "/api/v1/users/me/blueprint-sharing", MyBlueprintSharingResponse.class))
+        .thenReturn(new MyBlueprintSharingResponse(true, 4L));
 
     Model model = new ConcurrentModel();
     String view = controller.profile(model, principal);
@@ -112,7 +151,8 @@ class ProfileControllerTest {
     assertEquals("From-Backend", model.getAttribute("description"));
     assertEquals("Backend-DN", model.getAttribute("displayName"));
     assertEquals(4L, model.getAttribute("version"));
-    assertEquals(java.time.LocalDate.of(2024, 1, 15), model.getAttribute("joinDate"));
+    assertEquals(squadrons, model.getAttribute("profileSquadrons"));
+    assertEquals(LocalDate.of(2024, 1, 15), model.getAttribute("joinDate"));
     Long months = (Long) model.getAttribute("monthsInSquadron");
     assertNotNull(months);
     assertTrue(months >= 12, "expected at least one year, was " + months);
@@ -144,13 +184,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(3);
     when(principal.getAttribute("description")).thenReturn("From-Token");
     when(principal.getAttribute("displayName")).thenReturn("JD");
-    when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
-        .thenThrow(new RuntimeException("backend down"));
-    when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me/payout-preference"), anyTypeRef()))
-        .thenThrow(new RuntimeException("backend down"));
-    when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me/blueprint-sharing"), anyTypeRef()))
+    when(backendApiClient.get(any(String.class), any(Class.class)))
         .thenThrow(new RuntimeException("backend down"));
 
     Model model = new ConcurrentModel();
@@ -162,6 +196,7 @@ class ProfileControllerTest {
     assertEquals("JD", model.getAttribute("displayName"));
     assertEquals(PayoutPreference.PAYOUT, model.getAttribute("defaultPayoutPreference"));
     assertEquals(false, model.getAttribute("shareBlueprintsGlobally"));
+    assertEquals(true, model.getAttribute("deletionRequestUnavailable"));
   }
 
   @Test
@@ -170,8 +205,6 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(List.of(5, 6));
     when(principal.getAttribute("description")).thenReturn(List.of("first", "second"));
     when(principal.getAttribute("displayName")).thenReturn(java.util.List.of("DN"));
-    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
-        .thenReturn(null);
 
     Model model = new ConcurrentModel();
     controller.profile(model, principal);
@@ -187,8 +220,6 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(List.of());
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
-    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
-        .thenReturn(null);
 
     Model model = new ConcurrentModel();
     controller.profile(model, principal);
@@ -202,8 +233,6 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(2);
     when(principal.getAttribute("description")).thenReturn("Desc");
     when(principal.getAttribute("displayName")).thenReturn("DN");
-    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
-        .thenReturn(null);
 
     Model model = new ConcurrentModel();
     controller.profile(model, principal);
@@ -214,35 +243,30 @@ class ProfileControllerTest {
   }
 
   @Test
-  void profile_authenticated_backendUserMissingDescriptionKey_keepsToken() {
+  void profile_authenticated_backendUserWithoutRank_keepsTokenRank() {
     when(principal.getPreferredUsername()).thenReturn("jdoe");
     when(principal.getAttribute("rank")).thenReturn(2);
     when(principal.getAttribute("description")).thenReturn("Token-Desc");
     when(principal.getAttribute("displayName")).thenReturn("Token-DN");
-
-    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
-        .thenReturn(Map.of("rank", 4));
+    when(backendApiClient.get(ME, UserDto.class))
+        .thenReturn(user(null, "Backend-Desc", "Backend-DN", 3L, null, null));
 
     Model model = new ConcurrentModel();
     controller.profile(model, principal);
 
-    assertEquals("Token-Desc", model.getAttribute("description"));
-    assertEquals("Token-DN", model.getAttribute("displayName"));
-    assertEquals(4, model.getAttribute("rank"));
+    assertEquals(2, model.getAttribute("rank"));
+    assertEquals("Backend-Desc", model.getAttribute("description"));
+    assertEquals("Backend-DN", model.getAttribute("displayName"));
+    assertNull(model.getAttribute("profileSquadrons"));
   }
 
   @Test
-  void profile_invalidJoinDateFormat_isSilentlyIgnored() {
+  void profile_withoutJoinDate_setsNoTenure() {
     when(principal.getPreferredUsername()).thenReturn("jdoe");
     when(principal.getAttribute("rank")).thenReturn(2);
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
-
-    Map<String, Object> backendUser = new java.util.HashMap<>();
-    backendUser.put("rank", 4);
-    backendUser.put("joinDate", "not-a-valid-date");
-    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
-        .thenReturn(backendUser);
+    when(backendApiClient.get(ME, UserDto.class)).thenReturn(user(4, null, null, 1L, null, null));
 
     Model model = new ConcurrentModel();
     assertEquals("profile", controller.profile(model, principal));
@@ -251,46 +275,12 @@ class ProfileControllerTest {
   }
 
   @Test
-  void profile_versionFromBackendAsNumber_isUnboxedToLong() {
+  void profile_backendUserWithoutVersion_fallsBackToZero() {
     when(principal.getPreferredUsername()).thenReturn("jdoe");
     when(principal.getAttribute("rank")).thenReturn(2);
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
-
-    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
-        .thenReturn(Map.of("rank", 1, "version", 7));
-
-    Model model = new ConcurrentModel();
-    controller.profile(model, principal);
-
-    assertEquals(7L, model.getAttribute("version"));
-  }
-
-  @Test
-  void profile_versionFromBackendAsString_isParsedToLong() {
-    when(principal.getPreferredUsername()).thenReturn("jdoe");
-    when(principal.getAttribute("rank")).thenReturn(2);
-    when(principal.getAttribute("description")).thenReturn(null);
-    when(principal.getAttribute("displayName")).thenReturn(null);
-
-    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
-        .thenReturn(Map.of("rank", 1, "version", "42"));
-
-    Model model = new ConcurrentModel();
-    controller.profile(model, principal);
-
-    assertEquals(42L, model.getAttribute("version"));
-  }
-
-  @Test
-  void profile_versionFromBackendUnparseable_fallsBackToZero() {
-    when(principal.getPreferredUsername()).thenReturn("jdoe");
-    when(principal.getAttribute("rank")).thenReturn(2);
-    when(principal.getAttribute("description")).thenReturn(null);
-    when(principal.getAttribute("displayName")).thenReturn(null);
-
-    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
-        .thenReturn(Map.of("rank", 1, "version", "not-a-number"));
+    when(backendApiClient.get(ME, UserDto.class)).thenReturn(user(1, null, null, null, null, null));
 
     Model model = new ConcurrentModel();
     controller.profile(model, principal);
@@ -308,14 +298,11 @@ class ProfileControllerTest {
             form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
 
     assertEquals("redirect:/profile", view);
-
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
-        .put(eq("/api/v1/users/me/description"), bodyCap.capture(), eq(Void.class));
-    Map<String, Object> body = bodyCap.getValue();
-    assertEquals("New desc", body.get("description"));
-    assertEquals("New DN", body.get("displayName"));
-    assertEquals(2L, body.get("version"));
+        .put(
+            "/api/v1/users/me/description",
+            new UserDescriptionRequest("New desc", "New DN", 2L),
+            Void.class);
     verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
   }
 
@@ -327,11 +314,11 @@ class ProfileControllerTest {
     controller.updateDescription(
         form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
 
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
+    ArgumentCaptor<UserDescriptionRequest> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
         .put(eq("/api/v1/users/me/description"), bodyCap.capture(), eq(Void.class));
-    assertEquals("", bodyCap.getValue().get("description"));
-    assertEquals("", bodyCap.getValue().get("displayName"));
+    assertEquals("", bodyCap.getValue().description());
+    assertEquals("", bodyCap.getValue().displayName());
   }
 
   @Test
@@ -341,8 +328,6 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(1);
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
-    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
-        .thenReturn(null);
 
     ProfileDescriptionForm form = new ProfileDescriptionForm("", "", 1L);
 
@@ -411,8 +396,7 @@ class ProfileControllerTest {
   @Test
   void updateDescriptionAjax_happyPath_returns200WithRefreshedVersion() {
     when(bindingResult.hasErrors()).thenReturn(false);
-    when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
-        .thenReturn(Map.of("version", 5L));
+    when(backendApiClient.get(ME, UserDto.class)).thenReturn(user(1, null, null, 5L, null, null));
 
     ProfileDescriptionForm form = new ProfileDescriptionForm("New desc", "New DN", 4L);
     ResponseEntity<Map<String, Object>> response =
@@ -424,7 +408,24 @@ class ProfileControllerTest {
     assertEquals(5L, body.get("version"));
     assertEquals("New desc", body.get("description"));
     assertEquals("New DN", body.get("displayName"));
-    verify(backendApiClient).put(eq("/api/v1/users/me/description"), any(), eq(Void.class));
+    verify(backendApiClient)
+        .put(
+            "/api/v1/users/me/description",
+            new UserDescriptionRequest("New desc", "New DN", 4L),
+            Void.class);
+  }
+
+  @Test
+  void updateDescriptionAjax_versionRefreshFails_returnsPriorVersionPlusOne() {
+    when(bindingResult.hasErrors()).thenReturn(false);
+    when(backendApiClient.get(ME, UserDto.class)).thenThrow(new RuntimeException("backend down"));
+
+    ProfileDescriptionForm form = new ProfileDescriptionForm("d", "n", 4L);
+    ResponseEntity<Map<String, Object>> response =
+        controller.updateDescriptionAjax(form, bindingResult, principal);
+
+    assertNotNull(response.getBody());
+    assertEquals(5L, response.getBody().get("version"));
   }
 
   @Test
@@ -476,13 +477,11 @@ class ProfileControllerTest {
             form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
 
     assertEquals("redirect:/profile", view);
-
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
-        .put(eq("/api/v1/users/me/payout-preference"), bodyCap.capture(), eq(Void.class));
-    Map<String, Object> body = bodyCap.getValue();
-    assertEquals("DONATE", body.get("preference"));
-    assertEquals(2L, body.get("version"));
+        .put(
+            "/api/v1/users/me/payout-preference",
+            new MyPayoutPreferenceRequest("DONATE", 2L),
+            Void.class);
     verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
   }
 
@@ -528,8 +527,6 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(1);
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
-    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
-        .thenReturn(null);
 
     ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
 
@@ -545,8 +542,7 @@ class ProfileControllerTest {
   @Test
   void updatePayoutPreferenceAjax_happyPath_returns200WithRefreshedVersion() {
     when(bindingResult.hasErrors()).thenReturn(false);
-    when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
-        .thenReturn(Map.of("version", 7L));
+    when(backendApiClient.get(ME, UserDto.class)).thenReturn(user(1, null, null, 7L, null, null));
 
     ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.DONATE, 6L);
     ResponseEntity<Map<String, Object>> response =
@@ -557,12 +553,11 @@ class ProfileControllerTest {
     assertNotNull(body);
     assertEquals(7L, body.get("version"));
     assertEquals("DONATE", body.get("defaultPayoutPreference"));
-
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
-        .put(eq("/api/v1/users/me/payout-preference"), bodyCap.capture(), eq(Void.class));
-    assertEquals("DONATE", bodyCap.getValue().get("preference"));
-    assertEquals(6L, bodyCap.getValue().get("version"));
+        .put(
+            "/api/v1/users/me/payout-preference",
+            new MyPayoutPreferenceRequest("DONATE", 6L),
+            Void.class);
   }
 
   @Test
@@ -614,21 +609,18 @@ class ProfileControllerTest {
             form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
 
     assertEquals("redirect:/profile", view);
-
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
-        .put(eq("/api/v1/users/me/blueprint-sharing"), bodyCap.capture(), eq(Void.class));
-    Map<String, Object> body = bodyCap.getValue();
-    assertEquals(true, body.get("shareBlueprintsGlobally"));
-    assertEquals(2L, body.get("version"));
+        .put(
+            "/api/v1/users/me/blueprint-sharing",
+            new MyBlueprintSharingRequest(true, 2L),
+            Void.class);
     verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
   }
 
   @Test
   void updateBlueprintSharingAjax_happyPath_returns200WithRefreshedVersion() {
     when(bindingResult.hasErrors()).thenReturn(false);
-    when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
-        .thenReturn(Map.of("version", 9L));
+    when(backendApiClient.get(ME, UserDto.class)).thenReturn(user(1, null, null, 9L, null, null));
 
     ProfileBlueprintSharingForm form = new ProfileBlueprintSharingForm(true, 8L);
     ResponseEntity<Map<String, Object>> response =
@@ -639,12 +631,11 @@ class ProfileControllerTest {
     assertNotNull(body);
     assertEquals(9L, body.get("version"));
     assertEquals(true, body.get("shareBlueprintsGlobally"));
-
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
-        .put(eq("/api/v1/users/me/blueprint-sharing"), bodyCap.capture(), eq(Void.class));
-    assertEquals(true, bodyCap.getValue().get("shareBlueprintsGlobally"));
-    assertEquals(8L, bodyCap.getValue().get("version"));
+        .put(
+            "/api/v1/users/me/blueprint-sharing",
+            new MyBlueprintSharingRequest(true, 8L),
+            Void.class);
   }
 
   @Test

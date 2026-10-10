@@ -19,13 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.events.HangarNotices;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
+import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
@@ -33,15 +39,11 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipOverviewDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,6 +56,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -77,11 +80,13 @@ public class HangarService {
   private final UserRepository userRepository;
   private final ShipTypeRepository shipTypeRepository;
   private final LocationRepository locationRepository;
-  private final MissionUnitRepository missionUnitRepository;
-  private final ShipMapper shipMapper;
+  private final ShipDeletionObserver shipDeletionObserver;
+  private final ShipTypeMapper shipTypeMapper;
   private final EntityManager entityManager;
   private final OwnerScopeService ownerScopeService;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
+  private final ApplicationEventPublisher eventPublisher;
+  private final UserService userService;
 
   /**
    * Returns the paged ship list in the caller's squadron scope; an admin without an active squadron
@@ -162,7 +167,7 @@ public class HangarService {
               .orElseThrow(() -> new BadRequestException("Location not found")));
     }
     Ship saved = shipRepository.save(ship);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.HANGAR_SHIP_CREATED,
         saved.getId(),
         saved.getShipType().getName(),
@@ -184,19 +189,23 @@ public class HangarService {
 
   /**
    * Returns one page of the user's own ships in the personal-hangar order, optionally filtered by
-   * ship-type or manufacturer name (REQ-HANGAR-002). Ordering and filtering run in the repository
-   * across the whole fleet.
+   * ship-type or manufacturer name and by the fitted flag (REQ-HANGAR-002). Ordering and filtering
+   * run in the repository across the whole fleet.
    *
    * @param userId owner id; only this user's ships are returned
    * @param search optional ship-type/manufacturer name filter; {@code null}/blank means no filter
+   * @param fitted optional fitted filter; {@code null} means fitted and unfitted ships
    * @param pageable page request, unsorted (the query defines the order)
    * @return one ordered, optionally filtered page of the user's ships
    */
   public Page<Ship> getMyShipsFiltered(
-      @NotNull UUID userId, String search, @NotNull Pageable pageable) {
+      @NotNull UUID userId,
+      @Nullable String search,
+      @Nullable Boolean fitted,
+      @NotNull Pageable pageable) {
     String normalizedSearch =
         search == null || search.isBlank() ? null : LikePatterns.escape(search.trim());
-    return shipRepository.findByOwnerIdFiltered(userId, normalizedSearch, pageable);
+    return shipRepository.findByOwnerIdFiltered(userId, normalizedSearch, fitted, pageable);
   }
 
   /**
@@ -253,7 +262,7 @@ public class HangarService {
           }
 
           return new SquadronShipOverviewDto(
-              shipMapper.shipTypeToDto(type),
+              shipTypeMapper.toDto(type),
               ((Number) obj[1]).longValue(),
               obj[2] != null ? ((Number) obj[2]).longValue() : 0L,
               details);
@@ -325,7 +334,7 @@ public class HangarService {
 
     Ship saved = shipRepository.save(ship);
     if (!changed.isEmpty()) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.HANGAR_SHIP_UPDATED,
           saved.getId(),
           saved.getShipType().getName(),
@@ -354,11 +363,11 @@ public class HangarService {
       throw new AccessDeniedException("Access denied: You do not own this ship");
     }
 
-    int detached = detachFromMissionUnits(shipId);
+    int detached = shipDeletionObserver.beforeShipDelete(shipId);
 
     entityManager.flush();
     shipRepository.delete(ship);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.HANGAR_SHIP_DELETED,
         shipId,
         ship.getShipType().getName(),
@@ -383,11 +392,11 @@ public class HangarService {
     log.info("deleteAllShipsForUser: unlinking {} ships for user {}", ships.size(), userId);
     int detached = 0;
     for (Ship ship : ships) {
-      detached += detachFromMissionUnits(ship.getId());
+      detached += shipDeletionObserver.beforeShipDelete(ship.getId());
     }
     entityManager.flush();
     shipRepository.deleteAll(ships);
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.HANGAR_EMPTIED,
         null,
         null,
@@ -403,17 +412,85 @@ public class HangarService {
   @Transactional
   public void resetAllFittedStatus() {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    List<ShipRepository.OwnerShipCount> perOwner =
+        shipRepository.countFittedByOwnerScoped(
+            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     int reset =
         shipRepository.resetAllFittedScoped(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     if (reset > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.HANGAR_FITTED_RESET,
           null,
           null,
           null,
           AuditDetails.of("ships", reset).with("allUnits", scope.adminAllScope()));
+      ActorRef actor = userService.currentActor();
+      for (ShipRepository.OwnerShipCount owner : perOwner) {
+        eventPublisher.publishEvent(
+            HangarNotices.fittedReset(owner.getOwnerId(), owner.getShipCount(), actor));
+      }
     }
+  }
+
+  /**
+   * Adds a ship to a member's hangar on an admin's behalf and tells the member (REQ-HANGAR-008).
+   *
+   * @param memberId the hangar's owner
+   * @param dto the new ship
+   * @return the saved ship
+   */
+  @Transactional
+  public Ship addShipByAdmin(@NotNull UUID memberId, @NotNull ShipRequestDto dto) {
+    Ship ship = addShip(memberId, dto);
+    announceByAdmin(memberId, "ADDED", ship);
+    return ship;
+  }
+
+  /**
+   * Changes a ship of a member's hangar on an admin's behalf and tells the member (REQ-HANGAR-008).
+   *
+   * @param memberId the hangar's owner
+   * @param shipId the ship
+   * @param dto the new values
+   * @return the saved ship
+   */
+  @Transactional
+  public Ship updateShipByAdmin(
+      @NotNull UUID memberId, @NotNull UUID shipId, @NotNull ShipRequestDto dto) {
+    Ship ship = updateShip(memberId, shipId, dto);
+    announceByAdmin(memberId, "UPDATED", ship);
+    return ship;
+  }
+
+  /**
+   * Deletes a ship of a member's hangar on an admin's behalf and tells the member (REQ-HANGAR-008).
+   *
+   * @param memberId the hangar's owner
+   * @param shipId the ship
+   * @return how many mission units the ship was detached from
+   */
+  @Transactional
+  public int deleteShipByAdmin(@NotNull UUID memberId, @NotNull UUID shipId) {
+    Ship ship = shipRepository.findById(shipId).orElse(null);
+    int detached = deleteShip(memberId, shipId);
+    if (ship != null) {
+      announceByAdmin(memberId, "DELETED", ship);
+    }
+    return detached;
+  }
+
+  private void announceByAdmin(UUID memberId, String changeCode, Ship ship) {
+    ActorRef actor = userService.currentActor();
+    if (memberId.equals(actor.id())) {
+      return;
+    }
+    eventPublisher.publishEvent(
+        HangarNotices.hangarChanged(
+            memberId,
+            changeCode,
+            ship.getShipType() == null ? ActorRef.UNKNOWN_NAME : ship.getShipType().getName(),
+            actor));
   }
 
   /**
@@ -438,7 +515,7 @@ public class HangarService {
     }
     int updated = shipRepository.setLocationForOwner(userId, location);
     if (updated > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.HANGAR_HOME_LOCATION_SET,
           location.getId(),
           location.getName(),
@@ -446,27 +523,5 @@ public class HangarService {
           AuditDetails.of("ships", updated));
     }
     return updated;
-  }
-
-  /**
-   * Detaches a ship from every mission unit it is assigned to, recording one {@code
-   * MISSION_UNIT_UPDATED} event per unit so the mission trail shows the change (REQ-AUDIT-001).
-   *
-   * @param shipId the ship about to be deleted
-   * @return how many mission units were detached
-   */
-  private int detachFromMissionUnits(@NotNull UUID shipId) {
-    List<MissionUnit> units = missionUnitRepository.findByShipId(shipId);
-    for (MissionUnit unit : units) {
-      unit.setShip(null);
-      missionUnitRepository.save(unit);
-      auditService.record(
-          AuditEventType.MISSION_UNIT_UPDATED,
-          unit.getMission().getId(),
-          unit.getMission().getName(),
-          null,
-          AuditDetails.of("unit", unit.getId()).with("shipDetached", shipId));
-    }
-    return units.size();
   }
 }

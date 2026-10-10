@@ -113,17 +113,15 @@ function writeExpandedOrderMaterials(values) {
 
 function applyOrderMaterialsState(orderId, expanded) {
     const body = document.querySelector(
-        '[data-order-materials="' +
-            (window.CSS && CSS.escape ? CSS.escape(orderId) : orderId) +
-            '"]',
+        `[data-order-materials="${window.CSS && CSS.escape ? CSS.escape(orderId) : orderId}"]`,
     );
     const btn = document.querySelector(
-        '[data-trigger="ord-toggle-materials"][data-order-id="' +
-            (window.CSS && CSS.escape ? CSS.escape(orderId) : orderId) +
-            '"]',
+        `[data-trigger="ord-toggle-materials"][data-order-id="${
+            window.CSS && CSS.escape ? CSS.escape(orderId) : orderId
+        }"]`,
     );
     if (body) {
-        body.classList.toggle('krtm-display-none-5790', !expanded);
+        body.toggleAttribute('hidden', !expanded);
     }
     if (btn) {
         btn.setAttribute('aria-expanded', String(expanded));
@@ -199,9 +197,9 @@ function updateSquadronHeaderText() {
     } else if (checked.length === 1) {
         const option = checked[0].closest('.multi-select-option');
         const label = option ? option.querySelector('span') : null;
-        textEl.textContent = label ? label.textContent.trim() : checked.length + ' ' + dataSelected;
+        textEl.textContent = label ? label.textContent.trim() : `${checked.length} ${dataSelected}`;
     } else {
-        textEl.textContent = checked.length + ' ' + dataSelected;
+        textEl.textContent = `${checked.length} ${dataSelected}`;
     }
 }
 
@@ -243,7 +241,7 @@ function applyOrdersFilter() {
         if (key === 'squadronId') continue;
         if (value !== '') params.append(key, value);
     }
-    const boxes = squadronBoxes();
+    const boxes = scopeHidesSquadronFilter() ? [] : squadronBoxes();
     if (boxes.length > 0) {
         const checked = boxes.filter((b) => b.checked);
         if (checked.length === 0) {
@@ -254,7 +252,7 @@ function applyOrdersFilter() {
     }
     const query = params.toString();
     window.krtFetch.swap({
-        url: '/orders' + (query ? '?' + query : ''),
+        url: `/orders${query ? `?${query}` : ''}`,
         container: resultsContainer,
         history: true,
     });
@@ -341,6 +339,87 @@ function restoreStatusFilter() {
     );
 }
 
+const ORDERS_SCOPE_FILTER_KEY = 'orders_scope_filter';
+const ORDERS_SCOPES = ['MINE', 'TO_PROCESS', 'ALL'];
+
+function scopeInputs() {
+    return Array.prototype.slice.call(
+        document.querySelectorAll('#orders-filter-form input[name="scope"]'),
+    );
+}
+
+function currentScope() {
+    const checked = scopeInputs().filter((el) => el.checked)[0];
+    return checked ? checked.value : null;
+}
+
+function scopeHidesSquadronFilter() {
+    const field = document.getElementById('ordersSquadronField');
+    const scope = currentScope();
+    return scope === null ? field === null || field.hidden : scope !== 'ALL';
+}
+
+function selectScope(value) {
+    scopeInputs().forEach((el) => {
+        el.checked = el.value === value;
+    });
+    syncSquadronFieldVisibility();
+}
+
+function syncSquadronFieldVisibility() {
+    const field = document.getElementById('ordersSquadronField');
+    const scope = currentScope();
+    if (field && scope !== null) field.hidden = scope !== 'ALL';
+}
+
+function persistScopeFilter() {
+    const scope = currentScope();
+    if (scope === null) return;
+    try {
+        localStorage.setItem(ORDERS_SCOPE_FILTER_KEY, JSON.stringify(scope));
+    } catch (_e) {}
+}
+
+function readScopeFilter() {
+    try {
+        const raw = localStorage.getItem(ORDERS_SCOPE_FILTER_KEY);
+        const saved = raw === null ? null : JSON.parse(raw);
+        const offered = scopeInputs().some((el) => el.value === saved);
+        return offered && ORDERS_SCOPES.indexOf(saved) >= 0 ? saved : null;
+    } catch (_e) {
+        return null;
+    }
+}
+
+function restoreScopeFilter() {
+    if (scopeInputs().length === 0) return false;
+    if (/[?&]scope=/.test(window.location.search)) {
+        persistScopeFilter();
+        return false;
+    }
+    const saved = readScopeFilter();
+    if (saved === null || saved === currentScope()) return false;
+    selectScope(saved);
+    return true;
+}
+
+function countActiveOrdersFilters() {
+    let active = statusBoxes().filter((b) => b.checked).length;
+    if (!scopeHidesSquadronFilter()) {
+        const boxes = squadronBoxes();
+        if (boxes.some((b) => !b.checked)) active++;
+    }
+    return active;
+}
+
+function refreshOrdersFilterBadge() {
+    if (window.krtFilterPanel) window.krtFilterPanel.refresh('orders-filter-panel');
+}
+
+if (window.krtFilterPanel && typeof window.krtFilterPanel.registerCounter === 'function') {
+    window.krtFilterPanel.registerCounter('orders-filter-panel', countActiveOrdersFilters);
+}
+
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'ord-toggle-materials', toggleOrderMaterials);
     window.krtEvents.on('click', 'ord-toggle-squadron-multi', toggleSquadronMulti);
@@ -359,9 +438,12 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     colorOrderAges(document);
     restoreOrderMaterials(document);
+    const scopeDiffers = restoreScopeFilter();
     const statusDiffers = restoreStatusFilter();
     const squadronDiffers = restoreSquadronFilter();
-    if ((statusDiffers || squadronDiffers) && window.krtFetch) applyOrdersFilter();
+    refreshOrdersFilterBadge();
+    if (window.krtFilterChips) window.krtFilterChips.refresh();
+    if ((scopeDiffers || statusDiffers || squadronDiffers) && window.krtFetch) applyOrdersFilter();
 
     const filterForm = document.getElementById('orders-filter-form');
     if (filterForm && window.krtFetch) {
@@ -372,6 +454,14 @@ document.addEventListener('DOMContentLoaded', () => {
         filterForm.querySelectorAll('input[name="status"]').forEach((el) => {
             el.addEventListener('change', () => {
                 persistStatusFilter();
+                applyOrdersFilter();
+            });
+        });
+        scopeInputs().forEach((el) => {
+            el.addEventListener('change', () => {
+                syncSquadronFieldVisibility();
+                persistScopeFilter();
+                refreshOrdersFilterBadge();
                 applyOrdersFilter();
             });
         });

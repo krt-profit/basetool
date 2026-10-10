@@ -60,7 +60,7 @@
          * @returns {string} the prefixed trigger, e.g. `inv-admin-toggle-group`
          */
         function trigger(action) {
-            return cfg.triggerPrefix + '-' + action;
+            return `${cfg.triggerPrefix}-${action}`;
         }
 
         /** @type {string | null} */
@@ -178,8 +178,8 @@
             if (owningOrgUnitId) params.set('owningOrgUnitId', owningOrgUnitId);
             if (page != null) params.set('page', String(page));
             const path = gameItemId
-                ? cfg.basePath + '/game-item-stack/entries?'
-                : cfg.basePath + '/stack/entries?';
+                ? `${cfg.basePath}/game-item-stack/entries?`
+                : `${cfg.basePath}/stack/entries?`;
             return path + params.toString();
         }
 
@@ -242,7 +242,7 @@
         function restoreExpandedGroups() {
             const expandedRows = readExpanded(groupStorageKey());
             if (expandedRows.length === 0) return;
-            document.querySelectorAll('.tree-row--group').forEach(function (row) {
+            document.querySelectorAll('.tree-row--group').forEach((row) => {
                 const groupKey = groupKeyOf(row);
                 if (groupKey && expandedRows.includes(groupKey)) {
                     const nextRow = row.nextElementSibling;
@@ -260,7 +260,7 @@
         function restoreExpandedStacks() {
             const expandedStacks = readExpanded(stackStorageKey());
             if (expandedStacks.length === 0) return;
-            document.querySelectorAll('.stack-header').forEach(function (row) {
+            document.querySelectorAll('.stack-header').forEach((row) => {
                 if (!expandedStacks.includes(stackKey(row))) return;
                 const nextRow = row.nextElementSibling;
                 if (nextRow && nextRow.classList.contains('tree-stack-entries')) {
@@ -351,10 +351,10 @@
         function setStackEntriesStatus(content, message, isError) {
             content.replaceChildren();
             const div = document.createElement('div');
-            div.className = 'stack-entries-status';
-            if (isError) div.classList.add('hud-box-error');
-            div.style.padding = '1rem 2.5rem';
-            div.style.color = 'var(--color-gray-2-text)';
+            div.className = isError
+                ? 'stack-entries-status alert alert-danger'
+                : 'stack-entries-status';
+            if (isError) div.setAttribute('role', 'alert');
             div.textContent = message;
             content.appendChild(div);
         }
@@ -373,14 +373,13 @@
             );
             if (!content) return;
             setStackEntriesStatus(content, stackEntriesI18n.loading, false);
-            fetch(buildStackEntriesUrl(headerRow, page), {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            })
-                .then(function (r) {
-                    if (!r.ok) throw new Error('HTTP ' + r.status);
+            window.krtFetch
+                .get(buildStackEntriesUrl(headerRow, page))
+                .then((r) => {
+                    if (!r || !r.ok) throw new Error(`HTTP ${r ? r.status : 0}`);
                     return r.text();
                 })
-                .then(function (html) {
+                .then((html) => {
                     window.krtFetch.setTrustedHtml(content, html);
                     headerRow.setAttribute('data-stack-loaded', 'true');
                     if (typeof window.krtEnhanceComboboxes === 'function') {
@@ -388,7 +387,7 @@
                     }
                     if (cfg.onStackEntriesLoaded) cfg.onStackEntriesLoaded(content);
                 })
-                .catch(function (e) {
+                .catch((e) => {
                     console.error('Failed to load stack entries', e);
                     setStackEntriesStatus(content, stackEntriesI18n.error, true);
                 });
@@ -418,7 +417,7 @@
             const el = id ? document.getElementById(id) : null;
             if (!el) return;
             const isOpened = el.classList.contains('open');
-            document.querySelectorAll('.multi-select-options').forEach(function (opt) {
+            document.querySelectorAll('.multi-select-options').forEach((opt) => {
                 opt.classList.remove('open');
             });
             if (!isOpened) el.classList.add('open');
@@ -460,7 +459,8 @@
                     if (!firstChecked && label) firstChecked = label.innerText;
                 }
             }
-            if (count === 0 || count === checkboxes.length) {
+            const active = count > 0 && count < checkboxes.length;
+            if (!active) {
                 headerSpan.innerText = window.krtI18nText(
                     header.getAttribute('data-all'),
                     'data-all',
@@ -468,11 +468,41 @@
             } else if (count === 1) {
                 headerSpan.innerText = firstChecked || '';
             } else {
-                headerSpan.innerText =
-                    count +
-                    ' ' +
-                    window.krtI18nText(header.getAttribute('data-selected'), 'data-selected');
+                headerSpan.innerText = `${count} ${window.krtI18nText(
+                    header.getAttribute('data-selected'),
+                    'data-selected',
+                )}`;
             }
+            const summary = /** @type {HTMLInputElement | null} */ (
+                document.querySelector(`input[data-chip-header="${headerId}"]`)
+            );
+            if (summary) summary.value = active ? headerSpan.innerText : '';
+        }
+
+        /**
+         * Clears a multi-select family whose filter chip was removed: the chip empties the
+         * family's hidden summary input, which unticks the family and re-runs the filter.
+         *
+         * @param {Event} event the change event
+         */
+        function clearFamilyFromChip(event) {
+            const summary = event.target;
+            if (!(summary instanceof HTMLInputElement)) return;
+            if (!summary.hasAttribute('data-chip-family') || summary.value !== '') return;
+            const family = summary.getAttribute('data-chip-family');
+            const boxes = familyBoxes(family);
+            let changed = false;
+            for (let i = 0; i < boxes.length; i++) {
+                if (boxes[i].checked) changed = true;
+                boxes[i].checked = false;
+            }
+            if (!changed) return;
+            updateSelectState(
+                summary.getAttribute('data-chip-all'),
+                family,
+                summary.getAttribute('data-chip-header'),
+            );
+            cfg.refreshTable();
         }
 
         /**
@@ -536,7 +566,7 @@
         function closeMultiSelectsOnOutsideClick(e) {
             const target = /** @type {Element} */ (e.target);
             if (target && target.closest && target.closest('.multi-select-container')) return;
-            document.querySelectorAll('.multi-select-options.open').forEach(function (opt) {
+            document.querySelectorAll('.multi-select-options.open').forEach((opt) => {
                 opt.classList.remove('open');
             });
         }
@@ -550,10 +580,10 @@
         function broadcastOrdersChanged(orderIds) {
             if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
             let touchedAnyOrder = false;
-            (orderIds || []).forEach(function (orderId) {
+            (orderIds || []).forEach((orderId) => {
                 if (orderId) {
                     touchedAnyOrder = true;
-                    window.krtLiveSync.sendChanged('order:' + orderId, [
+                    window.krtLiveSync.sendChanged(`order:${orderId}`, [
                         'materials',
                         'aggregated',
                         'item-stock',
@@ -581,13 +611,13 @@
          * @returns {string[]} the distinct order ids
          */
         function collectLeafOrderIds(itemId) {
-            const leaf = document.querySelector('.tree-row--leaf[data-item-id="' + itemId + '"]');
+            const leaf = document.querySelector(`.tree-row--leaf[data-item-id="${itemId}"]`);
             if (!leaf) return [];
             /** @type {string[]} */
             const ids = [];
             leaf.querySelectorAll(
                 '.assoc-split[data-assoc-field="JOB_ORDER"] [data-assoc-chip][data-target-id]',
-            ).forEach(function (chip) {
+            ).forEach((chip) => {
                 const id = chip.getAttribute('data-target-id');
                 if (id && ids.indexOf(id) < 0) ids.push(id);
             });
@@ -646,7 +676,7 @@
                 document.getElementById('terminal')
             );
             const sellAmount = input('sellAmount');
-            if (sellFields) sellFields.style.display = typeSell ? 'block' : 'none';
+            if (sellFields) sellFields.hidden = !typeSell;
             if (terminal) terminal.required = typeSell;
             if (sellAmount) sellAmount.required = typeSell;
             const submitBtn = document.getElementById('bookOutSubmitBtn');
@@ -665,7 +695,7 @@
          */
         function typeRadio(value) {
             return /** @type {HTMLInputElement | null} */ (
-                document.querySelector('input[name="type"][value="' + value + '"]')
+                document.querySelector(`input[name="type"][value="${value}"]`)
             );
         }
 
@@ -692,7 +722,7 @@
                 if (discard) discard.checked = true;
                 toggleBookOutTypeFields();
             }
-            if (reason) reason.style.display = 'inline';
+            if (reason) reason.hidden = false;
         }
 
         /**
@@ -709,21 +739,18 @@
             if (!materialId) {
                 setPlaceholderOption(terminalSelect, bookOutI18n.terminalNoMaterial);
                 sellRadio.disabled = true;
-                if (reason) reason.style.display = 'inline';
+                if (reason) reason.hidden = false;
                 return;
             }
-            fetch('/api/proxy/materials/' + encodeURIComponent(materialId) + '/terminals')
-                .then(function (r) {
-                    if (!r.ok) throw new Error('Network response was not ok');
-                    return r.json();
-                })
-                .then(function (data) {
+            window.krtFetch
+                .getJson(`/api/proxy/materials/${encodeURIComponent(materialId)}/terminals`)
+                .then((data) => {
                     if (data && data.length > 0) {
                         setPlaceholderOption(terminalSelect, bookOutI18n.terminalChoose);
                         sellRadio.disabled = false;
                         data.forEach(
                             /** @param {{ terminalName: string, priceSell?: number }} terminal */
-                            function (terminal) {
+                            (terminal) => {
                                 const label =
                                     terminal.priceSell && terminal.priceSell > 0
                                         ? bookOutI18n.terminalPrice
@@ -740,7 +767,7 @@
                         disableSell(sellRadio, reason);
                     }
                 })
-                .catch(function (e) {
+                .catch((e) => {
                     console.error('Error loading terminals:', e);
                     setPlaceholderOption(terminalSelect, bookOutI18n.terminalError);
                     disableSell(sellRadio, reason);
@@ -782,7 +809,7 @@
             bookOutItemId = id;
             if (window.safeSameOriginUrl) {
                 bookOutForm.action = window.safeSameOriginUrl(
-                    '/inventory/' + id + '/book-out',
+                    `/inventory/${id}/book-out`,
                     bookOutForm.action,
                 );
             }
@@ -791,8 +818,8 @@
             targetAmountInput.setAttribute('step', isScu ? '0.001' : '1');
             const targetScuHint = document.getElementById('bookout-target-scu-hint');
             const amountScuHint = document.getElementById('bookout-amount-scu-hint');
-            if (targetScuHint) targetScuHint.classList.toggle('krtm-hidden', !isScu);
-            if (amountScuHint) amountScuHint.classList.toggle('krtm-hidden', !isScu);
+            if (targetScuHint) targetScuHint.classList.toggle('is-hidden', !isScu);
+            if (amountScuHint) amountScuHint.classList.toggle('is-hidden', !isScu);
 
             amountInput.value = amount ?? '';
             amountInput.max = amount ?? '';
@@ -812,7 +839,7 @@
 
             const sellNotPossibleReason = document.getElementById('sellNotPossibleReason');
             sellRadio.disabled = true;
-            if (sellNotPossibleReason) sellNotPossibleReason.style.display = 'none';
+            if (sellNotPossibleReason) sellNotPossibleReason.hidden = true;
             loadSellTerminals(materialId, terminalSelect, sellRadio, sellNotPossibleReason);
 
             window.krtModal.open(modal);
@@ -888,7 +915,7 @@
             window.krtFetch
                 .write({
                     method: 'POST',
-                    url: '/inventory/' + itemId + '/transfer',
+                    url: `/inventory/${itemId}/transfer`,
                     payload,
                     successMessage: bookOutI18n.success,
                     errorMessage: bookOutI18n.error,
@@ -901,7 +928,7 @@
                         broadcastBoardChanged();
                     },
                 })
-                .then(function () {
+                .then(() => {
                     bookOutInFlight = false;
                     if (submitBtn) submitBtn.disabled = false;
                 });
@@ -947,7 +974,7 @@
                 amountInput.value = String(stolenMarkTarget.max);
             }
             const scuHint = document.getElementById('stolen-mark-scu-hint');
-            if (scuHint) scuHint.classList.toggle('krtm-hidden', stolenMarkTarget.piece);
+            if (scuHint) scuHint.classList.toggle('is-hidden', stolenMarkTarget.piece);
             const amountOf = document.getElementById('stolenMarkAmountOfText');
             if (amountOf) {
                 amountOf.textContent = (amountOf.getAttribute('data-template') ?? '').replace(
@@ -1004,7 +1031,7 @@
             window.krtFetch
                 .write({
                     method: 'POST',
-                    url: '/inventory/' + stolenMarkTarget.id + '/stolen',
+                    url: `/inventory/${stolenMarkTarget.id}/stolen`,
                     payload: {
                         version: stolenMarkTarget.version,
                         stolen: marking,
@@ -1022,7 +1049,7 @@
                         broadcastBoardChanged();
                     },
                 })
-                .then(function () {
+                .then(() => {
                     stolenMarkInFlight = false;
                     if (submitBtn) submitBtn.disabled = false;
                 });
@@ -1063,40 +1090,35 @@
             const targetUserId = userSelect.value;
             select.replaceChildren();
             if (!targetUserId) {
-                wrapper.style.display = 'none';
+                wrapper.hidden = true;
                 return;
             }
-            fetch('/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            })
-                .then(function (r) {
-                    return r.ok ? r.json() : [];
-                })
+            window.krtFetch
+                .getJson(`/users/${encodeURIComponent(targetUserId)}/memberships?allKinds=true`)
                 .then(
                     /** @param {Array<{ orgUnitId: string, orgUnitName: string }>} memberships */
-                    function (memberships) {
+                    (memberships) => {
                         if (!Array.isArray(memberships) || memberships.length < 1) {
-                            wrapper.style.display = 'none';
+                            wrapper.hidden = true;
                             return;
                         }
-                        memberships.forEach(function (opt) {
+                        memberships.forEach((opt) => {
                             select.appendChild(new Option(opt.orgUnitName, opt.orgUnitId));
                         });
                         const current = umbuchenCurrentOwningOrgUnitId;
                         if (
                             current &&
-                            memberships.some(function (m) {
+                            memberships.some((m) => {
                                 return m.orgUnitId === current;
                             })
                         ) {
                             select.value = current;
                         }
-                        wrapper.style.display = 'block';
+                        wrapper.hidden = false;
                     },
                 )
-                .catch(function () {
-                    wrapper.style.display = 'none';
+                .catch(() => {
+                    wrapper.hidden = true;
                 });
         }
 
@@ -1119,8 +1141,8 @@
          * @param {Element | null} except the popover to leave alone
          */
         function assocCloseAllPops(except) {
-            document.querySelectorAll('[data-assoc-pop]').forEach(function (p) {
-                if (p !== except) p.classList.add('krtm-hidden');
+            document.querySelectorAll('[data-assoc-pop]').forEach((p) => {
+                if (p !== except) /** @type {HTMLElement} */ (p).hidden = true;
             });
         }
 
@@ -1142,13 +1164,13 @@
             const maxTop = Math.max(gap, window.innerHeight - popHeight - gap);
             const wantedTop = flipUp ? rect.top - gap - popHeight : rect.bottom + gap;
             const top = Math.max(gap, Math.min(wantedTop, maxTop));
-            pop.style.left = rect.left + 'px';
+            pop.style.left = `${rect.left}px`;
             if (flipUp) {
                 pop.style.top = 'auto';
-                pop.style.bottom = window.innerHeight - top - popHeight + 'px';
+                pop.style.bottom = `${window.innerHeight - top - popHeight}px`;
             } else {
                 pop.style.bottom = 'auto';
-                pop.style.top = top + 'px';
+                pop.style.top = `${top}px`;
             }
         }
 
@@ -1157,7 +1179,7 @@
          */
         function assocRepositionOpenPop() {
             const pop = /** @type {HTMLElement | null} */ (
-                document.querySelector('[data-assoc-pop]:not(.krtm-hidden)')
+                document.querySelector('[data-assoc-pop]:not([hidden])')
             );
             if (pop) assocPositionPop(pop);
         }
@@ -1168,10 +1190,14 @@
          * @param {Element} pop the popover
          */
         function assocShowPickSection(pop) {
-            const pick = pop.querySelector('[data-assoc-pop-pick]');
-            const amount = pop.querySelector('[data-assoc-pop-amount]');
-            if (pick) pick.classList.remove('krtm-hidden');
-            if (amount) amount.classList.add('krtm-hidden');
+            const pick = /** @type {HTMLElement | null} */ (
+                pop.querySelector('[data-assoc-pop-pick]')
+            );
+            const amount = /** @type {HTMLElement | null} */ (
+                pop.querySelector('[data-assoc-pop-amount]')
+            );
+            if (pick) pick.hidden = false;
+            if (amount) amount.hidden = true;
         }
 
         /**
@@ -1181,12 +1207,18 @@
          * @param {boolean} showRemove whether the slice exists and can be removed
          */
         function assocShowAmountSection(pop, showRemove) {
-            const pick = pop.querySelector('[data-assoc-pop-pick]');
-            const amount = pop.querySelector('[data-assoc-pop-amount]');
-            if (pick) pick.classList.add('krtm-hidden');
-            if (amount) amount.classList.remove('krtm-hidden');
-            const removeBtn = pop.querySelector('[data-trigger="' + trigger('assoc-remove') + '"]');
-            if (removeBtn) removeBtn.classList.toggle('krtm-hidden', !showRemove);
+            const pick = /** @type {HTMLElement | null} */ (
+                pop.querySelector('[data-assoc-pop-pick]')
+            );
+            const amount = /** @type {HTMLElement | null} */ (
+                pop.querySelector('[data-assoc-pop-amount]')
+            );
+            if (pick) pick.hidden = true;
+            if (amount) amount.hidden = false;
+            const removeBtn = /** @type {HTMLElement | null} */ (
+                pop.querySelector(`[data-trigger="${trigger('assoc-remove')}"]`)
+            );
+            if (removeBtn) removeBtn.hidden = !showRemove;
         }
 
         /**
@@ -1200,16 +1232,15 @@
         function assocBuildChip(field, alloc, isPiece) {
             const isOrder = field === 'JOB_ORDER';
             const chip = document.createElement('span');
-            chip.className =
-                'assoc-chip ' + (isOrder ? 'assoc-chip--order' : 'assoc-chip--mission');
+            chip.className = `assoc-chip ${isOrder ? 'assoc-chip--order' : 'assoc-chip--mission'}`;
             chip.setAttribute('role', 'button');
             chip.setAttribute('tabindex', '0');
             chip.setAttribute('data-trigger', trigger('assoc-edit'));
             chip.setAttribute('data-assoc-chip', isOrder ? 'jobOrder' : 'mission');
             chip.setAttribute('data-target-id', isOrder ? alloc.jobOrderId : alloc.missionId);
             chip.setAttribute('data-amount', alloc.amount);
-            const label = isOrder ? '#' + alloc.jobOrderDisplayId : alloc.missionName;
-            chip.appendChild(document.createTextNode(label + ' · '));
+            const label = isOrder ? `#${alloc.jobOrderDisplayId}` : alloc.missionName;
+            chip.appendChild(document.createTextNode(`${label} · `));
             const amt = document.createElement('span');
             amt.className = 'assoc-chip__amt';
             amt.textContent = assocFormatAmount(alloc.amount, isPiece);
@@ -1259,13 +1290,13 @@
             const isOrder = field === 'JOB_ORDER';
             const allocs = (isOrder ? dto.jobOrderAllocations : dto.missionAllocations) || [];
             const rest = isOrder ? dto.jobOrderRest : dto.missionRest;
-            split.querySelectorAll('[data-assoc-chip]').forEach(function (c) {
+            split.querySelectorAll('[data-assoc-chip]').forEach((c) => {
                 c.remove();
             });
             const addWrap = split.querySelector('.assoc-add-wrap');
             allocs.forEach(
                 /** @param {any} a */
-                function (a) {
+                (a) => {
                     split.insertBefore(assocBuildChip(field, a, isPiece), addWrap);
                 },
             );
@@ -1311,7 +1342,7 @@
             if (!window.krtFetch) return;
             await window.krtFetch.write({
                 method,
-                url: '/inventory/' + encodeURIComponent(entryId ?? '') + '/allocation',
+                url: `/inventory/${encodeURIComponent(entryId ?? '')}/allocation`,
                 payload: body,
                 bodyOnDelete: true,
                 successMessage: assocI18n.saved,
@@ -1321,7 +1352,7 @@
                 }),
                 onSuccess(dto) {
                     if (dto && typeof dto === 'object') assocRerender(split, dto);
-                    pop.classList.add('krtm-hidden');
+                    /** @type {HTMLElement} */ (pop).hidden = true;
                     cfg.notifyInventoryChanged();
                     if (body && body.field === 'JOB_ORDER') {
                         broadcastOrdersChanged([body.targetId]);
@@ -1369,11 +1400,11 @@
                 amount = Math.round(amount * 1000) / 1000;
             }
             const buttons = pop.querySelectorAll('button');
-            buttons.forEach(function (b) {
+            buttons.forEach((b) => {
                 b.disabled = true;
             });
             const release = function () {
-                buttons.forEach(function (b) {
+                buttons.forEach((b) => {
                     b.disabled = false;
                 });
             };
@@ -1383,7 +1414,7 @@
                 return assocSend(entryId, method, body, split, pop);
             };
             if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
-                return window.krtFetch.serialize('inv-assoc:' + entryId, run).finally(release);
+                return window.krtFetch.serialize(`inv-assoc:${entryId}`, run).finally(release);
             }
             return Promise.resolve().then(run).finally(release);
         }
@@ -1414,11 +1445,11 @@
 
         /** Installs the delegated allocation-chip handlers and the popover's window listeners. */
         function bindAssoc() {
-            window.krtEvents.on('click', trigger('assoc-add-open'), function (el) {
+            window.krtEvents.on('click', trigger('assoc-add-open'), (el) => {
                 const ctx = assocContext(el);
                 if (!ctx) return;
                 const pop = ctx.pop;
-                const wasHidden = pop.classList.contains('krtm-hidden');
+                const wasHidden = pop.hidden;
                 assocCloseAllPops(pop);
                 if (wasHidden) {
                     pop.removeAttribute('data-assoc-target');
@@ -1427,17 +1458,17 @@
                         pop.querySelector('input[type="hidden"]')
                     );
                     if (hidden && hidden.krtCombobox) hidden.krtCombobox.setValue('');
-                    pop.classList.remove('krtm-hidden');
+                    pop.hidden = false;
                     assocPositionPop(pop);
                     const cbInput = /** @type {HTMLElement | null} */ (
                         pop.querySelector('.krt-combobox__input')
                     );
                     if (cbInput) cbInput.focus();
                 } else {
-                    pop.classList.add('krtm-hidden');
+                    pop.hidden = true;
                 }
             });
-            window.krtEvents.on('change', trigger('assoc-pick'), function (el) {
+            window.krtEvents.on('change', trigger('assoc-pick'), (el) => {
                 const value = /** @type {HTMLInputElement} */ (el).value;
                 if (!value) return;
                 const pop = el.closest('[data-assoc-pop]');
@@ -1456,7 +1487,7 @@
                     amountInput.focus();
                 }
             });
-            window.krtEvents.on('click', trigger('assoc-edit'), function (el) {
+            window.krtEvents.on('click', trigger('assoc-edit'), (el) => {
                 const ctx = assocContext(el);
                 if (!ctx) return;
                 const pop = ctx.pop;
@@ -1468,17 +1499,17 @@
                     pop.querySelector('[data-assoc-amount-input]')
                 );
                 if (amountInput) amountInput.value = el.getAttribute('data-amount') ?? '';
-                pop.classList.remove('krtm-hidden');
+                pop.hidden = false;
                 assocPositionPop(pop);
                 if (amountInput) amountInput.focus();
             });
-            window.krtEvents.on('click', trigger('assoc-save'), function (el) {
+            window.krtEvents.on('click', trigger('assoc-save'), (el) => {
                 const pop = el.closest('[data-assoc-pop]');
                 const split = el.closest('.assoc-split');
                 if (!pop || !split) return;
                 assocSubmit(split, pop, assocSaveMethod(pop));
             });
-            window.krtEvents.on('click', trigger('assoc-remove'), function (el) {
+            window.krtEvents.on('click', trigger('assoc-remove'), (el) => {
                 const pop = el.closest('[data-assoc-pop]');
                 const split = el.closest('.assoc-split');
                 if (!pop || !split) return;
@@ -1486,7 +1517,7 @@
             });
             window.addEventListener('scroll', assocRepositionOpenPop, true);
             window.addEventListener('resize', assocRepositionOpenPop);
-            document.addEventListener('click', function (e) {
+            document.addEventListener('click', (e) => {
                 const target = /** @type {Element} */ (e.target);
                 if (
                     !target.closest('[data-assoc-pop]') &&
@@ -1496,7 +1527,7 @@
                     assocCloseAllPops(null);
                 }
             });
-            document.addEventListener('keydown', function (e) {
+            document.addEventListener('keydown', (e) => {
                 const target = /** @type {HTMLElement | null} */ (e.target);
                 if (!target || typeof target.matches !== 'function') return;
                 if (e.key === 'Enter' && target.matches('[data-assoc-amount-input]')) {
@@ -1521,12 +1552,13 @@
         function bind() {
             document.addEventListener('DOMContentLoaded', restoreExpandedTree);
             document.addEventListener('click', closeMultiSelectsOnOutsideClick);
+            document.addEventListener('change', clearFamilyFromChip);
             if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 window.krtEvents.on('click', trigger('toggle-group'), toggleGroup);
                 window.krtEvents.on('click', trigger('toggle-stack'), toggleStack);
                 window.krtEvents.on('click', trigger('stack-page'), goToStackEntriesPage);
                 bindAssoc();
-                window.krtEvents.on('click', trigger('bookout'), function (el) {
+                window.krtEvents.on('click', trigger('bookout'), (el) => {
                     openBookOutModal(
                         el.getAttribute('data-id'),
                         el.getAttribute('data-amount'),
@@ -1565,7 +1597,7 @@
             }
             const bookOutForm = document.getElementById('bookOutForm');
             if (bookOutForm) {
-                bookOutForm.addEventListener('submit', function (e) {
+                bookOutForm.addEventListener('submit', (e) => {
                     submitBookOut(/** @type {SubmitEvent} */ (e));
                 });
             }

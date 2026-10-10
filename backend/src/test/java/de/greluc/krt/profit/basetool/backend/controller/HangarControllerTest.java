@@ -115,15 +115,16 @@ class HangarControllerTest {
     ShipDto d1 = shipDto("Aurora");
     ShipDto d2 = shipDto("Cutlass");
     Page<Ship> page = new PageImpl<>(List.of(s1, s2), PageRequest.of(0, 20), 2);
-    when(hangarService.getMyShipsFiltered(eq(ownerId), isNull(), any(Pageable.class)))
+    when(hangarService.getMyShipsFiltered(eq(ownerId), isNull(), isNull(), any(Pageable.class)))
         .thenReturn(page);
     when(shipMapper.toDto(s1)).thenReturn(d1);
     when(shipMapper.toDto(s2)).thenReturn(d2);
 
-    PageResponse<ShipDto> result = controller.getMyShips(jwt, 0, 20, null);
+    PageResponse<ShipDto> result = controller.getMyShips(jwt, 0, 20, null, null);
 
     ArgumentCaptor<UUID> ownerCaptor = ArgumentCaptor.forClass(UUID.class);
-    verify(hangarService).getMyShipsFiltered(ownerCaptor.capture(), isNull(), any(Pageable.class));
+    verify(hangarService)
+        .getMyShipsFiltered(ownerCaptor.capture(), isNull(), isNull(), any(Pageable.class));
     assertThat(ownerCaptor.getValue()).isEqualTo(ownerId);
     assertThat(result.content()).containsExactly(d1, d2);
     assertThat(result.totalElements()).isEqualTo(2L);
@@ -135,12 +136,31 @@ class HangarControllerTest {
     UUID ownerId = UUID.randomUUID();
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     Page<Ship> page = new PageImpl<>(List.of());
-    when(hangarService.getMyShipsFiltered(eq(ownerId), eq("Cutlass"), any(Pageable.class)))
+    when(hangarService.getMyShipsFiltered(
+            eq(ownerId), eq("Cutlass"), isNull(), any(Pageable.class)))
         .thenReturn(page);
 
-    controller.getMyShips(jwt, 0, 50, "Cutlass");
+    controller.getMyShips(jwt, 0, 50, "Cutlass", null);
 
-    verify(hangarService).getMyShipsFiltered(eq(ownerId), eq("Cutlass"), any(Pageable.class));
+    verify(hangarService)
+        .getMyShipsFiltered(eq(ownerId), eq("Cutlass"), isNull(), any(Pageable.class));
+  }
+
+  /** The optional fitted filter reaches the service unchanged next to the search term. */
+  @Test
+  void getMyShips_forwardsFittedFilterToService() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    Page<Ship> page = new PageImpl<>(List.of());
+    when(hangarService.getMyShipsFiltered(
+            eq(ownerId), isNull(), eq(Boolean.FALSE), any(Pageable.class)))
+        .thenReturn(page);
+
+    controller.getMyShips(jwt, 0, 50, null, Boolean.FALSE);
+
+    verify(hangarService)
+        .getMyShipsFiltered(eq(ownerId), isNull(), eq(Boolean.FALSE), any(Pageable.class));
   }
 
   @Test
@@ -267,13 +287,13 @@ class HangarControllerTest {
         new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 0L, null);
     Ship created = new Ship();
     ShipDto dto = shipDto("Cutlass");
-    when(hangarService.addShip(targetUser, request)).thenReturn(created);
+    when(hangarService.addShipByAdmin(targetUser, request)).thenReturn(created);
     when(shipMapper.toDto(created)).thenReturn(dto);
 
     ShipDto result = controller.addUserShip(targetUser, request);
 
     assertThat(result).isSameAs(dto);
-    verify(hangarService).addShip(targetUser, request);
+    verify(hangarService).addShipByAdmin(targetUser, request);
   }
 
   @Test
@@ -284,13 +304,13 @@ class HangarControllerTest {
         new ShipRequestDto("Cutlass", UUID.randomUUID(), "LTI", null, true, 1L, null);
     Ship updated = new Ship();
     ShipDto dto = shipDto("Cutlass");
-    when(hangarService.updateShip(targetUser, shipId, request)).thenReturn(updated);
+    when(hangarService.updateShipByAdmin(targetUser, shipId, request)).thenReturn(updated);
     when(shipMapper.toDto(updated)).thenReturn(dto);
 
     ShipDto result = controller.updateUserShip(targetUser, shipId, request);
 
     assertThat(result).isSameAs(dto);
-    verify(hangarService).updateShip(targetUser, shipId, request);
+    verify(hangarService).updateShipByAdmin(targetUser, shipId, request);
   }
 
   @Test
@@ -300,7 +320,7 @@ class HangarControllerTest {
 
     controller.deleteUserShip(targetUser, shipId);
 
-    verify(hangarService).deleteShip(targetUser, shipId);
+    verify(hangarService).deleteShipByAdmin(targetUser, shipId);
   }
 
   @Test

@@ -31,12 +31,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.OwnerOrgUnitRequiredException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +59,7 @@ class InventoryMergeProbeTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private InventoryAccessPolicy inventoryAccessPolicy;
 
   private InventoryItemService service;
   private User caller;
@@ -81,6 +82,7 @@ class InventoryMergeProbeTest {
         null,
         null,
         ownerScopeService,
+        inventoryAccessPolicy,
         null,
         null,
         null,
@@ -142,7 +144,7 @@ class InventoryMergeProbeTest {
   @Test
   void refusesToProbeAnotherMembersStockWithoutBookingScope() {
     UUID other = UUID.randomUUID();
-    when(ownerScopeService.canManageUserInventory(other)).thenReturn(false);
+    when(inventoryAccessPolicy.canManageUserInventory(other)).thenReturn(false);
 
     assertThrows(
         AccessDeniedException.class,
@@ -156,7 +158,7 @@ class InventoryMergeProbeTest {
     UUID other = UUID.randomUUID();
     User target = new User();
     target.setId(other);
-    when(ownerScopeService.canManageUserInventory(other)).thenReturn(true);
+    when(inventoryAccessPolicy.canManageUserInventory(other)).thenReturn(true);
     when(userRepository.findById(other)).thenReturn(Optional.of(target));
     when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(target, null)).thenReturn(null);
     when(inventoryItemRepository.countMergeCandidates(
@@ -170,7 +172,7 @@ class InventoryMergeProbeTest {
   @Test
   void answersFalseForPersonalStockOfAnotherMember() {
     UUID other = UUID.randomUUID();
-    when(ownerScopeService.canManageUserInventory(other)).thenReturn(true);
+    when(inventoryAccessPolicy.canManageUserInventory(other)).thenReturn(true);
 
     assertFalse(
         service.hasMergeCandidates(other, CALLER, MATERIAL, LOCATION, 500, true, false, null));

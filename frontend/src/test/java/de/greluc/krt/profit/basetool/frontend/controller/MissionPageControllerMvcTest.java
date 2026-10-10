@@ -41,12 +41,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddCrewRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddExternalParticipantRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddUnitRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateMissionOwnerRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
@@ -55,7 +68,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -165,7 +177,7 @@ class MissionPageControllerMvcTest {
 
     MissionDto mission = minimalMission(missionId);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -192,7 +204,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void missionDetail_asMember_fetchesFinanceLedger() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(minimalMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -202,8 +214,9 @@ class MissionPageControllerMvcTest {
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
-            eq(MissionFinanceTotalsDto.class));
+            eq("/api/v1/missions/{id}/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
+            eq(missionId));
   }
 
   @Test
@@ -217,7 +230,7 @@ class MissionPageControllerMvcTest {
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionStepDto(
             UUID.randomUUID(), "Mining", null, false, 1);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(missionWithSteps(missionId, java.util.List.of(step1, step2)));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -244,7 +257,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_omitsEmptyGoalAndProcedureTiles_andOpensDescription() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(minimalMission(missionId, "**Briefing** folgt."));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -391,12 +404,16 @@ class MissionPageControllerMvcTest {
    */
   private void stubEmptyFinance(UUID missionId) {
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
-            eq(MissionFinanceTotalsDto.class)))
+            eq("/api/v1/missions/{id}/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
+            eq(missionId)))
         .thenReturn(
             new MissionFinanceTotalsDto(BigDecimal.ZERO, BigDecimal.ZERO, 0L, BigDecimal.ZERO, 0L));
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/finance-entries?size={size}"),
+            anyTypeRef(),
+            eq(missionId),
+            eq(200)))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 200, 0, 0, Collections.emptyList()));
   }
@@ -498,7 +515,7 @@ class MissionPageControllerMvcTest {
             null,
             java.util.List.of(realCrew, ghostCrew));
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(
             missionWithUnitsAndParticipants(
                 missionId, java.util.Set.of(realParticipant), java.util.List.of(unit)));
@@ -561,7 +578,7 @@ class MissionPageControllerMvcTest {
             null,
             java.util.List.of());
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(
             missionWithUnitsAndParticipants(
                 missionId, java.util.Set.of(participant), java.util.List.of(unit)));
@@ -667,7 +684,7 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -739,7 +756,7 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -833,12 +850,13 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(List.of(order));
 
     mockMvc
@@ -937,7 +955,7 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -955,7 +973,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     MissionDto refreshed = minimalMission(missionId);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(refreshed);
 
     mockMvc
@@ -966,14 +984,12 @@ class MissionPageControllerMvcTest {
                 .content("{\"userId\":\"" + userId + "\",\"version\":4}"))
         .andExpect(status().isOk());
 
-    @SuppressWarnings("unchecked")
-    org.mockito.ArgumentCaptor<Map<String, Object>> sent =
-        org.mockito.ArgumentCaptor.forClass(Map.class);
     verify(backendApiClient)
-        .put(eq("/api/v1/missions/" + missionId + "/owner"), sent.capture(), eq(Void.class));
-    org.assertj.core.api.Assertions.assertThat(sent.getValue())
-        .containsEntry("userId", userId)
-        .containsEntry("version", 4);
+        .put(
+            "/api/v1/missions/{id}/owner",
+            new UpdateMissionOwnerRequest(userId, 4L),
+            Void.class,
+            missionId);
   }
 
   @Test
@@ -982,7 +998,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/owner"), any(), eq(Void.class)))
+            eq("/api/v1/missions/{id}/owner"), any(), eq(Void.class), eq(missionId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict",
@@ -1011,16 +1027,13 @@ class MissionPageControllerMvcTest {
       throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
-    Map<String, Object> row = Map.of("id", participantId.toString(), "version", 7);
+    MissionParticipantDto row = participant(participantId, null, 7L);
     when(backendApiClient.put(
-            eq(
-                "/api/v1/missions/"
-                    + missionId
-                    + "/participants/"
-                    + participantId
-                    + "/payout-preference/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim"),
             any(),
-            eq(Object.class)))
+            eq(MissionParticipantDto.class),
+            eq(missionId),
+            eq(participantId)))
         .thenReturn(row);
 
     mockMvc
@@ -1153,11 +1166,11 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(missionId)))
         .thenReturn(current)
         .thenReturn(refreshed);
     when(backendApiClient.patch(
-            eq("/api/v1/missions/" + missionId + "/schedule"), any(), eq(Void.class)))
+            eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(missionId)))
         .thenReturn(null);
 
     String body =
@@ -1213,10 +1226,10 @@ class MissionPageControllerMvcTest {
             0L,
             null,
             null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), eq(MissionDto.class), eq(missionId)))
         .thenReturn(current);
     when(backendApiClient.patch(
-            eq("/api/v1/missions/" + missionId + "/schedule"), any(), eq(Void.class)))
+            eq("/api/v1/missions/{id}/schedule"), any(), eq(Void.class), eq(missionId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1252,9 +1265,11 @@ class MissionPageControllerMvcTest {
     UUID userId = UUID.randomUUID();
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/managers/" + userId + "/slim"),
+            eq("/api/v1/missions/{missionUuid}/managers/{userUuid}/slim"),
             eq(null),
-            eq(String.class)))
+            eq(String.class),
+            eq(missionId),
+            eq(userId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Error", null, 400));
@@ -1269,19 +1284,20 @@ class MissionPageControllerMvcTest {
   void addOrUpdateFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqTypeId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> freq = new java.util.HashMap<>();
-    freq.put("id", UUID.randomUUID().toString());
-    Map<String, Object> ft = new java.util.HashMap<>();
-    ft.put("id", freqTypeId.toString());
-    ft.put("name", "Tac");
-    freq.put("frequencyType", ft);
-    freq.put("value", 123.45);
-    freq.put("version", 1);
-    slimResponse.add(freq);
+    MissionFrequencyDto[] slimResponse = {
+      new MissionFrequencyDto(
+          UUID.randomUUID(),
+          new MissionFrequencyDto.FrequencyTypeRef(freqTypeId, "Tac"),
+          null,
+          new BigDecimal("123.45"),
+          1L)
+    };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/frequencies/slim"), any(), eq(Object.class)))
+            eq("/api/v1/missions/{id}/frequencies/slim"),
+            eq(new AddFrequencyRequest(freqTypeId, new BigDecimal("123.45"))),
+            eq(MissionFrequencyDto[].class),
+            eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"frequencyTypeId\":\"" + freqTypeId + "\",\"value\":123.45}";
@@ -1301,7 +1317,10 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID freqTypeId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/frequencies/slim"), any(), eq(Object.class)))
+            eq("/api/v1/missions/{id}/frequencies/slim"),
+            any(),
+            eq(MissionFrequencyDto[].class),
+            eq(missionId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1322,13 +1341,18 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/" + missionId + "/frequencies/" + freqId + "/slim"),
-            eq(Object.class)))
-        .thenReturn(java.util.Collections.emptyList());
+            eq("/api/v1/missions/{id}/frequencies/{frequencyId}/slim"),
+            eq(Void.class),
+            eq(missionId),
+            eq(freqId)))
+        .thenReturn(null);
 
     mockMvc
         .perform(delete("/missions/" + missionId + "/frequencies/" + freqId + "/ajax").with(csrf()))
         .andExpect(status().isOk());
+    verify(backendApiClient)
+        .delete(
+            "/api/v1/missions/{id}/frequencies/{frequencyId}/slim", Void.class, missionId, freqId);
   }
 
   @Test
@@ -1336,18 +1360,15 @@ class MissionPageControllerMvcTest {
   void addCustomFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> freq = new java.util.HashMap<>();
-    freq.put("id", freqId.toString());
-    freq.put("name", "Recon");
-    freq.put("value", 42.10);
-    freq.put("version", 0);
-    slimResponse.add(freq);
+    MissionFrequencyDto[] slimResponse = {
+      new MissionFrequencyDto(freqId, null, "Recon", new BigDecimal("42.10"), 0L)
+    };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/frequencies/custom/slim"),
-            any(),
-            eq(Object.class)))
+            eq("/api/v1/missions/{id}/frequencies/custom/slim"),
+            eq(new AddCustomFrequencyRequest("Recon", new BigDecimal("42.10"))),
+            eq(MissionFrequencyDto[].class),
+            eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"name\":\"Recon\",\"value\":42.10}";
@@ -1366,18 +1387,16 @@ class MissionPageControllerMvcTest {
   void updateCustomFrequencyAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> freq = new java.util.HashMap<>();
-    freq.put("id", freqId.toString());
-    freq.put("name", "Recon 2");
-    freq.put("value", 43.00);
-    freq.put("version", 1);
-    slimResponse.add(freq);
+    MissionFrequencyDto[] slimResponse = {
+      new MissionFrequencyDto(freqId, null, "Recon 2", new BigDecimal("43.00"), 1L)
+    };
 
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/frequencies/custom/" + freqId + "/slim"),
-            any(),
-            eq(Object.class)))
+            eq("/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim"),
+            eq(new UpdateCustomFrequencyRequest("Recon 2", new BigDecimal("43.00"), 0L)),
+            eq(MissionFrequencyDto[].class),
+            eq(missionId),
+            eq(freqId)))
         .thenReturn(slimResponse);
 
     String body = "{\"name\":\"Recon 2\",\"value\":43.00,\"version\":0}";
@@ -1397,9 +1416,11 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/frequencies/custom/" + freqId + "/slim"),
+            eq("/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim"),
             any(),
-            eq(Object.class)))
+            eq(MissionFrequencyDto[].class),
+            eq(missionId),
+            eq(freqId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1418,16 +1439,16 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void addUnitAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> unit = new java.util.HashMap<>();
-    unit.put("id", UUID.randomUUID().toString());
-    unit.put("name", "Alpha");
-    unit.put("highValueUnit", false);
-    unit.put("version", 0);
-    slimResponse.add(unit);
+    MissionUnitDto[] slimResponse = {
+      new MissionUnitDto(
+          UUID.randomUUID(), "Alpha", null, null, null, false, null, null, 0L, List.of())
+    };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/units/slim"), any(), eq(Object.class)))
+            eq("/api/v1/missions/{id}/units/slim"),
+            eq(new AddUnitRequest("Alpha", null, null, false, null, null, null)),
+            eq(MissionUnitDto[].class),
+            eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"name\":\"Alpha\",\"highValueUnit\":false}";
@@ -1447,9 +1468,11 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/slim"),
             any(),
-            eq(Object.class)))
+            eq(MissionUnitDto.class),
+            eq(missionId),
+            eq(unitId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1470,7 +1493,10 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/slim"), eq(Void.class)))
+            eq("/api/v1/missions/{id}/units/{unitId}/slim"),
+            eq(Void.class),
+            eq(missionId),
+            eq(unitId)))
         .thenReturn(null);
 
     mockMvc
@@ -1482,15 +1508,13 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void addParticipantAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> p = new java.util.HashMap<>();
-    p.put("id", UUID.randomUUID().toString());
-    p.put("guestName", "Guest-X");
-    p.put("version", 0);
-    slimResponse.add(p);
+    MissionParticipantDto[] slimResponse = {participant(UUID.randomUUID(), "Guest-X", 0L)};
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/participants/slim"), any(), eq(Object.class)))
+            eq("/api/v1/missions/{id}/participants/slim"),
+            eq(new AddExternalParticipantRequest(null, "Guest-X", null, null, null, null)),
+            eq(MissionParticipantDto[].class),
+            eq(missionId)))
         .thenReturn(slimResponse);
 
     String body = "{\"guestName\":\"Guest-X\"}";
@@ -1510,9 +1534,11 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
             any(),
-            eq(Object.class)))
+            eq(MissionParticipantDto.class),
+            eq(missionId),
+            eq(participantId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1533,8 +1559,10 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/slim"),
-            eq(Void.class)))
+            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq(Void.class),
+            eq(missionId),
+            eq(participantId)))
         .thenReturn(null);
 
     mockMvc
@@ -1549,18 +1577,13 @@ class MissionPageControllerMvcTest {
   void checkInParticipantAjax_Success_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
-    Map<String, Object> slimResponse = new java.util.HashMap<>();
-    slimResponse.put("id", participantId.toString());
-    slimResponse.put("version", 2);
+    MissionParticipantDto slimResponse = participant(participantId, null, 2L);
     when(backendApiClient.post(
-            eq(
-                "/api/v1/missions/"
-                    + missionId
-                    + "/participants/"
-                    + participantId
-                    + "/check-in/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/check-in/slim"),
             any(),
-            eq(Object.class)))
+            eq(MissionParticipantDto.class),
+            eq(missionId),
+            eq(participantId)))
         .thenReturn(slimResponse);
 
     mockMvc
@@ -1577,14 +1600,11 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq(
-                "/api/v1/missions/"
-                    + missionId
-                    + "/participants/"
-                    + participantId
-                    + "/check-out/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/check-out/slim"),
             any(),
-            eq(Object.class)))
+            eq(MissionParticipantDto.class),
+            eq(missionId),
+            eq(participantId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1601,20 +1621,20 @@ class MissionPageControllerMvcTest {
   void addCrewAjax_WithValidBody_ShouldReturn200() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> crew = new java.util.HashMap<>();
-    crew.put("id", UUID.randomUUID().toString());
-    crew.put("participantName", "Alice");
-    crew.put("version", 0);
-    slimResponse.add(crew);
+    UUID participantId = UUID.randomUUID();
+    MissionCrewDto[] slimResponse = {
+      new MissionCrewDto(UUID.randomUUID(), participantId, "Alice", 0L, java.util.Set.of())
+    };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/crew/slim"),
-            any(),
-            eq(Object.class)))
+            eq("/api/v1/missions/{id}/units/{unitId}/crew/slim"),
+            eq(new AddCrewRequest(participantId, List.of())),
+            eq(MissionCrewDto[].class),
+            eq(missionId),
+            eq(unitId)))
         .thenReturn(slimResponse);
 
-    String body = "{\"participantId\":\"" + UUID.randomUUID() + "\",\"jobTypeIds\":[]}";
+    String body = "{\"participantId\":\"" + participantId + "\",\"jobTypeIds\":[]}";
     mockMvc
         .perform(
             post("/missions/" + missionId + "/units/" + unitId + "/crew/ajax")
@@ -1632,9 +1652,12 @@ class MissionPageControllerMvcTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/crew/" + crewId + "/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim"),
             any(),
-            eq(Object.class)))
+            eq(MissionCrewDto.class),
+            eq(missionId),
+            eq(unitId),
+            eq(crewId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -1656,8 +1679,11 @@ class MissionPageControllerMvcTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/" + missionId + "/units/" + unitId + "/crew/" + crewId + "/slim"),
-            eq(Void.class)))
+            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim"),
+            eq(Void.class),
+            eq(missionId),
+            eq(unitId),
+            eq(crewId)))
         .thenReturn(null);
 
     mockMvc
@@ -1750,13 +1776,15 @@ class MissionPageControllerMvcTest {
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
 
     mockMvc
@@ -1860,13 +1888,15 @@ class MissionPageControllerMvcTest {
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage2 =
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage2);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage2);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage2);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(emptyPage2);
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
 
     mockMvc
@@ -1892,13 +1922,10 @@ class MissionPageControllerMvcTest {
   void getUnassignedParticipantsAjax_ShouldReturn200WithList() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
-    Map<String, Object> participant = new java.util.HashMap<>();
-    participant.put("id", participantId.toString());
-    participant.put("guestName", "Alice");
-    List<Map<String, Object>> response = List.of(participant);
+    List<MissionParticipantDto> response = List.of(participant(participantId, "Alice", 0L));
 
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/participants/unassigned"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/participants/unassigned"), anyTypeRef(), eq(missionId)))
         .thenReturn(response);
 
     mockMvc
@@ -1912,7 +1939,7 @@ class MissionPageControllerMvcTest {
   void getUnassignedParticipantsAjax_WithBackendError_ShouldPropagateStatus() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/participants/unassigned"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/participants/unassigned"), anyTypeRef(), eq(missionId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Not Found", null, 404));
@@ -2041,11 +2068,13 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/unit-ship-options"), anyTypeRef(), eq(missionId)))
         .thenReturn(List.of(participantShip, outsiderShip));
 
     mockMvc
@@ -2201,11 +2230,13 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/unit-ship-options"), anyTypeRef(), eq(missionId)))
         .thenReturn(List.of(participantShip, assignedShip, strayShip));
 
     mockMvc
@@ -2311,28 +2342,29 @@ class MissionPageControllerMvcTest {
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
-    de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Map<String, Object>>
-        freqTypesPage =
-            new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
-                List.of(
-                    Map.of("id", befehlTypeId.toString(), "name", "Befehl"),
-                    Map.of("id", notfallTypeId.toString(), "name", "Notfall")),
-                0,
-                2,
-                2,
-                1,
-                Collections.emptyList());
+    de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<FrequencyTypeDto> freqTypesPage =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
+            List.of(
+                new FrequencyTypeDto(befehlTypeId, "Befehl", null, true, 0, 0L),
+                new FrequencyTypeDto(notfallTypeId, "Notfall", null, true, 1, 0L)),
+            0,
+            2,
+            2,
+            1,
+            Collections.emptyList());
 
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
     when(backendApiClient.getCached(eq(CachedCatalog.FREQUENCY_TYPES_ACTIVE), anyTypeRef()))
         .thenReturn(freqTypesPage);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/unit-ship-options"), anyTypeRef(), eq(missionId)))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2419,13 +2451,15 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
     when(backendApiClient.getCached(eq(CachedCatalog.FREQUENCY_TYPES_ACTIVE), anyTypeRef()))
         .thenThrow(new RuntimeException("frequency types unavailable"));
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/unit-ship-options"), anyTypeRef(), eq(missionId)))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2518,20 +2552,27 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass())).thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
-            eq(MissionFinanceTotalsDto.class)))
+            eq("/api/v1/missions/{id}/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
+            eq(missionId)))
         .thenReturn(
             new MissionFinanceTotalsDto(BigDecimal.ZERO, BigDecimal.ZERO, 0L, BigDecimal.ZERO, 0L));
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"), anyTypeRef()))
+            eq("/api/v1/missions/{id}/finance-entries?size={size}"),
+            anyTypeRef(),
+            eq(missionId),
+            eq(200)))
         .thenReturn(financesPage);
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(Collections.emptyList());
-    when(backendApiClient.get(eq("/api/v1/inventory/mission/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/inventory/mission/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2629,19 +2670,19 @@ class MissionPageControllerMvcTest {
             null,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<java.util.Map<String, Object>>
-        crewJobTypesPage =
-            new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
-                List.of(java.util.Map.of("id", jobTypeId, "name", "Gunner")),
-                0,
-                1,
-                1,
-                1,
-                Collections.emptyList());
+    de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<JobTypeDto> crewJobTypesPage =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
+            List.of(
+                new JobTypeDto(jobTypeId, "Gunner", null, "CREW", null, true, false, false, 0L)),
+            0,
+            1,
+            1,
+            1,
+            Collections.emptyList());
     when(backendApiClient.getCached(eq(CachedCatalog.JOB_TYPES_CREW), anyTypeRef()))
         .thenReturn(crewJobTypesPage);
 
@@ -2708,7 +2749,7 @@ class MissionPageControllerMvcTest {
             null,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2765,7 +2806,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_CrewBoardFragment_RendersBoardOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2783,7 +2824,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_FinanceFragment_RendersFinancePaneOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2801,7 +2842,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_MgmtFragment_RendersManagementPanelOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2819,7 +2860,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_StepsEditorFragment_RendersStepsEditorOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2837,7 +2878,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_ObjectivesEditorFragment_RendersObjectivesEditorOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2855,7 +2896,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_FrequenciesEditorFragment_RendersFrequenciesEditorOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2874,7 +2915,7 @@ class MissionPageControllerMvcTest {
   void missionDetail_OrganisationFragment_RendersPartyLeadAndTypedFrequenciesOnly()
       throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2892,7 +2933,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_OrganisationFragment_ErrorPathRendersSectionSizedAlert() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenThrow(new RuntimeException("boom"));
 
     mockMvc
@@ -2906,7 +2947,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_FragmentBackendError_RendersInlineErrorFragmentNotRedirect() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenThrow(new RuntimeException("backend unavailable"));
 
     mockMvc
@@ -2923,13 +2964,17 @@ class MissionPageControllerMvcTest {
    */
   private void verifyNoFinanceReads(UUID missionId) {
     verify(backendApiClient, never())
-        .get(eq("/api/v1/missions/" + missionId + "/finance-entries/summary"), anyClass());
+        .get(eq("/api/v1/missions/{id}/finance-entries/summary"), anyClass(), eq(missionId));
     verify(backendApiClient, never())
-        .get(eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"), anyTypeRef());
+        .get(
+            eq("/api/v1/missions/{id}/finance-entries?size={size}"),
+            anyTypeRef(),
+            eq(missionId),
+            eq(200));
     verify(backendApiClient, never())
-        .get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef());
+        .get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(missionId));
     verify(backendApiClient, never())
-        .get(eq("/api/v1/inventory/mission/" + missionId), anyTypeRef());
+        .get(eq("/api/v1/inventory/mission/{id}"), anyTypeRef(), eq(missionId));
   }
 
   /**
@@ -2944,7 +2989,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_CrewBoardFragment_SkipsFinanceAndMgmtReads() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2962,7 +3007,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_OverviewFragment_SkipsFinanceMgmtAndShipReads() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2975,14 +3020,14 @@ class MissionPageControllerMvcTest {
     verifyNoFinanceReads(missionId);
     verifyNoUserLookupRead();
     verify(backendApiClient, never())
-        .get(eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef());
+        .get(eq("/api/v1/missions/{id}/unit-ship-options"), anyTypeRef(), eq(missionId));
   }
 
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_FinanceFragment_IssuesFinanceReads() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -2995,12 +3040,18 @@ class MissionPageControllerMvcTest {
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
-            eq(MissionFinanceTotalsDto.class));
+            eq("/api/v1/missions/{id}/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
+            eq(missionId));
     verify(backendApiClient)
-        .get(eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"), anyTypeRef());
-    verify(backendApiClient).get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef());
-    verify(backendApiClient).get(eq("/api/v1/inventory/mission/" + missionId), anyTypeRef());
+        .get(
+            eq("/api/v1/missions/{id}/finance-entries?size={size}"),
+            anyTypeRef(),
+            eq(missionId),
+            eq(200));
+    verify(backendApiClient)
+        .get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(missionId));
+    verify(backendApiClient).get(eq("/api/v1/inventory/mission/{id}"), anyTypeRef(), eq(missionId));
   }
 
   /** Verifies that only the stolen row of the mission's stock table carries the stolen chip. */
@@ -3008,12 +3059,12 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_FinanceFragment_MarksOnlyTheStolenInventoryRow() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
-    when(backendApiClient.get(eq("/api/v1/inventory/mission/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/inventory/mission/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(List.of(missionStock("Titanium", false), missionStock("Quantanium", true)));
 
     String html =
@@ -3045,12 +3096,12 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_FinanceFragment_NoStolenInventory_RendersNoChip() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
-    when(backendApiClient.get(eq("/api/v1/inventory/mission/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/inventory/mission/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(List.of(missionStock("Titanium", false)));
 
     mockMvc
@@ -3114,7 +3165,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_MgmtFragment_SkipsFinanceAndUserLookupReads() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -3132,7 +3183,7 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_FullPage_StillIssuesEveryGatedRead() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
@@ -3142,11 +3193,12 @@ class MissionPageControllerMvcTest {
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
-            eq(MissionFinanceTotalsDto.class));
+            eq("/api/v1/missions/{id}/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
+            eq(missionId));
     verifyNoUserLookupRead();
     verify(backendApiClient)
-        .get(eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef());
+        .get(eq("/api/v1/missions/{id}/unit-ship-options"), anyTypeRef(), eq(missionId));
   }
 
   @Test
@@ -3154,9 +3206,9 @@ class MissionPageControllerMvcTest {
   void setPartyLeadAjax_Success_ReturnsRefreshedMission() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/party-lead"), any(), eq(Void.class)))
+            eq("/api/v1/missions/{id}/party-lead"), any(), eq(Void.class), eq(missionId)))
         .thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(editableMission(missionId));
 
     String body = "{\"guestName\":\"Lead Guy\",\"version\":0}";
@@ -3174,7 +3226,7 @@ class MissionPageControllerMvcTest {
   void setPartyLeadAjax_BackendConflict_Returns409() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/party-lead"), any(), eq(Void.class)))
+            eq("/api/v1/missions/{id}/party-lead"), any(), eq(Void.class), eq(missionId)))
         .thenThrow(
             new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
                 "Conflict", null, 409));
@@ -3187,5 +3239,18 @@ class MissionPageControllerMvcTest {
                 .contentType("application/json")
                 .content(body))
         .andExpect(status().isConflict());
+  }
+
+  /**
+   * Builds a participant row carrying only an id, an optional guest name and a version.
+   *
+   * @param id the participant id
+   * @param guestName the guest name, or {@code null}
+   * @param version the row version
+   * @return the participant row
+   */
+  private static MissionParticipantDto participant(UUID id, String guestName, Long version) {
+    return new MissionParticipantDto(
+        id, null, guestName, null, null, null, null, null, null, null, version);
   }
 }

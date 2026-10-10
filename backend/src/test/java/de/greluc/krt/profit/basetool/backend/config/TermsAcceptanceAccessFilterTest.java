@@ -25,11 +25,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
-import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
-import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
-import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;

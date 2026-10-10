@@ -21,10 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.QualityTierWriteDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.service.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
 import java.util.Locale;
@@ -56,11 +57,11 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class AdminQualityTiersRelayController {
 
-  /** The backend's admin quality-tier endpoints. */
-  static final String BACKEND_BASE = "/api/v1/admin/quality-tiers";
+  /** Writes the quality tiers. */
+  private final CatalogueBackendClient catalogueClient;
 
-  /** Talks to the backend. */
-  private final BackendApiClient backendApiClient;
+  /** Evicts the quality-tier catalogue after a write. */
+  private final CatalogueCacheEviction cacheEviction;
 
   /**
    * Creates a tier and returns it; a backend refusal ({@code 400}, {@code 409}) is relayed with its
@@ -76,9 +77,8 @@ public class AdminQualityTiersRelayController {
         log,
         "create quality tier",
         () -> {
-          QualityTierDto created =
-              backendApiClient.post(BACKEND_BASE, normalized(request, null), QualityTierDto.class);
-          backendApiClient.evict(CacheDomain.QUALITY_TIER);
+          QualityTierDto created = catalogueClient.createQualityTier(normalized(request, null));
+          cacheEviction.evict(CacheDomain.QUALITY_TIER);
           return ResponseEntity.ok(created);
         });
   }
@@ -100,11 +100,8 @@ public class AdminQualityTiersRelayController {
         "update quality tier " + id,
         () -> {
           QualityTierDto updated =
-              backendApiClient.put(
-                  BACKEND_BASE + "/" + id,
-                  normalized(request, request.version()),
-                  QualityTierDto.class);
-          backendApiClient.evict(CacheDomain.QUALITY_TIER);
+              catalogueClient.updateQualityTier(id, normalized(request, request.version()));
+          cacheEviction.evict(CacheDomain.QUALITY_TIER);
           return ResponseEntity.ok(updated);
         });
   }
@@ -122,8 +119,8 @@ public class AdminQualityTiersRelayController {
         log,
         "delete quality tier " + id,
         () -> {
-          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
-          backendApiClient.evict(CacheDomain.QUALITY_TIER);
+          catalogueClient.deleteQualityTier(id);
+          cacheEviction.evict(CacheDomain.QUALITY_TIER);
           return ResponseEntity.ok().build();
         });
   }

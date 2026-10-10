@@ -19,13 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
@@ -33,7 +32,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -55,25 +53,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Slf4j
 public class BankManagePageController {
 
-  /** Response type for the paged {@code /bank/accounts} listing. */
-  private static final ParameterizedTypeReference<PageResponse<BankAccountDto>>
-      BANK_ACCOUNT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for the {@code /bank/holders} holder-registry list. */
-  private static final ParameterizedTypeReference<List<BankHolderDto>> BANK_HOLDER_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  /** Response type for the {@code /org-units/active-all-kinds} org-unit option list. */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      ORG_UNIT_OPTION_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
   /** Offered page sizes for the account-management table (REQ-BANK-053). */
   private static final List<Integer> PAGE_SIZES = List.of(25, 50, 100);
 
   /** Default page size when none (or a non-whitelisted one) is requested. */
   private static final int DEFAULT_PAGE_SIZE = 25;
 
-  private final BackendApiClient backendApiClient;
+  /** The bank domain's backend calls. */
+  private final BankBackendClient bankClient;
 
   /**
    * Renders the management page with all accounts including balances and the holder registry with
@@ -102,16 +89,8 @@ public class BankManagePageController {
     boolean management = hasRole(authentication, Roles.authority(Roles.BANK_MANAGEMENT));
     int effectiveSize = size == null || !PAGE_SIZES.contains(size) ? DEFAULT_PAGE_SIZE : size;
     int effectivePage = page == null || page < 0 ? 0 : page;
-    PageResponse<BankAccountDto> accounts =
-        backendApiClient.get(
-            "/api/v1/bank/accounts?page="
-                + effectivePage
-                + "&size="
-                + effectiveSize
-                + "&sort=name,asc",
-            BANK_ACCOUNT_PAGE_TYPE);
-    List<BankHolderDto> holders =
-        backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST_TYPE);
+    PageResponse<BankAccountDto> accounts = bankClient.accountPage(effectivePage, effectiveSize);
+    List<BankHolderDto> holders = bankClient.holders();
     model.addAttribute("accountsPage", accounts);
     model.addAttribute(
         "accounts", accounts == null ? List.<BankAccountDto>of() : accounts.content());
@@ -136,9 +115,7 @@ public class BankManagePageController {
     }
 
     if (management) {
-      List<OrgUnitMembershipOptionDto> orgUnits =
-          backendApiClient.getCached(
-              CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS, ORG_UNIT_OPTION_LIST_TYPE);
+      List<OrgUnitMembershipOptionDto> orgUnits = bankClient.cachedActiveOrgUnitsAllKinds();
       model.addAttribute(
           "orgUnits", orgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : orgUnits);
     } else {
@@ -156,9 +133,8 @@ public class BankManagePageController {
   @Nullable
   private BankAccountDto fetchCartelAccount() {
     try {
-      PageResponse<BankAccountDto> page =
-          backendApiClient.get("/api/v1/bank/accounts?type=CARTEL&size=1", BANK_ACCOUNT_PAGE_TYPE);
-      return page == null || page.content().isEmpty() ? null : page.content().get(0);
+      PageResponse<BankAccountDto> page = bankClient.cartelAccountPage();
+      return page == null || page.content().isEmpty() ? null : page.content().getFirst();
     } catch (RuntimeException e) {
       log.debug("Could not resolve the CARTEL account for the KRT-Freigaben tab", e);
       return null;

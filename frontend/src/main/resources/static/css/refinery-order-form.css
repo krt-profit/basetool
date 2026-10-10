@@ -1,0 +1,271 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+@layer base, components, page, utilities;
+
+@layer page {
+    .rod-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+        gap: var(--space-6);
+        align-items: start;
+    }
+    .rod-layout [hidden] {
+        display: none;
+    }
+    .rod-form {
+        max-width: none;
+    }
+    .rod-form > .form-actions--sticky {
+        justify-content: flex-end;
+    }
+    .rod-side {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+    .rod-side > .card + .card {
+        margin-top: 0;
+    }
+    .rod-ratings {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+        font-size: var(--fs-sm);
+    }
+    .rod-start,
+    .rod-duration {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+    .rod-start .datetime-split-inputs {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .rod-duration input {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+    .rod-unit {
+        flex: 0 0 auto;
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+    }
+    .rod-num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+    .rod-goods {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+    .rod-good {
+        display: grid;
+        grid-template-columns:
+            minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 1fr) 1rem minmax(0, 1.6fr)
+            minmax(0, 1fr) minmax(0, 0.8fr) var(--touch-target-dense);
+        gap: var(--space-2);
+        align-items: end;
+    }
+    .rod-good > .form-group {
+        margin: 0;
+    }
+    .rod-good > .import-row-flags {
+        grid-column: 1 / -1;
+    }
+    .rod-good--head {
+        align-items: center;
+        font-size: var(--fs-2xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-gray-2-text);
+    }
+    .rod-good--head .num {
+        text-align: right;
+    }
+    .form-group > .rod-good__label {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-1);
+        margin: 0;
+    }
+    .form-group:has([required]) > .rod-good__label::after {
+        content: none;
+    }
+    .rod-good__label .yield-bonus-badge {
+        margin: 0 0 var(--space-1) auto;
+    }
+    .rod-good__label-text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        white-space: nowrap;
+        clip-path: inset(50%);
+    }
+    .rod-good__arrow {
+        display: flex;
+        align-items: center;
+        min-height: var(--touch-target);
+        color: var(--color-primary);
+    }
+    .rod-good__actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--touch-target);
+    }
+    .rod-good .field-computed {
+        min-height: var(--touch-target);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .rod-good__scu {
+        color: var(--color-gray-2-text);
+    }
+    .rod-add {
+        width: 100%;
+        border-style: dashed;
+    }
+    .rod-status {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+    .rod-status__head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--space-3);
+        padding-bottom: var(--space-4);
+        border-bottom: var(--border-hairline);
+    }
+    .rod-profit {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+    }
+    .rod-profit__value {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-2);
+        margin: 0;
+    }
+    .rod-profit__value > span:first-child {
+        font-family: var(--font-headline);
+        font-size: 2rem;
+        font-weight: var(--fw-bold);
+        font-variant-numeric: tabular-nums;
+    }
+    .rod-profit--pos {
+        color: var(--color-success-text);
+    }
+    .rod-profit--neg {
+        color: var(--color-danger-text);
+    }
+    .rod-profit__unit {
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-bold);
+    }
+    .rod-profit__calc {
+        margin: 0;
+        color: var(--color-gray-1);
+        font-size: var(--fs-sm);
+        font-variant-numeric: tabular-nums;
+    }
+    .rod-store {
+        width: 100%;
+        justify-content: center;
+    }
+    .rod-assigned {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+    }
+    .rod-assigned__title {
+        margin: 0;
+        color: var(--color-white);
+        font-weight: var(--fw-bold);
+    }
+    .rod-assigned__meta {
+        margin: 0;
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-sm);
+    }
+    .yield-bonus-badge {
+        display: inline-block;
+        margin-left: 0.5rem;
+        padding: 0.05rem 0.4rem;
+        font-family: var(--font-body);
+        font-weight: bold;
+        font-size: 0.75rem;
+        letter-spacing: 0;
+        border-radius: var(--radius-none);
+        text-transform: none;
+    }
+    .yield-bonus-badge.yield-positive {
+        color: var(--color-dept-profit);
+        background-color: color-mix(in srgb, var(--color-success) 12%, transparent);
+        border: 1px solid var(--color-dept-profit);
+    }
+    .yield-bonus-badge.yield-negative {
+        color: var(--color-danger-text);
+        background-color: color-mix(in srgb, var(--color-danger) 12%, transparent);
+        border: 1px solid var(--color-danger);
+    }
+    .yield-bonus-badge.yield-zero {
+        color: var(--color-gray-2-text);
+        background-color: var(--color-gray-4);
+        border: 1px solid var(--color-gray-3);
+    }
+    @media (width <= 1024px) {
+        .rod-layout {
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .rod-side {
+            order: -1;
+        }
+    }
+    @media (width <= 768px) {
+        .rod-good--head,
+        .rod-good__arrow {
+            display: none;
+        }
+        .rod-good {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            padding-bottom: var(--space-3);
+            border-bottom: var(--border-hairline);
+        }
+        .rod-good__in,
+        .rod-good__out {
+            grid-column: 1 / -1;
+        }
+        .rod-good__actions {
+            grid-column: 1 / -1;
+            justify-content: flex-end;
+        }
+        .rod-good__actions:not(:has(*)) {
+            display: none;
+        }
+        .form-group > .rod-good__label {
+            margin-bottom: var(--space-1);
+        }
+        .rod-good__label-text {
+            position: static;
+            width: auto;
+            height: auto;
+            overflow: visible;
+            white-space: normal;
+            clip-path: none;
+        }
+    }
+}

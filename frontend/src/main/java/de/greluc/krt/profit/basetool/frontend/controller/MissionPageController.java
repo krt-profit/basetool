@@ -22,32 +22,34 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.CrewForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.UnitForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -56,7 +58,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -88,14 +89,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @PreAuthorize("isAuthenticated()")
 public class MissionPageController {
 
-  /** Response type for the {@code /api/v1/operations/lookup} reference-list read. */
-  private static final ParameterizedTypeReference<List<OperationReferenceDto>>
-      OPERATION_REFERENCE_LIST = new ParameterizedTypeReference<List<OperationReferenceDto>>() {};
-
-  /** Response type for the paged {@code /api/v1/missions/search} mission-overview read. */
-  private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_LIST_PAGE =
-      new ParameterizedTypeReference<PageResponse<MissionListDto>>() {};
-
   /**
    * The mission statuses {@code GET /api/v1/missions/search} filters on — the only {@code status}
    * values the list page relays (REQ-SEC-051). The backend stores the status as a string, so this
@@ -103,30 +96,11 @@ public class MissionPageController {
    */
   static final Set<String> MISSION_STATUSES = Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
 
-  /** Response type for the single-mission {@code /api/v1/missions/{id}} read. */
-  private static final ParameterizedTypeReference<MissionDto> MISSION =
-      new ParameterizedTypeReference<MissionDto>() {};
-
   /**
-   * Response type for the paged job-type / squadron / frequency-type catalog reads, whose rows are
-   * consumed as untyped {@code Map} attributes by the mission-detail template.
+   * The list's period segments (REQ-UI-027): upcoming (planned and active), past (completed and
+   * cancelled) and all.
    */
-  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
-      STRING_OBJECT_MAP_PAGE =
-          new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {};
-
-  /** Response type for the {@code /api/v1/missions/{id}/unit-ship-options} ship-picker read. */
-  private static final ParameterizedTypeReference<List<ShipDto>> SHIP_LIST =
-      new ParameterizedTypeReference<List<ShipDto>>() {};
-
-  /** Response type for the paged {@code /api/v1/ship-types} catalog read. */
-  private static final ParameterizedTypeReference<PageResponse<ShipTypeDto>> SHIP_TYPE_PAGE =
-      new ParameterizedTypeReference<PageResponse<ShipTypeDto>>() {};
-
-  /** Response type for the paged {@code /api/v1/missions/{id}/finance-entries} ledger read. */
-  private static final ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>
-      MISSION_FINANCE_ENTRY_PAGE =
-          new ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>() {};
+  static final Set<String> MISSION_PERIODS = Set.of("UPCOMING", "PAST", "ALL");
 
   /**
    * Page size of the mission-detail finance entries table; the totals come from the summary
@@ -134,32 +108,8 @@ public class MissionPageController {
    */
   private static final int FINANCE_TABLE_PAGE_SIZE = 200;
 
-  /** Response type for the {@code /api/v1/refinery-orders/mission/{id}} order-list read. */
-  private static final ParameterizedTypeReference<List<RefineryOrderListDto>> REFINERY_ORDER_LIST =
-      new ParameterizedTypeReference<List<RefineryOrderListDto>>() {};
-
-  /** Response type for the {@code /api/v1/inventory/mission/{id}} item-list read (#1138). */
-  private static final ParameterizedTypeReference<List<InventoryItemDto>> INVENTORY_ITEM_LIST =
-      new ParameterizedTypeReference<List<InventoryItemDto>>() {};
-
-  /** Response type for the untyped-JSON {@code participants/unassigned} passthrough read. */
-  private static final ParameterizedTypeReference<Object> OBJECT =
-      new ParameterizedTypeReference<Object>() {};
-
-  /** Response type for the single-setting {@code /api/v1/settings/{key}} read. */
-  private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP =
-      new ParameterizedTypeReference<Map<String, Object>>() {};
-
-  /**
-   * Response type for the org-unit option reads — the active-org-unit guest picker ({@code
-   * /api/v1/org-units/active}) and the caller's pickable-org-unit owner picker ({@code
-   * /api/v1/users/me/pickable-org-units}), both of which return a flat {@link
-   * OrgUnitMembershipOptionDto} list.
-   */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      ORG_UNIT_MEMBERSHIP_OPTION_LIST = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** The mission domain's typed backend client. */
+  private final MissionBackendClient missionClient;
 
   /**
    * Resolves the "registered member or above" predicate against the request's token authorities,
@@ -175,8 +125,7 @@ public class MissionPageController {
 
   private void addOperationsToModel(Model model) {
     try {
-      List<OperationReferenceDto> operations =
-          backendApiClient.get("/api/v1/operations/lookup", OPERATION_REFERENCE_LIST);
+      List<OperationReferenceDto> operations = missionClient.operationReferences();
       model.addAttribute("operationsList", operations);
     } catch (Exception e) {
       log.warn("Could not load operations", e);
@@ -200,7 +149,7 @@ public class MissionPageController {
           new ParticipantForm(null, "", null, null, "", List.of(), null, null, null, null);
       if (principal != null && prefillParticipantUser) {
         try {
-          UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
+          UserDto me = missionClient.currentUser();
           if (me != null) {
             String name =
                 (me.displayName() != null && !me.displayName().isBlank())
@@ -250,7 +199,10 @@ public class MissionPageController {
    * @param start optional inclusive lower bound on the planned start, ISO-8601 instant
    * @param end optional inclusive upper bound on the planned start, ISO-8601 instant
    * @param status optional status filter; values outside {@link #MISSION_STATUSES} are dropped
-   * @param showPast whether the default status filter includes finished missions
+   * @param showPast whether the default status filter includes finished missions; read only when no
+   *     {@code period} is given, as {@code ALL} when set
+   * @param period the period segment, {@code UPCOMING}, {@code PAST} or {@code ALL}; other values
+   *     fall back to {@code showPast}
    * @param page optional zero-based page index
    * @param size optional page size
    * @param fragment {@code "results"} to render only the results fragment for a live-filter swap
@@ -268,33 +220,12 @@ public class MissionPageController {
           Instant end,
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false, defaultValue = "false") boolean showPast,
+      @RequestParam(required = false) String period,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
-    StringBuilder uri = new StringBuilder("/api/v1/missions/search?");
-    List<Object> uriVariables = new ArrayList<>();
-    if (search != null && !search.isBlank()) {
-      uri.append("query={query}&");
-      uriVariables.add(search);
-    }
-    if (start != null) {
-      uri.append("start={start}&");
-      uriVariables.add(start);
-    }
-    if (end != null) {
-      uri.append("end={end}&");
-      uriVariables.add(end);
-    }
-    if (page != null) {
-      uri.append("page=").append(page).append("&");
-    }
-    if (size != null) {
-      uri.append("size=").append(size).append("&");
-    }
-    uri.append("sort=plannedStartTime,desc&");
-
     List<String> knownStatuses =
         status == null
             ? List.of()
@@ -302,29 +233,21 @@ public class MissionPageController {
                 .map(s -> RelayParams.oneOfOrNull(s, MISSION_STATUSES))
                 .filter(Objects::nonNull)
                 .toList();
-    if (knownStatuses.isEmpty()) {
-      if (showPast) {
-        uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELLED&");
-      } else {
-        uri.append("status=PLANNED&status=ACTIVE&");
-      }
-    } else {
-      for (String s : knownStatuses) {
-        uri.append("status=").append(s).append("&");
-      }
-    }
+    String knownPeriod = RelayParams.oneOfOrNull(period, MISSION_PERIODS);
+    String effectivePeriod = knownPeriod != null ? knownPeriod : showPast ? "ALL" : "UPCOMING";
 
     try {
       PageResponse<MissionListDto> missionsPage =
-          uriVariables.isEmpty()
-              ? backendApiClient.get(uri.toString(), MISSION_LIST_PAGE)
-              : backendApiClient.get(uri.toString(), MISSION_LIST_PAGE, uriVariables.toArray());
+          missionClient.searchMissions(
+              new MissionBackendClient.MissionSearch(
+                  search, start, end, page, size, knownStatuses, effectivePeriod));
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
       model.addAttribute("search", search);
       model.addAttribute("start", start);
       model.addAttribute("end", end);
-      model.addAttribute("showPast", showPast);
+      model.addAttribute("showPast", !"UPCOMING".equals(effectivePeriod));
+      model.addAttribute("period", effectivePeriod);
     } catch (Exception e) {
       log.error("Error loading missions", e);
       model.addAttribute("error", "error.missions.load");
@@ -357,7 +280,7 @@ public class MissionPageController {
       @AuthenticationPrincipal OidcUser principal,
       @RequestParam(required = false) String fragment) {
     try {
-      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
+      MissionDto mission = missionClient.mission(id);
 
       final boolean fullRender = fragment == null;
       final String frag = fullRender ? null : fragment.toLowerCase(java.util.Locale.ROOT);
@@ -424,86 +347,62 @@ public class MissionPageController {
       model.addAttribute("roundingMode", needFinance ? fetchRoundingMode() : "UP");
 
       try {
-        PageResponse<Map<String, Object>> jobTypesPage =
-            backendApiClient.getCached(CachedCatalog.JOB_TYPES_MISSION, STRING_OBJECT_MAP_PAGE);
+        PageResponse<JobTypeDto> jobTypesPage = missionClient.missionJobTypes();
         model.addAttribute("jobTypes", jobTypesPage.content());
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
 
       try {
-        PageResponse<Map<String, Object>> crewJobTypesPage =
-            backendApiClient.getCached(CachedCatalog.JOB_TYPES_CREW, STRING_OBJECT_MAP_PAGE);
+        PageResponse<JobTypeDto> crewJobTypesPage = missionClient.crewJobTypes();
         model.addAttribute("crewJobTypes", crewJobTypesPage.content());
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
 
       try {
-        PageResponse<Map<String, Object>> squadronsPage =
-            backendApiClient.getCached(CachedCatalog.SQUADRONS_UNSORTED, STRING_OBJECT_MAP_PAGE);
+        PageResponse<SquadronDto> squadronsPage = missionClient.squadrons();
         model.addAttribute("squadrons", squadronsPage.content());
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
 
       try {
-        List<OrgUnitMembershipOptionDto> orgUnits =
-            backendApiClient.getCached(
-                CachedCatalog.ORG_UNITS_ACTIVE, ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+        List<OrgUnitMembershipOptionDto> orgUnits = missionClient.activeOrgUnits();
         model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
-      } catch (Exception e) {
+      } catch (Exception _) {
         model.addAttribute("orgUnits", List.of());
       }
 
       try {
-        PageResponse<Map<String, Object>> freqTypesPage =
-            backendApiClient.getCached(
-                CachedCatalog.FREQUENCY_TYPES_ACTIVE, STRING_OBJECT_MAP_PAGE);
+        PageResponse<FrequencyTypeDto> freqTypesPage = missionClient.frequencyTypes();
         model.addAttribute("frequencyTypes", freqTypesPage.content());
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
 
       Boolean canEdit = mission.canEdit();
       if (canEdit != null && canEdit && needCrewBoard) {
         try {
-          List<ShipDto> unitShipOptions =
-              backendApiClient.get("/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST);
+          List<ShipDto> unitShipOptions = missionClient.unitShipOptions(id);
           model.addAttribute("unitShipOptions", unitShipOptions);
-        } catch (Exception ignored) {
+        } catch (Exception _) {
         }
       }
 
       try {
-        PageResponse<ShipTypeDto> allShipTypesPage =
-            backendApiClient.getCached(CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE);
+        PageResponse<ShipTypeDto> allShipTypesPage = missionClient.shipTypes();
         model.addAttribute("allShipTypes", allShipTypesPage.content());
-      } catch (Exception ignored) {
+      } catch (Exception _) {
       }
 
       if (authHelperService.isMemberOrAbove() && needFinance) {
         try {
           CompletableFuture<MissionFinanceTotalsDto> totalsFuture =
-              parallelPageLoader.loadAsync(
-                  () ->
-                      backendApiClient.get(
-                          "/api/v1/missions/" + id + "/finance-entries/summary",
-                          MissionFinanceTotalsDto.class));
+              parallelPageLoader.loadAsync(() -> missionClient.financeTotals(id));
           CompletableFuture<PageResponse<MissionFinanceEntryDto>> entriesFuture =
               parallelPageLoader.loadAsync(
-                  () ->
-                      backendApiClient.get(
-                          "/api/v1/missions/"
-                              + id
-                              + "/finance-entries?size="
-                              + FINANCE_TABLE_PAGE_SIZE,
-                          MISSION_FINANCE_ENTRY_PAGE));
+                  () -> missionClient.financeEntries(id, FINANCE_TABLE_PAGE_SIZE));
           CompletableFuture<List<RefineryOrderListDto>> refineryFuture =
-              parallelPageLoader.loadAsync(
-                  () ->
-                      backendApiClient.get(
-                          "/api/v1/refinery-orders/mission/" + id, REFINERY_ORDER_LIST));
+              parallelPageLoader.loadAsync(() -> missionClient.refineryOrders(id));
           CompletableFuture<List<InventoryItemDto>> inventoryFuture =
-              parallelPageLoader.loadAsync(
-                  () ->
-                      backendApiClient.get("/api/v1/inventory/mission/" + id, INVENTORY_ITEM_LIST));
+              parallelPageLoader.loadAsync(() -> missionClient.inventory(id));
           CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture, inventoryFuture)
               .join();
 
@@ -662,9 +561,7 @@ public class MissionPageController {
       return List.of();
     }
     try {
-      List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get(
-              "/api/v1/users/me/pickable-org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+      List<OrgUnitMembershipOptionDto> options = missionClient.pickableOrgUnits();
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for mission-create owner-picker", e);
@@ -683,8 +580,7 @@ public class MissionPageController {
   public org.springframework.http.ResponseEntity<Object> getUnassignedParticipantsAjax(
       @PathVariable @NotNull UUID id) {
     try {
-      Object result =
-          backendApiClient.get("/api/v1/missions/" + id + "/participants/unassigned", OBJECT);
+      List<MissionParticipantDto> result = missionClient.unassignedParticipants(id);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -701,12 +597,11 @@ public class MissionPageController {
   @NotNull
   private String fetchRoundingMode() {
     try {
-      Map<String, Object> setting =
-          backendApiClient.get("/api/v1/settings/refinery.rounding.mode", STRING_OBJECT_MAP);
-      if (setting != null && setting.get("value") != null) {
-        return String.valueOf(setting.get("value"));
+      SystemSettingDto setting = missionClient.refineryRoundingMode();
+      if (setting != null && setting.value() != null) {
+        return setting.value();
       }
-    } catch (Exception e) {
+    } catch (Exception _) {
       log.warn("Failed to fetch refinery rounding mode, using default UP");
     }
     return "UP";
@@ -738,7 +633,7 @@ public class MissionPageController {
       }
       java.time.ZonedDateTime zdt = instant.atZone(MISSION_TIME_ZONE);
       return zdt.toLocalDateTime().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();
-    } catch (Exception e) {
+    } catch (Exception _) {
       log.warn("Failed to format instant: {}", instantObj);
       return String.valueOf(instantObj);
     }

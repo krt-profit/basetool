@@ -27,13 +27,13 @@ function readMaterialNames() {
     );
     materialNames.length = 0;
     if (dataList) {
-        Array.from(dataList.options).forEach(function (o) {
+        Array.from(dataList.options).forEach((o) => {
             materialNames.push(o.value);
         });
     }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     readMaterialNames();
     const inpMaterials = document.getElementById('filterMaterials');
     if (inpMaterials) krtAutocomplete(inpMaterials, materialNames);
@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function addCategoryOption(cat) {
         document
             .querySelectorAll('select[data-update-type="CATEGORY"], #cm-category')
-            .forEach(function (sel) {
+            .forEach((sel) => {
                 const opt = document.createElement('option');
                 opt.value = cat.id;
                 opt.textContent = cat.name;
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function removeCategoryOption(id) {
         document
             .querySelectorAll('select[data-update-type="CATEGORY"] option, #cm-category option')
-            .forEach(function (opt) {
+            .forEach((opt) => {
                 if (opt.value === id) {
                     opt.remove();
                 }
@@ -62,12 +62,16 @@ document.addEventListener('DOMContentLoaded', function () {
         const tr = document.createElement('tr');
         tr.setAttribute('data-category-row', '');
         const nameTd = document.createElement('td');
-        nameTd.textContent = cat.name;
+        const title = document.createElement('span');
+        title.className = 'cell-title';
+        title.textContent = cat.name;
+        nameTd.appendChild(title);
         const actionTd = document.createElement('td');
+        actionTd.className = 'cell-actions';
         const form = document.createElement('form');
         form.method = 'post';
-        form.action = '/admin/materials/categories/' + encodeURIComponent(cat.id) + '/delete';
-        form.style.display = 'inline';
+        form.action = `/admin/materials/categories/${encodeURIComponent(cat.id)}/delete`;
+        form.className = 'm-0';
         form.setAttribute('data-krt-confirm', '');
         form.setAttribute('data-krt-confirm-message', CAT_MSG.deleteConfirm);
         form.setAttribute('data-category-id', cat.id);
@@ -76,8 +80,10 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.className = 'btn btn-quiet-danger btn-icon';
         btn.title = CAT_MSG.deleteTitle;
         btn.setAttribute('aria-label', CAT_MSG.deleteTitle);
-        btn.innerHTML =
-            '<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>';
+        krtHtml.set(
+            btn,
+            krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>`,
+        );
         form.appendChild(btn);
         actionTd.appendChild(form);
         tr.appendChild(nameTd);
@@ -85,17 +91,22 @@ document.addEventListener('DOMContentLoaded', function () {
         return tr;
     }
 
-    function buildEmptyCategoryRow() {
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-category-empty', '');
-        const td = document.createElement('td');
-        td.colSpan = 2;
-        td.textContent = CAT_MSG.noEntries;
-        tr.appendChild(td);
-        return tr;
+    /**
+     * Shows the category table while it holds a row and the empty state otherwise.
+     */
+    function syncCategoryEmpty() {
+        const tableWrap = document.querySelector('[data-category-table]');
+        const emptyState = document.querySelector('[data-category-empty]');
+        const hasRows = !!document.querySelector('[data-category-table] tr[data-category-row]');
+        if (tableWrap instanceof HTMLElement) {
+            tableWrap.hidden = !hasRows;
+        }
+        if (emptyState instanceof HTMLElement) {
+            emptyState.hidden = hasRows;
+        }
     }
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const form = event.target.closest('form[data-category-create]');
         if (!form) {
             return;
@@ -125,13 +136,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
                 addCategoryOption(created);
-                const tbody = form.closest('.data-section').querySelector('tbody');
+                const tbody = document.querySelector('[data-category-table] tbody');
                 if (tbody) {
-                    const emptyRow = tbody.querySelector('[data-category-empty]');
-                    if (emptyRow) {
-                        emptyRow.remove();
-                    }
                     tbody.appendChild(buildCategoryRow(created));
+                    syncCategoryEmpty();
                 }
                 if (nameInput) {
                     nameInput.value = '';
@@ -140,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const form = event.target.closest('form[data-krt-confirm]');
         if (!form || form.dataset.krtConfirmed === 'true') {
             return;
@@ -151,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function () {
             typeof window.showKrtConfirm === 'function'
                 ? window.showKrtConfirm(null, message)
                 : Promise.resolve(true);
-        proceed.then(function (ok) {
+        proceed.then((ok) => {
             if (!ok) {
                 return;
             }
@@ -166,13 +174,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     onSuccess() {
                         removeCategoryOption(categoryId);
                         const row = form.closest('tr');
-                        const tbody = row ? row.parentElement : null;
                         if (row) {
                             row.remove();
                         }
-                        if (tbody && !tbody.querySelector('tr:not([data-category-empty])')) {
-                            tbody.appendChild(buildEmptyCategoryRow());
-                        }
+                        syncCategoryEmpty();
                     },
                 });
                 return;
@@ -238,7 +243,7 @@ function updateMaterial(selectElement) {
             method: 'PUT',
             url: `/admin/materials/${encodeURIComponent(matId)}/ajax`,
             payload: buildRequestBody,
-            serialize: 'admin-material:' + matId,
+            serialize: `admin-material:${matId}`,
             containerSelector: tr,
             successMessage: MSG_UPDATE_SUCCESS,
             errorMessage: MSG_UPDATE_ERROR,
@@ -250,7 +255,7 @@ function updateMaterial(selectElement) {
 }
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('change', 'admin-materials-update', function (el) {
+    window.krtEvents.on('change', 'admin-materials-update', (el) => {
         updateMaterial(el);
     });
 }
@@ -321,24 +326,20 @@ function replaceFromDocument(fresh, selector) {
 }
 
 function refreshMaterialsTable() {
-    return fetch(window.location.pathname + window.location.search, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    })
-        .then(function (res) {
-            if (window.krtFetch && window.krtFetch.maybeReauthenticate(res)) {
-                return null;
-            }
-            return res.redirected || !res.ok ? null : res.text();
+    return window.krtFetch
+        .get(window.location.pathname + window.location.search)
+        .then((res) => {
+            return !res || !res.ok ? null : res.text();
         })
-        .then(function (html) {
+        .then((html) => {
             if (html === null) {
                 return false;
             }
-            const fresh = new DOMParser().parseFromString(html, 'text/html');
-            if (!fresh.querySelector('#materialsTable tbody')) {
+            const fresh = window.krtFetch.parseTrustedDocument(html);
+            if (!fresh.querySelector('#materials-results #materialsTable tbody')) {
                 return false;
             }
-            replaceFromDocument(fresh, '#materialsTable tbody');
+            replaceFromDocument(fresh, '#materials-results');
             replaceFromDocument(fresh, '#materialNames-data');
             replaceFromDocument(fresh, '#cm-refined');
             readMaterialNames();
@@ -348,13 +349,13 @@ function refreshMaterialsTable() {
             if (filterInput && filterInput.value) {
                 filterTable('materialsTable', filterInput.value);
             }
-            const table = document.getElementById('materialsTable');
+            const results = document.getElementById('materials-results');
             document.dispatchEvent(
-                new CustomEvent('krt:swapped', { detail: { container: table } }),
+                new CustomEvent('krt:swapped', { detail: { container: results } }),
             );
             return true;
         })
-        .catch(function (error) {
+        .catch((error) => {
             console.warn('admin-materials: table refresh failed', error);
             return false;
         });
@@ -363,22 +364,22 @@ function refreshMaterialsTable() {
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'materials-open-create-modal', openCreateMaterialModal);
     window.krtEvents.on('click', 'materials-close-create-modal', closeCreateMaterialModal);
-    window.krtEvents.on('click', 'materials-submit-create', function (btn) {
+    window.krtEvents.on('click', 'materials-submit-create', (btn) => {
         submitCreateMaterial(btn);
     });
 }
 
-document.addEventListener('keydown', function (e) {
+document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const overlay = document.getElementById('modal-create-material');
-        if (overlay && overlay.classList.contains('krtm-modal-open')) {
+        if (overlay && overlay.classList.contains('is-open')) {
             closeCreateMaterialModal();
         }
     }
 });
 const overlay = document.getElementById('modal-create-material');
 if (overlay) {
-    overlay.addEventListener('click', function (e) {
+    overlay.addEventListener('click', (e) => {
         if (e.target === overlay) closeCreateMaterialModal();
     });
 }

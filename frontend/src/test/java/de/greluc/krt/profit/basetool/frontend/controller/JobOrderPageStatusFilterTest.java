@@ -51,6 +51,12 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class JobOrderPageStatusFilterTest {
 
+  private static final String ONE_STATUS_URI =
+      "/api/v1/orders?page={page}&size={size}&sort=priority,asc&status={status}";
+
+  private static final String TWO_STATUSES_URI =
+      "/api/v1/orders?page={page}&size={size}&sort=priority,asc&status={status},{status}";
+
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
@@ -72,8 +78,7 @@ class JobOrderPageStatusFilterTest {
   @WithMockUser
   void viewOrders_withoutStatusParam_usesDefaultAndSetsNoCookie() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef()))
+            eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS")))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
     mockMvc
@@ -82,16 +87,13 @@ class JobOrderPageStatusFilterTest {
         .andExpect(cookie().doesNotExist("orders_filter_status"));
 
     verify(backendApiClient)
-        .get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef());
+        .get(eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
   }
 
   @Test
   @WithMockUser
   void viewOrders_withStatusParam_usesItAndSetsNoCookie() throws Exception {
-    when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"), anyTypeRef()))
+    when(backendApiClient.get(eq(ONE_STATUS_URI), anyTypeRef(), eq(0), eq(100), eq("COMPLETED")))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
     mockMvc
@@ -99,16 +101,14 @@ class JobOrderPageStatusFilterTest {
         .andExpect(status().isOk())
         .andExpect(cookie().doesNotExist("orders_filter_status"));
 
-    verify(backendApiClient)
-        .get(eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"), anyTypeRef());
+    verify(backendApiClient).get(eq(ONE_STATUS_URI), anyTypeRef(), eq(0), eq(100), eq("COMPLETED"));
   }
 
   @Test
   @WithMockUser
   void viewOrders_withInvalidStatusParam_fallsBackToDefault() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef()))
+            eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS")))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
     mockMvc
@@ -117,24 +117,19 @@ class JobOrderPageStatusFilterTest {
         .andExpect(cookie().doesNotExist("orders_filter_status"));
 
     verify(backendApiClient)
-        .get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef());
+        .get(eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
   }
 
   @Test
   @WithMockUser
   void viewOrders_withMultipleValidStatusParams_passesThemThrough() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,COMPLETED"),
-            anyTypeRef()))
+            eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("COMPLETED")))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
     mockMvc.perform(get("/orders").param("status", "OPEN", "COMPLETED")).andExpect(status().isOk());
 
     verify(backendApiClient)
-        .get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,COMPLETED"),
-            anyTypeRef());
+        .get(eq(TWO_STATUSES_URI), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("COMPLETED"));
   }
 }

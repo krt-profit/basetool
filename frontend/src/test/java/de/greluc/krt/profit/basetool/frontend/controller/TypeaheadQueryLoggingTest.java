@@ -30,6 +30,8 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.ArrayList;
@@ -103,11 +105,14 @@ class TypeaheadQueryLoggingTest {
   @Test
   void uexTypeahead_logsSanitisedQueryAtDebugNotWarn() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY)))
+    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY), eq(25)))
         .thenThrow(new RuntimeException("backend down"));
     ListAppender<ILoggingEvent> appender = capture(PersonalInventoryPageController.class);
 
-    assertThat(new PersonalInventoryPageController(client).uexSearch(FORGED_QUERY, 25)).isEmpty();
+    assertThat(
+            new PersonalInventoryPageController(new PersonalInventoryBackendClient(client))
+                .uexSearch(FORGED_QUERY, 25))
+        .isEmpty();
 
     assertSanitisedAt(appender, Level.DEBUG);
   }
@@ -115,11 +120,13 @@ class TypeaheadQueryLoggingTest {
   @Test
   void personalBlueprintTypeahead_logsSanitisedQueryAtDebugNotWarn() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY)))
+    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY), eq(25)))
         .thenThrow(new RuntimeException("backend down"));
     ListAppender<ILoggingEvent> appender = capture(PersonalInventoryBlueprintsPageController.class);
 
-    assertThat(new PersonalInventoryBlueprintsPageController(client).search(FORGED_QUERY, 25))
+    assertThat(
+            new PersonalInventoryBlueprintsPageController(new BlueprintBackendClient(client))
+                .search(FORGED_QUERY, 25))
         .isEmpty();
 
     assertSanitisedAt(appender, Level.DEBUG);
@@ -128,11 +135,14 @@ class TypeaheadQueryLoggingTest {
   @Test
   void defaultBlueprintTypeahead_logsSanitisedQueryAtDebugNotWarn() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY)))
+    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY), eq(25)))
         .thenThrow(new RuntimeException("backend down"));
     ListAppender<ILoggingEvent> appender = capture(AdminDefaultBlueprintsPageController.class);
 
-    assertThat(new AdminDefaultBlueprintsPageController(client).search(FORGED_QUERY, 25)).isEmpty();
+    assertThat(
+            new AdminDefaultBlueprintsPageController(new BlueprintBackendClient(client))
+                .search(FORGED_QUERY, 25))
+        .isEmpty();
 
     assertSanitisedAt(appender, Level.DEBUG);
   }
@@ -141,11 +151,11 @@ class TypeaheadQueryLoggingTest {
   @Test
   void adminBlueprintSearch_logsSanitisedQueryAtDebugOnBackendServiceException() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY)))
+    when(client.get(anyString(), anyTypeRef(), eq(25), eq(0), eq(FORGED_QUERY)))
         .thenThrow(new BackendServiceException("relay failed", null, 503));
     ListAppender<ILoggingEvent> appender = capture(AdminBlueprintsPageController.class);
 
-    new AdminBlueprintsPageController(client)
+    new AdminBlueprintsPageController(new BlueprintBackendClient(client))
         .listBlueprints(FORGED_QUERY, 0, null, new ExtendedModelMap());
 
     assertSanitisedAt(appender, Level.DEBUG);
@@ -158,11 +168,11 @@ class TypeaheadQueryLoggingTest {
   @Test
   void adminBlueprintSearch_keepsErrorLevelForTheUnexpectedCatchAll() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(anyString(), anyTypeRef(), eq(FORGED_QUERY)))
+    when(client.get(anyString(), anyTypeRef(), eq(25), eq(0), eq(FORGED_QUERY)))
         .thenThrow(new IllegalStateException("boom"));
     ListAppender<ILoggingEvent> appender = capture(AdminBlueprintsPageController.class);
 
-    new AdminBlueprintsPageController(client)
+    new AdminBlueprintsPageController(new BlueprintBackendClient(client))
         .listBlueprints(FORGED_QUERY, 0, null, new ExtendedModelMap());
 
     assertSanitisedAt(appender, Level.ERROR);

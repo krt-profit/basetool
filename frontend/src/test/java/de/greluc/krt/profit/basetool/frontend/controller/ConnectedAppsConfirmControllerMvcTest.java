@@ -108,6 +108,33 @@ class ConnectedAppsConfirmControllerMvcTest {
     verify(ingestHandoffService, never()).consume(anyString(), anyString(), any(), any());
   }
 
+  /**
+   * The page follows the form pattern (REQ-UI-027): its eyebrow leads back to the connected
+   * applications, the confirmation sits on one card, and discarding comes before confirming.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void thePageLeadsBackThroughItsEyebrow() throws Exception {
+    String html =
+        mockMvc
+            .perform(
+                get("/connected-apps/confirm")
+                    .param("handoff", HANDOFF)
+                    .with(user("member").roles("KRT_MEMBER")))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern("class=\"page-eyebrow\" href=\"/connected-apps\"")
+        .contains("class=\"form-layout card cac-card\"")
+        .doesNotContain("hud-box")
+        .doesNotContain("class=\"greeting");
+    assertThat(html.indexOf("id=\"cac-discard\"")).isLessThan(html.indexOf("id=\"cac-confirm\""));
+  }
+
   @Test
   void aMalformedIdIsNotHandedOn() throws Exception {
     mockMvc

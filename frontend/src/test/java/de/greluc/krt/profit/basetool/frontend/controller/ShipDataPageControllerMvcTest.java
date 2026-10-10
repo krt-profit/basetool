@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -50,7 +51,7 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * Render test for {@code /ship-data}: the {@code ship-data.js} module tag after the inline
  * bootstrap is present and the response ends with {@code </html>}, guarding against inline-script
- * truncation.
+ * truncation, and the page follows the list pattern (REQ-UI-027).
  */
 @SpringBootTest
 class ShipDataPageControllerMvcTest {
@@ -71,13 +72,11 @@ class ShipDataPageControllerMvcTest {
   }
 
   /**
-   * Asserts the extracted {@code ship-data.js} module tag (emitted AFTER both datalists and the
-   * interpolated bootstrap) appears in the rendered HTML — proof that the Thymeleaf inline
-   * truncation does not strike again.
+   * Stubs one manufacturer and one ship type, or none of either.
+   *
+   * @param empty whether both catalogues come back empty
    */
-  @Test
-  @WithMockUser(roles = "ADMIN")
-  void listData_ShouldRenderModuleTag_AfterBothDatalists() throws Exception {
+  private void stubCatalogue(boolean empty) {
     ManufacturerDto manufacturer =
         new ManufacturerDto(
             UUID.randomUUID(),
@@ -88,20 +87,36 @@ class ShipDataPageControllerMvcTest {
             "Mil-style",
             false);
     ShipTypeDto shipType =
-        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 8, false);
+        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", 8, true);
+    List<ManufacturerDto> manufacturers = empty ? List.of() : List.of(manufacturer);
+    List<ShipTypeDto> shipTypes = empty ? List.of() : List.of(shipType);
     PageResponse<ManufacturerDto> manufacturersPage =
-        new PageResponse<>(List.of(manufacturer), 0, 1000, 1, 1, Collections.emptyList());
+        new PageResponse<>(
+            manufacturers, 0, 1000, manufacturers.size(), 1, Collections.emptyList());
     PageResponse<ShipTypeDto> shipTypesPage =
-        new PageResponse<>(List.of(shipType), 0, 1000, 1, 1, Collections.emptyList());
+        new PageResponse<>(shipTypes, 0, 1000, shipTypes.size(), 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(manufacturersPage);
     when(backendApiClient.get(
-            eq("/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(shipTypesPage);
+  }
+
+  /**
+   * Asserts the extracted {@code ship-data.js} module tag (emitted AFTER both datalists and the
+   * interpolated bootstrap) appears in the rendered HTML — proof that the Thymeleaf inline
+   * truncation does not strike again.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_ShouldRenderModuleTag_AfterBothDatalists() throws Exception {
+    stubCatalogue(false);
 
     mockMvc
         .perform(get("/ship-data"))
@@ -112,10 +127,91 @@ class ShipDataPageControllerMvcTest {
         .andExpect(content().string(containsString("value=\"Avenger Titan\"")))
         .andExpect(content().string(containsString("value=\"Aegis Dynamics\"")))
         .andExpect(content().string(containsString("src=\"/js/ship-data.js\"")))
-        .andExpect(
-            PageStylesheets.content(
-                containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
+        .andExpect(PageStylesheets.content(containsString(".sd-row--hidden")))
         .andExpect(content().string(containsString("</html>")));
+  }
+
+  /**
+   * An admin sees the list pattern: the page head with the master-data eyebrow and the reset in its
+   * overflow menu, both catalogues as stacked tables in flush cards, row toggles as quiet buttons,
+   * a hidden entry marked by its row class, and no HUD box or greeting banner.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void anAdminSeesTheListPatternWithTheResetInTheOverflowMenu() throws Exception {
+    stubCatalogue(false);
+
+    String html =
+        mockMvc
+            .perform(get("/ship-data"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .contains("data-testid=\"overflow-menu-toggle\"")
+        .contains("data-testid=\"ship-data-reset-fitted\"")
+        .contains("id=\"shipTypesTable\" class=\"data-table data-table--stack\"")
+        .contains("id=\"manufacturersTable\" class=\"data-table data-table--stack\"")
+        .contains("class=\"btn btn-ghost btn-xs\"")
+        .contains("sd-row--hidden")
+        .doesNotContain("krtm-")
+        .doesNotContain("hud-box")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("btn--cta");
+  }
+
+  /**
+   * A member sees the same lists without any admin control: no overflow menu, no visibility toggle,
+   * no reset dialog.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void aMemberSeesNoAdminControls() throws Exception {
+    stubCatalogue(false);
+
+    String html =
+        mockMvc
+            .perform(get("/ship-data"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .contains("Avenger Titan")
+        .doesNotContain("ship-data-reset-fitted")
+        .doesNotContain("js-visibility-toggle")
+        .doesNotContain("reset-fitted-confirm-modal");
+  }
+
+  /**
+   * Empty catalogues show the empty state instead of a headless table.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void emptyCataloguesShowTheEmptyState() throws Exception {
+    stubCatalogue(true);
+
+    String html =
+        mockMvc
+            .perform(get("/ship-data"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html.split("data-testid=\"empty-state\"", -1)).hasSize(3);
+    assertThat(html).doesNotContain(" id=\"shipTypesTable\"").doesNotContain("colspan");
   }
 }

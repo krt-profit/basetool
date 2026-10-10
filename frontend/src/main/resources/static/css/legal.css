@@ -1,0 +1,92 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+@layer base, components, page, utilities;
+
+@layer page {
+    .legal-doc {
+        max-width: calc(var(--measure) + 2.5rem);
+    }
+
+    .legal-doc h2,
+    .terms-body h2 {
+        margin: var(--space-8) 0 var(--space-3);
+        font-size: 1.15rem;
+    }
+
+    .legal-doc > h2:first-child,
+    .legal-doc > .terms-body > p:first-child {
+        margin-top: 0;
+    }
+
+    .legal-doc h3 {
+        margin: var(--space-6) 0 var(--space-2);
+        font-size: 1rem;
+    }
+
+    .legal-list {
+        max-width: var(--measure);
+        margin: 0 0 var(--space-4) var(--space-6);
+        padding: 0;
+        list-style: disc;
+    }
+
+    .legal-list li + li {
+        margin-top: var(--space-1);
+    }
+
+    .legal-updated {
+        margin-top: var(--space-8);
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-sm);
+    }
+
+    .legal-toc {
+        max-width: calc(var(--measure) + 2.5rem);
+        margin-bottom: var(--space-4);
+    }
+
+    .legal-toc .card-title {
+        margin-bottom: var(--space-3);
+    }
+
+    .legal-toc__list,
+    .legal-toc__sub {
+        margin: 0;
+        padding-left: var(--space-6);
+    }
+
+    .legal-toc__list > li + li {
+        margin-top: var(--space-3);
+    }
+
+    .legal-toc__sub {
+        margin-top: var(--space-1);
+        list-style: lower-alpha;
+        font-size: var(--fs-sm);
+    }
+
+    .legal-toc__sub li + li {
+        margin-top: var(--space-1);
+    }
+
+    .legal-toc a {
+        display: inline-block;
+        padding: var(--space-1) 0;
+    }
+
+    .legal-doc details.oss-group > summary {
+        color: var(--color-white);
+    }
+
+    .legal-doc details.oss-group > summary:hover {
+        color: var(--color-primary);
+    }
+
+    .legal-doc [id] {
+        scroll-margin-top: 6rem;
+    }
+}

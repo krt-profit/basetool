@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
@@ -38,8 +40,6 @@ import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryServi
 import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
-import de.greluc.krt.profit.basetool.backend.support.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
@@ -48,7 +48,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -323,7 +322,7 @@ public class UserController {
   public UserDto getUserById(@PathVariable @NotNull UUID id) {
     User user = userService.findById(id);
     UserDto dto = userMapper.toDto(user);
-    if (isCrossSquadronNonAdmin(user)) {
+    if (userService.isCrossSquadronForNonAdmin(user.getId())) {
       return redactToPeerShape(dto);
     }
     return redactForPeerIfNeeded(dto);
@@ -360,25 +359,6 @@ public class UserController {
     return allKinds
         ? orgUnitMembershipQueryService.listDirectMembershipOptions(id)
         : orgUnitMembershipQueryService.listOptionsForUser(id);
-  }
-
-  /**
-   * Returns whether the caller is a non-admin who can see none of the target user's Staffeln via
-   * {@code OwnerScopeService}. A target without any squadron counts as cross-squadron.
-   *
-   * @param user target user resolved by id; never {@code null}
-   * @return {@code true} if the caller is a non-admin and shares none of the user's squadrons
-   */
-  private boolean isCrossSquadronNonAdmin(@NotNull User user) {
-    if (authHelperService.isAdmin()) {
-      return false;
-    }
-    List<UUID> targetSquadronIds =
-        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(user.getId());
-    if (targetSquadronIds.isEmpty()) {
-      return true;
-    }
-    return targetSquadronIds.stream().noneMatch(authHelperService::canSeeSquadron);
   }
 
   /**
@@ -470,9 +450,9 @@ public class UserController {
     User me =
         userService.updateUserDescription(
             userService.getUserIdFromJwt(jwt),
-            request.getDescription(),
-            request.getDisplayName(),
-            request.getVersion());
+            request.description(),
+            request.displayName(),
+            request.version());
     return withSelfEmail(userMapper.toDto(me), me);
   }
 
@@ -642,11 +622,11 @@ public class UserController {
     return userMapper.toDto(
         userService.updateUserAttributes(
             id,
-            request.getRank(),
-            request.getDescription(),
-            request.getDisplayName(),
-            request.getVersion(),
-            request.getJoinDate()));
+            request.rank(),
+            request.description(),
+            request.displayName(),
+            request.version(),
+            request.joinDate()));
   }
 
   /**
@@ -722,32 +702,33 @@ public class UserController {
             id, body.targetUserId(), body.version(), adminUserId));
   }
 
-  /** Body for {@link #updateUserAttributes}. */
-  @Data
-  public static class UserAttributesRequest {
-    @jakarta.validation.constraints.NotNull private Integer rank;
+  /**
+   * Body for {@link #updateUserAttributes}.
+   *
+   * @param rank the member's rank
+   * @param description the profile description
+   * @param displayName the display name
+   * @param version the user row's expected version
+   * @param joinDate the join date, or {@code null} to clear it
+   */
+  public record UserAttributesRequest(
+      @jakarta.validation.constraints.NotNull Integer rank,
+      @Size(max = 10_000) String description,
+      @Size(max = 255) String displayName,
+      @jakarta.validation.constraints.NotNull Long version,
+      @Nullable LocalDate joinDate) {}
 
-    @Size(max = 10_000)
-    private String description;
-
-    @Size(max = 255)
-    private String displayName;
-
-    @jakarta.validation.constraints.NotNull private Long version;
-    @Nullable private LocalDate joinDate;
-  }
-
-  /** Body for {@link #updateMyDescription}. */
-  @Data
-  public static class UserDescriptionRequest {
-    @Size(max = 10_000)
-    private String description;
-
-    @Size(max = 255)
-    private String displayName;
-
-    @jakarta.validation.constraints.NotNull private Long version;
-  }
+  /**
+   * Body for {@link #updateMyDescription}.
+   *
+   * @param description the profile description
+   * @param displayName the display name
+   * @param version the user row's expected version
+   */
+  public record UserDescriptionRequest(
+      @Size(max = 10_000) String description,
+      @Size(max = 255) String displayName,
+      @jakarta.validation.constraints.NotNull Long version) {}
 
   /**
    * Response for {@link #getMyPayoutPreference} / {@link #updateMyPayoutPreference}: the user's

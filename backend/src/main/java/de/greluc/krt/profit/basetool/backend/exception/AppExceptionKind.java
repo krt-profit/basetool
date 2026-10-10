@@ -25,10 +25,9 @@ import org.springframework.http.HttpStatus;
 
 /**
  * The fixed RFC&nbsp;7807 identity (status, stable code, i18n keys, problem-type suffix, log label,
- * disclosure policy) of every {@link AppException} subtype whose wire contract is constant per
- * type.
+ * disclosure policy) of each generic kind of the error kernel (ADR-0235).
  *
- * <p>{@code BankConflictException} is not listed: its identity is chosen per instance.
+ * <p>Module exceptions extend {@link DomainProblem} and carry their own identity instead.
  */
 @RequiredArgsConstructor
 public enum AppExceptionKind {
@@ -64,67 +63,6 @@ public enum AppExceptionKind {
       "problem.business_conflict.detail",
       "business-conflict",
       "Business conflict",
-      ErrorDisclosurePolicy.STANDARD),
-
-  /**
-   * {@code OverAllocationException}: an amount would push a dimension's sum over the inventory
-   * entry's own amount (REQ-INV-027). A {@code 422}, distinct from {@code 400} and {@code 409}, so
-   * the frontend renders an inline toast.
-   */
-  OVER_ALLOCATION(
-      HttpStatus.UNPROCESSABLE_CONTENT,
-      CoreProblemCode.OVER_ALLOCATION.code(),
-      "problem.over_allocation.title",
-      "problem.over_allocation.detail",
-      "over-allocation",
-      "Over-allocation",
-      ErrorDisclosurePolicy.STANDARD),
-
-  /**
-   * {@code ProductionAllocationException} — a well-formed, version-current production booking whose
-   * amount exceeds the item line's remaining-to-manufacture, or whose per-material consumption does
-   * not exactly cover the required demand (REQ-ORDERS-025). Like {@link #OVER_ALLOCATION} it is a
-   * {@code 422} so the frontend renders an inline toast rather than a {@code 409} reload prompt.
-   */
-  PRODUCTION_ALLOCATION(
-      HttpStatus.UNPROCESSABLE_CONTENT,
-      CoreProblemCode.PRODUCTION_ALLOCATION.code(),
-      "problem.production_allocation.title",
-      "problem.production_allocation.detail",
-      "production-allocation",
-      "Production allocation",
-      ErrorDisclosurePolicy.STANDARD),
-
-  /**
-   * {@code OwnerOrgUnitRequiredException}: a caller in several org units supplied no {@code
-   * owningOrgUnitId} and has no usable active-context pin, so no owner can be resolved
-   * (REQ-ORG-017).
-   *
-   * <p>A separate code from {@link #BAD_REQUEST} so the frontend can ask the member to choose an
-   * org unit (REQ-ORG-023).
-   */
-  OWNER_ORG_UNIT_REQUIRED(
-      HttpStatus.BAD_REQUEST,
-      CoreProblemCode.OWNER_ORG_UNIT_REQUIRED.code(),
-      "problem.owner_org_unit_required.title",
-      "problem.owner_org_unit_required.detail",
-      "owner-org-unit-required",
-      "Owning org unit required",
-      ErrorDisclosurePolicy.STANDARD),
-
-  /**
-   * {@code MissionParticipantRequiredException}: a refinery order is linked to a mission its owner
-   * does not take part in (REQ-SEC-042).
-   *
-   * <p>A separate code from {@link #BAD_REQUEST} so the form can point at the mission field.
-   */
-  MISSION_PARTICIPANT_REQUIRED(
-      HttpStatus.BAD_REQUEST,
-      CoreProblemCode.MISSION_PARTICIPANT_REQUIRED.code(),
-      "problem.mission_participant_required.title",
-      "problem.mission_participant_required.detail",
-      "mission-participant-required",
-      "Mission participant required",
       ErrorDisclosurePolicy.STANDARD),
 
   /**

@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
@@ -28,7 +28,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.context.ApplicationContext;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -46,7 +45,6 @@ import org.springframework.stereotype.Service;
 public class AuthHelperService {
 
   private final RoleHierarchy roleHierarchy;
-  private final ApplicationContext applicationContext;
 
   /**
    * The authorities that mark a caller as an organisation member or above, used by {@link
@@ -182,51 +180,5 @@ public class AuthHelperService {
   @NotNull
   public Optional<UUID> currentUserId() {
     return AuthenticatedSubject.idOf(currentAuthentication().orElse(null));
-  }
-
-  /**
-   * Returns the caller's squadron context, delegating lazily to {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#currentSquadronId()} to avoid a
-   * bean cycle.
-   *
-   * @return the home squadron for non-admins or the switcher selection for admins; empty for admins
-   *     in "all squadrons" mode and for unauthenticated callers
-   */
-  @NotNull
-  public Optional<UUID> currentSquadronId() {
-    return scope().currentSquadronId();
-  }
-
-  /**
-   * Plan-compliant convenience accessor for the squadron read-side check — delegates to {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#canSeeSquadron(UUID)}. See the
-   * delegate for the exact rule (admin without selection always passes; everyone else is compared
-   * against the active squadron).
-   */
-  public boolean canSeeSquadron(@NotNull UUID squadronId) {
-    return scope().canSeeSquadron(squadronId);
-  }
-
-  /**
-   * Plan-compliant convenience accessor for the squadron write-side check — delegates to {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#canEditSquadron(UUID)}.
-   */
-  public boolean canEditSquadron(@NotNull UUID squadronId) {
-    return scope().canEditSquadron(squadronId);
-  }
-
-  /**
-   * Returns whether the caller may edit the given Staffel or Spezialkommando, delegating to {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#canEditOrgUnit(UUID)}.
-   *
-   * @param orgUnitId the org-unit id (Staffel or Spezialkommando)
-   * @return {@code true} iff the caller may edit or label the org unit
-   */
-  public boolean canEditOrgUnit(@NotNull UUID orgUnitId) {
-    return scope().canEditOrgUnit(orgUnitId);
-  }
-
-  private OwnerScopeService scope() {
-    return applicationContext.getBean(OwnerScopeService.class);
   }
 }

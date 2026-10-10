@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
 > **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098, ADR-0101, ADR-0104,
 > ADR-0120, ADR-0124
 
@@ -250,9 +250,14 @@ toggle (query param `personalOnly=true`) narrows the grouped result to the calle
 (`personal = true` rows), and a **non-personal-entries-only** toggle (query param
 `nonPersonalOnly=true`) narrows it to the caller's shared stock (`personal = false` rows). When both
 params are absent or `false`, the caller's shared contributions and their personal stock are both
-returned — the unchanged default. The UI keeps the two toggles mutually exclusive (checking one
-clears the other); the backend query intersects the two clauses, so were both ever `true` the result
-is simply empty. The narrowing is applied **in SQL** by the same group-on-read query
+returned — the unchanged default. The UI offers the two flags as one segment „Alle · Persönlich ·
+Gemeinsam" (radio `personalScope`, values `''` / `personal` / `shared`) in the toolbar of both views,
+so they are exclusive by construction; the page translates the segment into the two query params and
+stores it as the same two booleans (REQ-UI-017). The backend query intersects the two clauses, so
+were both ever `true` the result is simply empty.
+
+*Amended 2026-10-03 (website overhaul phase 3): the two checkboxes became the segment „Alle ·
+Persönlich · Gemeinsam"; the query params and the stored preference are unchanged.* The narrowing is applied **in SQL** by the same group-on-read query
 (`findUserStacks`), so the material-group aggregates (summed amount, amount-weighted mean quality,
 max quality, entry count) always reflect exactly the visible stacks rather than a client-side subset.
 Both flags are URL-driven (a filtered view is shareable), compose with the other filters and the
@@ -267,7 +272,7 @@ there is no equivalent on the squadron-wide `/all` view.
 - [ ] With `nonPersonalOnly=true`, only the caller's `personal = false` (shared) stacks appear; the
   caller's personal stock is excluded.
 - [ ] With both params absent or `false`, both shared and personal stacks appear (unchanged
-  behaviour); the two toggles are mutually exclusive in the UI.
+  behaviour); the segment „Alle · Persönlich · Gemeinsam" can select only one of the two.
 - [ ] The material-group aggregates reflect only the visible stacks under the active filter.
 - [ ] Both flags compose with the material / min-quality / job-order / mission filters and are
   reflected in the page URL.
@@ -310,7 +315,7 @@ The operation is an **append-only split** (REQ-INV-001), structurally identical 
 `TRANSFER` branch: the moved `amount` is decremented off the source row (the source row is deleted
 when it depletes below the quantity epsilon) and inserted as its own new row with the opposite
 `personal` flag — it is never folded into an existing stack. It is per-entry (REQ-INV-044), guarded
-by optimistic locking on the source row's `version`, and owner-scoped (`@ownerScopeService.canEditInventoryItem`;
+by optimistic locking on the source row's `version`, and owner-scoped (`@inventoryAccessPolicy.canEditInventoryItem`;
 an admin/logistician may act within scope). Every rebooking records its own audit event
 (`INVENTORY_ITEM_DEPERSONALIZED` / `INVENTORY_ITEM_PERSONALIZED`, REQ-AUDIT-001).
 
@@ -362,8 +367,12 @@ Such a request is **rejected with HTTP 400** up front — before any decrement, 
 write. It must never fall through to the consume/discard tail: doing so would silently destroy the
 source stock and record it as `INVENTORY_ITEM_CONSUMED` with `type = TRANSFER`, an audit lie about
 a mutation the caller never requested. (The complementary no-op guard — a `TRANSFER` whose target
-resolves to the source's own user *and* location — likewise 400s; the append-only move of
-REQ-INV-001 is defined only for a target that actually differs.) A rejected book-out writes **no**
+resolves to the source's own user *and* location — likewise 400s with the localized
+`error.inventory.transfer.unchanged`; the append-only move of REQ-INV-001 is defined only for a
+target that actually differs.) Both Umbuchen dialogs (`/inventory/my`, `/inventory/all`) preset the
+target to the row's own user and location, so they refuse that no-op themselves: a submit whose
+target user and location both still equal the source shows `error.inventory.rebook.unchanged` as a
+toast, keeps the dialog open and sends nothing. A rejected book-out writes **no**
 audit event, consistent with the audit contract that only committed state mutations are logged
 (REQ-AUDIT-001).
 
@@ -381,10 +390,14 @@ and `ExternalContractTest` does not pin it.
   (REQ-INV-001).
 - [ ] An absent `type` with no target is still inferred as `DISCARD` (unchanged) and consumes the
   stock, logging `INVENTORY_ITEM_CONSUMED` with `type = DISCARD`.
+- [ ] An Umbuchen submit with the preset (unchanged) user and location sends no request and shows
+  the localized "unchanged" toast; the stack stays intact.
 
-**Enforced by:** `InventoryItemServiceBookOutTest` · **Code:**
+**Enforced by:** `InventoryItemServiceBookOutTest`,
+`InventoryOperationsE2eTest#edgeCaseTransferToSameLocationLeavesStockUnchanged` · **Code:**
 `InventoryCheckoutService#bookOutInventoryItem` (public façade
-`InventoryItemService#bookOutInventoryItem`) · **Issues:** —
+`InventoryItemService#bookOutInventoryItem`), `inventory-my.js` / `inventory-admin.js`
+`submitUmbuchen` · **Issues:** —
 
 ### REQ-INV-026 — Write-time stock merge for PIECE (auto) and SCU (per-action opt-in)
 
@@ -511,8 +524,11 @@ their hints — renders **whole (no decimals) for a `PIECE` material** and to th
 
 **Assignment writes.** The earmarks are edited through dedicated per-allocation endpoints `POST` /
 `PATCH` / `DELETE /api/v1/inventory/{id}/allocation` (add / change amount / remove), each gated by
-`isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)` — the same owner-scoped
-inventory-edit gate, **no new role**. They refuse a personal entry (personal stock carries no
+`isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)` — the same owner-scoped
+inventory-edit gate, **no new role** — and, like every other per-row write, the service then refuses
+a caller who neither owns the entry nor is Logistician or above (`403`,
+`AuthHelperService.isLogisticianOrAbove()`); until 2026-10-04 that second gate was missing, so any
+member whose scope covered the unit could earmark another member's row. They refuse a personal entry (personal stock carries no
 assignment), refuse a job-order target whose material the order does not require (REQ-ORDERS-018),
 reject a duplicate target, hold PIECE amounts whole, and enforce R5.
 
@@ -630,6 +646,9 @@ there is no separate income-attribution input.
   differing only in their earmarks stack together, and the earmarks render as leaf chips.
 - [ ] A personal entry rejects any allocation, and a job-order allocation whose material the order
   does not require is rejected (REQ-ORDERS-018).
+- [x] Adding, changing or removing an allocation on another member's entry is refused with `403`
+  for a caller below Logistician and changes nothing; the owner and a Logistician pass
+  (`InventoryItemServiceAllocationTest`, `InventoryItemControllerTest`).
 - [ ] `delivered` toggled for one order leaves the entry's other orders unchanged; the order
   material-collection shows the amount allocated to that order.
 - [ ] A stock merge sums the folded rows' allocations per target and OR-combines job-order delivered.
@@ -659,13 +678,13 @@ there is no separate income-attribution input.
   wins, and a blank-amount row still trips the personal-entry rejection.
 
 **Enforced by:** `InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,
-`InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,
+`InventoryItemServiceAllocationTest`, `InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,
 `InventoryAllocationSoakDataTest`, `InventoryItemControllerTest`, `InventoryPageControllerMvcTest`,
 `DatabaseIndexMigrationTest`, `InventoryInputAjaxControllerTest` (single-target shorthand),
 e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from; re-picking an
 already-allocated order edits its slice instead of posting a duplicate) ·
 **Code:** `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
-`support/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
+`inventory/api/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
 `InventoryItemService#createInventoryItem`, `InventoryCheckoutService` (book-out / merge / SELL),
 `InventoryAggregationService#getMaterialCollection`, `InventoryItemMapper`,
 `V217__add_inventory_allocation_tables.sql`, `V218__drop_inventory_scalar_associations.sql`,
@@ -773,9 +792,9 @@ requirement each frontend page fetched a single `size=1000` slice and silently h
 
 ### REQ-INV-034 — "Alle markieren" selects the whole filtered view for bulk check-out (no silent cap)
 
-The "Mein Lager" bulk bar (`/inventory/my`, both the Material and the Items view) offers an **"Alle
-markieren"** button before **"Markierte ausbuchen"** that marks **every** entry of the current
-filtered view for the bulk check-out, so the user need not expand each stack and tick each row by
+"Mein Lager" (`/inventory/my`, both the Material and the Items view) offers an **"Alle
+markieren"** button at the end of the toolbar that marks **every** entry of the current filtered
+view for the bulk actions, so the user need not expand each stack and tick each row by
 hand. Because the grouped tree lazy-loads and paginates each stack (REQ-INV-005), a client-side
 "check every visible box" would silently miss collapsed stacks and any entry past a stack's first
 page; select-all therefore resolves the complete id set **on the server** ([ADR-0104](../adr/0104-no-silent-caps-on-complete-list-surfaces.md)
@@ -791,9 +810,15 @@ no-silent-cap principle).
   impersonation) and can never return an id outside the grouped view.
 - **Selection is a decoupled set, not the DOM.** The frontend holds the selection in a Set that is
   independent of the lazily-loaded checkboxes: a loaded checkbox's checked state is derived from the
-  set, a stack expanded after select-all comes up already ticked, and the "Markierte ausbuchen"
-  count + POST read the set directly — so the bulk check-out spans the whole filtered view, not only
+  set, a stack expanded after select-all comes up already ticked, and the selection bar's count and
+  its POSTs read the set directly — so the bulk check-out spans the whole filtered view, not only
   the expanded stacks.
+- **The selection bar appears only with a selection.** The bulk actions live in a sticky bar at the
+  bottom of the page (`#bulkCheckoutBar`, the `.form-actions--sticky` pattern of REQ-UI-027) that is
+  hidden while nothing is marked and shows „n ausgewählt", „Auswahl aufheben", the „⋯" menu with
+  „Einheit ändern" (REQ-INV-052) and — for a caller who may — „Als gestohlen markieren" /
+  „Markierung entfernen" (REQ-INV-053), then „Umbuchen" (REQ-INV-036) and „Ausbuchen". The page
+  head's one primary action is „Einbuchen"; the tree stays as it was.
 - **Toggle + safe reset.** The button toggles between "Alle markieren" and "Auswahl aufheben"
   (clear). The selection is reset whenever the grouped table re-swaps (filter change, post-write
   refresh, or a live-sync peer refresh, REQ-FE-010/015): the freshly rendered checkboxes come back
@@ -804,11 +829,18 @@ no-silent-cap principle).
   (`POST /inventory/bulk-checkout`, REQ-INV-044); it adds no new write path and no new audit event
   (the bulk check-out's `INVENTORY_BULK_CHECKED_OUT` audit is unchanged).
 
+*Amended 2026-10-03 (website overhaul phase 3): „Alle markieren" moved into the toolbar, and the
+bulk buttons („Markierte ausbuchen", „Markierte umbuchen", „Markierte: Einheit ändern", the stolen
+pair) moved into a sticky selection bar that appears only while something is marked, labelled
+„Ausbuchen", „Umbuchen" and, in its „⋯" menu, „Einheit ändern" and the stolen pair.*
+
 **Acceptance**
 
-- [ ] `/inventory/my` (Material and Items view) renders an "Alle markieren" button before "Markierte
-  ausbuchen"; clicking it marks every entry of the current filtered view, including entries in
-  collapsed stacks and beyond a stack's first page, and the count reflects the full total.
+- [ ] `/inventory/my` (Material and Items view) renders an "Alle markieren" button in the toolbar;
+  clicking it marks every entry of the current filtered view, including entries in collapsed stacks
+  and beyond a stack's first page, and the selection bar's count reflects the full total.
+- [ ] The selection bar is hidden while nothing is marked and appears with the first marked entry;
+  „Auswahl aufheben" hides it again.
 - [ ] `GET /api/v1/inventory/my-inventory/entry-ids` returns exactly the ids of the caller's own
   entries matching the given filter + catalog, is owner-scoped, and rejects catalog-mismatched
   filters with 400 like `…/my-inventory/grouped`.
@@ -878,13 +910,15 @@ already known at storage time.
 
 ### REQ-INV-036 — "Markierte umbuchen": the bulk bar moves the whole selection, skipping already-at-target rows
 
-The "Mein Lager" bulk bar (`/inventory/my`, both the Material and the Items view) offers
-**"Markierte umbuchen"** next to "Markierte ausbuchen", acting on the **same** marked selection
+The "Mein Lager" selection bar (`/inventory/my`, both the Material and the Items view, REQ-INV-034)
+offers **„Umbuchen"** next to „Ausbuchen", acting on the **same** marked selection
 (REQ-INV-034) but *moving* the rows instead of discarding them. It is the bulk counterpart of the
 single-row Umbuchen modal (REQ-INV-007 / REQ-INV-025) and covers both of its destinations: another
-Ort / Nutzer / OrgUnit-Pool, or the personal marker. The same bar offers „Markierte: Einheit
+Ort / Nutzer / OrgUnit-Pool, or the personal marker. The same bar's „⋯" menu offers „Einheit
 ändern" (REQ-INV-052) and „Als gestohlen markieren" / „Markierung entfernen" (REQ-INV-053), and
-every bulk move carries a row's „gestohlen" marker.
+every bulk move carries a row's „gestohlen" marker. *Amended 2026-10-03 (website overhaul phase
+3): the button „Markierte umbuchen" is „Umbuchen" in the selection bar, which shows only while
+something is marked.*
 
 - **Every marked row moves in full.** There is no per-row amount. The selection spans collapsed
   stacks and later pages, so a per-row quantity could not be reviewed before submitting; moving the
@@ -925,8 +959,8 @@ every bulk move carries a row's „gestohlen" marker.
 
 **Acceptance**
 
-- [ ] `/inventory/my` (Material and Items view) renders "Markierte umbuchen" after "Markierte
-  ausbuchen"; both are enabled exactly when the selection is non-empty, and the modal offers all
+- [ ] `/inventory/my` (Material and Items view) renders „Umbuchen" beside „Ausbuchen" in the
+  selection bar, which is shown exactly when the selection is non-empty, and the modal offers all
   three modes.
 - [ ] Rebooking a selection to a target location moves every marked row in full and skips those
   already at that location; the response counts both and the toast names both numbers.
@@ -948,85 +982,87 @@ every bulk move carries a row's „gestohlen" marker.
 `InventoryWriteController#bulkRebook`, `templates/inventory-my.html`,
 `static/js/inventory-my.js` · **Issues:** — · **ADR:** ADR-0124
 
-### REQ-INV-037 — The Lager filter row collapses, and says so when it hides an active filter
+### REQ-INV-037 — The Lager filters sit in a popover, and the toolbar says when they narrow the view
 
-The filter widgets on `/inventory/my` and on `/inventory/all` are a full row of multi-selects and
-checkboxes that wraps onto lines of its own, pushing the bulk bar and the table down and leaving the
-band above the table hard to scan. The row therefore lives in a **collapsible panel** below the
-action bar, toggled by a **Filter** button in that bar. Both views (Material and Items) get it; only
-the active view's form exists in the DOM (REQ-INV-030), so one panel serves both.
+The filter widgets on `/inventory/my` and on `/inventory/all` — the multi-selects (material or game
+item, location, job order, mission), min. quality and the „Gestohlen" select — are a block of
+controls that would push the tree down and leave the band above it hard to scan. They therefore live
+in the **filter popover** of the page toolbar (`fragments/components :: filterPopover`, REQ-UI-027),
+opened by the **„Filter"** button. Both views (Material and Items) get it; only the active view's
+form exists in the DOM (REQ-INV-030), so one popover serves both.
 
-**Both Lager pages carry the same panel**, with page-local ids and storage keys: "Mein Lager"
-(`myFilterPanel`, `data-filter-panel="inventory-my"`) and the shared "Globales Lager"
-(`globalFilterPanel`, `data-filter-panel="inventory-all"`). The two preferences are deliberately
-independent — they describe two different pages' chrome. The shared Lager has no personal-entry
-flags (those are a "Mein Lager" dimension), so its count never includes them; everything else below
-holds verbatim on both.
+**Both Lager pages carry the same popover**, with page-local ids: "Mein Lager" (`myFilterPanel`,
+`data-filter-panel="inventory-my"`) and the shared "Globales Lager" (`globalFilterPanel`,
+`data-filter-panel="inventory-all"`). On "Mein Lager" the visibility segment „Alle · Persönlich ·
+Gemeinsam" (REQ-INV-046) sits **in the toolbar beside it**, not in the popover; the shared Lager has
+no visibility dimension. Everything else below holds verbatim on both.
 
 > **Correction (2026-09-22).** This requirement first shipped with page-local collapse code, a
 > first-visit rule "collapse only when nothing is filtered" and the preference stored inside the
 > REQ-UI-017 filter object. All three were replaced when the mechanism was generalised to every list
-> page by [`frontend-ajax-mutations.md`](frontend-ajax-mutations.md) REQ-FE-021: the Lager pages now
-> use the shared `filterToggle` fragment and `krt-filter-panel.js`, which **always** start collapsed
-> without a stored preference (owner decision, 2026-09-14) and keep the preference under their own
-> key. The bullets below state the current behaviour; the generic contract is REQ-FE-021's.
+> page by [`frontend-ajax-mutations.md`](frontend-ajax-mutations.md) REQ-FE-021.
+>
+> **Amended 2026-10-03 (website overhaul phase 3).** The collapsible panel below the action bar
+> became the toolbar's transient filter popover: it always starts closed, stores no open/closed
+> preference (the `krt.filterPanel.inventory-*` keys are no longer written), and every active filter
+> is also shown as a removable chip below the toolbar. The two personal checkboxes became the
+> toolbar segment, which the count leaves out.
 
-- **A collapsed panel must never hide the fact that the table is filtered.** The toggle carries a
-  chip with the number of filter dimensions currently narrowing the view, shown whenever that number
-  is greater than zero. The Lager pages cannot be counted by REQ-FE-021's generic scan of the
-  panel's own controls (the multi-selects hold their state in a widget, and the location dimension
-  is derived), so each registers its own counter through `window.krtFilterPanel.registerCounter` —
-  from its `DOMContentLoaded` handler, after the REQ-UI-017 restore — and re-states it with
-  `refresh()` after every in-place filter swap. The counter is derived from the same snapshot
-  REQ-UI-017 persists, so a dimension added there is counted automatically rather than quietly
-  missing from the chip. A multi-select with **all** boxes ticked counts as no filter, matching what
-  that state already means everywhere else on this page.
+- **A closed popover must never hide the fact that the tree is filtered.** The „Filter" button
+  carries a badge with the number of filter dimensions currently narrowing the view, shown whenever
+  that number is greater than zero, and each active dimension appears as a **chip** below the
+  toolbar („Alle zurücksetzen" clears them all; removing a chip clears that dimension and re-runs the
+  live filter). The Lager pages cannot be counted by REQ-FE-021's generic scan of the panel's own
+  controls (the multi-selects hold their state in a widget, and the location dimension is derived),
+  so each registers its own counter through `window.krtFilterPanel.registerCounter` — from its
+  `DOMContentLoaded` handler, after the REQ-UI-017 restore — and re-states it with `refresh()` after
+  every in-place filter swap. The counter is derived from the same snapshot REQ-UI-017 persists,
+  minus the visibility segment, which is visible in the toolbar itself. A multi-select with **all**
+  boxes ticked counts as no filter, matching what that state already means everywhere else on this
+  page.
 - **A multi-select says what it filters, in the same words on both pages** (owner decision
   2026-09-23). Its header reads „Alle" (`filter.all`) when no box or every box is ticked — both mean
   no filter —, the option's own name when exactly one is ticked, and „N ausgewählt"
-  (`filter.selected`) otherwise. The helper lives once in `inventory-common.js`; before, "Mein
-  Lager" said „N ausgewählt" with every box ticked while "Globales Lager" said „Alle".
-- **Rendered expanded, collapsed by script.** The server always emits the panel open; `hidden` is
-  the collapse mechanism and the script applies it on load, so a client without JavaScript keeps
-  working filters (REQ-FE-021).
-- **Collapsed by default; the member's own choice wins.** With no stored preference the panel starts
-  collapsed — filtered or not; the count chip is what keeps a filtered table explained. Once the
-  user toggles it, their choice wins on every later visit.
-- **The preference is per browser and per page, not per view.** `krt-filter-panel.js` stores it
-  under `krt.filterPanel.inventory-my` / `krt.filterPanel.inventory-all`, separately from the
-  REQ-UI-017 filter objects (`inventory_my_filters` / `inventory_admin_filters`), so switching
-  Material ↔ Items does not re-open a panel the user closed. Storage access stays guarded, so a
-  privacy mode that denies it degrades to the default instead of breaking the page.
+  (`filter.selected`) otherwise. The helper lives once in `inventory-common.js`.
+- **Transient.** The popover is a `data-filter-transient` panel: it starts closed on every load,
+  opens from the button, focuses its first field, closes on Escape or an outside click, and flips to
+  the left edge when it would leave the viewport (REQ-UI-027); on a phone it is a bottom sheet. The
+  filter selection itself still persists per browser under `inventory_my_filters` /
+  `inventory_admin_filters` (REQ-UI-017).
+- **Works without a script.** The server emits the panel inside the filter form, so a client without
+  JavaScript still submits working filters (REQ-FE-021).
 - **Accessible by construction.** The toggle is a real `<button>` carrying `aria-expanded` and
-  `aria-controls`, and the chip pairs its digit with a visually-hidden "Aktive Filter: N". The count
+  `aria-controls`, and the badge pairs its digit with a visually-hidden "Aktive Filter: N". The count
   is *not* pushed into a dynamic `aria-label` on the button — that would shadow the visible "Filter"
   text and break voice control's "click Filter".
 
 **Acceptance criteria**
 
 - [ ] All four of `/inventory/my`, `/inventory/my?view=items`, `/inventory/all` and
-  `/inventory/all?view=items` render the toggle, and the filter form sits inside the panel, between
-  the toggle and the table (on "Mein Lager": between the toggle and the bulk bar).
-- [ ] The panel is served expanded (`hidden` absent) on every one of those views.
-- [ ] With no stored preference the panel opens collapsed; expanding or collapsing, then reloading,
-  keeps that state, and the same holds after switching between the Material and the Items view.
+  `/inventory/all?view=items` render the „Filter" button in the toolbar, and the filter controls sit
+  inside its popover; "Mein Lager" renders the visibility segment in the toolbar, outside the popover.
+- [ ] The popover starts closed on every load, opens from the button, and closes on Escape; a
+  reload starts closed again.
 - [ ] Selecting a filter, resetting the filters, and a restored REQ-UI-017 selection all leave the
-  chip's number equal to the number of active dimensions; at zero the chip is hidden.
-- [ ] A multi-select with every box ticked leaves the chip hidden.
+  badge's number equal to the number of active dimensions and render one chip per active dimension;
+  at zero the badge and the chip bar are hidden. Choosing „Persönlich" or „Gemeinsam" narrows the
+  tree without changing the badge.
+- [ ] A multi-select with every box ticked leaves the badge hidden.
 - [ ] On both pages a multi-select header reads „Alle" with none or every box ticked, the option's
   name with one, and „N ausgewählt" otherwise.
-- [ ] Toggling the panel performs no navigation and no fetch — the table below is untouched.
+- [ ] Opening or closing the popover performs no navigation and no fetch — the tree below is
+  untouched.
 
-**Enforced by:** `InventoryPageControllerMvcTest` · `InventoryMultiSelectLabelE2eTest` (the header
-summary on both pages)
-(`viewMyInventory_rendersTheFilterRowInsideACollapsiblePanel`,
-`viewAllInventory_rendersTheFilterRowInsideACollapsiblePanel`),
-`InventoryFilterPanelCollapseE2eTest` · **Code:**
-`templates/inventory-my.html`, `templates/inventory-admin.html` (`fragments/components ::
-filterToggle`), `static/js/krt-filter-panel.js` (collapse, persistence, chip),
+**Enforced by:** `InventoryPageControllerMvcTest`
+(`viewMyInventory_rendersTheFiltersInsideTheToolbarPopover`,
+`viewAllInventory_rendersTheFiltersInsideTheToolbarPopover`), `InventoryLagerPatternRenderTest`,
+`InventoryMultiSelectLabelE2eTest` (the header summary on both pages),
+`InventoryFilterPanelCollapseE2eTest` · **Code:** `templates/inventory-my.html`,
+`templates/inventory-admin.html` (`fragments/components :: filterPopover`, `:: filterChips`,
+`:: segmented`), `static/js/krt-filter-panel.js` (open/close, badge), `static/js/krt-filter-chips.js`,
 `static/js/inventory-my.js` (`countActiveMyInventoryFilters`), `static/js/inventory-admin.js`
 (`countActiveAdminInventoryFilters`) · **Issues:** — · **ADR:** — (extends REQ-UI-017 / ADR-0120;
-mechanism generalised by REQ-FE-021)
+mechanism generalised by REQ-FE-021 and REQ-UI-027)
 
 ### REQ-INV-039 — The allocation pickers say what each order still needs
 
@@ -1190,9 +1226,9 @@ expand-and-read pass over the whole tree — several fetches, because stacks are
 Both Lager pages therefore carry a **location multi-select in the filter panel, in both the Material
 and the Items view** — `/inventory/my` and `/inventory/all`, four views in total. It behaves like
 every other multi-select on these pages: all boxes ticked means no filter, the selection is mirrored
-into the URL, persisted per browser (REQ-UI-017) and counted by the collapsed panel's active-filter
-chip (REQ-INV-037), which needs no extra wiring because that count is derived from the persisted
-snapshot.
+into the URL, persisted per browser (REQ-UI-017) and counted by the „Filter" button's active-filter
+badge and shown as a chip (REQ-INV-037), which needs no extra wiring because that count is derived
+from the persisted snapshot.
 
 - **The options are in-scope stock, never the catalog.** The location catalog is the whole Star
   Citizen universe, which is why every location *picker* on these pages (the Umbuchen target, the
@@ -1231,7 +1267,7 @@ snapshot.
 - [ ] The parameter is accepted under `catalog=ITEM` (never 400-rejected as a material-only filter)
   and narrows the item tree the same way.
 - [ ] The selection survives a reload per page and per view (REQ-UI-017) and is counted by the
-  active-filter chip (REQ-INV-037); every box ticked counts as no filter.
+  active-filter badge (REQ-INV-037); every box ticked counts as no filter.
 - [ ] The two pages' stored selections stay independent (`inventory_my_filters` /
   `inventory_admin_filters`).
 
@@ -1258,7 +1294,8 @@ REQ-INV-037)
 ### REQ-INV-041 — "Globales Lager leeren": the admin-only wipe of the shared stock in scope
 
 The shared "Globales Lager" page (`/inventory/all`) offers an admin a **"Globales Lager leeren"**
-button behind a danger confirmation modal. It deletes every **non-personal** Lager row inside the
+entry in the page head's „⋯" menu (since 2026-10-03, website overhaul phase 3; it was a button in
+the action bar above the table) behind a danger confirmation modal. It deletes every **non-personal** Lager row inside the
 caller's current org-unit scope in one statement; personal rows (`personal = true`) are never
 touched. The scope is the standard predicate triple
 ([`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-003): an admin in all-scope wipes the shared
@@ -1269,7 +1306,7 @@ stock of every org unit, an admin pinned to one org unit wipes only that unit's.
 - **Admin-only on both layers.** The backend `DELETE /api/v1/inventory/all` is gated by
   `hasRole('ADMIN')` (neither `OFFICER` nor `LOGISTICIAN` qualifies), and the frontend proxy
   `DELETE /inventory/all` (`InventoryDeleteAllProxyController`) repeats the gate so a non-admin call
-  never leaves the frontend; the button and its modal render only for an admin.
+  never leaves the frontend; the menu entry and its modal render only for an admin.
 - **Audited once.** The wipe records one `INVENTORY_WIPED` event carrying the scope and the number of
   removed rows (REQ-AUDIT-001); the unified viewer's Lager filter lists it.
 - **In place.** On success the page clears the grouped table through its existing filter swap, not
@@ -1353,7 +1390,10 @@ Lager row — shared or personal, material or game item — carries a **„gesto
 - **Book in as stolen** (a checkbox in the book-in dialog) and **mark or unmark afterwards** — a
   whole row, or a **part** that is split off as a new row with the other marker and the rest of the
   identity unchanged (`POST /api/v1/inventory/{id}/stolen`, optimistic `version`), for **whoever may
-  edit the row** (no new permission). A selection of one's own rows is marked or unmarked whole
+  edit the row** (no new permission): the row's scope (`canEditInventoryItem`) and then, like every
+  other per-row write, the owner or a Logistician or above — a member marking another member's row
+  gets `403`. *Amended 2026-10-04:* the second gate was missing until then, so any member whose
+  scope covered the unit could mark or split another member's row. A selection of one's own rows is marked or unmarked whole
   (`POST /api/v1/inventory/bulk-stolen`, locked in sorted id order like REQ-INV-036). A split may
   not leave the row below the amount it offers on the Materialbörse (refused with a message naming
   the offer) or below its earmarks (`422`).
@@ -1384,6 +1424,8 @@ Lager row — shared or personal, material or game item — carries a **„gesto
   it; a split never undercuts an offer or the earmarks.
 - [x] The per-material overview and the craftability sum are unchanged by mixed stock.
 - [x] Booking in as stolen and every mark/unmark are refused while the switch is off.
+- [x] A member marking another member's row is refused with `403` before any write; the owner and a
+  Logistician may mark it.
 - [x] The web shows the chip, the filters and the actions in place (REQ-FE-001), and an E2E flow
   books in or marks a part, filters and unmarks. Mein Lager offers the row and bulk actions, the
   Org-Lager the row action on the rows its actions column serves (logisticians).
@@ -1400,6 +1442,47 @@ Lager row — shared or personal, material or game item — carries a **„gesto
 `InventoryStolenMarkProxyController`, `fragments/inventory-stolen-mark.html`, `inventory-common.js` ·
 **Issues:** #2096
 (epic #2078).
+
+### REQ-INV-055 — A transfer that changes a row's owner tells the new and the previous owner
+
+A transfer that books stock onto **another member** reaches that member through the normal
+notification system (REQ-NOTIF-001), so they know about the booking and can trace the change in
+their stock. When someone other than the stock's previous owner made the transfer — a Logistician
+moving a member's row — the **previous owner** is told as well.
+
+- **Trigger:** a transfer whose new row's member differs from the source row's — the single-row
+  book-out `TRANSFER` (REQ-INV-025, `POST /api/v1/inventory/{id}/book-out`) and the bulk rebooking
+  in mode `LOCATION` with a target member (REQ-INV-036, `POST /api/v1/inventory/bulk-rebook`). Web
+  and app use the same endpoints. A move of location or org-unit pool alone, a personal ↔ shared
+  rebooking and a transaction that rolls back notify nobody (published after commit, REQ-NOTIF-002).
+- **Recipients:** the new owner gets `INVENTORY_TRANSFERRED_TO_USER`, the previous owner
+  `INVENTORY_TRANSFERRED_FROM_USER`, each only when they are not the acting member. Both go through
+  seeded, admin-editable rules (`V267`, `EVENT_RECIPIENT`, `exclude_actor`).
+- **One notification per recipient per action.** A bulk transfer lists every lot moved onto the
+  recipient in that action; the previous-owner notice groups by previous and new owner.
+- **Content:** the acting member's name and the lots — per lot amount (SCU, or pieces as `n×`),
+  material or item, quality (`Q800`) and location: the target location for the new owner, the
+  source location for the previous owner, who is also told the new owner's name. At most 20 lots
+  are listed, then `…`; the count names them all. No free text (notes) rides the event.
+- **Link:** both notifications open „Mein Lager" (`/inventory/my`).
+
+**Acceptance**
+
+- [x] A member's transfer onto another member notifies the new owner only.
+- [x] A Logistician's transfer of a member's row onto another member notifies both; onto
+  themselves, the previous owner only.
+- [x] A bulk transfer onto another member produces exactly one notification listing every moved
+  lot.
+- [x] A location-only move, a discard and a rolled-back transfer notify nobody.
+
+**Enforced by:** `InventoryItemServiceBookOutTest.TransferNotificationTests`,
+`InventoryCheckoutServiceBulkRebookTest`, `InventoryTransferEventsTest`,
+`InventoryTransferNotificationIntegrationTest`, `NotificationRuleEngineIntegrationTest`,
+`NotificationPageControllerTest`, `NotificationTypeMessageCoverageTest`,
+`AdminNotificationRuleOptionListsTest` · **Code:** `InventoryCheckoutService`,
+`InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent`, `TransferredLot`,
+`V267__seed_inventory_transfer_notification_rules.sql`, `NotificationPageController` ·
+**Issues:** #2409.
 
 ## Out of scope
 

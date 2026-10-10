@@ -34,10 +34,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -46,7 +48,6 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,7 +85,7 @@ class MaterialgesuchPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  /** Stubs both count pairs (shared four-tab bar) plus a one-request board + detail. */
+  /** Stubs both count pairs (tabs and scope segment) plus a one-request board + detail. */
   private void stubBoard(MaterialRequestDto request) {
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(0, 0));
@@ -92,7 +93,7 @@ class MaterialgesuchPageControllerMvcTest {
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
     when(backendApiClient.get(contains("/material-requests?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of()));
-    when(backendApiClient.get(contains("/material-requests/" + request.id()), anyClass()))
+    when(backendApiClient.get(eq("/api/v1/material-requests/{id}"), anyClass(), eq(request.id())))
         .thenReturn(request);
   }
 
@@ -129,8 +130,8 @@ class MaterialgesuchPageControllerMvcTest {
         .perform(get("/materialboerse").param("mode", "requests"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Agricium")))
-        .andExpect(content().string(containsString("data-mb-tab")))
-        .andExpect(content().string(containsString("Alle Gesuche")))
+        .andExpect(content().string(containsString("data-mb-mode=\"requests\"")))
+        .andExpect(content().string(containsString("data-testid=\"mb-create-request\"")))
         .andExpect(content().string(containsString("<strong>Titanium</strong>")))
         .andExpect(content().string(containsString("squadron-badge")))
         .andExpect(content().string(containsString(">IRI<")))
@@ -222,8 +223,10 @@ class MaterialgesuchPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void createRequestProxy_forwardsToBackend() throws Exception {
-    when(backendApiClient.post(eq("/api/v1/material-requests"), any(), eq(Object.class)))
-        .thenReturn(Map.of("id", requestId.toString()));
+    UUID materialId = UUID.fromString("7b1e2c3d-4a5f-4e6d-8c7b-9a0f1e2d3c4b");
+    when(backendApiClient.post(
+            eq("/api/v1/material-requests"), any(), eq(MaterialRequestDto.class)))
+        .thenReturn(materialRequest());
 
     mockMvc
         .perform(
@@ -231,17 +234,23 @@ class MaterialgesuchPageControllerMvcTest {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"materialId\":\"" + UUID.randomUUID() + "\",\"requestedAmount\":5}"))
-        .andExpect(status().isOk());
+                .content("{\"materialId\":\"" + materialId + "\",\"requestedAmount\":5}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(requestId.toString()));
 
-    verify(backendApiClient).post(eq("/api/v1/material-requests"), any(), eq(Object.class));
+    verify(backendApiClient)
+        .post(
+            eq("/api/v1/material-requests"),
+            eq(new MaterialRequestCreateRequest(materialId, null, 5.0, null)),
+            eq(MaterialRequestDto.class));
   }
 
   /** The request-edit proxy relays a backend optimistic-lock conflict as a 409 + problem code. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void updateRequestProxy_backendConflict_relays409() throws Exception {
-    when(backendApiClient.put(contains("/material-requests/"), any(), eq(Object.class)))
+    when(backendApiClient.put(
+            contains("/material-requests/"), any(), eq(MaterialRequestDto.class), any()))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "conflict"));
@@ -262,8 +271,11 @@ class MaterialgesuchPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void deactivateRequestProxy_ok() throws Exception {
     when(backendApiClient.post(
-            contains("/material-requests/" + requestId + "/deactivate"), any(), eq(Object.class)))
-        .thenReturn(Map.of());
+            eq("/api/v1/material-requests/{id}/deactivate"),
+            any(),
+            eq(MaterialRequestDto.class),
+            eq(requestId)))
+        .thenReturn(materialRequest());
 
     mockMvc
         .perform(
@@ -278,7 +290,7 @@ class MaterialgesuchPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void requestMaterialsProxy_forwardsSearch() throws Exception {
     when(backendApiClient.get(contains("/materials/search"), anyTypeRef(), eq("agri")))
-        .thenReturn(Map.of("content", List.of()));
+        .thenReturn(new PageResponse<>(List.of(), 0, 25, 0, 0, List.of()));
 
     mockMvc
         .perform(get("/materialboerse/request-materials").param("q", "agri"))

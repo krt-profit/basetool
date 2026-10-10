@@ -23,8 +23,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeStockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -33,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRe
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
@@ -42,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
-import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeOfferRatchet;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,6 +52,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Verifies that in-place inventory edits ({@code updateNote}, reducing {@code
@@ -69,12 +71,13 @@ class InventoryItemServiceVersionFlushTest {
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
 
   @Mock private AuditService auditService;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   private InventoryItemService inventoryItemService;
 
   private InventoryCheckoutService realCheckoutService;
@@ -88,11 +91,12 @@ class InventoryItemServiceVersionFlushTest {
             locationRepository,
             missionFinanceEntryRepository,
             missionParticipantRepository,
-            materialExchangeOfferRepository,
+            new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
             offerRatchet,
             inventoryItemMapper,
             ownerScopeService,
-            auditService);
+            auditService,
+            eventPublisher);
     inventoryItemService =
         new InventoryItemService(
             inventoryItemRepository,
@@ -105,10 +109,11 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemMapper,
             ownerScopeService,
             null,
+            null,
             auditService,
             null,
             realCheckoutService,
-            new de.greluc.krt.profit.basetool.backend.support.InventoryProperties(false));
+            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false));
   }
 
   private User userWithId(UUID id) {

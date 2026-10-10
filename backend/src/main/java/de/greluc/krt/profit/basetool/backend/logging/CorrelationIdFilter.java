@@ -20,9 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.logging;
 
 import de.greluc.krt.profit.basetool.backend.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
+import de.greluc.krt.profit.basetool.backend.service.ActiveOrgUnitProvider;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -76,7 +76,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
 
   private final LoggingProperties loggingProperties;
   private final AuthHelperService authHelperService;
-  private final OwnerScopeService ownerScopeService;
+  private final ActiveOrgUnitProvider activeOrgUnitProvider;
 
   @Override
   protected void doFilterInternal(
@@ -176,8 +176,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
       if (!authHelperService.isAuthenticated()) {
         return ANONYMOUS;
       }
-      return ownerScopeService
-          .currentSquadronId()
+      return activeOrgUnitProvider
+          .activeOrgUnitId()
           .map(UUID::toString)
           .orElseGet(() -> authHelperService.isAdmin() ? "all" : "none");
     } catch (RuntimeException ex) {

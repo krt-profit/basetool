@@ -388,7 +388,7 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
 - **Optimistic-lock 409** (`GlobalExceptionHandler`) — level unchanged (`WARN`); the line now carries
   `entity`, `entityId` and `versions` (`expected=<client> persisted=<persisted>`), degrading to the
   exception text alone for the bare JPA variant that names no entity. Numbers and ids only. All
-  `support.OptimisticLock` call sites pass a `UUID`, an `entity.getId()` or `null`; the single
+  `kernel.OptimisticLock` call sites pass a `UUID`, an `entity.getId()` or `null`; the single
   exception (`SystemSettingService`) passes a setting key that must already have matched a persisted
   row, so it is a bounded seeded key and not free text.
 - **Rate-limit rejection** (`RateLimitingFilter`) — level unchanged (`DEBUG`, attacker-paced); the
@@ -681,6 +681,26 @@ both as a privacy rule (metrics have 180-day retention) and as a cardinality gua
 Prometheus TSDB. This applies to every meter exposed on `/actuator/prometheus`, including
 the future `basetool_*` business metrics (epic #936 Phase 1c).
 
+**The `uri` tag is bounded by the route table, and its cap must sit above it.** Spring tags
+`http.server.requests` and `http.client.requests` with the route template, never the raw path, so
+the set of `uri` values is the set of routes. Micrometer still caps it
+(`management.metrics.web.server.max-uri-tags` / `.client.max-uri-tags`, default **100**) and, once
+the cap is reached, drops every further `uri` without a metric — one WARN from
+`MaximumAllowableTagsMeterFilter`, then silence. The backend has about 450 route templates and the
+frontend about 420, so the default cut both off within hours of a restart: on 2026-10-04 the
+backend had reached exactly 100 by evening and the frontend's backend calls 94, and every route
+first hit after that was missing from `Http5xxRateHigh`, `HttpLatencyP95High` and the dashboards.
+
+- The backend sets the server cap and the frontend both caps to **1000** in `application.yml`; the
+  ingest keeps the default (16 mappings).
+- `UriTagCapacityTest` (backend, frontend) counts the dispatcher's route templates and fails when
+  they plus 50 fixed tags (`UNKNOWN`, `NOT_FOUND`, `REDIRECTION`, …) reach the bound cap; the
+  frontend test also holds the client cap at 1000 or more, because the frontend relays to every
+  backend route.
+- `HttpUriTagCapNear` (`apps.yml`, warning) fires when an application reports 900 distinct `uri`
+  values on either meter for 15 minutes — the drift a test cannot see, such as a raw path leaking
+  into the tag.
+
 ### REQ-OBS-007 — Log ingestion into the monitoring plane (per-stream rules)
 
 When log streams are shipped to Loki (epic #936 Phase 2), each stream obeys its own recorded
@@ -715,8 +735,9 @@ rule — no blanket "everything is masked" claim:
   comment beside the rule), because their wording
   is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate them. The
   re-check in [`monitoring/README.md`](../../monitoring/README.md) → *After a Temurin bump* was done
-  on `…@sha256:3137541d…` (2026-09-22) and on `…@sha256:2ca9adf4…` (2026-09-25), the digest
-  `docker/app/Dockerfile` pins since #2035; every further bump owes it again. A second rule consumes the same stream since 2026-09-23: **`JvmStartupCacheRejected`**
+  on `…@sha256:3137541d…` (2026-09-22) and on `…@sha256:2ca9adf4…` (2026-09-25) and on
+  `…@sha256:3c0a9084…` (Temurin 25.0.4.1+1, 2026-10-04), the digest `docker/app/Dockerfile` pins now;
+  every further bump owes it again. A second rule consumes the same stream since 2026-09-23: **`JvmStartupCacheRejected`**
   (warning) fires on the JVM's own `Unable to use AOT cache` / `Loading static archive failed` (and
   the AppCDS equivalents), which a JVM prints when its `JAVA_TOOL_OPTIONS` layout differs from the
   one the image's startup cache was trained with — the service starts, without the cache
@@ -1291,8 +1312,8 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   `basetool_scheduled_job_duration_seconds{task}` timer,
   `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge,
   `basetool_scheduled_job_enabled{task}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the thirteen
-  wrapped jobs (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
+  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the fourteen
+  wrapped jobs (`user_sync`, `notification_retention`, `notification_timed`, `default_blueprint_provisioning`,
   `rejected_registration_retention`, `audit_retention`,
   `bank_ledger_integrity`, `job_order_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`,
   `exchange_registry_reconcile`, `exchange_change_retention`, `exchange_connection_retention`) via `TaskMetrics` (`record`
@@ -1534,6 +1555,16 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   cannot double-count. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
   who it was is in the ROLE audit trail. Backs `AdminAccountAutoActivated` (any occurrence in
   24 h, warning; added 2026-09-17).
+- `basetool_notification_muted_total{notification_type}` counter (`NotificationMuteService`, bounded by
+  the notification types) counts the recipients the engine dropped because they muted the type
+  (REQ-NOTIF-027); a panel on `07-basetool-operations.json` charts it per type. Added with issue
+  #2414.
+- `basetool_notification_timed_produced_total{kind}` counter (`NotificationTimedRunner`, one series
+  per `TimedNoticeProducer`, bounded by the number of producers) counts the notices the one-minute
+  time-based producer raised (REQ-NOTIF-026). The producer is the `notification_timed` scheduled
+  job; `NotificationTimedStale` (> 15 min, warning) fires when it stops succeeding, and a panel
+  on `07-basetool-operations.json` charts the notices raised per hour by kind. Added with issue
+  #2414.
 - `basetool_notification_retention_deleted_total{kind}` counter (`read` / `unread`,
   `NotificationRetentionTask`) splits the inbox sweep's two windows, which its `items` total
   conflated. The halves are isolated from each other in the task, so one can be stuck while the
@@ -2276,6 +2307,11 @@ A fifth frontend session meter came with the session type allow-list (REQ-SEC-06
   can: `basetool_session_type_allow_list_mode{mode="enforce"} == 1` per frontend instance proves the
   setting reached the process, as the startup line `Session type allow-list mode: ENFORCE` does for
   one start only. No alert: a mode is a configuration, not a fault.
+- `basetool_trusted_types_mode{mode}` — gauge (`TrustedTypesModeMetric`), one series per mode
+  (`report` / `enforce`, a closed set), `1` on the mode the frontend process resolved from
+  `app.security.trusted-types` and `0` on the other (REQ-SEC-064, ADR-0239). It shows whether the
+  Trusted Types directives of the CSP are report-only or enforced on each instance; the violations
+  themselves are `csp_violation` reports below. No alert, for the same reason.
 
 Two frontend meters were added by the 2026-08 logging audit:
 
@@ -2329,7 +2365,14 @@ Two frontend meters were added by the 2026-08 logging audit:
   `ClientErrorReportController.originOnly` repeats the reduction server-side, so a path, query or
   user info never reaches the `DEBUG` line even from a crafted beacon. It rides the same panel 43
   and the same `ClientErrorSpike` rule; browser extensions that inject inline code are part of its
-  permanent background, which is exactly what the step-change shape tolerates.
+  permanent background, which is exactly what the step-change shape tolerates. Since 2026-10-04 it
+  also carries the **Trusted Types** violations of the report-only policy (ADR-0239): `message` is
+  `require-trusted-types-for` followed by the sink the browser names (`Element innerHTML`, never the
+  sample's markup), or `trusted-types` for a policy name the CSP does not list, and `source` is
+  `trusted-types-sink` / `trusted-types-policy`. The browser dispatches `securitypolicyviolation`
+  for a report-only policy too, which is why the beacon needs no `report-uri` for this phase.
+  `sum(increase(basetool_client_error_total{kind="csp_violation"}[7d]))` staying empty is the
+  precondition for switching production to `enforce` (`deployment.md`).
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =
@@ -3356,7 +3399,7 @@ client if the exchange registry holds it and `other` if not (`ClientAttribution.
 REQ-XCH-010, REQ-XCH-028). `ApiUnknownClient` (warning) fires on a sustained
 `other`; the `none` rule ships staged (below).
 
-That mapping is **not private to this counter**. It lives in `support.ClientAttribution` and is
+That mapping is **not private to this counter**. It lives in `platform.api.ClientAttribution` and is
 shared with the audit trail's `client_id` column (REQ-AUDIT-005), which records the same bounded
 value on every audited mutation. The sharing is the requirement, not an implementation detail: an
 operator who sees a burst on this counter and then filters the audit log for the same client is
@@ -3550,3 +3593,39 @@ requests.
 `monitoring/prometheus/tests/security_expression_failures_test.yml`,
 `monitoring/grafana/dashboards/07-basetool-operations.json` · **Related:** REQ-SEC-075,
 REQ-API-004, REQ-OBS-011
+
+### REQ-OBS-021 — The hand-mirrored platform classes keep one security floor in all three applications
+
+The backend, frontend and ingest each keep a copy of `CorrelationIdFilter`, `ManagementPortSecurityConfig`
+and (backend, ingest) `KeycloakTrustSupport`. The copies differ where their application differs,
+so byte equality is not the rule; what cannot drift is the security floor each one gives:
+
+- **Correlation id.** An inbound id that could break a log line or a response header (control
+  characters, spaces, quotes, `%`, `$`, non-ASCII) is never echoed or bound to the MDC; no id is
+  longer than 128 characters; an id that is already safe comes back unchanged; an absent or blank one
+  becomes a fresh UUID. The three filters treat an over-long inbound id differently on purpose (backend
+  and frontend truncate it, the ingest mints a new one), so the contract states only the common part.
+- **Management port.** Each `ManagementPortSecurityConfig` is active only with `management.server.port`,
+  permits only through its own security matcher, is stateless, keeps no request cache and does not touch
+  CSRF protection; the three applications expose the same web Actuator endpoints. The backend
+  enumerates the read endpoints it opens, the frontend and ingest open `/actuator/**`, which is safe
+  only because CSRF stays armed there: the chains leave Spring Security's default alone, which the
+  parity test pins by refusing any mention of CSRF in them (the backend's own armed check is
+  `ActuatorLoggersCsrfArmedTest`).
+- **Keycloak trust.** The backend and ingest `KeycloakTrustSupport` are the same code apart from
+  comments, imports and the name of the read-timeout constant: the bundle's own trust managers,
+  HTTP/1.1, hostname verification on.
+
+**Acceptance**
+
+- [x] The same list of injection attempts and length edges runs through all three filters and every
+  outcome holds the contract (`CorrelationIdFilterTest` in each module over `CorrelationIdParity`); the
+  contract is proven able to fail (`CorrelationIdParityTest`).
+- [x] The management chains and the exposure lists are pinned as above, and the two trust-support
+  copies are equal after comments are removed (`PlatformMirrorParityTest`); a planted change to the
+  ingest copy fails it. The sources it reads are declared inputs of the backend `test` task, so a
+  change in the ingest or frontend module cannot leave the result cached.
+
+**Enforced by:** `CorrelationIdParity`, `CorrelationIdFilterTest`, `PlatformMirrorParityTest`,
+`ObservationPrivacyFilterMirrorParityTest` · **Related:** REQ-OBS-002, REQ-OBS-005, REQ-OBS-016,
+REQ-SEC-014, REQ-SEC-024

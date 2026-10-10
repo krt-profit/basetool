@@ -1,38 +1,124 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
-    .form-group label {
-        display: block;
-        margin-bottom: 0.4rem;
-        font-family: var(--font-body);
-        font-size: 0.8rem;
+    .card--flush > .alert {
+        margin: 0;
     }
-    .form-group input[type='text'],
-    .form-group select,
-    .form-group textarea {
+    .admin-rule-editor {
+        max-width: var(--content-max-form);
+        margin-top: var(--space-6);
+    }
+    .admin-rule-editor .form-layout {
+        max-width: none;
+    }
+    .form-section > .form-section__head {
         width: 100%;
-        padding: 0.5rem;
-        background-color: var(--color-gray-4);
-        border: 1px solid var(--color-gray-3);
-        color: var(--color-gray-1);
-        box-sizing: border-box;
+        padding-inline: 0;
     }
-    .form-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 1rem;
+    .form-label .opt {
+        font-weight: var(--fw-regular);
+        color: var(--color-gray-2-text);
+    }
+    .selector-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
     }
     .selector-row {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: end;
-        gap: 0.75rem;
-        padding: 0.75rem;
-        margin-bottom: 0.75rem;
-        border: 1px solid var(--color-gray-3);
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) var(--touch-target);
+        gap: var(--space-3);
+        align-items: center;
+    }
+    .selector-row > * {
+        grid-row: 1;
     }
     .selector-row .form-group {
-        flex: 1 1 160px;
         margin: 0;
+    }
+    .selector-row .form-hint {
+        margin: 0;
+    }
+    .selector-row__kind {
+        grid-column: 1;
+    }
+    .selector-row__value {
+        grid-column: 2;
+    }
+    .selector-row__value--wide {
+        grid-column: 2 / span 2;
+    }
+    .selector-row__context {
+        grid-column: 3;
+    }
+    .selector-row__remove {
+        grid-column: 4;
+        justify-self: center;
+    }
+    .selector-row--head {
+        font-size: var(--fs-2xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--color-gray-2-text);
+    }
+    .selector-row__label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+    .selector-add {
+        width: 100%;
+        border-style: dashed;
+    }
+    .admin-rule-editor .form-actions--sticky {
+        justify-content: flex-end;
+        margin: 0 -1.25rem -1rem;
+    }
+    @media (width <= 768px) {
+        .selector-row--head {
+            display: none;
+        }
+        .selector-row {
+            grid-template-columns: minmax(0, 1fr) var(--touch-target);
+            align-items: end;
+            padding-bottom: var(--space-3);
+            border-bottom: var(--border-hairline);
+        }
+        .selector-row > * {
+            grid-row: auto;
+        }
+        .selector-row__kind {
+            grid-row: 1;
+        }
+        .selector-row__remove {
+            grid-row: 1;
+            grid-column: 2;
+        }
+        .selector-row__value,
+        .selector-row__value--wide,
+        .selector-row__context {
+            grid-column: 1 / -1;
+        }
+        .selector-row__label {
+            position: static;
+            width: auto;
+            height: auto;
+            overflow: visible;
+            clip-path: none;
+            display: block;
+            margin-bottom: var(--space-2);
+            font-size: var(--fs-sm);
+            font-weight: var(--fw-bold);
+            color: var(--color-gray-1);
+        }
+    }
+    @media (width <= 1024px) {
+        .switch {
+            min-height: var(--touch-target);
+        }
     }
 }

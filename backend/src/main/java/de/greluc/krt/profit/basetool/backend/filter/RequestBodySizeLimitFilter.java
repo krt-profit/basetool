@@ -20,9 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.filter;
 
 import de.greluc.krt.profit.basetool.backend.exception.CoreProblemCode;
+import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
-import de.greluc.krt.profit.basetool.backend.support.RequestBodyLimitProperties;
+import de.greluc.krt.profit.basetool.backend.platform.internal.RequestBodyLimitProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ReadListener;

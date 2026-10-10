@@ -32,6 +32,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
@@ -39,13 +43,12 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.service.UserReconciliationService.ReconciledUser;
-import de.greluc.krt.profit.basetool.backend.support.AuthoritiesCacheProperties;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
-import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
-import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
@@ -59,6 +62,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -88,8 +92,9 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    * carve-out only fires where a test sets one (ADR-0129).
    */
   @Spy
-  private final IngestGatewayProperties ingestGatewayProperties =
-      new IngestGatewayProperties(gatewayClientIds);
+  private final ClientDirectory clientDirectory =
+      new ExchangeClientDirectory(
+          new IngestGatewayProperties(gatewayClientIds), Mockito.mock(KnownExchangeClients.class));
 
   /**
    * A real instance, not a mock: the converter reads {@link AuthoritiesCacheProperties#ttl()} in

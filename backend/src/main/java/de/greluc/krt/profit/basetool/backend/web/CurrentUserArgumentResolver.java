@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.web;
 
-import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import java.security.Principal;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -36,9 +36,9 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  * authenticated caller's subject.
  *
  * <p>The subject is read via {@link
- * de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject}, so a subject without a JWT,
- * as on ingest-gateway calls (ADR-0129), resolves too. An absent or non-UUID subject raises {@link
- * AccessDeniedException} (403).
+ * de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject}, so a subject without a
+ * JWT, as on ingest-gateway calls (ADR-0129), resolves too. An absent or non-UUID subject raises
+ * {@link AccessDeniedException} (403).
  */
 public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
 
@@ -75,7 +75,7 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
     String sub = requireSubject(webRequest);
     try {
       return UUID.fromString(sub);
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       throw new AccessDeniedException("JWT subject claim is not a valid identifier.");
     }
   }

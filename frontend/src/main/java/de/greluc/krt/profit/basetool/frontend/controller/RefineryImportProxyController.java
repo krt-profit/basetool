@@ -27,7 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryGoodForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -79,7 +79,8 @@ public class RefineryImportProxyController {
   /** Matches draft-row issue paths ({@code goods[<draftIndex>].<subField>}) for inline anchors. */
   private static final Pattern DRAFT_ROW_FIELD = Pattern.compile("^goods\\[(\\d+)]\\..+$");
 
-  private final BackendApiClient backendApiClient;
+  /** The refinery domain's typed backend client. */
+  private final RefineryBackendClient refineryClient;
 
   /**
    * Mapper used only to check that an upload parses as a JSON object; shared with {@code
@@ -106,9 +107,7 @@ public class RefineryImportProxyController {
       return "redirect:/refinery-orders/create";
     }
     try {
-      RefineryImportDraftDto draft =
-          backendApiClient.post(
-              "/api/v1/refinery-orders/import-extract", extract, RefineryImportDraftDto.class);
+      RefineryImportDraftDto draft = refineryClient.importExtract(extract);
       if (draft == null || draft.order() == null) {
         redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.failed");
         return "redirect:/refinery-orders/create";
@@ -238,7 +237,7 @@ public class RefineryImportProxyController {
     for (ImportIssueDto issue : issues) {
       Integer row = draftRowIndex(issue);
       if (row != null) {
-        byRow.computeIfAbsent(String.valueOf(row), k -> new ArrayList<>()).add(issue);
+        byRow.computeIfAbsent(String.valueOf(row), _ -> new ArrayList<>()).add(issue);
       }
     }
     return byRow;
@@ -282,7 +281,7 @@ public class RefineryImportProxyController {
     }
     try {
       return Integer.valueOf(matcher.group(1));
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       log.warn("Refinery import issue field index out of int range: {}", issue.field());
       return null;
     }

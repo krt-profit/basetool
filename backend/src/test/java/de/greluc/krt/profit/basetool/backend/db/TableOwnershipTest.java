@@ -191,7 +191,7 @@ class TableOwnershipTest {
           "Runs the person search over the PersonSearchTargets registry across every module.",
           "de.greluc.krt.profit.basetool.backend.service.UserAccountMergeService",
           "Re-points the member-referencing columns of every module during an account merge.",
-          "de.greluc.krt.profit.basetool.backend.config.ChangeSourceTransactionManager",
+          "de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSourceTransactionManager",
           "Binds the change-source setting the V252 triggers read; names no table.");
 
   private static final String BASE_PACKAGE = "de.greluc.krt.profit.basetool.backend";

@@ -19,16 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.mapper.AuditEventMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.AuditLogPdfFormat;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;

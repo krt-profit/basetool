@@ -31,8 +31,9 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationPageSliceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationViewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -47,13 +48,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -72,10 +74,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
+import reactor.core.Disposables;
 
 /**
  * Frontend page + AJAX relay for the per-user notification inbox. The browser never talks to the
@@ -91,26 +93,69 @@ import reactor.core.Disposable;
 @Slf4j
 public class NotificationPageController {
 
-  private static final String BACKEND_BASE = "/api/v1/notifications";
   private static final int PAGE_LIMIT = 50;
   private static final int DROPDOWN_LIMIT = 10;
+
+  /** The detail page of the record a notification is about, by the notification's entity type. */
+  private static final Map<String, String> ENTITY_PAGES =
+      Map.of(
+          "MISSION",
+          "/missions/",
+          "OPERATION",
+          "/operations/",
+          "JOB_ORDER",
+          "/orders/",
+          "REFINERY_ORDER",
+          "/refinery-orders/",
+          "BANK_ACCOUNT_GRANT",
+          "/bank/accounts/",
+          "BANK_HOLDER",
+          "/bank/holders/");
+
+  /** The types whose record is gone, so the row has nothing to link to. */
+  private static final Set<String> UNLINKED_TYPES = Set.of("MISSION_DELETED", "BANK_GRANT_REVOKED");
+
+  /** The page each notification type links to when its subject is a page rather than a record. */
+  private static final Map<String, String> PAGE_TARGETS =
+      Map.ofEntries(
+          Map.entry("MATERIAL_EXCHANGE_INTEREST_REGISTERED", "/materialboerse"),
+          Map.entry("MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "/materialboerse"),
+          Map.entry("MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "/materialboerse"),
+          Map.entry("MATERIAL_REQUEST_UNAVAILABLE", "/materialboerse"),
+          Map.entry("EXCHANGE_INSTALLATION_CONNECTED", "/connected-apps"),
+          Map.entry("EXCHANGE_BULK_UNDO_APPLIED", "/connected-apps"),
+          Map.entry("INVENTORY_TRANSFERRED_TO_USER", "/inventory/my"),
+          Map.entry("INVENTORY_TRANSFERRED_FROM_USER", "/inventory/my"),
+          Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", "/inventory/my"),
+          Map.entry("BANK_BOOKING_REQUEST_APPROVED", "/bank/requests"),
+          Map.entry("EXCHANGE_CLIENT_SUSPENDED", "/connected-apps"),
+          Map.entry("EXCHANGE_CLIENT_ACTIVATED", "/connected-apps"),
+          Map.entry("EXCHANGE_CLIENT_UPDATE_REQUIRED", "/connected-apps"),
+          Map.entry("EXCHANGE_CLIENT_CAPABILITY_REMOVED", "/connected-apps"),
+          Map.entry("EXCHANGE_SWITCHED_OFF", "/connected-apps"),
+          Map.entry("HANGAR_SHIP_ASSIGNED", "/hangar"),
+          Map.entry("HANGAR_FITTED_RESET", "/hangar"),
+          Map.entry("HANGAR_CHANGED_BY_ADMIN", "/hangar"),
+          Map.entry("BLUEPRINT_CHANGED_BY_ADMIN", "/personal-inventory/blueprints"),
+          Map.entry("BLUEPRINT_PURGED_BY_ADMIN", "/personal-inventory/blueprints"),
+          Map.entry("ACCOUNT_DELETION_REQUEST_DECLINED", "/profile"),
+          Map.entry("ACCOUNT_DELETION_REQUESTED", "/admin/deletion-requests"),
+          Map.entry("DISCORD_REGISTRATION_PENDING", "/admin/discord-registrations"));
+
+  /** The suffix that marks a render parameter as a code with a localized word (REQ-NOTIF-028). */
+  private static final String CODE_SUFFIX = "Code";
+
   private static final DateTimeFormatter DISPLAY_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
-  private static final ParameterizedTypeReference<List<NotificationDto>> LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-  private static final ParameterizedTypeReference<PageResponse<NotificationDto>> PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
-  private static final ParameterizedTypeReference<ServerSentEvent<String>> SSE_TYPE =
-      new ParameterizedTypeReference<>() {};
   private static final long STREAM_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
   private static final String REGISTRATION_ID = "keycloak";
 
   /** Upper bound on cause-chain traversal in {@link #isTermsGateSignal(Throwable)} (loop guard). */
   private static final int MAX_CAUSE_DEPTH = 25;
 
-  private final BackendApiClient backendApiClient;
+  private final NotificationBackendClient notificationClient;
   private final MessageSource messageSource;
-  private final WebClient sseWebClient;
+  private final BackendSideChannels backendSideChannels;
   private final OAuth2AuthorizedClientManager authorizedClientManager;
   private final MeterRegistry meterRegistry;
 
@@ -230,7 +275,7 @@ public class NotificationPageController {
       emitter.complete();
       return emitter;
     }
-    String bearerToken = authorizedClient.getAccessToken().getTokenValue();
+    final String bearerToken = authorizedClient.getAccessToken().getTokenValue();
     try {
       emitter.send(SseEmitter.event().comment("ready"));
     } catch (IOException | RuntimeException e) {
@@ -240,30 +285,24 @@ public class NotificationPageController {
       emitter.complete();
       return emitter;
     }
-    relayConnections.incrementAndGet();
-    Disposable subscription =
-        sseWebClient
-            .get()
-            .uri(BACKEND_BASE + "/stream")
-            .headers(headers -> headers.setBearerAuth(bearerToken))
-            .retrieve()
-            .bodyToFlux(SSE_TYPE)
-            .doFinally(signal -> relayConnections.decrementAndGet())
-            .subscribe(
-                event -> forward(emitter, event),
-                error ->
-                    handleStreamError(
-                        emitter,
-                        error,
-                        request.getContextPath() + TermsAcceptanceGateFilter.CONSENT_PATH),
-                emitter::complete);
+    Disposable.Swap subscription = Disposables.swap();
     emitter.onCompletion(subscription::dispose);
     emitter.onTimeout(
         () -> {
           subscription.dispose();
-          emitter.complete();
+          completeQuietly(emitter);
         });
-    emitter.onError(error -> subscription.dispose());
+    emitter.onError(_ -> subscription.dispose());
+    String consentUrl = request.getContextPath() + TermsAcceptanceGateFilter.CONSENT_PATH;
+    relayConnections.incrementAndGet();
+    subscription.update(
+        backendSideChannels
+            .notificationStream(bearerToken)
+            .doFinally(_ -> relayConnections.decrementAndGet())
+            .subscribe(
+                event -> forward(emitter, event, subscription),
+                error -> handleStreamError(emitter, error, consentUrl),
+                () -> completeQuietly(emitter)));
     return emitter;
   }
 
@@ -289,7 +328,7 @@ public class NotificationPageController {
   @PostMapping(value = "/{id}/read", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> markRead(@PathVariable @NotNull UUID id) {
     try {
-      backendApiClient.post(BACKEND_BASE + "/" + id + "/read", null, NotificationDto.class);
+      notificationClient.markRead(id);
       return ResponseEntity.ok(new NotificationCountResponse(currentUnreadCount()));
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -310,8 +349,7 @@ public class NotificationPageController {
   @PostMapping(value = "/read-all", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> markAllRead() {
     try {
-      NotificationBulkResultDto result =
-          backendApiClient.post(BACKEND_BASE + "/read-all", null, NotificationBulkResultDto.class);
+      NotificationBulkResultDto result = notificationClient.markAllRead();
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -333,7 +371,7 @@ public class NotificationPageController {
   @DeleteMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> delete(@PathVariable @NotNull UUID id) {
     try {
-      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+      notificationClient.delete(id);
       return ResponseEntity.ok(new NotificationCountResponse(currentUnreadCount()));
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -354,8 +392,7 @@ public class NotificationPageController {
   @DeleteMapping(value = "/read", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> clearRead() {
     try {
-      NotificationBulkResultDto result =
-          backendApiClient.delete(BACKEND_BASE + "/read", NotificationBulkResultDto.class);
+      NotificationBulkResultDto result = notificationClient.clearRead();
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -368,9 +405,7 @@ public class NotificationPageController {
   }
 
   private List<NotificationViewDto> loadView(int limit) {
-    List<NotificationDto> dtos =
-        backendApiClient.get(
-            BACKEND_BASE + "/recent?limit={limit}", LIST_TYPE, Integer.valueOf(limit));
+    List<NotificationDto> dtos = notificationClient.recent(limit);
     if (dtos == null) {
       return List.of();
     }
@@ -385,11 +420,7 @@ public class NotificationPageController {
    * @return the backend page response, or {@code null} when the backend returned none
    */
   private PageResponse<NotificationDto> loadPage(int page) {
-    return backendApiClient.get(
-        BACKEND_BASE + "?page={page}&size={size}&sort=createdAt,desc",
-        PAGE_TYPE,
-        Integer.valueOf(page),
-        Integer.valueOf(PAGE_LIMIT));
+    return notificationClient.page(page, PAGE_LIMIT);
   }
 
   /**
@@ -425,10 +456,43 @@ public class NotificationPageController {
         dto.read(),
         dto.createdAt() == null ? "" : DISPLAY_FORMAT.format(dto.createdAt()),
         dto.entityType(),
-        dto.entityId());
+        dto.entityId(),
+        targetOf(dto.type(), dto.entityType(), dto.entityId()));
   }
 
-  private String render(String type, Map<String, String> params, Locale locale) {
+  /**
+   * Resolves the page a notification is about, for the inbox row link.
+   *
+   * @param type the notification type
+   * @param entityType the originating aggregate's type tag
+   * @param entityId the originating aggregate's id
+   * @return a same-origin path, or {@code null} when the web app has no page for the type that its
+   *     seeded recipients can open
+   */
+  static @Nullable String targetOf(
+      @Nullable String type, @Nullable String entityType, @Nullable UUID entityId) {
+    if (type == null) {
+      return null;
+    }
+    String fixed = PAGE_TARGETS.get(type);
+    if (fixed != null || UNLINKED_TYPES.contains(type)) {
+      return fixed;
+    }
+    String prefix = entityType == null ? null : ENTITY_PAGES.get(entityType);
+    return prefix != null && entityId != null ? prefix + entityId : null;
+  }
+
+  /**
+   * Renders a notification into the member's language: the type's template with every parameter
+   * filled in, a parameter named {@code <name>Code} also giving {@code {<name>}} its localized word
+   * (REQ-NOTIF-028).
+   *
+   * @param type the notification type
+   * @param params the stored render parameters, or {@code null}
+   * @param locale the member's locale
+   * @return the rendered text
+   */
+  String render(String type, Map<String, String> params, Locale locale) {
     String key = "notifications.type." + type;
     String template = messageSource.getMessage(key, null, key, locale);
     if (template == null || template.equals(key)) {
@@ -440,15 +504,30 @@ public class NotificationPageController {
         template =
             template.replace(
                 "{" + entry.getKey() + "}", entry.getValue() == null ? "" : entry.getValue());
+        if (isCodeParameter(entry.getKey()) && entry.getValue() != null) {
+          String name = entry.getKey().substring(0, entry.getKey().length() - CODE_SUFFIX.length());
+          String valueKey = "notifications.value." + name + "." + entry.getValue();
+          String word = messageSource.getMessage(valueKey, null, entry.getValue(), locale);
+          template = template.replace("{" + name + "}", word == null ? entry.getValue() : word);
+        }
       }
     }
     return template;
   }
 
+  /**
+   * Whether a parameter carries a code that has a localized word, by its {@code Code} suffix.
+   *
+   * @param name the parameter name
+   * @return {@code true} for a name such as {@code changeCode}
+   */
+  private static boolean isCodeParameter(String name) {
+    return name.length() > CODE_SUFFIX.length() && name.endsWith(CODE_SUFFIX);
+  }
+
   private long currentUnreadCount() {
     try {
-      NotificationCountResponse response =
-          backendApiClient.get(BACKEND_BASE + "/unread-count", NotificationCountResponse.class);
+      NotificationCountResponse response = notificationClient.unreadCount();
       return response != null && response.count() != null ? response.count() : 0L;
     } catch (ReauthenticationRequiredException e) {
       throw e;
@@ -473,9 +552,9 @@ public class NotificationPageController {
       try {
         emitter.send(
             SseEmitter.event().name("reauth").data(ReauthenticationRequiredException.REAUTH_PATH));
-        emitter.complete();
+        completeQuietly(emitter);
       } catch (IOException | RuntimeException sendFailure) {
-        emitter.complete();
+        completeQuietly(emitter);
       }
       return;
     }
@@ -484,16 +563,16 @@ public class NotificationPageController {
       try {
         emitter.send(
             SseEmitter.event().name(TermsAcceptanceGateFilter.SSE_GATE_EVENT).data(consentUrl));
-        emitter.complete();
+        completeQuietly(emitter);
       } catch (IOException | RuntimeException sendFailure) {
-        emitter.complete();
+        completeQuietly(emitter);
       }
       return;
     }
     log.debug(
         "Notification stream dropped ({}); completing cleanly, poll fallback keeps the badge fresh",
         error.getClass().getSimpleName());
-    emitter.complete();
+    completeQuietly(emitter);
   }
 
   /**
@@ -518,7 +597,18 @@ public class NotificationPageController {
     return false;
   }
 
-  private static void forward(SseEmitter emitter, ServerSentEvent<String> event) {
+  /**
+   * Writes one backend event to the browser; a failed write stops the upstream subscription.
+   *
+   * <p>An {@link IOException} means the browser is gone and the container already runs its error
+   * dispatch, so the emitter is left to it; any other failure completes the emitter quietly.
+   *
+   * @param emitter the browser-facing emitter
+   * @param event the backend event to relay
+   * @param subscription the upstream subscription to cancel when the write fails
+   */
+  private static void forward(
+      SseEmitter emitter, ServerSentEvent<String> event, Disposable subscription) {
     try {
       SseEmitter.SseEventBuilder builder = SseEmitter.event();
       if (event.event() != null) {
@@ -531,10 +621,32 @@ public class NotificationPageController {
         builder.data(event.data());
       }
       emitter.send(builder);
-    } catch (IOException | RuntimeException e) {
+    } catch (IOException e) {
+      log.debug(
+          "Notification stream send failed ({}); the browser is gone",
+          e.getClass().getSimpleName());
+      subscription.dispose();
+    } catch (RuntimeException e) {
       log.debug(
           "Notification stream send failed ({}); completing cleanly", e.getClass().getSimpleName());
+      subscription.dispose();
+      completeQuietly(emitter);
+    }
+  }
+
+  /**
+   * Completes the emitter from a non-container thread, tolerating a request the container has
+   * already ended.
+   *
+   * @param emitter the browser-facing emitter to complete
+   */
+  private static void completeQuietly(SseEmitter emitter) {
+    try {
       emitter.complete();
+    } catch (IllegalStateException e) {
+      log.debug(
+          "Notification stream already ended by the container ({}); nothing to complete",
+          e.getClass().getSimpleName());
     }
   }
 }

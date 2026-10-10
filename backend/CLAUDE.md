@@ -31,7 +31,7 @@ authorization chain, the scope predicate, the audited areas, the aggregates and 
 
 The backend is being cut by domain (ADR-0231, `docs/DOMAIN_MODULARISATION_PLAN.md`). Until the
 domain packages exist, `src/test/resources/architecture/domain-map.txt` assigns every main class to
-its target module, first matching rule wins (REQ-MOD-001…005).
+its target module, first matching rule wins (REQ-MOD-001…006).
 
 - **A new class must match a rule.** `DomainMapTest` fails on an unassigned class, a dead rule, an
   empty module and a duplicate simple name. Add an explicit `class` rule with its reason when no name
@@ -40,13 +40,55 @@ its target module, first matching rule wins (REQ-MOD-001…005).
   edges. A new upward edge fails `ModuleBaselineTest`; when you remove one, a local test run shrinks
   the file and CI refuses until the shrunk file is committed. Never add a security rule to a
   baseline.
+- **Other modules use a module only through its `api` package** (plan §5.2). The first one is
+  `audit.api`: record audit rows through `AuditRecorder` (it returns nothing), with `AuditEventType`,
+  `AuditDomain` and `AuditDetails` from the same package. `AuditService` and the rest of the audit
+  trail are the audit module's internals; the listener and controller audit rules key on all three
+  recorder types, so a new recorder type is added there too.
+- **A lower module reacts upward only through an observer it owns** (plan §5.3). The org-unit
+  services report leadership and Kommandogruppe changes to `orgunit.api.MembershipChangeObserver`;
+  `OrgChartService` implements it. An implementation is `@Transactional(propagation = MANDATORY)`
+  and the interface carries `@ObserverSpi` (`ListenerAndObserverRulesTest` fails otherwise); never
+  call a higher module's service from `orgunit` directly.
+- **There is no `support` package** (split 2026-10-04, plan §7.3 P1-9). A domain-free helper
+  goes into the `kernel` base package (`OptimisticLock`, `StringNormalization`, `LikePatterns`,
+  `RequestMemo`, `Roles`, `Permissions`, `ProblemResponseFactory`, `HandleAnonymisation`, …;
+  the kernel has no sub-packages and depends on no module). The access core and the shared
+  request settings go into `platform.api` / `platform.internal`. A helper of one domain goes into
+  `<module>.internal`, or `<module>.api` when another module uses it. A helper that reads an entity
+  is not domain-free. Every such leaf helper is listed in `ArchitectureTest.LEAF_HELPER_CLASSES`,
+  which allows it only the other leaf helpers, the entity model and the repositories — add a new
+  one there and raise the floor of `leafHelpersMustStayDependencyLeaves` by the measured count.
+- **A domain event goes into its publisher's `<module>.api.events` package** — the module of the
+  service that calls `publishEvent` with it; there is no central `event` package. A
+  notification-producing event implements `notification.api.events.NotificationEvent`. A new
+  module package needs a `package <module> <module>` rule in the domain map. Event payloads are
+  data only: `eventLayerShouldNotDependOnServiceLayer` selects every `api.events` package tree.
+- **The platform modules (`audit`, `notification`, `livesync`, `platform`) never name a domain
+  class.** When they need a domain's data, they own an SPI and the domain implements it (plan
+  §5.3): `ActorHandleResolver` and `RetentionParticipant` (audit), the three
+  `*RecipientDirectory` interfaces (notification), `LiveSyncTopicAuthorizer` (livesync),
+  `ActiveOrgUnitProvider` (platform). A new live-sync room kind needs exactly one
+  `LiveSyncTopicAuthorizer` that asks the module's read gate, or the backend refuses to start; a new
+  audit trail outside the audit module joins retention as a `RetentionParticipant`. A platform SPI
+  in a layer package sits in a package its implementations already live in (`ActiveOrgUnitProvider`
+  in `service`, not `logging`), or the implementation closes a layer cycle.
+- **A new module package gets its Spring Modulith declarations in the same PR** (REQ-MOD-006,
+  ADR-0233 amendment 1). Its root `package-info` carries `@ApplicationModule(allowedDependencies =
+  {…})`, its `api` package **and every package below `api`** carry `@NamedInterface("api")` (a
+  package-level `@NamedInterface` does not cover sub-packages), and the module is added to
+  `ModularityTest.DECLARED_MODULES`. `allowedDependencies` is derived, not chosen: the `"<m>::api"`
+  of every declared module the domain map's ranks and `allow` rows permit — a bare `"<m>"` admits
+  only the unnamed interface. Declaring a module also adds it to the lists of the declared modules
+  above it. `ModularityTest` fails until all of this matches. The annotations come from
+  `spring-modulith-api`, `compileOnly`; never move Spring Modulith's engine out of test scope.
 
 ## Concurrency — read this before touching multi-step transactions
 
 The codebase has been bitten by optimistic-locking traps several times. The rules below exist
 because of real bugs that shipped.
 
-- **Optimistic locking via `@Version`** — every write DTO carries the `version` field; the frontend echoes it back; concurrent modifications surface as `ObjectOptimisticLockingFailureException` → HTTP 409. Don't strip the version from DTOs to "make it simpler." The version-mismatch **check** goes through the `support.OptimisticLock` helper family (S2, #908) — `check` (skip when the persisted version is null, else 409 unless equal), `checkOptionalClient` (also skip when the client omits the version — admin force-save), `checkRequired` (an absent persisted version is itself a 409) — rather than a hand-rolled `if (…) throw new ObjectOptimisticLockingFailureException(…)`. Pick the method by the site's null-semantics; never re-derive the guard inline. **Exception:** `Mission`'s manual `coreVersion`/`scheduleVersion`/`flagsVersion`/`partyLeadVersion`/`stepsVersion`/`objectivesVersion`/`owningOrgUnitVersion` counters are plain business `Long`s (not JPA `@Version`); since #1112/#1114/#1147 each section's check-and-bump is a **single DB-enforced atomic conditional** `UPDATE Mission … SET xVersion = xVersion + 1 WHERE id = ? AND xVersion = ?` (`MissionRepository.bump*VersionIfMatches`, dispatched by the `MissionSectionVersions.MissionSection` enum) driven through `MissionSectionVersions.enforceSectionVersion(...)` — 0 rows affected → 409 — which row-locks the mission so two racing same-section writers actually serialise (the earlier in-memory `assertSectionVersion` check-then-bump had a TOCTOU window that let both commit). This is only safe because **every mutable `Mission` scalar/association is `@OptimisticLock(excluded = true)` and the entity is `@DynamicUpdate`**: a section edit dirties only its own columns, so it never bumps the row `@Version` (no cross-section 409) and the column-narrowed flush never clobbers a concurrent other-section change. The in-memory `bumpSectionVersion` survives only for the two unconditional cross-section pokes with no client echo — the legacy full-replace `updateMission` (which force-increments the row `@Version` via `OPTIMISTIC_FORCE_INCREMENT`, its remaining guard once the scalars are excluded) and the activation auto-stamp of `actualStartTime`. Steps/objectives additionally carry a deferrable unique `(mission_id, order_index)` DB backstop (V208). Keep the deliberate `null → 0L` semantics; do **not** route these through the `support.OptimisticLock` family, and do **not** re-expand `enforceSectionVersion` into per-section helpers.
+- **Optimistic locking via `@Version`** — every write DTO carries the `version` field; the frontend echoes it back; concurrent modifications surface as `ObjectOptimisticLockingFailureException` → HTTP 409. Don't strip the version from DTOs to "make it simpler." The version-mismatch **check** goes through the `kernel.OptimisticLock` helper family (S2, #908) — `check` (skip when the persisted version is null, else 409 unless equal), `checkOptionalClient` (also skip when the client omits the version — admin force-save), `checkRequired` (an absent persisted version is itself a 409) — rather than a hand-rolled `if (…) throw new ObjectOptimisticLockingFailureException(…)`. Pick the method by the site's null-semantics; never re-derive the guard inline. **Exception:** `Mission`'s manual `coreVersion`/`scheduleVersion`/`flagsVersion`/`partyLeadVersion`/`stepsVersion`/`objectivesVersion`/`owningOrgUnitVersion` counters are plain business `Long`s (not JPA `@Version`); since #1112/#1114/#1147 each section's check-and-bump is a **single DB-enforced atomic conditional** `UPDATE Mission … SET xVersion = xVersion + 1 WHERE id = ? AND xVersion = ?` (`MissionRepository.bump*VersionIfMatches`, dispatched by the `MissionSectionVersions.MissionSection` enum) driven through `MissionSectionVersions.enforceSectionVersion(...)` — 0 rows affected → 409 — which row-locks the mission so two racing same-section writers actually serialise (the earlier in-memory `assertSectionVersion` check-then-bump had a TOCTOU window that let both commit). This is only safe because **every mutable `Mission` scalar/association is `@OptimisticLock(excluded = true)` and the entity is `@DynamicUpdate`**: a section edit dirties only its own columns, so it never bumps the row `@Version` (no cross-section 409) and the column-narrowed flush never clobbers a concurrent other-section change. The in-memory `bumpSectionVersion` survives only for the two unconditional cross-section pokes with no client echo — the legacy full-replace `updateMission` (which force-increments the row `@Version` via `OPTIMISTIC_FORCE_INCREMENT`, its remaining guard once the scalars are excluded) and the activation auto-stamp of `actualStartTime`. Steps/objectives additionally carry a deferrable unique `(mission_id, order_index)` DB backstop (V208). Keep the deliberate `null → 0L` semantics; do **not** route these through the `kernel.OptimisticLock` family, and do **not** re-expand `enforceSectionVersion` into per-section helpers.
 - **Lock as fine-grained as the data allows — the backend side.** The root file states the principle; here is what it costs to honour it. The canonical precedent is `Mission`'s manual `coreVersion` / `scheduleVersion` / `flagsVersion` / `partyLeadVersion` / … counters — plain business `Long`s independent of the row's Hibernate `@Version`, **DB-enforced** via an atomic conditional bump (see the Exception above) and decoupled at the row level by `@DynamicUpdate` plus per-scalar `@OptimisticLock(excluded = true)`, so an edit to one section never bumps `@Version` and never 409s a concurrent edit of another (note: these manual counters are NOT `@Version`, so the `saveAndFlush` writeback caveat of `REQ-FE-003` does **not** apply to them). Each form / fragment should write the smallest entity that owns the data it touches rather than re-saving the whole aggregate.
 - **Pessimistic locking for bulk reorders** — use `@Lock(LockModeType.PESSIMISTIC_WRITE)` (or atomic SQL) for priority shifts and reorder operations to avoid races.
 - **Exchange stock lots take an advisory lock first** (ADR-0229). A lot is a set of rows that grows and may be empty, so row locks cannot guard it: a writer that waited on them never sees the rows the holder booked in. Every exchange stock write and undo goes through `ExchangeStockWriteService.lockLots` (`pg_advisory_xact_lock` per member and lot key, all of a transaction's lots up front, ascending by lock key) before reading a lot's rows, then locks the rows in lot-key order. A new path that writes exchange lots takes the same locks the same way; never lock lots one by one as you go.

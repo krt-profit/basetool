@@ -1,0 +1,94 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.materialexchange.api.events;
+
+import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
+
+/**
+ * Domain event published when a member registers interest in a Materialbörse offer
+ * (REQ-MARKET-011), directed at the offer's owner via {@link #contextRecipientUserId()}.
+ *
+ * <p>Carries only immutable scalars; the interested member's name is disclosed to the owner only.
+ *
+ * @param offerId the offer (also the notification's loose entity id)
+ * @param materialName the offered material's name, for rendering
+ * @param interestedUserName the registering member's effective name, for rendering (owner-only)
+ * @param ownerUserId the offer owner's sub; the directed recipient
+ * @param actorSub the registering member's sub
+ */
+public record MaterialExchangeInterestRegisteredEvent(
+    UUID offerId,
+    String materialName,
+    String interestedUserName,
+    @Nullable UUID ownerUserId,
+    @Nullable UUID actorSub)
+    implements NotificationEvent {
+
+  /** Loose entity-type tag stored on the produced notification for deep-linking to the board. */
+  public static final String ENTITY_TYPE = "MATERIAL_EXCHANGE_OFFER";
+
+  @NotNull
+  @Override
+  public NotificationEventType eventType() {
+    return NotificationEventType.MATERIAL_EXCHANGE_INTEREST_REGISTERED;
+  }
+
+  @NotNull
+  @Unmodifiable
+  @Override
+  public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
+    return Map.of();
+  }
+
+  @Nullable
+  @Override
+  public UUID contextRecipientUserId() {
+    return ownerUserId;
+  }
+
+  @NotNull
+  @Override
+  public String entityType() {
+    return ENTITY_TYPE;
+  }
+
+  @Override
+  public UUID entityId() {
+    return offerId;
+  }
+
+  @NotNull
+  @Override
+  public Map<String, String> renderParams() {
+    Map<String, String> params = new LinkedHashMap<>();
+    params.put("interessent", interestedUserName);
+    params.put("material", materialName);
+    return params;
+  }
+}

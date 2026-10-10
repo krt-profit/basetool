@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -33,12 +34,15 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationPageSliceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationViewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.MessageSource;
@@ -59,9 +63,9 @@ class NotificationPageControllerTest {
     when(messageSource.getMessage(anyString(), any(), anyString(), any(Locale.class)))
         .thenReturn("Notification text");
     return new NotificationPageController(
-        backendApiClient,
+        new NotificationBackendClient(backendApiClient),
         messageSource,
-        mock(WebClient.class),
+        new BackendSideChannels(mock(WebClient.class), null),
         mock(OAuth2AuthorizedClientManager.class),
         new SimpleMeterRegistry());
   }
@@ -184,5 +188,206 @@ class NotificationPageControllerTest {
     ArgumentCaptor<Object> pageArg = ArgumentCaptor.captor();
     verify(backendApiClient).get(anyString(), anyTypeRef(), pageArg.capture(), any());
     assertEquals(0, pageArg.getValue());
+  }
+
+  /** A job-order notification links its order; without the order's id it links nothing. */
+  @Test
+  void targetOf_missionAndOperationNoticesLinkTheirRecord() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/missions/" + id,
+        NotificationPageController.targetOf("MISSION_RESCHEDULED", "MISSION", id));
+    assertEquals(
+        "/missions/" + id, NotificationPageController.targetOf("MISSION_REMINDER", "MISSION", id));
+    assertEquals(
+        "/operations/" + id,
+        NotificationPageController.targetOf("OPERATION_COMPLETED", "OPERATION", id));
+    assertNull(NotificationPageController.targetOf("MISSION_RESCHEDULED", "MISSION", null));
+  }
+
+  @Test
+  void targetOf_aDeletedMissionHasNothingToLink() {
+    assertNull(
+        NotificationPageController.targetOf("MISSION_DELETED", "MISSION", UUID.randomUUID()));
+  }
+
+  @Test
+  void targetOf_everyOrderNoticeLinksTheOrderExceptADeletedOne() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/orders/" + id,
+        NotificationPageController.targetOf("JOB_ORDER_REASSIGNED", "JOB_ORDER", id));
+    assertEquals(
+        "/orders/" + id,
+        NotificationPageController.targetOf("JOB_ORDER_ASSIGNED", "JOB_ORDER", id));
+    assertEquals(
+        "/orders/" + id,
+        NotificationPageController.targetOf("JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER", id));
+    assertNull(NotificationPageController.targetOf("JOB_ORDER_FINISHED", "JOB_ORDER_DELETED", id));
+  }
+
+  @Test
+  void targetOf_refineryNoticesLinkTheOrder() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/refinery-orders/" + id,
+        NotificationPageController.targetOf("REFINERY_ORDER_READY", "REFINERY_ORDER", id));
+    assertEquals(
+        "/refinery-orders/" + id,
+        NotificationPageController.targetOf(
+            "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER", id));
+  }
+
+  @Test
+  void targetOf_marketAndStockNoticesLinkTheirPage() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/materialboerse",
+        NotificationPageController.targetOf(
+            "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_EXCHANGE_OFFER", id));
+    assertEquals(
+        "/materialboerse",
+        NotificationPageController.targetOf(
+            "MATERIAL_REQUEST_UNAVAILABLE", "MATERIAL_EXCHANGE_REQUEST", id));
+    assertEquals(
+        "/inventory/my",
+        NotificationPageController.targetOf("INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_ITEM", id));
+  }
+
+  @Test
+  void targetOf_bankNoticesLinkWhatTheirRecipientCanOpen() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/bank/requests",
+        NotificationPageController.targetOf(
+            "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST", id));
+    assertEquals(
+        "/bank/accounts/" + id,
+        NotificationPageController.targetOf("BANK_GRANT_CHANGED", "BANK_ACCOUNT_GRANT", id));
+    assertNull(NotificationPageController.targetOf("BANK_GRANT_REVOKED", "BANK_ACCOUNT_GRANT", id));
+    assertEquals(
+        "/bank/holders/" + id,
+        NotificationPageController.targetOf(
+            "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER", id));
+  }
+
+  @Test
+  void targetOf_organisationNoticesHaveNoPageToLink() {
+    UUID id = UUID.randomUUID();
+    assertNull(NotificationPageController.targetOf("ORG_MEMBER_DEPARTED", "ORG_UNIT_MEMBER", id));
+    assertNull(
+        NotificationPageController.targetOf("ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_UNIT_MEMBER", id));
+  }
+
+  @Test
+  void targetOf_hangarAndBlueprintNoticesLinkTheirPage() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/hangar", NotificationPageController.targetOf("HANGAR_SHIP_ASSIGNED", "MISSION_UNIT", id));
+    assertEquals(
+        "/hangar", NotificationPageController.targetOf("HANGAR_CHANGED_BY_ADMIN", "HANGAR", id));
+    assertEquals(
+        "/personal-inventory/blueprints",
+        NotificationPageController.targetOf(
+            "BLUEPRINT_PURGED_BY_ADMIN", "PERSONAL_BLUEPRINTS", id));
+    assertEquals(
+        "/missions/" + id,
+        NotificationPageController.targetOf("HANGAR_SHIP_REMOVED_FROM_UNIT", "MISSION", id));
+  }
+
+  @Test
+  void targetOf_connectedApplicationNoticesLinkTheConnectedAppsPage() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/connected-apps",
+        NotificationPageController.targetOf("EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT", id));
+    assertEquals(
+        "/connected-apps",
+        NotificationPageController.targetOf("EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCH", id));
+  }
+
+  @Test
+  void targetOf_jobOrderLinksTheOrder() {
+    UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
+
+    assertEquals(
+        "/orders/" + orderId,
+        NotificationPageController.targetOf("JOB_ORDER_CREATED", "JOB_ORDER", orderId));
+    assertEquals(
+        "/orders/" + orderId,
+        NotificationPageController.targetOf(
+            "JOB_ORDER_UPDATED_BY_REQUESTER", "JOB_ORDER", orderId));
+    assertNull(NotificationPageController.targetOf("JOB_ORDER_CREATED", "JOB_ORDER", null));
+    assertNull(NotificationPageController.targetOf("JOB_ORDER_CREATED", "OTHER", orderId));
+  }
+
+  /** A notification whose subject is a page links that page; one without a page links nothing. */
+  @Test
+  void targetOf_pageSubjectsAndUnlinkedTypes() {
+    UUID id = UUID.randomUUID();
+
+    assertEquals(
+        "/materialboerse",
+        NotificationPageController.targetOf(
+            "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_EXCHANGE_OFFER", id));
+    assertEquals(
+        "/connected-apps",
+        NotificationPageController.targetOf(
+            "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_INSTALLATION", id));
+    assertEquals(
+        "/profile",
+        NotificationPageController.targetOf(
+            "ACCOUNT_DELETION_REQUEST_DECLINED", "DELETION_REQUEST", id));
+    assertNull(
+        NotificationPageController.targetOf(
+            "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST", id));
+    assertNull(NotificationPageController.targetOf(null, null, null));
+  }
+
+  /** Both Lager transfer notifications link the recipient's own Lager (REQ-INV-055). */
+  @Test
+  void targetOf_inventoryTransfersLinkMeinLager() {
+    UUID rowId = UUID.randomUUID();
+
+    assertEquals(
+        "/inventory/my",
+        NotificationPageController.targetOf(
+            "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_ITEM", rowId));
+    assertEquals(
+        "/inventory/my",
+        NotificationPageController.targetOf(
+            "INVENTORY_TRANSFERRED_FROM_USER", "INVENTORY_ITEM", rowId));
+  }
+
+  /** The page slice carries each row's link target for the load-more rows. */
+  @Test
+  void pageItems_carriesTheLinkTarget() {
+    UUID orderId = UUID.randomUUID();
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(), any()))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(
+                    new NotificationDto(
+                        UUID.randomUUID(),
+                        "JOB_ORDER_CREATED",
+                        null,
+                        "JOB_ORDER",
+                        orderId,
+                        false,
+                        null,
+                        0L,
+                        Instant.parse("2026-01-01T00:00:00Z"),
+                        null)),
+                1,
+                50,
+                51L,
+                2,
+                List.of()));
+    NotificationPageController controller = controllerWith(backendApiClient);
+
+    NotificationPageSliceDto slice = controller.pageItems(1);
+
+    assertEquals("/orders/" + orderId, slice.items().get(0).href());
   }
 }

@@ -19,22 +19,22 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
-import de.greluc.krt.profit.basetool.backend.model.dto.AddBereichLeaderRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddOlMemberRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.GrandAdmiralRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrganisationsleitungDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.web.AddBereichLeaderRequest;
+import de.greluc.krt.profit.basetool.backend.orgunit.web.GrandAdmiralRequest;
 import de.greluc.krt.profit.basetool.backend.service.OrgHierarchyService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;

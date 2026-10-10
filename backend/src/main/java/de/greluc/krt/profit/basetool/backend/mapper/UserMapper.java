@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Role;
@@ -27,9 +28,8 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.support.RequestMemo;
-import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -282,7 +282,7 @@ public abstract class UserMapper {
     if (cache == null) {
       return queryStaffelMemberships(user);
     }
-    return cache.computeIfAbsent(user.getId(), id -> queryStaffelMemberships(user));
+    return cache.computeIfAbsent(user.getId(), _ -> queryStaffelMemberships(user));
   }
 
   /**

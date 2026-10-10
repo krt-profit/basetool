@@ -14,11 +14,17 @@ REQ-OPS-035):
     digest the tag names now, and rewrites it in place when it moved. A resolution that fails leaves
     the line as Dependabot wrote it and prints a warning.
 
+``sync-test-images``
+    Moves every digest-pinned image constant in the test-support ``TestImages`` class to the digest
+    ``docker-compose.yml`` pins for the same ``name:tag`` (REQ-OPS-035). An image the compose file
+    does not pin is left alone; one it pins to more than one digest is left alone with a warning.
+
 Exit codes: ``0`` done, ``1`` refused or self-test failed, ``2`` bad invocation.
 
 Usage:
     dependabot_compose_followup.py guard --base <sha>
     dependabot_compose_followup.py refresh-digests --base <sha>
+    dependabot_compose_followup.py sync-test-images
     dependabot_compose_followup.py --selftest
 """
 
@@ -45,6 +51,18 @@ IMAGE_LINE = re.compile(
     r":(?P<tag>[^\s\"@#]+)"
     r"@(?P<digest>sha256:[0-9a-f]{64})"
     r"(?P<tail>.*)$"
+)
+
+TEST_IMAGES_COMPOSE = Path("docker-compose.yml")
+
+TEST_IMAGES = Path(
+    "test-support/src/main/java/de/greluc/krt/profit/basetool/testsupport/containers/TestImages.java"
+)
+
+JAVA_IMAGE_LITERAL = re.compile(
+    r"\"(?P<name>[^\s\"@#:]+(?::\d+/[^\s\"@#:]+)?)"
+    r":(?P<tag>[^\s\"@#]+)"
+    r"@(?P<digest>sha256:[0-9a-f]{64})\""
 )
 
 
@@ -163,8 +181,62 @@ def refresh_digests(base: str, resolver: Callable[[str], str | None] = resolve) 
     return 0
 
 
+def compose_pins(text: str) -> dict[str, set[str]]:
+    """Map each ``name:tag`` a compose file pins on an ``image:`` line to every digest it pins."""
+    pins: dict[str, set[str]] = {}
+    for line in text.splitlines():
+        match = IMAGE_LINE.match(line)
+        if match:
+            pins.setdefault(f"{match['name']}:{match['tag']}", set()).add(match["digest"])
+    return pins
+
+
+def sync_constants(java: str, pins: dict[str, set[str]]) -> tuple[str, list[str]]:
+    """Return ``java`` with each pinned image literal moved to the compose file's single digest.
+
+    Args:
+        java: source text of the class that holds the image constants.
+        pins: the compose file's ``name:tag`` to digests map, as :func:`compose_pins` builds it.
+
+    Returns:
+        The rewritten source and one line per literal it moved or had to leave ambiguous.
+    """
+    notes: list[str] = []
+
+    def replace(match: re.Match[str]) -> str:
+        ref = f"{match['name']}:{match['tag']}"
+        digests = pins.get(ref, set())
+        if len(digests) > 1:
+            notes.append(f"::warning title=dependabot-compose-followup::{TEST_IMAGES_COMPOSE} pins {ref} "
+                         f"to {len(digests)} digests; leaving the TestImages constant at {match['digest'][:19]}")
+            return match.group(0)
+        if len(digests) == 1:
+            (digest,) = digests
+            if digest != match["digest"]:
+                notes.append(f"{TEST_IMAGES.name}: {ref} moved from {match['digest'][:19]} to {digest[:19]}")
+                return f"\"{ref}@{digest}\""
+        return match.group(0)
+
+    return JAVA_IMAGE_LITERAL.sub(replace, java), notes
+
+
+def sync_test_images(root: Path = REPO) -> int:
+    """Move the ``TestImages`` digest constants to the digests ``docker-compose.yml`` pins."""
+    pins = compose_pins((root / TEST_IMAGES_COMPOSE).read_bytes().decode("utf-8"))
+    path = root / TEST_IMAGES
+    original = path.read_bytes().decode("utf-8")
+    text, notes = sync_constants(original, pins)
+    for note in notes:
+        print(note)
+    if text != original:
+        path.write_bytes(text.encode("utf-8"))
+    else:
+        print(f"{TEST_IMAGES.name}: every constant already matches {TEST_IMAGES_COMPOSE}")
+    return 0
+
+
 def selftest() -> int:
-    """Exercise the commit vetting, the diff parsing and the line rewrite on fixed inputs."""
+    """Exercise the commit vetting, the diff parsing, the line rewrite and the constant sync."""
     old = "sha256:" + "a" * 64
     new = "sha256:" + "b" * 64
     compose = (
@@ -202,6 +274,31 @@ def selftest() -> int:
          == f"  image: \"quay.io/x/y:v1.2@{new}\"\r\n"),
         ("an unpinned tag is not an image line", IMAGE_LINE.match("  image: redis:8-alpine") is None),
     ]
+    java = (
+        "  public static final String REDIS =\n"
+        f"      \"redis:8-alpine@{old}\";\n"
+        f"  public static final String POSTGRES =\n      \"postgres:18-alpine@{old}\";\n"
+        f"  public static final String OTHER = \"nginx:1@{old}\";\n"
+    )
+    moved, moved_notes = sync_constants(java, compose_pins(compose.replace(f"8-alpine@{old}", f"8-alpine@{new}")))
+    real_java = (REPO / TEST_IMAGES).read_bytes().decode("utf-8")
+    real_refs = {f"{m['name']}:{m['tag']}" for m in JAVA_IMAGE_LITERAL.finditer(real_java)}
+    real_pins = compose_pins((REPO / TEST_IMAGES_COMPOSE).read_bytes().decode("utf-8"))
+    cases += [
+        ("the compose pins collect every digest per tag",
+         compose_pins(compose + f"    image: redis:8-alpine@{new}\n")["redis:8-alpine"] == {old, new}),
+        ("a moved compose digest moves only that constant",
+         moved == java.replace(f"redis:8-alpine@{old}", f"redis:8-alpine@{new}") and len(moved_notes) == 1),
+        ("an unchanged compose digest leaves the constants alone",
+         sync_constants(java, compose_pins(compose)) == (java, [])),
+        ("an ambiguous compose pin leaves the constant and warns",
+         sync_constants(java, {"redis:8-alpine": {old, new}})[0] == java
+         and "::warning" in sync_constants(java, {"redis:8-alpine": {old, new}})[1][0]),
+        ("the real TestImages still holds the Redis and PostgreSQL literals",
+         {"redis:8-alpine", "postgres:18-alpine"} <= real_refs),
+        ("the real docker-compose.yml pins every TestImages reference once",
+         all(len(real_pins.get(ref, set())) == 1 for ref in real_refs)),
+    ]
     failures = 0
     for name, passed in cases:
         print(f"  {'ok  ' if passed else 'FAIL'} {name}")
@@ -211,13 +308,17 @@ def selftest() -> int:
 
 
 def main() -> int:
-    """Dispatch to the self-test or to one of the two subcommands."""
+    """Dispatch to the self-test or to one of the three subcommands."""
     if sys.argv[1:] == ["--selftest"]:
         return selftest()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=["guard", "refresh-digests"])
-    parser.add_argument("--base", required=True, help="The PR's base commit.")
+    parser.add_argument("command", choices=["guard", "refresh-digests", "sync-test-images"])
+    parser.add_argument("--base", help="The PR's base commit; required by guard and refresh-digests.")
     args = parser.parse_args()
+    if args.command == "sync-test-images":
+        return sync_test_images()
+    if not args.base:
+        parser.error(f"{args.command} requires --base")
     if args.command == "guard":
         return guard(args.base)
     return refresh_digests(args.base)

@@ -1,0 +1,76 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .bank-req-row--ready {
+        box-shadow: inset 3px 0 0 var(--color-primary);
+    }
+
+    .bank-req-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .bank-req-requester {
+        display: block;
+        color: var(--color-gray-1);
+    }
+
+    .bank-req-amount {
+        display: block;
+        color: var(--color-white);
+        font-weight: var(--fw-bold);
+    }
+
+    .bank-req-route {
+        margin-top: var(--space-1);
+    }
+
+    .bank-req-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--space-2);
+    }
+
+    .bank-req-waiting,
+    .bank-req-decider {
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+        white-space: normal;
+    }
+
+    .bank-req-actions .overflow-menu:has(.overflow-menu__panel:not([hidden])) {
+        z-index: var(--z-popover-raised);
+    }
+
+    @media (768px < width <= 1024px) {
+        .bank-req-table :is(th, td) {
+            padding-inline: var(--space-3);
+        }
+
+        .bank-req-row > td:not(.cell-actions) {
+            overflow-wrap: anywhere;
+        }
+
+        .bank-req-row > td.cell-actions {
+            white-space: normal;
+        }
+
+        .bank-req-actions {
+            flex-wrap: wrap;
+        }
+    }
+
+    @media (width <= 768px) {
+        .bank-req-head {
+            gap: var(--space-1) var(--space-2);
+        }
+
+        .bank-req-actions {
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+    }
+}

@@ -1,6 +1,7 @@
 # ADR-0235 — Errors are a sealed kernel of kinds plus per-module problem codes
 
-- **Status:** Accepted — implementation pending (plan Phase 1, error-code registry in Phase 0.7)
+- **Status:** Accepted — implemented (error-code registry in Phase 0.7, 2026-10-03; the exception
+  hierarchy and the per-module enums in Phase 1, P1-12, 2026-10-04)
 - **Date:** 2026-10-01
 - **Deciders:** @greluc (owner decision D-09)
 - **Related:** [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) §5.5, §8.1 ·

@@ -879,8 +879,11 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
 
 - **The privilege boundary is a named sudo bridge, not a group.** Under rootless Podman the
   `deploy` account reaches the service user's containers through `/etc/sudoers.d/basetool-deploy`:
-  `podman *` and `systemctl --user *` as that one user, and `systemctl restart alloy.service` as root
-  — nothing else (`22-deploy-user.yml`). The Docker deployment's `docker` group, which is
+  the podman sub-commands its scripts run (`basetool_host_deploy_podman_subcommands`, kept equal to
+  the `rt_*` seam's calls by `scripts/check-deploy-podman-allowlist.py`) and `systemctl --user *` as
+  that one user, and `systemctl restart alloy.service` as root — nothing else (`22-deploy-user.yml`,
+  OPS-SEC-08). `podman run` and `exec` are among them, so the boundary is still "any code as that
+  user, never root". The Docker deployment's `docker` group, which is
   root-equivalent by design, does not exist on the production host.
 - **Systemd sandbox.** `iri-deploy.service` confines the `deploy.sh` process with
   `ProtectSystem=strict`, `ProtectHome=read-only`, `PrivateTmp`, `PrivateDevices`,
@@ -1658,7 +1661,9 @@ fail-closed, exactly as REQ-OPS-015 specifies.
   additionally keeps `contents: write` for the release itself. In `release-images.yml` both are
   declared **per job, on the signing jobs only** (`merge`, `build-config`, `build-keycloak-spi`);
   the jobs that run the project's build (`build`, `keycloak-spi-jar`) hold neither, so no build step
-  can mint a certificate under the release identity (audit item CI-SEC-04, 2026-09-22).
+  can mint a certificate under the release identity (audit item CI-SEC-04, 2026-09-22). In
+  `release-publish.yml` they sit on the `publish` job, which runs in the `main`-only `release`
+  environment; its `detect` job holds only `contents: read` and `pull-requests: read` (ADR-0201).
 - [ ] A published artifact verifies with `gh attestation verify` alone — no cosign, and no copy of
   the signer-identity regexp that `deploy.sh` and `promote.yml` must keep in sync.
 - [ ] `deploy.sh` is **unchanged**: the host-side gate remains the cosign verification of
@@ -2343,7 +2348,16 @@ that has no entry at all, before it is used.
   on 2026-09-23) and the release workflows run in the default strict mode.
   `dependency-submission.yml` alone runs lenient — it ships nothing, and its action injects an
   init-script plugin the file does not describe.
+- **The submitted graph reports what the classpaths resolve.** The submission records every
+  resolution, detached ones included, so a plugin probe that resolves without the Boot BOM reports
+  versions nothing uses. PIT's `addJUnitPlatformLauncher` probe is switched off for that reason; the
+  launcher reaches PIT through the test runtime classpath ([`dependency-pins.md`](../dependency-pins.md)).
 - **Checksums only.** PGP signatures are not verified (ADR-0208 says why and when to revisit).
+- **The CI tools outside Gradle are pinned the same way** (CI-SEC-12): pip installs read
+  `--require-hashes` requirement files under `.github/requirements/`, markdownlint-cli2 is installed
+  with `npm ci` from `.github/tools/markdownlint/package-lock.json`, and the Ansible collections are
+  exact versions. Galaxy publishes no hash a requirements file could pin, so the collections are
+  version-pinned only.
 - **`-sources.jar`, `-javadoc.jar` and the Gradle distribution's `gradle-<version>-src.zip` are
   trusted** by pattern: IDE downloads, never on a build classpath.
 - **The change that alters the graph carries the regenerated file**, produced by
@@ -2390,6 +2404,10 @@ the result onto the Dependabot branch.
   list, and its `Signed-off-by` matches the author.
 - **A digest that cannot be resolved is kept and warned about**, never dropped; the workflow never
   adds or removes a file.
+- **The test images follow the compose pins.** Each digest-pinned constant in the test-support
+  `TestImages` class (Redis, PostgreSQL) is moved to the digest `docker-compose.yml` pins for the same
+  `name:tag`, so `TestImagesTest` stays green on the bump; an image the compose file pins to two
+  digests is left alone with a warning.
 - **No `pull_request_target` or `workflow_run` trigger** is used for it.
 - **A Keycloak image bump to another minor is not completed automatically.** The follow-up does not
   touch the version catalog, so `keycloak-version` (REQ-OPS-040) stays red until a human moves the
@@ -2404,7 +2422,11 @@ the result onto the Dependabot branch.
 - [ ] A second run on the completed head commits nothing.
 - [ ] A Dependabot branch carrying a human commit or a merge commit is refused with an error naming
   the commit.
-- [x] `dependabot_compose_followup.py --selftest` passes in `repo-lint.yml` (`quadlet-drift`).
+- [x] `dependabot_compose_followup.py --selftest` passes in `repo-lint.yml` (`quadlet-drift`),
+  including the `sync-test-images` cases and the check that the real `TestImages` and
+  `docker-compose.yml` still hold the Redis and PostgreSQL pins it syncs.
+- [ ] A Redis or PostgreSQL digest bump's `basetool-release[bot]` commit also moves the matching
+  `TestImages` constant.
 
 **Enforced by:** `.github/workflows/dependabot-compose.yml` ·
 `.github/scripts/dependabot_compose_followup.py` · `.github/scripts/create_signed_commit.py` ·
@@ -2734,6 +2756,24 @@ the apps are recreated (the brief all-vhost outage of an edge recreate included)
 `scripts/check-edge-nginx.sh` (`repo-lint.yml`) · `edge-deny-probe.yml` · `scripts/deploy.sh`
 (`reconcile_edge`) · **Runbook:** `docs/deployment.md` → *The edge* · **Related:** REQ-API-021,
 REQ-SEC-037, ADR-0135, ADR-0162
+
+### REQ-OPS-043 — Only final Java features: no preview flag, no incubator module, no module import
+
+ADR-0223 decision 1: the build, the tests, the images and every launch configuration use final Java
+features only. No tracked file outside Markdown and the audit archive names `--enable-preview` or a
+`jdk.incubator` module, and no Java source in any source set carries an `import module` declaration
+(Checkstyle's `AvoidModuleImport` covers `main` only).
+
+**Acceptance**
+
+- [x] `scripts/check-final-java-only.py` reports a planted preview flag in a build script, an
+  incubator module in a Dockerfile and a module import in a test source, and passes the clean files
+  beside them (its `--selftest`).
+- [x] The check scans at least 5,000 tracked files and 3,800 Java files, so a scan that loses its
+  selection fails instead of passing.
+
+**Enforced by:** `scripts/check-final-java-only.py` (`repo-lint.yml`, `final-java-only`) ·
+**Related:** ADR-0223, REQ-OPS-038
 
 ## Open questions
 

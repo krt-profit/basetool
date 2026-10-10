@@ -66,10 +66,8 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `repository` | Spring Data JPA; fetch strategies that keep the no-N+1 rule |
 | `model` | JPA entities, `@Version`, the OrgUnit hierarchy |
 | `dto` / `mapper` | Records on the boundary, MapStruct between them and entities |
-| `support` | Cross-cutting helpers, including the `OptimisticLock` family |
 | `task` | Scheduled jobs |
-| `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), which `KeycloakService` shares |
-| `event` | Domain events, including what drives notifications and live sync |
+| `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), through its external builder that refuses non-external addresses (REQ-SEC-081); the primary builder is `KeycloakService`'s |
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
 | `filter` / `interceptor` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
 
@@ -80,18 +78,132 @@ is the source of truth for its target module and that module's rank: every class
 by the first matching rule, and a class no rule assigns fails the build
 ([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-001/002).
 
+The first module package is `audit.api`, the audit module's published interface (plan §5.3): the
+`AuditRecorder` every other module records through, and the vocabulary `AuditEventType`,
+`AuditDomain` and `AuditDetails`. Recording stays a direct call inside the business transaction
+(`MANDATORY`), never an event. The recorder's implementation `AuditService`, the `AuditEvent`
+entity, its repository, the viewer and the retention purge are the module's internals and still sit
+in the layer packages.
+
+The domain events live in their publisher's `<module>.api.events` package (plan §5.2, §5.3); there
+is no central `event` package. Every listener runs after commit (`@TransactionalEventListener`),
+so the reaction may happen later or fail on its own, and none records an audit row for the mutation
+that published the event (REQ-AUDIT-007). Thirteen modules publish today:
+
+| Package | Events |
+| --- | --- |
+| `notification.api.events` | `NotificationEvent`, the contract every notification-producing event implements, the `OrgUnitRef` it carries, `NoticeEvent`, the plain event the newer producers build from their parts, and the `ActorRef` that names who acted |
+| `identity.api.events` | `DiscordRegistrationPendingEvent`, `DiscordRegistrationDecidedEvent`, `UserApprovalDecidedEvent`, `MemberDepartedEvent` (consumed by the exchange departure) |
+| `privacy.api.events` | the three `AccountDeletionRequest…Event`s (transitional module, plan §7.6) |
+| `bank.api.events` | `BankBookingRequestEvent` and its created, updated, confirmed, rejected, cancelled and notices-reconciled records; `BankAccountResponsibleAssignedEvent`; and `BankNotices`, the factory of the approval, grant, direct-booking and holder notices (REQ-BANK-057…060) |
+| `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent`, `JobOrderClosedEvent`, and `JobOrderNotices`, the factory of the reassigned, finished, assignee and withdrawn-claim notices (REQ-ORDERS-041…044) |
+| `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent`, and `MarketNotices`, the factory of the offer-gone and request-withdrawn notices (REQ-MARKET-021, -022) |
+| `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent`, and `ExchangeNotices`, the factory of the suspended, activated, update-required, capability-removed and switched-off notices (REQ-XCH-040, -041) |
+| `mission.api.events` | `MissionNotices`, the factory of the mission notices: rescheduled, cancelled, deleted, reminder, started, checked in, participant added / removed / left, never ended, end recorded, responsibility assigned (REQ-MISSION-021…027), a unit's ship assigned or unassigned (REQ-HANGAR-005) |
+| `operation.api.events` | `OperationNotices`, the factory of the payout paid out / unmarked and operation completed notices (REQ-MISSION-028, -029) |
+| `inventory.api.events` | `InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent` and the `TransferredLot` they list (REQ-INV-055), and `InventoryNotices`, the factory of the booked-out-by-somebody-else notice (REQ-INV-056) |
+| `orgunit.api.events` | `OrgNotices`, the factory of the leadership role-mismatch and member-departed notices (REQ-ORG-029, -030) |
+| `admin.api.events` | `HangarNotices`, the factory of the hangar and blueprint notices: a deleted ship dropping out of a mission, fitted marks reset, hangar or blueprints changed by an admin (REQ-HANGAR-006…008) |
+| `refinery.api.events` | `RefineryNotices`, the factory of the order-ready, order-ready-cleared and changed-by-somebody-else notices (REQ-REFINERY-023, -024) |
+
+An event either notifies, supersedes the notices of its entity (REQ-NOTIF-018), or reconciles one notice for named members (REQ-NOTIF-023, ADR-0244). The publishing services and the listeners still sit in `service`. `OrgUnitRef` stays with the
+notification contract rather than the kernel, because it carries the org-unit module's
+`OrgUnitKind`.
+
+The Phase 1 re-homings (plan §7.3) added three more: `kernel` (handle anonymisation, the handle
+scrubber and the generic `FuzzyNameMatcher`), `orgunit.api` (`BereichLeadershipRole` and the observer SPI `MembershipChangeObserver`) and
+`orgunit.web` (the Bereich-leader and Grand-Admiral request bodies). The org chart mirrors the
+leadership ranks as that observer, inside the transaction of the rank change, so the org-unit
+services no longer know `OrgChartService`. The exchange's row records are nested in the
+repositories that produce them, the catalogue's `ShipTypeMapper` maps ship types, and
+`AuthHelperService` no longer delegates to `OwnerScopeService`: callers ask the scope API
+directly.
+
+The former `support` package is gone (plan §7.3, P1-9). Its domain-free helpers are kernel
+types (`OptimisticLock`, `StringNormalization`, `LikePatterns`, `Quality`, `RequestMemo`, `Roles`,
+`Permissions`, `ProblemResponseFactory` and its `AppProblemProperties`); the access core and the
+request settings form the `platform` module (`platform.api`: `AuthenticatedSubject`,
+`SubjectAuthentication`, `OrgUnitContextualAuthority`, `ClientAttribution`, the refused-subject
+window, the resilient Redis listener container and the shared rate-limit, role-scope and
+authorities-cache settings; `platform.internal`: the metric client list and the body limit);
+every other helper sits in `<module>.internal`, or in `<module>.api` when another module uses it
+(for example `inventory.api.InventoryAllocations`, `livesync.api.LiveSyncTopic`,
+`catalogue.api.QuantityTypeRounding`, `orgunit.api.StaffelMembershipResolver`). `mission`
+publishes one command (`MissionCommands`); its section-version counters and peer redaction are
+internal, and the mapper's viewer-access seam `MissionViewerAccess` sits beside `MissionMapper` in
+`mapper`. The helpers stay
+dependency leaves — they may use only each other, the entity model and the repositories
+(`ArchitectureTest.LEAF_HELPER_CLASSES`).
+
+Phase 2 (plan §7.4) moves whole domains out of the layer packages, each into
+`<module>.api` (what other modules use), `<module>.internal` (entities, repositories, services,
+mappers no other module needs) and `<module>.web` (controllers and their REST DTOs):
+
+| Module | `api` | `internal` | `web` |
+| --- | --- | --- | --- |
+| `dashboard` | — (publishes nothing) | `Announcement`, `AnnouncementRepository`, `AnnouncementService` | `AnnouncementController`, `AnnouncementDto`, `AnnouncementMapper` |
+| `admin` | `SystemSettings` (setting read, system flag write) | `SystemSetting`, its repository, `SystemSettingService`, `SystemSettingMapper`, the setting records, `AndroidClientProperties`, `AndroidVersionPolicyReport` | `SystemSettingController`, `AppVersionPolicyController`, `SystemController`, `AppVersionPolicyDto`, `PingResponse` |
+| `exchange` | `ActingMemberAuthorities`, `IngestGatewayProperties`, the problem codes and the two events | the relay services, gates, mirrors and feed readers, the 14 entities and 10 repositories, `ActingMemberFilter`, the change-source transaction manager, the sandbox guard, the retention tasks; the relay wire records in `internal.dto` | the eight relay controllers under `/api/v1/exchange`, the registry and bulk-undo administration, `ConnectedAppsController` |
+| `personalinventory` | `PersonalInventoryErasure` (the GDPR deletion's bulk delete) | `PersonalInventoryItem`, `PersonalInventoryLocationType`, the repository, `PersonalInventoryItemService`, the mapper and records, `UexLocationDto` | `PersonalInventoryController`, `AdminPersonalInventoryController`, `UexLocationController` |
+| `bank` | `BankConflictException`, `BankProblemCode`, `BankAmounts`, `BankBookingRequestType`, the booking-request events | the Kartellbank (entities, ledger, booking requests, audit trail, PDF formats, ledger task) and the org-unit side behind `OrgUnitBankAccessService` | the eight Kartellbank controllers, `OrgUnitBankController` |
+| `materialexchange` | the two after-commit events | the offer and request entities, repositories and DTOs, the board services, `MaterialExchangeOfferRatchet` (the Lager's `StockChangeObserver`) and `MaterialExchangeStockOfferLookup` (its `StockOfferLookup`) | `MaterialExchangeController`, `MaterialRequestController` |
+| `refinery` | `RefineryDraftBuilder` (the exchange's refinery draft), the screenshot-extract and draft records, the problem codes | `RefineryOrderService` (also the blueprint craftability's `CraftabilityYieldSource`), `RefineryImportService`, `RefineryAccessPolicy`, the live-sync authorizer, the import settings and the store requests | `RefineryOrderController`, `RefineryImportController` |
+| `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the live-sync authorizer, the integrity task, its own repositories and the request DTOs | `JobOrderController`, `MaterialClaimController`, `MaterialCollectionController`, `JobOrderItemStockController` |
+| `mission` | `MissionCommands` (`detachFromOperation`) | the mission, structure, participant, timeline and finance services, `MissionSecurityService`, `MissionAccessPolicy`, the viewer-access service, the section counters, the peer redaction, the hangar's `ShipDeletionObserver` and the catalogue's `JobTypeDesignationObserver` implementations, the live-sync authorizer, its own repositories and the request DTOs | `MissionController`, `MissionFinanceEntryController` |
+| `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
+| `promotion` | — (publishes nothing; the GDPR deletion calls `service.MemberEvaluationErasure`, which the module implements) | the entities, repositories, services, mappers and records, `PromotionAccessPolicy` | the six promotion controllers |
+
+`OrgChartService` mirrors the leadership ranks inside the transaction of the rank change. The org
+chart's DTOs stay in `internal`, because its services return them: a moved domain's `web` depends on
+its `internal`, never the reverse ([`module-boundaries.md`](../specs/module-boundaries.md),
+REQ-MOD-006).
+
+The exchange is the first module whose lower neighbours had to stop naming it: the security
+configuration takes the acting-member filter from `platform.api.ActingMemberFilterProvider`, the
+blueprint upload preview hands the exchange envelope to `service.BlueprintEnvelopeReader`, and the
+token converter, the account deletion and the blueprint source names ask
+`platform.api.ClientDirectory`; all three SPIs are implemented in `exchange.internal`. The relay
+headers are platform vocabulary (`platform.api.ActingMemberHeader`). The relay surface itself is
+frozen (D-05): `exchange-relay.openapi.json` and the wire records did not change.
+
+`operation` followed: `OperationController` in `operation.web`; the operation, finance and payout
+services, the payout-status entity and repository, the finance and payout DTOs and
+`OperationAccessPolicy` in `operation.internal`. The policy (bean `operationAccessPolicy`) is the
+first access policy taken out of the scope hub (ADR-0236): the operation endpoints, the operation
+live-sync room and the payout ledger check ask it instead of `OwnerScopeService`. Deleting an
+operation detaches its missions through the mission module's first published command,
+`mission.api.MissionCommands#detachFromOperation` (`MANDATORY`), instead of writing `Mission`
+rows itself. The `Operation` entity, its repository and mapper and the DTOs the mission module
+embeds stay in the layer packages until `Mission` references its operation by id (plan §7.5), so
+the operation's JPQL scope fragment still sits in `ScopeSpecifications`.
+
+The platform modules reach the domains only through SPIs they own and the domains implement
+(plan §5.3); Spring injects the implementations, so the platform names no domain class:
+
+| SPI (owner) | Asked for | Implemented by |
+| --- | --- | --- |
+| `audit.api.ActorHandleResolver` | the actor handle an audit row snapshots | identity (`UserActorHandleResolver`) |
+| `audit.api.RetentionParticipant` | the audit trails outside the audit module that the retention run also purges, after the activity domains | bank (`BankAuditService`) |
+| `notification.api.RoleRecipientDirectory` | global-role holders, role holders within an org unit, the catalogue spelling of a role code | identity (`UserRoleRecipientDirectory`) |
+| `notification.api.OrgUnitRecipientDirectory` | the Lead, Logistician and Mission Manager flags of an org unit | orgunit (`OrgUnitMembershipRecipientDirectory`) |
+| `notification.api.AccountRecipientDirectory` | grant holders and responsible holders of a bank account | bank, org-unit side (`OrgUnitBankRecipientDirectory`) |
+| `livesync.api.LiveSyncTopicAuthorizer` | whether the caller may join a room, through the owning module's read gate; one implementation per kind, checked at startup | mission, operation, joborder, refinery, bank (`OrgUnitBankLiveSyncTopicAuthorizer`); the member and self rooms stay with livesync |
+| `service.ActiveOrgUnitProvider` (platform) | the org unit for the `orgUnitId` MDC field | scope (`ScopeActiveOrgUnitProvider`) |
+| `platform.api.ClientDirectory` | whether a client id is a configured ingest gateway or a registered exchange client, for the bounded client label | exchange (`ExchangeClientDirectory`) |
+
 ## 5.3 Level 2 — inside `frontend`
 
 | Package | What lives there |
 | --- | --- |
 | `controller` | Thymeleaf page and fragment endpoints; AJAX mutation endpoints that return fragments; the domain-specific view shaping (`MissionDetailModelBuilder`, `BankDashboardViewAssembler`, …) |
-| `service` | `BackendApiClient` and its catalogue cache, `ParallelPageLoader`, the ingest handoff, live-sync presence, Markdown rendering |
+| `<domain>.client` | One typed backend client per domain (`AuditBackendClient`, `NotificationBackendClient`, …): a thin `@Service` over `BackendApiClient` that owns its domain's backend paths, passes every runtime value as a URI-template variable and returns typed records; a controller reaches the backend only through its domain's client (plan F3, `TypedBackendClientTest`) |
+| `service` | The backend kernel — `BackendApiClient` with its catalogue cache and URI-template verbs for every verb, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe), `CatalogueCacheEviction` (the evictions a controller triggers after an admin write) — plus `ParallelPageLoader`, the ingest handoff, live-sync presence, Markdown rendering |
 | `model` | The hand-mirrored DTO records (`model.dto`) and the form objects (`model.form`) |
 | `view` | `MoneyFormat` |
 | `websocket` | `/ws/sync`, the handler and the Redis fanout |
 | `config` | WebClient, Resilience4j, Redis session, Reactor context propagation, security, the layout model |
 | `oss` | The open-source licence report |
-| `support` / `validation` / `exception` / `health` / `logging` / `metrics` | As on the backend |
+| `support` / `validation` / `exception` / `health` / `logging` / `metrics` | Shared helpers (`Roles` among them) and the usual Spring surface |
 
 *Corrected 2026-09-29:* this table called `BackendApiClient` "the single seam" (see §4.1), placed
 view-shaping services in `service` and view models in `view`; the view shaping lives in
@@ -185,7 +297,7 @@ decisions in ADR-0216 … ADR-0221 and ADR-0224 … ADR-0228.
 | ingest | `ExchangeIdempotencyFilter` | `Idempotency-Key` on every write, answers cached per client, member and key |
 | ingest | `web.ExchangeController`, `ExchangeSchemas`, `ExchangeRelay` | Schema check of request and answer, relay under the gateway's service identity naming member, client, capabilities and installation; staging of drafts and of a held mass change (`HandoffKind.MASS_CHANGE`) for the browser |
 | backend | Registry (`ExchangeRegistryService`, `AdminExchangeRegistryController`, `ExchangeRegistryMirrorSync`, `ExchangeRegistryReconcileTask`) | `exchange_client` and the switch, `ADMIN` only; the Redis mirror written restrictive-first, reconciled every 60 s |
-| backend | `config.ActingMemberFilter`, `ExchangeGate`, `ExchangeInstallationService`, `ExchangeConnectionRetentionTask` | The acting member's reduced authentication, `@exchangeGate` re-checking every capability, installations, revocations and departures; disconnected installations and revocations deleted after 90 days (REQ-XCH-035) |
+| backend | `exchange.internal.ActingMemberFilter`, `ExchangeGate`, `ExchangeInstallationService`, `ExchangeConnectionRetentionTask` | The acting member's reduced authentication, `@exchangeGate` re-checking every capability, installations, revocations and departures; disconnected installations and revocations deleted after 90 days (REQ-XCH-035) |
 | backend | Change feed (`V252`, `ChangeSourceTransactionManager`, `ExchangeFeedReader`) | Trigger-written key log with the writer, tombstones, cursors, the 90-day retention (ADR-0224) |
 | backend | Journal (`V253`, `ExchangeJournalService`) | Every written entry before and after, 90 days |
 | backend | Write services for blueprints, stock and ships (ship links `V254`) | Plan a change set, ask `ExchangeMassChangeGuard`, write, journal each entry; `ExchangeLiveSync` after commit. Ships and blueprints are written through the hangar's and the blueprint domain's own services; stock takes the Lager's lot locks through `InventoryItemRepository` and books out through the Lager's book-out, but books in by creating the `InventoryItem` row and its audit event itself |

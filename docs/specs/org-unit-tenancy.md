@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-05.
 > **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344, #500
 
 # Multi-org-unit tenancy & scope (CRITICAL)
@@ -199,7 +199,7 @@ said the lead toggle was ADMIN-only, and the member page was admin-only in the f
 lead's right existed in the API alone. **Promotion-system maintenance** is
 re-opened to OFFICER under an org-unit-scope gate (`canEditSquadron(topic.owningSquadron.id)`).
 Admins can toggle the promotion subsystem per Squadron
-(`PATCH /api/v1/squadrons/{id}/promotion-enabled`); `OwnerScopeService.isPromotionFeatureEnabledForCurrentScope()`
+(`PATCH /api/v1/squadrons/{id}/promotion-enabled`); `PromotionAccessPolicy.isFeatureEnabledForCurrentScope()`
 short-circuits promotion services when OFF. **SKs can never participate in promotion** —
 enforced at DB (V97 CHECK + V101 trigger `guard_promotion_topic_owner_kind`), app
 (`SpecialCommand` entity), and type layer (ArchUnit
@@ -211,7 +211,7 @@ enforced at DB (V97 CHECK + V101 trigger `guard_promotion_topic_owner_kind`), ap
 > **Promotion does NOT cascade (Phase 3 / #696):** the cascade mints the flat `ROLE_LOGISTICIAN` /
 > `ROLE_MISSION_MANAGER` (mirroring the SK-lead precedent), **not** `ROLE_OFFICER`, and a non-admin
 > Bereichsleitung/OL member holds no Staffel membership (REQ-ORG-017), so `currentSquadronId()` is empty
-> → `hasPromotionReadAccess()` is `false` and the OFFICER-gated promotion-topic write paths reject them.
+> → `PromotionAccessPolicy.hasReadAccess()` is `false` and the OFFICER-gated promotion-topic write paths reject them.
 > Promotion therefore stays **squadron-OFFICER-only** (consistent with "promotion stays Squadron-only");
 > Bereich/OL never own promotion data and SKs stay permanently excluded. This fail-closed boundary is
 > deliberate — widening promotion maintenance to Bereichsleitung is out of scope and would need an
@@ -358,8 +358,9 @@ shared pools. A **non-owner** stays bound by the strict `owning_org_unit_id` sco
 
 **Enforced by:** `OwnerScopeServiceTest` (`PersonalAggregateOwnerRetainsAccessTests`),
 `InventoryTenancyE2eTest` (`ownerRetainsEditAfterLeavingOwningOrgUnit`) · **Code:**
-`OwnerScopeService#canSeeInventoryItem` / `#canEditInventoryItem` / `#canSeeShip` / `#canEditShip` /
-`#canSeeRefineryOrder` / `#canEditRefineryOrder`.
+`InventoryAccessPolicy#canSeeInventoryItem` / `#canEditInventoryItem`, `OwnerScopeService#canSeeShip` /
+`#canEditShip`, `RefineryAccessPolicy#canSeeRefineryOrder` / `#canEditRefineryOrder` (corrected
+2026-10-10: the refinery gates left the scope hub with the refinery module).
 
 ### REQ-ORG-014 — Three-tier org hierarchy (Organisationsleitung > Bereich > Staffel/SK)
 
@@ -418,7 +419,8 @@ expanded set, so lists and per-row gates widen together (ADR-0026).
 > bank's read/write split: the balance **view** and the blueprint-availability overview cascade down
 > (`cascadedOfficerReach`), while bank booking **requests** use the separate, non-cascading
 > `currentOwnLevelOversightScope()` (REQ-BANK-027). *(Updated 2026-09-22: this note used to describe
-> the oversight scope as not yet cascaded.)*
+> the oversight scope as not yet cascaded. Corrected 2026-10-10: REQ-BANK-039 replaced the own-level
+> request scope with the view gate, and the unused method left the scope hub.)*
 
 Hard invariants:
 
@@ -442,7 +444,7 @@ Hard invariants:
   only ever enlarges.
 
 > **Amended by [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md) (REQ-HANGAR-003):**
-> the hangar **unit overview** (`/hangar/squadron`, "Org-Einheitsübersicht") is the single, deliberate
+> the hangar **unit overview** (`/hangar/squadron`, the hangar tab „Org-Einheit", until 2026-10-03 the page "Org-Einheitsübersicht") is the single, deliberate
 > exception to the first hard invariant above. A non-pinned **OL member** is upgraded to
 > `adminAllScope=true` **for that one aggregation read alone** (`OwnerScopeService.currentUnitOverviewScope()`),
 > so the OL's fleet view also includes ownerless personal ships (`owningOrgUnit == null`) of
@@ -655,7 +657,7 @@ CHECKs — DB-side defence in depth) · **Issues:** #692, #695.
 ### REQ-ORG-018 — Mission owning-OrgUnit reassignment
 
 A mission's `owning_org_unit_id` is **no longer immutable after creation** (it is still create-time
-stamped per REQ-ORG-004). The mission Verwaltung tab exposes a "Verantwortliche Einheit" control that
+stamped per REQ-ORG-004). The mission edit mode (the former Verwaltung tab, REQ-MISSION-004) exposes a "Verantwortliche Einheit" control that
 re-homes an existing mission to a different OrgUnit — Staffel, Spezialkommando, Bereich or
 Organisationsleitung (REQ-ORG-016) — or to **ownerless** (`owning_org_unit_id = NULL`, the
 public-leadership form of REQ-ORG-009). The reassignment is `PUT
@@ -724,7 +726,9 @@ referenced from the code and `INDEX.md` but had no entry in any spec.)*
 
 > **Renumbered 2026-09-22:** this requirement was `REQ-ORG-021` until 2026-09-22; that id also named the single Grand Admiral at the top of the Organisationsleitung in [`org-chart.md`](org-chart.md), which keeps it.
 
-`OwnerScopeService.canSeeOperation` admits a caller either through org-unit scope (or the
+`OperationAccessPolicy.canSeeOperation` (bean `operationAccessPolicy`, the operation module's
+access policy since 2026-10-05; the scope hub's `OwnerScopeService.canSeeOperation` before) admits
+a caller either through org-unit scope (or the
 ownerless-leadership case of REQ-ORG-009) **or** through the participant escape of ADR-0006. The
 second key is **self-issuable**: `POST /api/v1/missions/{id}/join` is gated only on
 `isAuthenticated() and canSeeMission(#id)`, and `canSeeMission` is `true` for every non-internal
@@ -758,7 +762,8 @@ key* — reasoning that assumes participation is granted rather than claimed.
 - [x] A caller inside the operation's scope is unaffected on all five endpoints.
 
 **Decided by:** ADR-0150. **Enforced by:** `OperationPayoutServiceTest`
-(`summary_escapeOnlyCaller_seesOnlyTheirOwnRow`), `AccessGateService#canSeeOperationLedger`.
+(`summary_escapeOnlyCaller_seesOnlyTheirOwnRow`), `OperationAccessPolicy#canSeeOperationLedger`,
+`OperationModuleContractTest`.
 
 ### REQ-ORG-023 — The owner-picker rejection is a stable code, never English prose
 
@@ -780,8 +785,8 @@ instruction nobody can act on — it names a JSON field, not the control on the 
 **The rule:** a service-layer rejection the member can fix carries a **stable problem code**, and the
 client renders its own localized wording from that code. Concretely for this one:
 
-- The backend throws `OwnerOrgUnitRequiredException` — its own sealed `AppException` subtype, its own
-  `AppExceptionKind`, code **`OWNER_ORG_UNIT_REQUIRED`**, still `400`. A pick the caller may *not*
+- The backend throws `OwnerOrgUnitRequiredException` — a `DomainProblem` of the scope module
+  (`scope.api`), code **`OWNER_ORG_UNIT_REQUIRED`** from `ScopeProblemCode`, still `400`. A pick the caller may *not*
   make stays an `AccessDeniedException`; this code means no pick was made at all.
 - The frontend renders it **centrally**, in `krt-fetch.js`, from `window.krtOwnerPickerI18n.required`
   (bundle key `ownerPicker.error.required`, DE + EN). The failure can arrive on any of the five
@@ -835,7 +840,7 @@ entry again restores the caller's options.
 pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidden on-behalf picker),
 `InventoryOperationsE2eTest#onBehalfOwnerPickerFollowsTheChosenMember` · **Code:**
 `fragments/owner-picker.html`, `inventory-input.js`, `OrgUnitStampingService#resolveStampedOrgUnit` /
-`#resolveSquadronForPickerOutput`, `OwnerOrgUnitRequiredException`, `AppExceptionKind`,
+`#resolveSquadronForPickerOutput`, `scope/api/OwnerOrgUnitRequiredException`, `ScopeProblemCode`,
 `krt-fetch.js#ownerOrgUnitRequiredMessage`, `fragments/head.html` ·
 **Related:** REQ-ORG-016, REQ-ORG-017, REQ-API-* (RFC 7807), the i18n rule in the root `CLAUDE.md`
 

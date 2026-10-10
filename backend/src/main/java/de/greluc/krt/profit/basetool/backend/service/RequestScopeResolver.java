@@ -19,16 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.RequestMemo;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
-import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,7 +39,6 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -402,42 +401,6 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Non-cascading own-level oversight scope, used for org-unit bank booking requests
-   * (REQ-BANK-022): the officer's Staffel, the SKs an SK lead leads, the Bereichsleitung's Bereich
-   * and the OL member's Organisationsleitung, never units below them. Admins get {@link
-   * #currentScopePredicate()}.
-   *
-   * <p>A pin applies only when it names one of the caller's own-level seats.
-   *
-   * @return a never-null, non-cascaded scope vector of the caller's own-level oversight seats.
-   */
-  @NotNull
-  public ScopePredicate currentOwnLevelOversightScope() {
-    if (authHelper.isAdmin()) {
-      return currentScopePredicate();
-    }
-    Set<UUID> ownLevelOrgUnitIds = new LinkedHashSet<>();
-    List<OrgUnitMembership> memberships = currentCallerMemberships();
-    if (authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
-      for (OrgUnitMembership m : memberships) {
-        if (m.getKind() == OrgUnitKind.SQUADRON) {
-          ownLevelOrgUnitIds.add(m.getId().getOrgUnitId());
-        }
-      }
-    }
-    for (OrgUnitMembership m : memberships) {
-      if (isOversightSeat(m)) {
-        ownLevelOrgUnitIds.add(m.getId().getOrgUnitId());
-      }
-    }
-    Optional<UUID> pinned = readActiveSquadronFromHeader();
-    if (pinned.isPresent() && ownLevelOrgUnitIds.contains(pinned.get())) {
-      return new ScopePredicate(false, pinned.get(), Set.of());
-    }
-    return new ScopePredicate(false, null, ownLevelOrgUnitIds);
-  }
-
-  /**
    * Whether the membership carries a functional rank ({@link
    * MembershipRole#confersOwnLevelOversight()}) and therefore oversight over its own org unit.
    *
@@ -446,20 +409,6 @@ public class RequestScopeResolver {
    */
   private static boolean isOversightSeat(@NotNull OrgUnitMembership m) {
     return m.getRole().confersOwnLevelOversight();
-  }
-
-  /**
-   * Whether the caller holds a Bereich- or OL-level seat ({@link MembershipRole#isAreaOrOl()}),
-   * which reveals the cartel-wide special accounts on the org-unit bank page (REQ-BANK-028).
-   * Excludes officers and SK leads; admins always qualify.
-   *
-   * @return {@code true} iff the caller is an admin or holds a Bereich-/OL-level oversight seat.
-   */
-  public boolean currentUserHasAreaOrOlOversight() {
-    if (authHelper.isAdmin()) {
-      return true;
-    }
-    return currentCallerMemberships().stream().anyMatch(RequestScopeResolver::isAreaOrOlSeat);
   }
 
   /**
@@ -521,23 +470,6 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Whether the caller is a member of the given Bereich or of any of its child Staffeln and
-   * Spezialkommandos (REQ-BANK-048).
-   *
-   * @param bereichId the owning Bereich org unit; never {@code null}
-   * @return {@code true} iff the caller has any membership on the Bereich or one of its children
-   */
-  public boolean currentUserIsMemberOfAreaCascade(@NotNull UUID bereichId) {
-    List<UUID> childIds = orgUnitRepository.findChildOrgUnitIds(bereichId);
-    return currentCallerMemberships().stream()
-        .anyMatch(
-            m -> {
-              UUID ou = m.getId().getOrgUnitId();
-              return ou.equals(bereichId) || childIds.contains(ou);
-            });
-  }
-
-  /**
    * Loads the {@link Squadron} matching {@link #currentSquadronId()}, memoised per request; used to
    * stamp {@code owningSquadron} on created aggregates that have no owner of their own.
    *
@@ -573,41 +505,6 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Whether the per-squadron promotion feature flag is on for the caller's scope: the flag of the
-   * effective (pinned or home) squadron, or {@code true} when there is none.
-   *
-   * @return {@code true} when the promotion menu may be exposed for the caller.
-   */
-  public boolean isPromotionFeatureEnabledForCurrentScope() {
-    return currentSquadron().map(Squadron::isPromotionEnabled).orElse(true);
-  }
-
-  /**
-   * Whether the caller may read any promotion data: admins and non-admins with an effective home
-   * squadron. List and eligibility reads return empty otherwise.
-   *
-   * @return {@code true} for admins and for non-admins with an effective squadron.
-   */
-  public boolean hasPromotionReadAccess() {
-    return authHelper.isAdmin() || currentSquadronId().isPresent();
-  }
-
-  /**
-   * Throws {@link AccessDeniedException} when the promotion feature flag is off for the caller's
-   * scope (see {@link #isPromotionFeatureEnabledForCurrentScope()}); called before every promotion
-   * write.
-   *
-   * @throws AccessDeniedException if the flag is disabled for the caller's scope.
-   */
-  public void assertPromotionFeatureEnabled() {
-    if (!isPromotionFeatureEnabledForCurrentScope()) {
-      throw new AccessDeniedException(
-          "Promotion feature is disabled for the caller's squadron; ask an administrator to"
-              + " re-enable it.");
-    }
-  }
-
-  /**
    * Reads the active-context pin from the {@link #ACTIVE_ORG_UNIT_HEADER} request header.
    *
    * @return the parsed active OrgUnit id, or empty when the header is absent, blank or malformed.
@@ -631,7 +528,7 @@ public class RequestScopeResolver {
     }
     try {
       return Optional.of(UUID.fromString(raw.trim()));
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       return Optional.empty();
     }
   }

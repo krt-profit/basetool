@@ -12,118 +12,84 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.personSearch.title}">Personensuche</h1>
-        <p th:text="#{admin.personSearch.subtitle}">Jede Stelle finden, an der ein Name vorkommt.</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.personSearch.title})}"></th:block>
 
-    <div class="hud-box mt-2 krtm-border-color-var-color-warning-display-flex-1b12" role="note">
-        <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
-            <use href="#krt-icon-info"/></svg>
-        <p class="krtm-margin-0-2a0c" th:text="#{admin.personSearch.purpose}">Vor jeder Auskunfts-, Berichtigungs- oder L&ouml;schanfrage ausf&uuml;hren.</p>
-    </div>
+    <div class="alert alert-warning" role="note" th:text="#{admin.personSearch.purpose}">Vor jeder Auskunfts-, Berichtigungs- oder L&ouml;schanfrage ausf&uuml;hren.</div>
 
-    <form id="person-search-form" method="get" th:action="@{/admin/person-search}"
-          class="bank-filterbar mt-2 no-track">
-        <div class="bank-form-row">
-            <label for="person-search-term" th:text="#{admin.personSearch.term}">Name</label>
-            <input type="text" id="person-search-term" name="q" th:value="${term}"
-                   minlength="3" data-testid="person-search-term"
-                   th:placeholder="#{admin.personSearch.term.placeholder}">
-        </div>
-        <div class="bank-filter-actions">
-            <button type="submit" class="btn btn--cta" data-testid="person-search-submit">
+    <form id="person-search-form" method="get" th:action="@{/admin/person-search}" class="no-track">
+        <div class="toolbar">
+            <div class="toolbar__search">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-                <span th:text="#{admin.personSearch.submit}">Suchen</span>
-            </button>
+                <input type="search" id="person-search-term" name="q" th:value="${term}"
+                       minlength="3" autocomplete="off" data-testid="person-search-term"
+                       th:attr="placeholder=#{admin.personSearch.term.placeholder},aria-label=#{admin.personSearch.term}">
+            </div>
+            <button type="submit" class="btn btn--cta" data-testid="person-search-submit"
+                    th:text="#{admin.personSearch.submit}">Suchen</button>
             <a th:href="@{/admin/person-search}" class="btn btn-ghost"
                th:text="#{admin.audit.filter.reset}">Zur&uuml;cksetzen</a>
         </div>
     </form>
 
-    <div id="person-search-results" class="mt-2">
+    <div id="person-search-results" class="stack gap-3 ps-results">
     <th:block th:fragment="results">
-        <div th:if="${error}" class="hud-box krtm-border-color-var-color-danger-b169"
-             data-testid="person-search-error">
-            <p th:text="#{${error}}">Fehler.</p>
-        </div>
+        <div th:if="${error}" class="alert alert-danger" role="alert"
+             data-testid="person-search-error" th:text="#{${error}}">Fehler.</div>
 
-        <div th:if="${truncated}" class="hud-box krtm-border-color-var-color-warning-display-flex-1b12"
-             role="alert" data-testid="person-search-truncated">
-            <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
-                <use href="#krt-icon-warning"/></svg>
-            <p class="krtm-margin-0-2a0c" th:text="#{admin.personSearch.truncated}">Die Liste ist gek&uuml;rzt. Bitte den Suchbegriff eingrenzen.</p>
-        </div>
+        <div th:if="${truncated}" class="alert alert-warning" role="alert"
+             data-testid="person-search-truncated" th:text="#{admin.personSearch.truncated}">Die Liste ist gek&uuml;rzt.</div>
 
-        <div th:if="${!#lists.isEmpty(cappedColumns)}"
-             class="hud-box krtm-border-color-var-color-warning-display-flex-1b12"
+        <div th:if="${!#lists.isEmpty(cappedColumns)}" class="alert alert-warning"
              role="alert" data-testid="person-search-capped">
-            <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
-                <use href="#krt-icon-warning"/></svg>
-            <p class="krtm-margin-0-2a0c">
-                <span th:text="#{admin.personSearch.capped}">In diesen Feldern gibt es weitere Treffer, die hier nicht angezeigt werden:</span>
-                <span class="data-value" th:text="${#strings.listJoin(cappedColumns, ', ')}">tabelle.spalte</span>
-            </p>
+            <span th:text="#{admin.personSearch.capped}">In diesen Feldern gibt es weitere Treffer:</span>
+            <span class="data-value" th:text="${#strings.listJoin(cappedColumns, ', ')}">tabelle.spalte</span>
         </div>
 
-        <div class="hud-box" th:if="${searched}">
-            <p class="ps-where" data-testid="person-search-count"
+        <th:block th:if="${searched}">
+            <p class="ps-count" data-testid="person-search-count"
                th:text="#{admin.personSearch.count(${#lists.size(hits)})}">0 Treffer</p>
-            <div class="table-responsive" th:if="${!#lists.isEmpty(hits)}">
-                <table class="data-table" id="person-search-table">
-                    <thead>
-                        <tr>
-                            <th th:text="#{admin.personSearch.col.area}">Bereich</th>
-                            <th th:text="#{admin.personSearch.col.where}">Feld</th>
-                            <th th:text="#{admin.personSearch.col.snippet}">Eintrag</th>
-                            <th th:text="#{admin.personSearch.col.action}">Datensatz</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="hit : ${hits}" data-testid="person-search-row">
-                            <td>
-                                <span class="chip"
-                                      th:text="${#messages.msgOrNull('admin.personSearch.area.' + hit.area()) ?: hit.area()}">Bereich</span>
-                            </td>
-                            <td class="ps-where" th:text="${hit.table()} + '.' + ${hit.column()}">tabelle.spalte</td>
-                            <td class="ps-snippet" th:text="${hit.snippet()}">Eintrag</td>
-                            <td th:switch="${hit.linkKind()}">
-                                <a th:case="'MEMBER'" class="btn btn-ghost btn-xs"
-                                   th:href="@{/members/{id}/edit(id=${hit.rowId()})}"
-                                   th:text="#{admin.personSearch.open}">&Ouml;ffnen</a>
-                                <a th:case="'MISSION'" class="btn btn-ghost btn-xs"
-                                   th:href="@{/missions/{id}(id=${hit.rowId()})}"
-                                   th:text="#{admin.personSearch.open}">&Ouml;ffnen</a>
-                                <a th:case="'OPERATION'" class="btn btn-ghost btn-xs"
-                                   th:href="@{/operations/{id}(id=${hit.rowId()})}"
-                                   th:text="#{admin.personSearch.open}">&Ouml;ffnen</a>
-                                <a th:case="'JOB_ORDER'" class="btn btn-ghost btn-xs"
-                                   th:href="@{/orders/{id}(id=${hit.rowId()})}"
-                                   th:text="#{admin.personSearch.open}">&Ouml;ffnen</a>
-                                <a th:case="'AUDIT'" class="btn btn-ghost btn-xs"
-                                   th:href="@{/admin/audit-log}"
-                                   th:text="#{admin.personSearch.open}">&Ouml;ffnen</a>
-                                <a th:case="'BANK'" class="btn btn-ghost btn-xs"
-                                   th:href="@{/bank/manage}"
-                                   th:text="#{admin.personSearch.openArea}">Bereich &ouml;ffnen</a>
-                                <a th:case="'ORG'" class="btn btn-ghost btn-xs"
-                                   th:href="@{/admin/org-structure}"
-                                   th:text="#{admin.personSearch.openArea}">Bereich &ouml;ffnen</a>
-                                <a th:case="'MARKET'" class="btn btn-ghost btn-xs"
-                                   th:href="@{/materialboerse}"
-                                   th:text="#{admin.personSearch.openArea}">Bereich &ouml;ffnen</a>
-                                <a th:case="'INVENTORY'" class="btn btn-ghost btn-xs"
-                                   th:href="@{/inventory}"
-                                   th:text="#{admin.personSearch.openArea}">Bereich &ouml;ffnen</a>
-                                <span th:case="*" class="ps-where" aria-hidden="true">&mdash;</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="card card--flush">
+                <div class="table-responsive" th:if="${!#lists.isEmpty(hits)}">
+                    <table class="data-table data-table--stack" id="person-search-table">
+                        <thead>
+                            <tr>
+                                <th th:text="#{admin.personSearch.col.snippet}">Eintrag</th>
+                                <th th:text="#{admin.personSearch.col.where}">Feld</th>
+                                <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.personSearch.col.action}">Datensatz</span></th>
+                            </tr>
+                        </thead>
+                        <tbody th:with="linkPaths=${ {'MEMBER': '/members/{id}/edit', 'MISSION': '/missions/{id}', 'OPERATION': '/operations/{id}',
+                                         'JOB_ORDER': '/orders/{id}', 'AUDIT': '/admin/audit-log', 'BANK': '/bank/manage',
+                                         'ORG': '/admin/org-structure', 'MARKET': '/materialboerse', 'INVENTORY': '/inventory'} }">
+                            <tr th:each="hit : ${hits}" data-testid="person-search-row"
+                                th:with="areaLabel=${#messages.msgOrNull('admin.personSearch.area.' + hit.area()) ?: hit.area()},
+                                         rowPath=${hit.linkKind() == null ? null : linkPaths[hit.linkKind()]},
+                                         recordLink=${rowPath != null and #strings.contains(rowPath, '{id}')},
+                                         rowHref=${rowPath == null ? null : #strings.replace(rowPath, '{id}', #uris.escapePathSegment(hit.rowId() ?: ''))}">
+                                <td>
+                                    <a th:if="${rowPath != null}" class="row-link" data-testid="row-link"
+                                       th:href="@{${rowHref}}"
+                                       th:title="${recordLink} ? #{admin.personSearch.open} : #{admin.personSearch.openArea}">
+                                        <span class="cell-title ps-snippet" th:text="${hit.snippet()}">Eintrag</span>
+                                        <span class="cell-sub" th:text="${areaLabel}">Bereich</span>
+                                    </a>
+                                    <th:block th:if="${rowPath == null}">
+                                        <span class="cell-title ps-snippet" th:text="${hit.snippet()}">Eintrag</span>
+                                        <span class="cell-sub" th:text="${areaLabel}">Bereich</span>
+                                    </th:block>
+                                </td>
+                                <td class="ps-where" th:attr="data-label=#{admin.personSearch.col.where}"
+                                    th:text="${hit.table()} + '.' + ${hit.column()}">tabelle.spalte</td>
+                                <td class="cell-actions"><svg th:if="${rowPath != null}" class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <th:block th:if="${#lists.isEmpty(hits)}">
+                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.personSearch.empty', textKey='admin.personSearch.empty.text')}"></th:block>
+                </th:block>
             </div>
-            <p th:if="${#lists.isEmpty(hits)}" class="ps-where"
-               th:text="#{admin.personSearch.empty}">Keine Treffer.</p>
-        </div>
+        </th:block>
     </th:block>
     </div>
 </main>

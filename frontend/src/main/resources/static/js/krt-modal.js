@@ -105,8 +105,8 @@
             returnFocus.set(overlay, document.activeElement);
         }
         overlay.style.removeProperty('display');
-        overlay.classList.remove('krtm-hidden');
-        overlay.classList.add('krtm-modal-open');
+        overlay.classList.remove('is-hidden');
+        overlay.classList.add('is-open');
         if (overlay instanceof HTMLDialogElement && !overlay.open && overlay.isConnected) {
             try {
                 overlay.showModal();
@@ -128,12 +128,12 @@
             return null;
         }
         overlay.style.removeProperty('display');
-        overlay.classList.remove('krtm-modal-open');
-        overlay.classList.add('krtm-hidden');
+        overlay.classList.remove('is-open');
+        overlay.classList.add('is-hidden');
         if (overlay instanceof HTMLDialogElement && overlay.open) {
             overlay.close();
         }
-        overlay.querySelectorAll(':scope > .notification-toast').forEach(function (toast) {
+        overlay.querySelectorAll(':scope > .notification-toast').forEach((toast) => {
             document.body.appendChild(toast);
         });
         const back = returnFocus.get(overlay);
@@ -171,7 +171,7 @@
 
     document.addEventListener(
         'cancel',
-        function (event) {
+        (event) => {
             const target = event.target;
             if (
                 !(target instanceof HTMLDialogElement) ||
@@ -187,7 +187,7 @@
         true,
     );
 
-    document.addEventListener('keydown', function (event) {
+    document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape' || event.defaultPrevented) {
             return;
         }
@@ -199,7 +199,7 @@
         dismiss(top);
     });
 
-    document.addEventListener('click', function (event) {
+    document.addEventListener('click', (event) => {
         const target = event.target instanceof Element ? event.target : null;
         const dismiss = target ? target.closest('[data-modal-dismiss]') : null;
         if (dismiss) {
@@ -221,14 +221,14 @@
             } catch (_notModal) {}
         } else if (!shown && dialog.open) {
             dialog.close();
-            dialog.querySelectorAll(':scope > .notification-toast').forEach(function (toast) {
+            dialog.querySelectorAll(':scope > .notification-toast').forEach((toast) => {
                 document.body.appendChild(toast);
             });
         }
     }
 
-    new MutationObserver(function (records) {
-        records.forEach(function (record) {
+    new MutationObserver((records) => {
+        records.forEach((record) => {
             const target = record.target;
             if (
                 target instanceof HTMLDialogElement &&
@@ -245,7 +245,7 @@
 
     window.krtModal = { open, close, isOpen, topmost, layerRoot };
 
-    document.querySelectorAll('dialog.krt-modal-overlay.krtm-modal-open').forEach(function (d) {
+    document.querySelectorAll('dialog.krt-modal-overlay.is-open').forEach((d) => {
         open(d);
     });
 })();

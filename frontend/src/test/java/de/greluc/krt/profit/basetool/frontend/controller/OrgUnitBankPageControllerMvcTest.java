@@ -151,7 +151,8 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            null);
     BankAccountRefDto target =
         new BankAccountRefDto(accountId, "KB-0001", "Staffel IRIDIUM", "ORG_UNIT");
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
@@ -305,7 +306,8 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             null,
             null,
-            0L);
+            0L,
+            null);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(BALANCES_URI), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
@@ -470,13 +472,14 @@ class OrgUnitBankPageControllerMvcTest {
     PageResponse<BankBookingDto> bookings =
         new PageResponse<>(List.of(booking), 0, 20, 1L, 1, List.of());
 
-    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class)))
+    when(backendApiClient.get(
+            eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class), eq(accountId)))
         .thenReturn(settings);
-    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef(), eq(accountId)))
         .thenReturn(bookings);
   }
 
@@ -491,7 +494,7 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("org-unit-bank-account-detail"))
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
-        .andExpect(content().string(Matchers.containsString("ou-facts")))
+        .andExpect(content().string(Matchers.containsString("bank-kpis")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-target")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-history")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-settings")))
@@ -506,7 +509,8 @@ class OrgUnitBankPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
-  void orgUnitBankAccount_plainViewerNoLimits_rendersHistoryWithoutTabs() throws Exception {
+  void orgUnitBankAccount_plainViewerNoLimits_rendersHistoryAndInfoTabsWithoutSettings()
+      throws Exception {
     UUID accountId = UUID.randomUUID();
     BankAccountDto account =
         new BankAccountDto(
@@ -541,24 +545,30 @@ class OrgUnitBankPageControllerMvcTest {
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
         new OrgUnitBankAccountDetailDto(inner, true, false, false, true, false, null, false);
-    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef(), eq(accountId)))
         .thenReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0, List.of()));
 
     mockMvc
         .perform(get("/org-unit-bank/accounts/" + accountId))
         .andExpect(status().isOk())
-        .andExpect(content().string(Matchers.containsString("ou-facts")))
+        .andExpect(content().string(Matchers.containsString("bank-kpis")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-bookings-panel")))
         .andExpect(
             content()
                 .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-settings"))))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-history")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-info")))
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-info-panel\"")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-cartel-ladder")))
         .andExpect(
             content()
-                .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-history"))));
+                .string(
+                    Matchers.not(
+                        Matchers.containsString("data-testid=\"org-unit-bank-settings\""))));
   }
 
   @Test
@@ -600,17 +610,18 @@ class OrgUnitBankPageControllerMvcTest {
     OrgUnitBankAccountDetailDto detail =
         new OrgUnitBankAccountDetailDto(
             inner, true, false, false, true, false, new BigDecimal("1000000"), false);
-    String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
+    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
+    when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef(), eq(accountId)))
         .thenReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0, List.of()));
 
     mockMvc
         .perform(get("/org-unit-bank/accounts/" + accountId))
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("bank-approval-limits-display")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-tab-info")))
         .andExpect(
             content()
                 .string(Matchers.not(Matchers.containsString("org-unit-bank-detail-tab-settings"))))
@@ -788,7 +799,8 @@ class OrgUnitBankPageControllerMvcTest {
         null,
         null,
         null,
-        0L);
+        0L,
+        null);
   }
 
   /**
@@ -836,7 +848,8 @@ class OrgUnitBankPageControllerMvcTest {
         null,
         null,
         null,
-        0L);
+        0L,
+        null);
   }
 
   /**

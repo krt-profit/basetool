@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.contains;
@@ -36,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleSelector
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -221,7 +223,115 @@ class AdminNotificationRulePageControllerMvcTest {
         .andExpect(view().name("admin/notification-rules :: rules"))
         .andExpect(model().attribute("error", "admin.notificationRules.error.load"))
         .andExpect(model().attribute("rules", List.of()))
-        .andExpect(content().string(containsString("class=\"text-danger\"")));
+        .andExpect(content().string(containsString("class=\"alert alert-danger\"")))
+        .andExpect(content().string(not(containsString("data-testid=\"empty-state\""))));
+  }
+
+  /**
+   * The page renders on the list pattern: page head with the admin group as eyebrow and the rule
+   * count, the rules as a stacked data table with the enabled flag as a chip instead of a glyph,
+   * and the editor as a card rather than a HUD box.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void pageRendersTheListPattern() throws Exception {
+    stubRules();
+
+    String html =
+        mockMvc
+            .perform(get("/admin/notification-rules").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-testid=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>2<")
+        .contains("data-list-count-for=\"rules-host\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
+    assertThat(main.split("btn--cta", -1)).hasSize(2);
+    assertThat(main)
+        .doesNotContain("colspan")
+        .contains("id=\"rules-host\" class=\"card card--flush\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .contains("data-list-total=\"2\"")
+        .containsPattern("class=\"cell-title\">Buchungsantrag gestellt<")
+        .contains("class=\"cell-sub\">seeded bank rule<")
+        .contains("class=\"chip chip--success\"")
+        .contains("class=\"chip chip--muted\"")
+        .doesNotContain(">\u2713<");
+  }
+
+  /**
+   * The rule editor renders on the form pattern inside its card: three numbered sections (event,
+   * recipients, options), the selector rows under one column header with an icon remove button and
+   * a full-width add button, the two flags as switches, and the actions in a sticky bar with the
+   * one primary button; every id the editor script binds stays in place.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theRuleEditorRendersTheFormPattern() throws Exception {
+    stubRules();
+
+    String html =
+        mockMvc
+            .perform(get("/admin/notification-rules").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    String editor =
+        html.substring(
+            html.indexOf("<section class=\"card admin-rule-editor\""), html.indexOf("</main>"));
+    assertThat(editor.split("class=\"form-section\"", -1)).hasSize(4);
+    assertThat(editor.split("btn--cta", -1)).hasSize(2);
+    assertThat(editor)
+        .contains("<form id=\"rule-form\" class=\"form-layout\" data-rule-id=\"\">")
+        .contains("1 \u00b7 Ereignis</legend>")
+        .contains("2 \u00b7 Empf\u00e4nger</legend>")
+        .contains("3 \u00b7 Optionen</legend>")
+        .contains("id=\"rule-version\"")
+        .contains("id=\"rule-eventType\"")
+        .contains("id=\"rule-notificationType\"")
+        .contains("id=\"rule-description\"")
+        .containsPattern("<label class=\"switch\" for=\"rule-enabled\">")
+        .containsPattern("<label class=\"switch\" for=\"rule-excludeActor\">")
+        .contains("class=\"selector-row selector-row--head\" aria-hidden=\"true\"")
+        .contains(">Auswahl<")
+        .contains("id=\"selectors-container\"")
+        .contains("class=\"btn btn-ghost selector-add\" id=\"add-selector\"")
+        .containsPattern(
+            "class=\"form-actions--sticky\">\\s*<button type=\"button\" class=\"btn btn-ghost\""
+                + " id=\"rule-cancel\"")
+        .contains("Regel speichern")
+        .contains("id=\"selector-row-template\"")
+        .contains("data-selector-row")
+        .containsPattern("<select data-selector-kind aria-label=\"Art\">")
+        .contains("data-krt-combobox=\"remote-users\" aria-label=\"Benutzer\">")
+        .containsPattern(
+            "class=\"btn btn-quiet-danger btn-icon selector-row__remove\" data-selector-remove")
+        .doesNotContain("<h3")
+        .doesNotContain("krtm-");
+  }
+
+  /** No rule yet: the fragment carries the empty state instead of a table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void anEmptyRuleListRendersTheEmptyState() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/notification-rules"), anyTypeRef()))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/admin/notification-rules").param("fragment", "rules").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(containsString("Noch keine Regeln vorhanden.")))
+        .andExpect(content().string(not(containsString("id=\"rules-table\""))));
   }
 
   /** The rule editor is admin-only. */

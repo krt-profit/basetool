@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.support.Permissions;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +52,7 @@ public class DataInitializer {
    */
   @Bean
   public CommandLineRunner initRoles() {
-    return args -> {
+    return _ -> {
       createRoleIfNotFound(
           Roles.KRT_MEMBER,
           "KRT Member",

@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,12 +50,16 @@ class ShipMapperTest {
     ReflectionTestUtils.setField(
         userMapper,
         "staffelMembershipResolver",
-        new de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver(
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver(
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class),
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
-    mapper = new ShipMapperImpl(userMapper, Mappers.getMapper(SquadronMapper.class));
+    mapper =
+        new ShipMapperImpl(
+            userMapper,
+            Mappers.getMapper(SquadronMapper.class),
+            new ShipTypeMapperImpl(Mappers.getMapper(ManufacturerMapper.class)));
   }
 
   @Test
@@ -176,49 +179,9 @@ class ShipMapperTest {
   }
 
   @Test
-  void shipTypeToDto_shouldMapManufacturerNested() {
-    Manufacturer mfr = new Manufacturer();
-    mfr.setId(UUID.randomUUID());
-    mfr.setName("Anvil");
-
-    ShipType type = new ShipType();
-    type.setId(UUID.randomUUID());
-    type.setName("Carrack");
-    type.setManufacturer(mfr);
-    type.setScu(456);
-
-    ShipTypeDto dto = mapper.shipTypeToDto(type);
-
-    assertNotNull(dto);
-    assertEquals(type.getId(), dto.id());
-    assertEquals("Carrack", dto.name());
-    assertEquals(456, dto.scu());
-    assertNotNull(dto.manufacturer());
-    assertEquals("Anvil", dto.manufacturer().name());
-  }
-
-  @Test
-  void shipTypeToDto_sourcesDescriptionFromRichColumns_germanPreferred() {
-    ShipType german = new ShipType();
-    german.setName("Carrack");
-    german.setDescriptionDe("Deutsche Beschreibung");
-    german.setDescriptionEn("English description");
-    assertEquals("Deutsche Beschreibung", mapper.shipTypeToDto(german).description());
-  }
-
-  @Test
-  void shipTypeToDto_fallsBackToEnglishDescription_whenGermanNull() {
-    ShipType englishOnly = new ShipType();
-    englishOnly.setName("Gladius");
-    englishOnly.setDescriptionEn("English only");
-    assertEquals("English only", mapper.shipTypeToDto(englishOnly).description());
-  }
-
-  @Test
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto(null));
     assertNull(mapper.locationToDto(null));
     assertNull(mapper.manufacturerToDto(null));
-    assertNull(mapper.shipTypeToDto(null));
   }
 }

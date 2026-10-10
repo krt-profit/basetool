@@ -29,8 +29,10 @@ Beyond roles there are three mechanisms that are easy to miss:
 - **The session store is not a trust boundary** — a session value names its own class, so the
   frontend reads only classes on `SessionTypeAllowList` (REQ-SEC-067, ADR-0206). Shipped in
   `report` mode, enforced in the E2E stack; production switches to `enforce` by one `.env` value,
-  and has run `enforce` since 2026-09-25. The types the frontend can put into a session are derived
-  from its bytecode and must be admitted by that list (REQ-FE-027).
+  and has run `enforce` since 2026-09-25; `enforce` is also the code default. The types the
+  frontend can put into a session are derived from its bytecode, and the list names exactly those
+  application types, by class name — no application package is admitted by prefix (REQ-FE-027,
+  D-10, since 2026-10-04).
 - **The frontend's security checks key on what it serves, not on packages** — a committed
   route/gate snapshot pins every mapping with its effective `@PreAuthorize`, every handler carries a
   gate of its own or its class's (nine public handlers excepted), and the template `T(…)`
@@ -121,7 +123,7 @@ models, and the entity-returning ones are a list that may only shrink (`REQ-DATA
 ## 8.4 Concurrency — the landmine field
 
 Optimistic locking with `@Version`, surfaced as HTTP 409, with the **finest granularity the data
-allows** (§4.5, §6.3). The specific traps — the `support.OptimisticLock` helper family, Mission's
+allows** (§4.5, §6.3). The specific traps — the `kernel.OptimisticLock` helper family, Mission's
 manual per-section counters and their DB-enforced atomic bump, pessimistic locking for bulk
 reorders, the `…WithinTransaction` pattern, bulk updates inside loops, and the find-or-create retry
 — are enumerated in [`backend/CLAUDE.md`](../../backend/CLAUDE.md). **Read that before touching any
@@ -170,10 +172,23 @@ Two binding rules shape every UI change:
 - **Live update is binding** — every create/update/delete/toggle/reorder/filter/paginate updates
   the DOM in place via `krtFetch`, with no full-page reload on success, and on shared surfaces a
   peer's change propagates without a manual reload.
-- **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): a `fetch`
-  write outside `krtFetch` fails `:frontend:lintJs` (REQ-FE-002), and so does an HTML sink that is
-  neither escaped through `escapeHtml` / `escapeAttr` nor a server fragment inserted through
-  `krtFetch.setTrustedHtml` (REQ-FE-022, `eslint-plugin-no-unsanitized`).
+- **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): any
+  `fetch` or `XMLHttpRequest` outside the transport fails `:frontend:lintJs` — writes go through
+  `krtFetch.write` / `submitForm` (REQ-FE-002), reads through `krtFetch.get` / `getJson`, which
+  hand a lost session to the login and refuse a redirected answer (REQ-FE-031, since 2026-10-04) —
+  and so does any HTML or script sink outside the two Trusted Types helpers (REQ-FE-022, since
+  2026-10-04).
+- **Every DOM sink takes a Trusted Types policy value** (ADR-0239, 2026-10-04). Markup built in
+  script goes through the tagged-template builder `krtHtml` (policy `krt-html`, escaping every
+  interpolation) and `krtHtml.set`; a server fragment through `krtFetch.setTrustedHtml` /
+  `replaceWithTrustedHtml` / `parseTrustedDocument` (policy `krt-fragment`); a clear is
+  `replaceChildren()`. No `default` policy exists. The CSP carries `require-trusted-types-for
+  'script'; trusted-types krt-html krt-fragment`, report-only by default and enforced by
+  `APP_SECURITY_TRUSTED_TYPES=enforce`; violations reach the client-error beacon as `csp_violation`
+  (REQ-SEC-064). The dialog page walk fails on any violation. Enforcing in production is the one
+  open step, an owner-approved configuration change.
+- **The browser baseline is "Baseline 2025"**: Chrome 122, Firefox 131, Safari / iOS 18.4; the type
+  check and ESLint run at ES2025 (ADR-0239, REQ-FE-018).
 - **An ETag only where it pays** (FE-PERF-03, 2026-09-22; assets out 2026-09-23). The frontend's
   `ShallowEtagHeaderFilter` covers the web app manifest and `assetlinks.json` — publicly
   cacheable and not content-hashed. The static assets are hashed, `immutable` and revalidate by
@@ -190,11 +205,13 @@ Two binding rules shape every UI change:
   linked where its `<style>` block stood; the icon sprite stays inline by measurement (2.4 KB gzip).
   A page is 33–42 % smaller raw and about half the size gzipped (REQ-UI-023,
   `TemplateCommentHygieneTest`).
-- **Every script is deferred; an inline script runs nothing at parse time** (FE-PERF-05,
-  2026-09-23). Only `krt-client-error.js` stays synchronous and first. Page modules keep their order
-  behind the head scripts; inline page scripts run their code on `DOMContentLoaded`. A head-side
-  `krtEvents` watchdog throws into the client-error beacon when `event-delegation.js` never ran
-  (REQ-FE-023, `InlineScriptLoadOrderTest`, `ScriptLoadOrderE2eTest`).
+- **Every script is deferred; an inline script is data only** (FE-PERF-05, 2026-09-23; ADR-0069
+  finished 2026-10-04). Only `krt-client-error.js` stays synchronous and first. Page modules keep
+  their order behind the head scripts. An inline script is a `th:inline="javascript"` bootstrap of
+  literals that hands Thymeleaf values to its module; all page logic is in linted, type-checked
+  files. The one exception is the head-side `krtEvents` stub, whose watchdog throws into the
+  client-error beacon when `event-delegation.js` never ran (REQ-FE-023, `InlineScriptLoadOrderTest`,
+  `InlineScriptDataOnlyTest`, `ScriptLoadOrderE2eTest`).
 - **Only data forms arm the unsaved-changes guard** (2026-10-02). `unsaved-changes.js` warns before
   a link leaves a page with an edited form; a form marked `no-track` or with `method="get"` is a
   query and never arms it, and a submit triggered by the same edit clears it (REQ-FE-024,
@@ -214,14 +231,26 @@ Two binding rules shape every UI change:
   `AccessibleTextTintTest` fails the build on a stylesheet or script that sets one of the canonical
   hues as a text colour (REQ-UI-006).
 - **The cascade layer decides, not the load order** (FE-MOD-02, 2026-09-23). Every stylesheet
-  declares `@layer base, components, page, migration, utilities;` and keeps its rules inside its
-  layer: page CSS beats the design system without specificity bumps, a migrated inline class beats
-  both, and the two state classes win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`).
+  declares `@layer base, components, page, utilities;` and keeps its rules inside its layer: page
+  CSS beats the design system without specificity bumps, and the two state classes (`is-hidden`, the
+  dialog's `is-open`) win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`). The `migration`
+  layer went with `inline-migration.css` on 2026-10-04 (REQ-UI-027 phase 4, `NoMigrationClassTest`).
 - **One navigation chrome, rendered once** (2026-10-03). Every app page includes
   `fragments/header.html` and `fragments/sidebar.html`; the drawer is also the phone menu sheet, and
   the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it, so `sec:authorize`
   in that one template stays the only place that decides which pages a member is offered
   (REQ-UI-026, ADR-0240, `NavigationRenderMvcTest`, `NavigationE2eTest`).
+- **Work pages follow three patterns, built from fragments** (2026-10-03). A list (A), the
+  overview of the home page (B) or a form (C): one page head with at most one primary action and an
+  overflow menu, a toolbar with live filters and removable filter chips, a list table that stacks on
+  phones, a sectioned form with a sticky action bar. The markup lives in `fragments/page-head` and
+  `fragments/components`, driven by two global scripts; breakpoints are only 768, 1024 and 1440 px,
+  enforced by Stylelint (REQ-UI-027, REQ-UI-009, ADR-0242, `PagePatternFragmentsRenderTest`).
+- **Colours and stacking layers go through tokens** (2026-10-04). A colour token's value is written
+  only in its declaration on `:root` — alpha variants are `color-mix()` of the token — and every
+  page-level `z-index` is a step of the ascending `--z-*` scale beside it; every `var()` must name a
+  declared property (REQ-UI-001, ADR-0243, `ColourTokenCopyTest`, `ZIndexScaleTest`,
+  `CustomPropertyExistenceTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),
@@ -238,9 +267,13 @@ a matching log line. The per-domain typed clients the frontend gets are built ov
 **The backend clients stay in the kernel and address only the backend** (REQ-FE-029, 2026-10-03).
 `WebClientConfig` builds four clients: `webClient` and the anonymous `termsDocumentClient` carry the
 Resilience4j chain, the SSE relay's `sseWebClient` and the live-sync probe's
-`liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only
-`BackendApiClient`, the SSE relay and the probe hold one (`WebClientConfinementTest`); every other
-class calls `BackendApiClient`. The first filter of all four refuses any request whose scheme, host
+`liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only the
+kernel holds one — `BackendApiClient`, and `BackendSideChannels` for the SSE relay and the probe
+(`WebClientConfinementTest`); a controller calls its domain's typed client in
+`frontend.<domain>.client`, a thin service over `BackendApiClient` (plan F3,
+`TypedBackendClientTest`). `BackendErrorMapper` maps every failed `BackendApiClient` call in one
+exhaustive switch, and a runtime value enters a backend URI only as a template variable, for every
+verb (REQ-SEC-051, `WriteUriTemplateTest` and `ReadUriTemplateTest`). The first filter of all four refuses any request whose scheme, host
 and port differ from `app.backend-url`, before the OAuth2 filter can attach the member's bearer —
 an absolute URL handed to a client would otherwise carry the token to that host. Future
 HTTP-interface clients are created over the same `webClient` bean and take no `URI`,
@@ -262,7 +295,9 @@ the thread that holds the MDC. Each module builds its clients in one `RestClient
 `config`, ingest `relay`), wires the observation registry by hand (neither ships Boot's
 `spring-boot-restclient`), pins HTTP/1.1 and caps the response body with a
 `ResponseSizeLimitInterceptor`; a new outbound call in either module goes through those clients
-rather than a fresh `RestClient.builder()`, or it is neither observed nor bounded. In the ingest,
+rather than a fresh `RestClient.builder()`, or it is neither observed nor bounded. The backend's
+clients for third parties come from the external builder, which refuses loopback, private and
+link-local addresses and follows no redirect (REQ-SEC-081). In the ingest,
 `ConcernPackageRulesTest` fails on an outbound HTTP client outside `relay` (REQ-INGEST-014).
 
 In the ingest the exchange relay runs on `exchangeRestClient` (30 s) under its own breaker
@@ -354,15 +389,20 @@ module's `src/test/resources` and the `jar`/`bootJar` tasks fail on a jar that c
 shared test helpers in `test-support` reach no runtime classpath. And a test runs against what
 production runs where that is cheap to arrange: the Redis integration tests start the production
 image by digest (`TestImages.REDIS`, guarded against the compose file and the Quadlet unit), and
-the backend's Testcontainers PostgreSQL is one container per test JVM (`TC_DAEMON=true`).
+the backend's Testcontainers PostgreSQL is one container per test JVM (`TC_DAEMON=true`) of the
+production image by digest (`TestImages.POSTGRES`, substituted for the JDBC URL's tag by
+the backend's test `PinnedPostgresImageSubstitutor`).
 
 Backend module coupling is measured in tests too. An ArchUnit `modules()` rule over the domain map
 lets a module depend only on lower-ranked modules and its same-rank `allow` rows; today's violations
 are frozen in `backend/src/test/resources/architecture/module-baseline/` and may only shrink — a new
 edge fails, a fixed one must be removed from the committed file. Spring Modulith runs beside it in
-test scope only, with explicitly annotated module detection. **Only coupling is ever frozen;** a
+test scope only, with explicitly annotated module detection: every module package declares itself
+in its `package-info` (only the annotations are on the main compile classpath, `compileOnly`), its
+`api` package tree is its one named interface, and its allowed dependencies are derived from the
+domain map's ranks, so the two tools state one layering. **Only coupling is ever frozen;** a
 security or structural rule stays a hard rule
-([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-003…005).
+([`module-boundaries.md`](../specs/module-boundaries.md), REQ-MOD-003…006).
 
 **A quality gate never falls back to a default, and a guard never narrows in silence.** Each module
 declares its test heap, coverage floors and PIT targets in its own `build-settings.properties`, and
@@ -417,7 +457,8 @@ ADR-0221, ADR-0224 … ADR-0228; the third-party view is published from `docs/ex
 ## 8.14 Domain modules — decided, being built
 
 The backend is being cut into domain modules inside its one Gradle module (plan
-[`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md); nothing has moved yet). Five
+[`DOMAIN_MODULARISATION_PLAN.md`](../DOMAIN_MODULARISATION_PLAN.md); the first classes to move
+were the module exceptions and their problem-code enums, into `backend.<module>.api`). Five
 rules hold for every module as it lands:
 
 - **One package per domain, with a rank.** A module depends only on lower ranks or on what its

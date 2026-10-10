@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;

@@ -1,6 +1,6 @@
 # ADR-0032 — Single frontend resilience pass at the WebClient filter
 
-- **Status:** Accepted — amended 2026-10-02 (one filter chain under per-domain typed clients, see below)
+- **Status:** Accepted — amended 2026-10-02 (one filter chain under per-domain typed clients) and 2026-10-04 (the kernel extraction F1), see below
 - **Date:** 2026-06-21
 - **Deciders:** @greluc
 - **Related:** ADR-0019 (frontend reauth + single-flight refresh) · spec [`security-and-access.md`](../specs/security-and-access.md) (REQ-SEC-012) · `WebClientConfig` · `BackendApiClient` · PR #766
@@ -83,3 +83,40 @@ fresh client without the filters; client interfaces take no `java.net.URI`, `Uri
 `@CookieValue` parameter, carry no `@Cacheable` and use only relative `/api/` paths; and a filter
 on the `webClient` bean refuses any request not addressed to the backend's own host, because the
 OAuth2 filter attaches the member's token without a host check.
+
+## Amendment — 2026-10-04: the kernel extraction (plan F1)
+
+The one error mapping is now a type of its own: `BackendErrorMapper` classifies every failed call
+into one case of a sealed `Outcome` — `Problem` (an error status with its RFC 7807 `code`),
+`Reauthentication` (an unusable token, typically an expired refresh token), `CircuitOpen`,
+`BulkheadFull`, `Timeout`, `Unexpected` — and maps it in one exhaustive pattern switch to the log
+line, the `basetool_backend_client_errors_total` increment and the exception the caller sees.
+`BackendApiClient` routes every verb through it and hands it its own logger, so behaviour, log
+categories and metric labels are unchanged; a typed client of F3 inherits it by calling
+`BackendApiClient`. Every write verb has a URI-template twin, and runtime values reach a backend URI
+only as template variables (REQ-SEC-051).
+
+The named exceptions of the rules above are gone: the SSE relay and the live-sync probe keep their
+own clients without the resilience filters, but reach them through `BackendSideChannels`, a kernel
+class offering exactly those two calls. Only `WebClientConfig`, `BackendApiClient` and
+`BackendSideChannels` hold a `WebClient` (REQ-FE-029, `WebClientConfinementTest`).
+
+## Amendment — 2026-10-05: the typed clients (plan F3)
+
+Each domain gets its typed client as a thin `@Service` over `BackendApiClient`, named
+`<Domain>BackendClient` and placed in `frontend.<domain>.client`, the package plan §5.9 gives it:
+the client owns the domain's backend paths, takes typed arguments and returns typed records, and a
+controller reaches the backend only through its own domain's client. The cached catalogue reads
+stay in the kernel and the catalogue evictions after an admin write go through the kernel's
+`CatalogueCacheEviction`. No client builds or holds a `WebClient` and none caches a response, so
+the decision above holds for all of them: one resilience pass on the `webClient` bean, one error
+mapping in `BackendErrorMapper`, one metric. `TypedBackendClientTest` keeps
+`BackendApiClient` confined to the kernel and the client packages and checks the client rules
+against planted fixtures.
+
+Every verb now has a URI-template twin, `get` with a `Class` response included, and no call
+concatenates a runtime value into its URI: `ReadUriTemplateTest` covers `get` and
+`execute(…)` as `WriteUriTemplateTest` covers the writes (REQ-SEC-051). A converted call sends the
+same bytes as before: an id, number, boolean or enum name goes in as a template variable, a value
+with reserved characters (an `Instant`) keeps its `UriComponentsBuilder.queryParam` encoding,
+with only the path variable left in the template (`encode().build()`).

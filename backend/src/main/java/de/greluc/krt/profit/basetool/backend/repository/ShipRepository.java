@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
-import de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeShipRow;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
@@ -45,7 +44,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   /** A member's ships with their type and location, as the exchange reads them (REQ-XCH-017). */
   String EXCHANGE_SHIPS =
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.exchange.ExchangeShipRow(
+      SELECT new
+      de.greluc.krt.profit.basetool.backend.repository.ShipRepository$ExchangeShipRow(
       s.id, s.version, s.name, t.id, t.name, s.insurance, l.name, c.idCity, st.idSpaceStation,
       s.fitted) FROM Ship s JOIN s.shipType t LEFT JOIN s.location l LEFT JOIN l.city c
       LEFT JOIN l.spaceStation st WHERE s.owner.id = :member
@@ -124,6 +124,42 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
+   * Counts, per owner, the fitted ships {@link #resetAllFittedScoped} is about to clear
+   * (REQ-HANGAR-007).
+   *
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
+   * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @return one row per owner with at least one fitted ship in scope
+   */
+  @Query(
+      "SELECT s.owner.id AS ownerId, COUNT(s) AS shipCount FROM Ship s WHERE s.fitted = true AND "
+          + ScopeSpecifications.SHIP_SCOPE_TRIPLE
+          + " GROUP BY s.owner.id")
+  List<OwnerShipCount> countFittedByOwnerScoped(
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+
+  /** Row of {@link #countFittedByOwnerScoped}: an owner and how many of their ships it counts. */
+  interface OwnerShipCount {
+
+    /**
+     * The ships' owner.
+     *
+     * @return the owner id
+     */
+    UUID getOwnerId();
+
+    /**
+     * How many ships of the owner the query counted.
+     *
+     * @return the count, at least one
+     */
+    long getShipCount();
+  }
+
+  /**
    * Bulk-sets the location of every ship owned by {@code ownerId}, backing the hangar "set home
    * location" action.
    *
@@ -187,8 +223,10 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @return one row per ship type the owner holds, with its ship count
    */
   @Query(
-      "SELECT s.shipType.id AS shipTypeId, COUNT(s) AS shipCount FROM Ship s"
-          + " WHERE s.owner.id = :ownerId GROUP BY s.shipType.id")
+      """
+      SELECT s.shipType.id AS shipTypeId, COUNT(s) AS shipCount FROM Ship s
+      WHERE s.owner.id = :ownerId GROUP BY s.shipType.id
+      """)
   List<ShipTypeCount> countShipsPerTypeByOwnerId(@Param("ownerId") UUID ownerId);
 
   /**
@@ -236,6 +274,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param ownerId the owning user id; only this user's ships are returned
    * @param search optional case-insensitive ship-type/manufacturer name filter; {@code null}/blank
    *     returns every ship the user owns
+   * @param fitted optional fitted filter; {@code null} returns fitted and unfitted ships
    * @param pageable page and size only; the ordering lives in the query, so pass it unsorted
    * @return one ordered page of the user's ships
    */
@@ -249,6 +288,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           LEFT JOIN FETCH s.owner
           LEFT JOIN FETCH s.owningOrgUnit
           WHERE s.owner.id = :ownerId
+          AND (:fitted IS NULL OR s.fitted = :fitted)
           AND (cast(:search as string) IS NULL
           OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
           OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
@@ -271,13 +311,17 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           LEFT JOIN s.shipType st
           LEFT JOIN st.manufacturer m
           WHERE s.owner.id = :ownerId
+          AND (:fitted IS NULL OR s.fitted = :fitted)
           AND (cast(:search as string) IS NULL
           OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
           OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
           )
           """)
   Page<Ship> findByOwnerIdFiltered(
-      @Param("ownerId") UUID ownerId, @Param("search") String search, Pageable pageable);
+      @Param("ownerId") UUID ownerId,
+      @Param("search") String search,
+      @Param("fitted") Boolean fitted,
+      Pageable pageable);
 
   /**
    * Returns every ship owned by any of the given users, eagerly fetching the relations needed for
@@ -377,4 +421,31 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+
+  /**
+   * One of a member's ships as the exchange reads it in one query, with its type and location
+   * (REQ-XCH-017).
+   *
+   * @param id the ship's id
+   * @param version the ship's optimistic-lock version, or {@code null} before its first write
+   * @param name the member's name for it, or {@code null}
+   * @param shipTypeId the ship type's id
+   * @param shipTypeName the ship type's name
+   * @param insurance {@code LTI} or the insurance months as digits, or {@code null}
+   * @param locationName the location's name, or {@code null} when the ship has none
+   * @param uexCityId the UEX id of the location's city, or {@code null}
+   * @param uexSpaceStationId the UEX id of the location's space station, or {@code null}
+   * @param fitted whether the ship is fitted
+   */
+  record ExchangeShipRow(
+      UUID id,
+      Long version,
+      String name,
+      UUID shipTypeId,
+      String shipTypeName,
+      String insurance,
+      String locationName,
+      Integer uexCityId,
+      Integer uexSpaceStationId,
+      boolean fitted) {}
 }

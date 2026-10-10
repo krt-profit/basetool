@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -108,7 +110,9 @@ class CatalogSearchControllerMvcTest {
     UUID id = UUID.randomUUID();
     PageResponse<MaterialDto> page =
         new PageResponse<>(List.of(material(id, "Quantainium")), 0, 25, 1L, 1, List.of());
-    doReturn(page).when(backendApiClient).get(anyString(), any(), any(Object[].class));
+    doReturn(page)
+        .when(backendApiClient)
+        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/material-search").param("q", "quant").param("raw", "true"))
@@ -125,7 +129,10 @@ class CatalogSearchControllerMvcTest {
     PageResponse<MaterialDto> page = new PageResponse<>(List.of(), 0, 25, 0L, 0, List.of());
     doReturn(page)
         .when(backendApiClient)
-        .get(contains("jobOrderOnly={jobOrder}&rawOnly={raw}"), any(), any(Object[].class));
+        .get(
+            contains("jobOrderOnly={jobOrder}&rawOnly={raw}"),
+            any(ParameterizedTypeReference.class),
+            any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/material-search").param("q", "x").param("jobOrder", "true"))
@@ -137,7 +144,7 @@ class CatalogSearchControllerMvcTest {
   void materialSearch_backendFailure_returnsEmptyList() throws Exception {
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .get(anyString(), any(), any(Object[].class));
+        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/material-search").param("q", "x"))
@@ -151,7 +158,9 @@ class CatalogSearchControllerMvcTest {
     PageResponse<LocationReferenceDto> page =
         new PageResponse<>(
             List.of(new LocationReferenceDto(id, "Port Olisar")), 0, 25, 1L, 1, List.of());
-    doReturn(page).when(backendApiClient).get(anyString(), any(), any(Object[].class));
+    doReturn(page)
+        .when(backendApiClient)
+        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/location-search").param("q", "port"))
@@ -165,7 +174,7 @@ class CatalogSearchControllerMvcTest {
   void locationSearch_backendFailure_returnsEmptyList() throws Exception {
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .get(anyString(), any(), any(Object[].class));
+        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/location-search").param("q", "x"))
@@ -182,15 +191,20 @@ class CatalogSearchControllerMvcTest {
   @Test
   void locationSearch_requestsMoreRowsThanTheLocationPickerRenders() throws Exception {
     PageResponse<LocationReferenceDto> page = new PageResponse<>(List.of(), 0, 1, 0L, 0, List.of());
-    doReturn(page).when(backendApiClient).get(anyString(), any(), any(Object[].class));
+    doReturn(page)
+        .when(backendApiClient)
+        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
 
     mockMvc.perform(get("/catalog/location-search").param("q", "x")).andExpect(status().isOk());
 
     ArgumentCaptor<String> uri = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uri.capture(), any(), any(Object[].class));
-    assertThat(uri.getValue())
-        .as("location relay page size")
-        .contains("size=" + PickerSearch.LOCATION_PAGE_SIZE);
+    verify(backendApiClient)
+        .get(
+            uri.capture(),
+            any(ParameterizedTypeReference.class),
+            eq("x"),
+            eq(PickerSearch.LOCATION_PAGE_SIZE));
+    assertThat(uri.getValue()).as("location relay page size").contains("size={size}");
     assertThat(PickerSearch.LOCATION_PAGE_SIZE).isGreaterThan(PickerSearch.LOCATION_RENDER_CAP);
   }
 
@@ -203,15 +217,22 @@ class CatalogSearchControllerMvcTest {
   @Test
   void materialSearch_requestsMoreRowsThanTheComboboxRenders() throws Exception {
     PageResponse<MaterialDto> page = new PageResponse<>(List.of(), 0, 1, 0L, 0, List.of());
-    doReturn(page).when(backendApiClient).get(anyString(), any(), any(Object[].class));
+    doReturn(page)
+        .when(backendApiClient)
+        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
 
     mockMvc.perform(get("/catalog/material-search").param("q", "x")).andExpect(status().isOk());
 
     ArgumentCaptor<String> uri = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uri.capture(), any(), any(Object[].class));
-    assertThat(uri.getValue())
-        .as("material relay page size")
-        .contains("size=" + PickerSearch.PAGE_SIZE);
+    verify(backendApiClient)
+        .get(
+            uri.capture(),
+            any(ParameterizedTypeReference.class),
+            eq("x"),
+            eq(false),
+            eq(false),
+            eq(PickerSearch.PAGE_SIZE));
+    assertThat(uri.getValue()).as("material relay page size").contains("size={size}");
     assertThat(PickerSearch.PAGE_SIZE).isGreaterThan(PickerSearch.RENDER_CAP);
   }
 }

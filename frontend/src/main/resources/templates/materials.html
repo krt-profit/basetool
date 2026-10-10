@@ -12,51 +12,56 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box flex-between">
-        <h1 th:text="#{nav.materials.list}">Materialien</h1>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.materials', titleText=#{nav.materials.list},
+        count=${materials != null ? #lists.size(materials) : null}, countId='materials-count')}"></th:block>
 
-    <div class="hud-box mt-2">
-        <div th:if="${error}" class="hud-box hud-box-error">
-            <p th:text="#{__${error}__}">Fehler</p>
-        </div>
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
 
-        <div class="form-group krtm-position-relative-a8a9">
-            <input type="text" id="materialFilter" th:placeholder="#{filter.material.placeholder}" data-trigger="materials-filter" autocomplete="off">
+    <div class="toolbar">
+        <div class="toolbar__search">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+            <input type="search" id="materialFilter" data-trigger="materials-filter" autocomplete="off"
+                   data-testid="toolbar-search"
+                   th:attr="placeholder=#{filter.material.placeholder},aria-label=#{filter.material}">
             <datalist id="materialNames-data">
                 <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
             </datalist>
         </div>
-
-        <div class="materials-grouping-toggle">
+        <label class="switch" data-testid="materials-group-switch">
             <input type="checkbox" id="groupByCategory" data-trigger="materials-toggle-grouping" checked>
-            <label for="groupByCategory" th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</label>
-        </div>
+            <span class="switch__track" aria-hidden="true"></span>
+            <span th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</span>
+        </label>
+    </div>
 
-        <div id="materialsGrouped">
-            <div th:each="entry : ${materialsByKind}" class="kind-group mt-1-5">
-                <div class="hud-box kind-header krtm-cursor-pointer-display-flex-justify-content-d016" data-trigger="materials-toggle-kind">
-                    <h2 class="krtm-margin-0-font-family-var-font-headline-font-d92f" th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kategorie Name</h2>
-                    <span class="toggle-icon krtm-color-var-color-primary-font-weight-bold-fon-b57e">+</span>
-                </div>
+    <div id="materialsGrouped" class="stack gap-3">
+        <section th:each="entry, kind : ${materialsByKind}" class="kind-group"
+                 th:with="kindId=${'materials-kind-' + kind.index}">
+            <h2 class="kind-head">
+                <button type="button" class="kind-toggle" data-trigger="materials-toggle-kind"
+                        aria-expanded="false" th:aria-controls="${kindId}">
+                    <svg class="krt-icon kind-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                    <span class="kind-name" th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kategorie Name</span>
+                    <span class="chip chip--muted kind-count" th:text="${#lists.size(entry.value)}">3</span>
+                </button>
+            </h2>
 
-                <div class="grid-auto-cards materialsGrid krtm-margin-top-1rem-display-none-c750">
-                    <th:block th:each="mat : ${entry.value}">
-                        <div th:replace="~{fragments/material-card :: materialCard(${mat})}"></div>
-                    </th:block>
-                </div>
+            <div class="grid-auto-cards materialsGrid" th:id="${kindId}" hidden>
+                <th:block th:each="mat : ${entry.value}">
+                    <div th:replace="~{fragments/material-card :: materialCard(${mat})}"></div>
+                </th:block>
             </div>
-        </div>
+        </section>
+    </div>
 
-        <div id="materialsFlat" class="grid-auto-cards mt-1-5 krtm-display-none-5790">
-            <th:block th:each="mat : ${materials}">
-                <div th:replace="~{fragments/material-card :: materialCard(${mat})}"></div>
-            </th:block>
-        </div>
+    <div id="materialsFlat" class="grid-auto-cards" hidden>
+        <th:block th:each="mat : ${materials}">
+            <div th:replace="~{fragments/material-card :: materialCard(${mat})}"></div>
+        </th:block>
+    </div>
 
-        <div id="noResultsMsg" class="krtm-display-none-text-align-center-color-var-col-4c56" th:text="#{materials.list.noResults}">
-            Keine Materialien gefunden.
-        </div>
+    <div id="noResultsMsg" class="card card--flush" th:hidden="${materials != null and !materials.isEmpty()}">
+        <th:block th:replace="~{fragments/components :: emptyState(titleKey='materials.list.noResults', textKey='materials.list.noResults.text')}"></th:block>
     </div>
 </main>
 

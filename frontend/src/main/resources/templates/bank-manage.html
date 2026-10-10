@@ -4,6 +4,7 @@
     <title th:text="#{bank.manage.title} + ' - ' + ${appTitle}">Bank-Verwaltung - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/bank-manage.css}">
     </th:block>
 </head>
 <body>
@@ -12,31 +13,24 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available}">
-    <div class="greeting hud-box flex-between">
-        <div>
-            <h1 th:text="#{bank.manage.title}">Bank-Verwaltung</h1>
-            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
-               th:text="#{bank.manage.subtitle}">Konten-Lebenszyklus und Halter-Registry der Kartellbank.</p>
-        </div>
-        <div class="bank-head-actions">
-            <a th:href="@{/bank}" class="btn btn-ghost" data-testid="bank-back-link"
-               th:text="#{bank.manage.back}">Zur Bank</a>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', eyebrowHref=@{/bank}, titleText=#{bank.manage.title}, actions=~{::bank-manage-actions})}">
+        <th:block th:ref="bank-manage-actions">
+            <button type="button" class="btn btn-ghost" th:if="${activeTab == 'halter' and management}"
+                    data-trigger="open-modal-display" data-modal-id="bank-register-holder-modal"
+                    data-testid="bank-register-holder-open" th:text="#{bank.manage.holder.register}">+ Halter registrieren</button>
+            <button type="button" class="btn btn--cta" th:if="${activeTab == 'halter'}"
+                    data-trigger="open-modal-display" data-modal-id="bank-holder-transfer-modal"
+                    data-testid="bank-holder-transfer-open" th:text="#{bank.manage.holder.transfer}">+ Umbuchung</button>
             <button type="button" class="btn btn--cta" th:if="${activeTab == 'konten'}"
                     data-trigger="open-modal-display" data-modal-id="bank-create-account-modal"
                     data-testid="bank-create-account-open"
                     th:text="${management} ? #{bank.manage.account.create} : #{bank.manage.account.createSpecial}">+ Konto anlegen</button>
-            <button type="button" class="btn btn--cta" th:if="${activeTab == 'halter'}"
-                    data-trigger="open-modal-display" data-modal-id="bank-holder-transfer-modal"
-                    data-testid="bank-holder-transfer-open" th:text="#{bank.manage.holder.transfer}">+ Umbuchung</button>
-            <button type="button" class="btn btn--cta" th:if="${activeTab == 'halter' and management}"
-                    data-trigger="open-modal-display" data-modal-id="bank-register-holder-modal"
-                    data-testid="bank-register-holder-open" th:text="#{bank.manage.holder.register}">+ Halter registrieren</button>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <div id="bank-manage-results">
     <th:block th:fragment="manageBody">
-    <div class="tab-nav mt-2" role="tablist">
+    <div class="tab-nav" role="tablist">
         <a th:href="@{/bank/manage(tab='halter')}" class="tab" role="tab"
            th:classappend="${activeTab == 'halter'} ? ' active' : ''"
            th:aria-selected="${activeTab == 'halter'}" data-testid="bank-tab-holders">
@@ -56,175 +50,211 @@
         </a>
     </div>
 
-    <div class="bank-panel mt-2" th:if="${activeTab == 'krt-freigaben' and management}"
-         data-testid="bank-krt-approvals-panel">
-        <div class="bank-panel-body">
-            <h2 class="sub-h" th:text="#{bank.manage.krt.title}">KRT-Konto Freigabe-Stufen</h2>
-            <p class="text-muted" th:text="#{bank.manage.krt.hint}">
-                Lege die zwei Schwellen fest, ab denen Auszahlungen und Transfers vom KRT-Konto durch die
-                Bankleitung bzw. die Organisationsleitung freigegeben werden m&uuml;ssen. Bis zur
-                ersten Schwelle gibt ein Bankmitarbeiter selbst frei.</p>
+    <section class="card bank-tiers" th:if="${activeTab == 'krt-freigaben' and management}"
+             data-testid="bank-krt-approvals-panel"
+             th:with="t1=${cartelAccount != null ? cartelAccount.employeeApprovalCeiling() : null},t2=${cartelAccount != null ? cartelAccount.areaLeadApprovalCeiling() : null}">
+        <h2 class="bank-tiers__title" th:text="#{bank.manage.krt.question}">Wer gibt Auszahlungen vom KRT-Konto frei?</h2>
+        <p class="bank-tiers__lead" th:text="#{bank.manage.krt.lead}">Zwei Schwellen teilen die Betr&auml;ge in drei Stufen. Trage die Betr&auml;ge ein.</p>
 
-            <div th:if="${cartelAccount == null}" class="bank-empty" data-testid="bank-krt-approvals-empty"
-                 th:text="#{bank.manage.krt.noAccount}">Es existiert noch kein KRT-Konto.</div>
+        <th:block th:if="${cartelAccount == null}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.manage.krt.noAccount.title', textKey='bank.manage.krt.noAccount', emptyId='bank-krt-approvals-empty')}"></th:block>
+        </th:block>
 
-            <form th:if="${cartelAccount != null}" class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
-                  data-endpoint="/api/proxy/bank/accounts/{id}/approval-tiers" data-method="PATCH"
-                  data-testid="bank-krt-approvals-form">
-                <input type="hidden" name="_id" th:value="${cartelAccount.id()}">
-                <input type="hidden" name="version" th:value="${cartelAccount.version()}">
+        <form th:if="${cartelAccount != null}" class="bank-ajax-form no-track bank-tiers__form" data-refresh="manageBody" data-livesync="bank/manage,grid"
+              data-endpoint="/api/proxy/bank/accounts/{id}/approval-tiers" data-method="PATCH"
+              data-testid="bank-krt-approvals-form" data-bank-tiers
+              th:attr="data-label-none=#{bank.cartelLadder.none},data-label-above=#{bank.cartelLadder.above},data-label-up-to=#{bank.manage.krt.upTo('{0}')},data-label-no-ol=#{bank.manage.krt.noOl}">
+            <input type="hidden" name="_id" th:value="${cartelAccount.id()}">
+            <input type="hidden" name="version" th:value="${cartelAccount.version()}">
+
+            <div class="bank-tiers__bar" data-testid="bank-krt-tier-bar">
+                <div class="bank-tiers__seg bank-tiers__seg--employee">
+                    <span class="bank-tiers__name" th:text="#{bank.cartelLadder.tier.employee}">Bankmitarbeiter</span>
+                    <span class="bank-tiers__range" data-tier-range="employee"
+                          th:text="${t1 != null} ? #{bank.manage.krt.upTo(${#numbers.formatInteger(@moneyFormat.round(t1), 1, 'POINT')})} : #{bank.cartelLadder.none}">bis 250.000</span>
+                </div>
+                <div class="bank-tiers__seg bank-tiers__seg--management">
+                    <span class="bank-tiers__name" th:text="#{bank.cartelLadder.tier.bankManagement}">Bankleitung</span>
+                    <span class="bank-tiers__range" data-tier-range="management"
+                          th:text="${t2 != null} ? #{bank.manage.krt.upTo(${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'POINT')})} : #{bank.cartelLadder.above}">bis 2.000.000</span>
+                </div>
+                <div class="bank-tiers__seg bank-tiers__seg--ol">
+                    <span class="bank-tiers__name" th:text="#{bank.cartelLadder.tier.ol}">Organisationsleitung</span>
+                    <span class="bank-tiers__range" data-tier-range="ol"
+                          th:text="${t2 != null} ? #{bank.cartelLadder.above} : #{bank.manage.krt.noOl}">dar&uuml;ber</span>
+                </div>
+            </div>
+            <div class="bank-tiers__scale" aria-hidden="true">
+                <span>0</span>
+                <span data-tier-mark="t1" th:text="${t1 != null} ? ${#numbers.formatInteger(@moneyFormat.round(t1), 1, 'POINT')} : '0'">250.000</span>
+                <span data-tier-mark="t2" th:text="${t2 != null} ? ${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'POINT')} : '&#8734;'">2.000.000</span>
+            </div>
+
+            <div class="bank-tiers__fields">
                 <div class="bank-form-row">
-                    <label for="bank-krt-t1" th:text="#{bank.manage.krt.employeeCeiling}">Bankmitarbeiter bis (aUEC)</label>
+                    <label for="bank-krt-t1" th:text="#{bank.manage.krt.employeeCeiling}">Bankmitarbeiter gibt frei bis (aUEC)</label>
                     <input type="number" id="bank-krt-t1" name="employeeCeiling" min="0" step="1"
-                           inputmode="numeric" data-testid="bank-krt-t1"
-                           th:value="${cartelAccount.employeeApprovalCeiling() != null ? cartelAccount.employeeApprovalCeiling().toBigInteger() : ''}"
+                           inputmode="numeric" data-testid="bank-krt-t1" data-tier-input="t1"
+                           th:value="${t1 != null ? t1.toBigInteger() : ''}"
                            th:placeholder="#{bank.manage.krt.ceiling.placeholder}">
                     <span class="bank-field-hint" th:text="#{bank.manage.krt.employeeCeiling.hint}">Bis zu diesem Betrag gibt ein Bankmitarbeiter selbst frei; leer lassen = keine Selbstfreigabe.</span>
                     <span class="bank-field-error" data-error-for="employeeCeiling"></span>
                 </div>
                 <div class="bank-form-row">
-                    <label for="bank-krt-t2" th:text="#{bank.manage.krt.areaLeadCeiling}">Bankleitung bis (aUEC)</label>
+                    <label for="bank-krt-t2" th:text="#{bank.manage.krt.areaLeadCeiling}">Bankleitung gibt frei bis (aUEC)</label>
                     <input type="number" id="bank-krt-t2" name="areaLeadCeiling" min="0" step="1"
-                           inputmode="numeric" data-testid="bank-krt-t2"
-                           th:value="${cartelAccount.areaLeadApprovalCeiling() != null ? cartelAccount.areaLeadApprovalCeiling().toBigInteger() : ''}"
+                           inputmode="numeric" data-testid="bank-krt-t2" data-tier-input="t2"
+                           th:value="${t2 != null ? t2.toBigInteger() : ''}"
                            th:placeholder="#{bank.manage.krt.ceiling.placeholder}">
                     <span class="bank-field-hint" th:text="#{bank.manage.krt.areaLeadCeiling.hint}">Bis zu diesem Betrag gibt die Bankleitung frei; dar&uuml;ber die Organisationsleitung. Leer lassen = keine OL-Stufe.</span>
                     <span class="bank-field-error" data-error-for="areaLeadCeiling"></span>
                 </div>
-                <span class="bank-field-error" data-error-for="_global"></span>
-                <div class="mt-2">
+                <div class="bank-tiers__submit">
                     <button type="submit" class="btn btn--cta" data-testid="bank-krt-approvals-save"
-                            th:text="#{bank.manage.krt.save}">Speichern</button>
+                            th:text="#{bank.manage.krt.saveTiers}">Schwellen speichern</button>
                 </div>
-            </form>
-        </div>
+            </div>
+            <span class="bank-field-error" data-error-for="_global"></span>
+
+            <div class="alert alert-info bank-tiers__example" data-testid="bank-krt-example"
+                 th:attr="data-template=#{bank.manage.krt.example('{0}')},data-template-ol=#{bank.manage.krt.exampleOl('{0}')}">
+                <span data-tier-example th:text="#{bank.manage.krt.example(${t1 != null ? #numbers.formatInteger(@moneyFormat.round(t1), 1, 'POINT') : '0'})}">Beispiel: Eine Auszahlung &uuml;ber 250.000 aUEC braucht die Freigabe der Bankleitung.</span>
+                <span data-tier-example-ol th:text="${t2 != null} ? #{bank.manage.krt.exampleOl(${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'POINT')})} : ''">&Uuml;ber 2.000.000 aUEC gibt die Organisationsleitung frei.</span>
+            </div>
+        </form>
+    </section>
+
+    <div class="card card--flush" th:if="${activeTab == 'konten'}" data-testid="bank-accounts-panel">
+        <table class="data-table data-table--stack" th:if="${!#lists.isEmpty(accounts)}">
+            <thead>
+            <tr>
+                <th th:text="#{bank.manage.account.name}">Name</th>
+                <th th:text="#{bank.manage.account.ref}">Org-Einheit / Bereich</th>
+                <th class="num" th:text="#{bank.manage.account.balance}">Saldo</th>
+                <th class="cell-status" th:text="#{bank.manage.account.status}">Status</th>
+                <th class="cell-actions"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="a : ${accounts}" data-testid="bank-account-row"
+                th:attr="data-account-no=${a.accountNo()}">
+                <td>
+                    <a class="row-link" data-testid="row-link" th:href="@{'/bank/accounts/' + ${a.id()}}">
+                        <span class="cell-title" th:text="${a.name()}">Staffel IRIDIUM</span>
+                        <span class="cell-sub" th:text="${a.accountNo()} + ' &middot; ' + #{'bank.account.type.' + ${a.type()}}">KB-0001 &middot; Org-Einheit</span>
+                    </a>
+                </td>
+                <td th:attr="data-label=#{bank.manage.account.ref}"
+                    th:text="${a.orgUnit() != null ? a.orgUnit().name() : (a.areaName() != null ? a.areaName() : '—')}">IRIDIUM</td>
+                <td class="num"
+                    th:text="${#numbers.formatInteger(@moneyFormat.round(a.balance()), 1, 'POINT')}">1.850.000</td>
+                <td class="cell-status">
+                    <span class="status-pill"
+                          th:classappend="${a.status() == 'ACTIVE'} ? ' status-active' : ' status-completed'"
+                          th:text="#{'bank.account.status.' + ${a.status()}}">Aktiv</span>
+                </td>
+                <td class="cell-actions">
+                    <div class="bank-manage-row-actions">
+                        <th:block th:if="${management}">
+                            <th:block th:replace="~{fragments/components :: overflowMenu(id=${'bank-acc-more-' + a.id()}, items=~{::bank-acc-more-items})}">
+                                <th:block th:ref="bank-acc-more-items">
+                                    <button type="button" class="overflow-menu__item" role="menuitem"
+                                            data-trigger="open-modal-display" data-modal-id="bank-rename-modal"
+                                            th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-name=${a.name()}"
+                                            data-testid="bank-rename-open" th:text="#{bank.manage.account.rename}">Umbenennen</button>
+                                    <button type="button" class="overflow-menu__item" role="menuitem"
+                                            data-trigger="open-modal-display" data-modal-id="bank-target-modal"
+                                            th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-target=${a.balanceTarget() != null ? a.balanceTarget().toBigInteger() : ''}"
+                                            data-testid="bank-target-open" th:text="#{bank.manage.account.target}">Zielkontostand</button>
+                                    <button type="button" class="overflow-menu__item" role="menuitem"
+                                            th:if="${a.status() == 'CLOSED'}"
+                                            data-trigger="open-modal-display" data-modal-id="bank-reopen-modal"
+                                            th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
+                                            data-testid="bank-reopen-open" th:text="#{bank.manage.account.reopen}">Wieder&ouml;ffnen</button>
+                                    <div class="overflow-menu__sep" role="separator" th:if="${a.status() == 'ACTIVE'}"></div>
+                                    <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                                            th:if="${a.status() == 'ACTIVE' and a.balance().signum() == 0}"
+                                            data-trigger="open-modal-display" data-modal-id="bank-close-modal"
+                                            th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
+                                            data-testid="bank-close-open" th:text="#{bank.manage.account.close} + ' &hellip;'">Schlie&szlig;en &hellip;</button>
+                                    <button type="button" class="overflow-menu__item" role="menuitem" disabled aria-disabled="true"
+                                            th:if="${a.status() == 'ACTIVE' and a.balance().signum() != 0}"
+                                            th:title="#{bank.manage.account.close.blocked}"
+                                            data-testid="bank-close-blocked" th:text="#{bank.manage.account.close}">Schlie&szlig;en</button>
+                                </th:block>
+                            </th:block>
+                        </th:block>
+                        <svg class="krt-icon row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        <th:block th:if="${#lists.isEmpty(accounts)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.manage.accounts.empty.title', textKey='bank.manage.accounts.empty', emptyId='bank-accounts-empty')}"></th:block>
+        </th:block>
+        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${accountsPage}, baseUrl=${accountsPaginationBaseUrl})}"></th:block>
+        <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${accountsPage}, baseUrl=${accountsPaginationBaseUrl}, sizes=${pageSizes})}"></nav>
     </div>
 
-    <div class="bank-panel mt-2" th:if="${activeTab == 'konten'}" data-testid="bank-accounts-panel">
-        <div class="bank-panel-body">
-            <div class="table-responsive" th:if="${!#lists.isEmpty(accounts)}">
-                <table class="data-table">
-                    <thead>
-                    <tr>
-                        <th th:text="#{bank.manage.account.no}">Nr.</th>
-                        <th th:text="#{bank.manage.account.name}">Name</th>
-                        <th th:text="#{bank.manage.account.type}">Typ</th>
-                        <th th:text="#{bank.manage.account.ref}">Org-Einheit / Bereich</th>
-                        <th class="text-right" th:text="#{bank.manage.account.balance}">Saldo</th>
-                        <th th:text="#{bank.manage.account.status}">Status</th>
-                        <th class="text-right" th:text="#{general.actions}">Aktionen</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="a : ${accounts}" data-testid="bank-account-row"
-                        th:attr="data-account-no=${a.accountNo()}">
-                        <td><a th:href="@{'/bank/accounts/' + ${a.id()}}" th:text="${a.accountNo()}">KB-0001</a></td>
-                        <td th:text="${a.name()}">Staffel IRIDIUM</td>
-                        <td><span class="chip krtm-font-size-0-55rem-eff3"
-                                  th:text="#{'bank.account.type.' + ${a.type()}}">Staffel</span></td>
-                        <td th:text="${a.orgUnit() != null ? a.orgUnit().name() : (a.areaName() != null ? a.areaName() : '—')}">IRIDIUM</td>
-                        <td class="text-right"
-                            th:text="${#numbers.formatInteger(@moneyFormat.round(a.balance()), 1, 'POINT')}">1.850.000</td>
-                        <td>
-                            <span class="status-pill"
-                                  th:classappend="${a.status() == 'ACTIVE'} ? ' status-active' : ' status-completed'"
-                                  th:text="#{'bank.account.status.' + ${a.status()}}">Aktiv</span>
-                        </td>
-                        <td class="text-right">
+    <div class="card card--flush" th:if="${activeTab == 'halter'}" data-testid="bank-holders-panel">
+        <div class="table-responsive" th:if="${!#lists.isEmpty(holders)}">
+            <table class="data-table data-table--stack">
+                <thead>
+                <tr>
+                    <th th:text="#{bank.manage.holder.handle}">Handle</th>
+                    <th th:text="#{bank.manage.holder.source}">Typ</th>
+                    <th class="num" th:text="#{bank.manage.holder.total}">H&auml;lt gesamt</th>
+                    <th class="cell-status" th:text="#{bank.manage.holder.status}">Status</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="h : ${holders}" data-testid="bank-holder-registry-row"
+                    th:with="canViewHolder=${management or (h.userId() != null and selfUserId != null and h.userId().toString().equals(selfUserId))}"
+                    th:attr="data-holder-handle=${h.handle()}">
+                    <td>
+                        <a th:if="${canViewHolder}" class="row-link" th:href="@{'/bank/holders/' + ${h.id()}}"
+                           data-testid="bank-holder-history-link">
+                            <span class="cell-title" th:text="${@handles.display(h.handle())}">greluc</span>
+                        </a>
+                        <span th:unless="${canViewHolder}" class="cell-title" th:text="${@handles.display(h.handle())}">greluc</span>
+                    </td>
+                    <td th:attr="data-label=#{bank.manage.holder.source}">
+                        <span class="chip chip--muted"
+                              th:text="${h.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
+                    </td>
+                    <td class="num" th:attr="data-label=#{bank.manage.holder.total}"
+                        th:text="${#numbers.formatInteger(@moneyFormat.round(h.totalHeld()), 1, 'POINT')}">1.000.000</td>
+                    <td class="cell-status">
+                        <span class="status-pill"
+                              th:classappend="${h.active()} ? ' status-active' : ' status-completed'"
+                              th:text="${h.active()} ? #{bank.holder.status.active} : #{bank.holder.status.inactive}">Aktiv</span>
+                    </td>
+                    <td class="cell-actions">
+                        <div class="bank-manage-row-actions">
                             <th:block th:if="${management}">
-                            <button type="button" class="btn btn-ghost btn-sm"
-                                    data-trigger="open-modal-display" data-modal-id="bank-rename-modal"
-                                    th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-name=${a.name()}"
-                                    data-testid="bank-rename-open" th:text="#{bank.manage.account.rename}">Umbenennen</button>
-                            <button type="button" class="btn btn-ghost btn-sm"
-                                    data-trigger="open-modal-display" data-modal-id="bank-target-modal"
-                                    th:attr="data-field-_id=${a.id()},data-field-version=${a.version()},data-field-target=${a.balanceTarget() != null ? a.balanceTarget().toBigInteger() : ''}"
-                                    data-testid="bank-target-open" th:text="#{bank.manage.account.target}">Zielkontostand</button>
-                            <button type="button" class="btn btn-ghost btn-sm"
-                                    th:if="${a.status() == 'ACTIVE' and a.balance().signum() == 0}"
-                                    data-trigger="open-modal-display" data-modal-id="bank-close-modal"
-                                    th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
-                                    data-testid="bank-close-open" th:text="#{bank.manage.account.close}">Schlie&szlig;en</button>
-                            <button type="button" class="btn btn-ghost btn-sm" disabled
-                                    th:if="${a.status() == 'ACTIVE' and a.balance().signum() != 0}"
-                                    th:title="#{bank.manage.account.close.blocked}"
-                                    data-testid="bank-close-blocked" th:text="#{bank.manage.account.close}">Schlie&szlig;en</button>
-                            <button type="button" class="btn btn-ghost btn-sm"
-                                    th:if="${a.status() == 'CLOSED'}"
-                                    data-trigger="open-modal-display" data-modal-id="bank-reopen-modal"
-                                    th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
-                                    data-testid="bank-reopen-open" th:text="#{bank.manage.account.reopen}">Wieder&ouml;ffnen</button>
+                                <button type="button" class="btn btn-quiet-danger btn-xs" th:if="${h.active()}"
+                                        data-trigger="open-modal-display" data-modal-id="bank-holder-deactivate-modal"
+                                        th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
+                                        data-testid="bank-holder-deactivate-open"
+                                        th:text="#{bank.manage.holder.deactivate}">Deaktivieren</button>
+                                <button type="button" class="btn btn-ghost btn-xs" th:unless="${h.active()}"
+                                        data-trigger="open-modal-display" data-modal-id="bank-holder-reactivate-modal"
+                                        th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
+                                        data-testid="bank-holder-reactivate-open"
+                                        th:text="#{bank.manage.holder.reactivate}">Reaktivieren</button>
                             </th:block>
-                            <span class="text-muted krtm-font-size-0-7rem-3921" th:unless="${management}">&mdash;</span>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-            <p class="text-center text-muted" th:if="${#lists.isEmpty(accounts)}"
-               data-testid="bank-accounts-empty" th:text="#{bank.manage.accounts.empty}">Noch keine Konten angelegt.</p>
-            <div class="pagination-controls"
-                 th:if="${accountsPage != null and accountsPage.totalElements() > 0}">
-                <nav th:replace="~{fragments/pagination :: pageSizePicker(${accountsPage}, ${accountsPaginationBaseUrl}, ${pageSizes})}"></nav>
-                <nav th:replace="~{fragments/pagination :: pagination(${accountsPage}, ${accountsPaginationBaseUrl})}"></nav>
-            </div>
+                            <svg th:if="${canViewHolder}" class="krt-icon row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
         </div>
-    </div>
-
-    <div class="bank-panel mt-2" th:if="${activeTab == 'halter'}" data-testid="bank-holders-panel">
-        <div class="bank-panel-body">
-            <div class="table-responsive" th:if="${!#lists.isEmpty(holders)}">
-                <table class="data-table">
-                    <thead>
-                    <tr>
-                        <th th:text="#{bank.manage.holder.handle}">Handle</th>
-                        <th th:text="#{bank.manage.holder.status}">Status</th>
-                        <th class="text-right" th:text="#{bank.manage.holder.total}">H&auml;lt gesamt</th>
-                        <th th:text="#{bank.manage.holder.source}">Typ</th>
-                        <th class="text-right" th:text="#{general.actions}">Aktionen</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="h : ${holders}" data-testid="bank-holder-registry-row"
-                        th:attr="data-holder-handle=${h.handle()}">
-                        <td th:with="canViewHolder=${management or (h.userId() != null and selfUserId != null and h.userId().toString().equals(selfUserId))}">
-                            <a th:if="${canViewHolder}" th:href="@{'/bank/holders/' + ${h.id()}}"
-                               th:text="${@handles.display(h.handle())}" data-testid="bank-holder-history-link">greluc</a>
-                            <span th:unless="${canViewHolder}" th:text="${@handles.display(h.handle())}">greluc</span>
-                        </td>
-                        <td>
-                            <span class="status-pill"
-                                  th:classappend="${h.active()} ? ' status-active' : ' status-completed'"
-                                  th:text="${h.active()} ? #{bank.holder.status.active} : #{bank.holder.status.inactive}">Aktiv</span>
-                        </td>
-                        <td class="text-right"
-                            th:text="${#numbers.formatInteger(@moneyFormat.round(h.totalHeld()), 1, 'POINT')}">1.000.000</td>
-                        <td>
-                            <span class="chip krtm-font-size-0-55rem-eff3"
-                                  th:text="${h.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
-                        </td>
-                        <td class="text-right">
-                            <th:block th:if="${management}">
-                            <button type="button" class="btn btn-ghost btn-sm" th:if="${h.active()}"
-                                    data-trigger="open-modal-display" data-modal-id="bank-holder-deactivate-modal"
-                                    th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
-                                    data-testid="bank-holder-deactivate-open"
-                                    th:text="#{bank.manage.holder.deactivate}">Deaktivieren</button>
-                            <button type="button" class="btn btn-ghost btn-sm" th:unless="${h.active()}"
-                                    data-trigger="open-modal-display" data-modal-id="bank-holder-reactivate-modal"
-                                    th:attr="data-field-_id=${h.id()},data-field-version=${h.version()}"
-                                    data-testid="bank-holder-reactivate-open"
-                                    th:text="#{bank.manage.holder.reactivate}">Reaktivieren</button>
-                            </th:block>
-                            <span class="text-muted krtm-font-size-0-7rem-3921" th:unless="${management}">&mdash;</span>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-            <p class="text-center text-muted" th:if="${#lists.isEmpty(holders)}"
-               data-testid="bank-holders-empty" th:text="#{bank.manage.holders.empty}">Noch keine Halter registriert.</p>
-        </div>
+        <th:block th:if="${#lists.isEmpty(holders)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.manage.holders.empty.title', textKey='bank.manage.holders.empty', emptyId='bank-holders-empty')}"></th:block>
+        </th:block>
     </div>
     </th:block>
     </div>
@@ -484,18 +514,6 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:attr="nonce=${cspNonce}">
-    function bindBankManageSwaps() {
-        if (window.krtFetch) {
-            window.krtFetch.bindSwap({
-                container: '#bank-manage-results',
-                fragmentValue: 'manageBody',
-                history: true
-            });
-        }
-    }
-    document.addEventListener('DOMContentLoaded', bindBankManageSwaps);
-    document.addEventListener('krt:swapped', bindBankManageSwaps);
-</script>
+<script th:src="@{/js/bank-manage.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

@@ -25,6 +25,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificationPublisher;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -58,6 +61,7 @@ class MissionEinsatzleiterConstraintTest {
   @Mock private JobTypeRepository jobTypeRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private AuditService auditService;
+  @Mock private MissionNotificationPublisher notificationPublisher;
   @InjectMocks private MissionParticipantService missionParticipantService;
 
   private UUID missionId;

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.SyncReportMapper;
 import de.greluc.krt.profit.basetool.backend.model.ExternalSyncReport;
 import de.greluc.krt.profit.basetool.backend.model.SyncSourceSystem;
@@ -26,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.SyncReportDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SyncReportPurgeResultDto;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -132,7 +132,7 @@ public class SyncReportController {
     }
     try {
       return SyncSourceSystem.valueOf(source.trim().toUpperCase(Locale.ROOT));
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

@@ -22,12 +22,20 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
+import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.*;
-import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -44,9 +52,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.client.ResourceAccessException;
 
 /**
@@ -67,21 +77,22 @@ class UserDeletionServiceTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private MaterialClaimRepository materialClaimRepository;
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
   @Mock private KeycloakService keycloakService;
-  @Mock private PersonalInventoryItemRepository personalInventoryItemRepository;
+  @Mock private PersonalInventoryErasure personalInventoryErasure;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
   @Mock private NotificationRepository notificationRepository;
   @Mock private NotificationRuleRepository notificationRuleRepository;
-  @Mock private MemberEvaluationRepository memberEvaluationRepository;
+  @Mock private MemberEvaluationErasure memberEvaluationErasure;
 
   @Mock private UserService userService;
 
-  @Mock
-  private ObjectProvider<OrgUnitBankResponsibilityService> orgUnitBankResponsibilityServiceProvider;
+  @Mock private ObjectProvider<ResponsibleHolderTracker> responsibleHolderTrackerProvider;
 
-  @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
+  @Mock private ResponsibleHolderTracker responsibleHolderTracker;
+
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   /** The gateway allowlist a test may extend; the properties record reads it by reference. */
   private final List<String> gatewayClientIds = new ArrayList<>();
@@ -91,8 +102,9 @@ class UserDeletionServiceTest {
    * exercise the member path (ADR-0129).
    */
   @Spy
-  private final IngestGatewayProperties ingestGatewayProperties =
-      new IngestGatewayProperties(gatewayClientIds);
+  private final ClientDirectory clientDirectory =
+      new ExchangeClientDirectory(
+          new IngestGatewayProperties(gatewayClientIds), Mockito.mock(KnownExchangeClients.class));
 
   @InjectMocks private UserDeletionService userDeletionService;
 
@@ -115,10 +127,10 @@ class UserDeletionServiceTest {
     admin.setInKeycloak(true);
 
     lenient()
-        .when(orgUnitBankResponsibilityServiceProvider.getObject())
-        .thenReturn(orgUnitBankResponsibilityService);
+        .when(responsibleHolderTrackerProvider.getObject())
+        .thenReturn(responsibleHolderTracker);
     lenient()
-        .when(orgUnitBankResponsibilityService.snapshotResponsibleHoldersForUser(any()))
+        .when(responsibleHolderTracker.snapshotResponsibleHoldersForUser(any()))
         .thenReturn(Map.of());
   }
 
@@ -133,11 +145,11 @@ class UserDeletionServiceTest {
     purge.verify(offerRatchet).beforeUserPurge(userId);
     purge.verify(inventoryItemRepository).deleteByUserId(userId);
     verify(shipRepository).deleteByOwnerId(userId);
-    verify(personalInventoryItemRepository).deleteByOwnerUserId(userId);
+    verify(personalInventoryErasure).deleteAllItemsOf(userId);
     verify(personalBlueprintRepository).deleteAllByOwnerUserId(userId);
     verify(notificationRepository).deleteAllForRecipient(userId);
     verify(notificationRuleRepository).deleteSelectorsByUserId(userId);
-    verify(memberEvaluationRepository).deleteAllByUserId(userId);
+    verify(memberEvaluationErasure).deleteAllEvaluationsOf(userId);
     verify(refineryOrderRepository).updateOwner(user, admin);
     verify(missionRepository).updateOwner(user, admin);
     verify(missionOwnershipRepository).updateOwner(user, admin);
@@ -301,7 +313,7 @@ class UserDeletionServiceTest {
 
     verify(userRepository, never()).delete(any());
     verify(inventoryItemRepository, never()).deleteByUserId(any());
-    verify(personalInventoryItemRepository, never()).deleteByOwnerUserId(any());
+    verify(personalInventoryErasure, never()).deleteAllItemsOf(any());
   }
 
   @Test
@@ -320,6 +332,41 @@ class UserDeletionServiceTest {
             eq(AuditEventType.PERSONAL_DATA_PURGED_ON_USER_DELETION), any(), any(), any(), any());
     verify(auditService, never())
         .record(eq(AuditEventType.REFINERY_ORDERS_REASSIGNED), any(), any(), any(), any());
+  }
+
+  @Test
+  void deleteUser_ofAPendingRegistration_clearsTheAdminsPendingNotices() {
+    user.setApprovalStatus(ApprovalStatus.PENDING);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+
+    userDeletionService.deleteUser(
+        userId, UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+
+    verify(eventPublisher).publishEvent(new DiscordRegistrationDecidedEvent(userId, null));
+    verify(userRepository).delete(user);
+  }
+
+  @Test
+  void deleteUser_ofAnActiveMember_publishesNoRegistrationEvent() {
+    user.setApprovalStatus(ApprovalStatus.ACTIVE);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+
+    userDeletionService.deleteUser(userId);
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
+  @Test
+  void deleteUser_refusedWhileInKeycloak_publishesNothing() {
+    user.setApprovalStatus(ApprovalStatus.PENDING);
+    user.setInKeycloak(true);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    assertThrows(BadRequestException.class, () -> userDeletionService.deleteUser(userId));
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
   }
 
   @Test

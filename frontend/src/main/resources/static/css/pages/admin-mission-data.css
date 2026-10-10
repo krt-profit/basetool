@@ -1,16 +1,13 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
-    .data-section {
-        margin-bottom: 3rem;
-    }
     .form-group label {
         display: block;
         margin-bottom: 0.5rem;
         font-family: var(--font-body);
         font-size: 0.8rem;
     }
-    .form-group input:where(:not([type='checkbox']):not([type='radio'])),
+    .form-group input:where(:not([type='checkbox'], [type='radio'])),
     .form-group select,
     .form-group textarea {
         width: 100%;
@@ -20,5 +17,66 @@
         color: var(--color-gray-1);
         font-family: var(--font-body);
         box-sizing: border-box;
+    }
+    .form-group .md-check {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0;
+    }
+    .md-kind-list {
+        display: flex;
+        flex-direction: column;
+    }
+    .md-kind-row {
+        width: 100%;
+        min-height: 44px;
+        color: var(--color-gray-1);
+        background: transparent;
+        border: 0;
+        border-bottom: var(--border-hairline);
+        font: inherit;
+        text-align: left;
+    }
+    .md-kind-row:last-child {
+        border-bottom: 0;
+    }
+    .md-panes {
+        min-width: 0;
+    }
+    .md-box {
+        min-width: 0;
+        padding: 0;
+    }
+    .md-box[hidden] {
+        display: none;
+    }
+    .md-box__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: var(--border-hairline);
+    }
+    .md-filter {
+        margin: 0;
+    }
+    .md-row--inactive td:not(.cell-actions) {
+        opacity: 0.6;
+    }
+    .md-desc {
+        max-width: 40rem;
+        word-break: normal;
+        overflow-wrap: anywhere;
+    }
+    .md-inline-form {
+        display: inline-block;
+        margin: 0;
+    }
+    .draggable-row {
+        cursor: grab;
     }
 }

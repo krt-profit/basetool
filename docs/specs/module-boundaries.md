@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
-> **Owner area:** MOD · **Related ADRs:** none yet (plan step 0.1 records the module ADRs)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-05.
+> **Owner area:** MOD · **Related ADRs:** ADR-0231, ADR-0233
 
 # Backend module boundaries
 
@@ -36,10 +36,13 @@ assigns every top-level backend production type to exactly one module. It is lin
 A nested, local or anonymous class belongs to its top-level class, and a generated MapStruct
 `XMapperImpl` to the `@Mapper` type `XMapper` it implements. The rules are a faithful port of the
 audit's classification (`docs/archive/domain-modularisation-audit-2026-09/scripts/10-backend-domains-classify.py`)
-with the behaviour-free re-homings of plan §7.3 applied (leadership into `orgunit`, the access core
-into `platform`, the scope kernel into `scope`, the 31 GDPR classes into `privacy`,
+with the behaviour-free re-homings of plan §7.3 applied (the leadership writes into `orgunit` and
+the Leitung view into `orgchart` — corrected 2026-10-04, the view was first mapped to `orgunit` —,
+the access core into `platform`, the scope kernel into `scope`, the 31 GDPR classes into `privacy`,
 `HandleAnonymisation` into `kernel`, `PayoutPreference` into `identity`, the composition root into
-`app`). Changing a class's target module is a reviewed edit of this file.
+`app`). Changing a class's target module is a reviewed edit of this file. Once a module's package
+exists, a `package` rule assigns its tree (for example `audit`, `kernel`, `orgunit`) and the
+`class` rules of the classes that moved into it are removed.
 
 **Acceptance**
 
@@ -115,7 +118,23 @@ sealed `AppException` (ArchUnit does not import a `PermittedSubclasses` attribut
 and nine types that appear only in the descriptor of a called member or in an inlined constant,
 while ArchUnit additionally sees one annotation class value (`@Mapper(uses = SquadronMapper.class)`
 in `UserMapper`) and the two `kernel → platform` edges of `AppException` and `AppExceptionKind` to
-`ErrorDisclosurePolicy`, which the plan's count left out as same-rank edges.
+`ErrorDisclosurePolicy`, which the plan's count left out as same-rank edges. Those two left on
+2026-10-04, when the domain map assigned `ErrorDisclosurePolicy` to the kernel with the rest of the
+exception contract (ADR-0235): **136 edges**.
+
+Shrunk the same day to **127 class edges in 37 module pairs** by the Phase 1 re-homings of plan
+§7.3: the exchange row records nested in the repositories that produce them (−5), the catalogue
+`ShipTypeMapper` (−1), the org chart behind the org-unit module's `MembershipChangeObserver` (−2)
+and `AuthHelperService` without its delegations to `OwnerScopeService` (−1).
+
+After the platform SPIs (plan §7.3, P1-8, 2026-10-04): **112 class edges in 30 module pairs**.
+
+After the `support` split (plan §7.3, P1-9, 2026-10-04): **110 class edges in 29 module pairs**.
+`ClientAttribution` asks the platform's `ClientDirectory` SPI, which the exchange implements,
+instead of reading `IngestGatewayProperties` and `KnownExchangeClients` itself (−2, the
+`platform -> exchange` pair). The split moved `RequestMemo`, `Roles`, `Permissions`,
+`ProblemResponseFactory` and `AppProblemProperties` from `platform` to `kernel`; that added no
+edge, since every module may depend on either.
 
 **Acceptance**
 
@@ -133,12 +152,14 @@ Spring Modulith 2.1.1 (`spring-modulith-core` and `spring-modulith-docs`, Apache
 which it was not compiled (it declares 1.4.2). Module detection is `explicitly-annotated`
 (`spring.modulith.detection-strategy` in the backend's `application-test.yml`): only a package whose
 `package-info` carries `@ApplicationModule` is a Modulith module. `ModularityTest` asserts that the
-detected module set equals the declared list — empty today, because no domain package exists yet —
-and that `ApplicationModules.verify()` passes. The `Documenter` output is written to
-`backend/build/spring-modulith-docs` and is not committed while no module is declared.
+detected module set equals its declared list (REQ-MOD-006) and that `ApplicationModules.verify()`
+passes. The `Documenter` output is written to `backend/build/spring-modulith-docs` and is not
+committed.
 
-Nothing of Spring Modulith reaches the backend's `runtimeClasspath`, its image or its SBOM. Its
-event publication registry is not used (plan §10).
+The annotation types come from `spring-modulith-api`, a `compileOnly` dependency of the backend's
+main source set (ADR-0233 amendment 1); the engine (`core`, `docs`) stays `testImplementation`.
+Nothing of Spring Modulith reaches the backend's `runtimeClasspath`, its boot jar, its image or its
+SBOM. Its event publication registry is not used (plan §10).
 
 **Acceptance**
 
@@ -147,14 +168,70 @@ event publication registry is not used (plan §10).
       `internal` package, is reported by `detectViolations()` and fails `verify()`; an unannotated
       sibling package is not detected as a module.
 - [x] `:backend:dependencies --configuration runtimeClasspath` lists no Spring Modulith, Structurizr
-      or ArchUnit artefact.
+      or ArchUnit artefact, and the boot jar holds no `spring-modulith-*` jar.
 
 **Enforced by:** `ModularityTest`
 
+### REQ-MOD-006 — Every module package declares itself, its `api` and its allowed dependencies
+
+A first-level backend package named after a module of the domain map is a module package, and it is
+declared in the same pull request that creates it (plan §5.2, §5.7, step P1-13):
+
+- its `package-info` carries `@ApplicationModule` — closed, never `OPEN`;
+- its `api` package and **every package below `api`** carry `@NamedInterface("api")`; Spring
+  Modulith merges them into the module's one named interface, because a package-level
+  `@NamedInterface` covers its own package only. Everything outside `api` is internal to the
+  module;
+- its `allowedDependencies` lists exactly the `<module>::api` of every **declared** module the domain
+  map lets it depend on (lower rank, or an `allow` row): `audit` and `notification` (rank 1) allow
+  nothing. The list is derived, not chosen: a module that becomes declared enters the lists of the
+  modules above it in the same pull request, since Spring Modulith rejects an allowed dependency on
+  an undeclared module.
+
+A module without an `api` package keeps all its types in its base package, which is its unnamed
+interface: `kernel` today. A module that publishes nothing yet keeps every type below its base
+package and outside an `api` package, so it exposes no type at all; no declaration allows it,
+and Spring Modulith reports any module that reaches into it: `dashboard`, `operation` and
+`orgchart` today, which no other module uses. Its dependents allow it by bare name (`"kernel"`, not
+`"kernel::api"`), it publishes no named interface, and no type lies below its base package. A
+module that may depend on no declared module says so with `allowedDependencies = {}`: the
+annotation's default is Spring Modulith's "everything allowed" sentinel, not an empty list.
+
+Declared on `main`: `admin`, `audit`, `bank`, `catalogue`, `dashboard`, `exchange`, `identity`,
+`inventory`, `joborder`, `kernel`, `livesync`, `materialexchange`, `mission`, `notification`,
+`operation`, `orgchart`, `orgunit`, `personalinventory`, `platform`, `privacy`, `promotion`,
+`refinery`, `scope` (floor 23). `mission` publishes `mission.api.MissionCommands`, its first
+command (`detachFromOperation`, plan §5.3). `bank.api` carries `BankAmounts` and `BankBookingRequestType`, which its
+events and its conflict exception expose.
+Every `<module>.web` and `<module>.internal` package is internal to its module.
+
+A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
+services, so `web` depends on `internal` and never the other way: the layers inside a module stay
+acyclic (ADR-0047) until the module API returns its own records (plan §5.2). `orgchart`, `admin`,
+`personalinventory`, `promotion`, `exchange`, `materialexchange`, `refinery`, `joborder` and `mission` are laid out this way; the exchange's frozen relay
+wire records sit in `exchange.internal.dto`.
+
+**Acceptance**
+
+- [x] The module packages found in the compiled backend equal `ModularityTest.DECLARED_MODULES`,
+      which equals the detected Modulith modules, with a floor of 23.
+- [x] Each declared module's only named interface is `api`, and it contains every top-level type
+      of the module's `api` package tree and nothing outside it — except `kernel`, whose types all
+      lie in its base package, and a module that publishes nothing, which has no named interface
+      and no type in its base package or an `api` package (a check run against the kernel proves
+      it fails).
+- [x] Each declaration's `allowedDependencies` equals the set the domain map derives.
+- [x] A planted fixture shaped like a backend module proves that a module reaching past another's
+      `api` into its `internal` package, and a module depending on an `api` its declaration does not
+      allow, are both reported and fail `verify()`, while a module using the `api` and a
+      sub-package of it annotated into the same interface is not reported.
+
+**Enforced by:** `ModularityTest` · **Fixture:** `architecturefixture.modulithapi`
+
 ## Out of scope
 
-- Moving classes into module packages, named interfaces and `@ApplicationModule(allowedDependencies
-  = …)` declarations — the later phases of the plan.
+- Moving classes into module packages — the later phases of the plan; each move adds its module's
+  declarations under REQ-MOD-006.
 - The re-keyed security and structural ArchUnit rules (G-01) and the other guards of plan §6.1.
 - Table ownership and native SQL across modules (G-10).
 

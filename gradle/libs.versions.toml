@@ -5,6 +5,7 @@ spring-dependency-management = { id = "io.spring.dependency-management", version
 cyclonedx-bom = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
 spotbugs-base = { id = "com.github.spotbugs-base", version.ref = "spotbugs" }
 pitest = { id = "info.solidsoft.pitest", version.ref = "pitest" }
+errorprone = { id = "net.ltgt.errorprone", version.ref = "errorpronePlugin" }
 node-gradle = { id = "com.github.node-gradle.node", version.ref = "nodeGradle" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owaspDependencycheck" }
@@ -19,15 +20,15 @@ springDependencyManagement = "1.1.7"
 cyclonedx = "3.4.1"
 licensee = "1.14.1"
 testcontainers = "2.0.5"
-flyway = "13.8.0"
+flyway = "13.9.0"
 mapstruct = "1.6.3"
 resilience4j = "2.4.0"
-bucket4j = "8.20.0"
+bucket4j = "8.21.0"
 semver4j = "6.0.0"
 logstashLogback = "9.0"
 archunit = "1.5.1"
 springModulith = "2.1.1"
-jsonSchemaValidator = "3.0.7"
+jsonSchemaValidator = "3.0.8"
 springdocOpenapi = "3.1.1"
 okhttp3 = "5.5.0"
 playwright = "1.63.0"
@@ -43,6 +44,9 @@ nodeGradle = "7.1.0"
 spotless = "8.10.3"
 owaspDependencycheck = "13.0.0"
 findsecbugs = "1.14.0"
+errorprone = "2.50.0"
+errorpronePlugin = "5.1.1"
+nullaway = "0.14.2"
 checkstyle = "14.3.0"
 googleJavaFormat = "1.36.1"
 node = "24.21.0"
@@ -53,10 +57,10 @@ mockito = "5.24.0"
 protobuf3 = "3.25.9"
 handlebars = "4.5.5"
 plexusUtils = "3.6.1"
-commonsLang3 = "3.20.0"
-jackson2 = "2.21.7"
+commonsLang3 = "3.21.0"
+jackson2 = "2.22.3"
 jackson2Plugins = "2.22.3"
-jackson3 = "3.1.7"
+jackson3 = "3.2.3"
 
 [libraries]
 
@@ -73,6 +77,7 @@ bucket4j-core = { module = "com.bucket4j:bucket4j_jdk17-core", version.ref = "bu
 semver4j-core = { module = "org.semver4j:semver4j", version.ref = "semver4j" }
 logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-encoder", version.ref = "logstashLogback" }
 archunit-core = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
+spring-modulith-api = { module = "org.springframework.modulith:spring-modulith-api", version.ref = "springModulith" }
 spring-modulith-core = { module = "org.springframework.modulith:spring-modulith-core", version.ref = "springModulith" }
 spring-modulith-docs = { module = "org.springframework.modulith:spring-modulith-docs", version.ref = "springModulith" }
 json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "jsonSchemaValidator" }
@@ -86,6 +91,8 @@ lombok-mapstruct-binding = { module = "org.projectlombok:lombok-mapstruct-bindin
 openpdf-core = { module = "com.github.librepdf:openpdf", version.ref = "openpdf" }
 commonmark-core = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
 findsecbugs-plugin = { module = "com.h3xstream.findsecbugs:findsecbugs-plugin", version.ref = "findsecbugs" }
+errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
+nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
 checkstyle = { module = "com.puppycrawl.tools:checkstyle", version.ref = "checkstyle" }
 google-java-format = { module = "com.google.googlejavaformat:google-java-format", version.ref = "googleJavaFormat" }
 pitest-junit5-plugin = { module = "org.pitest:pitest-junit5-plugin", version.ref = "pitestJunit5" }

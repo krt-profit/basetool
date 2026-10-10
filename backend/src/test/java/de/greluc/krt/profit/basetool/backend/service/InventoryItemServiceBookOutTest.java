@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -26,17 +27,25 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
+import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
@@ -47,21 +56,21 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -74,6 +83,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -94,13 +104,14 @@ class InventoryItemServiceBookOutTest {
   @Mock private MissionRepository missionRepository;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
-  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockOfferLookup stockOfferLookup;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
 
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService service;
 
   private static final UUID ITEM_ID = UUID.randomUUID();
@@ -281,7 +292,7 @@ class InventoryItemServiceBookOutTest {
 
       verify(inventoryItemRepository, org.mockito.Mockito.times(1))
           .saveAndFlush(any(InventoryItem.class));
-      verify(offerRatchet).lower(ITEM_ID, 9.0, MaterialExchangeOfferRatchet.Reason.CHECKOUT);
+      verify(offerRatchet).lower(ITEM_ID, 9.0, StockChangeReason.CHECKOUT);
     }
   }
 
@@ -400,7 +411,7 @@ class InventoryItemServiceBookOutTest {
                       newDto(1.0, OWNER_ID, LOCATION_ID, CheckoutType.TRANSFER, null, null, 1L),
                       OWNER_ID,
                       false));
-      assert ex.getMessage().toLowerCase().contains("change");
+      assertEquals("error.inventory.transfer.unchanged", ex.getMessage());
     }
 
     @Test
@@ -455,7 +466,7 @@ class InventoryItemServiceBookOutTest {
       assertSame(item, source, "the flushed row is the original source");
       assertSame(targetUser, newItem.getUser());
       verify(inventoryItemRepository, never()).delete(any());
-      verify(offerRatchet).lower(ITEM_ID, 7.0, MaterialExchangeOfferRatchet.Reason.TRANSFER);
+      verify(offerRatchet).lower(ITEM_ID, 7.0, StockChangeReason.TRANSFER);
     }
 
     @Test
@@ -476,8 +487,7 @@ class InventoryItemServiceBookOutTest {
           OWNER_ID,
           false);
 
-      verify(offerRatchet)
-          .beforeDelete(List.of(ITEM_ID), MaterialExchangeOfferRatchet.Reason.TRANSFER);
+      verify(offerRatchet).beforeDelete(List.of(ITEM_ID), StockChangeReason.TRANSFER);
       verify(inventoryItemRepository).delete(item);
       verify(inventoryItemRepository, org.mockito.Mockito.times(1)).save(any(InventoryItem.class));
     }
@@ -902,8 +912,7 @@ class InventoryItemServiceBookOutTest {
               false);
 
       assertNull(result, "full discard returns null");
-      verify(offerRatchet)
-          .beforeDelete(List.of(ITEM_ID), MaterialExchangeOfferRatchet.Reason.CHECKOUT);
+      verify(offerRatchet).beforeDelete(List.of(ITEM_ID), StockChangeReason.CHECKOUT);
       verify(inventoryItemRepository).delete(item);
       verify(inventoryItemRepository, never()).save(any());
     }
@@ -1014,6 +1023,190 @@ class InventoryItemServiceBookOutTest {
               any(),
               eq(targetUserId),
               any());
+    }
+  }
+
+  @Nested
+  class TransferNotificationTests {
+
+    private User member(UUID id, String name) {
+      User user = new User();
+      user.setId(id);
+      user.setUsername(name);
+      return user;
+    }
+
+    private List<Object> publishedEvents() {
+      ArgumentCaptor<Object> events = ArgumentCaptor.forClass(Object.class);
+      verify(eventPublisher, atLeast(0)).publishEvent(events.capture());
+      return events.getAllValues();
+    }
+
+    private void stubTransfer(InventoryItem item, User target) {
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(userRepository.findById(target.getId())).thenReturn(Optional.of(target));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void ownersTransferToAnotherMember_announcesTheNewOwnerOnly() {
+      User bob = member(UUID.randomUUID(), "bob");
+      stubTransfer(newItem(10.0, 1L), bob);
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(3.0, bob.getId(), null, CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      assertThat(publishedEvents())
+          .singleElement()
+          .isEqualTo(
+              new InventoryTransferredToUserEvent(
+                  bob.getId(),
+                  OWNER_ID,
+                  "alice",
+                  ITEM_ID,
+                  List.of(new TransferredLot("Quantanium", 3.0, false, 500, "ARC-L1"))));
+    }
+
+    @Test
+    void logisticiansTransferOfAnotherMembersRow_announcesBothOwners() {
+      User bob = member(UUID.randomUUID(), "bob");
+      User carol = member(ADMIN_ID, "carol");
+      Location hangar = new Location();
+      hangar.setId(UUID.randomUUID());
+      hangar.setName("Lorville");
+      stubTransfer(newItem(10.0, 1L), bob);
+      when(locationRepository.findById(hangar.getId())).thenReturn(Optional.of(hangar));
+      when(userRepository.findById(ADMIN_ID)).thenReturn(Optional.of(carol));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(10.0, bob.getId(), hangar.getId(), CheckoutType.TRANSFER, null, null, 1L),
+          ADMIN_ID,
+          true);
+
+      assertThat(publishedEvents())
+          .containsExactly(
+              new InventoryTransferredToUserEvent(
+                  bob.getId(),
+                  ADMIN_ID,
+                  "carol",
+                  ITEM_ID,
+                  List.of(new TransferredLot("Quantanium", 10.0, false, 500, "Lorville"))),
+              new InventoryTransferredFromUserEvent(
+                  OWNER_ID,
+                  ADMIN_ID,
+                  "carol",
+                  "bob",
+                  ITEM_ID,
+                  List.of(new TransferredLot("Quantanium", 10.0, false, 500, "ARC-L1"))));
+    }
+
+    @Test
+    void logisticianTransfersAnotherMembersRowToThemselves_announcesThePreviousOwnerOnly() {
+      User carol = member(ADMIN_ID, "carol");
+      stubTransfer(newItem(10.0, 1L), carol);
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(2.0, ADMIN_ID, null, CheckoutType.TRANSFER, null, null, 1L),
+          ADMIN_ID,
+          true);
+
+      assertThat(publishedEvents())
+          .singleElement()
+          .isEqualTo(
+              new InventoryTransferredFromUserEvent(
+                  OWNER_ID,
+                  ADMIN_ID,
+                  "carol",
+                  "carol",
+                  ITEM_ID,
+                  List.of(new TransferredLot("Quantanium", 2.0, false, 500, "ARC-L1"))));
+    }
+
+    @Test
+    void locationOnlyTransfer_announcesNothing() {
+      Location hangar = new Location();
+      hangar.setId(UUID.randomUUID());
+      hangar.setName("Lorville");
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
+      when(locationRepository.findById(hangar.getId())).thenReturn(Optional.of(hangar));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(4.0, null, hangar.getId(), CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void ownersOwnDiscard_announcesNothing() {
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
+
+      service.bookOutInventoryItem(
+          ITEM_ID, newDto(4.0, null, null, CheckoutType.DISCARD, null, null, 1L), OWNER_ID, false);
+
+      verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void ownersOwnSale_announcesNothing() {
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(4.0, null, null, CheckoutType.SELL, "Terminal", BigDecimal.TEN, 1L),
+          OWNER_ID,
+          false);
+
+      verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void anAdminsDiscardOfAnotherMembersRow_tellsTheOwnerWhatWasBookedOut() {
+      User carol = member(ADMIN_ID, "carol");
+      when(userRepository.findById(ADMIN_ID)).thenReturn(Optional.of(carol));
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
+
+      service.bookOutInventoryItem(
+          ITEM_ID, newDto(4.0, null, null, CheckoutType.DISCARD, null, null, 1L), ADMIN_ID, true);
+
+      List<Object> events = publishedEvents();
+      assertEquals(1, events.size());
+      NoticeEvent notice = (NoticeEvent) events.getFirst();
+      assertEquals(NotificationEventType.INVENTORY_BOOKED_OUT_BY_OTHER, notice.eventType());
+      assertEquals(OWNER_ID, notice.contextRecipientUserId());
+      assertEquals(ADMIN_ID, notice.actorSub());
+      assertEquals("DISCARDED", notice.renderParams().get("actionCode"));
+      assertEquals("1", notice.renderParams().get("count"));
+      assertEquals("4 SCU Quantanium (Q500) in ARC-L1", notice.renderParams().get("lots"));
+    }
+
+    @Test
+    void anAdminsSaleOfAnotherMembersRow_namesTheSaleAndAlsoCoversADepletedRow() {
+      User carol = member(ADMIN_ID, "carol");
+      when(userRepository.findById(ADMIN_ID)).thenReturn(Optional.of(carol));
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(newItem(10.0, 1L)));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(10.0, null, null, CheckoutType.SELL, "Terminal", BigDecimal.TEN, 1L),
+          ADMIN_ID,
+          true);
+
+      List<Object> events = publishedEvents();
+      assertEquals(1, events.size());
+      NoticeEvent notice = (NoticeEvent) events.getFirst();
+      assertEquals("SOLD", notice.renderParams().get("actionCode"));
+      assertEquals("10 SCU Quantanium (Q500) in ARC-L1", notice.renderParams().get("lots"));
     }
   }
 

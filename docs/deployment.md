@@ -97,9 +97,14 @@ disaster recovery: [`backup.md`](backup.md). The monitoring plane:
 | `deploy` | system account, `/sbin/nologin`, home `/var/lib/iri` | runs `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`; owns `/var/lib/iri`, `/etc/iri`, `/var/iri/code`, the unit directory |
 | `iri` | the rootless service user (lingering, subuid base 100000) | the container store and all 39 Quadlet units; the podman-exporter user unit |
 
-`deploy` reaches `iri`'s containers only through `/etc/sudoers.d/basetool-deploy`: `podman *` and
+`deploy` reaches `iri`'s containers only through `/etc/sudoers.d/basetool-deploy`: the podman
+sub-commands its scripts run (`basetool_host_deploy_podman_subcommands` in the role defaults —
+`cp`, `create`, `exec`, `image inspect`, `image prune`, `info`, `inspect`, `login`,
+`network prune`, `ps`, `pull`, `rm`, `run`, `system df`, `volume inspect`) and
 `systemctl --user *` as `iri`, plus `systemctl restart alloy.service` as root, nothing else
-(`ansible/roles/basetool_host/tasks/22-deploy-user.yml`). That is strictly narrower than the
+(`ansible/roles/basetool_host/tasks/22-deploy-user.yml`). A script that needs another sub-command
+adds it to that list in the same PR — repo-lint's `check-deploy-podman-allowlist.py` fails
+otherwise — and the role run that installs the script installs the rule. That is strictly narrower than the
 `docker` group of the retired host, which was root-equivalent.
 
 **Container uids are translated.** Container uid *N* is host uid `100000 + N − 1`: 10001 → 110000
@@ -523,10 +528,23 @@ skipped commit has no `:sha-<short>` tag. A release commit's run never skips. Th
 GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
 lets only that App and @greluc create `v*` tags, and an App token's events trigger
 `release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the
-publish job stops with an error. The same key is also a Dependabot secret for
+publish job stops with an error. `release-prepare.yml`, `refresh-versions.yml` and
+`release-publish.yml` read the key in the GitHub environment **`release`**, which only `main` may
+deploy to (CI-SEC-16, ADR-0201 amendments 3 and 4). `release-publish.yml` runs on every push to
+`main`: its `detect` job looks up the pull request whose merge commit was pushed and ends green
+unless that is a merged `release/vX.Y.Z` PR; only then does the `publish` job enter the
+environment. The same key is also a Dependabot secret for
 [Dependabot image bumps](#dependabot-image-bumps); a rotation updates both. The manual path is @greluc creating the tag at the release PR's
 merge commit and re-running the failed publish job, which then skips the tag and publishes the
 rest.
+
+> [!important] One-time owner step (CI-SEC-16)
+> *Settings → Environments → New environment* `release`; *Deployment branches and tags* →
+> *Selected branches and tags* → branch rule `main`; no reviewers, no wait timer. Add the
+> environment secret `RELEASE_APP_PRIVATE_KEY` with the App's PEM. Then delete the **repository**
+> secret `RELEASE_APP_PRIVATE_KEY` under *Settings → Secrets and variables → Actions* — keep the
+> Dependabot copy. If a release job ran before this step, GitHub has already created `release`
+> without a branch rule; add the rule to it.
 
 Nothing is deployed yet: `:stable` still names the previous release.
 
@@ -891,7 +909,8 @@ moved. Dependabot's image-pin bumps take this path too.
 ### Dependabot image bumps
 
 Dependabot edits `docker-compose*.yml` only. `.github/workflows/dependabot-compose.yml` completes each
-compose bump on its branch (ADR-0215, REQ-OPS-035): it re-resolves the digests the bump pins, runs
+compose bump on its branch (ADR-0215, REQ-OPS-035): it re-resolves the digests the bump pins, moves
+the `TestImages` digest constants (Redis, PostgreSQL) to the pins in `docker-compose.yml`, runs
 `generate-quadlet.py` and `check-monitoring-image-pins.sh --fix`, and commits the changed files as
 `basetool-release[bot]`. The required checks then run again on that head and should be green.
 
@@ -902,12 +921,14 @@ compose bump on its branch (ADR-0215, REQ-OPS-035): it re-resolves the digests t
 | `Refuse to continue without the release App's key` failed | The Dependabot secret is missing — see below. |
 | `Mint a basetool-release App token` failed | The Dependabot copy of the key is stale or malformed — see below. |
 | A warning `could not resolve the tag` | The registry could not be read; the digest is Dependabot's. Re-resolve it by hand before merging: `docker buildx imagetools inspect <repo>:<tag> --format '{{json .Manifest}}'`. |
-| No run at all | The PR touches no `docker-compose*.yml`, or it is not Dependabot's. Regenerate by hand: `python scripts/generate-quadlet.py && scripts/check-monitoring-image-pins.sh --fix`, commit, push. |
+| A warning `pins … to 2 digests; leaving the TestImages constant` | `docker-compose.yml` pins one image to two digests; make them agree, then the constant follows on the next run. |
+| No run at all | The PR touches no `docker-compose*.yml`, or it is not Dependabot's. Regenerate by hand: `python .github/scripts/dependabot_compose_followup.py sync-test-images && python scripts/generate-quadlet.py && scripts/check-monitoring-image-pins.sh --fix`, commit, push. |
 
 **The App key lives in two secret stores.** A Dependabot-triggered run reads Dependabot secrets only,
-so `RELEASE_APP_PRIVATE_KEY` is set both under *Settings → Secrets and variables → Actions* and under
-*→ Dependabot*, with the same PEM. Rotating the App's key updates **both**; the release workflows
-fail on a stale Actions copy, this workflow on a stale Dependabot copy.
+so `RELEASE_APP_PRIVATE_KEY` is set both in the `release` environment (*Settings → Environments*,
+see [Cutting a release](#cutting-a-release)) and under *Settings → Secrets and variables →
+Dependabot*, with the same PEM. Rotating the App's key updates **both**; the release workflows fail on
+a stale environment copy, this workflow on a stale Dependabot copy.
 
 A `postgres` or `redis` digest bump recreates that stateful container on the next deploy tick after
 promotion; merging such a PR is the operator's decision to take that restart.
@@ -1013,6 +1034,88 @@ the same request (REQ-SEC-050) — the member keeps the login.
 `env.d/` again with the same command and `${UCTL} restart frontend.service`. No stored session is
 touched either way: the mode governs reading only. `off` restores the pre-list validator exactly, for
 the case where the reporting itself misbehaves.
+
+#### The exact list of application types (D-10)
+
+The release that narrows the application entry from the prefix `…frontend.model.` to the exact
+`SessionTypeAllowList.SESSION_BOUND_TYPES` (21 forms, DTOs, nested types and enums; REQ-FE-027)
+**ships in its own frontend release, before any frontend class moves to a per-domain package** (plan
+§7.8 F2). It changes no configuration and needs no step beyond the ordinary frontend deploy; the
+mode stays `enforce`.
+
+**Sessions written by the previous release.** That release can only have stored types its own code
+stores, and the list is derived from that same code, so nothing in a live session becomes unreadable
+by the switch. If a value were refused anyway, it takes the ordinary `enforce` path: that one
+attribute is dropped (`FaultTolerantSessionSerializer`), logged once by class name and repaired on
+the same request (REQ-SEC-050). The security context and the authorized clients are Spring Security
+and JDK types, still admitted, so **no member is signed out and login is unaffected**; the worst case
+is one redirect's lost flash attributes (a toast or a re-shown form).
+
+**Watch for an hour after the deploy** (read-only): `SessionTypeOutsideAllowList` and
+`SessionValueDropsSustained` stay silent, and
+
+```text
+sum by (mode) (increase(basetool_session_type_refused_total[1h]))
+{app="frontend"} |= "not on the session type allow-list"
+```
+
+return nothing. A hit names a class: if it is one of ours, add it to `SESSION_BOUND_TYPES` in a PR
+(and teach `SessionBoundTypeClosureTest` why the derivation missed it). Until it lands, the rollback
+is the previous frontend image, or `APP_SESSION_TYPE_ALLOW_LIST=report` as above — a production
+write, so it waits for the owner's yes.
+
+### Trusted Types: report, then enforce
+
+The frontend sends the Trusted Types directives `require-trusted-types-for 'script'; trusted-types
+krt-html krt-fragment` (REQ-SEC-064, REQ-FE-022, ADR-0239). It ships in **`report`** mode: the
+directives travel in a `Content-Security-Policy-Report-Only` header, so a DOM sink written without
+a policy value still works and the browser reports it, through the client-error beacon, as
+`basetool_client_error_total{kind="csp_violation"}`. **`enforce`** moves them into the enforced
+`Content-Security-Policy`, where such a write throws. The switch is `APP_SECURITY_TRUSTED_TYPES` in
+`.env` (`report` when unset, blank or mistyped) plus a frontend restart: a production write, so it
+waits for the owner's yes. **This switch is the only step of ADR-0239 still open.**
+
+**Precondition** — over at least a week of ordinary use since the release carrying the report-only
+policy went live, no CSP violation was reported, and the dialog page walk of the E2E suite
+(`DialogA11yE2eTest`, which fails on any Trusted Types violation) is green on `main`:
+
+```text
+# Grafana → Explore → Prometheus: must return nothing
+sum(increase(basetool_client_error_total{kind="csp_violation"}[7d])) > 0
+```
+
+A hit is a violation, not necessarily a Trusted Types one. To name it, raise
+`de.greluc.krt.profit.basetool.frontend.controller.ClientErrorReportController` to DEBUG through
+`/actuator/loggers` (REQ-OBS-016; a production write as well) and read `{app="frontend"} |= "Client
+error reported [kind=csp_violation"`: a Trusted Types sink shows as `message=require-trusted-types-for
+Element innerHTML` (the directive and the sink, never the markup), an unlisted policy as
+`message=trusted-types`. Convert the sink in a PR and restart the week; do not enforce around it.
+
+**Apply** (as root, from `/`; `${UCTL}` from [Shell conventions](#shell-conventions-used-below)):
+
+```bash
+cd /
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+sudo -u deploy "${EDITOR:-vi}" /var/iri/code/.env      # set APP_SECURITY_TRUSTED_TYPES=enforce (one line)
+grep -c '^APP_SECURITY_TRUSTED_TYPES=' /var/iri/code/.env       # 1
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+grep -c '^APP_SECURITY_TRUSTED_TYPES=enforce$' /var/iri/code/env.d/frontend.env   # 1
+${UCTL} restart frontend.service                        # blocks until healthy; sessions live in Redis
+```
+
+**Reading the effective mode** (no write needed): Grafana → Explore → Prometheus,
+`basetool_trusted_types_mode == 1` returns one series per frontend instance whose `mode` label is the
+mode the process runs with. From outside, `curl -sI https://profit-base.online/ | grep -i
+'^content-security-policy'` shows the directives at the end of `Content-Security-Policy` under
+`enforce`, and as the whole `Content-Security-Policy-Report-Only` header under `report`.
+
+**Expected effect:** none a member can see. Watch for a day: `ClientErrorSpike` stays silent for
+`csp_violation`, and `sum(increase(basetool_client_error_total{kind="csp_violation"}[1h]))` stays
+empty. A violation under `enforce` means a page part silently stopped working (the write threw).
+
+**Rollback:** edit the line to `APP_SECURITY_TRUSTED_TYPES=report` (deleting it also means
+`report`), render `env.d/` again with the same command and `${UCTL} restart frontend.service`.
 
 ### Internal JWKS for the backend
 

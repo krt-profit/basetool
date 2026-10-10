@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -44,8 +45,10 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    * @return {@code true} iff at least one participant references the org unit.
    */
   @Query(
-      "SELECT COUNT(mp) > 0 FROM MissionParticipant mp JOIN mp.orgUnits ou WHERE ou.id ="
-          + " :orgUnitId")
+      """
+      SELECT COUNT(mp) > 0 FROM MissionParticipant mp JOIN mp.orgUnits ou WHERE ou.id =
+      :orgUnitId
+      """)
   boolean existsByOrgUnitId(@Param("orgUnitId") UUID orgUnitId);
 
   /**
@@ -84,8 +87,10 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    */
   @Modifying
   @Query(
-      "UPDATE MissionParticipant p SET p.missionLeadParticipant = false "
-          + "WHERE p.plannedMissionJobType.id = :jobTypeId AND p.missionLeadParticipant = true")
+      """
+      UPDATE MissionParticipant p SET p.missionLeadParticipant = false
+      WHERE p.plannedMissionJobType.id = :jobTypeId AND p.missionLeadParticipant = true
+      """)
   int clearMissionLeadFlagForJobType(@Param("jobTypeId") UUID jobTypeId);
 
   /**
@@ -101,9 +106,11 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    */
   @Modifying(flushAutomatically = true)
   @Query(
-      "UPDATE MissionParticipant p SET p.endTime = :end, p.version = p.version + 1 "
-          + "WHERE p.mission.id = :missionId AND p.startTime IS NOT NULL "
-          + "AND (p.endTime IS NULL OR p.endTime > :end)")
+      """
+      UPDATE MissionParticipant p SET p.endTime = :end, p.version = p.version + 1
+      WHERE p.mission.id = :missionId AND p.startTime IS NOT NULL
+      AND (p.endTime IS NULL OR p.endTime > :end)
+      """)
   int clampCheckedInEndTimes(@Param("missionId") UUID missionId, @Param("end") Instant end);
 
   /**
@@ -121,4 +128,43 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
       FROM MissionParticipant p WHERE p.mission.id IN :missionIds GROUP BY p.mission.id
       """)
   List<MissionParticipantCount> countByMissions(@Param("missionIds") Collection<UUID> missionIds);
+
+  /**
+   * Returns which of the given missions the given member holds a participant row on, in one query.
+   *
+   * @param userId the member whose participations to look up.
+   * @param missionIds the missions on the page; an empty collection yields an empty list.
+   * @return the ids of the missions among {@code missionIds} the member is signed up for.
+   */
+  @Query(
+      """
+      SELECT p.mission.id FROM MissionParticipant p
+      WHERE p.user.id = :userId AND p.mission.id IN :missionIds
+      """)
+  List<UUID> findMissionIdsSignedUpBy(
+      @Param("userId") UUID userId, @Param("missionIds") Collection<UUID> missionIds);
+
+  /**
+   * Returns the registered members signed up for a mission; guest participants carry no user and
+   * are left out.
+   *
+   * @param missionId the mission
+   * @return the participants' user ids; never {@code null}, possibly empty
+   */
+  @Query(
+      "SELECT p.user.id FROM MissionParticipant p WHERE p.mission.id = :missionId"
+          + " AND p.user IS NOT NULL")
+  Set<UUID> findRegisteredUserIdsByMission(@Param("missionId") UUID missionId);
+
+  /**
+   * Returns the registered members signed up for a mission who have not checked in yet.
+   *
+   * @param missionId the mission
+   * @return the user ids of participants whose {@code startTime} is still unset; never {@code
+   *     null}, possibly empty
+   */
+  @Query(
+      "SELECT p.user.id FROM MissionParticipant p WHERE p.mission.id = :missionId"
+          + " AND p.user IS NOT NULL AND p.startTime IS NULL")
+  Set<UUID> findNotCheckedInUserIdsByMission(@Param("missionId") UUID missionId);
 }

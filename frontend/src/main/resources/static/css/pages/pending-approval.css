@@ -1,0 +1,27 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .pending-approval-card {
+        max-width: 640px;
+        margin: var(--space-8) auto;
+        padding: var(--space-6);
+        text-align: center;
+    }
+
+    .pending-approval-card p {
+        margin-inline: auto;
+    }
+
+    .pending-approval-emphasis {
+        font-weight: var(--fw-bold);
+    }
+
+    .pending-approval-help {
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-sm);
+    }
+
+    .pending-approval-logout {
+        margin-top: var(--space-6);
+    }
+}

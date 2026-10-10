@@ -65,13 +65,13 @@ function rebuildCategoryDropdown(topicSelect) {
     while (catSelect.options.length > 1) catSelect.remove(1);
     const topicId = topicSelect.value;
     if (topicId && AR_CATEGORIES_BY_TOPIC && AR_CATEGORIES_BY_TOPIC[topicId]) {
-        AR_CATEGORIES_BY_TOPIC[topicId].forEach(function (cat) {
+        AR_CATEGORIES_BY_TOPIC[topicId].forEach((cat) => {
             const opt = document.createElement('option');
             opt.value = cat.id;
             opt.textContent = cat.name;
             catSelect.appendChild(opt);
         });
-        if (previousValue && catSelect.querySelector('option[value="' + previousValue + '"]')) {
+        if (previousValue && catSelect.querySelector(`option[value="${previousValue}"]`)) {
             catSelect.value = previousValue;
         }
     }
@@ -106,7 +106,7 @@ function apiCall(url, method, body) {
                 return true;
             },
         })
-        .then(function (result) {
+        .then((result) => {
             if (!result.ok) {
                 return null;
             }
@@ -114,15 +114,45 @@ function apiCall(url, method, body) {
         });
 }
 
-function openCreateModal() {
-    document.getElementById('cr-from').value = 20;
-    document.getElementById('cr-to').value = 19;
-    document.getElementById('cr-topic').value = '';
+function openCreateModal(btn) {
+    const presetFrom = btn ? parseInt(btn.getAttribute('data-ar-from') || '', 10) : NaN;
+    const from = Number.isFinite(presetFrom) ? presetFrom : 20;
+    document.getElementById('cr-from').value = from;
+    document.getElementById('cr-to').value = from - 1;
+    document.getElementById('cr-topic').value = (btn && btn.getAttribute('data-ar-topic-id')) || '';
     rebuildCategoryDropdown(document.getElementById('cr-topic'));
     document.getElementById('cr-level').value = 'LEVEL_A';
     document.getElementById('cr-count').value = 1;
     document.getElementById('cr-desc').value = '';
     openModal('modal-create');
+}
+
+function showMatrixCell(btn) {
+    const from = btn.getAttribute('data-ar-from');
+    const to = btn.getAttribute('data-ar-to');
+    const topicId = btn.getAttribute('data-ar-topic-id') || '';
+    const group = document.getElementById(`ar-group-${from}-${to}`);
+    if (!group) return;
+    const rows = Array.from(group.querySelectorAll('tr[data-ar-req-id]')).filter((row) => {
+        return (row.getAttribute('data-ar-topic') || '') === topicId;
+    });
+    const filter = document.getElementById('ar-filter');
+    if (
+        filter &&
+        filter.value &&
+        rows.some((row) => {
+            return row.hidden;
+        })
+    ) {
+        filter.value = '';
+        applyFilter();
+    }
+    group.scrollIntoView({ block: 'start' });
+    rows.forEach((row) => {
+        row.classList.remove('is-flash');
+        row.getBoundingClientRect();
+        row.classList.add('is-flash');
+    });
 }
 
 function openEditModal(btn) {
@@ -157,7 +187,7 @@ function submitCreate() {
         requiredCount: parseInt(document.getElementById('cr-count').value, 10),
         description: document.getElementById('cr-desc').value || null,
     };
-    apiCall('/api/proxy/promotion/rank-requirements', 'POST', body).then(function (data) {
+    apiCall('/api/proxy/promotion/rank-requirements', 'POST', body).then((data) => {
         if (!data) return;
         toastSuccess(MSG_SAVED);
         closeModal('modal-create');
@@ -183,7 +213,7 @@ function submitEdit() {
         requiredCount: parseInt(document.getElementById('er-count').value, 10),
         description: document.getElementById('er-desc').value || null,
     };
-    apiCall('/api/proxy/promotion/rank-requirements/' + id, 'PUT', body).then(function (data) {
+    apiCall(`/api/proxy/promotion/rank-requirements/${id}`, 'PUT', body).then((data) => {
         if (!data) return;
         toastSuccess(MSG_SAVED);
         closeModal('modal-edit');
@@ -193,15 +223,15 @@ function submitEdit() {
 
 function deleteRequirement(id) {
     if (!id) return Promise.resolve(false);
-    return apiCall('/api/proxy/promotion/rank-requirements/' + id, 'DELETE', null);
+    return apiCall(`/api/proxy/promotion/rank-requirements/${id}`, 'DELETE', null);
 }
 
 function confirmAndDelete(id) {
     const fn = window.showKrtConfirm;
     if (typeof fn !== 'function') return;
-    fn(MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_OK, MSG_CANCEL).then(function (ok) {
+    fn(MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_OK, MSG_CANCEL).then((ok) => {
         if (!ok) return;
-        deleteRequirement(id).then(function (data) {
+        deleteRequirement(id).then((data) => {
             if (!data) return;
             toastSuccess(MSG_DELETED);
             arRefresh();
@@ -213,31 +243,29 @@ function confirmAndDeleteGroup(fromRank, toRank) {
     const fn = window.showKrtConfirm;
     if (typeof fn !== 'function') return;
     const rows = document.querySelectorAll(
-        '.rank-group[data-ar-from-rank="' +
-            fromRank +
-            '"][data-ar-to-rank="' +
-            toRank +
-            '"] tr[data-ar-req-id]',
+        `.rank-group[data-ar-from-rank="${fromRank}"][data-ar-to-rank="${
+            toRank
+        }"] tr[data-ar-req-id]`,
     );
     if (rows.length === 0) return;
     const msg = MSG_DELETE_GROUP_MSG.replace('{from}', String(fromRank))
         .replace('{to}', String(toRank))
         .replace('{count}', String(rows.length));
-    fn(MSG_DELETE_GROUP_TITLE, msg, MSG_OK, MSG_CANCEL).then(function (ok) {
+    fn(MSG_DELETE_GROUP_TITLE, msg, MSG_OK, MSG_CANCEL).then((ok) => {
         if (!ok) return;
-        const ids = Array.from(rows).map(function (r) {
+        const ids = Array.from(rows).map((r) => {
             return r.getAttribute('data-ar-req-id');
         });
         let chain = Promise.resolve(true);
-        ids.forEach(function (id) {
-            chain = chain.then(function (alive) {
+        ids.forEach((id) => {
+            chain = chain.then((alive) => {
                 if (!alive) return false;
-                return deleteRequirement(id).then(function (data) {
+                return deleteRequirement(id).then((data) => {
                     return data !== null;
                 });
             });
         });
-        chain.then(function () {
+        chain.then(() => {
             toastSuccess(MSG_GROUP_DELETED);
             arRefresh();
         });
@@ -249,13 +277,13 @@ function applyFilter() {
     const query = (input ? input.value : '').trim().toLowerCase();
     const groups = document.querySelectorAll('.rank-group');
     let anyVisible = false;
-    groups.forEach(function (group) {
+    groups.forEach((group) => {
         const fromRank = group.getAttribute('data-ar-from-rank') || '';
         const toRank = group.getAttribute('data-ar-to-rank') || '';
-        const rankKey = fromRank + '->' + toRank;
+        const rankKey = `${fromRank}->${toRank}`;
         const rows = group.querySelectorAll('tr[data-ar-search]');
         let groupVisible = 0;
-        rows.forEach(function (row) {
+        rows.forEach((row) => {
             const text = row.getAttribute('data-ar-search') || '';
             const match =
                 query === '' ||
@@ -263,35 +291,39 @@ function applyFilter() {
                 rankKey.indexOf(query) !== -1 ||
                 fromRank === query ||
                 toRank === query;
-            row.style.display = match ? '' : 'none';
+            row.hidden = !match;
             if (match) groupVisible++;
         });
-        group.classList.toggle('is-hidden', groupVisible === 0 && query !== '');
+        group.hidden = groupVisible === 0 && query !== '';
         if (groupVisible > 0 || query === '') anyVisible = true;
     });
     const empty = document.getElementById('ar-empty');
-    if (empty) empty.hidden = anyVisible;
+    if (empty) empty.hidden = anyVisible || groups.length === 0;
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     rebuildCategoryDropdown(document.getElementById('cr-topic'));
 
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'ar-open-create', openCreateModal);
+        window.krtEvents.on('click', 'ar-open-create', () => {
+            openCreateModal(null);
+        });
+        window.krtEvents.on('click', 'ar-matrix-add', openCreateModal);
+        window.krtEvents.on('click', 'ar-matrix-show', showMatrixCell);
         window.krtEvents.on('click', 'ar-open-edit', openEditModal);
-        window.krtEvents.on('click', 'ar-open-delete', function (btn) {
+        window.krtEvents.on('click', 'ar-open-delete', (btn) => {
             confirmAndDelete(btn.getAttribute('data-ar-id'));
         });
-        window.krtEvents.on('click', 'ar-delete-group', function (btn) {
+        window.krtEvents.on('click', 'ar-delete-group', (btn) => {
             confirmAndDeleteGroup(
                 parseInt(btn.getAttribute('data-ar-from-rank'), 10),
                 parseInt(btn.getAttribute('data-ar-to-rank'), 10),
             );
         });
-        window.krtEvents.on('click', 'ar-close-create', function () {
+        window.krtEvents.on('click', 'ar-close-create', () => {
             closeModal('modal-create');
         });
-        window.krtEvents.on('click', 'ar-close-edit', function () {
+        window.krtEvents.on('click', 'ar-close-edit', () => {
             closeModal('modal-edit');
         });
         window.krtEvents.on('click', 'ar-submit-create', submitCreate);
@@ -300,8 +332,8 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtEvents.on('input', 'ar-rank-from', syncToRank);
     }
 
-    document.querySelectorAll('.ar-rank-from').forEach(function (el) {
-        el.addEventListener('input', function () {
+    document.querySelectorAll('.ar-rank-from').forEach((el) => {
+        el.addEventListener('input', () => {
             syncToRank(el);
         });
     });
@@ -309,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const filter = document.getElementById('ar-filter');
     if (filter) filter.addEventListener('input', applyFilter);
 
-    document.addEventListener('krt:swapped', function (e) {
+    document.addEventListener('krt:swapped', (e) => {
         if (e.detail && e.detail.container && e.detail.container.id === 'ar-results') {
             applyFilter();
         }

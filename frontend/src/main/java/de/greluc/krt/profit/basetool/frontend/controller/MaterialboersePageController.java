@@ -20,13 +20,18 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient.BoardFilter;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeCountsDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeReleasableItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeReleaseRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialItemRequestCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.HashMap;
@@ -38,7 +43,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -52,7 +56,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Controller for the Materialbörse page ({@code /materialboerse}): renders the master-detail board
@@ -67,26 +70,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 @PreAuthorize("hasRole('" + Roles.KRT_MEMBER + "')")
 public class MaterialboersePageController {
 
-  /** Captured generic type for the paged board response. */
-  private static final ParameterizedTypeReference<PageResponse<MaterialExchangeOfferDto>>
-      OFFERS_PAGE = new ParameterizedTypeReference<>() {};
-
-  /** Captured generic type for the paged Gesuche (requests) board response. */
-  private static final ParameterizedTypeReference<PageResponse<MaterialRequestDto>> REQUESTS_PAGE =
-      new ParameterizedTypeReference<>() {};
-
-  /** Captured generic type for a raw, forwarded backend payload (the material-catalog picker). */
-  private static final ParameterizedTypeReference<Object> RAW =
-      new ParameterizedTypeReference<>() {};
-
-  /** Captured generic type for the releasable-items picker response. */
-  private static final ParameterizedTypeReference<List<MaterialExchangeReleasableItemDto>>
-      RELEASABLE_LIST = new ParameterizedTypeReference<>() {};
-
-  /** Captured generic type for the offerable blueprint-products picker response. */
-  private static final ParameterizedTypeReference<List<BlueprintProductDto>> PRODUCT_LIST =
-      new ParameterizedTypeReference<>() {};
-
   /** The board request size — large enough to show the whole board in one scrollable list. */
   private static final int BOARD_SIZE = 200;
 
@@ -95,8 +78,7 @@ public class MaterialboersePageController {
 
   /**
    * The sort keys the board's {@code <select>} offers, and therefore the only ones relayed to the
-   * backend. Mirrors the option list in {@code materialboerse.html} and {@code
-   * fragments/materialgesuch-board.html}.
+   * backend. Mirrors the option list in {@code materialboerse.html}.
    */
   private static final Set<String> SORT_KEYS = Set.of(DEFAULT_SORT, "menge", "mat", "neu");
 
@@ -106,14 +88,21 @@ public class MaterialboersePageController {
   /** Cap on the number of catalogue materials the material-request type-ahead requests. */
   private static final int MATERIAL_PICKER_LIMIT = 25;
 
-  private final BackendApiClient backendApiClient;
+  /** Sends the board reads, the writes and the picker searches. */
+  private final MaterialExchangeBackendClient materialExchangeClient;
 
   /**
    * Renders the Materialbörse page, or only its {@code board}, {@code list} or {@code detail}
-   * region for an in-place swap. The counts of both modes are always loaded for the tab bar.
+   * region for an in-place swap. The counts of both views are always loaded for the tabs and the
+   * scope segment. The view is {@code view=offers|requests} and the scope {@code scope=all|mine};
+   * the older {@code mode} and {@code tab} parameters are honoured when the new ones are absent.
    *
-   * @param mode {@code "requests"} for the Gesuche board, anything else for the Angebote board.
-   * @param tab {@code "mein"} for "Meine …", else "Alle …".
+   * @param view {@code "requests"} for the Gesuche board, {@code "offers"} for the Angebote board,
+   *     or {@code null} to fall back to {@code mode}.
+   * @param scope {@code "mine"} for the caller's own entries, {@code "all"} for every entry, or
+   *     {@code null} to fall back to {@code tab}.
+   * @param mode {@code "requests"} for the Gesuche board when {@code view} is absent.
+   * @param tab {@code "mein"} for the caller's own entries when {@code scope} is absent.
    * @param q the search fragment (material/item or player), or {@code null}.
    * @param minQuality the minimum quality filter 0–1000, or {@code null}.
    * @param minAmount the minimum quantity filter, or {@code null}.
@@ -129,6 +118,8 @@ public class MaterialboersePageController {
   @NotNull
   @GetMapping
   public String board(
+      @RequestParam(required = false) String view,
+      @RequestParam(required = false) String scope,
       @RequestParam(required = false) String mode,
       @RequestParam(required = false) String tab,
       @RequestParam(required = false) String q,
@@ -139,7 +130,7 @@ public class MaterialboersePageController {
       @RequestParam(required = false, defaultValue = "false") boolean excludeStolen,
       @RequestParam(required = false) String fragment,
       Model model) {
-    boolean requests = "requests".equals(mode);
+    boolean requests = "requests".equals(view != null ? view : mode);
 
     if ("detail".equals(fragment)) {
       if (requests) {
@@ -150,17 +141,21 @@ public class MaterialboersePageController {
       return "materialboerse :: detail";
     }
 
-    String activeTab = "mein".equals(tab) ? "mein" : "alle";
+    boolean mine = scope != null ? "mine".equals(scope) : "mein".equals(tab);
+    final String activeTab = mine ? "mein" : "alle";
     String activeSort = sort != null && SORT_KEYS.contains(sort) ? sort : DEFAULT_SORT;
 
     MaterialExchangeCountsDto offerCounts = loadCounts();
     MaterialExchangeCountsDto requestCounts = loadRequestCounts();
+    MaterialExchangeCountsDto viewCounts = requests ? requestCounts : offerCounts;
     model.addAttribute("countAll", offerCounts.all());
     model.addAttribute("countMine", offerCounts.mine());
     model.addAttribute("countReqAll", requestCounts.all());
     model.addAttribute("countReqMine", requestCounts.mine());
+    model.addAttribute("scopeCountAll", viewCounts.all());
+    model.addAttribute("scopeCountMine", viewCounts.mine());
     model.addAttribute("activeMode", requests ? "requests" : "offers");
-    model.addAttribute("activeTab", activeTab);
+    model.addAttribute("activeScope", mine ? "mine" : "all");
     model.addAttribute("filterQ", q);
     model.addAttribute("filterMinQuality", minQuality);
     model.addAttribute("filterMinAmount", minAmount);
@@ -173,7 +168,7 @@ public class MaterialboersePageController {
       model.addAttribute(
           "selectedRequest", loadRequestDetail(pickSelectedRequestId(reqs, selected)));
       if ("board".equals(fragment)) {
-        return "fragments/materialgesuch-board :: requestBoard";
+        return "materialboerse :: board";
       }
       if ("list".equals(fragment)) {
         return "fragments/materialgesuch-board :: requestList";
@@ -198,15 +193,13 @@ public class MaterialboersePageController {
    * Releases one of the caller's own Lager rows to the board ("Material anbieten" / the Lager
    * checkbox).
    *
-   * @param body the {@code {inventoryItemId, remark}} payload.
+   * @param body the {@code {inventoryItemId, offeredAmount, remark}} payload.
    * @return the backend result, or its error status + body.
    */
   @PostMapping("/offers/ajax")
   @ResponseBody
-  public ResponseEntity<Object> release(@RequestBody Map<String, Object> body) {
-    return proxy(
-        "Release Materialbörse offer failed",
-        () -> backendApiClient.post("/api/v1/material-exchange/offers", body, Object.class));
+  public ResponseEntity<Object> release(@RequestBody MaterialExchangeReleaseRequest body) {
+    return proxy("Release Materialbörse offer failed", () -> materialExchangeClient.release(body));
   }
 
   /**
@@ -217,10 +210,9 @@ public class MaterialboersePageController {
    */
   @PostMapping("/item-offers/ajax")
   @ResponseBody
-  public ResponseEntity<Object> releaseItem(@RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> releaseItem(@RequestBody MaterialExchangeItemReleaseRequest body) {
     return proxy(
-        "List Materialbörse item offer failed",
-        () -> backendApiClient.post("/api/v1/material-exchange/item-offers", body, Object.class));
+        "List Materialbörse item offer failed", () -> materialExchangeClient.releaseItem(body));
   }
 
   /**
@@ -233,12 +225,9 @@ public class MaterialboersePageController {
   @GetMapping("/offerable-products")
   @ResponseBody
   public ResponseEntity<Object> offerableProducts(@RequestParam(required = false) String q) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/blueprints/products/search")
-            .queryParam("limit", PRODUCT_PICKER_LIMIT);
     return proxy(
         "Load Materialbörse offerable products failed",
-        () -> backendGetWithQuery(uri, q, PRODUCT_LIST));
+        () -> materialExchangeClient.offerableProducts(q, PRODUCT_PICKER_LIMIT));
   }
 
   /**
@@ -251,12 +240,9 @@ public class MaterialboersePageController {
   @PutMapping("/offers/{id}/remark/ajax")
   @ResponseBody
   public ResponseEntity<Object> updateOffer(
-      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody MaterialExchangeOfferUpdateRequest body) {
     return proxy(
-        "Update Materialbörse offer failed",
-        () ->
-            backendApiClient.put(
-                "/api/v1/material-exchange/offers/" + id + "/remark", body, Object.class));
+        "Update Materialbörse offer failed", () -> materialExchangeClient.updateOffer(id, body));
   }
 
   /**
@@ -269,10 +255,7 @@ public class MaterialboersePageController {
   @ResponseBody
   public ResponseEntity<Object> deactivate(@PathVariable @NotNull UUID id) {
     return proxy(
-        "Deactivate Materialbörse offer failed",
-        () ->
-            backendApiClient.post(
-                "/api/v1/material-exchange/offers/" + id + "/deactivate", null, Object.class));
+        "Deactivate Materialbörse offer failed", () -> materialExchangeClient.deactivateOffer(id));
   }
 
   /**
@@ -287,11 +270,7 @@ public class MaterialboersePageController {
   public ResponseEntity<Object> deactivateForItem(@PathVariable @NotNull UUID inventoryItemId) {
     return proxy(
         "Deactivate Materialbörse offer for item failed",
-        () ->
-            backendApiClient.post(
-                "/api/v1/material-exchange/items/" + inventoryItemId + "/deactivate",
-                null,
-                Object.class));
+        () -> materialExchangeClient.deactivateOfferForItem(inventoryItemId));
   }
 
   /**
@@ -305,9 +284,7 @@ public class MaterialboersePageController {
   public ResponseEntity<Object> registerInterest(@PathVariable @NotNull UUID id) {
     return proxy(
         "Register Materialbörse interest failed",
-        () ->
-            backendApiClient.post(
-                "/api/v1/material-exchange/offers/" + id + "/interest", null, Object.class));
+        () -> materialExchangeClient.registerInterest(id));
   }
 
   /**
@@ -321,9 +298,7 @@ public class MaterialboersePageController {
   public ResponseEntity<Object> withdrawInterest(@PathVariable @NotNull UUID id) {
     return proxy(
         "Withdraw Materialbörse interest failed",
-        () ->
-            backendApiClient.delete(
-                "/api/v1/material-exchange/offers/" + id + "/interest", Object.class));
+        () -> materialExchangeClient.withdrawInterest(id));
   }
 
   /**
@@ -339,12 +314,10 @@ public class MaterialboersePageController {
   @ResponseBody
   public ResponseEntity<Object> releasableItems(
       @RequestParam(required = false) String q, @RequestParam(required = false) String kind) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/material-exchange/releasable-items");
-    appendIfPresent(uri, "kind", normaliseKind(kind));
+    String safeKind = normaliseKind(kind);
     return proxy(
         "Load Materialbörse releasable items failed",
-        () -> backendGetWithQuery(uri, q, RELEASABLE_LIST));
+        () -> materialExchangeClient.releasableItems(q, safeKind));
   }
 
   /**
@@ -373,10 +346,11 @@ public class MaterialboersePageController {
    */
   @PostMapping("/requests/ajax")
   @ResponseBody
-  public ResponseEntity<Object> createMaterialRequest(@RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> createMaterialRequest(
+      @RequestBody MaterialRequestCreateRequest body) {
     return proxy(
         "Create Materialbörse request failed",
-        () -> backendApiClient.post("/api/v1/material-requests", body, Object.class));
+        () -> materialExchangeClient.createMaterialRequest(body));
   }
 
   /**
@@ -387,10 +361,11 @@ public class MaterialboersePageController {
    */
   @PostMapping("/item-requests/ajax")
   @ResponseBody
-  public ResponseEntity<Object> createItemRequest(@RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> createItemRequest(
+      @RequestBody MaterialItemRequestCreateRequest body) {
     return proxy(
         "Create Materialbörse item request failed",
-        () -> backendApiClient.post("/api/v1/material-requests/item", body, Object.class));
+        () -> materialExchangeClient.createItemRequest(body));
   }
 
   /**
@@ -403,10 +378,10 @@ public class MaterialboersePageController {
   @PutMapping("/requests/{id}/ajax")
   @ResponseBody
   public ResponseEntity<Object> updateRequest(
-      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID id, @RequestBody MaterialRequestUpdateRequest body) {
     return proxy(
         "Update Materialbörse request failed",
-        () -> backendApiClient.put("/api/v1/material-requests/" + id, body, Object.class));
+        () -> materialExchangeClient.updateRequest(id, body));
   }
 
   /**
@@ -420,9 +395,7 @@ public class MaterialboersePageController {
   public ResponseEntity<Object> deactivateRequest(@PathVariable @NotNull UUID id) {
     return proxy(
         "Deactivate Materialbörse request failed",
-        () ->
-            backendApiClient.post(
-                "/api/v1/material-requests/" + id + "/deactivate", null, Object.class));
+        () -> materialExchangeClient.deactivateRequest(id));
   }
 
   /**
@@ -436,9 +409,7 @@ public class MaterialboersePageController {
   public ResponseEntity<Object> signalFulfillment(@PathVariable @NotNull UUID id) {
     return proxy(
         "Signal Materialbörse fulfilment failed",
-        () ->
-            backendApiClient.post(
-                "/api/v1/material-requests/" + id + "/interest", null, Object.class));
+        () -> materialExchangeClient.signalFulfillment(id));
   }
 
   /**
@@ -452,8 +423,7 @@ public class MaterialboersePageController {
   public ResponseEntity<Object> withdrawFulfillment(@PathVariable @NotNull UUID id) {
     return proxy(
         "Withdraw Materialbörse fulfilment failed",
-        () ->
-            backendApiClient.delete("/api/v1/material-requests/" + id + "/interest", Object.class));
+        () -> materialExchangeClient.withdrawFulfillment(id));
   }
 
   /**
@@ -461,21 +431,14 @@ public class MaterialboersePageController {
    * request.
    *
    * @param q a material-name fragment, or {@code null} for the first materials.
-   * @return the matching materials page (raw), or the backend error status + body.
+   * @return the matching materials page, or the backend error status + body.
    */
   @GetMapping("/request-materials")
   @ResponseBody
   public ResponseEntity<Object> requestMaterials(@RequestParam(required = false) String q) {
-    String base =
-        UriComponentsBuilder.fromPath("/api/v1/materials/search")
-            .queryParam("size", MATERIAL_PICKER_LIMIT)
-            .toUriString();
     return proxy(
         "Load Materialbörse request materials failed",
-        () ->
-            q == null || q.isBlank()
-                ? backendApiClient.get(base, RAW)
-                : backendApiClient.get(base + "&search={search}", RAW, q));
+        () -> materialExchangeClient.requestMaterials(q, MATERIAL_PICKER_LIMIT));
   }
 
   /**
@@ -496,18 +459,10 @@ public class MaterialboersePageController {
       Double minAmount,
       String sort,
       boolean excludeStolen) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/material-exchange/offers")
-            .queryParam("tab", tab)
-            .queryParam("size", BOARD_SIZE);
-    appendIfPresent(uri, "minQuality", minQuality);
-    appendIfPresent(uri, "minAmount", minAmount);
-    appendIfPresent(uri, "sort", sort);
-    if (excludeStolen) {
-      uri.queryParam("excludeStolen", true);
-    }
     try {
-      PageResponse<MaterialExchangeOfferDto> page = backendGetWithQuery(uri, q, OFFERS_PAGE);
+      PageResponse<MaterialExchangeOfferDto> page =
+          materialExchangeClient.offers(
+              new BoardFilter(tab, BOARD_SIZE, minQuality, minAmount, sort, q), excludeStolen);
       return page == null ? List.of() : page.content();
     } catch (BackendServiceException e) {
       log.debug("Failed to load Materialbörse board", e);
@@ -531,8 +486,7 @@ public class MaterialboersePageController {
       return null;
     }
     try {
-      return backendApiClient.get(
-          "/api/v1/material-exchange/offers/" + offerId, MaterialExchangeOfferDto.class);
+      return materialExchangeClient.offer(offerId);
     } catch (BackendServiceException e) {
       log.debug("Failed to load Materialbörse offer {}", offerId, e);
       return null;
@@ -549,8 +503,7 @@ public class MaterialboersePageController {
    */
   private MaterialExchangeCountsDto loadCounts() {
     try {
-      return backendApiClient.get(
-          "/api/v1/material-exchange/counts", MaterialExchangeCountsDto.class);
+      return materialExchangeClient.offerCounts();
     } catch (BackendServiceException e) {
       log.debug("Failed to load Materialbörse counts", e);
       return new MaterialExchangeCountsDto(0, 0);
@@ -589,15 +542,10 @@ public class MaterialboersePageController {
    */
   private List<MaterialRequestDto> loadRequests(
       String tab, String q, Integer minQuality, Double minAmount, String sort) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/material-requests")
-            .queryParam("tab", tab)
-            .queryParam("size", BOARD_SIZE);
-    appendIfPresent(uri, "minQuality", minQuality);
-    appendIfPresent(uri, "minAmount", minAmount);
-    appendIfPresent(uri, "sort", sort);
     try {
-      PageResponse<MaterialRequestDto> page = backendGetWithQuery(uri, q, REQUESTS_PAGE);
+      PageResponse<MaterialRequestDto> page =
+          materialExchangeClient.requests(
+              new BoardFilter(tab, BOARD_SIZE, minQuality, minAmount, sort, q));
       return page == null ? List.of() : page.content();
     } catch (BackendServiceException e) {
       log.debug("Failed to load Materialbörse Gesuche board", e);
@@ -621,8 +569,7 @@ public class MaterialboersePageController {
       return null;
     }
     try {
-      return backendApiClient.get(
-          "/api/v1/material-requests/" + requestId, MaterialRequestDto.class);
+      return materialExchangeClient.request(requestId);
     } catch (BackendServiceException e) {
       log.debug("Failed to load Materialbörse request {}", requestId, e);
       return null;
@@ -639,8 +586,7 @@ public class MaterialboersePageController {
    */
   private MaterialExchangeCountsDto loadRequestCounts() {
     try {
-      MaterialExchangeCountsDto counts =
-          backendApiClient.get("/api/v1/material-requests/counts", MaterialExchangeCountsDto.class);
+      MaterialExchangeCountsDto counts = materialExchangeClient.requestCounts();
       return counts == null ? new MaterialExchangeCountsDto(0, 0) : counts;
     } catch (BackendServiceException e) {
       log.debug("Failed to load Materialbörse Gesuche counts", e);
@@ -670,45 +616,6 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Runs an authenticated backend GET, appending the free-text {@code q} as a URI-template variable
-   * so it is encoded exactly once (REQ-MARKET-002/014).
-   *
-   * @param uri the pre-built URI (path plus every safe, non-free-text query parameter).
-   * @param q the free-text search fragment, or {@code null}/blank for no filter.
-   * @param responseType the decoded response type.
-   * @param <T> the response body type.
-   * @return the decoded backend response.
-   */
-  private <T> T backendGetWithQuery(
-      @NotNull UriComponentsBuilder uri,
-      @Nullable String q,
-      @NotNull ParameterizedTypeReference<T> responseType) {
-    String base = uri.toUriString();
-    if (q == null || q.isBlank()) {
-      return backendApiClient.get(base, responseType);
-    }
-    String separator = base.indexOf('?') >= 0 ? "&" : "?";
-    return backendApiClient.get(base + separator + "q={q}", responseType, q);
-  }
-
-  /**
-   * Appends a query parameter when its value is present (and, for a string, non-blank).
-   *
-   * @param uri the builder.
-   * @param name the parameter name.
-   * @param value the value, or {@code null}.
-   */
-  private static void appendIfPresent(UriComponentsBuilder uri, String name, Object value) {
-    if (value == null) {
-      return;
-    }
-    if (value instanceof String s && s.isBlank()) {
-      return;
-    }
-    uri.queryParam(name, value);
-  }
-
-  /**
    * Parses a UUID string leniently.
    *
    * @param value the string, or {@code null}.
@@ -721,7 +628,7 @@ public class MaterialboersePageController {
     }
     try {
       return UUID.fromString(value);
-    } catch (IllegalArgumentException ignored) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

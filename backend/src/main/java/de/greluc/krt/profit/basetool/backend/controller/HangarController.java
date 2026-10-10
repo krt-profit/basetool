@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation;
+import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
@@ -34,8 +36,6 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.service.HangarService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
-import de.greluc.krt.profit.basetool.backend.support.Permissions;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -108,6 +108,7 @@ public class HangarController {
    * @param page zero-based page index
    * @param size page size
    * @param search optional case-insensitive ship-type/manufacturer name filter; blank means none
+   * @param fitted optional fitted filter; absent means fitted and unfitted ships
    * @return one ordered, optionally filtered page of the caller's ships
    */
   @GetMapping("/my-ships")
@@ -116,10 +117,12 @@ public class HangarController {
       @AuthenticationPrincipal Jwt jwt,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String search) {
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false) Boolean fitted) {
     Pageable pageable = PaginationUtil.createUnsortedPageRequest(page, size);
     Page<Ship> p =
-        hangarService.getMyShipsFiltered(userService.getUserIdFromJwt(jwt), search, pageable);
+        hangarService.getMyShipsFiltered(
+            userService.getUserIdFromJwt(jwt), search, fitted, pageable);
     return PageResponse.of(p.map(shipMapper::toDto));
   }
 
@@ -259,7 +262,7 @@ public class HangarController {
   @Transactional
   public ShipDto addUserShip(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid ShipRequestDto shipRequest) {
-    return shipMapper.toDto(hangarService.addShip(userId, shipRequest));
+    return shipMapper.toDto(hangarService.addShipByAdmin(userId, shipRequest));
   }
 
   /** Admin-only: updates a target user's ship. */
@@ -270,7 +273,7 @@ public class HangarController {
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID shipId,
       @RequestBody @Valid @NotNull ShipRequestDto shipRequest) {
-    return shipMapper.toDto(hangarService.updateShip(userId, shipId, shipRequest));
+    return shipMapper.toDto(hangarService.updateShipByAdmin(userId, shipId, shipRequest));
   }
 
   /** Admin-only: deletes a target user's ship. */
@@ -278,7 +281,7 @@ public class HangarController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteUserShip(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID shipId) {
-    hangarService.deleteShip(userId, shipId);
+    hangarService.deleteShipByAdmin(userId, shipId);
   }
 
   /**

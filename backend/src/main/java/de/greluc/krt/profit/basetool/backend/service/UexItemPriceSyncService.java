@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.config.UexProperties;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexItemPriceDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
@@ -26,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.model.GameItemPrice;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
-import de.greluc.krt.profit.basetool.backend.support.StalePriceSweep;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;

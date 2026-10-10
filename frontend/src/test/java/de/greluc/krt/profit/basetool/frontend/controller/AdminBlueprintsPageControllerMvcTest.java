@@ -20,12 +20,14 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -37,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -104,7 +107,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersSwapWrapper() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(1));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page(1));
 
     mockMvc
         .perform(get("/admin/blueprints"))
@@ -116,7 +119,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentResults_rendersOnlyInnerFragment() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(60));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page(60));
 
     mockMvc
         .perform(get("/admin/blueprints").param("fragment", "results"))
@@ -127,10 +130,74 @@ class AdminBlueprintsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"admin-bp-results\""))));
   }
 
+  /**
+   * The full page renders on the list pattern (REQ-UI-027): page head with the master-data eyebrow
+   * and count, the live search outside the swapped fragment, and the table inside a flush card.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_fullPage_rendersTheListPattern() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page(1));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/blueprints").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .contains("data-list-count-for=\"admin-bp-results\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("btn--cta")
+        .contains("id=\"admin-bp-results\" class=\"card card--flush\"")
+        .contains("data-list-total=\"1\"");
+    String filter = html.substring(html.indexOf("id=\"admin-bp-filter\""));
+    assertThat(filter.substring(0, filter.indexOf("</form>")))
+        .contains("data-testid=\"toolbar-search\"")
+        .contains("name=\"search\"")
+        .doesNotContain("type=\"submit\"");
+    assertThat(html.indexOf("id=\"admin-bp-filter\""))
+        .isLessThan(html.indexOf("id=\"admin-bp-results\""));
+  }
+
+  /**
+   * An empty result renders the empty state instead of a colspan row.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_emptyResult_rendersTheEmptyState() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.<BlueprintDto>of(), 0, 25, 0, 0, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/blueprints").param("fragment", "results"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("data-testid=\"empty-state\"")
+        .doesNotContain("class=\"bp-table\"")
+        .doesNotContain("colspan")
+        .doesNotContain("data-list-total");
+  }
+
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_passesMultiWordSearchAsUriVariable() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page(1));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page(1));
 
     mockMvc
         .perform(get("/admin/blueprints").param("search", "Omni Sky").param("fragment", "results"))
@@ -138,7 +205,8 @@ class AdminBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> termCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture());
+    verify(backendApiClient)
+        .get(uriCaptor.capture(), anyTypeRef(), eq(25), eq(0), termCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("search={search}"), uriCaptor.getValue());
     assertEquals("Omni Sky", termCaptor.getValue());
   }
@@ -146,7 +214,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_passesUmlautSearchAsUriVariable_notFormEncoded() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page(1));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page(1));
 
     String term = "Größe Röhre";
     mockMvc
@@ -155,7 +223,8 @@ class AdminBlueprintsPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> termCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture());
+    verify(backendApiClient)
+        .get(uriCaptor.capture(), anyTypeRef(), eq(25), eq(0), termCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("search={search}"), uriCaptor.getValue());
     assertEquals(term, termCaptor.getValue());
   }

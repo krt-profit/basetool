@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -111,12 +112,14 @@ public interface MissionRepository
    * @return the mission (at most one element), with its unit graph initialised
    */
   @Query(
-      "SELECT m FROM Mission m LEFT JOIN FETCH m.assignedUnits u"
-          + " LEFT JOIN FETCH u.shipType ust LEFT JOIN FETCH ust.manufacturer"
-          + " LEFT JOIN FETCH u.ship s LEFT JOIN FETCH s.shipType sst"
-          + " LEFT JOIN FETCH sst.manufacturer LEFT JOIN FETCH s.location"
-          + " LEFT JOIN FETCH s.owner LEFT JOIN FETCH u.responsibleUser"
-          + " WHERE m.id = :id")
+      """
+      SELECT m FROM Mission m LEFT JOIN FETCH m.assignedUnits u
+      LEFT JOIN FETCH u.shipType ust LEFT JOIN FETCH ust.manufacturer
+      LEFT JOIN FETCH u.ship s LEFT JOIN FETCH s.shipType sst
+      LEFT JOIN FETCH sst.manufacturer LEFT JOIN FETCH s.location
+      LEFT JOIN FETCH s.owner LEFT JOIN FETCH u.responsibleUser
+      WHERE m.id = :id
+      """)
   List<Mission> fetchAssignedUnitGraph(@Param("id") UUID id);
 
   /**
@@ -212,6 +215,15 @@ public interface MissionRepository
   void removeManager(@Param("userId") UUID userId);
 
   /**
+   * Returns every mission linked to the operation, for the detach before the operation is deleted.
+   *
+   * @param operationId the operation whose missions are returned
+   * @return the linked missions, empty when none is linked
+   */
+  @Query("SELECT m FROM Mission m WHERE m.operation.id = :operationId")
+  List<Mission> findAllLinkedToOperation(@Param("operationId") UUID operationId);
+
+  /**
    * Returns whether any mission of the operation lacks {@code actualStartTime} or {@code
    * actualEndTime}, i.e. whether the operation's payout figures are still preliminary.
    *
@@ -236,8 +248,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.coreVersion = m.coreVersion + 1 WHERE m.id = :id"
-          + " AND m.coreVersion = :expected")
+      """
+      UPDATE Mission m SET m.coreVersion = m.coreVersion + 1 WHERE m.id = :id
+      AND m.coreVersion = :expected
+      """)
   int bumpCoreVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -250,8 +264,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.scheduleVersion = m.scheduleVersion + 1 WHERE m.id = :id"
-          + " AND m.scheduleVersion = :expected")
+      """
+      UPDATE Mission m SET m.scheduleVersion = m.scheduleVersion + 1 WHERE m.id = :id
+      AND m.scheduleVersion = :expected
+      """)
   int bumpScheduleVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -264,8 +280,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.flagsVersion = m.flagsVersion + 1 WHERE m.id = :id"
-          + " AND m.flagsVersion = :expected")
+      """
+      UPDATE Mission m SET m.flagsVersion = m.flagsVersion + 1 WHERE m.id = :id
+      AND m.flagsVersion = :expected
+      """)
   int bumpFlagsVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -278,8 +296,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.partyLeadVersion = m.partyLeadVersion + 1 WHERE m.id = :id"
-          + " AND m.partyLeadVersion = :expected")
+      """
+      UPDATE Mission m SET m.partyLeadVersion = m.partyLeadVersion + 1 WHERE m.id = :id
+      AND m.partyLeadVersion = :expected
+      """)
   int bumpPartyLeadVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -292,8 +312,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.stepsVersion = m.stepsVersion + 1 WHERE m.id = :id"
-          + " AND m.stepsVersion = :expected")
+      """
+      UPDATE Mission m SET m.stepsVersion = m.stepsVersion + 1 WHERE m.id = :id
+      AND m.stepsVersion = :expected
+      """)
   int bumpStepsVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -306,8 +328,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.objectivesVersion = m.objectivesVersion + 1 WHERE m.id = :id"
-          + " AND m.objectivesVersion = :expected")
+      """
+      UPDATE Mission m SET m.objectivesVersion = m.objectivesVersion + 1 WHERE m.id = :id
+      AND m.objectivesVersion = :expected
+      """)
   int bumpObjectivesVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -320,8 +344,10 @@ public interface MissionRepository
    */
   @Modifying
   @Query(
-      "UPDATE Mission m SET m.owningOrgUnitVersion = m.owningOrgUnitVersion + 1 WHERE m.id = :id"
-          + " AND m.owningOrgUnitVersion = :expected")
+      """
+      UPDATE Mission m SET m.owningOrgUnitVersion = m.owningOrgUnitVersion + 1 WHERE m.id = :id
+      AND m.owningOrgUnitVersion = :expected
+      """)
   int bumpOwningOrgUnitVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
@@ -337,4 +363,71 @@ public interface MissionRepository
   @EntityGraph(attributePaths = {"participants"})
   @Query("SELECT m FROM Mission m WHERE m.id = :id")
   Optional<Mission> findByIdForFullReplace(@Param("id") UUID id);
+
+  /**
+   * Returns the id of the member who owns a mission.
+   *
+   * @param id the mission
+   * @return the owner's user id, or empty for an ownerless mission
+   */
+  @Query("SELECT m.owner.id FROM Mission m WHERE m.id = :id AND m.owner IS NOT NULL")
+  Optional<UUID> findOwnerUserIdById(@Param("id") UUID id);
+
+  /**
+   * Returns the ids of the co-managers of a mission.
+   *
+   * @param id the mission
+   * @return the managers' user ids; never {@code null}, possibly empty
+   */
+  @Query("SELECT u.id FROM Mission m JOIN m.managers u WHERE m.id = :id")
+  Set<UUID> findManagerUserIdsById(@Param("id") UUID id);
+
+  /**
+   * Returns the planned missions that reach the 24-hour mark in the given window and have not been
+   * reminded of it yet (REQ-MISSION-022).
+   *
+   * @param from the earliest start time, inclusive
+   * @param to the latest start time, inclusive
+   * @return the missions; never {@code null}
+   */
+  @Query(
+      """
+      SELECT m FROM Mission m
+      WHERE m.status = 'PLANNED' AND m.reminder24hSentAt IS NULL
+        AND COALESCE(m.meetingTime, m.plannedStartTime) BETWEEN :from AND :to
+      """)
+  List<Mission> findDueForReminder24h(@Param("from") Instant from, @Param("to") Instant to);
+
+  /**
+   * Returns the planned missions that start within the given window and have not been reminded of
+   * it yet (REQ-MISSION-022).
+   *
+   * @param from the earliest start time, exclusive
+   * @param to the latest start time, inclusive
+   * @return the missions; never {@code null}
+   */
+  @Query(
+      """
+      SELECT m FROM Mission m
+      WHERE m.status = 'PLANNED' AND m.reminder1hSentAt IS NULL
+        AND COALESCE(m.meetingTime, m.plannedStartTime) > :from
+        AND COALESCE(m.meetingTime, m.plannedStartTime) <= :to
+      """)
+  List<Mission> findDueForReminder1h(@Param("from") Instant from, @Param("to") Instant to);
+
+  /**
+   * Returns the active or completed missions whose planned end is before the cutoff and that have
+   * no actual end time and no never-ended notice yet (REQ-MISSION-025).
+   *
+   * @param cutoff the latest planned end that counts as overdue
+   * @return the missions; never {@code null}
+   */
+  @Query(
+      """
+      SELECT m FROM Mission m
+      WHERE m.status IN ('ACTIVE', 'COMPLETED') AND m.actualEndTime IS NULL
+        AND m.neverEndedNotifiedAt IS NULL AND m.plannedEndTime IS NOT NULL
+        AND m.plannedEndTime < :cutoff
+      """)
+  List<Mission> findOverdueWithoutEnd(@Param("cutoff") Instant cutoff);
 }

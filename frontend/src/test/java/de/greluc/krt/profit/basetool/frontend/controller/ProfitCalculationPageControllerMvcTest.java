@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -28,10 +29,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,8 +70,8 @@ class ProfitCalculationPageControllerMvcTest {
     ShipTypeDto c2 = new ShipTypeDto(c2Id, "C2 Hercules Starlifter", null, "C2", 696, false);
     PageResponse<ShipTypeDto> shipTypes = new PageResponse<>(List.of(c2), 0, 10, 1, 1, List.of());
 
-    PageResponse<Map<String, Object>> terminals =
-        new PageResponse<>(List.of(Map.of("starSystemName", "Stanton")), 0, 10, 1, 1, List.of());
+    PageResponse<TerminalDto> terminals =
+        new PageResponse<>(List.of(stantonTerminal()), 0, 10, 1, 1, List.of());
 
     when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(shipTypes);
@@ -93,8 +95,7 @@ class ProfitCalculationPageControllerMvcTest {
     PageResponse<ShipTypeDto> shipTypes =
         new PageResponse<>(List.of(titan), 0, 10, 1, 1, List.of());
 
-    PageResponse<Map<String, Object>> terminals =
-        new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
+    PageResponse<TerminalDto> terminals = new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
     when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(shipTypes);
@@ -106,6 +107,52 @@ class ProfitCalculationPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("materials-profit-calculation"))
         .andExpect(model().attributeDoesNotExist("defaultShipId"));
+  }
+
+  /**
+   * The page renders on the calculator pattern: page head, the inputs in one card with the ship
+   * select (Hull C ships marked), the systems dropdown and the hidden Hull C chip, and the result
+   * table with its state line instead of a colspan message row.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void showProfitCalculationPage_rendersTheCalculatorPattern() throws Exception {
+    ShipTypeDto hullC =
+        new ShipTypeDto(UUID.randomUUID(), "MISC Hull C", null, "Hull C", 4608, false);
+    ShipTypeDto titan =
+        new ShipTypeDto(UUID.randomUUID(), "Avenger Titan", null, "Titan", 8, false);
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(hullC, titan), 0, 10, 2, 1, List.of()));
+    when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(stantonTerminal()), 0, 10, 1, 1, List.of()));
+
+    String html =
+        mockMvc
+            .perform(get("/materials/profit-calculation").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Handel<")
+        .containsPattern("<h1>Profitberechnung</h1>")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("krtm-")
+        .doesNotContain("colspan")
+        .doesNotContain("btn--cta")
+        .doesNotContain("window.krtProfitI18n")
+        .contains("class=\"card profit-inputs\"")
+        .containsPattern("data-hull-c=\"true\"[^>]*>MISC Hull C · 4608 SCU<")
+        .containsPattern("data-hull-c=\"false\"[^>]*>Avenger Titan · 8 SCU<")
+        .containsPattern("id=\"systemHeader\"[^>]*aria-controls=\"systemOptions\"")
+        .containsPattern("id=\"systemOptions\"[^>]*data-filter-transient")
+        .containsPattern("id=\"profitHullC\"[^>]*hidden")
+        .contains("id=\"resultsTable\" class=\"data-table data-table--stack profit-table\"")
+        .contains("<tbody id=\"profitBody\"></tbody>")
+        .contains("id=\"profitState\"");
   }
 
   @Test
@@ -120,8 +167,7 @@ class ProfitCalculationPageControllerMvcTest {
     PageResponse<ShipTypeDto> shipTypes =
         new PageResponse<>(List.of(gladius, titan, noScu), 0, 10, 3, 1, List.of());
 
-    PageResponse<Map<String, Object>> terminals =
-        new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
+    PageResponse<TerminalDto> terminals = new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
     when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(shipTypes);
@@ -132,5 +178,29 @@ class ProfitCalculationPageControllerMvcTest {
         .perform(get("/materials/profit-calculation"))
         .andExpect(status().isOk())
         .andExpect(model().attribute("shipTypes", List.of(titan)));
+  }
+
+  /**
+   * Builds a Stanton terminal row of the cached terminal catalogue.
+   *
+   * @return the terminal
+   */
+  private static TerminalDto stantonTerminal() {
+    return new TerminalDto(
+        UUID.fromString("0d6b3e1a-7c42-4f58-9a1e-3b5c7d9e2f40"),
+        "Area18 TDD",
+        null,
+        "Stanton",
+        "ArcCorp",
+        "Area18",
+        null,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        null,
+        false);
   }
 }

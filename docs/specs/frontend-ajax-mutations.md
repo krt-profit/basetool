@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
 > **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165, ADR-0206, ADR-0239
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
@@ -177,9 +177,65 @@ handover PDF preview) and, on `write`, `bodyOnDelete` (the Lager allocation remo
 reads a body); a 2xx result also reports `redirected`, so a caller that swaps an HTML body can refuse
 a followed redirect.
 
-**Enforced by:** `:frontend:lintJs` (`no-restricted-syntax`), per-area double-submit e2e (incl.
+> [!note] Amended 2026-10-04 — every raw `fetch` is rejected (REQ-FE-031)
+> The `no-restricted-syntax` selector above, which saw only an inline `method` other than `GET`, is
+> gone: `eslint.config.mjs` now rejects every `fetch(…)` and `window` / `globalThis` / `self`
+> `.fetch` outside the two exempt files (`no-restricted-globals`, `no-restricted-properties`), and
+> `XMLHttpRequest` everywhere. That also closes the gap of an init built in another function.
+
+**Enforced by:** `:frontend:lintJs` (`no-restricted-globals`, `no-restricted-properties`),
+`:frontend:testEslintBans`, per-area double-submit e2e (incl.
 `AdminMaterialCreateInPlaceE2eTest`) · **Code:** `krt-fetch.js` (`write`, `submitForm`, `send`,
 `resolveSubmitter`), `eslint.config.mjs` · **Issues:** #572, #916, #1133
+
+### REQ-FE-031 — Every read goes through `krtFetch.get` / `krtFetch.getJson`
+
+A background read — a picker's remote source, a lazily loaded fragment, a poll, a report download —
+behaves on session loss and at the consent gate exactly like a write. There is one read path in
+`krt-fetch.js`:
+
+- **`krtFetch.get(url, opts)`** sends a same-origin `GET` that always carries
+  `X-Requested-With: XMLHttpRequest`, so the entry point and the terms gate answer `401` +
+  `X-Reauthenticate` or `X-Terms-Acceptance-Required` instead of a redirect (REQ-SEC-012,
+  REQ-SEC-028). It offers every answer to both gates first and resolves **null** when one of them
+  navigated away or when the answer came through a redirect, which for a background read is a login
+  or consent page rather than the resource. Any other answer is resolved as the `Response`, ok or
+  not; a transport failure or an abort rejects, as `fetch` does. `opts`: `accept`, extra `headers`,
+  an `AbortSignal` (`signal`), and a supersede `key` — a later read with the same key aborts the
+  earlier one still in flight.
+- **`krtFetch.getJson(url, opts)`** reads through `get` with `Accept: application/json` and resolves
+  the parsed body of a 2xx JSON answer (null for a `204`). Anything else rejects with a
+  `KrtReadError` (`reason` `refused` / `status` / `not-json`, the `status`, and the parsed problem
+  of a non-2xx JSON answer): a redirected or non-JSON answer is never parsed as the payload.
+- `krtFetch.swap` reads through `get` as well.
+
+**Pickers and other reads that went empty on session loss now send the member to the login.** That
+is the intended contract: a remote picker used to answer a lost session with "no matches", which
+reads as "the member does not exist". A refused read otherwise takes the call site's existing
+failure path (its fallback value or its error toast).
+
+Only `krt-fetch.js` (the transport) and `krt-client-error.js` (the beacon, which must work when
+`krtFetch` did not load) call `fetch`; `XMLHttpRequest` is banned in every file. Inline template
+scripts are not linted (ADR-0069), so the same rule is pinned against the shipped scripts **and**
+templates by a Java test.
+
+**Acceptance**
+
+- [x] No script outside the two transport files and no template calls `fetch` or uses
+  `XMLHttpRequest`. *`:frontend:lintJs`, `BackgroundReadGateContractTest`.*
+- [x] `get` runs both gates, always sends the background marker and refuses a redirected answer;
+  `getJson` refuses a non-JSON or non-2xx answer; a supersede key aborts the earlier read.
+  *`:frontend:testKrtFetchReadJs`.*
+- [x] The bans fire on planted sources. *`:frontend:testEslintBans`,
+  `BackgroundReadGateContractTest#theRawRequestMatcher_seesEveryShapeItRejects`.*
+- [x] A remote picker typed into after the session is gone shows the Keycloak login.
+  *`PickerSessionLossE2eTest`.*
+
+**Enforced by:** `:frontend:lintJs` (`no-restricted-globals`, `no-restricted-properties`),
+`:frontend:testEslintBans`, `:frontend:testKrtFetchReadJs`, `BackgroundReadGateContractTest`,
+`PickerSessionLossE2eTest` · **Code:** `krt-fetch.js` (`get`, `getJson`, `swap`),
+`types/globals.d.ts` (`KrtReadOpts`, `KrtReadError`), `eslint.config.mjs` · **ADR:** ADR-0012,
+ADR-0239 · **Plan:** domain modularisation §8.2 ("One read path")
 
 ### REQ-FE-022 — Every HTML sink is escaped or a trusted server fragment
 
@@ -351,8 +407,11 @@ The operations area (#576) combines the patterns through a set of `X-Requested-W
 (`createOperationAjax` / `updateOperationAjax` / `deleteOperationAjax`) beside the classic
 POST→redirect fallbacks. Creating or deleting from the list re-renders `#operations-results` via the
 existing `GET /operations?fragment=results` swap (the page exposes `window.krtOperationsReload` so the
-write handlers reuse the active filter query); editing on the detail page patches the version input
-and the title in place from the twin's `{version, name, status}` (the backend PUT echoes the
+write handlers reuse the active filter query); editing on the detail page — since 2026-10-03 in
+the „Bearbeiten" dialog — patches the version input from the twin's `{version, name, status}`,
+adopts the saved values as the form's defaults, closes the dialog and re-renders the overview
+fragment, whose head meta repaints the title, the status badge and the KPI bar (the backend PUT
+echoes the
 persisted operation in-transaction, so no second round-trip can observe a concurrent writer's
 `version+2` or mask an already-committed write — no navigation); deleting
 from the detail page navigates back to the list (the entity is gone — REQ-FE-006). The payout
@@ -455,7 +514,9 @@ writes for in-place fragment swaps. The two admin pages re-render their list reg
 mutation: **topics/categories** create / edit / delete and the up/down **reorder** swap
 `promotion-admin-topics :: topicsResults` into `#pa-topics-results`, and the **rank-requirements**
 create / edit / delete + group-delete swap `promotion-admin-rank-requirements :: ranksResults` into
-`#ar-results`. A full server re-render is exactly what re-syncs every card's `@Version`, sort order
+`#ar-results`. The topics swap requests `?topic=<selected id>` (2026-10-03, REQ-PROMO-003), so the
+master-detail keeps the selected topic open across every write and a freshly created topic opens
+selected. A full server re-render is exactly what re-syncs every card's `@Version`, sort order
 and first/last arrow state, so a second reorder can no longer 409 — and the reorder no longer relies
 on a non-existent GET-by-id proxy route (it now reads the full DTO each PUT needs straight from the
 card's edit-button data attributes). The **manage** matrix already saved grades in place through its
@@ -486,7 +547,12 @@ two Staffel slots (REQ-ORG-017, up to two) each carry their own flags and save t
 `{field: message}` membership-delta twin (REQ-FE-007).
 The profile payout-preference form joins the description form on `krtFetch.write` (both echo the one
 shared user-row version), and the home-page mark-announcement-read posts in place and removes its
-control. The one reload deliberately kept is the sidebar active-OrgUnit switcher: switching the
+control. Since 2026-10-03 the profile is one settings page (REQ-UI-027): its four sections keep
+their forms and endpoints, and one save bar — shown only while a section differs from what was
+loaded — writes the changed sections one after another, each with the version the previous write
+returned, stops at the first failure (the failed and later sections stay marked changed), and
+copies the new version into all four forms. A `<noscript>` button per section keeps the plain form
+post (REQ-SEC-072). The one reload deliberately kept is the sidebar active-OrgUnit switcher: switching the
 org-unit re-scopes every list, count and entity on the page through `OwnerScopeService`, so the
 existing controlled full navigation (`POST /me/active-org-unit` → `_referer` redirect) is the correct
 UX — an "in-place" swap would amount to re-rendering the whole page anyway (REQ-ORG-\*).
@@ -500,6 +566,10 @@ same `?fragment=…` fragment the include-inactive filters already swap, plus a 
 `special-command-detail :: membersResults` fragment for the member roster. A full server re-render is
 exactly what re-syncs every row's `@Version`, the active / role / lead badges and the frequency
 ordering, so a second action can no longer 409, and the reorder drops its `location.reload()`.
+Since 2026-10-03 mission-data is a master-detail over its three data kinds (Staffeln · Aufgaben ·
+Frequenztypen): the selected kind is the `?kind=squadrons|jobtypes|freqtypes` deep link, rewritten
+in place on every selection, sent along with the include-inactive swaps, and a validation
+re-render opens the kind whose dialog failed.
 **announcement** (update / delete), **material-aliases** (create / update / delete), **material
 categories** (create / delete) and **admin-settings** (the five-version save) patch their own
 row / version inputs in place; settings validation failures and material-category conflicts come back
@@ -516,7 +586,18 @@ Two later changes on the same pages (2026-09-22). The SK **detail page** moved o
 area to `/organisation/special-commands/{id}` (`SpecialCommandMembersPageController`, ADR-0198),
 because an SK lead manages the roster there too; its member twins and the
 `organisation/special-command-detail :: membersResults` swap moved with it unchanged, and only the
-admin-only lead toggle still posts to `/admin/special-commands/{id}/members/{userId}/lead`. And
+admin-only lead toggle still posts to `/admin/special-commands/{id}/members/{userId}/lead`. Since
+2026-10-03 the roster is one fragment, `organisation/unit-detail :: skRoster`, rendered both there
+and in the selected SK on „Leitung" (REQ-ROLE-004): the same member twins write it, and each
+rendering names its own re-render in `data-refresh-url` / `-container` / `-fragment` — the member
+page swaps `#members-results`, „Leitung" swaps `#leitung-sections`
+(`?unit=<id>&fragment=leitungSections`), and on „Leitung" the lead toggle posts to the delegated
+`/organisation/leitung/special-commands/{id}/members/{userId}/lead/ajax` proxy. The flag toggles,
+the removal and the member page's admin lead toggle stay `<form method="post">` that the script
+intercepts, so their classic handlers keep the no-JS path; the delegated lead toggle on „Leitung"
+is a script-only button, like the rest of that page. The Leitung page's rank and Kommandogruppe
+selects save on `change` through `krtFetch.write` with the row `version` (no save button),
+conflicts through the shared reload-confirm. And
 **notification-rules** dropped its `location.reload()` after save / delete: it re-swaps its
 `admin/notification-rules :: rules` table fragment (`?fragment=rules`) instead (REQ-NOTIF-007).
 Neither page takes part in the live multi-user sync — no admin catalogue page does, except the org
@@ -823,8 +904,8 @@ notification SSE registry carries the same two fixes (#1157 / #1156, see REQ-NOT
 - [ ] With the same mission open in two sessions, a mutation by user A (participant add, crew move,
   finance entry, manager/owner change, core/schedule/status/party-lead edit, Ablauf-step,
   Ziele-objective or frequency/custom-frequency edit) appears on user B's view within a short delay
-  without a manual reload — including the Verwaltung steps/objectives/frequencies editors, not only
-  their Übersicht mirrors.
+  without a manual reload — including the edit mode's (formerly Verwaltung)
+  steps/objectives/frequencies editors, not only their Übersicht mirrors.
 - [ ] No mission data crosses the socket — a peer viewer's auto-refresh still renders the
   PII-redacted fragment and the member-only finance section stays gated per viewer.
 - [ ] An incoming change while user B has a modal open (or is editing the affected section) does not
@@ -1312,7 +1393,9 @@ itself, while `missions` (the embedded child-missions table) and `finance` (the 
 `overview → missions` / `finance → finance` onto its parent `operation:{id}` (publishing needs no
 subscription), so an operation viewer refreshes those two sections in place without a reload (#1241).
 The mission page reads its parent operation id from `window.missionOperationId`; a mission with no
-operation forwards nothing.
+operation forwards nothing. The operation page adds `overview` to every section it re-renders for a
+peer, and its own paid-out toggle refreshes `overview` too, because the head, the KPI bar and the
+payout card read their values from the overview fragment (`#operation-head-meta`, 2026-10-03).
 
 **Authorization is asymmetric by design (ADR-0094).** *Subscribing* to a topic requires the same
 authenticated read the page itself performs (table above), checked asynchronously off the WS
@@ -1748,22 +1831,35 @@ constant is added to **both** the declaration file and the module's `global` hea
 
 **The browser baseline is "Baseline 2025" (ES2025)** (owner decision D-16, ADR-0239). The scripts
 may rely on what Chrome 122, Firefox 131 and Safari / iOS 18.4 ship — the floor set by the iterator
-helpers — and nothing newer: `Promise.try`, `RegExp.escape` and `Float16Array` wait until the floor
-moves past them. The type check's `lib` / `target` and ESLint's `ecmaVersion` stay at **ES2023**
-until TypeScript 7 is proven to accept the `ES2025` lib, then rise to 2025 together; until then an
-ES2025 API is used only where the type check already knows it. Trusted Types follow the same
-decision: report-only through the `csp_violation` beacon first, then enforced.
+helpers — and nothing newer. The type check's `lib` / `target` (`tsconfig.json`) and ESLint's
+`ecmaVersion` (`eslint.config.mjs`, browser and Node scripts) are **ES2025**. TypeScript's `ES2025`
+lib also declares `Promise.try`, `RegExp.escape` and `Float16Array`, which the floor does not ship,
+so ESLint rejects those three (`no-restricted-properties`, `no-restricted-globals`) until the floor
+moves past them. Trusted Types follow the same decision: report-only through the `csp_violation`
+beacon first, then enforced.
+
+**Modern syntax is lint-enforced.** `prefer-template`, `prefer-arrow-callback`,
+`prefer-object-has-own`, `radix` and `logical-assignment-operators` are errors for the browser and
+the Node scripts. `?.` and `??` are not enforced: their semantics differ from `&&` / `||` for falsy
+values, so they are introduced by hand in files that opt into `// @ts-check`.
 
 > [!note] Amended 2026-10-02 — the browser baseline (D-16; ADR-0239)
 > The project had no documented baseline; the features already shipped implied Chrome 105,
-> Firefox 121 and Safari 16.4. **Decided, implementation pending:** `tsconfig.json` and
-> `eslint.config.mjs` still target ES2023, and no Trusted Types directive is sent yet.
+> Firefox 121 and Safari 16.4.
+
+> [!note] Amended 2026-10-04 — the language level is ES2025
+> TypeScript 7.0.2 accepts the `ES2025` lib: a planted checked file using `Set.prototype.union`
+> and an iterator helper passes `:frontend:typecheckJs` under ES2025 and fails it under ES2023
+> (TS2550, TS2339). `tsconfig.json` and `eslint.config.mjs` moved to 2025 together, and the five
+> modern-syntax rules above were enabled with their autofix applied. No Trusted Types directive is
+> sent yet.
 
 **JSDoc must be JSDoc.** In a checked file, `{@code …}` / `{@link …}` / `@param name {shape}` —
 Javadoc spellings this repo uses elsewhere — are parsed as type syntax and are hard errors.
 Convert them when opting a file in.
 
-> **Verification** — **Gate:** `./gradlew :frontend:typecheckJs` (strict, in `check`) ·
+> **Verification** — **Gate:** `./gradlew :frontend:typecheckJs` (strict, in `check`),
+> `:frontend:lintJs` and `:frontend:testEslintBans` (the language level and the baseline bans) ·
 > **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
 > `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
 > `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
@@ -1831,7 +1927,7 @@ and 1500 ms for a global one, full-jittered. Frames consumed from Redis bypass t
 — they were already accepted where they originated.
 
 **Authorization is the real read, not a proxy for it.** Each room's gate is the gate of the fetch it
-provokes (`ownerScopeService.canSeeMission`, `canSeeJobOrder`, `canViewJobOrders`, …), asked
+provokes (`missionAccessPolicy.canSeeMission`, `canSeeJobOrder`, `canViewJobOrders`, …), asked
 synchronously of the backend's own data. There is no fail-open branch, because unlike the frontend's
 authorizer there is no indeterminate verdict to resolve; a check that throws refuses the room.
 
@@ -1866,7 +1962,10 @@ registry: the admin area is web-only permanently, so a room there would have no 
 - [x] Both buckets bound what they are meant to, and one member's flood does not cost another theirs
   (`LiveSyncRelayServiceTest`).
 - [x] Each room's gate is its own read's gate; a throwing check refuses
-  (`LiveSyncSubscriptionAuthorizerTest`).
+  (`LiveSyncSubscriptionAuthorizerTest`). The owning module asks it through its
+  `livesync.api.LiveSyncTopicAuthorizer`; every kind but the member and self rooms has exactly one,
+  or the backend does not start (`LiveSyncSubscriptionAuthorizerTest`,
+  `LiveSyncTopicAuthorizersTest`).
 - [x] The backend registry is a subset of the frontend's, staff rooms excluded
   (`LiveSyncTopicRegistryParityTest`).
 - [x] **A Redis that is unreachable at startup does not stop the backend from starting**; the
@@ -1892,7 +1991,8 @@ registry: the admin area is web-only permanently, so a room there would have no 
 > anyway, in the keyspace-notification initializer, before any `SmartLifecycle` runs.
 >
 > **Code:** `backend/…/controller/LiveSyncController`, `backend/…/service/LiveSyncStreamService`,
-> `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `RedisLiveSyncFanout`,
+> `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `backend/…/livesync/api/LiveSyncTopicAuthorizer`
+> and its `*LiveSyncTopicAuthorizer` implementations, `RedisLiveSyncFanout`,
 > `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `NotificationRedisConfig`,
 > `backend/…/support/ResilientRedisMessageListenerContainer`, `backend/…/support/LiveSyncTopic`,
 > `LiveSyncTopicClass`, `LiveSyncAuthorization` · **ADR:** ADR-0143 (ADR-0094 unchanged) ·
@@ -1975,14 +2075,27 @@ ADR-0165
 
 ### REQ-FE-021 — A list page's filters collapse behind one toggle
 
+> **Amended 2026-10-03 (website overhaul phases 1–3).** Every list page now renders its filter block
+> as the toolbar's transient filter popover (`fragments/components :: filterPopover`, REQ-UI-027):
+> it keeps the `.filter-toggle` / `.filter-panel` contract, the count badge and the
+> script-collapses-a-rendered-panel fallback below, but it **always starts closed and stores no
+> open/closed preference** — the third property below is retired. No page uses `filterToggle` any
+> more; active filters are additionally shown as `.filter-chips`.
+>
+> **Amended 2026-10-04 (phase 4):** the unused `components :: filterToggle` fragment and the stored
+> preference (`krt.filterPanel.<name>` in localStorage) are removed: `krt-filter-panel.js` treats every
+> `[data-filter-panel]` as the transient popover, so `data-filter-transient` on the markup only marks
+> that contract. The text below describes the toggle as first built.
+
 Every list page whose filter block carries **more than a single control** must render that block as
 a collapsible panel: the block gets `data-filter-panel="<page>"`, and the shared
 `fragments/components :: filterToggle` sits beside it in an `actions-bar` that also carries the
 page's primary action. `krt-filter-panel.js` wires the two through `aria-controls` alone and is
 loaded globally; a page adds no script of its own.
 
-**A single search field is explicitly out of scope.** Hangar, Staffel-Hangar and Mein Inventar
-filter through one input; putting that behind a toggle costs a tap and saves one row of height,
+**A single search field is explicitly out of scope.** The Hangar (both tabs; „Meine Schiffe" adds
+the readiness segment „Alle · Bereit · Nicht bereit" beside it) and Mein Inventar filter through one
+input; putting that behind a toggle costs a tap and saves one row of height,
 which is a worse screen, not a tidier one. The rule is about blocks that push the list itself off a
 phone — the Einsatz, Operationen, Auftrags, Raffinerie, Mitglieder and Materialübersicht filters
 each fill a viewport on their own.
@@ -2019,8 +2132,8 @@ calls `refresh()` after the swap so a collapsed panel never under-reports.
 > handler, where the deferred script has run and the restored widget state is also in place.
 
 **Enforced by:** `InventoryFilterPanelCollapseE2eTest`, `JobOrderMaterialDemandE2eTest`,
-`InventoryPageControllerMvcTest` (the panel markup and the shared `filterToggle`) · **Code:**
-`krt-filter-panel.js`, `fragments/components.html` (`filterToggle`)
+`InventoryPageControllerMvcTest` (the filters inside the toolbar popover) · **Code:**
+`krt-filter-panel.js`, `fragments/components.html` (`filterPopover`)
 
 ### REQ-FE-023 — Every script is deferred, and an inline script runs nothing at parse time
 
@@ -2162,10 +2275,12 @@ and planted fixtures) · **Code:** `support/Roles`
 
 ### REQ-FE-027 — Every session-bound type is derived from the code and admitted by the allow-list
 
-The session type allow-list of REQ-SEC-067 admits the application's classes by the prefix
-`de.greluc.krt.profit.basetool.frontend.model.`. A flashed form moved out of that package would be
-refused under `enforce` and its flash attribute dropped after the redirect, silently in the UI. The
-set of types the frontend can store in the session is therefore derived from the compiled code:
+The session type allow-list of REQ-SEC-067 admits the application's classes by exact name only,
+from `SessionTypeAllowList.SESSION_BOUND_TYPES` (D-10, since 2026-10-04; before that by the prefix
+`de.greluc.krt.profit.basetool.frontend.model.`, which admitted all 325 classes of that package). A
+session-bound type without an entry would be refused under `enforce` and its flash attribute dropped
+after the redirect, silently in the UI. The set of types the frontend can store in the session is
+therefore derived from the compiled code, and the list must equal it:
 
 - Every call of `RedirectAttributes.addFlashAttribute` / `addAllFlashAttributes`, a `FlashMap`
   write, `HttpSession.setAttribute` and `WebUtils.setSessionAttribute` is resolved to the static type
@@ -2178,24 +2293,29 @@ set of types the frontend can store in the session is therefore derived from the
   application type, transitively — must be admitted by the enforcing validator as production builds
   it. `@SessionAttributes` and session-scoped beans are absent; one appearing fails the build until
   the scan learns about it.
-- The application part of the closure is the **exact list** the allow-list narrows to in its own
-  release (D-10): `frontend/src/test/resources/session/session-bound-types.txt`, 21 types on
-  2026-10-02 (10 flashed forms and DTOs plus their nested types and enums), rewritten with
-  `-PupdateSnapshots`.
-- **No allow-list entry is broader than a model or session package**: an application prefix must
-  name a `model` or `session` package of the frontend, the non-application prefixes stay
-  `org.springframework.security.`, the three name patterns stay the reviewed ones, and an exact name
-  is a plain class name.
+- The application part of the closure **equals** `SessionTypeAllowList.SESSION_BOUND_TYPES`, the
+  exact list the allow-list admits: 21 types on 2026-10-04 (10 flashed forms and DTOs plus their
+  nested types and enums). A derived type without an entry fails the build, and so does an entry no
+  session write reaches; the fix is an edit of that list in the same change, which a reviewer sees
+  in the security class itself. The list replaced the golden file
+  `frontend/src/test/resources/session/session-bound-types.txt` of 2026-10-02, which is gone.
+- **No allow-list entry admits an application class wholesale**: the only prefix is
+  `org.springframework.security.`, the three name patterns stay the reviewed ones, every exact name
+  is a plain class name, and every `SESSION_BOUND_TYPES` entry is one class of the frontend.
 
 **Acceptance**
 
 - [x] 317 session writes are resolved, every type of the closure is admitted, and the exact list
   matches the committed file (2026-10-02).
+- [x] The allow-list admits exactly the derived list: `SESSION_BOUND_TYPES` equals the closure's
+  application types, and a planted session-bound form and row without an entry, plus a stale entry,
+  are each reported, with the enforcing validator refusing the unlisted pair (2026-10-04).
 - [x] A planted flash of a form outside `frontend.model`, a nested row type and a
   `java.util.concurrent` map are each refused; a raw list and an `Object` value are reported as
   unresolved; a planted `@SessionAttributes` is reported.
 - [x] A prefix such as `…frontend.`, `…frontend.mission.`, `de.greluc.` or `java.` is reported as too
-  broad.
+  broad; since 2026-10-04 so is any application prefix, `…frontend.model.` included, and a wildcard
+  or non-frontend `SESSION_BOUND_TYPES` entry.
 
 **Enforced by:** `SessionBoundTypeClosureTest`, `SessionTypeAllowListBreadthTest` · **Code:**
 `config/SessionTypeAllowList`, `config/RedisSessionConfig` · **Related:** REQ-SEC-067 · **ADR:**
@@ -2254,10 +2374,30 @@ the breaker, the error mapping.
 
 - **Only `WebClientConfig` builds a client** — calls `WebClient.builder()`, `create` or `mutate`,
   or uses `WebClient.Builder`.
-- **Only the kernel and two named exceptions hold one**: a `WebClient` field, constructor parameter
-  or `@Bean` exists only in `WebClientConfig`, `BackendApiClient`, the SSE relay
-  `NotificationPageController` and the live-sync probe `LiveSyncSubscriptionAuthorizer`. Everything
-  else calls `BackendApiClient`.
+- **Only the backend kernel holds one, with no exception outside it** (since 2026-10-04, plan F1):
+  a `WebClient` field, constructor parameter or `@Bean` exists only in `WebClientConfig`,
+  `BackendApiClient` and `BackendSideChannels`. `BackendSideChannels` offers exactly the two calls
+  that skip the resilience pass and the error mapping by design — the notification SSE stream and
+  the live-sync subscribe probe — so `NotificationPageController` and
+  `LiveSyncSubscriptionAuthorizer` no longer hold a client. Everything else calls `BackendApiClient`.
+- **One error mapping.** Every failure of a `BackendApiClient` call goes through
+  `BackendErrorMapper`: `classify` turns it into one case of the sealed `Outcome` (`Problem` for an
+  error status with its RFC 7807 `code`, `Reauthentication` for an unusable token, `CircuitOpen`,
+  `BulkheadFull`, `Timeout`, `Unexpected`), and one exhaustive pattern switch writes the log line,
+  increments `basetool_backend_client_errors_total` and builds the exception the caller sees.
+  `BackendErrorResponses` parses a raw backend refusal through the same mapper.
+- **Controllers call their domain's typed client** (plan F3, since 2026-10-05). Each domain has a
+  `<Domain>BackendClient` in `frontend.<domain>.client`, a `@Service` over `BackendApiClient` that
+  owns the domain's backend paths, passes runtime values as URI-template variables and returns
+  typed records; only the kernel packages (`service`, `config`, `websocket`) and these clients
+  call `BackendApiClient`. A typed client takes no `java.net.URI` or `UriBuilderFactory` and
+  carries no cache annotation. A client sends and returns records, never an untyped `Map`, with
+  two exceptions by design: the org-unit bank path-only writes, whose backend endpoint binds no
+  request body, and the refinery import's extract, a `JsonNode` relayed unchanged because the
+  extractor's file is its own JSON contract (ADR-0008). Twenty-one clients cover every
+  controller, and no class outside
+  the kernel and the client packages calls `BackendApiClient` (`TypedBackendClientTest`, no
+  allow-list).
 - **HTTP-interface clients** (Spring `@HttpExchange`, none yet) are created only by the kernel,
   over the `webClient` bean (`HttpServiceProxyFactory`/`WebClientAdapter` used nowhere else), and
   never take a `java.net.URI` or `UriBuilderFactory` parameter (it replaces the whole request URL),
@@ -2284,10 +2424,20 @@ the breaker, the error mapping.
   the guard placed last instead of first the token is resolved, and the test fails.
 - [x] A planted class that holds, builds and wraps its own `WebClient` and a planted HTTP interface
   breaking each client rule are reported.
+- [x] No class outside the kernel holds a `WebClient`, and no controller does.
+- [x] Each `Outcome` maps to the status, problem code, log level and metric label it had before
+  the mapper was extracted (`BackendErrorMapperTest`, and the unchanged `BackendApiClient*Test`).
+- [x] Every controller reaches the backend only through its domain's typed client; a planted
+  controller calling `BackendApiClient` and a planted client outside a `<domain>.client` package
+  that takes a `URI` and caches are reported (`TypedBackendClientTest`). Each typed client's
+  requests are pinned against a MockWebServer (`*BackendClientTest`).
 
-**Enforced by:** `WebClientConfinementTest`, `WebClientBackendSeamTest`, `BackendOriginGuardTest` ·
-**Code:** `config/WebClientConfig`, `config/BackendOriginGuard` · **Related:** REQ-SEC-012,
-REQ-FE-028, ADR-0032
+**Enforced by:** `TypedBackendClientTest`, `WebClientConfinementTest`,
+`ArchitectureTest#noControllerHoldsARawWebClient`,
+`WebClientBackendSeamTest`, `BackendOriginGuardTest`, `BackendErrorMapperTest` · **Code:**
+`config/WebClientConfig`, `config/BackendOriginGuard`, `service/BackendApiClient`,
+`service/BackendErrorMapper`, `service/BackendSideChannels` · **Related:** REQ-SEC-012,
+REQ-FE-028, REQ-SEC-051, ADR-0032
 
 ### REQ-FE-030 — A parallel page section relays the same request context as the page
 

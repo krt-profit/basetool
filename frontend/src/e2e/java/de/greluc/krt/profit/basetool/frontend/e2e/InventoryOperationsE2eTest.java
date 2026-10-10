@@ -754,8 +754,8 @@ class InventoryOperationsE2eTest {
 
   /**
    * Edge case: an Umbuchen LOCATION transfer that changes neither the owner nor the location (the
-   * Umbuchen modal's preselected source defaults) is rejected by the backend, so the single 50-SCU
-   * stack stays intact.
+   * Umbuchen modal's preselected source defaults) is refused in the dialog with a toast, sends no
+   * transfer, and leaves the single 50-SCU stack intact.
    */
   @Test
   void edgeCaseTransferToSameLocationLeavesStockUnchanged() {
@@ -764,7 +764,22 @@ class InventoryOperationsE2eTest {
         page -> {
           openUmbuchenModal(page, sameLocMatId, sameLocItemId);
           page.locator("#umbuchenAmount").fill("10");
-          submitUmbuchenInPlace(page);
+          java.util.List<String> posts = new java.util.ArrayList<>();
+          page.onRequest(
+              request -> {
+                if ("POST".equals(request.method()) && request.url().contains("/transfer")) {
+                  posts.add(request.url());
+                }
+              });
+          page.evaluate(
+              "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                  + " 'none'; } }");
+          page.locator("#umbuchenSubmitBtn").click();
+          assertThat(page.locator(".notification-toast.error-toast"))
+              .containsText((String) page.evaluate("umbuchenI18n.unchanged"));
+          assertThat(page.locator("#umbuchenModal")).isVisible();
+          page.waitForTimeout(1_000);
+          assertTrue(posts.isEmpty(), "an unchanged target must not reach the backend");
 
           JsonArray stacks = stacksForMaterial(sameLocMatId);
           assertEquals(1, stackCount(stacks), "a no-op transfer must not split the row");
@@ -850,10 +865,8 @@ class InventoryOperationsE2eTest {
 
           page.locator("#personal").check();
 
-          assertThat(page.locator("#missionAllocGroup"))
-              .hasClass(Pattern.compile(".*krtm-hidden.*"));
-          assertThat(page.locator("#jobOrderAllocGroup"))
-              .hasClass(Pattern.compile(".*krtm-hidden.*"));
+          assertThat(page.locator("#missionAllocGroup")).isHidden();
+          assertThat(page.locator("#jobOrderAllocGroup")).isHidden();
           assertThat(page.locator("#missionAllocRows [data-alloc-row]")).hasCount(0);
         });
   }
@@ -908,6 +921,8 @@ class InventoryOperationsE2eTest {
           page.waitForResponse(
               r -> r.url().contains("/inventory/my?") && r.url().contains("stolenOnly=true"),
               () -> page.locator("#stolenFilter").selectOption("only"));
+          page.locator("#stolenFilter").press("Escape");
+          assertThat(page.locator("#myFilterPanel")).isHidden();
           assertThat(stackHeader(stolenMatId, true, page)).hasCount(1);
           assertThat(stackHeader(stolenMatId, false, page)).hasCount(0);
 

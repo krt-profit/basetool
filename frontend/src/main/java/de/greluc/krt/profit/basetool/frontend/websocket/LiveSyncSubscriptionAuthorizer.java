@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.websocket;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronRelayFilter;
+import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +32,6 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
@@ -114,7 +114,7 @@ public class LiveSyncSubscriptionAuthorizer {
   private static final ParameterizedTypeReference<Map<String, Object>> CAPABILITIES_TYPE =
       new ParameterizedTypeReference<>() {};
 
-  private final WebClient liveSyncAuthWebClient;
+  private final BackendSideChannels backendSideChannels;
 
   /**
    * Decides whether a subscribe to {@code topic} is authorized: a per-resource read for
@@ -256,13 +256,8 @@ public class LiveSyncSubscriptionAuthorizer {
   private Decision probeOne(
       LiveSyncTopic topic, String uri, String accessToken, UUID activeOrgUnitId) {
     try {
-      liveSyncAuthWebClient
-          .get()
-          .uri(uri)
-          .headers(headers -> applyAuth(headers, accessToken, activeOrgUnitId))
-          .retrieve()
-          .toBodilessEntity()
-          .block(PROBE_TIMEOUT);
+      backendSideChannels.probeStatus(
+          uri, headers -> applyAuth(headers, accessToken, activeOrgUnitId), PROBE_TIMEOUT);
       return Decision.ALLOW;
     } catch (WebClientResponseException e) {
       int status = e.getStatusCode().value();
@@ -301,13 +296,11 @@ public class LiveSyncSubscriptionAuthorizer {
       LiveSyncTopic topic, String path, String field, String accessToken, UUID activeOrgUnitId) {
     try {
       Map<String, Object> capabilities =
-          liveSyncAuthWebClient
-              .get()
-              .uri(path)
-              .headers(headers -> applyAuth(headers, accessToken, activeOrgUnitId))
-              .retrieve()
-              .bodyToMono(CAPABILITIES_TYPE)
-              .block(PROBE_TIMEOUT);
+          backendSideChannels.probeBody(
+              path,
+              headers -> applyAuth(headers, accessToken, activeOrgUnitId),
+              CAPABILITIES_TYPE,
+              PROBE_TIMEOUT);
       boolean granted = capabilities != null && Boolean.TRUE.equals(capabilities.get(field));
       if (!granted) {
         log.debug(

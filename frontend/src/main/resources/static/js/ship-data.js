@@ -19,16 +19,16 @@
 
 /* global krtAutocomplete, shipDataI18n, shipDataConflict, shipDataResetUrl */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const shipTypesData = document.getElementById('shipTypeNames-data');
     const shipTypeNames = shipTypesData
-        ? Array.from(shipTypesData.options).map(function (o) {
+        ? Array.from(shipTypesData.options).map((o) => {
               return o.value;
           })
         : [];
     const mfgData = document.getElementById('mfgNames-data');
     const mfgNames = mfgData
-        ? Array.from(mfgData.options).map(function (o) {
+        ? Array.from(mfgData.options).map((o) => {
               return o.value;
           })
         : [];
@@ -57,31 +57,27 @@ function filterTable(tableId, query) {
     }
 }
 
-function openModal(id) {
-    document.getElementById(id).style.display = 'flex';
-}
 function closeModal(id) {
     if (typeof window.resetUnsavedChanges === 'function') {
         window.resetUnsavedChanges();
     }
-    document.getElementById(id).style.display = 'none';
+    window.krtModal.close(id);
 }
 
 window.filterTable = filterTable;
-window.openModal = openModal;
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.krt-modal-overlay').forEach((m) => {
         m.addEventListener('click', function (e) {
             if (e.target === this) {
-                this.style.display = 'none';
+                window.krtModal.close(this);
             }
         });
     });
 });
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'ship-close-modal', function (el) {
+    window.krtEvents.on('click', 'ship-close-modal', (el) => {
         closeModal(el.getAttribute('data-modal-id'));
     });
 }
@@ -93,7 +89,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     const i18n = shipDataI18n;
     const conflict = shipDataConflict;
 
-    document.addEventListener('submit', function (e) {
+    document.addEventListener('submit', (e) => {
         const form = e.target;
         if (!form.classList || !form.classList.contains('js-visibility-toggle')) {
             return;
@@ -108,14 +104,14 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtFetch
             .write({
                 method: 'POST',
-                url: form.getAttribute('action') + '?hidden=' + desired,
+                url: `${form.getAttribute('action')}?hidden=${desired}`,
                 toast: false,
                 errorMessage: i18n.toggleError,
                 conflict,
                 onSuccess() {
                     const row = form.closest('tr');
                     if (row) {
-                        row.style.opacity = desired ? '0.5' : '';
+                        row.classList.toggle('sd-row--hidden', desired);
                     }
                     if (hiddenInput) {
                         hiddenInput.value = (!desired).toString();
@@ -124,21 +120,20 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                         btn.textContent = desired
                             ? form.getAttribute('data-label-show')
                             : form.getAttribute('data-label-hide');
-                        btn.classList.toggle('btn-secondary', !desired);
                     }
                     if (window.showFrontendSuccessToast) {
                         window.showFrontendSuccessToast(i18n.saved);
                     }
                 },
             })
-            .then(function () {
+            .then(() => {
                 if (btn) {
                     btn.disabled = false;
                 }
             });
     });
 
-    window.krtEvents.on('click', 'shipdata-reset', function (el) {
+    window.krtEvents.on('click', 'shipdata-reset', (el) => {
         el.disabled = true;
         window.krtFetch
             .write({
@@ -154,7 +149,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                     }
                 },
             })
-            .then(function () {
+            .then(() => {
                 el.disabled = false;
             });
     });

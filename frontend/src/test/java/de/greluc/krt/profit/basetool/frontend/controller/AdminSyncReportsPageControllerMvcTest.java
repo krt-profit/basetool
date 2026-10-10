@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.contains;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.SyncReportPurgeResultDto
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,9 +54,9 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * MVC-level render test for {@link AdminSyncReportsPageController}: pins the AJAX pager fragment
- * (REQ-FE-002). The full page renders the swap-target wrapper + tab bar; {@code fragment=results}
- * renders only the inner table + pager block (tabs, total and purge form live outside it), and the
- * pager links keep the active tab's base path. Fails if the shared fragment selector breaks.
+ * (REQ-FE-002). The full page renders the swap-target wrapper + tabs; {@code fragment=results}
+ * renders only the inner table + list foot (tabs, page head and purge form live outside it), and
+ * the pager links keep the active tab's base path. Fails if the shared fragment selector breaks.
  */
 @SpringBootTest
 class AdminSyncReportsPageControllerMvcTest {
@@ -107,7 +109,58 @@ class AdminSyncReportsPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("admin/sync-reports"))
         .andExpect(content().string(containsString("id=\"sync-results\"")))
-        .andExpect(content().string(containsString("tab-bar")));
+        .andExpect(content().string(containsString("class=\"tab-nav sync-tabs\"")));
+  }
+
+  /**
+   * The page follows the list pattern (REQ-UI-027): page head with the admin eyebrow and count, the
+   * purge in the overflow menu, translated event types and the list foot instead of a bare pager.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void combined_fullPage_rendersTheListPattern() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/sync-reports"), anyTypeRef()))
+        .thenReturn(twoPages());
+
+    String html =
+        mockMvc
+            .perform(get("/admin/sync-reports").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern("class=\"page-eyebrow\"[^>]*>System &amp; Daten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>60<")
+        .contains("data-list-count-for=\"sync-results\"")
+        .containsPattern(
+            "id=\"purge-trigger\" class=\"overflow-menu__item overflow-menu__item--danger\"")
+        .contains("id=\"purge-form\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .contains("Nur aus dem Wiki angelegt")
+        .doesNotContain(">CREATED_WIKI_ONLY<")
+        .doesNotContain(">SCWIKI<")
+        .contains("class=\"utc-time\"")
+        .contains("data-list-total=\"60\"")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("colspan")
+        .doesNotContain("btn--cta");
+  }
+
+  /** An empty result renders the empty state instead of a colspan row. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void emptyResult_rendersTheEmptyState() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/sync-reports"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0L, 0, List.of()));
+
+    mockMvc
+        .perform(get("/admin/sync-reports").param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
+        .andExpect(content().string(not(containsString("data-table--stack"))));
   }
 
   @Test
@@ -121,10 +174,10 @@ class AdminSyncReportsPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("admin/sync-reports :: results"))
         .andExpect(content().string(containsString("FragmentEvent")))
-        .andExpect(content().string(containsString("class=\"pager\"")))
+        .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(containsString("/admin/sync-reports/uex?page=1")))
         .andExpect(content().string(not(containsString("id=\"sync-results\""))))
-        .andExpect(content().string(not(containsString("tab-bar"))))
+        .andExpect(content().string(not(containsString("tab-nav"))))
         .andExpect(content().string(not(containsString("id=\"purge-form\""))));
   }
 

@@ -19,10 +19,10 @@
 
 /* global krtAutocomplete, LOCATION_MSG, LOCATION_CONFLICT */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const dataList = document.getElementById('locationNames-data');
     const locationNames = dataList
-        ? Array.from(dataList.options).map(function (o) {
+        ? Array.from(dataList.options).map((o) => {
               return o.value;
           })
         : [];
@@ -49,17 +49,14 @@ function filterTable(tableId, query) {
 
 window.filterTable = filterTable;
 
-document.addEventListener('DOMContentLoaded', function () {});
-
-document.addEventListener('DOMContentLoaded', function () {
-    function patchButton(btn, flagValue, secondaryWhen) {
+document.addEventListener('DOMContentLoaded', () => {
+    function patchButton(btn, flagValue) {
         if (!btn) {
             return;
         }
         btn.textContent = flagValue
             ? btn.getAttribute('data-label-on')
             : btn.getAttribute('data-label-off');
-        btn.classList.toggle('btn-secondary', flagValue === secondaryWhen);
     }
 
     function patchRow(row, updated) {
@@ -69,14 +66,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const visForm = row.querySelector('form[data-location-toggle="visibility"]');
         const homeForm = row.querySelector('form[data-location-toggle="home"]');
         if (visForm) {
-            patchButton(visForm.querySelector('button'), updated.hidden, false);
+            patchButton(visForm.querySelector('button'), updated.hidden);
             const visInput = visForm.querySelector('input[name="hidden"]');
             if (visInput) {
                 visInput.value = String(!updated.hidden);
             }
         }
         if (homeForm) {
-            patchButton(homeForm.querySelector('button'), updated.homeLocation, true);
+            patchButton(homeForm.querySelector('button'), updated.homeLocation);
             const homeInput = homeForm.querySelector('input[name="homeLocation"]');
             if (homeInput) {
                 homeInput.value = String(!updated.homeLocation);
@@ -84,7 +81,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const form = event.target.closest('form[data-location-toggle]');
         if (!form) {
             return;
@@ -110,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     patchRow(row, updated);
                 },
             })
-            .finally(function () {
+            .finally(() => {
                 if (button) {
                     button.disabled = false;
                 }

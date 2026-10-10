@@ -26,23 +26,34 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendSideChannels;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.ClientAuthorizationException;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
@@ -53,6 +64,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Hooks;
 
 /**
  * Unit tests for {@link NotificationPageController#stream(HttpServletRequest, HttpServletResponse,
@@ -73,9 +85,9 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientManager.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
-            sseWebClient,
+            new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry());
 
@@ -100,9 +112,9 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientManager.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
-            sseWebClient,
+            new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry());
 
@@ -128,9 +140,9 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientManager.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
-            sseWebClient,
+            new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry());
 
@@ -158,9 +170,9 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientManager.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
-            sseWebClient,
+            new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry());
 
@@ -215,7 +227,11 @@ class NotificationPageControllerStreamTest {
     SimpleMeterRegistry registry = new SimpleMeterRegistry();
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient, messageSource, sseWebClient, authorizedClientManager, registry);
+            new NotificationBackendClient(backendApiClient),
+            messageSource,
+            new BackendSideChannels(sseWebClient, null),
+            authorizedClientManager,
+            registry);
     controller.registerRelayGauge();
 
     HttpServletRequest request = mock(HttpServletRequest.class);
@@ -256,9 +272,9 @@ class NotificationPageControllerStreamTest {
     SseEmitter mockEmitter = mock(SseEmitter.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient,
+            new NotificationBackendClient(backendApiClient),
             messageSource,
-            sseWebClient,
+            new BackendSideChannels(sseWebClient, null),
             authorizedClientManager,
             new SimpleMeterRegistry()) {
           @Override
@@ -300,5 +316,86 @@ class NotificationPageControllerStreamTest {
     assertTrue(
         serialized.contains(":ready"),
         "initial commit must be an invisible SSE comment, was: " + serialized);
+  }
+
+  @Test
+  void stream_whenTheBrowserIsGone_cancelsTheUpstream_andLeavesTheEmitterToTheContainer()
+      throws Exception {
+    SseEmitter mockEmitter = mock(SseEmitter.class);
+    doNothing()
+        .doThrow(new IOException("Broken pipe"))
+        .when(mockEmitter)
+        .send(any(SseEmitter.SseEventBuilder.class));
+    AtomicBoolean cancelled = new AtomicBoolean();
+    Flux<ServerSentEvent<String>> upstream =
+        Flux.just(ServerSentEvent.builder("{}").event("notification").build())
+            .concatWith(Flux.never())
+            .doOnCancel(() -> cancelled.set(true));
+
+    streamWith(mockEmitter, upstream);
+
+    assertTrue(cancelled.get(), "a failed write must cancel the backend subscription");
+    verify(mockEmitter, never()).complete();
+  }
+
+  @Test
+  void stream_whenTheContainerAlreadyEndedTheRequest_dropsNoErrorOnUpstreamCompletion()
+      throws Exception {
+    SseEmitter mockEmitter = mock(SseEmitter.class);
+    doThrow(new IllegalStateException("AsyncContext no longer usable"))
+        .when(mockEmitter)
+        .complete();
+    List<Throwable> dropped = new CopyOnWriteArrayList<>();
+    Hooks.onErrorDropped(dropped::add);
+    try {
+      streamWith(mockEmitter, Flux.empty());
+      streamWith(mockEmitter, Flux.error(new IllegalStateException("upstream failed")));
+    } finally {
+      Hooks.resetOnErrorDropped();
+    }
+
+    assertTrue(dropped.isEmpty(), "no error may reach onErrorDropped, got: " + dropped);
+    verify(mockEmitter, times(2)).complete();
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static void streamWith(SseEmitter emitter, Flux<ServerSentEvent<String>> upstream) {
+    WebClient sseWebClient = mock(WebClient.class);
+    OAuth2AuthorizedClientManager authorizedClientManager =
+        mock(OAuth2AuthorizedClientManager.class);
+    NotificationPageController controller =
+        new NotificationPageController(
+            new NotificationBackendClient(mock(BackendApiClient.class)),
+            mock(MessageSource.class),
+            new BackendSideChannels(sseWebClient, null),
+            authorizedClientManager,
+            new SimpleMeterRegistry()) {
+          @Override
+          protected SseEmitter newEmitter() {
+            return emitter;
+          }
+        };
+    OAuth2AuthorizedClient client = mock(OAuth2AuthorizedClient.class);
+    when(client.getAccessToken())
+        .thenReturn(
+            new OAuth2AccessToken(
+                OAuth2AccessToken.TokenType.BEARER,
+                "live-token",
+                Instant.now(),
+                Instant.now().plusSeconds(300)));
+    when(authorizedClientManager.authorize(any())).thenReturn(client);
+    WebClient.RequestHeadersUriSpec uriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+    WebClient.RequestHeadersSpec headersSpec = mock(WebClient.RequestHeadersSpec.class);
+    WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
+    when(sseWebClient.get()).thenReturn(uriSpec);
+    when(uriSpec.uri(anyString())).thenReturn(headersSpec);
+    when(headersSpec.headers(any())).thenReturn(headersSpec);
+    when(headersSpec.retrieve()).thenReturn(responseSpec);
+    when(responseSpec.bodyToFlux(anyTypeRef())).thenReturn((Flux) upstream);
+
+    controller.stream(
+        mock(HttpServletRequest.class),
+        mock(HttpServletResponse.class),
+        mock(Authentication.class));
   }
 }

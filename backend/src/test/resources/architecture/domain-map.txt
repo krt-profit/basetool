@@ -41,14 +41,9 @@ class UserAccountMergeService privacy GDPR orchestration, transitional module (p
 class AccountConsolidationService privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class DataExportService privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class DataExportReportService privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class DataExportSections privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class DataExportPdfFormat privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class PersonSearchService privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class PersonSearchTargets privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class PersonSearchHitDto privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class HandleErasureCoverage privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class HandleScrubber privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class HandleSpellings privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class DataExportController privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class AdminDataExportController privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class AdminPersonSearchController privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
@@ -61,63 +56,36 @@ class DeletionRequestRepository privacy GDPR orchestration, transitional module 
 class DeletionRequestDto privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class CreateDeletionRequestRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class DecideDeletionRequestRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class AccountDeletionRequestDeclinedEvent privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class AccountDeletionRequestResolvedEvent privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class AccountDeletionRequestedEvent privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class ConsolidateAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class MergeAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class HandleAnonymisation kernel handle anonymisation sentinel (plan 5.1 kernel)
 class PayoutPreference identity member preference on User (plan 7.3)
-class AccessGateService scope per-aggregate can* gate slab for mission/joborder/inventory/refinery/operation/ship (ADR-0065)
+class AccessGateService scope per-aggregate can* gate slab for mission/joborder/inventory/refinery/ship (ADR-0065)
 class OwnerScopeService scope scope facade referenced by 64+ SpEL strings (ADR-0065)
+class ScopeActiveOrgUnitProvider scope the active org unit for the logging MDC (plan 5.3)
 class RequestScopeResolver scope request-scoped pin and ScopePredicate resolution (ADR-0065)
 class OrgUnitStampingService scope create-time owner stamping behind OwnerScopeService (REQ-ORG-004)
 class ScopePredicate scope scope vector returned by OwnerScopeService#currentScopePredicate
 class ScopeSpecifications scope compile-time JPQL scope fragments per aggregate (REQ-DATA-010)
 class AuthHelperService platform the single SecurityContextHolder reader (ArchUnit rule)
+class ActiveOrgUnitProvider platform SPI for the orgUnitId MDC field, implemented by scope (plan 5.3)
 class CustomJwtGrantedAuthoritiesConverter scope JWT -> authorities, incl. contextual org-unit authorities
-class AuthenticatedSubject platform which subject a request acts as, token or token-less
-class SubjectAuthentication platform token-less Authentication carrying a subject
-class OrgUnitContextualAuthority platform ROLE_X@orgUnit authority value
-class Roles platform role-code constants
-class Permissions platform permission-string constants
-class AuthoritiesCacheProperties platform authorities-cache tuning of the JWT converter
-class PartialRoleScopeProperties platform clients with partial role claims (REQ-SEC-036)
-class OwnerOrgUnitRequiredException scope thrown by the stamping resolvers (REQ-ORG-023)
-class DatabaseActingMemberAuthorities exchange acting member's reduced exchange authorities (ADR-0129)
-class ChangeSourceTransactionManager exchange attributes writes for the change-feed triggers (ADR-0224)
-class TransactionManagerConfig exchange installs the change-source transaction manager (ADR-0224)
-class ChangeSource exchange writer attribution for the change-feed triggers
-class ChangeSourceProperties exchange change-feed writer attribution clients
-class SandboxProfileGuard exchange sandbox image guard (REQ-XCH-029)
-class ExchangeProblemException exchange exchange error registry
 class MissionAllocationDto inventory mission slice of an inventory entry (REQ-INV-027), mapped by InventoryItemMapper
 class MaterialCollectionEntryDto inventory produced by InventoryAggregationService
 class UpdateDeliveredRequest inventory delivered toggle of an inventory entry's job-order slice (REQ-INV-027)
 class InventoryCatalog inventory inventory read-family discriminator
 class AllocationReductions inventory deduct-from plans for inventory writes (REQ-INV-027)
-class InventoryAllocations inventory allocation slice helpers (REQ-INV-027)
-class OverAllocationException inventory inventory over-allocation (REQ-INV-027)
 class CheckoutType inventory book-out type
 class BulkRebookMode inventory bulk rebooking mode (REQ-INV-036)
-class InventoryProperties inventory Lager switches
-class JobOrderInventoryOwnerRedactor joborder redacts order-linked stock (REQ-ORDERS-029)
-class ProductionAllocationException joborder production booking error (REQ-ORDERS-025)
 class QualityBucketAllocator joborder distributes order-linked stock across quality buckets (REQ-ORDERS-037)
 class LinkedStockAttributionDto joborder per-row quality-bucket attribution (REQ-ORDERS-037)
 class AggregatedMaterialDto joborder item-order material view row
 class DerivedMaterialDto joborder item-order derivation preview row
 class ItemDerivationDto joborder item-order derivation preview
 class SubAssemblySuggestionDto joborder item-order sub-assembly suggestion
-class MissionParticipantRequiredException refinery thrown when a refinery order links a mission (REQ-SEC-042)
 class RefineryYield catalogue UEX refinery-yield matrix row, written by UexRefinerySyncService
 class RefineryYieldRepository catalogue repository of the UEX yield matrix
 class RefineryImportProperties refinery refinery screenshot import tuning
 class ShipTypeMatcher hangar ShipType resolver for the hangar import
-class UexLocationController personalinventory UEX location picker served by PersonalInventoryItemService
-class UexLocationDto personalinventory UEX location picker row of the personal inventory
-class MaterialCollectionController joborder material collection overview of a job order
-class JobOrderItemStockController joborder order-detail item stock panel
 class MeController identity the caller's own profile surface (/me)
 class UserZone platform web argument binding
 class UserZoneArgumentResolver platform web argument binding
@@ -127,47 +95,32 @@ class UserApprovalMailService identity identity mail composition
 class PendingRegistrationMailService identity identity mail composition
 class PendingApprovalAccessFilter identity enforces the approval gate (REQ-SEC-017)
 class TermsAcceptanceAccessFilter identity enforces the terms gate (REQ-SEC-028)
-class TermsConsentCheck identity terms acceptance check (REQ-SEC-028)
-class RefusedSubjectWindow platform refused-subject metric window
 class DiscordSpiPrecheckProperties identity Discord SPI precheck secret (REQ-SEC-022)
-class KeycloakSyncProperties identity Keycloak user-sync configuration
 class KeycloakTrustSupport identity Keycloak admin-client truststore
 class KeycloakHealthIndicator platform health probe
 class UserSyncTask identity Keycloak user-sync trigger
 class RejectedRegistrationRetentionTask identity rejected-registration purge (REQ-SEC-057)
-class MemberDepartedEvent identity member left the organisation (identity provider)
-class OrgUnitRef notification org-unit reference carried by NotificationEvent
-class NotificationEvent notification contract every notification-producing event implements
 class SseSendFailureCause platform SSE failure tag shared by notification and live sync
 class RedisJsonFanout platform Redis pub/sub transport shared by notification and live sync
-class ResilientRedisMessageListenerContainer platform Redis listener plumbing
 class KrtPdfSupport platform shared PDF design layer
 class AuditLogPdfFormat audit audit PDF format
-class BankBalanceChart bank bank PDF chart
-class BankPdfFormat bank bank PDF format
-class BankAmounts bank bank amount formatting
-class ClientAttribution platform bounded client label for metrics and audit rows
 class CentralMapperConfig platform MapStruct shared config
 class PageResponse kernel paging envelope used by every list endpoint
 class AbstractEntity kernel JPA base class of every entity
-class OptimisticLock kernel version-check helper family
-class StringNormalization kernel inbound text normalisation primitives
-class LikePatterns kernel LIKE escaping
-class RequestMemo platform request-scoped memo
 class DtoConstraints kernel shared validation constants
 class OnUpdate kernel validation group
-class ProblemCode kernel the sealed problem-code contract every module's codes implement (ADR-0235)
+class ProblemCode kernel the problem-code contract every registry enum implements (ADR-0235)
 class CoreProblemCode kernel the generic problem codes of the error kernel (ADR-0235)
 class WholeNumber kernel validation constraint
 class WholeNumberValidator kernel validation constraint
-class Quality kernel the 0..1000 quality range (REQ-DATA-023)
 class QualityValue kernel quality range constraint (REQ-DATA-023)
 class QuantityAware catalogue material/item amount validation contract
 class ValidQuantityAmount catalogue material/item amount constraint
 class ValidQuantityAmountValidator catalogue material/item amount constraint
 class MaterialPieceTypeLookup catalogue material piece-type lookup SPI (ADR-0047)
-class AppException kernel sealed base of domain exceptions
-class AppExceptionKind kernel RFC 7807 identities of AppException
+class AppException kernel sealed root of the generic kinds and DomainProblem (ADR-0235)
+class AppExceptionKind kernel RFC 7807 identities of the generic kinds
+class DomainProblem kernel open base of every module exception (ADR-0235)
 class BadRequestException kernel generic domain exception
 class BusinessConflictException kernel generic domain exception
 class DuplicateEntityException kernel generic domain exception
@@ -178,18 +131,15 @@ class NotFoundException kernel generic domain exception
 class ExternalServiceException kernel generic upstream failure
 class ReportGenerationException kernel generic report failure
 class GlobalExceptionHandler platform RFC 7807 handler
-class ErrorDisclosurePolicy platform RFC 7807 disclosure policy
-class BankConflictException bank bank problem codes
+class ProblemSupport platform RFC 7807 handler family of GlobalExceptionHandler
+class ConcurrencyProblemHandlers platform RFC 7807 handler family of GlobalExceptionHandler
+class SecurityProblemHandlers platform RFC 7807 handler family of GlobalExceptionHandler
+class RequestProblemHandlers platform RFC 7807 handler family of GlobalExceptionHandler
+class ApplicationProblemHandlers platform RFC 7807 handler family of GlobalExceptionHandler
+class ErrorDisclosurePolicy kernel the disclosure policy every AppException carries (ADR-0235)
 class LiveSyncChangedRequest livesync app live-sync relay payload
-class PingResponse admin liveness probe payload of SystemController
-class SystemController admin liveness/version probe
-class StaffelMembershipResolver orgunit resolves SQUADRON memberships to squadrons
-class OrgUnitLabels orgunit org-unit audit label
 class Department orgunit Bereich brand colour
 class MembershipRole orgunit rank on an OrgUnitMembership
-class BereichLeadershipRole orgunit Bereichsleitung role of an appointment
-class GrandAdmiralRequest orgunit Grand Admiral appointment (REQ-ORG-021)
-class AreaLeadershipDto orgchart org chart tier
 class FinanceType mission mission finance entry type
 class RefineryMissionProfitAggregate refinery refinery profit per mission projection
 class FinanceEntryAggregate mission mission finance aggregate projection
@@ -212,28 +162,44 @@ class BlueprintReferenceDto catalogue recipe reference DTO
 class BlueprintIngredientKind catalogue recipe graph enum
 class UexCategory catalogue UEX category reference row
 class JobOrderAllocationDto inventory job-order slice of an inventory entry (REQ-INV-027), mapped by InventoryItemMapper
+class CraftabilityYieldSource blueprint pending-yield SPI of the craftability, implemented by the refinery (plan 5.3)
+class BlueprintEnvelopeReader blueprint upload-preview envelope SPI, implemented by the exchange (plan 5.3)
 class BlueprintPackTags blueprint log-name clean-up used only by BlueprintImportService
 class BasetoolErrorController platform container error dispatch as RFC 7807
-class ConnectedInstallationDto exchange connected-apps installation row
-class CounterpartySnapshot bank bank counterparty snapshot (REQ-BANK-044)
-class ApiClientMetricsProperties platform client-id metric label allow-list
-class AppProblemProperties platform RFC 7807 base URI
-class ProblemResponseFactory platform RFC 7807 body builder
-class RateLimitProperties platform rate-limit filter configuration
-class RequestBodyLimitProperties platform request-body limit configuration
+class MemberEvaluationErasure promotion GDPR erasure command; in service until 7.6, a promotion package would close a service-promotion package cycle
+class BankHandleSnapshots bank GDPR handle anonymisation of the bank tables; in service until 7.6, a bank package would close a service-bank package cycle
 
 package dto catalogue external feed DTO packages of the UEX, SC Wiki and P4K imports
 package integration catalogue outbound catalogue clients
+package audit audit the audit module's package tree (plan 5.2)
+package bank bank the bank module's package tree (plan 5.2)
+package exchange exchange the exchange module's package tree (plan 5.2)
+package identity identity the identity module's package tree (plan 5.2)
+package joborder joborder the job-order module's package tree (plan 5.2)
+package livesync livesync the live-sync module's package tree (plan 5.2)
+package materialexchange materialexchange the Materialboerse module's package tree (plan 5.2)
+package notification notification the notification module's package tree (plan 5.2)
+package privacy privacy the GDPR module's package tree, transitional (plan 5.1 rank 13, 7.6)
+package inventory inventory the inventory module's package tree (plan 5.2)
+package hangar hangar the hangar module's package tree (plan 5.2)
+package refinery refinery the refinery module's package tree (plan 5.2)
+package scope scope the scope module's package tree (plan 5.2)
+package kernel kernel the kernel's package tree (plan 5.1 rank 0)
+package orgunit orgunit the org-unit module's package tree (plan 5.2)
+package platform platform the platform's package tree (plan 5.1 rank 0)
+package catalogue catalogue the catalogue module's package tree (plan 5.2)
+package mission mission the mission module's package tree (plan 5.2)
+package dashboard dashboard the dashboard module's package tree (plan 5.2)
+package orgchart orgchart the org chart module's package tree (plan 5.2)
+package admin admin the admin module's package tree (plan 5.2)
+package operation operation the operation module's package tree (plan 5.2)
+package promotion promotion the promotion module's package tree (plan 5.2)
+package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)
 
-name ^OrgUnitBank bank
-name ^(Bank|CreateBank|CancelBank|ConfirmBank|RegisterBank|RejectBank|RenameBank|ReverseBank|SetBank|UpdateBank|SetCartel|OrgUnitBalanceTarget) bank
-name ^(Exchange|ConnectedApp|FirstPartyClientIds|RedisExchange|DisabledExchange|KnownExchangeClients|ActingMember|IngestGateway) exchange
-name ^(MaterialExchange|MaterialRequest|MaterialItemRequest) materialexchange
 name ^(MaterialClaim|ClaimBucket|ClaimDto|CreateClaim|MaterialDemand) joborder
 name ^(JobOrder|CreateJobOrder|UpdateJobOrder|HandoverReport) joborder
-name ^PersonalInventory personalinventory
 name ^(Inventory|BulkCheckout|BulkRebook|BulkStolenMark|BulkOrgUnitChange|AggregatedInventory|GroupedInventory|AllocationReduction|StockViewerAccess|OwnedStockSlice) inventory
-name ^(PersonalBlueprint|DefaultBlueprint|BlueprintImport|BlueprintExport|BlueprintCraftability|Craftability|BlueprintOverview|BlueprintProduct|BlueprintUploadPreview|BlueprintFuzzy|BlueprintOwner|BlueprintModifierMath|BlueprintVariant|BlueprintSource|BlueprintExternalAlias) blueprint
+name ^(PersonalBlueprint|DefaultBlueprint|BlueprintImport|BlueprintExport|BlueprintCraftability|Craftability|BlueprintOverview|BlueprintProduct|BlueprintUploadPreview|BlueprintOwner|BlueprintModifierMath|BlueprintVariant|BlueprintSource|BlueprintExternalAlias) blueprint
 name ^(Blueprint) catalogue
 name ^(Mission|AddCrew|AddExternalParticipant|AddParticipantById|AddUnit|JoinMission|UpdateCrew|UpdateParticipant|UpdatePayoutPreference|UpdateUnit|AddCustomFrequency|AddFrequency|UpdateCustomFrequency|CreateMission|PatchMission|ReorderMission|SetPartyLead|ToggleMissionStep|UpdateMission|AddMission|ParticipantTargetResolver) mission
 name ^Operation operation
@@ -242,20 +208,14 @@ name ^Refining catalogue
 name ^(Hangar|Ship(?!Type)|Fleet|Starjump|Shiplist|SquadronShip|SetHomeLocation) hangar
 name ^(Notification|LocalNotification|RedisNotification|RuleEvaluation|RecipientResolution|SelectorKind|OrgRelativeRole|Mail|SmtpMail) notification
 name ^Audit audit
-name ^(Promotion|RankRequirement|MemberEvaluation) promotion
-name ^(OrgChart|BereichChart|CommandChart|OlChart|SpecialCommandChart|SquadronChart) orgchart
-name ^(Leitung|OrgRoleManagement|AddBereichLeader|AddOlMember|SquadronRole|AssignSquadronRank) orgunit leadership merged into orgunit (plan 7.3)
+name ^(OrgRoleManagement|AddOlMember|SquadronRole|AssignSquadronRank) orgunit leadership writes merged into orgunit (plan 7.3)
 name ^(OrgUnit|Squadron|SpecialCommand|Bereich|Organisationsleitung|KommandoGroup|CreateKommandoGroup|UpdateKommandoGroup|OrgHierarchy|Membership) orgunit
 name ^(User|Role|Registration|PendingRegistration|ApproveRegistration|RejectRegistration|ReopenRegistration|LinkRegistration|MyRegistration|Discord|Keycloak|Terms|DeletionRequest|CreateDeletionRequest|DecideDeletionRequest|DataExport|AdminDataExport|AccountDeletion|AccountConsolidation|ConsolidateAccount|MergeAccount|Handle|PersonSearch|AdminPersonSearch|AdminTerms|AdminDeletion|RejectedRegistration|ApprovalDecision|ApprovalStatus|AdminController$) identity
-name ^AdminPersonalInventory personalinventory
 name ^(AdminPersonalBlueprint|AdminDefaultBlueprint) blueprint
-name ^(AdminExchange) exchange
 name ^(AdminP4k) catalogue
 name ^(QualityTier|AdminQualityTier) catalogue
-name ^Announcement dashboard
-name ^(SystemSetting|AppVersionPolicy|AndroidClient|AndroidVersionPolicy) admin
 name ^(LiveSync|LocalLiveSync|RedisLiveSync) livesync
-name ^(City|Location|StarSystem|SpaceStation|Outpost|Poi|Terminal|Planet|Moon|Orbit|Faction|Jurisdiction|Material|Manufacturer|ShipType|JobType|FrequencyType|GameItem|Uex|ScWiki|P4k|Sync|ExternalSync|MasterData|EvictAllMaterialCaches|QuantityType|LookupTable|PairKeyRef|StalePriceSweep|CachedEntityGraphs) catalogue
+name ^(City|Location|StarSystem|SpaceStation|Outpost|Poi|Terminal|Planet|Moon|Orbit|Faction|Jurisdiction|Material|Manufacturer|ShipType|JobType|FrequencyType|GameItem|Uex|ScWiki|P4k|Sync|ExternalSync|MasterData|EvictAllMaterialCaches|QuantityType|LookupTable|PairKeyRef) catalogue
 
 layer config platform infrastructure layer package
 layer filter platform infrastructure layer package

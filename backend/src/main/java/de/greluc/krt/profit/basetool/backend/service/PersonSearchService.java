@@ -19,12 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
-import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets;
-import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets.Target;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets.Target;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
@@ -83,7 +84,7 @@ public class PersonSearchService {
    */
   private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[a-z_][a-z0-9_]{0,62}$");
 
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -159,7 +160,7 @@ public class PersonSearchService {
    */
   @Transactional
   public void recordSearch(@NotNull String term, @NotNull PersonSearchResult result) {
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PERSON_SEARCH_PERFORMED,
         null,
         null,

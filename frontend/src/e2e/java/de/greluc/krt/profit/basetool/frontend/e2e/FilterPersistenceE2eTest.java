@@ -34,7 +34,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Verifies per-browser filter persistence across reloads (REQ-UI-017, ADR-0120) on {@code
- * /refinery-orders} (status checkboxes), {@code /missions} ({@code showPast}) and {@code
+ * /refinery-orders} (status segment), {@code /missions} ({@code showPast}) and {@code
  * /materialboerse} (offer sort).
  *
  * <p>Needs no seeded data and mutates no server state; runs as {@code test-admin}.
@@ -97,8 +97,8 @@ class FilterPersistenceE2eTest {
   }
 
   /**
-   * Refinery queue: COMPLETED added to the default status subset and "only mine" both stay checked
-   * after a reload.
+   * Refinery queue: the "Abgeschlossen" segment and the "only mine" switch both stay selected after
+   * a reload.
    */
   @Test
   void refineryStatusFilterSurvivesReload() {
@@ -106,15 +106,17 @@ class FilterPersistenceE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + "/refinery-orders");
-        E2eSupport.openFilterPanel(page);
-        page.locator("#refinery-filter-form input[name='status'][value='COMPLETED']").check();
-        page.locator("#refinery-filter-form input[name='onlyMine']").check();
+        page.locator("[data-testid='segment-view-completed']").click();
+        assertThat(page.locator("#refinery-filter-form input[name='view'][value='COMPLETED']"))
+            .isChecked();
+        page.locator("label.switch[for='refinery-only-mine']").click();
+        assertThat(page.locator("#refinery-filter-form input[name='onlyMine']")).isChecked();
 
         E2eSupport.navigate(page, STACK.baseUrl() + "/refinery-orders");
-        E2eSupport.openFilterPanel(page);
-        assertThat(page.locator("#refinery-filter-form input[name='status'][value='COMPLETED']"))
+        assertThat(page.locator("#refinery-filter-form input[name='view'][value='COMPLETED']"))
             .isChecked();
-        assertThat(page.locator("#refinery-filter-form input[name='status'][value='OPEN']"))
+        assertThat(page.locator("#refinery-filter-form input[name='view'][value='RUNNING']"))
+            .not()
             .isChecked();
         assertThat(page.locator("#refinery-filter-form input[name='onlyMine']")).isChecked();
       } catch (RuntimeException | AssertionError failure) {
@@ -125,21 +127,20 @@ class FilterPersistenceE2eTest {
   }
 
   /**
-   * Missions list: the {@code showPast} toggle survives a reload; the checkbox is restored and the
-   * restored state drives the existing results re-fetch.
+   * Missions list: the period segment survives a reload; the radio is restored and the restored
+   * state drives the existing results re-fetch.
    */
   @Test
-  void missionsShowPastSurvivesReload() {
+  void missionsPeriodSurvivesReload() {
     try (BrowserContext context = newContext()) {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
-        E2eSupport.openFilterPanel(page);
-        page.locator("input[name='showPast']").check();
+        page.locator("[data-testid='segment-period-all']").click();
+        assertThat(page.locator("input[name='period'][value='ALL']")).isChecked();
 
         E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
-        E2eSupport.openFilterPanel(page);
-        assertThat(page.locator("input[name='showPast']")).isChecked();
+        assertThat(page.locator("input[name='period'][value='ALL']")).isChecked();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "filter-persistence-missions");
         throw failure;

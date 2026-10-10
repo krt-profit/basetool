@@ -19,7 +19,7 @@
 
 /* global DISCORD_MSG */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     if (!window.krtFetch) {
         return;
     }
@@ -44,27 +44,85 @@ document.addEventListener('DOMContentLoaded', function () {
         return document.getElementById('merge-source');
     }
 
-    function removeRowFrom(row, tbody, emptyId, colSpan, emptyText) {
-        row.remove();
-        if (!tbody || tbody.querySelector('tr[data-id]')) {
-            return;
+    function syncList(tbody, tableId, emptyId, countKey) {
+        const rows = tbody ? tbody.querySelectorAll('tr[data-id]').length : 0;
+        const table = document.getElementById(tableId);
+        const empty = document.getElementById(emptyId);
+        if (table) {
+            table.hidden = rows === 0;
         }
-        const empty = document.createElement('tr');
-        empty.id = emptyId;
-        const cell = document.createElement('td');
-        cell.colSpan = colSpan;
-        cell.textContent = emptyText;
-        empty.appendChild(cell);
-        tbody.appendChild(empty);
+        if (empty) {
+            empty.hidden = rows > 0;
+        }
+        const count = document.querySelector(`[data-reg-count="${countKey}"]`);
+        if (count) {
+            count.textContent = String(rows);
+        }
+        if (countKey === 'open') {
+            const headCount = document.getElementById('registrationsCount');
+            if (headCount) {
+                headCount.textContent = String(rows);
+            }
+        }
+    }
+
+    function syncPending() {
+        syncList(body, 'registrationsTable', 'registrationsEmpty', 'open');
+    }
+
+    function syncRejected() {
+        syncList(rejectedBody, 'rejectedTable', 'rejectedEmpty', 'rejected');
     }
 
     function removeRow(row) {
-        removeRowFrom(row, body, 'registrationsEmpty', 4, DISCORD_MSG.empty);
+        row.remove();
+        syncPending();
     }
 
     function removeRejectedRow(row) {
-        removeRowFrom(row, rejectedBody, 'rejectedEmpty', 5, DISCORD_MSG.rejectedEmpty);
+        row.remove();
+        syncRejected();
     }
+
+    const tabs = Array.prototype.slice.call(document.querySelectorAll('[data-reg-tab]'));
+
+    function selectTab(tab, focus) {
+        tabs.forEach((other) => {
+            const selected = other === tab;
+            other.classList.toggle('active', selected);
+            other.setAttribute('aria-selected', selected ? 'true' : 'false');
+            other.tabIndex = selected ? 0 : -1;
+            const panel = document.getElementById(other.getAttribute('aria-controls'));
+            if (panel) {
+                panel.hidden = !selected;
+            }
+        });
+        if (focus) {
+            tab.focus();
+        }
+    }
+
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => {
+            selectTab(tab, false);
+        });
+        tab.addEventListener('keydown', (event) => {
+            let next = null;
+            if (event.key === 'ArrowRight') {
+                next = tabs[(index + 1) % tabs.length];
+            } else if (event.key === 'ArrowLeft') {
+                next = tabs[(index - 1 + tabs.length) % tabs.length];
+            } else if (event.key === 'Home') {
+                next = tabs[0];
+            } else if (event.key === 'End') {
+                next = tabs[tabs.length - 1];
+            }
+            if (next) {
+                event.preventDefault();
+                selectTab(next, true);
+            }
+        });
+    });
 
     function pad(value) {
         return String(value).padStart(2, '0');
@@ -78,17 +136,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (Number.isNaN(date.getTime())) {
             return '';
         }
-        return (
-            pad(date.getUTCDate()) +
-            '.' +
-            pad(date.getUTCMonth() + 1) +
-            '.' +
-            date.getUTCFullYear() +
-            ' ' +
-            pad(date.getUTCHours()) +
-            ':' +
-            pad(date.getUTCMinutes())
-        );
+        return `${pad(date.getUTCDate())}.${pad(
+            date.getUTCMonth() + 1,
+        )}.${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
     }
 
     function actionButton(action, className, label) {
@@ -100,26 +150,39 @@ document.addEventListener('DOMContentLoaded', function () {
         return button;
     }
 
-    function insertPendingRow(reg) {
-        if (!body || !reg || !reg.id) {
-            return;
+    function textCell(text, className, label) {
+        const cell = document.createElement('td');
+        if (className) {
+            cell.className = className;
         }
-        const placeholder = document.getElementById('registrationsEmpty');
-        if (placeholder) {
-            placeholder.remove();
+        if (label) {
+            cell.setAttribute('data-label', label);
         }
+        cell.textContent = text;
+        return cell;
+    }
+
+    function headerLabel(table, index) {
+        const th = table ? table.querySelectorAll('thead th')[index] : null;
+        return th ? (th.textContent || '').trim() : '';
+    }
+
+    function baseRow(reg, idPrefix, table) {
         const row = document.createElement('tr');
-        row.id = 'reg-row-' + reg.id;
+        row.id = idPrefix + reg.id;
         row.setAttribute('data-id', reg.id);
         if (reg.version !== null && reg.version !== undefined) {
             row.setAttribute('data-version', String(reg.version));
         }
 
         const nameCell = document.createElement('td');
-        nameCell.textContent = reg.username == null ? '' : reg.username;
+        const name = document.createElement('span');
+        name.className = 'cell-title';
+        name.textContent = reg.username == null ? '' : reg.username;
+        nameCell.appendChild(name);
         row.appendChild(nameCell);
 
-        const nickCell = document.createElement('td');
+        const nickCell = textCell('', '', headerLabel(table, 1));
         const nick = document.createElement('span');
         if (reg.serverNickname) {
             nick.textContent = reg.serverNickname;
@@ -131,21 +194,57 @@ document.addEventListener('DOMContentLoaded', function () {
         nickCell.appendChild(nick);
         row.appendChild(nickCell);
 
-        const whenCell = document.createElement('td');
-        whenCell.className = 'reg-when';
-        whenCell.textContent = formatUtc(reg.registeredAt);
-        row.appendChild(whenCell);
+        row.appendChild(textCell(formatUtc(reg.registeredAt), 'reg-when', headerLabel(table, 2)));
+        return row;
+    }
 
-        const actionsCell = document.createElement('td');
+    function actionsCell(buttons) {
+        const cell = document.createElement('td');
+        cell.className = 'cell-actions';
         const actions = document.createElement('div');
-        actions.className = 'reg-actions';
-        actions.appendChild(actionButton('approve', 'btn btn--cta', DISCORD_MSG.approve));
-        actions.appendChild(actionButton('link', 'btn btn-outline', DISCORD_MSG.link));
-        actions.appendChild(actionButton('reject', 'btn btn-outline-danger', DISCORD_MSG.reject));
-        actionsCell.appendChild(actions);
-        row.appendChild(actionsCell);
+        actions.className = 'cluster gap-2 reg-actions';
+        buttons.forEach((button) => {
+            actions.appendChild(button);
+        });
+        cell.appendChild(actions);
+        return cell;
+    }
 
+    function insertPendingRow(reg) {
+        if (!body || !reg || !reg.id) {
+            return;
+        }
+        const row = baseRow(reg, 'reg-row-', document.getElementById('registrationsTable'));
+        row.appendChild(
+            actionsCell([
+                actionButton('approve', 'btn btn-success btn-xs', DISCORD_MSG.approve),
+                actionButton('link', 'btn btn-ghost btn-xs', DISCORD_MSG.link),
+                actionButton('merge', 'btn btn-ghost btn-xs', DISCORD_MSG.merge),
+                actionButton('reject', 'btn btn-quiet-danger btn-xs', DISCORD_MSG.reject),
+            ]),
+        );
         body.appendChild(row);
+        syncPending();
+    }
+
+    function insertRejectedRow(reg) {
+        if (!rejectedBody || !reg || !reg.id) {
+            return;
+        }
+        const table = document.getElementById('rejectedTable');
+        const row = baseRow(reg, 'rejected-row-', table);
+        row.appendChild(
+            textCell(
+                reg.decidedAt ? formatUtc(reg.decidedAt) : '—',
+                'reg-when',
+                headerLabel(table, 3),
+            ),
+        );
+        row.appendChild(
+            actionsCell([actionButton('reopen', 'btn btn-ghost btn-xs', DISCORD_MSG.reopen)]),
+        );
+        rejectedBody.insertBefore(row, rejectedBody.firstChild);
+        syncRejected();
     }
 
     function approve(row) {
@@ -153,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const version = row.getAttribute('data-version');
         window.krtFetch.write({
             method: 'POST',
-            url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/approve',
+            url: `/admin/discord-registrations/${encodeURIComponent(id)}/approve`,
             payload: { version: version == null ? null : Number(version) },
             toast: false,
             errorMessage: DISCORD_MSG.approveError,
@@ -220,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function () {
         reopenTarget = null;
     }
 
-    body.addEventListener('click', function (event) {
+    body.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-action]');
         if (!btn) {
             return;
@@ -242,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (rejectedBody) {
-        rejectedBody.addEventListener('click', function (event) {
+        rejectedBody.addEventListener('click', (event) => {
             const btn = event.target.closest('button[data-action="reopen"]');
             if (!btn) {
                 return;
@@ -260,7 +359,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     const confirmBtn = document.getElementById('reject-confirm');
     if (confirmBtn) {
-        confirmBtn.addEventListener('click', function () {
+        confirmBtn.addEventListener('click', () => {
             if (!rejectTarget) {
                 return;
             }
@@ -270,19 +369,20 @@ document.addEventListener('DOMContentLoaded', function () {
             const reason = reasonInput ? reasonInput.value.trim() : '';
             window.krtFetch.write({
                 method: 'POST',
-                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/reject',
+                url: `/admin/discord-registrations/${encodeURIComponent(id)}/reject`,
                 payload: {
                     reason: reason === '' ? null : reason,
                     version: version == null ? null : Number(version),
                 },
                 toast: false,
                 errorMessage: DISCORD_MSG.rejectError,
-                onSuccess() {
+                onSuccess(data) {
                     if (window.showFrontendSuccessToast) {
                         window.showFrontendSuccessToast(DISCORD_MSG.rejected);
                     }
                     closeReject();
                     removeRow(row);
+                    insertRejectedRow(data);
                 },
             });
         });
@@ -294,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     const linkConfirmBtn = document.getElementById('link-confirm');
     if (linkConfirmBtn) {
-        linkConfirmBtn.addEventListener('click', function () {
+        linkConfirmBtn.addEventListener('click', () => {
             if (!linkTarget) {
                 return;
             }
@@ -311,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const version = row.getAttribute('data-version');
             window.krtFetch.write({
                 method: 'POST',
-                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/link',
+                url: `/admin/discord-registrations/${encodeURIComponent(id)}/link`,
                 payload: {
                     targetUserId,
                     version: version == null ? null : Number(version),
@@ -336,7 +436,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const mergeConfirmBtn = document.getElementById('merge-confirm');
     if (mergeConfirmBtn) {
-        mergeConfirmBtn.addEventListener('click', function () {
+        mergeConfirmBtn.addEventListener('click', () => {
             if (!mergeTarget) {
                 return;
             }
@@ -353,7 +453,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const version = row.getAttribute('data-version');
             window.krtFetch.write({
                 method: 'POST',
-                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/merge',
+                url: `/admin/discord-registrations/${encodeURIComponent(id)}/merge`,
                 payload: {
                     sourceUserId,
                     version: version == null ? null : Number(version),
@@ -379,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     const reopenConfirmBtn = document.getElementById('reopen-confirm');
     if (reopenConfirmBtn) {
-        reopenConfirmBtn.addEventListener('click', function () {
+        reopenConfirmBtn.addEventListener('click', () => {
             if (!reopenTarget) {
                 return;
             }
@@ -389,7 +489,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const reason = reopenReasonInput ? reopenReasonInput.value.trim() : '';
             window.krtFetch.write({
                 method: 'POST',
-                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/reopen',
+                url: `/admin/discord-registrations/${encodeURIComponent(id)}/reopen`,
                 payload: {
                     reason: reason === '' ? null : reason,
                     version: version == null ? null : Number(version),
@@ -408,7 +508,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    window.addEventListener('click', function (event) {
+    window.addEventListener('click', (event) => {
         if (event.target === modal) {
             closeReject();
         } else if (event.target === linkModal) {
@@ -417,7 +517,7 @@ document.addEventListener('DOMContentLoaded', function () {
             closeReopen();
         }
     });
-    document.addEventListener('keydown', function (event) {
+    document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') {
             return;
         }

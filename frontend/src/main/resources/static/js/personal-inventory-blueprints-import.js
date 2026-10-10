@@ -33,7 +33,7 @@
         summaryEl = $('krt-bp-import-summary');
         applyBtn = /** @type {HTMLButtonElement | null} */ ($('krt-bp-import-apply'));
         if (fileInput) fileInput.addEventListener('change', onFileChosen);
-        document.addEventListener('keydown', function (e) {
+        document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeModal();
         });
         loadHandoff();
@@ -61,15 +61,14 @@
         if (!id) return;
         params.delete('handoff');
         const cleaned =
-            window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+            window.location.pathname + (params.toString() ? `?${params.toString()}` : '');
         if (window.history && window.history.replaceState) {
             window.history.replaceState(null, '', cleaned);
         }
         if (!window.krtFetch) return;
-        const url =
-            (endpoints().importStaged || '/personal-inventory/blueprints/import/staged') +
-            '?handoff=' +
-            encodeURIComponent(id);
+        const url = `${
+            endpoints().importStaged || '/personal-inventory/blueprints/import/staged'
+        }?handoff=${encodeURIComponent(id)}`;
         window.krtFetch
             .write({
                 method: 'POST',
@@ -84,7 +83,7 @@
                     return true;
                 },
             })
-            .then(function (result) {
+            .then((result) => {
                 showPreviewResult(result, handoffNotFound);
             });
     }
@@ -123,7 +122,7 @@
                 toast: false,
                 errorMessage: i18n().error,
             })
-            .then(function (result) {
+            .then((result) => {
                 showPreviewResult(result, toastError);
             });
     }
@@ -131,63 +130,51 @@
     function renderPreview(preview) {
         if (!bodyEl) return;
         if (summaryEl) {
-            summaryEl.textContent =
-                window.krtI18nText(i18n().summary, 'krtBlueprintsImportI18n.summary') +
-                ': ' +
-                (preview.total || 0) +
-                ' · ' +
-                window.krtI18nText(i18n().groupMatched, 'krtBlueprintsImportI18n.groupMatched') +
-                ': ' +
-                ((preview.matched || 0) + (preview.matchedByAlias || 0)) +
-                ' · ' +
-                window.krtI18nText(
-                    i18n().groupSuggested,
-                    'krtBlueprintsImportI18n.groupSuggested',
-                ) +
-                ': ' +
-                (preview.suggested || 0) +
-                ' · ' +
-                window.krtI18nText(
-                    i18n().groupUnmatched,
-                    'krtBlueprintsImportI18n.groupUnmatched',
-                ) +
-                ': ' +
-                (preview.unmatched || 0) +
-                ' · ' +
-                window.krtI18nText(i18n().groupOwned, 'krtBlueprintsImportI18n.groupOwned') +
-                ': ' +
-                (preview.alreadyOwned || 0);
+            summaryEl.textContent = `${window.krtI18nText(
+                i18n().summary,
+                'krtBlueprintsImportI18n.summary',
+            )}: ${preview.total || 0} · ${window.krtI18nText(
+                i18n().groupMatched,
+                'krtBlueprintsImportI18n.groupMatched',
+            )}: ${(preview.matched || 0) + (preview.matchedByAlias || 0)} · ${window.krtI18nText(
+                i18n().groupSuggested,
+                'krtBlueprintsImportI18n.groupSuggested',
+            )}: ${preview.suggested || 0} · ${window.krtI18nText(
+                i18n().groupUnmatched,
+                'krtBlueprintsImportI18n.groupUnmatched',
+            )}: ${preview.unmatched || 0} · ${window.krtI18nText(
+                i18n().groupOwned,
+                'krtBlueprintsImportI18n.groupOwned',
+            )}: ${preview.alreadyOwned || 0}`;
         }
         const entries = preview.entries || [];
-        const matched = entries.filter(function (e) {
+        const matched = entries.filter((e) => {
             return e.status === 'MATCHED' || e.status === 'MATCHED_BY_ALIAS';
         });
-        const suggested = entries.filter(function (e) {
+        const suggested = entries.filter((e) => {
             return e.status === 'SUGGESTED';
         });
-        const unmatched = entries.filter(function (e) {
+        const unmatched = entries.filter((e) => {
             return e.status === 'UNMATCHED';
         });
-        const owned = entries.filter(function (e) {
+        const owned = entries.filter((e) => {
             return e.status === 'ALREADY_OWNED';
         });
 
-        let html = '';
+        /** @type {KrtHtml[]} */
+        const html = [];
 
         function appendGroup(title, groupEntries, kind) {
             if (!groupEntries || groupEntries.length === 0) return;
-            html +=
-                '<section class="krt-bp-imp-group">' +
-                '<h3 class="krt-bp-imp-group-title">' +
-                escapeHtml(title || '') +
-                ' (' +
-                escapeHtml(groupEntries.length) +
-                ')</h3>' +
-                '<div class="krt-bp-imp-rows">';
-            groupEntries.forEach(function (e) {
+            html.push(
+                krtHtml`<section class="krt-bp-imp-group"><h3 class="krt-bp-imp-group-title">${
+                    title || ''
+                } (${groupEntries.length})</h3><div class="krt-bp-imp-rows">`,
+            );
+            groupEntries.forEach((e) => {
                 appendRow(e, kind);
             });
-            html += '</div>' + '</section>';
+            html.push(krtHtml`</div></section>`);
         }
 
         function appendRow(entry, kind) {
@@ -204,127 +191,112 @@
             } else if (kind === 'matched' || (kind === 'suggested' && resolved)) {
                 includeState = ' checked';
             }
-            html +=
-                '<div class="krt-bp-imp-row" data-external="' +
-                escapeAttr(entry.externalName) +
-                '"' +
-                ' data-key="' +
-                escapeAttr(resolved) +
-                '" data-acquired="' +
-                escapeAttr(acquired) +
-                '">' +
-                '<label class="krt-bp-imp-include-cell">' +
-                '<input type="checkbox" class="krt-bp-imp-include"' +
-                includeState +
-                '>' +
-                '</label>' +
-                '<span class="krt-bp-imp-external">' +
-                escapeHtml(entry.externalName || '') +
-                '</span>' +
-                '<span class="krt-bp-imp-resolution">';
+            const checkbox = isOwned
+                ? krtHtml`<input type="checkbox" class="krt-bp-imp-include" disabled>`
+                : includeState
+                  ? krtHtml`<input type="checkbox" class="krt-bp-imp-include" checked>`
+                  : krtHtml`<input type="checkbox" class="krt-bp-imp-include">`;
+            html.push(
+                krtHtml`<div class="krt-bp-imp-row" data-external="${entry.externalName}" data-key="${
+                    resolved
+                }" data-acquired="${acquired}"><label class="krt-bp-imp-include-cell">${
+                    checkbox
+                }</label><span class="krt-bp-imp-external">${
+                    entry.externalName || ''
+                }</span><span class="krt-bp-imp-resolution">`,
+            );
             if (kind === 'matched') {
-                html +=
-                    '<span class="krt-bp-imp-product">' +
-                    escapeHtml(entry.productName || '') +
-                    '</span>';
+                html.push(
+                    krtHtml`<span class="krt-bp-imp-product">${entry.productName || ''}</span>`,
+                );
             } else if (isOwned) {
-                html +=
-                    '<span class="krt-bp-imp-owned">' +
-                    escapeHtml(
-                        window.krtI18nText(i18n().ownedLabel, 'krtBlueprintsImportI18n.ownedLabel'),
-                    ) +
-                    '</span>';
+                html.push(
+                    krtHtml`<span class="krt-bp-imp-owned">${window.krtI18nText(
+                        i18n().ownedLabel,
+                        'krtBlueprintsImportI18n.ownedLabel',
+                    )}</span>`,
+                );
             } else {
                 appendSearchControl(entry);
             }
             if (acquired) {
-                html +=
-                    '<span class="krt-bp-imp-date">' +
-                    escapeHtml(String(acquired).substring(0, 10)) +
-                    '</span>';
+                html.push(
+                    krtHtml`<span class="krt-bp-imp-date">${String(acquired).substring(0, 10)}</span>`,
+                );
             }
-            html += '</span>';
+            html.push(krtHtml`</span>`);
             if (!isOwned) {
-                html +=
-                    '<input type="text" class="krt-bp-imp-note" maxlength="2000"' +
-                    ' placeholder="' +
-                    escapeAttr(i18n().notePlaceholder || '') +
-                    '">';
+                html.push(
+                    krtHtml`<input type="text" class="krt-bp-imp-note" maxlength="2000" placeholder="${
+                        i18n().notePlaceholder || ''
+                    }">`,
+                );
             }
-            html += '</div>';
+            html.push(krtHtml`</div>`);
         }
 
         function appendSearchControl(entry) {
             const suggestions = entry.suggestions || [];
-            html +=
-                '<span class="krt-bp-imp-search-wrap">' +
-                '<input type="text" class="krt-bp-imp-search" autocomplete="off"' +
-                ' value="' +
-                escapeAttr(suggestions.length > 0 ? suggestions[0].productName : '') +
-                '" placeholder="' +
-                escapeAttr(
-                    window.krtI18nText(
-                        i18n().searchPlaceholder,
-                        'krtBlueprintsImportI18n.searchPlaceholder',
-                    ),
-                ) +
-                '">' +
-                '<div class="krt-bp-imp-results krt-pi-typeahead-results" hidden></div>';
+            html.push(
+                krtHtml`<span class="krt-bp-imp-search-wrap"><input type="text" class="krt-bp-imp-search" autocomplete="off" value="${
+                    suggestions.length > 0 ? suggestions[0].productName : ''
+                }" placeholder="${window.krtI18nText(
+                    i18n().searchPlaceholder,
+                    'krtBlueprintsImportI18n.searchPlaceholder',
+                )}"><div class="krt-bp-imp-results krt-pi-typeahead-results" hidden></div>`,
+            );
             if (suggestions.length > 0) {
-                html += '<span class="krt-bp-imp-suggestions">';
-                suggestions.forEach(function (s) {
-                    html +=
-                        '<button type="button" class="krt-bp-imp-suggestion" data-key="' +
-                        escapeAttr(s.productKey) +
-                        '"' +
-                        ' data-name="' +
-                        escapeAttr(s.productName) +
-                        '">' +
-                        escapeHtml(s.productName) +
-                        '</button>';
-                });
-                html += '</span>';
+                html.push(
+                    krtHtml`<span class="krt-bp-imp-suggestions">${suggestions.map(
+                        (s) =>
+                            krtHtml`<button type="button" class="krt-bp-imp-suggestion" data-key="${
+                                s.productKey
+                            }" data-name="${s.productName}">${s.productName}</button>`,
+                    )}</span>`,
+                );
             }
-            html += '</span>';
+            html.push(krtHtml`</span>`);
         }
 
         appendGroup(i18n().groupMatched, matched, 'matched');
         appendGroup(i18n().groupSuggested, suggested, 'suggested');
         appendGroup(i18n().groupUnmatched, unmatched, 'unmatched');
         appendGroup(i18n().groupOwned, owned, 'owned');
-        if (!html)
-            html =
-                '<p class="krt-bp-staging-empty">' +
-                escapeHtml(window.krtI18nText(i18n().nothing, 'krtBlueprintsImportI18n.nothing')) +
-                '</p>';
-        bodyEl.innerHTML = html;
+        if (!html.length)
+            html.push(
+                krtHtml`<p class="krt-bp-staging-empty">${window.krtI18nText(
+                    i18n().nothing,
+                    'krtBlueprintsImportI18n.nothing',
+                )}</p>`,
+            );
+        krtHtml.set(bodyEl, html);
         bindRowSearch();
     }
 
     function bindRowSearch() {
         if (!bodyEl) return;
-        bodyEl.querySelectorAll('.krt-bp-imp-suggestion').forEach(function (chip) {
-            chip.addEventListener('click', function () {
+        bodyEl.querySelectorAll('.krt-bp-imp-suggestion').forEach((chip) => {
+            chip.addEventListener('click', () => {
                 const row = chip.closest('.krt-bp-imp-row');
                 setRowProduct(row, chip.getAttribute('data-key'), chip.getAttribute('data-name'));
             });
         });
-        bodyEl.querySelectorAll('.krt-bp-imp-search').forEach(function (input) {
+        bodyEl.querySelectorAll('.krt-bp-imp-search').forEach((input) => {
             const row = input.closest('.krt-bp-imp-row');
             const results = row
                 ? /** @type {HTMLElement | null} */ (row.querySelector('.krt-bp-imp-results'))
                 : null;
-            input.addEventListener('input', function () {
+            input.addEventListener('input', () => {
                 if (rowDebounce.has(input)) clearTimeout(rowDebounce.get(input));
                 rowDebounce.set(
                     input,
-                    setTimeout(function () {
+                    setTimeout(() => {
                         rowSearch(input, results, row);
                     }, 250),
                 );
             });
-            input.addEventListener('blur', function () {
-                setTimeout(function () {
+            input.addEventListener('blur', () => {
+                setTimeout(() => {
                     if (results) results.hidden = true;
                 }, 200);
             });
@@ -334,19 +306,15 @@
     function rowSearch(input, results, row) {
         if (!results) return;
         const q = input.value || '';
-        const url =
-            (endpoints().search || '/personal-inventory/blueprints/search') +
-            '?q=' +
-            encodeURIComponent(q) +
-            '&limit=10';
-        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : [];
-            })
-            .then(function (items) {
+        const url = `${
+            endpoints().search || '/personal-inventory/blueprints/search'
+        }?q=${encodeURIComponent(q)}&limit=10`;
+        window.krtFetch
+            .getJson(url)
+            .then((items) => {
                 renderRowResults(results, row, items);
             })
-            .catch(function () {
+            .catch(() => {
                 renderRowResults(results, row, []);
             });
     }
@@ -354,33 +322,30 @@
     function renderRowResults(results, row, items) {
         if (!results) return;
         if (!items || items.length === 0) {
-            results.innerHTML =
-                '<div class="krt-pi-typeahead-empty">' +
-                escapeHtml(
-                    window.krtI18nText(i18n().noResults, 'krtBlueprintsImportI18n.noResults'),
-                ) +
-                '</div>';
+            krtHtml.set(
+                results,
+                krtHtml`<div class="krt-pi-typeahead-empty">${window.krtI18nText(
+                    i18n().noResults,
+                    'krtBlueprintsImportI18n.noResults',
+                )}</div>`,
+            );
             results.hidden = false;
             return;
         }
-        let html = '';
-        items.forEach(function (it) {
-            html +=
-                '<button type="button" class="krt-pi-typeahead-item krt-bp-imp-hit"' +
-                ' data-key="' +
-                escapeAttr(it.productKey) +
-                '" data-name="' +
-                escapeAttr(it.name) +
-                '">' +
-                '<span class="krt-pi-typeahead-name">' +
-                escapeHtml(it.name || '') +
-                '</span>' +
-                '</button>';
-        });
-        results.innerHTML = html;
+        krtHtml.set(
+            results,
+            items.map(
+                (it) =>
+                    krtHtml`<button type="button" class="krt-pi-typeahead-item krt-bp-imp-hit" data-key="${
+                        it.productKey
+                    }" data-name="${it.name}"><span class="krt-pi-typeahead-name">${
+                        it.name || ''
+                    }</span></button>`,
+            ),
+        );
         results.hidden = false;
-        results.querySelectorAll('.krt-bp-imp-hit').forEach(function (btn) {
-            btn.addEventListener('click', function () {
+        results.querySelectorAll('.krt-bp-imp-hit').forEach((btn) => {
+            btn.addEventListener('click', () => {
                 setRowProduct(row, btn.getAttribute('data-key'), btn.getAttribute('data-name'));
                 results.hidden = true;
             });
@@ -400,7 +365,7 @@
         if (!bodyEl) return;
         /** @type {NodeListOf<HTMLInputElement>} */ (
             bodyEl.querySelectorAll('.krt-bp-imp-include')
-        ).forEach(function (cb) {
+        ).forEach((cb) => {
             if (!cb.disabled) {
                 const row = cb.closest('.krt-bp-imp-row');
                 if (!value || (row && row.getAttribute('data-key'))) cb.checked = value;
@@ -411,7 +376,7 @@
     function apply() {
         if (!bodyEl) return;
         const resolutions = [];
-        bodyEl.querySelectorAll('.krt-bp-imp-row').forEach(function (row) {
+        bodyEl.querySelectorAll('.krt-bp-imp-row').forEach((row) => {
             const include = /** @type {HTMLInputElement | null} */ (
                 row.querySelector('.krt-bp-imp-include')
             );
@@ -446,36 +411,22 @@
                 errorMessage: i18n().error,
                 onSuccess(result) {
                     const res = result || {};
-                    const msg =
-                        window.krtI18nText(i18n().applied, 'krtBlueprintsImportI18n.applied') +
-                        ' ' +
-                        window.krtI18nText(
-                            i18n().addedLabel,
-                            'krtBlueprintsImportI18n.addedLabel',
-                        ) +
-                        ': ' +
-                        (res.added || 0) +
-                        ', ' +
-                        window.krtI18nText(
-                            i18n().updatedLabel,
-                            'krtBlueprintsImportI18n.updatedLabel',
-                        ) +
-                        ': ' +
-                        (res.acquiredAtUpdated || 0) +
-                        ', ' +
-                        window.krtI18nText(
-                            i18n().aliasesLabel,
-                            'krtBlueprintsImportI18n.aliasesLabel',
-                        ) +
-                        ': ' +
-                        (res.aliasesLearned || 0) +
-                        ', ' +
-                        window.krtI18nText(
-                            i18n().skippedLabel,
-                            'krtBlueprintsImportI18n.skippedLabel',
-                        ) +
-                        ': ' +
-                        (res.skipped || 0);
+                    const msg = `${window.krtI18nText(
+                        i18n().applied,
+                        'krtBlueprintsImportI18n.applied',
+                    )} ${window.krtI18nText(
+                        i18n().addedLabel,
+                        'krtBlueprintsImportI18n.addedLabel',
+                    )}: ${res.added || 0}, ${window.krtI18nText(
+                        i18n().updatedLabel,
+                        'krtBlueprintsImportI18n.updatedLabel',
+                    )}: ${res.acquiredAtUpdated || 0}, ${window.krtI18nText(
+                        i18n().aliasesLabel,
+                        'krtBlueprintsImportI18n.aliasesLabel',
+                    )}: ${res.aliasesLearned || 0}, ${window.krtI18nText(
+                        i18n().skippedLabel,
+                        'krtBlueprintsImportI18n.skippedLabel',
+                    )}: ${res.skipped || 0}`;
                     if (window.showFrontendSuccessToast) {
                         window.showFrontendSuccessToast(msg);
                     }
@@ -488,7 +439,7 @@
                     });
                 },
             })
-            .then(function () {
+            .then(() => {
                 if (applyBtn) {
                     applyBtn.disabled = false;
                 }
@@ -525,10 +476,10 @@
         window.krtEvents.on('click', 'bp-import-pick', pickFile);
         window.krtEvents.on('click', 'bp-import-close', closeModal);
         window.krtEvents.on('click', 'bp-import-apply', apply);
-        window.krtEvents.on('click', 'bp-import-selectall', function () {
+        window.krtEvents.on('click', 'bp-import-selectall', () => {
             selectAll(true);
         });
-        window.krtEvents.on('click', 'bp-import-selectnone', function () {
+        window.krtEvents.on('click', 'bp-import-selectnone', () => {
             selectAll(false);
         });
     }

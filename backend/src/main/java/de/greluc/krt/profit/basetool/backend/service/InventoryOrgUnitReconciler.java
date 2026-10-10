@@ -19,11 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class InventoryOrgUnitReconciler {
 
   private final InventoryItemRepository inventoryItemRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Moves the user's ownerless shared inventory into their first org unit so it appears in its
@@ -65,7 +66,7 @@ public class InventoryOrgUnitReconciler {
   public void onUserGainedFirstOrgUnit(@NotNull UUID userId, @NotNull OrgUnit firstOrgUnit) {
     int restamped = restamp(userId, firstOrgUnit, false);
     if (restamped > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_ORG_RESTAMPED,
           null,
           null,
@@ -86,7 +87,7 @@ public class InventoryOrgUnitReconciler {
   public void onUserLostLastOrgUnit(@NotNull UUID userId) {
     int restamped = restamp(userId, null, true);
     if (restamped > 0) {
-      auditService.record(
+      auditRecorder.record(
           AuditEventType.INVENTORY_ORG_RESTAMPED,
           null,
           null,

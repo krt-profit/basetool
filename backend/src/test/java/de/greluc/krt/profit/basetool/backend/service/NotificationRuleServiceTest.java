@@ -34,13 +34,12 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgRelativeRole;
-import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.SelectorKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequest;
+import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,7 +66,7 @@ class NotificationRuleServiceTest {
 
   @Mock private NotificationRuleRepository notificationRuleRepository;
 
-  @Mock private RoleRepository roleRepository;
+  @Mock private RoleRecipientDirectory roleRecipientDirectory;
 
   @Mock private NotificationRuleMapper notificationRuleMapper;
   @InjectMocks private NotificationRuleService notificationRuleService;
@@ -90,9 +89,7 @@ class NotificationRuleServiceTest {
 
   /** Makes {@code roleCode} resolve to a catalogue row, so the REQ-SEC-053 check passes. */
   private void catalogueKnows(String roleCode) {
-    Role role = new Role();
-    role.setCode(roleCode);
-    when(roleRepository.findByCodeIgnoreCase(roleCode)).thenReturn(Optional.of(role));
+    when(roleRecipientDirectory.catalogueRoleCode(roleCode)).thenReturn(Optional.of(roleCode));
   }
 
   private static NotificationRule ruleWithVersion(UUID id, Long version) {
@@ -212,7 +209,15 @@ class NotificationRuleServiceTest {
   @ParameterizedTest(name = "{0}")
   @EnumSource(
       value = SelectorKind.class,
-      names = {"ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE"})
+      names = {
+        "ACCOUNT_GRANT",
+        "EVENT_RECIPIENT",
+        "ACCOUNT_RESPONSIBLE",
+        "MISSION_PARTICIPANTS",
+        "MISSION_LEADERSHIP",
+        "EXCHANGE_CLIENT_HOLDERS",
+        "EVENT_RECIPIENTS"
+      })
   void createAcceptsEventDerivedKindAndStoresNoColumns(SelectorKind kind) {
     NotificationRule saved = ruleWithVersion(UUID.randomUUID(), 0L);
     when(notificationRuleRepository.saveAndFlush(any(NotificationRule.class))).thenReturn(saved);
@@ -228,13 +233,21 @@ class NotificationRuleServiceTest {
     assertThat(persisted.getValue().getSelectors())
         .singleElement()
         .satisfies(selector -> assertStoredWithoutColumns(selector, kind));
-    verify(roleRepository, never()).findByCodeIgnoreCase(any());
+    verify(roleRecipientDirectory, never()).catalogueRoleCode(any());
   }
 
   @ParameterizedTest(name = "{0}")
   @EnumSource(
       value = SelectorKind.class,
-      names = {"ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE"})
+      names = {
+        "ACCOUNT_GRANT",
+        "EVENT_RECIPIENT",
+        "ACCOUNT_RESPONSIBLE",
+        "MISSION_PARTICIPANTS",
+        "MISSION_LEADERSHIP",
+        "EXCHANGE_CLIENT_HOLDERS",
+        "EVENT_RECIPIENTS"
+      })
   void updateAcceptsEventDerivedKindAndStoresNoColumns(SelectorKind kind) {
     UUID id = UUID.randomUUID();
     NotificationRule persisted = ruleWithVersion(id, 3L);
@@ -308,9 +321,7 @@ class NotificationRuleServiceTest {
 
   @Test
   void aDifferentlyCasedRoleCodeIsAcceptedAndStoredCanonically() {
-    Role role = new Role();
-    role.setCode("ADMIN");
-    when(roleRepository.findByCodeIgnoreCase("admin")).thenReturn(Optional.of(role));
+    when(roleRecipientDirectory.catalogueRoleCode("admin")).thenReturn(Optional.of("ADMIN"));
     NotificationRule saved = ruleWithVersion(UUID.randomUUID(), 0L);
     when(notificationRuleRepository.saveAndFlush(any(NotificationRule.class))).thenReturn(saved);
     when(notificationRuleMapper.toDto(saved)).thenReturn(dtoFor(saved));
@@ -326,7 +337,7 @@ class NotificationRuleServiceTest {
 
   @Test
   void createWithUnknownRoleCodeIsRejected() {
-    when(roleRepository.findByCodeIgnoreCase("GUEST")).thenReturn(Optional.empty());
+    when(roleRecipientDirectory.catalogueRoleCode("GUEST")).thenReturn(Optional.empty());
 
     assertThatThrownBy(
             () -> notificationRuleService.create(writeRequest(null, roleSelector("GUEST"))))

@@ -245,9 +245,9 @@ class ArchitectureRuleFailureTest {
   }
 
   @Test
-  void theSupportAllowListFails() {
+  void theLeafHelperAllowListFails() {
     assertReports(
-        ArchitectureTest.supportPackageMustStayADependencyLeafRule(
+        ArchitectureTest.leafHelpersMustStayDependencyLeavesRule(
             ArchitectureTest.packageTreeOf("fixture support", Helper.class),
             ArchitectureTest.packageTreeOf("fixture support", Helper.class)
                 .or(ArchitectureTest.MODEL_CODE)
@@ -378,13 +378,14 @@ class ArchitectureRuleFailureTest {
         BANK,
         "MissionLedgerFixture");
     assertReports(
-        ArchitectureTest.bankClassesMustNotConsultOrgUnitScopeRule(OrgScopeFixture.class),
+        ArchitectureTest.bankClassesMustNotConsultOrgUnitScopeRule(
+            OrgScopeFixture.class, fixturesRoot),
         BANK,
         "LedgerFixtureService");
     assertReports(
         ArchitectureTest.orgUnitAwareBankSeamRule(
             ArchitectureTest.bridgesOrgUnitScopeAndTheBank(
-                OrgScopeFixture.class, ArchitectureTest.BANK_DOMAIN),
+                OrgScopeFixture.class, ArchitectureTest.bankDomain(fixturesRoot)),
             SanctionedBridge.class),
         BANK,
         "RogueBridge");

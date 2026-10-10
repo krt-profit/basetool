@@ -1,6 +1,6 @@
 ARG MODULE
 
-FROM eclipse-temurin:25-jdk-alpine@sha256:541729c21f9308a68cebbe5a0627e4cd465dfe8980fc03bac0b2feaee57daafd AS build
+FROM eclipse-temurin:25-jdk-alpine@sha256:3fd2d245c4e0eba615fe366a71b8bd25f5db7104f53e4026b24bf508b880bd2a AS build
 ARG MODULE
 ARG APP_VERSION=
 WORKDIR /app
@@ -21,13 +21,13 @@ RUN case "$MODULE" in \
         backend|frontend|ingest) ;; \
         *) echo "MODULE must be backend, frontend or ingest (got '${MODULE}')" >&2; exit 1 ;; \
     esac; \
-    ./gradlew ":${MODULE}:dependencies" --no-daemon
+    ./gradlew ":${MODULE}:dependencies" --no-daemon --no-configuration-cache
 
 COPY ${MODULE}/src/main/ ${MODULE}/src/main/
 COPY logging-support/src/main/ logging-support/src/main/
 COPY frontend/oss-bundled-components.json frontend/oss-bundled-components.json
 
-RUN ./gradlew ":${MODULE}:bootJar" ${APP_VERSION:+-PappVersion=$APP_VERSION} --no-daemon
+RUN ./gradlew ":${MODULE}:bootJar" ${APP_VERSION:+-PappVersion=$APP_VERSION} --no-daemon --no-configuration-cache
 
 WORKDIR /app/${MODULE}/build/libs
 RUN set -eu; \
@@ -45,7 +45,7 @@ RUN set -eu; \
 WORKDIR /app
 RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
 
-FROM eclipse-temurin:25-jre-alpine@sha256:2ca9adf44f5c29d28ecd26cf92d75cc0c66b7f32bfd839a4439e363a8b428af8 AS runtime
+FROM eclipse-temurin:25-jre-alpine@sha256:3c0a9084927a221ccd1d007fcaf614465672c0af37aaa834c5184483afe56d61 AS runtime
 WORKDIR /app
 
 RUN apk upgrade --no-cache \
@@ -127,17 +127,17 @@ ENTRYPOINT ["java", "-XX:AOTCache=/app/app.aot", "-jar", "/app/app.jar"]
 FROM runtime AS runtime-backend
 EXPOSE 11261
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --start-interval=5s --retries=3 \
-    CMD wget -q --no-check-certificate -O /dev/null https://localhost:11261/actuator/health/readiness || exit 1
+    CMD ["sh", "-c", "wget -q --no-check-certificate -O /dev/null https://localhost:11261/actuator/health/readiness || exit 1"]
 
 FROM runtime AS runtime-frontend
 EXPOSE 18081
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --start-interval=5s --retries=3 \
-    CMD wget -q --no-check-certificate -O /dev/null https://localhost:18081/actuator/health/readiness || exit 1
+    CMD ["sh", "-c", "wget -q --no-check-certificate -O /dev/null https://localhost:18081/actuator/health/readiness || exit 1"]
 
 FROM runtime AS runtime-ingest
 EXPOSE 11262
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --start-interval=5s --retries=3 \
-    CMD wget -q --no-check-certificate -O /dev/null https://localhost:11262/actuator/health/readiness || exit 1
+    CMD ["sh", "-c", "wget -q --no-check-certificate -O /dev/null https://localhost:11262/actuator/health/readiness || exit 1"]
 
 # hadolint ignore=DL3006
 FROM runtime-${MODULE}

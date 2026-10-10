@@ -180,6 +180,67 @@ class JobOrderMaterialDemandRenderTest {
   }
 
   @Test
+  void demandPage_rendersTheListPatternWithACoverageBar() throws Exception {
+    UUID userId = UUID.randomUUID();
+    MaterialDemandRowDto row =
+        new MaterialDemandRowDto(
+            material("Titanium", "SCU"),
+            "GOOD",
+            QualityTierTestData.forCode("GOOD"),
+            1000.0,
+            250.0,
+            100.0,
+            650.0,
+            List.of(
+                new MaterialDemandOrderShareDto(
+                    UUID.randomUUID(), 42, "IN_PROGRESS", "MATERIAL", 1000.0, 250.0, 100.0)));
+    when(backendApiClient.get(contains("/material-demand"), anyClass()))
+        .thenReturn(
+            new MaterialDemandOverviewDto(
+                List.of(
+                    new MaterialDemandGroupDto(
+                        new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"),
+                        List.of(row)))));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/material-demand")
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("page head with the logistics eyebrow")
+        .contains("class=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Flotte &amp; Logistik<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box")
+        .doesNotContain("btn--cta");
+    assertThat(html)
+        .as("the filter popover in the toolbar")
+        .contains("class=\"toolbar demand-toolbar\"")
+        .contains("data-filter-transient");
+    assertThat(html)
+        .as("each group a flush card holding a stacking table")
+        .contains("class=\"card card--flush demand-group\"")
+        .contains("class=\"data-table data-table--stack demand-table\"");
+    assertThat(html)
+        .as("coverage bar: 25 % booked, 10 % claimed, 35 % covered")
+        .contains("data-krtm-width=\"25.0\"")
+        .contains("data-krtm-width=\"10.0\"")
+        .contains("aria-valuenow=\"35\"")
+        .contains(">35 %<");
+    assertThat(html)
+        .as("the order status in the drill-down is translated")
+        .containsPattern("class=\"status-pill status-in_progress\">In Bearbeitung<")
+        .doesNotContain(">IN_PROGRESS<");
+  }
+
+  @Test
   void demandPage_drillDownListsContributingOrdersAndStartsCollapsed() throws Exception {
     UUID userId = UUID.randomUUID();
     UUID orderId = UUID.randomUUID();
@@ -216,7 +277,9 @@ class JobOrderMaterialDemandRenderTest {
     assertThat(html).as("contributing order linked by display id").contains("#7");
     assertThat(html).as("drill-down links to the order detail").contains("/orders/" + orderId);
     assertThat(html).as("an item order still contributes material").contains("order-kind-item");
-    assertThat(html).as("drill-down starts hidden").contains("krtm-display-none-5790");
+    assertThat(html)
+        .as("drill-down starts hidden")
+        .containsPattern("<tr class=\"demand-orders-row\" hidden data-bucket-orders=");
     assertThat(html).as("toggle reports the collapsed state").contains("aria-expanded=\"false\"");
   }
 

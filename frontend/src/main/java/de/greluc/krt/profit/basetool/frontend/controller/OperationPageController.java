@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.model.OperationPayoutProgress;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
@@ -34,22 +35,22 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutSummaryDt
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.OperationForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.operation.client.OperationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -85,34 +86,33 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class OperationPageController {
 
-  private final BackendApiClient backendApiClient;
+  /** The operation domain's typed backend client. */
+  private final OperationBackendClient operationClient;
+
   private final MarkdownRenderer markdown;
   private final ParallelPageLoader parallelPageLoader;
 
-  /** Response type for one paginated page of the operations search endpoint. */
-  private static final ParameterizedTypeReference<PageResponse<OperationDto>> OPERATION_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  /** Response type for the caller's pickable org units feeding the owner-picker fragment. */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      PICKABLE_ORG_UNIT_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for one paginated page of an operation's embedded missions. */
-  private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
+  /**
+   * The list's period segments (REQ-UI-027): upcoming (planned and active), past (completed and
+   * canceled) and all.
+   */
+  static final Set<String> OPERATION_PERIODS = Set.of("UPCOMING", "PAST", "ALL");
 
   /**
    * Renders the paginated, filtered operations list. {@code search} matches name and description,
-   * {@code showPast} widens the default {@code PLANNED}/{@code ACTIVE} filter to all statuses, and
-   * {@code start}/{@code end} filter on the span of the linked missions. {@code fragment=results}
-   * returns only the results fragment for an in-place AJAX swap.
+   * {@code period} picks the status set, and {@code start}/{@code end} filter on the span of the
+   * linked missions. {@code fragment=results} returns only the results fragment for an in-place
+   * AJAX swap.
    *
    * @param search free-text query, may be {@code null}
    * @param start inclusive lower bound (ISO-8601 instant) on the earliest linked mission's planned
    *     start, may be {@code null}; a non-instant value is a {@code 400}
    * @param end inclusive upper bound (ISO-8601 instant) on the latest linked mission's planned end,
    *     may be {@code null}; a non-instant value is a {@code 400}
-   * @param showPast when {@code true}, include COMPLETED and CANCELED
+   * @param showPast whether the default status filter includes finished operations; read only when
+   *     no {@code period} is given, as {@code ALL} when set
+   * @param period the period segment, {@code UPCOMING}, {@code PAST} or {@code ALL}; other values
+   *     fall back to {@code showPast}
    * @param page zero-based page index
    * @param size page size (default 20)
    * @param fragment when equal to {@code "results"}, render only the results fragment
@@ -129,46 +129,27 @@ public class OperationPageController {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
           Instant end,
       @RequestParam(required = false, defaultValue = "false") boolean showPast,
+      @RequestParam(required = false) String period,
       @RequestParam(required = false, defaultValue = "0") Integer page,
       @RequestParam(required = false, defaultValue = "20") Integer size,
       @RequestParam(required = false) String fragment,
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
-    StringBuilder uri = new StringBuilder("/api/v1/operations/search?");
-    List<Object> uriVariables = new ArrayList<>();
-    if (search != null && !search.isBlank()) {
-      uri.append("query={query}&");
-      uriVariables.add(search);
-    }
-    if (start != null) {
-      uri.append("start={start}&");
-      uriVariables.add(start);
-    }
-    if (end != null) {
-      uri.append("end={end}&");
-      uriVariables.add(end);
-    }
-    uri.append("page=").append(page).append("&");
-    uri.append("size=").append(size).append("&");
-    uri.append("sort=createdAt,desc&");
-
-    if (showPast) {
-      uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
-    } else {
-      uri.append("status=PLANNED&status=ACTIVE&");
-    }
+    String knownPeriod = RelayParams.oneOfOrNull(period, OPERATION_PERIODS);
+    String effectivePeriod = knownPeriod != null ? knownPeriod : showPast ? "ALL" : "UPCOMING";
+    model.addAttribute("showPast", !"UPCOMING".equals(effectivePeriod));
+    model.addAttribute("period", effectivePeriod);
 
     try {
       PageResponse<OperationDto> operationsPage =
-          uriVariables.isEmpty()
-              ? backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE)
-              : backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, uriVariables.toArray());
+          operationClient.searchOperations(
+              new OperationBackendClient.OperationSearch(
+                  search, start, end, page, size, effectivePeriod));
       model.addAttribute("operations", operationsPage.content());
       model.addAttribute("operationsPage", operationsPage);
       model.addAttribute("search", search);
       model.addAttribute("start", start);
       model.addAttribute("end", end);
-      model.addAttribute("showPast", showPast);
     } catch (Exception e) {
       log.error("Error loading operations", e);
       model.addAttribute("error", "error.operations.load");
@@ -188,8 +169,7 @@ public class OperationPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
     try {
-      List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
+      List<OrgUnitMembershipOptionDto> options = operationClient.pickableOrgUnits();
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for operation-create owner-picker", e);
@@ -272,7 +252,7 @@ public class OperationPageController {
           yield "operation-detail :: payoutSection";
         }
         case "finance" -> {
-          loadFinanceModel(id, page, size, model);
+          loadFinanceModel(id, model);
           yield "operation-detail :: financeSection";
         }
         default -> "operation-detail :: fragmentError";
@@ -286,9 +266,9 @@ public class OperationPageController {
   /**
    * Loads the full operation-detail model (the overview fragment needs all of it): the four
    * independent reads fanned out on virtual threads via {@link ParallelPageLoader} plus the derived
-   * {@code operationMaxMissionResult}, {@code canEdit} and {@code canUnsetPaidOut}. Propagates a
-   * backend failure to the caller (the full page redirects, the overview fragment shows its inline
-   * error).
+   * {@code operationMaxMissionResult}, {@code payoutProgress}, {@code canEdit} and {@code
+   * canUnsetPaidOut}. Propagates a backend failure to the caller (the full page redirects, the
+   * overview fragment shows its inline error).
    *
    * @param id operation id
    * @param page zero-based page index for the embedded missions table
@@ -299,21 +279,13 @@ public class OperationPageController {
   private void loadFullModel(
       UUID id, Integer page, Integer size, Authentication authentication, Model model) {
     CompletableFuture<OperationDto> operationF =
-        parallelPageLoader.loadAsync(
-            () -> backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
+        parallelPageLoader.loadAsync(() -> operationClient.operation(id));
     CompletableFuture<PageResponse<MissionListDto>> missionsF =
         parallelPageLoader.loadAsync(() -> fetchMissionsPage(id, page, size));
     CompletableFuture<OperationFinanceSummaryDto> financeF =
-        parallelPageLoader.loadAsync(
-            () ->
-                backendApiClient.get(
-                    "/api/v1/operations/" + id + "/finance-summary",
-                    OperationFinanceSummaryDto.class));
+        parallelPageLoader.loadAsync(() -> operationClient.financeSummary(id));
     CompletableFuture<OperationPayoutSummaryDto> payoutsF =
-        parallelPageLoader.loadAsync(
-            () ->
-                backendApiClient.get(
-                    "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class));
+        parallelPageLoader.loadAsync(() -> operationClient.payouts(id));
     CompletableFuture.allOf(operationF, missionsF, financeF, payoutsF).join();
 
     model.addAttribute("operation", operationF.join());
@@ -328,6 +300,7 @@ public class OperationPageController {
     OperationPayoutSummaryDto payoutSummary = payoutsF.join();
     model.addAttribute("operationPayouts", payoutSummary.payouts());
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
+    model.addAttribute("payoutProgress", OperationPayoutProgress.of(payoutSummary.payouts()));
 
     BigDecimal maxMissionResult =
         operationFinance.missions() == null
@@ -345,46 +318,34 @@ public class OperationPageController {
 
   /**
    * Loads only the model the {@code payoutSection} fragment needs (fragment-gating): the operation
-   * (for the preliminary-values flag and the checkbox operation id), the payout summary (rows +
-   * donation total) and the two role flags. Deliberately issues neither the finance-summary nor the
-   * missions read.
+   * (for the preliminary-values flag and the checkbox operation id), the payout summary (rows,
+   * donation total and the folded {@link OperationPayoutProgress} of the sum row) and the two role
+   * flags. Deliberately issues neither the finance-summary nor the missions read.
    *
    * @param id operation id
    * @param authentication current user's authentication
    * @param model Thymeleaf model to populate
    */
   private void loadPayoutModel(UUID id, Authentication authentication, @NotNull Model model) {
-    model.addAttribute(
-        "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
-    OperationPayoutSummaryDto payoutSummary =
-        backendApiClient.get(
-            "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class);
+    model.addAttribute("operation", operationClient.operation(id));
+    OperationPayoutSummaryDto payoutSummary = operationClient.payouts(id);
     model.addAttribute("operationPayouts", payoutSummary.payouts());
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
+    model.addAttribute("payoutProgress", OperationPayoutProgress.of(payoutSummary.payouts()));
     model.addAttribute("canEdit", hasMissionManagerRole(authentication));
     model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
   }
 
   /**
    * Loads only the model the {@code financeSection} fragment needs (fragment-gating): the finance
-   * roll-up, the donation total (from the payout summary) and the missions page (its total feeds
-   * the sum-strip's per-operation count). Deliberately does not issue the operation-detail read.
+   * roll-up. Deliberately issues neither the operation-detail, the payout nor the missions read;
+   * the totals live in the KPI bar, which the overview refresh carries.
    *
    * @param id operation id
-   * @param page zero-based page index for the embedded missions table
-   * @param size page size for the embedded missions table
    * @param model Thymeleaf model to populate
    */
-  private void loadFinanceModel(UUID id, Integer page, Integer size, @NotNull Model model) {
-    model.addAttribute(
-        "operationFinance",
-        backendApiClient.get(
-            "/api/v1/operations/" + id + "/finance-summary", OperationFinanceSummaryDto.class));
-    OperationPayoutSummaryDto payoutSummary =
-        backendApiClient.get(
-            "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class);
-    model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
-    model.addAttribute("missionsPage", fetchMissionsPage(id, page, size));
+  private void loadFinanceModel(UUID id, @NotNull Model model) {
+    model.addAttribute("operationFinance", operationClient.financeSummary(id));
   }
 
   /**
@@ -402,8 +363,7 @@ public class OperationPageController {
   @NotNull
   private String missionsFragment(UUID id, Integer page, Integer size, Model model) {
     try {
-      model.addAttribute(
-          "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
+      model.addAttribute("operation", operationClient.operation(id));
       PageResponse<MissionListDto> missionsPage = fetchMissionsPage(id, page, size);
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
@@ -425,15 +385,7 @@ public class OperationPageController {
    * @return the requested missions page envelope
    */
   private PageResponse<MissionListDto> fetchMissionsPage(UUID id, Integer page, Integer size) {
-    return backendApiClient.get(
-        "/api/v1/missions/search?operationId="
-            + id
-            + "&page="
-            + page
-            + "&size="
-            + size
-            + "&sort=plannedStartTime,asc",
-        MISSION_PAGE_TYPE);
+    return operationClient.missions(id, page, size);
   }
 
   /**
@@ -452,10 +404,7 @@ public class OperationPageController {
   public String operationMissionFinance(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID missionId, Model model) {
     try {
-      MissionFinanceSummaryDto detail =
-          backendApiClient.get(
-              "/api/v1/operations/" + id + "/finances/" + missionId,
-              MissionFinanceSummaryDto.class);
+      MissionFinanceSummaryDto detail = operationClient.missionFinance(id, missionId);
       model.addAttribute("financeDetail", detail);
     } catch (Exception e) {
       log.error("Error loading finance detail for operation {} mission {}", id, missionId, e);
@@ -503,7 +452,7 @@ public class OperationPageController {
   public String createOperation(
       @ModelAttribute OperationForm form, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.post("/api/v1/operations", form, Void.class);
+      operationClient.createOperation(form);
       redirectAttributes.addFlashAttribute("successMessage", "operation.create.success");
     } catch (Exception e) {
       log.error("Error creating operation", e);
@@ -529,7 +478,7 @@ public class OperationPageController {
       @ModelAttribute OperationForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.put("/api/v1/operations/" + id, form, Void.class);
+      operationClient.updateOperation(id, form);
       redirectAttributes.addFlashAttribute("successMessage", "operation.update.success");
     } catch (BackendServiceException e) {
       if (e.getStatusCode() == 409) {
@@ -569,11 +518,7 @@ public class OperationPageController {
   public ResponseEntity<OperationPayoutStatusDto> updatePayoutStatus(
       @PathVariable @NotNull UUID id, @RequestBody OperationPayoutStatusUpdateDto request) {
     try {
-      OperationPayoutStatusDto updated =
-          backendApiClient.put(
-              "/api/v1/operations/" + id + "/payouts/paid-out",
-              request,
-              OperationPayoutStatusDto.class);
+      OperationPayoutStatusDto updated = operationClient.updatePayoutStatus(id, request);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       log.debug(
@@ -629,7 +574,7 @@ public class OperationPageController {
   public String deleteOperation(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/operations/" + id, Void.class);
+      operationClient.deleteOperation(id);
       redirectAttributes.addFlashAttribute("successMessage", "operation.delete.success");
     } catch (Exception e) {
       log.error("Error deleting operation", e);
@@ -652,7 +597,7 @@ public class OperationPageController {
         log,
         "create operation (ajax)",
         () -> {
-          backendApiClient.post("/api/v1/operations", form, Void.class);
+          operationClient.createOperation(form);
           return ResponseEntity.ok().build();
         });
   }
@@ -675,8 +620,7 @@ public class OperationPageController {
         log,
         "update operation (ajax) for " + id,
         () -> {
-          OperationDto updated =
-              backendApiClient.put("/api/v1/operations/" + id, form, OperationDto.class);
+          OperationDto updated = operationClient.updateOperationAndRead(id, form);
           java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
           result.put("version", updated.version());
           result.put("name", updated.name());
@@ -700,7 +644,7 @@ public class OperationPageController {
         log,
         "delete operation (ajax) for " + id,
         () -> {
-          backendApiClient.delete("/api/v1/operations/" + id, Void.class);
+          operationClient.deleteOperation(id);
           return ResponseEntity.ok().build();
         });
   }

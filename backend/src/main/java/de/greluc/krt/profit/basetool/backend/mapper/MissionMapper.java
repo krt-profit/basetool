@@ -45,7 +45,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionStepDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
-import de.greluc.krt.profit.basetool.backend.support.MissionViewerAccess;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -61,7 +60,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 /** MapStruct mapper between Mission entities and DTOs. */
 @Mapper(
     config = CentralMapperConfig.class,
-    uses = {ShipMapper.class, UserMapper.class, OperationMapper.class, SquadronMapper.class})
+    uses = {
+      ShipMapper.class,
+      ShipTypeMapper.class,
+      UserMapper.class,
+      OperationMapper.class,
+      SquadronMapper.class
+    })
 public abstract class MissionMapper {
 
   @Autowired protected MissionViewerAccess missionViewerAccess;
@@ -171,12 +176,14 @@ public abstract class MissionMapper {
    *
    * @param mission the entity to project; {@code null} returns {@code null}
    * @param registeredCount the mission's participant count, resolved by the caller for the page
+   * @param signedUp whether the calling member is signed up, resolved by the caller for the page
    * @return the list-row DTO
    */
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
   @Mapping(target = "owningSquadron", source = "mission.owningOrgUnit")
   @Mapping(target = "registeredCount", expression = "java(registeredCount)")
-  public abstract MissionListDto toListDto(Mission mission, long registeredCount);
+  @Mapping(target = "signedUp", expression = "java(signedUp)")
+  public abstract MissionListDto toListDto(Mission mission, long registeredCount, boolean signedUp);
 
   /**
    * Projects org-unit affiliations into {@link OrgUnitReferenceDto}s, Staffel first, then
@@ -238,7 +245,7 @@ public abstract class MissionMapper {
   /**
    * Counts participants that have been checked in. A participant is considered checked in as soon
    * as {@code startTime} is set (see {@link
-   * de.greluc.krt.profit.basetool.backend.service.MissionService#checkIn}).
+   * de.greluc.krt.profit.basetool.backend.mission.internal.MissionService#checkIn}).
    */
   public int resolveCheckedInParticipants(Mission mission) {
     if (mission == null || mission.getParticipants() == null) {

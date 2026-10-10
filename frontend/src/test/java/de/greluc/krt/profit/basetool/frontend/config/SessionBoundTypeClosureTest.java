@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.FrontendApplication;
 import de.greluc.krt.profit.basetool.frontend.config.SessionBoundTypeScan.SessionWrite;
-import de.greluc.krt.profit.basetool.frontend.support.GoldenFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -54,15 +53,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * <p>Every session write of the compiled main classes is resolved to its static type by {@link
  * SessionBoundTypeScan}; the closure over the application types' members must be admitted by the
  * enforcing validator, so a flashed form moved out of {@code frontend.model} fails here instead of
- * being dropped in production. The application part of the closure is committed as {@code
- * src/test/resources/session/session-bound-types.txt}, the exact list the allow-list narrows to
- * (D-10); rewrite it with {@code ./gradlew :frontend:test --tests '*SessionBoundTypeClosureTest'
- * -PupdateSnapshots}.
+ * being dropped in production. The application part of the closure must equal {@link
+ * SessionTypeAllowList#SESSION_BOUND_TYPES}, the exact list the allow-list admits (D-10): a new
+ * session-bound type without an entry, and an entry no session write reaches, both fail.
  */
 class SessionBoundTypeClosureTest {
-
-  /** Golden file of the session-bound application types, below {@code src/test/resources}. */
-  private static final String EXACT_LIST = "session/session-bound-types.txt";
 
   /** Selection floor: session writes in the main classes when the test was added. */
   private static final int MIN_WRITES = 317;
@@ -133,12 +128,66 @@ class SessionBoundTypeClosureTest {
   }
 
   @Test
-  void theExactListMatchesTheCommittedFile() {
+  void theAllowListNamesExactlyTheSessionBoundTypes() {
     Set<String> closure =
         SessionBoundTypeScan.closure(roots(mainWrites()), loader, new ArrayList<>());
 
-    GoldenFile.assertMatches(
-        EXACT_LIST, List.copyOf(applicationTypes(closure)), "exact session-bound type list");
+    assertThat(SessionTypeAllowList.SESSION_BOUND_TYPES).doesNotHaveDuplicates();
+    assertThat(
+            listDifference(
+                applicationTypes(closure), Set.copyOf(SessionTypeAllowList.SESSION_BOUND_TYPES)))
+        .as(
+            "SessionTypeAllowList.SESSION_BOUND_TYPES must name exactly the derived session-bound"
+                + " application types; add a missing type there in the same change, remove a"
+                + " stale one")
+        .isEmpty();
+  }
+
+  @Test
+  void aPlantedSessionBoundTypeWithoutAnEntryFailsTheExactList() {
+    Set<String> closure =
+        SessionBoundTypeScan.closure(
+            SessionBoundTypeScan.writes(classBytes(FlashingFixture.class), loader)
+                .getFirst()
+                .types(),
+            loader,
+            new ArrayList<>());
+    Set<String> derived = new TreeSet<>(SessionTypeAllowList.SESSION_BOUND_TYPES);
+    derived.addAll(applicationTypes(closure));
+    Set<String> listed = new TreeSet<>(SessionTypeAllowList.SESSION_BOUND_TYPES);
+    listed.add("de.greluc.krt.profit.basetool.frontend.model.form.RetiredForm");
+
+    assertThat(listDifference(derived, listed))
+        .containsExactlyInAnyOrder(
+            "missing from SESSION_BOUND_TYPES: " + MovedForm.class.getName(),
+            "missing from SESSION_BOUND_TYPES: " + MovedRow.class.getName(),
+            "stale in SESSION_BOUND_TYPES: "
+                + "de.greluc.krt.profit.basetool.frontend.model.form.RetiredForm");
+    assertThat(refused(Set.of(MovedForm.class.getName(), MovedRow.class.getName())))
+        .as("the enforcing validator refuses a session-bound type that has no entry")
+        .containsExactlyInAnyOrder(MovedForm.class.getName(), MovedRow.class.getName());
+  }
+
+  /**
+   * Names every type the derivation and the list disagree on.
+   *
+   * @param derived the session-bound application types derived from the code
+   * @param listed the types the allow-list names
+   * @return one line per missing or stale entry, sorted
+   */
+  private static Set<String> listDifference(Set<String> derived, Set<String> listed) {
+    Set<String> difference = new TreeSet<>();
+    for (String name : derived) {
+      if (!listed.contains(name)) {
+        difference.add("missing from SESSION_BOUND_TYPES: " + name);
+      }
+    }
+    for (String name : listed) {
+      if (!derived.contains(name)) {
+        difference.add("stale in SESSION_BOUND_TYPES: " + name);
+      }
+    }
+    return difference;
   }
 
   @Test

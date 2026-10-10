@@ -19,17 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
-import de.greluc.krt.profit.basetool.backend.event.MemberDepartedEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.RolesChangedObserver;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.PartialRoleScopeProperties;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Collection;
@@ -96,6 +97,7 @@ public class UserReconciliationService {
   private final UserRegistrationService userRegistrationService;
   private final UserService userService;
   private final PartialRoleScopeProperties partialRoleScopeProperties;
+  private final List<RolesChangedObserver> rolesChangedObservers;
 
   /** Counts callsign collisions between a new subject and an existing account. */
   private final MeterRegistry meterRegistry;
@@ -178,6 +180,7 @@ public class UserReconciliationService {
               new MemberDepartedEvent(user.getId(), MemberDepartedEvent.REASON_ROLE_LOST));
         }
         user.setRoles(localRoles);
+        notifyRolesChanged(user, localRoles);
         changed = true;
       }
     } else if (!user.getRoles().equals(localRoles)) {
@@ -285,6 +288,7 @@ public class UserReconciliationService {
     }
     if (!user.getRoles().equals(localRoles)) {
       user.setRoles(localRoles);
+      notifyRolesChanged(user, localRoles);
       changed = true;
       roleChangedAccounts.incrementAndGet();
       log.debug(
@@ -386,6 +390,16 @@ public class UserReconciliationService {
   }
 
   /**
+   * Tells the observers that a member's roles were replaced.
+   *
+   * @param user the member
+   * @param roles the roles the member holds now
+   */
+  private void notifyRolesChanged(@NotNull User user, @NotNull Set<Role> roles) {
+    rolesChangedObservers.forEach(observer -> observer.onRolesChanged(user.getId(), roles));
+  }
+
+  /**
    * Returns the display names of every local role, which the scheduled Keycloak sync matches
    * case-insensitively against the realm's roles to fetch memberships.
    *
@@ -464,7 +478,7 @@ public class UserReconciliationService {
     return roleRepository.findAllWithPermissions().stream()
         .collect(
             Collectors.toUnmodifiableMap(
-                role -> role.getName().toLowerCase(Locale.ROOT), role -> role, (a, b) -> a));
+                role -> role.getName().toLowerCase(Locale.ROOT), role -> role, (a, _) -> a));
   }
 
   /**

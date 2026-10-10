@@ -1,4 +1,4 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
     .sc-links-section {
@@ -29,7 +29,7 @@
     .sc-link-card:hover,
     .sc-link-card:focus-visible {
         border-color: var(--color-primary);
-        background-color: rgb(231 126 35 / 6%);
+        background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
     }
     .sc-link-logo {
         flex: none;

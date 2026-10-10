@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -39,7 +40,9 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,8 +89,9 @@ class AdminLocationsPageControllerMvcTest {
         new PageResponse<>(List.of(location), 0, 1000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(page);
 
     mockMvc
@@ -105,8 +109,9 @@ class AdminLocationsPageControllerMvcTest {
   void listData_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
     PageResponse<LocationDto> page = new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of());
     when(backendApiClient.get(
-            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=0"),
-            anyTypeRef()))
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
         .thenReturn(page);
 
     mockMvc
@@ -115,7 +120,73 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(
             PageStylesheets.content(
                 containsString(
-                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+                    ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
+  }
+
+  /**
+   * Renders {@code /admin/locations} in German with the given locations from the backend.
+   *
+   * @param locations the locations the catalogue returns
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private @NotNull String renderList(@NotNull List<LocationDto> locations) throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page={page}"),
+            anyTypeRef(),
+            eq(0)))
+        .thenReturn(
+            new PageResponse<>(locations, 0, 1000, locations.size(), 1, Collections.emptyList()));
+    return mockMvc
+        .perform(get("/admin/locations").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /** The list renders on the list pattern: page head, toolbar search, stacked data table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_rendersTheListPattern() throws Exception {
+    String html =
+        renderList(
+            List.of(new LocationDto(UUID.randomUUID(), "ARC-L1", "Arc-Corp L1", false, true, 0L)));
+
+    assertThat(html)
+        .contains("data-testid=\"page-head\"")
+        .containsPattern("class=\"page-eyebrow\"[^>]*>Stammdaten<")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
+        .doesNotContain("class=\"greeting")
+        .doesNotContain("hud-box");
+    assertThat(html.substring(html.indexOf("<main"), html.indexOf("</main>")))
+        .doesNotContain("krtm-")
+        .doesNotContain("colspan");
+    assertThat(html.split("btn--cta", -1)).hasSize(1);
+    assertThat(html)
+        .contains("data-testid=\"toolbar-search\"")
+        .containsPattern(
+            "id=\"filterLocations\"[^>]*data-trigger=\"filter-table\""
+                + " data-table-id=\"locationsTable\"")
+        .contains("class=\"data-table data-table--stack\"")
+        .containsPattern("class=\"cell-title\">ARC-L1<")
+        .contains("class=\"btn btn-ghost btn-xs\"")
+        .contains(">Ausblenden<")
+        .doesNotContain("data-testid=\"empty-state\"");
+    assertThat(html.substring(html.indexOf("<main"), html.indexOf("</main>")))
+        .doesNotContain("btn-secondary");
+  }
+
+  /** An empty catalogue renders the empty state and no table. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_rendersTheEmptyState() throws Exception {
+    String html = renderList(List.of());
+
+    assertThat(html)
+        .contains("data-testid=\"empty-state\"")
+        .doesNotContain("<table id=\"locationsTable\"")
+        .containsPattern("data-testid=\"page-head-count\"[^>]*>0<");
   }
 
   @Test
@@ -124,9 +195,9 @@ class AdminLocationsPageControllerMvcTest {
     UUID id = UUID.randomUUID();
     LocationDto before = new LocationDto(id, "ARC-L1", "desc", false, false, 0L);
     LocationDto after = new LocationDto(id, "ARC-L1", "desc", true, false, 1L);
-    when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/locations/{id}"), eq(LocationDto.class), eq(id)))
         .thenReturn(before, after);
-    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
         .thenReturn(null);
 
     mockMvc
@@ -142,9 +213,9 @@ class AdminLocationsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void toggleLocationVisibilityAjax_backendConflict_relays409() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/locations/{id}"), eq(LocationDto.class), eq(id)))
         .thenReturn(new LocationDto(id, "ARC-L1", "desc", false, false, 0L));
-    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, java.util.List.of(), "conflict"));
@@ -161,9 +232,9 @@ class AdminLocationsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void toggleLocationVisibility_withoutHeader_redirects() throws Exception {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/locations/" + id), eq(LocationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/locations/{id}"), eq(LocationDto.class), eq(id)))
         .thenReturn(new LocationDto(id, "ARC-L1", "desc", false, false, 0L));
-    when(backendApiClient.put(eq("/api/v1/locations/" + id), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/locations/{id}"), any(), eq(Void.class), eq(id)))
         .thenReturn(null);
 
     mockMvc

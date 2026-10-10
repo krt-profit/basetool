@@ -45,6 +45,8 @@ public final class ModuleSubjects {
 
   private static final String IMPL_SUFFIX = "Impl";
 
+  private static final String PACKAGE_INFO = "package-info";
+
   private ModuleSubjects() {}
 
   /**
@@ -85,7 +87,8 @@ public final class ModuleSubjects {
   }
 
   /**
-   * The top-level classes of a class set, generated ones included.
+   * The top-level classes of a class set, generated ones included and annotated {@code
+   * package-info} declarations excluded.
    *
    * @param classes the imported classes
    * @return the top-level classes, sorted by name
@@ -93,6 +96,7 @@ public final class ModuleSubjects {
   public static @NotNull Stream<JavaClass> topLevelClasses(@NotNull JavaClasses classes) {
     return classes.stream()
         .filter(javaClass -> !javaClass.getName().contains("$"))
+        .filter(javaClass -> !PACKAGE_INFO.equals(javaClass.getSimpleName()))
         .sorted(Comparator.comparing(JavaClass::getName));
   }
 

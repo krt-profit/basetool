@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncTopicClass;
@@ -59,7 +60,7 @@ class MissionListLiveSyncPublishTest {
     liveSyncLocalBus = mock(LiveSyncLocalBus.class);
     controller =
         new MissionWriteController(
-            backendApiClient,
+            new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             mock(MissionPageController.class),
             liveSyncLocalBus);
@@ -89,7 +90,9 @@ class MissionListLiveSyncPublishTest {
   @Test
   void deleteMission_onBackendFailure_doesNotPublish() {
     UUID id = UUID.randomUUID();
-    doThrow(new RuntimeException("backend down")).when(backendApiClient).delete(anyString(), any());
+    doThrow(new RuntimeException("backend down"))
+        .when(backendApiClient)
+        .delete(anyString(), any(), any(Object[].class));
 
     String view = controller.deleteMission(id, redirectAttributes);
 

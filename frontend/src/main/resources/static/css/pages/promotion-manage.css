@@ -1,47 +1,14 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
-    .pm-toolbar {
-        display: flex;
-        gap: 0.75rem;
+    .pm-filter-option {
         align-items: center;
-        margin-bottom: 0.75rem;
-        flex-wrap: wrap;
+        min-height: 40px;
     }
-    .pm-toolbar .pm-search {
-        flex: 1 1 240px;
-        min-width: 180px;
-        max-width: 320px;
-    }
-    .pm-toolbar .pm-spacer {
-        flex: 1;
-    }
-    .pm-toolbar .btn-tiny {
-        padding: 0.4rem 0.75rem;
-        font-size: 0.75rem;
-        min-height: 38px;
-    }
-    .pm-filter-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        padding: 0.35rem 0.6rem;
-        border: 1px solid var(--color-gray-3);
-        background-color: var(--color-bg-dark-gray);
-        color: var(--color-gray-1);
-        font-size: 0.8rem;
-        cursor: pointer;
-        user-select: none;
-        min-height: 38px;
-        box-sizing: border-box;
-    }
-    .pm-filter-chip:has(input:checked) {
-        border-color: var(--color-primary);
-        color: var(--color-primary);
-    }
-    .pm-filter-chip input[type='checkbox'] {
+    .pm-filter-option input[type='checkbox'] {
         width: 1rem;
         height: 1rem;
+        margin-top: 0;
     }
 
     .pm-queue-indicator {
@@ -74,7 +41,7 @@
         padding: 0.6rem 0.75rem;
         margin-bottom: 0.75rem;
         border: 1px solid var(--color-primary);
-        background-color: rgba(231, 126, 35, 0.06);
+        background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
     }
     .pm-bulk-panel.visible {
         display: flex;
@@ -126,12 +93,12 @@
         background-color: var(--color-surface-input);
     }
     .pm-matrix tbody tr.pm-row-selected td {
-        background-color: rgba(231, 126, 35, 0.06);
+        background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
     }
     .pm-matrix tbody tr.pm-row-selected .pm-checkbox-cell,
     .pm-matrix tbody tr.pm-row-selected .pm-member-cell,
     .pm-matrix tbody tr.pm-row-selected .pm-eligibility-cell {
-        background-color: rgba(231, 126, 35, 0.06);
+        background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
     }
 
     .pm-matrix thead tr.pm-row-topic th {
@@ -410,17 +377,14 @@
         font-size: 0.75rem;
     }
 
-    .pm-empty {
-        padding: 1.5rem;
-        text-align: center;
-        color: var(--color-gray-2-text);
-        font-style: italic;
-    }
     .pm-row-hidden {
         display: none;
     }
 
     @media (width <= 1024px) {
+        .pm-filter-option {
+            min-height: var(--touch-target);
+        }
         .pm-matrix .pm-member-col {
             width: 11rem;
             min-width: 11rem;

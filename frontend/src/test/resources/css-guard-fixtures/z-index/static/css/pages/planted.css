@@ -1,0 +1,15 @@
+.planted-magic {
+    z-index: 1500;
+}
+.planted-missing {
+    z-index: var(--z-missing);
+}
+.planted-local {
+    z-index: 3;
+}
+.planted-token {
+    z-index: var(--z-low);
+}
+.planted-auto {
+    z-index: auto;
+}

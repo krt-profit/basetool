@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SyncReportDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SyncReportPurgeResultDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,7 +33,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -44,7 +43,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Admin-only, read-only controller for the {@code /admin/sync-reports} pages: a combined view and
@@ -57,13 +55,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminSyncReportsPageController {
 
-  private static final int PAGE_SIZE = 100;
-
-  /** Response type for the paged {@code /sync-reports} listing. */
-  private static final ParameterizedTypeReference<PageResponse<SyncReportDto>>
-      SYNC_REPORT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** Reads and purges the sync reports. */
+  private final CatalogueBackendClient catalogueClient;
 
   /**
    * Combined view across both catalogues.
@@ -134,10 +127,8 @@ public class AdminSyncReportsPageController {
       redirectAttributes.addFlashAttribute("error", "error.admin.syncReports.delete");
       return "redirect:" + redirect;
     }
-    String uri = purgeUri(canonicalSource, days);
     try {
-      SyncReportPurgeResultDto result =
-          backendApiClient.delete(uri, SyncReportPurgeResultDto.class);
+      SyncReportPurgeResultDto result = catalogueClient.purgeSyncReports(canonicalSource, days);
       redirectAttributes.addFlashAttribute("deletedCount", result == null ? 0 : result.deleted());
     } catch (Exception e) {
       log.error("Failed to delete old sync reports (source={}, days={})", source, days, e);
@@ -163,10 +154,9 @@ public class AdminSyncReportsPageController {
     if (days < 1) {
       return ResponseEntity.badRequest().build();
     }
-    String uri = purgeUri(canonicalSource(source), days);
+    String canonicalSource = canonicalSource(source);
     try {
-      SyncReportPurgeResultDto result =
-          backendApiClient.delete(uri, SyncReportPurgeResultDto.class);
+      SyncReportPurgeResultDto result = catalogueClient.purgeSyncReports(canonicalSource, days);
       Map<String, Object> body = new LinkedHashMap<>();
       body.put("deleted", result == null ? 0 : result.deleted());
       return ResponseEntity.ok(body);
@@ -214,23 +204,6 @@ public class AdminSyncReportsPageController {
   }
 
   /**
-   * Builds the backend purge URI for a canonical source, or for both catalogues when it is {@code
-   * null}.
-   *
-   * @param source the canonical source ({@code "SCWIKI"} / {@code "UEX"}), or {@code null} for both
-   * @param days minimum age in days a report must exceed to be deleted
-   * @return the relative backend URI
-   */
-  private static String purgeUri(@Nullable String source, int days) {
-    UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/sync-reports").queryParam("olderThanDays", days);
-    if (source != null) {
-      uri.queryParam("source", source);
-    }
-    return uri.toUriString();
-  }
-
-  /**
    * Fetches one page of sync-report events, optionally filtered by source, and populates the model;
    * a backend failure yields an error banner and an empty list.
    *
@@ -247,21 +220,14 @@ public class AdminSyncReportsPageController {
   private String render(
       String source, String activeTab, String basePath, int page, String fragment, Model model) {
     int safePage = Math.max(page, 0);
-    UriComponentsBuilder uriBuilder =
-        UriComponentsBuilder.fromPath("/api/v1/sync-reports")
-            .queryParam("page", safePage)
-            .queryParam("size", PAGE_SIZE);
-    if (source != null) {
-      uriBuilder.queryParam("source", source);
-    }
-    String uri = uriBuilder.toUriString();
     try {
-      PageResponse<SyncReportDto> events = backendApiClient.get(uri, SYNC_REPORT_PAGE_TYPE);
+      PageResponse<SyncReportDto> events = catalogueClient.syncReportPage(safePage, source);
       if (events != null) {
         model.addAttribute("events", events.content() == null ? List.of() : events.content());
         model.addAttribute("currentPage", events.page());
         model.addAttribute("totalPages", events.totalPages());
         model.addAttribute("totalElements", events.totalElements());
+        model.addAttribute("eventsPage", events);
       } else {
         populateEmpty(model);
       }

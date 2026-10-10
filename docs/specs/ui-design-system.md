@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-27.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
 > **Owner area:** UI · **Related ADRs:**
 > [0053](../adr/0053-standardize-user-selection-on-searchable-combobox.md) (searchable user pickers, REQ-UI-012) ·
 > [0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (no inline `style=""`, REQ-UI-013) ·
@@ -11,8 +11,11 @@
 > [0177](../adr/0177-the-app-has-exactly-one-dialog-shape.md) (REQ-UI-013) ·
 > [0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md) (REQ-UI-021) ·
 > [0212](../adr/0212-every-stylesheet-sits-in-a-cascade-layer.md) (REQ-UI-024) ·
+> [0239](../adr/0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md) (supported browsers) ·
 > [0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md) (REQ-UI-026) ·
-> **Next free id:** `REQ-UI-027` · **Visual source of truth:** the design
+> [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
+> [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
+> **Next free id:** `REQ-UI-028` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
 
@@ -29,6 +32,12 @@ disagree, the skill wins and this file is corrected in the same PR.
 
 > New UI/visual decisions are recorded in an ADR and reflected here and in the design
 > skill — see the governance rules in `CLAUDE.md`.
+
+**Supported browsers — "Baseline 2025".** The UI targets at least **Chrome 122, Firefox 131 and
+Safari / iOS 18.4** (owner decision D-16, [ADR-0239](../adr/0239-the-browser-baseline-is-baseline-2025-and-trusted-types-follow.md)).
+Set methods, iterator helpers, the `popover` attribute and same-document view transitions are
+available without a polyfill; `Promise.try`, `RegExp.escape` and `Float16Array` are not, and ESLint
+rejects them. The script-side rule — the type check and ESLint at ES2025 — is REQ-FE-018.
 
 ## Requirements
 
@@ -55,16 +64,50 @@ components in `krt-components.css`.
   declares the same 48 tokens in `colors_and_type.css` (krt-profit/design-system#4, submodule at
   `06e47e5`); all 48 values were compared and are identical, case aside.
 
-- [x] Every fallback-free `var(--token)` in `static/css` names a custom property that a stylesheet,
-  a script or a template declares; an undefined one silently drops its declaration (the material
-  demand search header was transparent on `--color-black`, `bank.css` named `--color-text`).
-  `CustomPropertyExistenceTest` fails the build on one; its allow-list is empty.
+- [x] Every fallback-free `var(--token)` in the stylesheets, the templates (inline and `th:style`
+  values) and the scripts names a custom property that a stylesheet, a script or a template
+  declares; an undefined one silently drops its declaration (the material demand search header was
+  transparent on `--color-black`, `bank.css` named `--color-text`; both fixed, none left on
+  2026-10-04). `CustomPropertyExistenceTest` fails the build on one; its allow-list is empty.
+- [x] **A colour token's value appears only in its own declaration** (ADR-0243, 2026-10-04): an
+  opaque copy is `var(--color-x)`, an alpha variant is
+  `color-mix(in srgb, var(--color-x) N%, transparent)` — the token's colour at alpha N % — and a
+  fully transparent one is `transparent`. A colour that is not a token stays a literal. 120
+  hand-written copies were replaced with unchanged computed values.
+- [x] **Page-level stacking goes through the `--z-*` scale** on `:root` in `styles.css` (ADR-0243,
+  2026-10-04), bottom to top:
 
-**Enforced by:** design review, `CustomPropertyExistenceTest`, plus one lint rule: `declaration-property-value-disallowed-list`
-in `frontend/.stylelintrc.json` and `.stylelintrc.templates.json` fails `:frontend:lintCss` /
-`:frontend:lintCssInline` on a hex fallback inside `var()` (2026-09-22), and an override applies
-`color-no-hex` to `materials-overview.css` (2026-09-23). Otherwise the web-asset
-linters gate syntax and style only; no rule checks that a value uses a token.
+  | Token | Value | Used by |
+  | --- | --- | --- |
+  | `--z-popover` | 50 | overflow-menu and filter-popover panels |
+  | `--z-popover-raised` | 60 | the inventory allocation popover; an open row overflow menu on the bank pages |
+  | `--z-dropdown` | 99 | autocomplete list, searchable-select listbox |
+  | `--z-sticky-head` | 900 | the mission detail's sticky head |
+  | `--z-chart-scrollbar` | 998 | the org chart's fixed scrollbar |
+  | `--z-footer` | 999 | footer |
+  | `--z-header` | 1000 | header |
+  | `--z-header-control` | 1001 | hamburger button |
+  | `--z-floating` | 1100 | multi-select options, the phone filter sheet, inventory typeahead results |
+  | `--z-floating-raised` | 1200 | blueprint import results |
+  | `--z-drawer-scrim` | 1999 | drawer overlay |
+  | `--z-drawer` | 2000 | drawer |
+  | `--z-tabbar` | 2100 | phone tab bar |
+  | `--z-modal` | 3000 | dialog overlay |
+  | `--z-hint` | 4000 | SCU hint bubble |
+  | `--z-status-pill` | 9000 | live-sync pill |
+  | `--z-toast` | 9999 | notification toast |
+  | `--z-confirm` | 10000 | confirm dialog |
+
+  A literal `z-index` is allowed only below 50, where it orders the parts of one component (sticky
+  table cells, a lifted overflow menu); a new layer that competes across the page is a new token in
+  its place in the scale. `ZIndexScaleTest` pins the order and fails on a literal of 50 or more.
+
+**Enforced by:** design review, `CustomPropertyExistenceTest`, `ColourTokenCopyTest`,
+`ZIndexScaleTest` (each proven against a planted fixture), plus one lint rule:
+`declaration-property-value-disallowed-list` in `frontend/.stylelintrc.json` and
+`.stylelintrc.templates.json` fails `:frontend:lintCss` / `:frontend:lintCssInline` on a hex fallback
+inside `var()` (2026-09-22), and an override applies `color-no-hex` to `materials-overview.css`
+(2026-09-23). No gate checks that a colour which is not yet a token should become one.
 
 ### REQ-UI-002 — Brand colour & logo
 
@@ -129,8 +172,9 @@ values exactly:
 > **Deprecated aliases — do not use as names.** Three earlier code names survive only as CSS
 > aliases so old code resolves: `--color-dept-combat` → Raumüberlegenheit, `--color-dept-research`
 > → Forschung, `--color-dept-marine` → Marinekorps (`styles.css` `:root`). Always use the official
-> names above; the last remaining consumer is `operation-detail.html`'s inline
-> `--color-dept-marine`.
+> names above. No stylesheet consumes the aliases any more: the last one, `operation-detail.css`'s
+> `--color-dept-marine`, went with the operation redesign of 2026-10-03, so the three aliases can go
+> in the phase-4 cleanup.
 
 **Acceptance**
 
@@ -160,26 +204,27 @@ honeycomb wash masked this from the automated a11y gate; the flat-black surface 
 REQ-UI-003 exposed it). When muted grey **is the text itself** — `.text-muted`, secondary
 labels, hints, placeholders, the quiet-danger button label — use `--color-gray-2-text`
 `#8A8A8A` (≈ 6.1:1 on black, ≥ 4.9:1 on the `#141414` / `#1C1C1C` surfaces). Keep the
-canonical `--color-gray-2` for hairline borders, scrollbar thumbs, disabled fills and
-purely decorative glyphs.
+canonical `--color-gray-2` for hairline borders, scrollbar thumbs and disabled fills. A glyph that
+sits in text — even an `aria-hidden` one — takes the tint too (DS-1, REQ-UI-027).
 
 **Acceptance**
 
 - [x] Semantic colour used as small text uses the matching `*-text` tint, not the dark
   canonical hue; the canonical hues stay on fills/borders/tags.
 - [x] Muted grey used as small text uses `--color-gray-2-text`, not the canonical
-  `--color-gray-2`; the canonical Grau 2 stays on borders/scrollbars/decorative glyphs.
+  `--color-gray-2`; the canonical Grau 2 stays on borders, scrollbars and disabled fills.
 
 Until 2026-09-25 nothing checked this, and 49 declarations broke it: the item badge in the order
 list (#355DDC, 3.29:1, the `/orders` finding of the a11y smoke that appeared only once another test
 had created an item order), the price column of the materials matrix, the outline danger button,
 error texts, empty-state hints and more, most of them on elements no test had data to render. All
-now take the tints. The two exceptions are the `aria-hidden` glyphs that keep Grau 2 as allowed
-above: the unsorted-column indicator of the material demand table and the blueprint search icon.
+now take the tints. Two `aria-hidden` glyphs kept Grau 2 as decorative exceptions until
+2026-10-03 — the unsorted-column indicator of the material demand table and the blueprint search
+icon; DS-1 (REQ-UI-027) gave them the tint as well, so there is no exception left.
 
 **Enforced by:** `AccessibleTextTintTest` (no stylesheet sets `color` to the danger, info or Grau 2
-hue, and no script writes one into `style.color`; the two decorative glyphs are exempted by
-selector) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on five pages; its report now names every
+hue, and no script writes one into `style.color`; its selector exemption list for decorative
+glyphs is empty) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on five pages; its report now names every
 failing node with its colours and ratio)
 
 ### REQ-UI-007 — Visual style: square-first sci-fi HUD
@@ -203,7 +248,14 @@ The shared `krtFetch` mutation layer (REQ-FE-001..005,
 optimistic-lock outcome through the KRT toast/confirm infrastructure precisely so this rule holds
 app-wide; new AJAX call sites inherit it for free.
 
-**Enforced by:** code/design review only. The rule is grep-able, but ESLint's `no-alert` is **not**
+A `.notification-toast` carries no control and is transparent to the pointer
+(`pointer-events: none`) for its whole life, so it never swallows a click on the control it covers
+in the bottom-right corner. Until 2026-10-05 a shown toast took pointer events: for five seconds it
+blocked what lay beneath it, and because it turned hit-testable 100 ms after it was appended, it
+could take the second half of a click already in progress.
+
+**Enforced by:** code/design review only for the native-dialog ban; the toast's pointer
+transparency by `MaterialsCategoryEmptyStateInPlaceE2eTest`. The native-dialog rule is grep-able, but ESLint's `no-alert` is **not**
 enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questions.
 
 ### REQ-UI-013 — Canonical modal shell + one close convention (S12, #918; one shape, #1891)
@@ -283,20 +335,20 @@ footer buttons of the `mission-detail.html` dialogs (handled by `krt-modal.js`);
 use it. The overlay's hidden default comes from
 the **global** `.krt-modal-overlay { display:none }` in `styles.css` (loaded on every page;
 `bank.css` duplicates it as defense-in-depth), so the fragment injects no inline style. A modal is
-made visible by adding the `krtm-modal-open` class (`display:flex`, in the `utilities` cascade layer,
-so it wins over every component, page and migrated rule — REQ-UI-024; until 2026-09-23 it won by
-being loaded last) — at runtime via `open-modal-display` (which toggles `classList`, not an
+made visible by adding the `is-open` class (`.krt-modal-overlay.is-open { display:flex }`, in the
+`utilities` cascade layer, so it wins over every component and page rule — REQ-UI-024; until
+2026-10-04 the pair was named `krtm-modal-open` / `krtm-hidden`) — at runtime via `open-modal-display` (which toggles `classList`, not an
 inline `style.display`) or a server-rendered `th:classappend`; the global default must never be
 `display:flex`, or a page whose scoped stylesheet fails to load would render every closed modal open
 on load (#1003 WebKit flake). A page script that **closes** a modal after an in-place AJAX write
 (e.g. the bank confirm/reject modal on success, `bank.js`) must close it the **same** class-based
-way — remove `krtm-modal-open` (and add `krtm-hidden`), never write an inline `modal.style.display =
+way — remove `is-open` (and add `is-hidden`), never write an inline `modal.style.display =
 'none'`. An inline `display` outranks the non-`!important` class rule, so an inline close leaves a
 stale inline style that the class-toggling `open-modal-display` cannot beat, and the modal can never
 be re-opened without a full page reload (a bank staffer confirming a second request straight after
 the first got a dead button). The inverse also holds: a modal a page script OPENS with an
 inline `style.display = 'flex'` must not be closed through the class-only `close-modal-display`
-alone, or the inline `display:flex` outranks `krtm-hidden` and the modal stays on screen (the
+alone, or the inline `display:flex` outranks `is-hidden` and the modal stays on screen (the
 `delete-operation-modal` Cancel button). As a defensive backstop **both** shared handlers clear any
 inline `display` on the modal — `open-modal-display` before showing it, `close-modal-display` before
 hiding it — so the class always wins regardless of how the other side toggled visibility.
@@ -359,10 +411,11 @@ singular.
 
 **No inline `style=""` attributes (CSP hardening).** Templates must not use inline `style=""`
 attributes: the CSP pins `style-src-attr 'none'`, so an inline style attribute is blocked by the
-browser (closing the CSS-injection residual). Static styling goes in a CSS class; a former inline
-value already has a `krtm-*` class in `inline-migration.css` (generated, one class per distinct
-value, loaded last). Data-driven values use a class toggle (`th:classappend`, e.g. the modal
-`krtm-modal-open`/`krtm-hidden` pair, `krtm-opacity-05/06`, `krtm-color-danger`) or, when the value
+browser (closing the CSS-injection residual). Static styling goes in a design-system class or a page-stylesheet rule;
+the generated one-class-per-value `krtm-*` classes of `inline-migration.css` that first replaced the
+inline values are retired (2026-10-04, REQ-UI-027 phase 4, guarded by `NoMigrationClassTest`).
+Data-driven values use a class toggle (`th:classappend`, e.g. the modal `is-open` / `is-hidden`
+pair) or, when the value
 is genuinely dynamic (progress-bar widths), a `data-krtm-width` attribute applied to `style.width`
 via the CSSOM in `inline-style-apply.js` — the CSSOM is not governed by `style-src-attr`. Setting a
 style through JavaScript (`element.style.x = …`) stays allowed; only literal `style=""` attributes in
@@ -374,8 +427,8 @@ blocked exactly the same way (this is what broke the `/materials/overview` virtu
 rows — a JS-built `style="height:…"` — after the CSP was pinned). A value a script computes goes
 through a CSS class (static) or the same `data-krtm-*` → CSSOM path (`element.style.x = …`, genuinely
 dynamic — e.g. the `/materials/overview` virtual-scroll spacer heights) instead. And when a script
-toggles the visibility of an element whose hidden state is a **class** (e.g. the skeleton hides it
-with `krtm-display-none-*`, or the scu-hint fragment with `krtm-hidden`), it must **toggle that
+toggles the visibility of an element whose hidden state is a **class** (e.g. the scu-hint fragment
+hides it with `is-hidden`), it must **toggle that
 class** — clearing `element.style.display` does not override a class rule, so `el.style.display = ''`
 leaves a class-hidden element hidden. Setting a non-empty display (`el.style.display = 'flex'`) still
 works (inline beats a non-`!important` class), and a pure JS filter loop that both hides and reveals
@@ -390,10 +443,11 @@ clips it the overflow reads as "the spacing is wrong" rather than as a broken la
 non-shrinkable (10.5rem + `--space-2` + 7rem = an **18rem** floor). The measured defect is the
 participant edit modal: two groups in the 600px `.krt-modal--wide` frame get ~275px each, so the
 time part overflows by ~13px and "Endzeit" sits 3px from the modal border — at every desktop width
-from 1280px up. The mission Verwaltung form is the other multi-column user of the widget and is
-**not** affected today: its row keeps two groups per line at ≥18rem each across 1280–1800px, both
-before and after this rule. The rule is stated for the widget rather than scoped to the modal, so
-it also covers a future narrower row there.
+from 1280px up. The mission edit-mode form (formerly the Verwaltung tab) is the other multi-column
+user of the widget; since 2026-10-03 it lays its date/time groups out in an auto-fill grid
+(`.mission-time-grid`, columns of at least 18.5rem) rather than a `.form-row`, so it wraps by
+construction. The rule is stated for the widget rather than scoped to the modal, so it also covers
+a future narrower row there.
 
 Such a control declares its true minimum (`min-width: min(18rem, 100%)`) so the row **wraps** onto
 full-width lines instead of overflowing — where there is room the groups stay side by side, otherwise
@@ -418,10 +472,10 @@ out-specify the page-level `.form-row > .form-group` floor, which is declared la
 - [ ] A swap container between `.krt-modal` and its `<form>` carries `.krt-modal-flow`, so the body
   still scrolls under the `90vh` cap.
 - [ ] `.krt-modal-overlay` is `display:none` by default in the global `styles.css` (not only in a
-  page-scoped stylesheet); a modal is shown by adding the `krtm-modal-open` class (`display:flex`),
+  page-scoped stylesheet); a modal is shown by adding the `is-open` class (`display:flex`),
   never an inline `style.display`.
-- [ ] A modal a script closes after an in-place AJAX write toggles its class (`krtm-modal-open` off,
-  `krtm-hidden` on), not an inline `style.display = 'none'`, so the next `open-modal-display` re-opens
+- [ ] A modal a script closes after an in-place AJAX write toggles its class (`is-open` off,
+  `is-hidden` on), not an inline `style.display = 'none'`, so the next `open-modal-display` re-opens
   it in the same session without a page reload.
 - [ ] A modal a script opens with an inline `style.display = 'flex'` still closes via
   `close-modal-display` (the shared handlers clear the inline `display` on both open and close, so the
@@ -450,8 +504,18 @@ Every layout change and new component works on **four** classes:
 
 - **Smartphone** (≤768px) and **Tablet** (768–1024px) — touch first; minimum click target
   **44px**; collapse multi-column grids to one column; wide tables scroll horizontally.
-- **Desktop** (1024–1600px) and **Ultra-wide** (1600px+) — exploit space (docked sidebars,
-  auto-fit card/dashboard grids) but cap long-form text at `max-width: 80ch` on `<p>`.
+- **Desktop** (1024–1440px) and **Wide** (1440px+) — exploit space (docked sidebars,
+  auto-fit card/dashboard grids) but cap long-form text at `max-width: 80ch` on `<p>`. From
+  1440px `main` widens to `--content-max-data` (1600px).
+
+**Breakpoints are only the class boundaries** (DS-11, ADR-0242, amended 2026-10-03): a media query
+uses `(width <= 768px)`, `(width <= 1024px)` or `(width >= 1440px)` — or a range between two of them —
+and nothing else. Stylelint's `media-feature-name-value-allowed-list` enforces it in both
+configurations, for `width`, `min-width` and `max-width`. A component that has to react to its own
+width uses a container query. The tokens `--bp-phone-max`, `--bp-tablet-max` and `--bp-wide-min`
+document the values (a custom property cannot be used inside `@media`). The fifteen earlier values
+moved to the next boundary — 460–760 → 768, 820–980 → 1024, 1600 and 1800 → 1440 — and a script's
+`matchMedia` moves with the stylesheet it mirrors. Until 2026-10-03 the Desktop class ended at 1600px.
 
 **Dense row actions are an explicit exception at 32px.** The two compact variants `.btn-xs`
 and `.btn-icon` — the *repeated* per-row actions of a dense table / tree action cluster
@@ -490,24 +554,29 @@ The mechanism is `position: static` inside the `width <= 768px` block, and one c
 optional: **`--krt-footer-height` means "how much of the viewport bottom is covered", not "how tall
 the footer is".** `sidebar.js` publishes `0` whenever the footer is not `fixed`, because every
 reader of that property — `main`'s reserve, the shared `--krt-panel-viewport-rest` that caps the
-Materialbörse / Materialien-Übersicht / Gewinnberechnung / Beförderung panels, the org-chart proxy
-scrollbar's `bottom`, the mission-detail action bar's `bottom`, and the mission- and
-operation-detail paddings — would otherwise reserve space for a footer that is not there.
+Materialbörse / Preis-Übersicht / Beförderung panels, the org-chart proxy
+scrollbar's `bottom`, the `bottom` of the sticky form actions (`.form-actions--sticky`) and of the
+operation payout table's pinned sum row, and the mission-detail padding — would otherwise reserve
+space for a footer that is not there.
 
 **Two amendments to the dense-action exception, owner-approved 2026-09-13** after the first
 measured sweep of the touch classes found both:
 
-- **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in the page stylesheets
-  of `mission-detail.html` and `operation-detail.html` (inline `<style>` blocks until FE-PERF-02,
-  now `css/pages/mission-detail.css` / `operation-detail.css`, linked in the same place), and two of its instances are *form*
-  actions — „Ziel hinzufügen", „Schritt hinzufügen" on the Einsatz create form. The rule above is
+- **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in the page stylesheet of
+  `mission-detail.html` (an inline `<style>` block until FE-PERF-02, now
+  `css/pages/mission-detail.css`; `operation-detail.html` stopped using it on 2026-10-03), and three
+  of its instances are *form* actions — „Ziel hinzufügen", „Schritt hinzufügen" and „Frequenz
+  hinzufügen" in the mission's edit mode (the create form's own add buttons are plain `.btn`). The
+  rule above is
   explicit that a form button keeps the floor, so the whole variant is raised to 44px on the touch
   classes and keeps its density on desktop. The override is written `.btn.btn-xs2` because the
   page's inline rule is read *after* `styles.css`: at equal specificity the page would win and the
   fix would be silently inert — the same trap this requirement already records for `.btn.btn-xs`.
 - **`.master-row` IS exempt**, at 32px. The blueprint list rows on `/personal-inventory/blueprints`
   measured 33px; they are a scan-and-tap list where density is the point, and were ruled equivalent
-  to a repeated row action rather than a standalone control.
+  to a repeated row action rather than a standalone control. Since 2026-10-03 those rows declare
+  `min-height: 44px` themselves (`.krt-bp-md .master-row`, website overhaul phase 3); the exemption
+  stays for other master lists.
 
 **A third round of amendments, 2026-09-13**, after the guard first ran with *seeded* data. The
 first sweep could only measure what a fresh stack renders, and a fresh stack has empty lists: no
@@ -591,8 +660,8 @@ Declared `--touch-target-dense` consumers today: `.btn.btn-xs`, `.btn-icon` (`st
 
 The same inversion applies to **which rows wrap on the phone class**: a row that directly contains a
 control or a link wraps, matched structurally with `:has()` rather than by class name. Enumeration
-was hopeless there for an additional reason — many rows carry a generated class from
-`inline-migration.css`, and those names are content-hashed.
+was hopeless there for an additional reason — many rows then carried a generated, content-hashed
+class from `inline-migration.css` (retired 2026-10-04).
 
 **Acceptance**
 
@@ -638,11 +707,29 @@ was hopeless there for an additional reason — many rows carry a generated clas
   lets the text inside it wrap instead of painting straight out of the narrowed track.
 - [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
   `fixed` and `main`'s `padding-bottom` covers its measured height.
+- [ ] **The page-pattern rules of REQ-UI-027 hold on every swept page** (2026-10-04): on the phone
+  class no visible `.card` is wider inside than its own box (`scrollWidth` ≤ `clientWidth`; a
+  `.table-responsive` scroller inside the card clips its own overflow and is allowed to scroll, the
+  card is not); at every class the page head's primary action — the visible `page-head-primary`, or
+  else the visible `.btn--cta` in `.page-head .page-actions` — lies inside the first viewport above
+  the phone tab bar; a `.page-actions` row shows at most one visible `.btn--cta`; no `.hud-box`
+  sits inside another (hidden ones included); and no visible element draws its own text in
+  `rgb(100, 100, 100)`, the retired `--color-gray-2` that failed contrast as text (DS-1). A finding
+  names the card's widest box outside a nested scroller, the primary's position against the
+  viewport, the crowded buttons, both boxes, or the gray element.
+- [ ] **A hidden overlay takes no room.** A hidden tooltip bubble still counts toward the page's
+  scrollable width, and on a phone it widens the layout viewport: the hidden `.scu-hint__bubble`
+  beside a toolbar's right edge widened `/personal-inventory/blueprints` to 487 px at 375 px and
+  scrolled it 104 px sideways at 810 px. The hidden bubble is scaled to nothing
+  (`transform: … scale(0)`, restored at once on hover or focus and only after the fade-out).
 
 **Enforced by:** [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five device classes — 375×812, 810×1080, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per
 list and every modal on the page — 96 `.krt-modal-overlay` roots, the one shape `MODAL_SHAPES` holds
 since ADR-0177: page-level overflow, cut-off elements, unscrollable tables, control floors, footer
-behaviour, chrome share — with a full-page screenshot per page and class) ·
+behaviour, chrome share, and the five page-pattern checks of REQ-UI-027 — cards scrolling sideways
+on the phone, the head's primary action outside the first viewport, more than one `.btn--cta` in
+`.page-actions`, nested `.hud-box`es, text in `rgb(100, 100, 100)` — with a full-page screenshot per
+page and class and a per-page `patterns:` line in the report) ·
 `PageRouteCatalogueTest` (the route list is no longer hand-maintained on trust: it asks the
 dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither
 `PAGES` nor `NOT_PAGES`, so a page added next month is swept on the day it is added — and it runs
@@ -827,7 +914,7 @@ The mechanics follow the established idiom (REQ-ORDERS-027, REQ-UI-016):
   `null` = "no filter", so options added later stay included; on restore, stale values are dropped
   and an entirely stale subset falls back to the page's rendered no-filter default (all checked on
   the matrix/profit pages, all unchecked on the Lager views — semantically identical). Status
-  queues whose server default is a **subset** (orders, refinery: OPEN+IN_PROGRESS) store the
+  queues whose server default is a **subset** (orders: OPEN+IN_PROGRESS) store the
   checked list verbatim and collapse only zero-checked to `null`, so an explicit "show everything"
   choice survives (REQ-ORDERS-027 precedent).
 - The selection is persisted immediately on every change (never debounced with the re-fetch).
@@ -840,13 +927,22 @@ The mechanics follow the established idiom (REQ-ORDERS-027, REQ-UI-016):
   breaking the page.
 
 Covered surfaces (beyond the pre-existing REQ-ORDERS-027 orders queue, REQ-UI-016 price matrix,
-bank request-queue/dashboard/org-layout modules and the grouping toggles): Materialbörse (both
-boards: mode/tab, min quality, min amount, sort), Mein Lager + Globales Lager (all multi-selects,
-min quality, personal-only flags, per view), Raffinerie-Aufträge (status + only-mine),
-Profitberechnung (ship + systems), Missionen/Operationen (`showPast`), Meine Bewertungen
+bank request-queue/dashboard/org-layout modules and the grouping toggles): Materialbörse (view +
+scope, and per view min quality, min amount, sort and „Ohne gestohlene"; key
+`materialboerse_filters`), Mein Lager + Globales Lager (all multi-selects, min quality,
+„Gestohlen", the „Alle · Persönlich · Gemeinsam" segment stored as the two personal flags, per
+view), Raffinerie (the segment „Läuft · Abholbereit · Abgeschlossen · Alle" + only-mine, key
+`refinery_orders_filter`; a stored status list of the former checkboxes maps onto a segment),
+Profitberechnung (ship + systems), Missionen/Operationen (the period segment „Kommend · Vergangen ·
+Alle"; a stored `showPast` migrates), Aufträge scope „Meine · Zu bearbeiten · Alle" (`orders_scope_filter`,
+REQ-ORDERS-040), Benachrichtigungen „Ungelesen · Alle" (`notifications_filter`, REQ-NOTIF-022),
+Meine Bewertungen
 (only-open), Persönliche Blueprints (refinery + craftable toggles), Beförderung verwalten
 (filters/sort/collapse, migrated sessionStorage → localStorage), Bank-Freigaben (view + account /
-employee selection), Bank-Kontodetail chart range (both detail pages) and the Org-Kontodetail tab,
+employee selection), Bank-Kontodetail chart range (both detail pages) and the Kontodetail tab (both
+detail pages: `bank_account_tab_<user>`, `org_unit_bank_account_tab_<user>`), the bank request
+queue's status segment (one stored segment since 2026-10-03; a stored checkbox list migrates onto
+it, REQ-BANK-023),
 Admin: Audit-Log event-type (per domain), Missionsdaten + SK include-inactive toggles, and the
 member selection of the personal-inventory/blueprints admin pages.
 
@@ -1191,14 +1287,16 @@ content-hashed, `immutable` asset fetched once.
 - [x] Every moved stylesheet is equivalent to the block it replaced (whitespace, quotes and comments
   aside — checked once at the move); the render tests that pinned a page selector read the linked
   stylesheet instead of the response.
-- [x] The page stylesheets are linted: `:frontend:lintCssInline` reads `static/css/pages/**` with the
-  same rule set it applied to the inline blocks; `.stylelintrc.json` ignores the directory, and
-  Prettier formats it like every other stylesheet.
+- [x] The page stylesheets are linted with the standard configuration: `:frontend:lintCss` reads
+  `static/css/pages/**` like every other stylesheet, and Prettier formats them (2026-10-04,
+  ADR-0243; until then `.stylelintrc.json` ignored the directory and `:frontend:lintCssInline` read
+  it with the small template rule set, which let 66 findings of the standard set accumulate).
+  `:frontend:lintCssInline` keeps only the `<style>` blocks a template might bring back.
 
 **Enforced by:** `TemplateCommentHygieneTest` (all four rules), `PageStylesheets` in the render
 tests, `SingleModalShapeTest` (which now also reads the page stylesheets — and found three dead
-legacy `.modal` rules the inline blocks had hidden from it), `:frontend:lintCssInline`,
-`:frontend:prettierCheck` · **Related:** REQ-UI-009, REQ-UI-013, REQ-SEC-031 (`no-store` pages),
+legacy `.modal` rules the inline blocks had hidden from it), `:frontend:lintCss`,
+`:frontend:lintCssInline`, `:frontend:prettierCheck` · **Related:** REQ-UI-009, REQ-UI-013, REQ-SEC-031 (`no-store` pages),
 ADR-0093 (nonce-gated style blocks), ADR-0168 (asset trees)
 
 ### REQ-UI-024 — Every stylesheet sits in a cascade layer; the layer decides, not the load order
@@ -1207,16 +1305,19 @@ Precedence between two stylesheets is decided by the **cascade layer** each rule
 in this order at the top of every file:
 
 ```css
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 ```
+
+*Amended 2026-10-04 (REQ-UI-027 phase 4): the `migration` layer is gone with `inline-migration.css`,
+and the two state classes, renamed `is-hidden` and `is-open`, moved into a `utilities` block at the
+end of `styles.css`. The statements below about migrated classes describe 2026-09-23 to 2026-10-04.*
 
 | Layer | Holds |
 | --- | --- |
 | `base` | `@font-face` and the `:root` design tokens (`styles.css`) |
 | `components` | the rest of `styles.css`: the design system's components and helpers |
 | `page` | every page / area stylesheet (`bank.css`, …, `css/pages/*.css`), and the few design-system declarations that must keep beating one (the block at the end of `styles.css`) |
-| `migration` | `inline-migration.css`: one class per former inline `style="…"` |
-| `utilities` | the two runtime state classes, `krtm-hidden` and `krtm-modal-open` |
+| `utilities` | the two runtime state classes, `.is-hidden` and `.krt-modal-overlay.is-open` (the last block of `styles.css`) |
 
 Between layers the order decides, before specificity. Inside a layer, specificity and source order
 decide as before. So:
@@ -1229,14 +1330,13 @@ decide as before. So:
   ADR-0214: this used to be a comment beside the rule). Inside that layer, specificity
   against the page stylesheets decides exactly as it did under load order. It does not go into
   `utilities`: that would also let it beat the page rules that deliberately out-specify it
-  (`.krt-personal-inventory .form-group select`) and every migrated inline class.
+  (`.krt-personal-inventory .form-group select`).
 - **A migrated inline style wins against page and component CSS**, as the inline `style=""` it
   replaced did (ADR-0093). Under load order it lost to any rule with higher specificity. That changed
   what a few elements look like, and the owner accepted each change (listed below).
-- **The state classes win outright.** `krtm-hidden` hides whatever display a component, page or
-  migrated rule sets. The co-located `.x.krtm-hidden` re-assertions are gone.
-- **`head.html`'s link order is no longer part of the contract.** `inline-migration.css` still loads
-  last, but only because it always did.
+- **The state classes win outright.** `is-hidden` hides whatever display a component or page rule
+  sets. No stylesheet re-asserts it next to another class.
+- **`head.html`'s link order is no longer part of the contract.**
 
 **The page-layer block at the end of `styles.css`.** Before the layers these won by specificity
 alone; in `components` they would lose to every page rule. `styles.css` loads first, so a page rule
@@ -1276,12 +1376,12 @@ knock-on of one; no declaration changed hands between the design system and a pa
 **Acceptance**
 
 - [x] Every stylesheet under `static/css` starts with the layer order and puts all its rules in one
-  of the five layers.
-- [x] No page stylesheet uses `!important` against a component rule; the two that remain beat a
-  migrated class (the Lager filter rows).
+  of the four layers.
+- [x] No page stylesheet uses `!important`.
 - [x] No change a user can see beyond the accepted corrections above.
 
-**Enforced by:** `CascadeLayerOrderTest` (the order line and the layer of every file) ·
+**Enforced by:** `CascadeLayerOrderTest` (the order line, the layer of every file, the state
+classes only in `utilities`) ·
 `SingleModalShapeTest` and `TouchClassLayoutE2eTest` read rules inside `@layer` blocks ·
 **Related:** ADR-0212, ADR-0093, ADR-0176, REQ-UI-023
 
@@ -1406,6 +1506,226 @@ sheet) · `DialogA11yE2eTest` (the quick access follows the dialog contract) ·
 chrome budget) · **Code:** `fragments/header.html`, `fragments/sidebar.html`,
 `fragments/palette.html`, `fragments/mobile-nav.html`, `static/js/sidebar.js`,
 `static/js/krt-palette.js` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019
+
+### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
+
+The website audit of 2026-10-03 found the same faults on almost every template — a banner that
+repeats the title, nested `.hud-box`es, up to twelve filled orange buttons, tables that scroll
+sideways on a phone, raw status values, `colspan` empty rows, collapsed filter panels with a
+„Filtern" button, forms as one long column. The design system answers with twelve changes, DS-1 to
+DS-12 ([ADR-0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md),
+krt-profit/design-system#6), and every work page follows one of three patterns.
+
+**Type and surfaces (DS-1, DS-2, DS-3, DS-10)** — global, migrated page or not:
+
+- Body text is Lato **400** (`--fw-regular`); Lato 300 only as `.lead` (1.1 rem) for lead text.
+- Only `h1` carries the house orange. `h2` and `h3` are white, `h4`–`h6` Grau 1; upper case and
+  tracking stay. Orange is for `h1`, the one primary action, the active state and identity.
+- Muted text is `--color-gray-2-text`, never `--color-gray-2` (REQ-UI-006).
+- At most **one** `.hud-box` per view, never nested; a nested legacy `.hud-box` loses its corner
+  brackets. Content never sits with white text directly on `#000`: lists and tables in
+  `.card.card--flush`, notices as `.alert`.
+
+**Global rules of a work page:**
+
+1. **One primary action per context** — at most one `.btn--cta` in the page head and one per panel
+   or dialog. Row actions are `.btn-ghost.btn-xs`, `.btn-success.btn-xs` or
+   `.btn-quiet-danger.btn-xs`, never `.btn--cta`.
+2. **The page head is `.page-head`** (DS-4): an eyebrow naming the navigation area — or, on a form
+   or detail page, a back link „← Aufträge" —, the `h1` with an optional count chip, and
+   `.page-actions`. `.greeting` stays only on the home page, the landing page and the error pages.
+   A `*.description` subtitle is dropped unless it says something the title does not; the keys stay
+   for a later clean-up.
+3. **Rare and destructive actions go into the overflow menu** („⋯", `.overflow-menu`). Deleting
+   always goes through `showKrtConfirm` or a `.krt-modal--danger`.
+4. **Status is always translated** (`#{…status.<value>}`), never `${x.status}` raw.
+5. **An empty list is an `.empty-state`** with a title, one sentence and optionally an action —
+   never a `<td colspan>` row.
+6. **Tables** are `.card.card--flush > table.data-table.data-table--stack` (DS-7, DS-8): rows of at
+   least 56 px, the first column an `a.row-link` with `.cell-title` and `.cell-sub` (the whole row is
+   clickable), numbers `.num`, status `.cell-status`, actions `.cell-actions`, a `.row-chevron` at
+   the end — no column holding only an „Öffnen" button. Below 768 px a row stacks: title and status
+   on the first line, the other cells as one meta line (a `data-label` prefixes its cell), a lone
+   chevron centred on the right; nothing scrolls sideways.
+7. **Filters** sit in a `.toolbar` (DS-5): the search always visible, a `.segmented` control for two
+   to four exclusive options (DS-6), further filters behind „Filter" with a `.filter-badge`, active
+   filters as `.filter-chips` with „Alle zurücksetzen". Filters apply live through `krtFetch`, never
+   through a „Filtern" button; per-browser persistence (REQ-UI-017) stays.
+8. **Forms** use `.form-layout` (at most 760 px) with numbered `.form-section`s, a `.form-grid` that
+   is two columns from tablet up, computed values as `.field-computed`, two to four exclusive options
+   as `.segmented--lg` instead of radios, and the actions in `.form-actions--sticky` with a live
+   `.form-actions__summary` (DS-9).
+9. **Layout** uses `.stack`, `.cluster`, `.split` and `.grid-auto` (DS-12). No `krtm-*` class
+   (the last ones were replaced in phase 4).
+10. **Touch targets** stay at 44 px on phones and tablets (REQ-UI-009), including the overflow-menu
+    entries, the filter chips and the toolbar search.
+
+**The three patterns:**
+
+- **A · List** — page head, toolbar, filter chips, the list table with the pagination below it.
+- **B · Overview** (the home page) — `.greeting` without a description, information first in a 2 : 1
+  grid that is one column from 1024 px down.
+- **C · Form** — page head with the back link, `.form-layout.card`, sticky actions whose primary
+  button names verb and object („Auftrag anlegen"); field errors under the field (`.field-error`),
+  page errors as `.alert.alert-danger` above the first section.
+
+**The fragments** — pages call these instead of repeating the markup:
+
+| Fragment | Renders |
+| --- | --- |
+| `fragments/page-head :: pageHead` | `.page-head`; parameters `eyebrowKey`, `eyebrowHref` (makes the eyebrow a back link), `titleText`, `count`, `countId`, and the slot `actions=~{::ref}` |
+| `fragments/components :: emptyState` | `.empty-state`; `titleKey`, `textKey`, `filterHintKey`, `actionHref`, `actionKey`, `emptyId` — `emptyStateBody` stays for existing callers |
+| `fragments/components :: toolbarSearch(id, name, value, placeholderKey)` | the search field, excluded from the chips |
+| `fragments/components :: segmented` | a `role="radiogroup"` of radios inside labels; `name`, `options` (each with `value`, `labelKey`, optional `count`; a `null` value is the „all" option), `selected`, `labelKey`, `variant`, `form` |
+| `fragments/components :: overflowMenu` | the „⋯" toggle (`aria-haspopup`, `aria-expanded`, `aria-controls`) and a hidden `role="menu"` panel; `id` and the slot `items` |
+| `fragments/components :: filterChips(formId)` | the chip bar bound to a filter form |
+| `fragments/components :: filterPopover` | the „Filter" button with a `.filter-badge` and a popover panel holding the further filters (`panelId`, `panelName`, `testid`, slot `body`); a bottom sheet above the tab bar on phones. It keeps the `.filter-toggle`/`.filter-panel` contract of REQ-FE-021, so `krt-filter-panel.js` counts its active controls; a `data-filter-transient` panel always starts closed, stores no preference, focuses its first field, closes on Escape or an outside click, and flips to the left edge when it would leave the viewport |
+| `fragments/components :: listFoot(pageResponse, baseUrl)` | „1–7 von 24" and the pagination below a table; its `data-list-total` keeps the page head's count chip (`countFor`) current after every live swap (`krt-list-count.js`) |
+
+Two global scripts drive them: `krt-overflow-menu.js` opens and closes the menus (toggle, Escape,
+outside click, Tab, focus back to the toggle, arrow keys, Home/End) and closes a menu when one of its
+entries is clicked; `krt-filter-chips.js` renders a chip per active control of the bound form
+(skipping search fields, segmented controls and `data-filter-chip-ignore`), and removing a chip
+clears that control and fires its `input` and `change` events, so the page's own live filter runs.
+Pages that swap their filter form call `window.krtFilterChips.refresh()`.
+
+New `data-testid`s: `page-head`, `page-eyebrow`, `page-head-count`, `page-head-primary` (set by
+the page on its primary action), `overflow-menu-toggle`, `toolbar-search`, `segment-<name>-<value>`,
+`filter-chips`, `filter-chip-<name>`, `filter-chips-reset`, `empty-state`, `empty-state-action`,
+`row-link` (on the `a.row-link` that makes a table row clickable). Every existing `data-testid`
+stays: a primary action or row link that carried a page-specific id before the patterns keeps it
+(`missions-create-link`, `orders-create-link`, `bank-movement-open`, `bank-holder-history-link`, …),
+because an element has one `data-testid` and the smoke tests address the old one. A hand-built
+pattern carries the same ids as its fragment — the bank's account filter is the page's
+`toolbar-search`.
+
+*Amended 2026-10-04 (phase 5): `row-link` added; the ids pinned per pattern by
+`PagePatternTestIdsRenderTest`.*
+
+**Rollout.** Phase 0 (this requirement's foundation) ships the design-system update, the fragments,
+the scripts and the breakpoint gate; the list pages, the home page and the forms, the areas of the
+audit (hangar, blueprints, operations, Materialbörse, refinery, Leitung, bank, trade) and the removal
+of `inline-migration.css` follow as their own PRs, each moving its pages onto these patterns.
+
+**On pattern A (phase 1):** Einsätze, Operationen, Benachrichtigungen, Mitglieder, Beförderung
+verwalten, Auftragsverwaltung, Materialbedarf, Lager-Übersicht, Item- und Materialsammelübersicht,
+Material-Liste, and the admin lists Audit-Logs, Blueprints, Standard-Blueprints, Löschanträge,
+Discord-Registrierungen (tabs „Offen · Abgelehnt"), Verbundene Anwendungen, Orte, Material-Aliase,
+Materialien, Benachrichtigungsregeln, Organisationsstruktur, Qualitätsstufen, P4K-Import,
+Personensuche, Persönliche Blueprints/Inventare, Spezialkommandos, Sync-Berichte,
+Nutzungsbedingungen (segment „Noch offen · Zugestimmt · Alle"), Einsatzdaten and UEX-Daten. A list
+row's relative day („in 5 Tagen", „heute", „vor 4 Tagen") comes from the `@relativeDays` template
+bean (Europe/Berlin), its date from `.utc-time[data-format=short]`.
+
+**On patterns B and C (phase 2):** the home page (pattern B: the greeting without a description, eyebrow
+„<Org-Einheit> · <Wochentag, Datum>", a 2 : 1 grid with „Nächste 7 Tage" as row links — date block,
+„TS · Join · Treffpunkt · Einheit", translated status, „Meine Einheit" — and, beside it, the
+information card with a three-line clamp and „Gelesen", and the three newest notifications read
+from the bell's `/notifications/recent`; no call to action per mission). Pattern C: Neuer Auftrag
+(kind as a segment, numbered sections, material rows as a grid with a remove icon, the scmdb import
+as a dialog, a comment counter, a live summary in the sticky bar), Lagereintrag einbuchen, Mitglied
+bearbeiten (tabs „Stammdaten · Mitgliedschaften · Datenauskunft", `?tab=` deeplink),
+Systemeinstellungen, Information bearbeiten, the notification-rule editor, the quality-tier dialog,
+and the profile as one settings page (section navigation, one save bar that appears on a change and
+saves the changed sections one after another, REQ-FE-001). The hangar's insurance field is a
+segment „Keine · Monate · LTI" with a month field; the stored value stays `0` / `LTI` / `n`. The
+hand-off's „Angemeldet" chip marks a home row the member is signed up for, read from the mission
+list's per-caller `signedUp` flag (REQ-MISSION-012).
+
+Amended 2026-10-04: the „Angemeldet" chip, left out of phase 2 for want of a read, is built.
+
+**On the areas (phase 3):** Hangar: one page with the tabs „Meine Schiffe" · „Org-Einheit" (the
+former Org-Einheitsübersicht, ship types as tree rows with a readiness bar); „Meine Schiffe" filters
+by „Alle · Bereit · Nicht bereit" beside the search and counts „n von m einsatzbereit", and import,
+home location and „Hangar leeren …" sit in the page head (REQ-HANGAR-001/002). Mein Inventar →
+Blueprints: „Blueprints hinzufügen" opens a dialog, the extractor link and „Alle löschen …" sit in
+the „⋯" menu, one search, the segment „Alle · Craftbar" and the refinery switch; each row shows a
+status dot and „3×", the detail a key figure and the ingredients with need, stock and quality; the
+availability overview shows the first owners as chips with „+ n weitere" (REQ-INV-008/012/013/048).
+Materialbörse: tabs „Angebote · Gesuche" with the scope segment „Alle · Meine" (the former four
+tabs, `?view=&scope=`, old `mode`/`tab` honoured), one create menu per tab („Angebot erstellen ▾" /
+„Gesuch erstellen ▾"), the filter popover with chips and a compact sort menu, three detail figures.
+Raffinerie: the list with the run-state segment „Läuft · Abholbereit · Abgeschlossen · Alle" and its
+counters, a server-side search over owner, location, method and materials across all pages,
+server-side paging, progress bars and a row action „Einlagern" on ready rows; create and detail as
+one numbered form (Raffinerie · Zeit · Materialien · Finanzen · Besitzer) with a side card holding
+the status steps „Läuft → Abholbereit → Eingelagert", the profit with its calculation and the
+primary action „Ausbeute einlagern", and saving as an outline button in the sticky bar
+(REQ-REFINERY-019). Mein Lager and Globales Lager: page head with „Einbuchen" (and, for an admin on
+the shared Lager, „Globales Lager leeren" in the overflow menu), the filters in the transient
+popover with chips, the segment „Alle · Persönlich · Gemeinsam" on Mein Lager, and the bulk actions
+in a sticky selection bar that appears only while something is marked; the tree stays. The material
+and item drill-downs are data tables with a count chip in the head. Handel: the price matrix as a
+wide data view with the „UEX · vor n min" chip, dropdown filters that summarise their selection („6
+von 42"), „+ Filter" chips, the best sale/purchase rings, the spread and the legend; the material
+detail with category/flag chips, four figures and the terminal table sorted by sale price (segment
+„Verkauf · Einkauf"); the profit calculation with one input card, the Hull C chip and results ranked
+by max. profit with a two-line route „Kauf <Terminal> (<Ort>) · <Preis>" / „Verkauf <Terminal> (<Ort>)
+· <Preis>", the terminal's location (planet or star system, then city, station or outpost) in
+brackets after its name; the lines wrap rather than cut off.
+Auftragsdetail: page head with kind and status badges and the admin overflow „Auftrag löschen", the
+progress tile „Geliefert / benötigt" leading the KPI grid, tabs filtered per kind (Material: Bedarf
+· Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Hersteller · Übergaben ·
+Bearbeiter · Verknüpft) with empty tabs hidden, and „Übergabe erfassen" as the one action of the
+handover tab (REQ-ORDERS-026). Einsatz and Operation detail: both heads are page heads with the back
+link, the title and a translated `.status-badge`. The Einsatz page keeps three tabs (Übersicht ·
+Teilnehmer & Einheiten · Finanzen & Auszahlung); its „Verwaltung" tab became an edit mode behind
+„Bearbeiten" (tabs show views, not forms), „Anmelden" is the head's one CTA and deleting sits in the
+„⋯" menu. The Operation page has a KPI bar and four tabs (Übersicht · Einsätze · Auszahlung ·
+Finanzen), and is edited in a dialog (REQ-MISSION-004, REQ-MISSION-011). Leitung and
+Spezialkommandos: „Leitung" is a master-detail — a unit tree grouped OL · Bereiche · Staffeln ·
+Spezialkommandos with Bereich colour, member count and a search over units and people, and the
+selected unit with „Mitglied hinzufügen" and the tabs „Mitglieder · Kommandogruppen" (`?unit=`,
+`?tab=groups`); rank and group selects save on change, rare and destructive actions sit in the row's
+„⋯" menu. The SK member page renders the same roster fragment (name · Rollen as `.matrix-flag`
+toggles · Leiter) (REQ-ROLE-004). Beförderung and Einsatzdaten: „Themenbereiche verwalten" and the
+admin page „Einsatzdaten verwalten" are master-detail pages (topics | categories with their level
+texts; data kinds | list), each selection a deep link (`?topic=`, `?kind=`) and the list driven by
+the arrow keys; „Rangvoraussetzungen verwalten" leads with a Rangsprung × Themenbereich matrix;
+„Beförderungssystem" shows the rank path as `.ablauf` steps; „Meine Bewertungen" opens with a
+progress card to the next rank (REQ-PROMO-002, REQ-PROMO-003). Kartellbank: both account-detail
+pages lead with four KPI tiles (Saldo, Ziel, ± 30 Tage, Buchungen) over the tabs „Buchungen" and
+„Konto-Info" (bank) or „Ziel & Sichtbarkeit" (org unit); the history has the period segment „30 Tage
+· 90 Tage · Zeitraum …" and a „Saldo nach Buchung" column, and no panel collapses any more. The
+org-unit bank names its tab „Anträge an unsere Konten", „Laufende Anträge" shows each pending
+request's approval path, the staff request queue filters by the status segment „Ausstehend ·
+Bestätigt · Abgelehnt · Alle" with „n warten auf dich", and the KRT approval thresholds are drawn as
+a tier bar (REQ-BANK-023, REQ-BANK-047).
+
+*Amended 2026-10-04: the terminal's location stands in the route line in brackets (it was a tooltip,
+invisible on touch screens; owner decision of the same day).*
+
+*Amended 2026-10-04: the profit calculation's route names its terminals.
+`GET /api/v1/materials/profit-calculation` answers each row with `buyTerminalName`,
+`buyTerminalLocation`, `sellTerminalName` and `sellTerminalLocation` — the terminals of the chosen
+lowest purchase and highest sale price, the first by name on a price tie, a location `null` when the
+terminal names no place.*
+
+**Clean-up (phase 4, 2026-10-04):** `inline-migration.css` and its `<link>` in `fragments/head.html`
+are deleted. The last six one-off classes went to the design system or a page rule (the admin bank
+page onto the page head with `.alert` notices, the bank account table's number as `.cell-sub`, the
+account card's type chip as a `bank.css` rule); the two state classes are `is-hidden` and the
+overlay's `is-open`, declared in `styles.css`'s `utilities` layer. Dead rules the redesign left
+behind are gone (the bank panel, collapse, facts and filter-bar rules, the 2200 px widening of the
+bank account detail — it now stops at `--content-max-data` like every page — `.hangar-filter*`,
+the unused `promotion-admin.css` toolbar rules, `.oss-unavailable`), and so are the
+`components :: filterToggle` fragment, the stored open/closed state of `krt-filter-panel.js`, the
+bank panel-collapse and old request status-filter scripts, and 205 message keys no template, script
+or class read any more (the `*.description` subtitles stay). No template or script may name a
+`krtm-*` class again (`NoMigrationClassTest`); `data-krtm-width` and `inline-style-apply.js` stay as
+the CSP-safe width mechanism.
+
+**Enforced by:** `PagePatternFragmentsRenderTest` (the fragments' markup and ARIA) ·
+`PagePatternTestIdsRenderTest` (the smoke-test ids on a representative page per pattern) ·
+`NoMigrationClassTest` (no `krtm-*` class, no `inline-migration.css`) · Stylelint
+`media-feature-name-value-allowed-list` (breakpoints) · `TouchClassLayoutE2eTest` (touch floors, and
+on every swept page: no `.card` scrolling sideways on the phone, the head's primary action in the
+first viewport, one `.btn--cta` per `.page-actions`, no nested `.hud-box`, no text in the retired
+gray — see REQ-UI-009) ·
+**Code:** `static/css/styles.css` (`components` layer), `fragments/page-head.html`,
+`fragments/components.html`, `static/js/krt-overflow-menu.js`, `static/js/krt-filter-chips.js`,
+`frontend/.stylelintrc.json`, `frontend/.stylelintrc.templates.json` · **Related:** REQ-UI-004,
+REQ-UI-006, REQ-UI-009, REQ-UI-017, REQ-UI-022, REQ-FE-021
 
 ## Out of scope
 

@@ -26,48 +26,48 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.architecture.MassAssignmentGuardRules.Component;
 import de.greluc.krt.profit.basetool.backend.architecture.MassAssignmentGuardRules.Handler;
-import de.greluc.krt.profit.basetool.backend.controller.JobOrderController.ReassignResponsibleOrgUnitRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.AddExternalParticipantRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankDepositRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankWithdrawalRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankAccountRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto.BookInDto;
+import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController.ReassignResponsibleOrgUnitRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.AddExternalParticipantRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwningOrgUnitRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionCreateDto.BookInDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrganisationsleitungDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.TerminalDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UpdateParticipantRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankAccountRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionCoreRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionOwningOrgUnitRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
+import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionCreateRequest;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.guardfixture.massassignment.FixtureMassAssignmentController;
 import de.greluc.krt.profit.basetool.guardfixture.massassignment.FixtureNestedRequest;
 import de.greluc.krt.profit.basetool.guardfixture.massassignment.FixtureOrderDto;
@@ -185,7 +185,7 @@ class MassAssignmentGuardTest {
                   Map.of(
                       "owner",
                       "create on behalf, honoured only when"
-                          + " OwnerScopeService.canManageUserRefineryOrders admits the caller"
+                          + " RefineryAccessPolicy.canManageUserRefineryOrders admits the caller"
                           + " (REQ-SEC-005); the proof forges an owner outside the caller's units",
                       "status",
                       "forced to OPEN on create; client-settable on the edit form by owner"

@@ -14,79 +14,78 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.specialcommands.title}">Spezialkommandos verwalten</h1>
-        <p class="krtm-color-var-color-gray-2-margin-top-0-5rem-e129" th:text="#{admin.specialcommands.subtitle}">
-            Spezialkommandos sind eine zweite Tenant-Art neben Staffeln. Mitglieder können zusätzlich
-            zu ihrer Staffel beliebig vielen Spezialkommandos angehören.
-        </p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{admin.specialcommands.title},
+        count=${specialCommands != null ? #lists.size(specialCommands) : 0}, countId='sc-count', countFor='sc-results', actions=~{::sc-actions})}">
+        <th:block th:ref="sc-actions">
+            <button type="button" id="add-sc-btn" class="btn btn--cta" data-testid="page-head-primary"
+                    th:data-action="@{/admin/special-commands}" th:text="#{admin.specialcommands.create}">Neues Spezialkommando</button>
+        </th:block>
+    </th:block>
 
-    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
+    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass=null)}"></th:block>
 
-    <div class="hud-box data-section mt-2" id="specialcommands-box">
-        <div class="box-header krtm-display-flex-justify-content-space-between-a-1321">
-            <h2 th:text="#{admin.specialcommands.title}" class="m-0">Spezialkommandos</h2>
-            <div class="krtm-display-flex-gap-1rem-align-items-center-6529">
-                <form th:action="@{/admin/special-commands}" method="get" id="sc-filter-form" class="no-track m-0 flex-gap-sm">
-                    <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}">
-                    <label for="includeInactive" class="krtm-color-var-color-gray-2-font-size-0-9rem-curs-0b43" th:text="#{admin.specialcommands.show_inactive}">Inaktive anzeigen</label>
-                </form>
-                <button id="add-sc-btn" class="btn btn--cta" th:data-action="@{/admin/special-commands}" th:text="#{admin.specialcommands.create}">Neues Spezialkommando</button>
-            </div>
+    <form th:action="@{/admin/special-commands}" method="get" id="sc-filter-form" class="no-track">
+        <div class="toolbar">
+            <label class="switch" for="includeInactive">
+                <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}">
+                <span class="switch__track" aria-hidden="true"></span>
+                <span th:text="#{admin.specialcommands.show_inactive}">Inaktive anzeigen</span>
+            </label>
         </div>
+    </form>
 
-        <div class="box-content" id="sc-results">
-            <th:block th:fragment="results">
-            <th:block th:if="${catalogTruncated}">
-                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
-            </th:block>
-            <div th:if="${specialCommands == null or #lists.isEmpty(specialCommands)}" class="krtm-color-var-color-gray-2-padding-1rem-0-5444" th:text="#{admin.specialcommands.empty}">
-                Noch keine Spezialkommandos angelegt.
-            </div>
-            <div th:if="${specialCommands != null and !#lists.isEmpty(specialCommands)}" class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th th:text="#{admin.specialcommands.column.name}">Name</th>
-                            <th th:text="#{admin.specialcommands.column.shorthand}">Kürzel</th>
-                            <th th:text="#{admin.specialcommands.column.description}">Beschreibung</th>
-                            <th th:text="#{admin.specialcommands.column.actions}">Aktion</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="sc : ${specialCommands}" th:classappend="${!sc.active} ? 'krtm-opacity-06' : ''">
-                            <td>
-                                <span th:text="${sc.name}">Name</span>
-                                <span th:if="${!sc.active}" class="badge-inactive" th:text="#{admin.specialcommands.inactive}">Inaktiv</span>
-                            </td>
-                            <td th:text="${sc.shorthand}">Kürzel</td>
-                            <td th:text="${sc.description}">Desc</td>
-                            <td class="flex-gap-xs">
-                                <a th:href="@{/organisation/special-commands/{id}(id=${sc.id})}" class="btn btn-ghost"
-                                   th:text="#{admin.specialcommands.members.manage}">Mitglieder verwalten</a>
-                                <button class="btn btn-ghost btn-icon edit-sc-btn"
-                                        th:data-action="@{/admin/special-commands/{id}/update(id=${sc.id})}"
-                                        th:data-id="${sc.id}"
-                                        th:data-name="${sc.name}"
-                                        th:data-shorthand="${sc.shorthand}"
-                                        th:data-desc="${sc.description}"
-                                        th:data-version="${sc.version}"
-                                        th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                                <button th:if="${sc.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
-                                        th:data-action="@{/admin/special-commands/{id}/delete(id=${sc.id})}"
-                                        th:data-name="${sc.name}"
-                                        th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                                <form th:if="${!sc.active}" th:action="@{/admin/special-commands/{id}/activate(id=${sc.id})}" method="post" class="m-0">
-                                    <button type="submit" class="btn btn-ghost" th:text="#{admin.specialcommands.activate}">Aktivieren</button>
-                                </form>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            </th:block>
+    <div id="sc-results" class="card card--flush">
+        <th:block th:fragment="results">
+        <th:block th:if="${catalogTruncated}">
+            <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
+        </th:block>
+        <div class="table-responsive" th:if="${specialCommands != null and !#lists.isEmpty(specialCommands)}">
+            <table class="data-table data-table--stack"
+                   th:data-list-total="${#lists.size(specialCommands)}">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.specialcommands.column.name}">Name</th>
+                        <th th:text="#{admin.specialcommands.column.shorthand}">K&uuml;rzel</th>
+                        <th th:text="#{admin.specialcommands.column.description}">Beschreibung</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.specialcommands.column.actions}">Aktion</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="sc : ${specialCommands}" th:classappend="${!sc.active} ? 'sc-row--inactive' : ''">
+                        <td>
+                            <a class="row-link" data-testid="row-link" th:href="@{/organisation/special-commands/{id}(id=${sc.id})}"
+                               th:title="#{admin.specialcommands.members.manage}">
+                                <span class="cell-title"><span th:text="${sc.name}">Name</span><span th:if="${!sc.active}" class="badge-inactive" th:text="#{admin.specialcommands.inactive}">Inaktiv</span></span>
+                            </a>
+                        </td>
+                        <td th:attr="data-label=#{admin.specialcommands.column.shorthand}" th:text="${sc.shorthand}">K&uuml;rzel</td>
+                        <td class="sc-desc" th:text="${sc.description}">Desc</td>
+                        <td class="cell-actions">
+                            <button type="button" class="btn btn-ghost btn-icon edit-sc-btn"
+                                    th:data-action="@{/admin/special-commands/{id}/update(id=${sc.id})}"
+                                    th:data-id="${sc.id}"
+                                    th:data-name="${sc.name}"
+                                    th:data-shorthand="${sc.shorthand}"
+                                    th:data-desc="${sc.description}"
+                                    th:data-version="${sc.version}"
+                                    th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            <button th:if="${sc.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
+                                    th:data-action="@{/admin/special-commands/{id}/delete(id=${sc.id})}"
+                                    th:data-name="${sc.name}"
+                                    th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                            <form th:if="${!sc.active}" th:action="@{/admin/special-commands/{id}/activate(id=${sc.id})}" method="post" class="sc-inline-form">
+                                <button type="submit" class="btn btn-success btn-xs" th:text="#{admin.specialcommands.activate}">Aktivieren</button>
+                            </form>
+                            <svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+        <th:block th:if="${specialCommands == null or #lists.isEmpty(specialCommands)}">
+            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.specialcommands.empty.title', textKey='admin.specialcommands.empty')}"></th:block>
+        </th:block>
+        </th:block>
     </div>
 </main>
 
@@ -123,7 +122,7 @@
     <th:block th:ref="sc-delete-modal-body">
         <div class="krt-modal-body">
             <p th:text="#{admin.specialcommands.delete.confirm}" class="mb-2">Möchten Sie dieses Spezialkommando wirklich löschen?</p>
-            <p class="m-0"><strong id="sc-delete-name" class="krtm-color-var-color-primary-473b"></strong></p>
+            <p class="m-0"><strong id="sc-delete-name" class="sc-delete-name"></strong></p>
         </div>
         <div class="krt-modal-foot">
             <button type="button" class="btn btn-ghost close-sc-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
@@ -136,18 +135,18 @@
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var SC_MSG = {
-        saved:   '[[#{notification.success.save}]]',
-        deleted: '[[#{notification.success.delete}]]',
-        error:   '[[#{notification.error.save}]]',
-        createTitle: '[[#{admin.specialcommands.create}]]',
-        editTitle:   '[[#{admin.specialcommands.edit}]]'
+        saved:   /*[[#{notification.success.save}]]*/ '',
+        deleted: /*[[#{notification.success.delete}]]*/ '',
+        error:   /*[[#{notification.error.save}]]*/ '',
+        createTitle: /*[[#{admin.specialcommands.create}]]*/ '',
+        editTitle:   /*[[#{admin.specialcommands.edit}]]*/ ''
     };
     var SC_CONFLICT = {
-        title:                '[[#{frontend.ajax.conflict.title}]]',
-        reloadDetailFallback: '[[#{frontend.ajax.conflict.detail}]]',
-        reloadLabel:          '[[#{frontend.ajax.conflict.reload}]]',
-        dismissLabel:         '[[#{frontend.ajax.conflict.dismiss}]]',
-        reloadQuestion:       '[[#{frontend.ajax.conflict.question}]]'
+        title:                /*[[#{frontend.ajax.conflict.title}]]*/ '',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ '',
+        reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ '',
+        dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ '',
+        reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ ''
     };
 </script>
 <script th:src="@{/js/special-commands.js}" defer th:attr="nonce=${cspNonce}"></script>

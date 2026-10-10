@@ -1,33 +1,21 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
-    html,
-    body {
-        overflow-x: hidden;
-    }
-    .operations-table {
-        width: 100%;
-        table-layout: auto;
-    }
-    .operations-table td.op-desc,
-    .operations-table th.op-desc {
-        max-width: 40ch;
-        white-space: normal;
-        overflow-wrap: anywhere;
-    }
-    .operations-table td.op-action,
-    .operations-table th.op-action {
+    .operations-table .operations-desc {
+        max-width: 60ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
-        text-align: right;
-    }
-    .operations-table td.op-action .btn {
-        margin-left: 0.25rem;
     }
 
     @media (width <= 768px) {
-        .operations-table td.op-desc,
-        .operations-table th.op-desc {
-            display: none;
+        .operations-table .operations-desc {
+            display: -webkit-box;
+            max-width: none;
+            white-space: normal;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
         }
     }
 }

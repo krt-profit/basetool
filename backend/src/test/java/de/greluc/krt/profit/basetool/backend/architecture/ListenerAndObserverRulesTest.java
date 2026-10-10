@@ -32,11 +32,12 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.ListenerAndObserverFixtures;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
+import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.service.RequestScopeResolver;
-import de.greluc.krt.profit.basetool.backend.support.RequestMemo;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.LinkedHashSet;
@@ -83,14 +84,17 @@ class ListenerAndObserverRulesTest {
   private static final int LISTENER_FLOOR = 14;
 
   /**
-   * Observer SPIs today: none exist yet, so the floor is zero by design; the fixtures prove the
-   * rule fails on a non-compliant implementation.
+   * Observer SPIs today: {@code MembershipChangeObserver}; the fixtures prove the rule fails on a
+   * non-compliant implementation.
    */
-  private static final int OBSERVER_SPI_FLOOR = 0;
+  private static final int OBSERVER_SPI_FLOOR = 1;
 
   /** The audit recorders whose rows must be written inside the business transaction. */
   private static final Set<String> AUDIT_RECORDERS =
-      Set.of(AuditService.class.getName(), BankAuditService.class.getName());
+      Set.of(
+          AuditRecorder.class.getName(),
+          AuditService.class.getName(),
+          BankAuditService.class.getName());
 
   /** Types every member of which reads request-bound state. */
   private static final Set<String> REQUEST_BOUND_TYPES =
@@ -112,7 +116,7 @@ class ListenerAndObserverRulesTest {
    */
   static final Map<String, String> AUDITING_LISTENERS =
       Map.of(
-          "de.greluc.krt.profit.basetool.backend.service.exchange.ExchangeDepartureService"
+          "de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeDepartureService"
               + ".onDeparture",
           "Audits the departure work it performs itself (Keycloak consent and session removal,"
               + " revocations) in its own REQUIRES_NEW transaction after the roster sync"
@@ -164,7 +168,7 @@ class ListenerAndObserverRulesTest {
   @DisplayName("every observer SPI implementation is MANDATORY")
   void everyObserverImplementationIsMandatory() {
     assertThat(observerSpis(PRODUCTION))
-        .as("observer SPIs; none exist yet, so the floor is zero by design")
+        .as("observer SPIs")
         .hasSizeGreaterThanOrEqualTo(OBSERVER_SPI_FLOOR);
     assertThat(nonMandatoryObserverMethods(PRODUCTION))
         .as(

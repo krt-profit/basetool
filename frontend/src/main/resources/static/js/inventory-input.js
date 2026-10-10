@@ -19,7 +19,7 @@
 
 /* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG, INV_OWNER_PICKER_MSG */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const matSelect = document.getElementById('materialId');
     if (matSelect) {
         matSelect.addEventListener('change', function () {
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function () {
         qualityInput.addEventListener('input', scheduleMergeProbe);
     }
 
-    ['locationId', 'owningOrgUnitId', 'personal', 'stolen'].forEach(function (id) {
+    ['locationId', 'owningOrgUnitId', 'personal', 'stolen'].forEach((id) => {
         const field = document.getElementById(id);
         if (field) field.addEventListener('change', scheduleMergeProbe);
     });
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', function () {
         personalToggle.addEventListener('change', syncPersonalAllocations);
     }
 
-    document.addEventListener('click', function (event) {
+    document.addEventListener('click', (event) => {
         if (event.target.closest('[data-trigger="inv-input-add-order"]')) {
             addAllocRow('jobOrder');
         } else if (event.target.closest('[data-trigger="inv-input-add-mission"]')) {
@@ -70,15 +70,15 @@ document.addEventListener('DOMContentLoaded', function () {
             removeAllocRow(event.target.closest('[data-trigger="inv-input-remove-alloc"]'));
         }
     });
-    document.addEventListener('input', function (event) {
+    document.addEventListener('input', (event) => {
         if (event.target.matches('[data-alloc-amount]') || event.target.id === 'amount') {
             updateAllocOver();
         }
     });
-    document.addEventListener('change', function (event) {
+    document.addEventListener('change', (event) => {
         if (event.target.matches('[data-alloc-target]')) {
             updateAllocOver();
-        } else if (event.target.matches('[data-trigger="inv-input-mode-toggle"]')) {
+        } else if (event.target.matches('input[name="inventoryCatalogMode"]')) {
             applyCatalogMode();
         }
     });
@@ -109,18 +109,14 @@ function startOrderNeedsLiveSync() {
 }
 
 function refreshOrderNeeds() {
-    fetch('/inventory/order-needs', {
-        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-    })
-        .then(function (response) {
-            return response.ok ? response.json() : null;
-        })
-        .then(function (needs) {
+    window.krtFetch
+        .getJson('/inventory/order-needs')
+        .then((needs) => {
             if (!needs) return;
             orderNeeds = needs;
             relabelOrderOptions();
         })
-        .catch(function () {});
+        .catch(() => {});
 }
 
 function currentCatalogMode() {
@@ -138,7 +134,7 @@ function activeCatalogId() {
 function setCatalogBlockDisabled(blockId, disabled) {
     const block = document.getElementById(blockId);
     if (!block) return;
-    block.querySelectorAll('input, select, textarea, button').forEach(function (el) {
+    block.querySelectorAll('input, select, textarea, button').forEach((el) => {
         el.disabled = disabled;
     });
 }
@@ -166,8 +162,8 @@ function applyItemAmountMode() {
     const unitSpan = document.getElementById('amount-unit');
     const scuHint = document.getElementById('amount-scu-hint');
     if (amountInput) amountInput.setAttribute('step', '1');
-    if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
-    if (scuHint) scuHint.classList.add('krtm-hidden');
+    if (unitSpan) unitSpan.textContent = `(${MSG_UNIT_PIECE})`;
+    if (scuHint) scuHint.classList.add('is-hidden');
     updateMergeOptIn('PIECE');
 }
 
@@ -199,16 +195,16 @@ function updateAmountFieldForMaterial(selectElement) {
 
     if (qtType === 'PIECE') {
         amountInput.setAttribute('step', '1');
-        unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
-        if (scuHint) scuHint.classList.add('krtm-hidden');
+        unitSpan.textContent = `(${MSG_UNIT_PIECE})`;
+        if (scuHint) scuHint.classList.add('is-hidden');
     } else if (qtType === 'SCU') {
         amountInput.setAttribute('step', '0.001');
-        unitSpan.textContent = '(' + MSG_UNIT_SCU + ')';
-        if (scuHint) scuHint.classList.remove('krtm-hidden');
+        unitSpan.textContent = `(${MSG_UNIT_SCU})`;
+        if (scuHint) scuHint.classList.remove('is-hidden');
     } else {
         amountInput.setAttribute('step', '0.001');
         unitSpan.textContent = '';
-        if (scuHint) scuHint.classList.add('krtm-hidden');
+        if (scuHint) scuHint.classList.add('is-hidden');
     }
 
     updateMergeOptIn(qtType);
@@ -227,7 +223,7 @@ function setMergeOptInVisible(visible) {
     const mergeRow = document.getElementById('merge-stock-row');
     const mergeCheckbox = document.getElementById('mergeStock');
     if (!mergeRow) return;
-    mergeRow.classList.toggle('krtm-hidden', !visible);
+    mergeRow.hidden = !visible;
     if (!visible && mergeCheckbox) mergeCheckbox.checked = false;
 }
 
@@ -269,18 +265,14 @@ function scheduleMergeProbe() {
         setMergeOptInVisible(false);
         return;
     }
-    mergeProbeTimer = window.setTimeout(function () {
-        fetch('/inventory/merge-candidates?' + query, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-        })
-            .then(function (response) {
-                return response.ok ? response.json() : { exists: true };
-            })
-            .then(function (answer) {
+    mergeProbeTimer = window.setTimeout(() => {
+        window.krtFetch
+            .getJson(`/inventory/merge-candidates?${query}`)
+            .then((answer) => {
                 if (sequence !== mergeProbeSequence) return;
                 setMergeOptInVisible(!!(answer && answer.exists));
             })
-            .catch(function () {
+            .catch(() => {
                 if (sequence === mergeProbeSequence) setMergeOptInVisible(true);
             });
     }, 250);
@@ -300,11 +292,11 @@ function captureOwnOwnerOptions() {
     const parts = ownerPickerParts();
     if (!parts) return;
     ownOwnerOptions = {
-        nodes: Array.prototype.map.call(parts.select.childNodes, function (node) {
+        nodes: Array.prototype.map.call(parts.select.childNodes, (node) => {
             return node.cloneNode(true);
         }),
         value: parts.select.value,
-        visible: !parts.wrapper.classList.contains('krtm-hidden'),
+        visible: !parts.wrapper.classList.contains('is-hidden'),
         required: parts.select.required,
     };
 }
@@ -314,13 +306,13 @@ function restoreOwnOwnerOptions() {
     if (!parts || !ownOwnerOptions) return;
     parts.select.replaceChildren.apply(
         parts.select,
-        ownOwnerOptions.nodes.map(function (node) {
+        ownOwnerOptions.nodes.map((node) => {
             return node.cloneNode(true);
         }),
     );
     parts.select.value = ownOwnerOptions.value;
     parts.select.required = ownOwnerOptions.required;
-    parts.wrapper.classList.toggle('krtm-hidden', !ownOwnerOptions.visible);
+    parts.wrapper.classList.toggle('is-hidden', !ownOwnerOptions.visible);
 }
 
 function ownerOption(membership, selectedId) {
@@ -335,7 +327,7 @@ function renderOwnerOptions(memberships) {
     const parts = ownerPickerParts();
     if (!parts) return;
     const list = Array.isArray(memberships)
-        ? memberships.filter(function (m) {
+        ? memberships.filter((m) => {
               return m && m.orgUnitId;
           })
         : [];
@@ -343,7 +335,7 @@ function renderOwnerOptions(memberships) {
     const preset =
         list.length === 1
             ? list[0].orgUnitId
-            : list.some(function (m) {
+            : list.some((m) => {
                     return m.orgUnitId === activeId;
                 })
               ? activeId
@@ -356,14 +348,14 @@ function renderOwnerOptions(memberships) {
         placeholder.textContent = INV_OWNER_PICKER_MSG.placeholder;
         select.appendChild(placeholder);
     }
-    const kinds = OWNER_KIND_ORDER.filter(function (kind) {
-        return list.some(function (m) {
+    const kinds = OWNER_KIND_ORDER.filter((kind) => {
+        return list.some((m) => {
             return m.kind === kind;
         });
     });
     const grouped = kinds.length > 1;
-    OWNER_KIND_ORDER.forEach(function (kind) {
-        const ofKind = list.filter(function (m) {
+    OWNER_KIND_ORDER.forEach((kind) => {
+        const ofKind = list.filter((m) => {
             return m.kind === kind;
         });
         if (!ofKind.length) return;
@@ -374,19 +366,19 @@ function renderOwnerOptions(memberships) {
             select.appendChild(group);
             parent = group;
         }
-        ofKind.forEach(function (m) {
+        ofKind.forEach((m) => {
             parent.appendChild(ownerOption(m, preset));
         });
     });
-    list.filter(function (m) {
+    list.filter((m) => {
         return OWNER_KIND_ORDER.indexOf(m.kind) < 0;
-    }).forEach(function (m) {
+    }).forEach((m) => {
         select.appendChild(ownerOption(m, preset));
     });
     select.value = preset;
     const visible = list.length > 1;
     select.required = visible && !preset;
-    parts.wrapper.classList.toggle('krtm-hidden', !visible);
+    parts.wrapper.classList.toggle('is-hidden', !visible);
 }
 
 function reloadOwnerPickerForUser() {
@@ -401,16 +393,12 @@ function reloadOwnerPickerForUser() {
         scheduleMergeProbe();
         return;
     }
-    fetch('/users/' + encodeURIComponent(userId) + '/memberships?allKinds=true', {
-        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-    })
-        .then(function (response) {
-            return response.ok ? response.json() : [];
-        })
-        .catch(function () {
+    window.krtFetch
+        .getJson(`/users/${encodeURIComponent(userId)}/memberships?allKinds=true`)
+        .catch(() => {
             return [];
         })
-        .then(function (memberships) {
+        .then((memberships) => {
             if (sequence !== ownerReloadSequence) return;
             renderOwnerOptions(memberships);
             scheduleMergeProbe();
@@ -421,18 +409,18 @@ function blankAmountRows(dimension) {
     const targeted = allocTargetedRows(dimension);
     if (targeted.length < 2) return [];
     return targeted
-        .map(function (select) {
+        .map((select) => {
             const row = select.closest('[data-alloc-row]');
             return row ? row.querySelector('[data-alloc-amount]') : null;
         })
-        .filter(function (input) {
+        .filter((input) => {
             return !!input && String(input.value || '').trim() === '';
         });
 }
 
 function markBlankAllocationAmounts() {
     const blank = blankAmountRows('jobOrder').concat(blankAmountRows('mission'));
-    document.querySelectorAll('[data-alloc-amount]').forEach(function (input) {
+    document.querySelectorAll('[data-alloc-amount]').forEach((input) => {
         if (blank.indexOf(input) >= 0) {
             input.setAttribute('aria-invalid', 'true');
         } else {
@@ -440,7 +428,7 @@ function markBlankAllocationAmounts() {
         }
     });
     const hint = document.getElementById('inputAllocAmountMissing');
-    if (hint) hint.classList.toggle('krtm-hidden', blank.length === 0);
+    if (hint) hint.hidden = blank.length === 0;
     return blank;
 }
 
@@ -464,8 +452,8 @@ function allocConfig(dimension) {
 
 function allocTargetedRows(dimension) {
     return Array.prototype.filter.call(
-        document.querySelectorAll('#' + allocConfig(dimension).rows + ' [data-alloc-target]'),
-        function (select) {
+        document.querySelectorAll(`#${allocConfig(dimension).rows} [data-alloc-target]`),
+        (select) => {
             return !!select.value;
         },
     );
@@ -474,18 +462,18 @@ function allocTargetedRows(dimension) {
 function updateAllocSingleHint(dimension) {
     const hint = document.getElementById(allocConfig(dimension).singleHint);
     if (!hint) return;
-    hint.classList.toggle('krtm-hidden', allocTargetedRows(dimension).length > 1);
+    hint.hidden = allocTargetedRows(dimension).length > 1;
 }
 
 function reindexAllocRows(dimension) {
     const cfg = allocConfig(dimension);
     const container = document.getElementById(cfg.rows);
     if (!container) return;
-    container.querySelectorAll('[data-alloc-row]').forEach(function (row, index) {
+    container.querySelectorAll('[data-alloc-row]').forEach((row, index) => {
         const select = row.querySelector('[data-alloc-target]');
         const amount = row.querySelector('[data-alloc-amount]');
-        if (select) select.name = cfg.prefix + '[' + index + '].targetId';
-        if (amount) amount.name = cfg.prefix + '[' + index + '].amount';
+        if (select) select.name = `${cfg.prefix}[${index}].targetId`;
+        if (amount) amount.name = `${cfg.prefix}[${index}].amount`;
     });
 }
 
@@ -514,7 +502,7 @@ function removeAllocRow(button) {
 
 function filterOrderSelects(catalogId) {
     const attr = currentCatalogMode() === 'item' ? 'data-game-items' : 'data-materials';
-    document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]').forEach(function (select) {
+    document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]').forEach((select) => {
         let hasSelectedValid = false;
         for (let i = 1; i < select.options.length; i++) {
             const option = select.options[i];
@@ -554,7 +542,7 @@ function orderNeedFor(orderId, materialId) {
     let outstanding = 0;
     let floor = null;
     let matched = false;
-    buckets.forEach(function (bucket) {
+    buckets.forEach((bucket) => {
         if (bucket.materialId !== materialId) return;
         matched = true;
         if (typeof bucket.outstandingAmount === 'number') outstanding += bucket.outstandingAmount;
@@ -571,7 +559,7 @@ function orderNeedFor(orderId, materialId) {
 function orderItemNeedFor(orderId, gameItemId) {
     const needs = needsMapFor(true)[orderId];
     if (!needs || !needs.length || !gameItemId) return null;
-    const match = needs.find(function (need) {
+    const match = needs.find((need) => {
         return need.gameItemId === gameItemId;
     });
     if (!match) return null;
@@ -601,14 +589,14 @@ function relabelOrderOptions() {
     const isPiece = itemMode || pickedMaterialQuantityType() === 'PIECE';
     const unit = isPiece ? MSG_UNIT_PIECE : MSG_UNIT_SCU;
     const grade = itemMode ? NaN : parseInt((document.getElementById('quality') || {}).value, 10);
-    document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]').forEach(function (select) {
+    document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]').forEach((select) => {
         for (let i = 1; i < select.options.length; i++) {
             applyOrderOptionLabel(select.options[i], catalogId, itemMode, isPiece, unit, grade);
         }
     });
     const template = document.getElementById('jobOrderRowTemplate');
     if (template && template.content) {
-        template.content.querySelectorAll('[data-alloc-target] option').forEach(function (option) {
+        template.content.querySelectorAll('[data-alloc-target] option').forEach((option) => {
             if (option.value) {
                 applyOrderOptionLabel(option, catalogId, itemMode, isPiece, unit, grade);
             }
@@ -633,21 +621,21 @@ function applyOrderOptionLabel(option, catalogId, itemMode, isPiece, unit, grade
         need.outstanding > 0
             ? INV_ORDER_NEED_MSG.outstanding.replace(
                   '{0}',
-                  formatNeedAmount(need.outstanding, isPiece) + ' ' + unit,
+                  `${formatNeedAmount(need.outstanding, isPiece)} ${unit}`,
               )
             : INV_ORDER_NEED_MSG.covered,
     );
     if (need.floor !== null && !isNaN(grade) && grade < need.floor) {
         parts.push(INV_ORDER_NEED_MSG.qualityFloor.replace('{0}', String(need.floor)));
     }
-    option.textContent = base + ' · ' + parts.join(' · ');
+    option.textContent = `${base} · ${parts.join(' · ')}`;
 }
 
 function allocDimensionSum(dimension) {
     let sum = 0;
     document
-        .querySelectorAll('#' + allocConfig(dimension).rows + ' [data-alloc-amount]')
-        .forEach(function (input) {
+        .querySelectorAll(`#${allocConfig(dimension).rows} [data-alloc-amount]`)
+        .forEach((input) => {
             const value = parseFloat(input.value);
             if (!isNaN(value)) sum += value;
         });
@@ -666,21 +654,21 @@ function updateAllocOver() {
     const total = isNaN(amount) ? 0 : amount;
     const over =
         allocDimensionSum('jobOrder') > total + 1e-6 || allocDimensionSum('mission') > total + 1e-6;
-    overEl.classList.toggle('krtm-hidden', !over);
+    overEl.hidden = !over;
 }
 
 function syncPersonalAllocations() {
     const personal = document.getElementById('personal');
     const on = !!(personal && personal.checked);
     const itemMode = currentCatalogMode() === 'item';
-    ['jobOrder', 'mission'].forEach(function (dimension) {
+    ['jobOrder', 'mission'].forEach((dimension) => {
         const cfg = allocConfig(dimension);
         const hide = on || (dimension === 'mission' && itemMode);
         const group = document.getElementById(cfg.group);
-        if (group) group.classList.toggle('krtm-hidden', hide);
+        if (group) group.hidden = hide;
         if (hide) {
             const container = document.getElementById(cfg.rows);
-            if (container) container.innerHTML = '';
+            if (container) container.replaceChildren();
         }
     });
     updateAllocOver();
@@ -690,7 +678,7 @@ function syncPersonalAllocations() {
     if (!window.krtFetch) return;
     const form = document.getElementById('inventory-input-form');
     if (!form) return;
-    form.addEventListener('submit', function (event) {
+    form.addEventListener('submit', (event) => {
         event.preventDefault();
         const blank = markBlankAllocationAmounts();
         if (blank.length) {
@@ -723,9 +711,9 @@ function syncPersonalAllocations() {
             onSuccess(body) {
                 const target = body && body.targetUrl ? body.targetUrl : '/inventory';
                 window.location.assign(
-                    target +
-                        (target.indexOf('?') >= 0 ? '&' : '?') +
-                        'success=success.inventory.add',
+                    `${
+                        target + (target.indexOf('?') >= 0 ? '&' : '?')
+                    }success=success.inventory.add`,
                 );
             },
         });

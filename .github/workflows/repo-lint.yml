@@ -22,8 +22,8 @@ jobs:
     env:
       ACTIONLINT_VERSION: 1.7.12
       ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-      HADOLINT_VERSION: 2.14.0
-      HADOLINT_SHA256: 6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47
+      HADOLINT_VERSION: 2.15.1
+      HADOLINT_SHA256: c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -78,7 +78,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
-          url="https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64"
+          url="https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-x86_64"
           curl -fsSL "$url" -o /tmp/hadolint
           echo "${HADOLINT_SHA256}  /tmp/hadolint" | sha256sum -c -
           sudo install -m 0755 /tmp/hadolint /usr/local/bin/hadolint
@@ -105,7 +105,7 @@ jobs:
         run: |
           set -eu
           if ! python3 -c "import yaml" >/dev/null 2>&1; then
-            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
+            pip3 install --disable-pip-version-check --require-hashes -r .github/requirements/pyyaml.txt
           fi
           python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 
@@ -124,6 +124,14 @@ jobs:
       - name: gradle-input-paths / Check every build-script input path exists
         if: ${{ !cancelled() }}
         run: python3 scripts/check-gradle-input-paths.py
+
+      - name: final-java-only / Self-test the preview and incubator checker
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-final-java-only.py --selftest
+
+      - name: final-java-only / Check that only final Java features are used
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-final-java-only.py
 
       - name: pid1-reaping / Self-test the detector
         if: ${{ !cancelled() }}
@@ -152,6 +160,10 @@ jobs:
       - name: quadlet-drift / Self-test the Dependabot compose follow-up
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/dependabot_compose_followup.py --selftest
+
+      - name: cache-janitor / Self-test the Gradle cache selection
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/prune_gradle_caches.py --selftest
 
       - name: ingest-audience / Self-test the ingest audience checker
         if: ${{ !cancelled() }}
@@ -285,13 +297,10 @@ jobs:
 
       - name: ansible-lint / Install ansible-core, ansible-lint and the pinned collections
         if: ${{ !cancelled() }}
-        env:
-          ANSIBLE_CORE_VERSION: 2.21.4
-          ANSIBLE_LINT_VERSION: 26.9.0
         run: |
           set -euo pipefail
           pip install --disable-pip-version-check --quiet \
-            "ansible-core==${ANSIBLE_CORE_VERSION}" "ansible-lint==${ANSIBLE_LINT_VERSION}"
+            --require-hashes -r .github/requirements/ansible-lint.txt
           ansible --version | head -n 1
           ansible-lint --version
           attempts=3
@@ -414,7 +423,7 @@ jobs:
         run: |
           set -eu
           if ! python3 -c "import yaml" >/dev/null 2>&1; then
-            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
+            pip3 install --disable-pip-version-check --require-hashes -r .github/requirements/pyyaml.txt
           fi
           python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 

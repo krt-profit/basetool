@@ -19,7 +19,7 @@
 
 /* global ALIAS_MSG, ALIAS_CONFLICT */
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const table = document.getElementById('aliasesTable');
     const tbody = table ? table.querySelector('tbody') : null;
 
@@ -46,37 +46,83 @@ document.addEventListener('DOMContentLoaded', function () {
         return payload;
     }
 
-    function buildEmptyAliasRow() {
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-alias-empty', '');
+    /**
+     * Shows the table while it holds a row and the empty state otherwise, and copies the row
+     * count into the page-head count chip.
+     */
+    function syncAliasEmpty() {
+        if (!tbody) {
+            return;
+        }
+        const count = tbody.querySelectorAll('tr[data-alias-id]').length;
+        const tableWrap = document.querySelector('[data-alias-table]');
+        const emptyState = document.querySelector('[data-alias-empty]');
+        if (tableWrap instanceof HTMLElement) {
+            tableWrap.hidden = count === 0;
+        }
+        if (emptyState instanceof HTMLElement) {
+            emptyState.hidden = count > 0;
+        }
+        const chip = document.getElementById('aliases-count');
+        if (chip) {
+            chip.textContent = String(count);
+        }
+    }
+
+    function sourceLabel(code) {
+        const labels = {
+            SCWIKI: ALIAS_MSG.sourceScwiki,
+            UEX: ALIAS_MSG.sourceUex,
+            REFINERY_SCREEN: ALIAS_MSG.sourceRefineryScreen,
+        };
+        return code != null && labels[code] ? labels[code] : code != null ? code : '';
+    }
+
+    function textCell(field, value, label) {
         const td = document.createElement('td');
-        td.colSpan = 7;
-        td.textContent = ALIAS_MSG.empty;
-        tr.appendChild(td);
-        return tr;
+        if (field) {
+            td.setAttribute('data-alias-field', field);
+        }
+        if (label) {
+            td.setAttribute('data-label', label);
+        }
+        td.textContent = value != null ? value : '';
+        return td;
     }
 
     function buildAliasRow(alias) {
         const tr = document.createElement('tr');
         tr.setAttribute('data-alias-id', alias.id);
-        [
-            'sourceSystem',
-            'externalName',
-            'materialName',
-            'externalKey',
-            'externalCode',
-            'createdBy',
-        ].forEach(function (key) {
-            const td = document.createElement('td');
-            td.textContent = alias[key] != null ? alias[key] : '';
-            tr.appendChild(td);
-        });
+        tr.setAttribute('data-testid', 'alias-row');
+
+        const nameTd = document.createElement('td');
+        const title = document.createElement('span');
+        title.className = 'cell-title';
+        title.setAttribute('data-alias-field', 'externalName');
+        title.textContent = alias.externalName != null ? alias.externalName : '';
+        nameTd.appendChild(title);
+        tr.appendChild(nameTd);
+
+        const sourceTd = document.createElement('td');
+        sourceTd.setAttribute('data-label', ALIAS_MSG.sourceSystemLabel);
+        const chip = document.createElement('span');
+        chip.className = 'chip chip--muted';
+        chip.setAttribute('data-alias-field', 'sourceSystem');
+        chip.setAttribute('data-source-system', alias.sourceSystem || '');
+        chip.textContent = sourceLabel(alias.sourceSystem);
+        sourceTd.appendChild(chip);
+        tr.appendChild(sourceTd);
+
+        tr.appendChild(textCell('materialName', alias.materialName, ALIAS_MSG.materialLabel));
+        tr.appendChild(textCell('externalKey', alias.externalKey, ALIAS_MSG.externalKeyLabel));
+        tr.appendChild(textCell('externalCode', alias.externalCode, ALIAS_MSG.externalCodeLabel));
+        tr.appendChild(textCell(null, alias.createdBy, ALIAS_MSG.createdByLabel));
+
         const actionTd = document.createElement('td');
-        const wrap = document.createElement('div');
-        wrap.className = 'flex-gap-xs';
+        actionTd.className = 'cell-actions';
         const form = document.createElement('form');
         form.method = 'post';
-        form.action = '/admin/material-aliases/' + encodeURIComponent(alias.id) + '/delete';
+        form.action = `/admin/material-aliases/${encodeURIComponent(alias.id)}/delete`;
         form.className = 'm-0';
         form.setAttribute('data-alias-delete', '');
         const btn = document.createElement('button');
@@ -84,36 +130,35 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.className = 'btn btn-quiet-danger btn-icon';
         btn.title = ALIAS_MSG.deleteTitle;
         btn.setAttribute('aria-label', ALIAS_MSG.deleteTitle);
-        btn.innerHTML =
-            '<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>';
+        krtHtml.set(
+            btn,
+            krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>`,
+        );
         form.appendChild(btn);
-        wrap.appendChild(form);
-        actionTd.appendChild(wrap);
+        actionTd.appendChild(form);
         tr.appendChild(actionTd);
         return tr;
     }
 
     function patchAliasRow(alias) {
-        const row = tbody ? tbody.querySelector('tr[data-alias-id="' + alias.id + '"]') : null;
+        const row = tbody ? tbody.querySelector(`tr[data-alias-id="${alias.id}"]`) : null;
         if (!row) {
             return;
         }
-        const cells = row.querySelectorAll('td');
-        const values = [
-            alias.sourceSystem,
-            alias.externalName,
-            alias.materialName,
-            alias.externalKey,
-            alias.externalCode,
-        ];
-        values.forEach(function (value, i) {
-            if (cells[i]) {
-                cells[i].textContent = value != null ? value : '';
+        ['externalName', 'materialName', 'externalKey', 'externalCode'].forEach((key) => {
+            const cell = row.querySelector(`[data-alias-field="${key}"]`);
+            if (cell) {
+                cell.textContent = alias[key] != null ? alias[key] : '';
             }
         });
+        const source = row.querySelector('[data-alias-field="sourceSystem"]');
+        if (source) {
+            source.setAttribute('data-source-system', alias.sourceSystem || '');
+            source.textContent = sourceLabel(alias.sourceSystem);
+        }
     }
 
-    document.addEventListener('submit', function (event) {
+    document.addEventListener('submit', (event) => {
         const createForm = event.target.closest('form[data-alias-create]');
         const updateForm = event.target.closest('form[data-alias-update]');
         const deleteForm = event.target.closest('form[data-alias-delete]');
@@ -141,13 +186,10 @@ document.addEventListener('DOMContentLoaded', function () {
             opts.errorMessage = ALIAS_MSG.deleteError;
             opts.onSuccess = function () {
                 const row = form.closest('tr');
-                const tb = row ? row.parentElement : null;
                 if (row) {
                     row.remove();
                 }
-                if (tb && !tb.querySelector('tr:not([data-alias-empty])')) {
-                    tb.appendChild(buildEmptyAliasRow());
-                }
+                syncAliasEmpty();
             };
         } else {
             opts.payload = aliasPayload(form);
@@ -158,11 +200,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (!created || created.id == null || !tbody) {
                         return;
                     }
-                    const emptyRow = tbody.querySelector('[data-alias-empty]');
-                    if (emptyRow) {
-                        emptyRow.remove();
-                    }
                     tbody.appendChild(buildAliasRow(created));
+                    syncAliasEmpty();
                     form.reset();
                 };
             } else {
@@ -178,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 };
             }
         }
-        window.krtFetch.write(opts).finally(function () {
+        window.krtFetch.write(opts).finally(() => {
             if (submitBtn) {
                 submitBtn.disabled = false;
             }

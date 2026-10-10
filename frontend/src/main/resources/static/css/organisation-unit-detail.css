@@ -1,0 +1,145 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+@layer base, components, page, utilities;
+
+@layer page {
+    .unit-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: var(--space-4);
+    }
+
+    .unit-head__titles {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        min-width: 0;
+    }
+
+    .unit-head__title {
+        margin: 0;
+        font-size: 1.3rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--color-white);
+        overflow-wrap: anywhere;
+    }
+
+    .unit-tabs {
+        padding: 0;
+        background: transparent;
+    }
+
+    .unit-tabpanel {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .unit-tabpanel[hidden] {
+        display: none;
+    }
+
+    .unit-roster {
+        border: var(--border-hairline);
+    }
+
+    .unit-roster__name {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .unit-roster select {
+        width: 100%;
+        min-width: 10rem;
+        margin: 0;
+    }
+
+    .unit-roster .cell-actions > .overflow-menu:has(> .overflow-menu__panel:not([hidden])) {
+        z-index: 5;
+    }
+
+    .unit-roster__flags {
+        white-space: nowrap;
+    }
+
+    .unit-flag-form,
+    .unit-menu-form {
+        display: contents;
+    }
+
+    .unit-flag {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-height: var(--touch-target-dense);
+        margin-right: var(--space-2);
+        padding: 0 var(--space-2);
+        background: none;
+        border: 1px solid transparent;
+        color: var(--color-gray-1);
+        font: inherit;
+        font-size: var(--fs-sm);
+        cursor: pointer;
+    }
+
+    .unit-flag:hover {
+        border-color: var(--color-gray-3);
+    }
+
+    .unit-flag:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    .unit-flag.is-on {
+        color: var(--color-white);
+    }
+
+    .unit-flag[aria-busy='true'] {
+        opacity: 0.6;
+        cursor: progress;
+    }
+
+    .unit-flag .matrix-flag {
+        cursor: inherit;
+    }
+
+    .unit-roster .matrix-flag.on::after {
+        content: '\2713';
+    }
+
+    .unit-roster__lead {
+        cursor: default;
+    }
+
+    .unit-hint {
+        margin: 0;
+        font-size: var(--fs-xs);
+        color: var(--color-gray-2-text);
+    }
+
+    @media (width <= 1024px) {
+        .unit-flag {
+            min-height: var(--touch-target);
+        }
+    }
+
+    @media (width <= 768px) {
+        .unit-roster__flags {
+            white-space: normal;
+        }
+
+        .unit-roster select {
+            min-width: 0;
+        }
+    }
+}

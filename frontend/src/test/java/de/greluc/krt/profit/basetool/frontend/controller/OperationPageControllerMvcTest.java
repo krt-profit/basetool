@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,6 +50,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationFinanceSummaryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OperationMissionFinanceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutSummaryDto;
@@ -56,9 +58,11 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -105,7 +109,8 @@ class OperationPageControllerMvcTest {
             UUID.randomUUID(), "Op Alpha", "First op", "PLANNED", null, 0L, null, null, null);
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
-    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef()))
+    when(backendApiClient.get(
+            startsWith("/api/v1/operations/search?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page);
 
     mockMvc
@@ -125,7 +130,8 @@ class OperationPageControllerMvcTest {
             UUID.randomUUID(), "Op Alpha", "First op", "ACTIVE", null, 0L, null, null, null);
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
-    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef()))
+    when(backendApiClient.get(
+            startsWith("/api/v1/operations/search?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(page);
 
     mockMvc
@@ -135,10 +141,182 @@ class OperationPageControllerMvcTest {
         .andExpect(content().string(containsString("status-active")));
   }
 
+  /**
+   * Renders {@code /operations} in German with the given page from the backend.
+   *
+   * @param page the page the backend returns
+   * @param query the query string, without {@code ?}
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private String renderList(PageResponse<OperationDto> page, String query) throws Exception {
+    when(backendApiClient.get(
+            startsWith("/api/v1/operations/search?"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(page);
+    return mockMvc
+        .perform(get("/operations?" + query).locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /**
+   * An operation row as the search returns it.
+   *
+   * @param status the backend status string
+   * @param description the description, may be {@code null}
+   * @return the row
+   */
+  private static OperationDto listedOperation(String status, String description) {
+    return new OperationDto(
+        UUID.fromString("00000000-0000-0000-0000-000000000077"),
+        "Op Alpha",
+        description,
+        status,
+        null,
+        0L,
+        Instant.parse("2030-10-08T18:00:00Z"),
+        null,
+        null);
+  }
+
+  /**
+   * The list renders on pattern A: head with eyebrow, count and the one create action, toolbar,
+   * row-link table with a translated status and the admin's row delete, list foot.
+   */
+  @Test
+  @WithMockUser(roles = {"ADMIN", "MISSION_MANAGER"})
+  void operationsList_rendersTheListPattern() throws Exception {
+    String html =
+        renderList(
+            new PageResponse<>(
+                List.of(listedOperation("PLANNED", "Erste Operation")),
+                0,
+                20,
+                1L,
+                1,
+                List.of("createdAt,desc")),
+            "");
+
+    assertTrue(html.contains("class=\"page-head\""), "page head");
+    assertTrue(
+        Pattern.compile("class=\"page-eyebrow\"[^>]*>Einsatzplanung<").matcher(html).find(),
+        "eyebrow names the navigation area");
+    assertTrue(
+        Pattern.compile("data-testid=\"page-head-count\"[^>]*>1<").matcher(html).find(),
+        "count chip");
+    assertTrue(html.contains("data-list-count-for=\"operations-results\""));
+    assertFalse(html.contains("class=\"greeting"), "no greeting banner");
+    assertFalse(html.contains("hud-box"), "no hud-box");
+    String head =
+        html.substring(html.indexOf("class=\"page-head\""), html.indexOf("operations-filter-form"));
+    assertEquals(2, head.split("btn--cta", -1).length, "exactly one primary action in the head");
+    assertTrue(head.contains("data-modal-id=\"create-operation-modal\""), "create opens the modal");
+    assertTrue(html.contains("data-testid=\"toolbar-search\""));
+    assertTrue(html.contains("id=\"operation-search\""));
+    assertTrue(html.contains("data-testid=\"segment-period-upcoming\""));
+    assertTrue(
+        Pattern.compile("name=\"period\" value=\"UPCOMING\" checked=\"checked\"")
+            .matcher(html)
+            .find(),
+        "upcoming is the default segment");
+    assertTrue(html.contains("data-testid=\"operations-filter-toggle\""));
+    assertTrue(html.contains("data-filter-chips"));
+    assertTrue(html.contains("class=\"data-table data-table--stack operations-table\""));
+    assertTrue(
+        Pattern.compile(
+                "class=\"row-link\"[^>]*href=\"/operations/00000000-0000-0000-0000-000000000077\"")
+            .matcher(html)
+            .find(),
+        "the first column links the row");
+    assertTrue(html.contains("Erste Operation"), "the description is the row's sub line");
+    assertTrue(
+        Pattern.compile("class=\"status-pill status-planned\">GEPLANT<").matcher(html).find(),
+        "translated status");
+    assertFalse(html.contains(">PLANNED<"), "no raw status");
+    assertTrue(html.contains("data-trigger=\"operations-open-delete\""), "admin row delete");
+    assertTrue(html.contains("id=\"delete-operation-form\""));
+    assertTrue(html.contains("data-list-total=\"1\""));
+  }
+
+  /** An empty result renders the empty state and no table. */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationsList_rendersTheEmptyState() throws Exception {
+    String html =
+        renderList(new PageResponse<>(List.<OperationDto>of(), 0, 20, 0L, 0, List.of()), "");
+
+    assertTrue(html.contains("data-testid=\"empty-state\""));
+    assertTrue(html.contains("Keine Operationen gefunden."));
+    assertFalse(html.contains("data-table--stack"));
+    assertFalse(html.contains("data-list-total"));
+    assertFalse(html.contains("data-trigger=\"operations-open-delete\""));
+  }
+
+  /** The past segment relays only finished statuses and is selected from the URL. */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationsList_pastPeriod_relaysOnlyFinishedStatusesAndSelectsTheSegment() throws Exception {
+    String html =
+        renderList(
+            new PageResponse<>(
+                List.of(listedOperation("COMPLETED", null)), 0, 20, 1L, 1, List.of()),
+            "period=PAST");
+
+    List<String> relayed = relayedSearchUris();
+    assertEquals(1, relayed.size(), relayed.toString());
+    assertTrue(relayed.get(0).endsWith("&status=COMPLETED&status=CANCELED&"), relayed.get(0));
+    assertTrue(
+        Pattern.compile("name=\"period\" value=\"PAST\" checked=\"checked\"").matcher(html).find());
+    assertTrue(
+        Pattern.compile("class=\"status-pill status-completed\">ABGESCHLOSSEN<")
+            .matcher(html)
+            .find());
+  }
+
+  /** {@code showPast=true} still means all statuses; an unknown period falls back to upcoming. */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationsList_legacyShowPast_meansAllAndUnknownPeriodFallsBack() throws Exception {
+    when(backendApiClient.get(
+            startsWith("/api/v1/operations/search?"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(new PageResponse<>(List.<OperationDto>of(), 0, 20, 0L, 0, List.of()));
+
+    mockMvc
+        .perform(get("/operations").param("showPast", "true").param("fragment", "results"))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(get("/operations").param("period", "SOMETIME").param("fragment", "results"))
+        .andExpect(status().isOk());
+
+    List<String> relayed = relayedSearchUris();
+    assertEquals(2, relayed.size(), relayed.toString());
+    assertTrue(
+        relayed.get(0).endsWith("&status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&"),
+        relayed.get(0));
+    assertTrue(relayed.get(1).endsWith("&status=PLANNED&status=ACTIVE&"), relayed.get(1));
+  }
+
+  /**
+   * The operation-search URIs relayed to the backend so far, in call order.
+   *
+   * @return the relayed {@code /api/v1/operations/search} URI templates
+   */
+  private List<String> relayedSearchUris() {
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient, atLeastOnce())
+        .get(uriCaptor.capture(), anyTypeRef(), any(Object[].class));
+    return uriCaptor.getAllValues().stream()
+        .filter(uri -> uri.startsWith("/api/v1/operations/search?"))
+        .toList();
+  }
+
   @Test
   @WithMockUser(roles = "OFFICER")
   void operationsList_passesMultiWordSearchAsUriVariable() throws Exception {
-    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef(), any()))
+    when(backendApiClient.get(
+            startsWith("/api/v1/operations/search?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.<OperationDto>of(), 0, 20, 0L, 0, List.of()));
 
     mockMvc
@@ -147,7 +325,8 @@ class OperationPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> termCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture());
+    verify(backendApiClient)
+        .get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture(), eq(0), eq(20));
     assertTrue(uriCaptor.getValue().contains("query={query}"), uriCaptor.getValue());
     assertEquals("Widget Alpha", termCaptor.getValue());
   }
@@ -155,7 +334,8 @@ class OperationPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void operationsList_passesUmlautSearchAsUriVariable_notFormEncoded() throws Exception {
-    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef(), any()))
+    when(backendApiClient.get(
+            startsWith("/api/v1/operations/search?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.<OperationDto>of(), 0, 20, 0L, 0, List.of()));
 
     String term = "Müller Größe";
@@ -165,14 +345,15 @@ class OperationPageControllerMvcTest {
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> termCaptor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture());
+    verify(backendApiClient)
+        .get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture(), eq(0), eq(20));
     assertTrue(uriCaptor.getValue().contains("query={query}"), uriCaptor.getValue());
     assertEquals(term, termCaptor.getValue());
   }
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
-  void operationDetail_readOnlyUser_seesDisabledFormAndNoSaveButton() throws Exception {
+  void operationDetail_readOnlyUser_seesNoEditDialogAndNoActions() throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
         opId, new OperationDto(opId, "Op Read", "ro", "PLANNED", null, 0L, null, null, null));
@@ -180,15 +361,16 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("id=\"operation-form\"")))
-        .andExpect(content().string(containsString("id=\"op-name\"")))
-        .andExpect(content().string(containsString("disabled")))
-        .andExpect(content().string(not(containsString("form=\"operation-form\""))));
+        .andExpect(content().string(containsString("id=\"operation-title\"")))
+        .andExpect(content().string(not(containsString("id=\"operation-form\""))))
+        .andExpect(content().string(not(containsString("data-testid=\"operation-edit\""))))
+        .andExpect(content().string(not(containsString("class=\"page-actions\""))))
+        .andExpect(content().string(not(containsString("data-trigger=\"operation-open-delete\""))));
   }
 
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
-  void operationDetail_missionManager_seesEnabledFormAndSaveButton() throws Exception {
+  void operationDetail_missionManager_seesEditDialogButNoDelete() throws Exception {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
         opId, new OperationDto(opId, "Op Edit", "rw", "PLANNED", null, 0L, null, null, null));
@@ -196,22 +378,162 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"operation-edit\"")))
+        .andExpect(content().string(containsString("id=\"edit-operation-modal\"")))
         .andExpect(content().string(containsString("id=\"operation-form\"")))
-        .andExpect(content().string(containsString("form=\"operation-form\"")));
+        .andExpect(content().string(containsString("form=\"operation-form\"")))
+        .andExpect(content().string(not(containsString("data-trigger=\"operation-open-delete\""))));
+  }
+
+  /**
+   * The detail renders the 2026-10 layout: back eyebrow, title with translated status badge, the
+   * edit action and the admin's overflow delete, the four KPIs, four tabs without the edit tab,
+   * result rows linking each mission and the payout card.
+   */
+  @Test
+  @WithMockUser(roles = {"ADMIN", "MISSION_MANAGER"})
+  void operationDetail_rendersTheDetailLayout() throws Exception {
+    UUID opId = UUID.randomUUID();
+    UUID missionId = UUID.fromString("00000000-0000-0000-0000-000000000042");
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Ironclad", "", "ACTIVE", null, 3L, null, null, null));
+    when(backendApiClient.get(
+            eq("/api/v1/operations/{id}/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
+            eq(opId)))
+        .thenReturn(
+            new OperationFinanceSummaryDto(
+                opId,
+                new BigDecimal("1284500"),
+                List.of(
+                    new OperationMissionFinanceDto(
+                        missionId, "Quantanium-Abbau", new BigDecimal("1284500"))),
+                false));
+    when(backendApiClient.get(
+            eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
+        .thenReturn(
+            new OperationPayoutSummaryDto(
+                new BigDecimal("128450"),
+                List.of(
+                    payoutRow("Pilot Paid", PayoutPreference.PAYOUT, "600000", true),
+                    payoutRow("Pilot Open", PayoutPreference.DONATE, "412880", false))));
+
+    String html =
+        mockMvc
+            .perform(get("/operations/" + opId).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertTrue(
+        Pattern.compile("class=\"page-eyebrow\" href=\"/operations\"").matcher(html).find(),
+        "the eyebrow links back to the list");
+    assertTrue(Pattern.compile("id=\"operation-title\">Ironclad<").matcher(html).find(), "title");
+    assertTrue(
+        Pattern.compile("class=\"status-badge status-active\"[^>]*>AKTIV<").matcher(html).find(),
+        "translated status badge");
+    assertFalse(html.contains(">ACTIVE<"), "no raw status");
+    assertFalse(html.contains("hud-box"), "no hud-box");
+    assertFalse(
+        Pattern.compile("class=\"[^\"]*krtm-").matcher(html).find(), "no migrated one-off classes");
+    String head =
+        html.substring(html.indexOf("data-testid=\"page-head\""), html.indexOf("op-kpis"));
+    assertFalse(head.contains("btn--cta"), "the head's edit action is a ghost button");
+    assertTrue(head.contains("data-modal-id=\"edit-operation-modal\""), "edit opens the dialog");
+    assertTrue(head.contains("data-trigger=\"operation-open-delete\""), "delete in the menu");
+    assertTrue(head.contains("overflow-menu__item--danger"));
+    assertEquals(5, html.split("class=\"kpi-total\"", -1).length, "four KPIs");
+    assertTrue(html.contains("id=\"op-kpi-total\">1.284.500<"), "thousands separators");
+    assertTrue(html.contains("id=\"op-kpi-donated\">128.450<"));
+    assertTrue(html.contains("id=\"op-kpi-participants\">2<"));
+    assertFalse(html.contains("optab-verw"), "the edit tab is gone");
+    assertTrue(html.contains("id=\"optab-missions-count\""));
+    assertTrue(
+        Pattern.compile(
+                "class=\"op-result-row\"[^>]*href=\"/missions/"
+                    + "00000000-0000-0000-0000-000000000042\"")
+            .matcher(html)
+            .find(),
+        "a result row links its mission");
+    assertTrue(html.contains("data-krtm-width=\"100.0\""), "the largest result fills its bar");
+    assertTrue(
+        Pattern.compile("data-testid=\"op-payout-ratio\">1 / 2<").matcher(html).find(),
+        "payout ratio");
+    assertTrue(html.contains("412.880 aUEC"), "the open amount");
+    assertTrue(html.contains("1 Person"), "the donation wish");
+    assertTrue(html.contains("data-op-goto-tab=\"payout\""), "the card jumps to the payout tab");
+    assertTrue(html.contains("data-testid=\"operation-payout-sum\""), "sum row");
+    assertTrue(html.contains("id=\"op-payout-paid-count\">1 / 2<"));
+    assertTrue(html.contains("class=\"chip chip--success\">Spenden<"), "preference as chip");
+  }
+
+  /**
+   * One payout row for a render test.
+   *
+   * @param name participant name
+   * @param preference payout preference
+   * @param amount payout amount
+   * @param paidOut whether the row is marked paid out
+   * @return the row
+   */
+  private static OperationPayoutDto payoutRow(
+      String name, PayoutPreference preference, String amount, boolean paidOut) {
+    return new OperationPayoutDto(
+        UUID.randomUUID().toString(),
+        name,
+        50.0,
+        preference,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        new BigDecimal(amount),
+        paidOut,
+        null,
+        null);
+  }
+
+  /** Without missions, results and participants every section shows its empty state. */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_rendersEmptyStates() throws Exception {
+    UUID opId = UUID.randomUUID();
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op Empty", "", "PLANNED", null, 0L, null, null, null));
+
+    String html =
+        mockMvc
+            .perform(get("/operations/" + opId).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertTrue(html.contains("Noch kein Ergebnis"), "results empty state");
+    assertTrue(html.contains("Keine Teilnehmenden"), "payout empty state");
+    assertTrue(html.contains("Keine Einsätze gefunden."), "missions empty state");
+    assertFalse(html.contains("data-table--stack"), "no empty tables");
+    assertFalse(html.contains("data-op-goto-tab"), "no payout jump without participants");
   }
 
   private void stubDetailEndpoints(UUID opId, OperationDto operation) {
-    when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/operations/{id}"), eq(OperationDto.class), eq(opId)))
         .thenReturn(operation);
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
+            contains("/api/v1/missions/search?operationId={id}"),
+            anyTypeRef(),
+            eq(opId),
+            any(),
+            any()))
         .thenReturn(new PageResponse<>(List.<MissionListDto>of(), 0, 10, 0L, 0, List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/finance-summary"),
-            eq(OperationFinanceSummaryDto.class)))
+            eq("/api/v1/operations/{id}/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
+            eq(opId)))
         .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
+            eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
   }
 
@@ -222,7 +544,7 @@ class OperationPageControllerMvcTest {
 
     OperationDto operation =
         new OperationDto(opId, "Completed Op", "", "COMPLETED", null, 0L, null, null, null);
-    when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/operations/{id}"), eq(OperationDto.class), eq(opId)))
         .thenReturn(operation);
 
     MissionListDto mission =
@@ -242,19 +564,25 @@ class OperationPageControllerMvcTest {
             null,
             null,
             0L,
+            false,
             0L);
     PageResponse<MissionListDto> missionsPage =
         new PageResponse<>(List.of(mission), 0, 10, 1L, 1, List.of("plannedStartTime,asc"));
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
+            contains("/api/v1/missions/search?operationId={id}"),
+            anyTypeRef(),
+            eq(opId),
+            any(),
+            any()))
         .thenReturn(missionsPage);
 
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/finance-summary"),
-            eq(OperationFinanceSummaryDto.class)))
+            eq("/api/v1/operations/{id}/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
+            eq(opId)))
         .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
+            eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
 
     mockMvc
@@ -273,7 +601,7 @@ class OperationPageControllerMvcTest {
     UUID opId = UUID.randomUUID();
     OperationDto operation =
         new OperationDto(opId, "Op", "", "PLANNED", null, 0L, null, null, null);
-    when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/operations/{id}"), eq(OperationDto.class), eq(opId)))
         .thenReturn(operation);
 
     MissionListDto mission =
@@ -293,9 +621,14 @@ class OperationPageControllerMvcTest {
             null,
             null,
             0L,
+            false,
             0L);
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
+            contains("/api/v1/missions/search?operationId={id}"),
+            anyTypeRef(),
+            eq(opId),
+            any(),
+            any()))
         .thenReturn(
             new PageResponse<>(List.of(mission), 0, 10, 15L, 2, List.of("plannedStartTime,asc")));
 
@@ -310,10 +643,11 @@ class OperationPageControllerMvcTest {
 
     verify(backendApiClient, never())
         .get(
-            eq("/api/v1/operations/" + opId + "/finance-summary"),
-            eq(OperationFinanceSummaryDto.class));
+            eq("/api/v1/operations/{id}/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
+            eq(opId));
     verify(backendApiClient, never())
-        .get(eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class));
+        .get(eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId));
   }
 
   @Test
@@ -328,7 +662,9 @@ class OperationPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("operation-detail :: overviewSection"))
         .andExpect(content().string(containsString("id=\"operation-head-meta\"")))
-        .andExpect(content().string(not(containsString("id=\"operation-head-sticky\""))));
+        .andExpect(content().string(containsString("data-kpi-participants=\"0\"")))
+        .andExpect(content().string(containsString("data-kpi-total-negative=\"false\"")))
+        .andExpect(content().string(not(containsString("data-testid=\"page-head\""))));
   }
 
   @Test
@@ -336,10 +672,10 @@ class OperationPageControllerMvcTest {
   void operationDetail_fragmentPayout_rendersPayoutSection_andSkipsFinanceAndMissions()
       throws Exception {
     UUID opId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/operations/{id}"), eq(OperationDto.class), eq(opId)))
         .thenReturn(new OperationDto(opId, "Op", "", "PLANNED", null, 0L, null, null, null));
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
+            eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
 
     mockMvc
@@ -350,10 +686,16 @@ class OperationPageControllerMvcTest {
 
     verify(backendApiClient, never())
         .get(
-            eq("/api/v1/operations/" + opId + "/finance-summary"),
-            eq(OperationFinanceSummaryDto.class));
+            eq("/api/v1/operations/{id}/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
+            eq(opId));
     verify(backendApiClient, never())
-        .get(contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef());
+        .get(
+            contains("/api/v1/missions/search?operationId={id}"),
+            anyTypeRef(),
+            eq(opId),
+            any(),
+            any());
   }
 
   @Test
@@ -362,14 +704,19 @@ class OperationPageControllerMvcTest {
       throws Exception {
     UUID opId = UUID.randomUUID();
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/finance-summary"),
-            eq(OperationFinanceSummaryDto.class)))
+            eq("/api/v1/operations/{id}/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
+            eq(opId)))
         .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
+            eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
+            contains("/api/v1/missions/search?operationId={id}"),
+            anyTypeRef(),
+            eq(opId),
+            any(),
+            any()))
         .thenReturn(new PageResponse<>(List.<MissionListDto>of(), 0, 10, 0L, 0, List.of()));
 
     mockMvc
@@ -378,7 +725,17 @@ class OperationPageControllerMvcTest {
         .andExpect(view().name("operation-detail :: financeSection"))
         .andExpect(content().string(not(containsString("id=\"pane-op-fin\""))));
 
-    verify(backendApiClient, never()).get(eq("/api/v1/operations/" + opId), eq(OperationDto.class));
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/operations/{id}"), eq(OperationDto.class), eq(opId));
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId));
+    verify(backendApiClient, never())
+        .get(
+            contains("/api/v1/missions/search?operationId={id}"),
+            anyTypeRef(),
+            eq(opId),
+            any(),
+            any());
   }
 
   @Test
@@ -396,7 +753,7 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void operationDetail_fragmentBackendFailure_rendersFragmentError() throws Exception {
     UUID opId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/operations/{id}"), eq(OperationDto.class), eq(opId)))
         .thenThrow(new RuntimeException("backend down"));
 
     mockMvc
@@ -462,8 +819,10 @@ class OperationPageControllerMvcTest {
             new BigDecimal("500"),
             0L);
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/finances/" + missionId),
-            eq(MissionFinanceSummaryDto.class)))
+            eq("/api/v1/operations/{id}/finances/{missionId}"),
+            eq(MissionFinanceSummaryDto.class),
+            eq(opId),
+            eq(missionId)))
         .thenReturn(
             new MissionFinanceSummaryDto(
                 missionId, "Mission A", new BigDecimal("500"), List.of(entry), List.of()));
@@ -481,8 +840,10 @@ class OperationPageControllerMvcTest {
     UUID opId = UUID.randomUUID();
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/finances/" + missionId),
-            eq(MissionFinanceSummaryDto.class)))
+            eq("/api/v1/operations/{id}/finances/{missionId}"),
+            eq(MissionFinanceSummaryDto.class),
+            eq(opId),
+            eq(missionId)))
         .thenThrow(new RuntimeException("backend down"));
 
     mockMvc
@@ -512,7 +873,7 @@ class OperationPageControllerMvcTest {
             null,
             null);
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
+            eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
         .thenReturn(new OperationPayoutSummaryDto(new BigDecimal("350.00"), List.of(donor)));
 
     mockMvc
@@ -536,7 +897,12 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("alert-warning")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "class=\"alert alert-info\" role=\"status\""
+                            + " data-testid=\"operation-payout-preliminary\"")))
         .andExpect(content().string(containsString("Vorläufige Werte")));
   }
 
@@ -552,7 +918,7 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("alert-warning"))));
+        .andExpect(content().string(not(containsString("operation-payout-preliminary"))));
   }
 
   @Test
@@ -565,7 +931,7 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("alert-warning"))));
+        .andExpect(content().string(not(containsString("operation-payout-preliminary"))));
   }
 
   @Test
@@ -590,9 +956,10 @@ class OperationPageControllerMvcTest {
     UUID participantId = UUID.randomUUID();
 
     when(backendApiClient.put(
-            eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
+            eq("/api/v1/operations/{id}/payouts/paid-out"),
             any(),
-            eq(OperationPayoutStatusDto.class)))
+            eq(OperationPayoutStatusDto.class),
+            eq(opId)))
         .thenReturn(new OperationPayoutStatusDto(participantId.toString(), false, null, null));
 
     mockMvc
@@ -611,9 +978,10 @@ class OperationPageControllerMvcTest {
     UUID participantId = UUID.randomUUID();
 
     when(backendApiClient.put(
-            eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
+            eq("/api/v1/operations/{id}/payouts/paid-out"),
             any(),
-            eq(OperationPayoutStatusDto.class)))
+            eq(OperationPayoutStatusDto.class),
+            eq(opId)))
         .thenReturn(new OperationPayoutStatusDto(participantId.toString(), true, null, null));
 
     mockMvc
@@ -632,9 +1000,10 @@ class OperationPageControllerMvcTest {
     UUID participantId = UUID.randomUUID();
 
     when(backendApiClient.put(
-            eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
+            eq("/api/v1/operations/{id}/payouts/paid-out"),
             any(),
-            eq(OperationPayoutStatusDto.class)))
+            eq(OperationPayoutStatusDto.class),
+            eq(opId)))
         .thenThrow(new BackendServiceException("payout toggle race", null, 409));
 
     mockMvc
@@ -650,7 +1019,7 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "MISSION_MANAGER")
   void updateOperation_classicForm_maps409ToOptimisticLockingFlash() throws Exception {
     UUID opId = UUID.randomUUID();
-    when(backendApiClient.put(eq("/api/v1/operations/" + opId), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/operations/{id}"), any(), eq(Void.class), eq(opId)))
         .thenThrow(new BackendServiceException("stale operation version", null, 409));
 
     mockMvc
@@ -669,7 +1038,7 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "MISSION_MANAGER")
   void updateOperation_classicForm_mapsOtherErrorsToGenericFlash() throws Exception {
     UUID opId = UUID.randomUUID();
-    when(backendApiClient.put(eq("/api/v1/operations/" + opId), any(), eq(Void.class)))
+    when(backendApiClient.put(eq("/api/v1/operations/{id}"), any(), eq(Void.class), eq(opId)))
         .thenThrow(new BackendServiceException("backend down", null, 500));
 
     mockMvc

@@ -28,8 +28,10 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -44,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +56,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Audit tests (REQ-AUDIT-001) for the delivered-flag toggle ({@link
@@ -72,9 +74,10 @@ class InventoryCheckoutServiceAuditTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private OwnerScopeService ownerScopeService;
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
 
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService service;
 
   @Test
@@ -145,7 +148,9 @@ class InventoryCheckoutServiceAuditTest {
 
     assertEquals(42, removed);
     InOrder order = inOrder(offerRatchet, inventoryItemRepository);
-    order.verify(offerRatchet).beforeWipe(scope);
+    order
+        .verify(offerRatchet)
+        .beforeWipe(scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     order.verify(inventoryItemRepository).deleteAllNonPersonal(true, null, Set.of());
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)

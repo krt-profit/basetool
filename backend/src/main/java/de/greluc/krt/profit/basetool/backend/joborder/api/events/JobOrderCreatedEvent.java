@@ -1,0 +1,107 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.joborder.api.events;
+
+import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * Domain event published right after a new job order is persisted. Carries the scalars the
+ * notification pipeline needs (the responsible / requesting org units, the display id and handle
+ * for rendering, the order type, and the creating actor to exclude) so the after-commit listener
+ * never touches the managed {@link de.greluc.krt.profit.basetool.backend.model.JobOrder}.
+ *
+ * @param jobOrderId the created job order's id (also the notification's loose entity id)
+ * @param displayId the human-facing sequential display id
+ * @param handle the order handle/title, or {@code null}
+ * @param responsibleOrgUnit the processing org unit (id + kind)
+ * @param responsibleOrgUnitShorthand the processing org unit's shorthand, for rendering
+ * @param requestingOrgUnit the requesting/customer org unit (id + kind)
+ * @param jobOrderType the order type name ({@code MATERIAL} / {@code ITEM})
+ * @param actorSub the creating user's sub, or {@code null} when anonymous/guest
+ */
+public record JobOrderCreatedEvent(
+    UUID jobOrderId,
+    Integer displayId,
+    String handle,
+    OrgUnitRef responsibleOrgUnit,
+    String responsibleOrgUnitShorthand,
+    @Nullable OrgUnitRef requestingOrgUnit,
+    @Nullable String jobOrderType,
+    @Nullable UUID actorSub)
+    implements NotificationEvent {
+
+  /** Loose entity-type tag stored on the produced notifications. */
+  public static final String ENTITY_TYPE = "JOB_ORDER";
+
+  @NotNull
+  @Override
+  public NotificationEventType eventType() {
+    return NotificationEventType.JOB_ORDER_CREATED;
+  }
+
+  @NotNull
+  @Override
+  public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
+    Map<NotificationContextRole, OrgUnitRef> map =
+        new LinkedHashMap<>(Map.of(NotificationContextRole.RESPONSIBLE, responsibleOrgUnit));
+    if (requestingOrgUnit != null) {
+      map.put(NotificationContextRole.REQUESTING, requestingOrgUnit);
+    }
+    return map;
+  }
+
+  @NotNull
+  @Override
+  public String entityType() {
+    return ENTITY_TYPE;
+  }
+
+  @Override
+  public UUID entityId() {
+    return jobOrderId;
+  }
+
+  @NotNull
+  @Override
+  public Map<String, String> renderParams() {
+    Map<String, String> params = new LinkedHashMap<>();
+    if (displayId != null) {
+      params.put("displayId", String.valueOf(displayId));
+    }
+    if (handle != null && !handle.isBlank()) {
+      params.put("handle", handle);
+    }
+    if (responsibleOrgUnitShorthand != null && !responsibleOrgUnitShorthand.isBlank()) {
+      params.put("orgUnit", responsibleOrgUnitShorthand);
+    }
+    if (jobOrderType != null) {
+      params.put("jobOrderType", jobOrderType);
+    }
+    return params;
+  }
+}

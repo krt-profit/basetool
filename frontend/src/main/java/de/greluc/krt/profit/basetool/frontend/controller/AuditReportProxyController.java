@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.withBackendStatus;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.AuditDomains;
 import java.time.Instant;
 import java.util.List;
@@ -31,7 +31,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -44,7 +43,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Frontend proxy for the unified audit-log exports and purges (REQ-AUDIT-001): {@code BANK} routes
@@ -64,7 +62,8 @@ public class AuditReportProxyController {
    */
   private static final List<String> ALLOWED_DOMAINS = AuditDomains.ALL;
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the exports and sends the purges. */
+  private final AuditBackendClient auditClient;
 
   /**
    * Rejects any {@code domain} path segment that is not a known audit tab, so a crafted or unknown
@@ -96,17 +95,11 @@ public class AuditReportProxyController {
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
     requireKnownDomain(domain);
-    String backendBase =
-        "BANK".equals(domain)
-            ? "/api/v1/bank/admin/audit/export"
-            : "/api/v1/audit/" + domain + "/export";
-    String uri =
-        UriComponentsBuilder.fromPath(backendBase)
-            .queryParam("from", from)
-            .queryParam("to", to)
-            .toUriString();
     String filename = "audit-" + domain.toLowerCase(Locale.ROOT) + ".pdf";
-    return fetchAttachment(uri, userTimeZone, filename, MediaType.APPLICATION_PDF);
+    return attachment(
+        withBackendStatus(() -> auditClient.exportPdf(domain, from, to, userTimeZone)),
+        filename,
+        MediaType.APPLICATION_PDF);
   }
 
   /**
@@ -125,17 +118,11 @@ public class AuditReportProxyController {
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
     requireKnownDomain(domain);
-    String backendBase =
-        "BANK".equals(domain)
-            ? "/api/v1/bank/admin/audit/export.json"
-            : "/api/v1/audit/" + domain + "/export.json";
-    String uri =
-        UriComponentsBuilder.fromPath(backendBase)
-            .queryParam("from", from)
-            .queryParam("to", to)
-            .toUriString();
     String filename = "audit-" + domain.toLowerCase(Locale.ROOT) + ".json";
-    return fetchAttachment(uri, null, filename, MediaType.APPLICATION_JSON);
+    return attachment(
+        withBackendStatus(() -> auditClient.exportJson(domain, from, to)),
+        filename,
+        MediaType.APPLICATION_JSON);
   }
 
   /**
@@ -152,56 +139,23 @@ public class AuditReportProxyController {
       @PathVariable @NotNull String domain,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before) {
     requireKnownDomain(domain);
-    String backendBase =
-        "BANK".equals(domain) ? "/api/v1/bank/admin/audit" : "/api/v1/audit/" + domain;
-    String uri =
-        UriComponentsBuilder.fromPath(backendBase).queryParam("before", before).toUriString();
-    byte[] body =
-        withBackendStatus(
-            () ->
-                backendApiClient.execute(
-                    HttpMethod.DELETE,
-                    uri,
-                    webClient -> webClient.delete().uri(uri),
-                    spec -> spec.bodyToMono(byte[].class)));
+    byte[] body = withBackendStatus(() -> auditClient.purge(domain, before));
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     return ResponseEntity.ok().headers(headers).body(body);
   }
 
   /**
-   * Fetches one backend export document and re-wraps it with attachment headers; backend errors
-   * propagate with their original status so the page can surface 400/403 distinctly.
+   * Re-wraps one backend export document with attachment headers; backend errors have already
+   * propagated with their original status so the page can surface 400/403 distinctly.
    *
-   * @param uri the backend URI incl. query
-   * @param userTimeZone the zone header to forward; may be {@code null}
+   * @param pdf the exported document
    * @param filename the download filename
    * @param mediaType the response content type (PDF or JSON)
    * @return the proxied attachment response
    */
-  private ResponseEntity<byte[]> fetchAttachment(
-      @NotNull String uri,
-      String userTimeZone,
-      @NotNull String filename,
-      @NotNull MediaType mediaType) {
-    byte[] pdf =
-        withBackendStatus(
-            () ->
-                backendApiClient.execute(
-                    HttpMethod.GET,
-                    uri,
-                    webClient ->
-                        webClient
-                            .get()
-                            .uri(uri)
-                            .headers(
-                                h -> {
-                                  if (userTimeZone != null && !userTimeZone.isBlank()) {
-                                    h.set("X-User-Time-Zone", userTimeZone);
-                                  }
-                                }),
-                    spec -> spec.bodyToMono(byte[].class)));
-
+  private static ResponseEntity<byte[]> attachment(
+      byte[] pdf, @NotNull String filename, @NotNull MediaType mediaType) {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(mediaType);
     headers.setContentDispositionFormData("attachment", filename);

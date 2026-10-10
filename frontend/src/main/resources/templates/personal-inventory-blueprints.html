@@ -12,93 +12,85 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box krt-personal-inventory-header krt-bp-head"
-         th:with="noteCount=${blueprints.?[note != null and !note.isBlank()].size()}">
-        <div>
-            <h1 th:text="#{personalInventory.blueprints.title}">Meine Blueprints</h1>
-            <p class="krt-subtitle" th:text="|${blueprints.size()} ${#messages.msg('personalInventory.blueprints.facts.count')} &middot; ${noteCount} ${#messages.msg('personalInventory.blueprints.facts.withNote')}|">42 Blueprints &middot; 6 mit Notiz</p>
-        </div>
-        <div class="krt-bp-addbar-wrap">
-            <div class="krt-bp-addbar">
-                <div class="krt-pi-typeahead krt-bp-search">
-                    <label for="krt-bp-search-input" class="visually-hidden" th:text="#{personalInventory.blueprints.add.search}">Blueprints suchen</label>
-                    <span class="krt-bp-search-icon" aria-hidden="true"><svg class="krt-icon"><use href="#krt-icon-search"/></svg></span>
-                    <input id="krt-bp-search-input" type="text" autocomplete="off"
-                           th:placeholder="#{personalInventory.blueprints.add.searchPlaceholder}">
-                    <div id="krt-bp-search-results" class="krt-pi-typeahead-results" hidden></div>
-                </div>
-                <button type="button" id="krt-bp-add-selected" class="btn btn--cta" disabled>
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                    <span th:text="#{general.add}">Hinzuf&uuml;gen</span>
-                </button>
-                <input type="file" id="krt-bp-import-file" accept=".json,application/json" hidden>
-                <button type="button" id="krt-bp-import-open" class="btn btn-ghost"
-                        data-trigger="bp-import-pick">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg>
-                    <span th:text="#{personalInventory.blueprints.import.button}">JSON importieren</span>
-                </button>
-                <a id="krt-bp-extractor-link" class="btn btn-ghost"
-                   href="https://github.com/krt-profit/basetool-sc-extractor/releases/latest"
-                   target="_blank" rel="noopener noreferrer"
-                   th:title="#{scExtractor.download.title}">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
-                    <span th:text="#{scExtractor.download.button}">SC Extractor laden</span>
-                </a>
-                <button type="button" id="krt-bp-delete-all-open" class="btn btn-quiet-danger"
-                        data-trigger="bp-open-delete-all"
-                        th:hidden="${blueprints.?[removable].size() == 0}"
-                        th:title="#{personalInventory.blueprints.action.removeAll}">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
-                    <span th:text="#{personalInventory.blueprints.action.removeAll}">Alle l&ouml;schen</span>
-                </button>
-            </div>
-            <div class="krt-bp-staging-bar">
-                <span class="krt-bp-staging-label" th:text="#{personalInventory.blueprints.add.selectedHeading}">Auswahl</span>
-                <div id="krt-bp-staging-list" class="krt-bp-chip-list"
-                     th:attr="data-empty-text=#{personalInventory.blueprints.add.empty}">
-                    <span class="krt-bp-staging-empty" th:text="#{personalInventory.blueprints.add.empty}">Noch keine Blueprints ausgew&auml;hlt.</span>
-                </div>
-            </div>
-        </div>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.personal', titleText=#{nav.personal.items}, actions=~{::bp-actions})}">
+        <th:block th:ref="bp-actions">
+            <input type="file" id="krt-bp-import-file" accept=".json,application/json" hidden>
+            <button type="button" id="krt-bp-import-open" class="btn btn-ghost"
+                    data-trigger="bp-import-pick"
+                    th:title="#{personalInventory.blueprints.import.button}">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg>
+                <span th:text="#{personalInventory.blueprints.import.short}">Importieren</span>
+            </button>
+            <button type="button" id="krt-bp-add-open" class="btn btn--cta" data-testid="page-head-primary"
+                    data-trigger="open-modal-display" data-modal-id="krt-bp-add-modal">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{personalInventory.blueprints.add.heading}">Blueprints hinzuf&uuml;gen</span>
+            </button>
+            <th:block th:replace="~{fragments/components :: overflowMenu(id='krt-bp-menu', items=~{::bp-menu-items})}">
+                <th:block th:ref="bp-menu-items">
+                    <a id="krt-bp-extractor-link" class="overflow-menu__item" role="menuitem"
+                       href="https://github.com/krt-profit/basetool-sc-extractor/releases/latest"
+                       target="_blank" rel="noopener noreferrer"
+                       th:title="#{scExtractor.download.title}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
+                        <span th:text="#{scExtractor.download.button}">SC Extractor laden</span>
+                        <svg class="krt-icon krt-bp-menu-external" aria-hidden="true"><use href="#krt-icon-external-link"/></svg>
+                    </a>
+                    <button type="button" id="krt-bp-delete-all-open" role="menuitem"
+                            class="overflow-menu__item overflow-menu__item--danger"
+                            data-trigger="bp-open-delete-all"
+                            th:hidden="${blueprints.?[removable].size() == 0}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+                        <span th:text="#{personalInventory.blueprints.action.removeAllMenu}">Alle l&ouml;schen &hellip;</span>
+                    </button>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
 
-    <nav class="tab-nav" th:aria-label="#{personalInventory.blueprints.title}">
-        <a th:href="@{/personal-inventory}" class="tab" th:text="#{personalInventory.tab.items}">Items</a>
+    <nav class="tab-nav krt-pi-tabs-nav" th:aria-label="#{nav.personal.items}">
+        <a th:href="@{/personal-inventory}" class="tab">
+            <span th:text="#{personalInventory.tab.items}">Items</span>
+            <span class="tab-count" th:if="${itemCount != null}" th:text="${itemCount}">118</span>
+        </a>
         <a th:href="@{/personal-inventory/blueprints}" class="tab active" aria-current="page">
             <span th:text="#{personalInventory.tab.blueprints}">Blueprints</span>
             <span class="tab-count" th:text="${blueprints.size()}">42</span>
         </a>
     </nav>
 
-    <div class="hud-box krt-personal-inventory mt-2">
-    <div class="krt-bp-craft-toolbar" id="krt-bp-craft-toolbar"
-         th:classappend="${#lists.isEmpty(blueprints)} ? ' is-empty' : ''">
-        <label class="krt-bp-refinery-toggle" for="krt-bp-refinery-toggle">
-            <input type="checkbox" id="krt-bp-refinery-toggle">
-            <span th:text="#{personalInventory.blueprints.craft.refineryToggle}">Raffinerie-Ertrag einrechnen</span>
-        </label>
-        <span class="krt-bp-craft-toolbar-hint" th:text="#{personalInventory.blueprints.craft.refineryHint}">Offene &amp; laufende Raffinerie-Auftr&auml;ge einrechnen</span>
-        <label class="krt-bp-refinery-toggle krt-bp-craftable-toggle" for="krt-bp-craftable-toggle">
-            <input type="checkbox" id="krt-bp-craftable-toggle">
-            <span th:text="#{personalInventory.blueprints.craft.craftableFilter}">Nur craftbare anzeigen</span>
-        </label>
-    </div>
+    <form id="krt-bp-filter-form" class="krt-bp-toolbar-form no-track" th:action="@{/personal-inventory/blueprints}" method="get">
+        <div class="toolbar krt-bp-toolbar" id="krt-bp-craft-toolbar"
+             th:classappend="${#lists.isEmpty(blueprints) and #strings.isEmpty(filterQuery)} ? ' is-empty' : ''">
+            <th:block th:replace="~{fragments/components :: toolbarSearch('krt-bp-q', 'q', ${filterQuery}, 'personalInventory.blueprints.filter.searchPlaceholder')}"></th:block>
+            <th:block th:replace="~{fragments/components :: segmented(name='bpScope', labelKey='personalInventory.blueprints.filter.scope', selected='',
+                options=${ {{value: '', labelKey: 'filter.all', count: blueprints.size()},
+                            {value: 'craftable', labelKey: 'personalInventory.blueprints.craft.craftableLabel', count: '–'}} })}"></th:block>
+            <span class="toolbar__spacer"></span>
+            <span class="krt-bp-refinery">
+                <label class="switch" for="krt-bp-refinery-toggle" th:title="#{personalInventory.blueprints.craft.refineryHint}">
+                    <input type="checkbox" id="krt-bp-refinery-toggle">
+                    <span class="switch__track" aria-hidden="true"></span>
+                    <span th:text="#{personalInventory.blueprints.craft.refinerySwitch}">Raffinerie einrechnen</span>
+                </label>
+                <th:block th:replace="~{fragments/scu-hint :: fieldHint('personalInventory.blueprints.craft.refineryHint')}"></th:block>
+            </span>
+        </div>
+    </form>
 
     <div id="krt-bp-list" th:data-live-sync-topic="${blueprintsLiveSyncTopic}">
     <th:block th:fragment="blueprintList">
         <span id="krt-bp-total-meta" hidden
               th:attr="data-total=${blueprints.size()},
                        data-notecount=${blueprints.?[note != null and !note.isBlank()].size()}"></span>
-        <div th:if="${#lists.isEmpty(blueprints)}" class="empty-state"
-             th:insert="~{fragments/components :: emptyStateBody('personalInventory.blueprints.collection.emptyTitle', 'personalInventory.blueprints.empty', 'personalInventory.blueprints.collection.emptyFilterHint')}"></div>
+        <th:block th:if="${#lists.isEmpty(blueprints)}">
+            <div class="card card--flush">
+                <th:block th:replace="~{fragments/components :: emptyState(titleKey='personalInventory.blueprints.collection.emptyTitle', textKey='personalInventory.blueprints.empty', filterHintKey='personalInventory.blueprints.collection.emptyFilterHint')}"></th:block>
+            </div>
+        </th:block>
 
-        <div th:unless="${#lists.isEmpty(blueprints)}" class="master-detail krt-bp-md" id="krt-bp-md">
+        <div th:unless="${#lists.isEmpty(blueprints)}" class="master-detail card card--flush krt-bp-md" id="krt-bp-md">
             <div class="master-list">
-                <form class="krt-bp-master-filter no-track" th:action="@{/personal-inventory/blueprints}" method="get">
-                    <label for="krt-bp-q" class="visually-hidden" th:text="#{personalInventory.filter.search}">Suche</label>
-                    <input id="krt-bp-q" type="search" name="q" th:value="${filterQuery}"
-                           th:placeholder="#{personalInventory.filter.search}">
-                </form>
                 <div class="krt-bp-master-rows" id="krt-bp-master-rows" role="listbox"
                      th:aria-label="#{personalInventory.blueprints.list.aria}">
                     <button type="button" class="master-row" role="option" aria-selected="false"
@@ -112,12 +104,16 @@
                                      data-source=${bp.source},
                                      data-source-client=${bp.sourceClientId},
                                      data-source-client-name=${bp.sourceClientName}">
-                        <span th:text="${bp.productName}">Produkt</span>
+                        <span class="krt-bp-dot" aria-hidden="true"></span>
+                        <span class="krt-bp-row-name" th:text="${bp.productName}">Produkt</span>
                         <span class="krt-bp-row-aside">
                             <span class="master-row-note" th:if="${bp.note != null and !bp.note.isBlank()}"
                                   th:title="#{personalInventory.blueprints.field.note}" aria-hidden="true"><svg class="krt-icon"><use href="#krt-icon-edit"/></svg></span>
                         </span>
                     </button>
+                </div>
+                <div class="krt-bp-filter-empty" id="krt-bp-filter-empty" hidden>
+                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='personalInventory.blueprints.filter.noMatchTitle', textKey='personalInventory.blueprints.filter.noMatchText')}"></th:block>
                 </div>
             </div>
 
@@ -132,12 +128,14 @@
                     <span class="empty-text" th:text="#{personalInventory.blueprints.detail.emptyText}">W&auml;hle links einen Blueprint, um Zutaten und Stats zu sehen.</span>
                 </div>
 
-                <div id="krt-bp-detail-content" hidden>
+                <div id="krt-bp-detail-content" class="stack gap-4" hidden>
                     <div class="krt-bp-detail-head">
-                        <div>
-                            <span class="krt-bp-detail-name" id="krt-bp-detail-name">Produkt</span>
-                            <div class="krt-bp-detail-acquired" id="krt-bp-detail-acquired"></div>
-                            <div class="krt-bp-detail-acquired" id="krt-bp-detail-source" hidden></div>
+                        <div class="stack gap-2">
+                            <h2 class="krt-bp-detail-name" id="krt-bp-detail-name">Produkt</h2>
+                            <div class="cluster gap-2 krt-bp-detail-chips">
+                                <span class="chip" id="krt-bp-detail-acquired" hidden></span>
+                                <span class="chip" id="krt-bp-detail-source" hidden></span>
+                            </div>
                         </div>
                         <div class="krt-bp-detail-actions">
                             <button type="button" class="btn btn-ghost btn-icon" id="krt-bp-detail-edit"
@@ -151,22 +149,51 @@
                         </div>
                     </div>
 
-                    <div class="krt-bp-craft" id="krt-bp-detail-craft" hidden></div>
+                    <div class="krt-bp-craft stack gap-4" id="krt-bp-detail-craft" hidden></div>
 
-                    <h2 class="section-title" th:text="#{personalInventory.blueprints.detail.heading}">Zutaten &amp; Stat-Beitrag nach Zutat-Qualit&auml;t</h2>
-                    <div class="krt-bp-detail-recipe" id="krt-bp-detail-recipe"></div>
+                    <section class="krt-bp-detail-section">
+                        <h3 class="krt-bp-section-head" th:text="#{personalInventory.blueprints.recipe.statContribution}">Stat-Beitrag nach Zutat-Qualit&auml;t</h3>
+                        <div class="krt-bp-detail-recipe" id="krt-bp-detail-recipe"></div>
+                    </section>
 
-                    <div id="krt-bp-detail-note-section" class="mt-2" hidden>
-                        <h2 class="section-title" th:text="#{personalInventory.blueprints.field.note}">Notiz</h2>
+                    <section id="krt-bp-detail-note-section" class="krt-bp-detail-section" hidden>
+                        <h3 class="krt-bp-section-head" th:text="#{personalInventory.blueprints.field.note}">Notiz</h3>
                         <p class="krt-bp-detail-note" id="krt-bp-detail-note"></p>
-                    </div>
+                    </section>
                 </div>
             </div>
         </div>
     </th:block>
     </div>
-    </div>
 </main>
+
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-add-modal', titleKey='personalInventory.blueprints.add.heading', variant='krt-modal--wide', body=~{::krt-bp-add-modal-body})}">
+    <th:block th:ref="krt-bp-add-modal-body">
+        <div class="krt-modal-body stack gap-4">
+            <div class="form-group krt-pi-typeahead krt-bp-search">
+                <label for="krt-bp-search-input" th:text="#{personalInventory.blueprints.add.catalogSearch}">Im Katalog suchen</label>
+                <input id="krt-bp-search-input" type="search" autocomplete="off"
+                       th:placeholder="#{personalInventory.blueprints.add.searchPlaceholder}">
+                <div id="krt-bp-search-results" class="krt-pi-typeahead-results" hidden></div>
+            </div>
+            <div class="krt-bp-staging">
+                <span class="krt-bp-staging-label" th:text="#{personalInventory.blueprints.add.selectedHeading}">Auswahl</span>
+                <div id="krt-bp-staging-list" class="krt-bp-chip-list"
+                     th:attr="data-empty-text=#{personalInventory.blueprints.add.empty}">
+                    <span class="krt-bp-staging-empty" th:text="#{personalInventory.blueprints.add.empty}">Noch keine Blueprints ausgew&auml;hlt.</span>
+                </div>
+            </div>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="krt-bp-add-modal"
+                    th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+            <button type="button" id="krt-bp-add-selected" class="btn btn--cta" disabled>
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{general.add}">Hinzuf&uuml;gen</span>
+            </button>
+        </div>
+    </th:block>
+</th:block>
 
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-edit-modal', titleKey='personalInventory.blueprints.modal.editNote.title', variant='krt-modal--wide', titleId='krt-bp-edit-title', closeTrigger='bp-close-edit', body=~{::krt-bp-edit-modal-body})}">
     <th:block th:ref="krt-bp-edit-modal-body">
@@ -176,7 +203,7 @@
                 <input type="hidden" name="version" id="krt-bp-edit-version">
                 <input type="hidden" name="acquiredAt" id="krt-bp-edit-acquired">
                 <p class="krt-bp-edit-product" id="krt-bp-edit-product"></p>
-                <div class="form-group krtm-margin-bottom-0-5043">
+                <div class="form-group krt-bp-note-group">
                     <label for="krt-bp-edit-note" th:text="#{personalInventory.blueprints.field.note}">Notiz</label>
                     <textarea id="krt-bp-edit-note" name="note" maxlength="2000" rows="4"></textarea>
                 </div>
@@ -192,7 +219,7 @@
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-delete-modal', titleKey='personalInventory.blueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='bp-close-delete', body=~{::krt-bp-delete-modal-body})}">
     <th:block th:ref="krt-bp-delete-modal-body">
         <div class="krt-modal-body">
-            <p id="krt-bp-delete-message" class="krtm-margin-0-2a0c" th:text="#{personalInventory.blueprints.modal.remove.body}">Wirklich entfernen?</p>
+            <p id="krt-bp-delete-message" class="m-0" th:text="#{personalInventory.blueprints.modal.remove.body}">Wirklich entfernen?</p>
         </div>
         <form id="krt-bp-delete-form" method="post">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
@@ -207,7 +234,7 @@
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-delete-all-modal', titleKey='personalInventory.blueprints.modal.removeAll.title', variant='krt-modal--danger', closeTrigger='bp-close-delete-all', body=~{::krt-bp-delete-all-modal-body})}">
     <th:block th:ref="krt-bp-delete-all-modal-body">
         <div class="krt-modal-body">
-            <p class="krtm-margin-0-2a0c" th:text="#{personalInventory.blueprints.modal.removeAll.body}">Wirklich ALLE deine Blueprints entfernen? Standard-Blueprints bleiben erhalten. Dies kann nicht r&uuml;ckg&auml;ngig gemacht werden.</p>
+            <p class="m-0" th:text="#{personalInventory.blueprints.modal.removeAll.body}">Wirklich ALLE deine Blueprints entfernen? Standard-Blueprints bleiben erhalten. Dies kann nicht r&uuml;ckg&auml;ngig gemacht werden.</p>
         </div>
         <form id="krt-bp-delete-all-form" method="post" th:action="@{/personal-inventory/blueprints/delete-all}">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
@@ -265,8 +292,6 @@
         conflictReload:   /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
         conflictDismiss:  /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
         conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?',
-        factsCount:    /*[[#{personalInventory.blueprints.facts.count}]]*/    'Blueprints',
-        factsWithNote: /*[[#{personalInventory.blueprints.facts.withNote}]]*/ 'mit Notiz',
         noteTitle:     /*[[#{personalInventory.blueprints.field.note}]]*/     'Notiz',
         chipRemove:    /*[[#{personalInventory.blueprints.action.remove}]]*/  'Entfernen'
     };
@@ -304,7 +329,7 @@
         error:            /*[[#{personalInventory.blueprints.recipe.error}]]*/    'Rezept konnte nicht geladen werden.',
         exampleRecipe:    /*[[#{personalInventory.blueprints.recipe.exampleRecipe}]]*/ 'Beispielrezept',
         variants:         /*[[#{personalInventory.blueprints.add.variants}]]*/    'Varianten',
-        acquiredLabel:    /*[[#{personalInventory.blueprints.field.acquired}]]*/  'Erhalten am',
+        acquiredLabel:    /*[[#{personalInventory.blueprints.field.acquiredShort}]]*/  'Erhalten',
         sourceLabel:      /*[[#{personalInventory.blueprints.source.label}]]*/    'Herkunft',
         sourceVia:        /*[[#{personalInventory.blueprints.source.via}]]*/      'ueber',
         sourceLOG:        /*[[#{personalInventory.blueprints.source.LOG}]]*/      'Spiel-Log',
@@ -313,16 +338,23 @@
         sourceDEFAULT:    /*[[#{personalInventory.blueprints.source.DEFAULT}]]*/  'Standard-Blueprint',
         sourceOTHER:      /*[[#{personalInventory.blueprints.source.OTHER}]]*/    'Andere Quelle',
         qualityAria:      /*[[#{personalInventory.blueprints.detail.qualityAria}]]*/ 'Qualitaet',
-        craftTitle:       /*[[#{personalInventory.blueprints.craft.title}]]*/         'Craftbarkeit',
         craftableLabel:   /*[[#{personalInventory.blueprints.craft.craftableLabel}]]*/ 'Craftbar',
         notCraftable:     /*[[#{personalInventory.blueprints.craft.notCraftable}]]*/  'Nicht craftbar',
-        badgeMissing:     /*[[#{personalInventory.blueprints.craft.badgeMissing}]]*/  'fehlt',
+        notEvaluated:     /*[[#{personalInventory.blueprints.craft.notEvaluated}]]*/  'Nicht bewertbar',
+        limitedState:     /*[[#{personalInventory.blueprints.craft.limitedState}]]*/  'Craftbar mit Einschraenkung',
+        countTemplate:    /*[[#{blueprints.craftable.count}]]*/                       '{0}x',
         viaRefinery:      /*[[#{personalInventory.blueprints.craft.viaRefinery}]]*/   'nur dank Raffinerie',
+        refineryIncluded: /*[[#{personalInventory.blueprints.craft.refineryIncluded}]]*/ 'Raffinerie eingerechnet',
         limitedBy:        /*[[#{personalInventory.blueprints.craft.limitedBy}]]*/     'limitiert durch',
-        qualityShort:     /*[[#{personalInventory.blueprints.craft.qualityShort}]]*/  'Q',
         itemNotEvaluated: /*[[#{personalInventory.blueprints.craft.itemNotEvaluated}]]*/ 'Nur ITEM-Zutaten - nicht bewertet.',
         itemHint:         /*[[#{personalInventory.blueprints.craft.itemHint}]]*/      'Enthaelt ITEM-Zutaten (nicht bewertet).',
         noRecipe:         /*[[#{personalInventory.blueprints.craft.noRecipe}]]*/      'Kein Rezept verfuegbar - nicht bewertbar.',
+        colMaterial:      /*[[#{personalInventory.blueprints.craft.col.material}]]*/  'Material',
+        colNeed:          /*[[#{personalInventory.blueprints.craft.col.need}]]*/      'Bedarf',
+        colStock:         /*[[#{personalInventory.blueprints.craft.col.stock}]]*/     'Vorrat',
+        missing:          /*[[#{personalInventory.blueprints.craft.missing}]]*/       'fehlt {0}',
+        colQuality:       /*[[#{personalInventory.blueprints.craft.col.quality}]]*/   'Qualitaet',
+        qualityHint:      /*[[#{personalInventory.blueprints.craft.col.qualityHint}]]*/ 'SCU-gewichtete Qualitaet',
         unitScu:          /*[[#{material.quantity.scu}]]*/                            'SCU',
         unitPiece:        /*[[#{material.quantity.piece}]]*/                          'Stueck'
     };

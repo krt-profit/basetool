@@ -275,8 +275,15 @@ stale document instead of rewriting it. An API change must commit its
 regenerated documents. **CI must be green before a PR merges** —
 there is no "rerun until it passes" allowance.
 
-**The build scripts must stay configuration-cache compatible**, because CI
-runs with the cache switched on and strict. The usual mistakes are a task
+**The build scripts must stay configuration-cache compatible**, because every
+build runs with the cache switched on and strict: `gradle.properties` sets
+`org.gradle.configuration-cache=true` for local builds too, and CI passes
+`--configuration-cache` as well. `--no-configuration-cache` turns it off for one
+run; a task a plugin marks incompatible (the OWASP `dependencyCheckAggregate`)
+makes Gradle skip the cache for that run on its own. The image builds in
+`docker/app/Dockerfile` and `docker/sandbox/keycloak/Dockerfile` pass
+`--no-configuration-cache`: their context has no git checkout, and the
+frontend's `git describe` version probe is a cache problem there. The usual mistakes are a task
 action (`doLast`, a `CommandLineArgumentProvider`, a `rename {}`) that reads a
 script-level `val` or `project` at execution time — copy the value into a
 local inside the task's configuration block first — and a process started at
@@ -385,12 +392,28 @@ change takes effect from the next PR on),
 [`cache-janitor.yml`](.github/workflows/cache-janitor.yml) is housekeeping,
 not a check: after each CodeQL run, daily and when a PR closes it deletes
 Actions caches nothing will read again — superseded CodeQL dependency caches,
-Gradle dependency caches on `main` unused for a day (the newest always stays)
-and a closed PR's caches — so the repository stays under GitHub's 10 GB cache
-cap and the NVD dataset the dependency scan needs is not evicted. [`dependency-submission.yml`](.github/workflows/dependency-submission.yml)
+every Gradle cache on `main` but the newest `gradle-home-` entry per job family
+and the extracted bundles it was saved or restored with
+([`prune_gradle_caches.py`](.github/scripts/prune_gradle_caches.py); anything
+touched in the last two hours stays, for runs in flight) and a closed PR's caches —
+so the repository stays under GitHub's 10 GB cache cap and the NVD dataset the
+dependency scan needs is not evicted. It warns in the run when the total is
+still above 8 GiB afterwards. [`dependency-submission.yml`](.github/workflows/dependency-submission.yml)
 is housekeeping too: on every push to `main` it submits the resolved Gradle
 dependency graph, so GitHub's dependency graph and Dependabot alerts see the
 Java dependencies at all.
+
+Tools a workflow installs outside Gradle are pinned by hash too: Python
+packages come from `--require-hashes` requirement files in
+[`.github/requirements/`](.github/requirements/) (zizmor, PyYAML,
+ansible-core with ansible-lint), regenerated with
+`uv pip compile <in> --universal --generate-hashes --python-version 3.12 --no-header --no-annotate -o .github/requirements/<name>.txt`
+from a one-line input such as `ansible-core==2.21.4` plus `ansible-lint==26.9.0`;
+markdownlint-cli2 comes from the lockfile in
+[`.github/tools/markdownlint/`](.github/tools/markdownlint/) through `npm ci`
+(bump with `npm install --package-lock-only` there); the Ansible collections in
+`ansible/requirements.yml` are exact versions. No workflow runs `npx --yes`
+or an unpinned `pip install`.
 
 Workflow changes follow the same bar as code: every `uses:` pinned to a full
 commit SHA (the repository's Actions policy refuses anything else), every
@@ -441,6 +464,26 @@ and re-uses it for a week (`nvd.validForHours = 168`). Setting
 `dependencyCheck { data { directory = … } }` has no effect in plugin 13.0.0 —
 the task pins its own default — so point a scratch run elsewhere on the
 task itself (`tasks.dependencyCheckAggregate { data.directory = … }`).
+
+<a id="owasp-suppressions"></a>**OWASP suppressions expire, and renewing one is a review.** Every
+entry in [`config/owasp/dependency-check-suppressions.xml`](config/owasp/dependency-check-suppressions.xml)
+carries `until="YYYY-MM-DDZ"`; from that day on it stops applying and the weekly scan turns red on
+the finding again, by design — and most entries share one date, so they come due together. Do not
+move the dates blindly. Per entry:
+
+1. Read the finding the entry covered — from the red weekly run, or locally with
+   `./gradlew dependencyCheckAggregate --no-parallel` after moving that entry's `until` into the past.
+2. Re-check its `notes` against today's facts: the CVE record and its CPE, and the version the
+   build resolves now (`./gradlew :<module>:dependencyInsight --dependency <artifact>
+   --configuration runtimeClasspath`). A CPE confusion must still be one; a "fixed in" version must
+   still be on every classpath.
+3. Still a false positive: move `until` about three months ahead (never more than six) and bring
+   the `notes` up to date. No longer one: delete the entry and fix the dependency instead.
+4. Renew in one PR (`chore(security): renew OWASP suppressions`) that names each CVE and why it
+   still does not apply; the dependency-check workflow runs on it because it touches the file.
+
+A new suppression has the same shape: a `packageUrl` regex narrowed to the artifact, the CVE (or
+CPE), `notes` saying why it is a false positive, and an `until` no more than six months out.
 
 ### Review and merge
 
@@ -850,11 +893,14 @@ you touch these areas.
   module does not depend on Spring Data JPA.
 - In the frontend every handler carries a gate of its own or its class's,
   and the route table with its gates is a committed snapshot
-  (`frontend/src/test/resources/security/route-gate-snapshot.txt`), as is
-  the list of session-bound types (`session/session-bound-types.txt`).
-  An intended change rewrites both with
+  (`frontend/src/test/resources/security/route-gate-snapshot.txt`). An
+  intended change rewrites it with
   `./gradlew :frontend:test -PupdateSnapshots`; commit the diff with the
-  change so the reviewer sees it (REQ-FE-025, REQ-FE-027).
+  change so the reviewer sees it (REQ-FE-025).
+- A type the frontend newly flashes or stores in the session gets an
+  exact entry in `SessionTypeAllowList.SESSION_BOUND_TYPES` in the same
+  change; `SessionBoundTypeClosureTest` fails the build until it has
+  one, and on an entry nothing stores any more (REQ-FE-027).
 - Full role / permission matrix:
   [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md).
 
@@ -915,7 +961,7 @@ because of real bugs that shipped. The short version:
   `@Transactional(propagation = MANDATORY)` that operates on the
   already-managed entity and relies on dirty-checking. Canonical
   example:
-  [`JobOrderService.completeJobOrderWithinTransaction`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/JobOrderService.java).
+  [`JobOrderService.completeJobOrderWithinTransaction`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/joborder/internal/JobOrderService.java).
 - **Pessimistic locking** for bulk reorders / priority shifts:
   `@Lock(LockModeType.PESSIMISTIC_WRITE)` (or atomic SQL).
 
@@ -988,8 +1034,12 @@ because of real bugs that shipped. The short version:
   included — lives in `src/test/resources`, never in `src/main/resources`;
   the `jar` / `bootJar` tasks fail when a shipped jar contains one.
 - A Testcontainers image a test starts must be the one production runs:
-  Redis comes from `TestImages.REDIS` in `test-support`, which a guard test
-  keeps equal to the compose file and the Quadlet unit.
+  Redis comes from `TestImages.REDIS` and PostgreSQL from `TestImages.POSTGRES`
+  in `test-support`, which a guard test keeps equal to the compose file and the
+  Quadlet units. The backend's `jdbc:tc:postgresql:18-alpine` URL cannot carry
+  a digest, so the backend's test `PinnedPostgresImageSubstitutor` (activated
+  in its test `testcontainers.properties`) swaps in the pinned reference. A Dependabot
+  digest bump of either image updates the constant in the same PR.
 - **Every new feature ships with tests.** No exceptions.
 - **Never use production / real credentials in tests or local test
   stacks.** This is a hard rule covering Mockito unit tests, MockMvc,

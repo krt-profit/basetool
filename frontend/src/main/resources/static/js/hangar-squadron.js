@@ -18,86 +18,103 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-function bindSquadronDetailsToggles(root) {
-    (root || document).querySelectorAll('tr.sq-row details').forEach(function (details) {
-        if (details._sqBound) {
-            return;
-        }
-        details._sqBound = true;
-        details.addEventListener('toggle', function () {
-            const row = details.closest('tr');
-            const detailsRow = row ? row.nextElementSibling : null;
-            if (detailsRow && detailsRow.classList.contains('details-row')) {
-                detailsRow.classList.toggle('sq-expanded', details.open);
-            }
-        });
-    });
+/**
+ * Opens or closes the owner rows of one ship type in the org-unit overview.
+ *
+ * @param {HTMLElement} toggle the type row's chevron button
+ */
+function toggleSquadronOwners(toggle) {
+    const groupId = toggle.getAttribute('aria-controls');
+    const group = groupId ? document.getElementById(groupId) : null;
+    if (!group) {
+        return;
+    }
+    const open = toggle.getAttribute('aria-expanded') !== 'true';
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    group.hidden = !open;
+    const row = toggle.closest('tr');
+    if (row) {
+        row.classList.toggle('is-open', open);
+    }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    bindSquadronDetailsToggles(document);
+document.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const toggle = target ? target.closest('.hangar-tree__toggle') : null;
+    if (toggle instanceof HTMLElement) {
+        toggleSquadronOwners(toggle);
+    }
+});
 
+document.addEventListener('DOMContentLoaded', () => {
     const filterForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('squadron-filter-form')
     );
     const resultsContainer = document.getElementById('squadron-results');
-    const clearLink = document.getElementById('squadron-filter-clear');
     const searchInput = /** @type {HTMLInputElement | null} */ (
         document.getElementById('squadron-ship-filter')
     );
     /** @type {number | null} */
     let squadronFilterTimer = null;
 
+    /**
+     * Swaps the overview for the given URL, or for the filter form's current state.
+     *
+     * @param {string | null} url the target URL, or null to build it from the filter form
+     */
     function applySquadronFilter(url) {
-        if (!resultsContainer || !window.krtFetch) {
-            if (url) {
-                window.location.assign(url);
-            } else if (filterForm) {
-                filterForm.submit();
-            }
-            return;
-        }
         let target = url;
-        if (!target && filterForm) {
-            const data = new FormData(filterForm);
+        if (!target) {
             const params = new URLSearchParams();
-            for (const [key, value] of data.entries()) {
-                if (value !== '') {
-                    params.append(key, String(value));
+            if (filterForm) {
+                const data = new FormData(filterForm);
+                for (const [key, value] of data.entries()) {
+                    if (value !== '') {
+                        params.append(key, String(value));
+                    }
                 }
             }
             const query = params.toString();
-            target = '/hangar/squadron' + (query ? '?' + query : '');
+            target = `/hangar/squadron${query ? `?${query}` : ''}`;
+        }
+        if (!resultsContainer || !window.krtFetch) {
+            window.location.assign(target);
+            return;
         }
         window.krtFetch.swap({ url: target, container: resultsContainer, history: true });
     }
 
     if (filterForm) {
-        filterForm.addEventListener('submit', function (event) {
+        filterForm.addEventListener('submit', (event) => {
             event.preventDefault();
             clearTimeout(squadronFilterTimer ?? undefined);
-            applySquadronFilter();
+            applySquadronFilter(null);
         });
     }
     if (searchInput) {
-        searchInput.addEventListener('input', function () {
+        searchInput.addEventListener('input', () => {
             clearTimeout(squadronFilterTimer ?? undefined);
-            squadronFilterTimer = setTimeout(function () {
-                applySquadronFilter();
+            squadronFilterTimer = window.setTimeout(() => {
+                applySquadronFilter(null);
             }, 300);
         });
     }
-    if (clearLink) {
-        clearLink.addEventListener('click', function (event) {
+    if (resultsContainer) {
+        resultsContainer.addEventListener('click', (event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const clear = target ? target.closest('[data-testid="empty-state-action"]') : null;
+            if (!clear || !resultsContainer.contains(clear)) {
+                return;
+            }
             event.preventDefault();
             if (searchInput) {
                 searchInput.value = '';
             }
-            applySquadronFilter(clearLink.getAttribute('href'));
+            clearTimeout(squadronFilterTimer ?? undefined);
+            applySquadronFilter(clear.getAttribute('href'));
         });
     }
-});
-
-document.addEventListener('krt:swapped', function (e) {
-    bindSquadronDetailsToggles(e && e.detail ? e.detail.container : document);
+    if (window.krtFetch && typeof window.krtFetch.bindSwap === 'function') {
+        window.krtFetch.bindSwap({ container: '#squadron-results', history: true });
+    }
 });

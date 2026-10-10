@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0099](../adr/0099-job-order-item-production-booking.md),
 > [ADR-0101](../adr/0101-inventory-game-item-rows.md) (production book-in)
 
@@ -58,17 +58,17 @@ also **consumes the order's earmarked item stock** for the delivered game items,
 `REQ-ORDERS-030` — so the phantom stock a delivery would otherwise leave behind disappears, while a
 legacy line manufactured before item stock existed still delivers unblocked.
 
-The *Item-Übergaben* tab surfaces this to the operator. While the order is not yet fully delivered
+The item order's *Übergaben* tab surfaces this to the operator. While the order is not yet fully delivered
 (`isFullyDelivered` false) but nothing is manufactured-but-undelivered to hand over, it shows a hint
 that no manufactured items are available for handover and points the operator at the Herstellung step
-(now on the *Bestellte Items* tab). The "all items delivered" note shows only once every ordered unit
+(now on the *Items* tab). The "all items delivered" note shows only once every ordered unit
 is delivered (`isFullyDelivered` — every line's `deliveredAmount ≥ amount`). Both empty states leave
 `hasOutstandingItemLines` false, so that flag plus `isFullyDelivered` disambiguate them.
 
 **Booking.** A production run is booked through
 `POST /api/v1/orders/{id}/items/{itemId}/production`
 (`JobOrderItemProductionService.bookProduction`), gated `(hasRole('LOGISTICIAN') or
-hasRole('OFFICER') or hasRole('ADMIN')) and @ownerScopeService.canEditJobOrder(#id)` — the same
+hasRole('OFFICER') or hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id)` — the same
 authorisation as the item handovers. The payload is `JobOrderItemProductionCreateDto` (`amount` ≥ 1,
 the line `version`, a `consumption` list of `JobOrderItemProductionConsumptionDto`, each naming an
 `inventoryItemId`, the `materialId` it holds, a positive `amount`, and the entry `version`, and an
@@ -115,7 +115,7 @@ Because the manufactured counter advances on **every** booking — whether the m
 of stock or marked skipped — the **aggregated-materials demand shrinks with production**:
 `JobOrderItemService.aggregateMaterials` sums only the material for the units **not yet
 manufactured** per line (`requiredQuantity × (amount − manufacturedAmount) / amount` per material,
-rounded per bucket), so the *Aggregierte Materialien* view and the item-order *Offene Menge* KPI
+rounded per bucket), so the aggregated *Materialien* tab and the item-order *Offene Menge* KPI
 (derived from `totalQuantity`) drop by the manufactured portion and reach 0 once a bucket is fully
 manufactured (the row is kept so its quality bucket and claims stay visible). This is what makes a
 skipped material's demand actually disappear even though its stock was never drawn down. The
@@ -148,7 +148,11 @@ section shipped. The full contract lives in REQ-INV-032.
 carries a **"Nicht ausbuchen" checkbox** (`data-prod-skip`). Ticking it flags the card, disables that
 material's stock inputs, drops the material from the "buchen" coverage gate, and adds its id to the
 posted `skippedMaterialIds` (no `consumption` is sent for it) — so the operator can record production
-while leaving a material's linked stock untouched. Below the cards the modal carries the book-in
+while leaving a material's linked stock untouched. Each typed amount is rounded to the material's
+precision (three decimals for SCU, a whole number for `PIECE`) **before** the card's coverage gate
+adds it and before it is posted, so the gate checks exactly the figures the backend receives: a gate
+that rounded only the sum let a figure with a fourth decimal pass in the dialog and come back
+`422` from the backend's unrounded comparison. Below the cards the modal carries the book-in
 section (location — required, the booking button stays disabled without it —, owner defaulting to
 the acting user, owning org unit, personal flag, "allocate to order") that fills the `bookIn` block.
 The relay `JobOrderWriteController.bookProductionAjax`
@@ -214,16 +218,31 @@ ADR-0099
 
 ### REQ-ORDERS-026 — Order-detail tab layout and KPI band
 
-The order-detail page (`/orders/{id}`) MUST render, below the read-only **overview** header (kept
-unchanged), a high-signal **KPI band** followed by a `.tab-nav` with **one `.tab-pane` per section**,
-adopting the mission-detail tab pattern (`REQ-MISSION-004`).
+The order-detail page (`/orders/{id}`) MUST render a page head, a summary card, a **KPI grid** and a
+`.tab-nav` with **one `.tab-pane` per section**, adopting the mission-detail tab pattern
+(`REQ-MISSION-004`) and the page head of `REQ-UI-027`.
 
-**KPI band.** A `.kpi-band` of KPI tiles whose set depends on the order type:
+**Page head and summary.** The eyebrow is the back link „← Aufträge"; the title „Auftrag #<n>"
+carries the kind badge (Material / Item) and the translated status badge. Actions: „Bearbeiten"
+(ghost, a `MATERIAL` order, logistician or requester — opens the edit dialog), „Items bearbeiten"
+(ghost, an `ITEM` order without item handovers, logistician) and, for an admin, the overflow menu
+„⋯" with „Auftrag löschen". Below it a summary card holds the facts (Erstellt am, Vergangene Tage,
+Priorität, Auftraggeber, Bearbeitende Einheit, Handle), the comment and — for a logistician — the
+status select.
 
-- **`MATERIAL`** — *Materialien erfüllt* (`fulfilled / total` with a mini progress bar), *Offene
-  Menge*, the claims tile (see below), and *Übergaben* (handover count).
-- **`ITEM`** — *Items geliefert* (`delivered / amount` with a mini progress bar), *Offene Menge*
-  (material), the claims tile, and *Übergaben*.
+**KPI grid.** A `.kpi-grid` of `.kpi-total` tiles:
+
+- **„Geliefert / benötigt"** — the progress head, with a meter and „n % geliefert". An `ITEM` order
+  shows delivered against ordered pieces. A `MATERIAL` order shows what its handovers delivered
+  against what was required, per unit — one SCU line and one Stück line, each only when the order
+  holds that unit; the requirement is the still-open line amount plus the delivered amount, because a
+  handover lowers its line. With both units the percentage is the mean of the two per-unit shares;
+  SCU and pieces are never summed. The tile is omitted while nothing is required, and on the
+  requester-redacted view of a `MATERIAL` order, which carries no handovers.
+- **`MATERIAL`** — *Materialien erfüllt* (`fulfilled / total`; not on the requester view) and *Offene
+  Menge*. **`ITEM`** — *Offene Materialmenge*.
+- The claims tile *Eingetragen (Claims)* (see below) and *Übergaben* (handover count; not on the
+  requester view).
 
 The **_Offene Menge_ tile splits the still-open quantity by unit type**: SCU-measured and
 whole-unit (PIECE) materials are incommensurable, so the tile reports up to two separate numbers
@@ -236,21 +255,31 @@ figure.
 The **claims KPI tile is shown only for SK-public orders** — the tile renders only when the order
 supports material claims (`kpi.supportsClaims`), i.e. a public Spezialkommando order that can carry
 Eintragungen ([`orders-material-claims.md`](orders-material-claims.md)); a strict-staffel order that
-cannot be claimed omits the tile entirely. The KPI band is its own AJAX-swappable fragment
+cannot be claimed omits the tile entirely. The KPI grid is its own AJAX-swappable fragment
 (`kpiSection`, container `#order-kpi-results`, live-sync key `kpi`) so a production booking, a claim,
 a delivery or an assignee change refreshes the KPIs in place.
 
-**Tabs.** A tab appears only when its pane is rendered. Tab and pane carry the same condition, except
-that the two handover tabs additionally drop out of the requester view — their panes still render
-there but, having no tab, can never be selected. The tab sets:
+**Tabs.** The tabs are filtered by order kind, in this order:
 
-- **`MATERIAL`** — *Materialien*, *Bearbeiter* (unless requester-redacted view), *Übergaben* (unless
-  requester view), and *Verknüpft* (only when orphaned linked inventory is present).
-- **`ITEM`** — *Bestellte Items* (which, for a LOGISTICIAN+ editor, also carries the production
-  booking surface of `REQ-ORDERS-025` — see below; there is no separate *Herstellung* tab),
-  *Aggregierte Materialien* (unless requester view), *Blaupausen* (only when the caller may see the
-  blueprint-coverage view, `REQ-ORDERS-016`), *Bearbeiter* (unless requester view), *Item-Übergaben*
-  (unless requester view), and *Verknüpft* (as above).
+- **`MATERIAL`** — *Bedarf* · *Übergaben* · *Bearbeiter* · *Verknüpft*.
+- **`ITEM`** — *Items* · *Materialien* (the aggregated material demand) · *Hersteller* (the
+  blueprint coverage of `REQ-ORDERS-016` — who can craft the items) · *Übergaben* · *Bearbeiter* ·
+  *Verknüpft*.
+
+A tab appears only when its pane applies, and an empty tab is not shown: *Materialien* is hidden
+while the aggregate is empty; *Übergaben* is hidden while the order has none and the caller may not
+record one (Logistician, Officer, Admin); *Hersteller* needs the caller to see the blueprint
+coverage; *Verknüpft* needs orphaned linked inventory. The requester-redacted view (`REQ-ORDERS-023`)
+drops *Materialien*, *Übergaben* and *Bearbeiter* as before. A hidden tab reappears when a live swap
+brings its count above zero. Each tab holds at most one primary action: *Übergaben* „Übergabe
+erfassen", which opens the dialog of the same name for a material or an item handover (submit
+„Übergabe speichern"), and *Bearbeiter* „Mich eintragen". Empty sections render an `.empty-state`
+(„Keine Materialien", „Keine Items", „Noch keine Übergaben", „Noch keine Bearbeiter", „Keine
+Blaupausen").
+
+The tab keys are unchanged — `materials` (*Bedarf*), `items`, `aggregated` (*Materialien*),
+`blueprints` (*Hersteller*), `handovers` and `item-handovers` (*Übergaben*), `assignees`, `verkn` —
+so stored and linked tabs keep resolving.
 
 **Tab behaviour.** Tabs use the WAI-ARIA tabs pattern (`role="tablist"/"tab"/"tabpanel"`,
 `aria-selected`, `aria-controls`, roving `tabindex`). The active tab resolves from a **`?tab=`** URL
@@ -264,18 +293,18 @@ This is a **presentation restructure**: every backend contract, DTO, optimistic-
 permission gate of the previous panel layout is preserved; the redacted requester view
 (`REQ-ORDERS-023`) keeps hiding the same sections.
 
-The **production booking surface folds into the *Bestellte Items* tab** for LOGISTICIAN+ editors —
-there is no separate *Herstellung* tab. Each item line carries a leading chevron that reveals the
-per-unit material demand (*Bedarf je Stück*) in a collapsible sub-row (hidden by default, mirroring
-the bank request table's Notiz/Begründung detail row, so a multi-material recipe no longer widens the
-row) and, as the last column, a *Herstellung erfassen* button that opens the booking modal.
-Manufactured and delivered each render a progress bar. The machine-readable per-material demand the
-modal consumes stays on the main row, so booking is unaffected; a booking re-renders the *Bestellte
-Items* section rather than a separate production section. Requesters/read-only viewers see the plain
-status columns without the chevron, demand sub-row or button.
+The **production booking surface stays on the *Items* tab** for LOGISTICIAN+ editors — the
+*Hersteller* tab shows who can craft, it books nothing. Each item line carries a leading chevron
+that reveals the per-unit material demand (*Bedarf je Stück*) in a collapsible sub-row (hidden by
+default, mirroring the bank request table's Notiz/Begründung detail row, so a multi-material recipe
+no longer widens the row) and, as the last column, a *Herstellung erfassen* button that opens the
+booking modal. Manufactured and delivered each render a progress bar. The machine-readable
+per-material demand the modal consumes stays on the main row, so booking is unaffected; a booking
+re-renders the *Items* section rather than a separate production section. Requesters/read-only
+viewers see the plain status columns without the chevron, demand sub-row or button.
 
-**Aggregierte-Materialien-Spalten.** The *Aggregierte Materialien* pane lists, per material+quality
-bucket, *Material*, *Qualität*, *Gesamtmenge* (the outstanding requirement), **_Vorhanden_**, and —
+**Columns of the aggregated *Materialien* pane.** The pane lists, per material+quality bucket,
+*Material*, *Qualität*, *Gesamtmenge* (the outstanding requirement), **_Vorhanden_**, and —
 for SK-public orders only — the single claim column *Eingetragen* (Σ claims), which also hosts the
 *Eintragen* action. *Vorhanden* sits **between *Gesamtmenge* and *Eingetragen*** and shows the
 linked-inventory stock earmarked to the order for that material at or above the bucket's quality
@@ -296,49 +325,70 @@ remainder is **not** dropped from the contract: `openAmount` still travels in th
 the write server-side (no overclaim), and is still surfaced to the user as the claim modal's
 `Maximal verfügbar:` hint, fed by the `data-open` attribute on the *Eintragen* / edit controls.
 
+*Amended 2026-10-03 (website overhaul phase 3): page head with kind and status badges and the
+overflow menu; the KPI band became a `.kpi-grid` led by the „Geliefert / benötigt" progress tile (the
+„Items geliefert" tile folded into it), requester-redacted views drop the fulfilment and handover
+tiles; tabs renamed and reordered per kind (*Bestellte Items* → *Items*, *Aggregierte Materialien* →
+*Materialien*, *Blaupausen* → *Herstellung*, *Item-Übergaben* → *Übergaben*, *Materialien* of a
+material order → *Bedarf*), empty tabs hidden, the handover dialog titled „Übergabe erfassen".*
+
+*Amended 2026-10-04 (owner decision): the blueprint-coverage tab is called *Hersteller* instead of
+*Herstellung*, so it no longer shares its name with the production booking (*Herstellung erfassen*)
+on the *Items* tab.*
+
 **Acceptance**
 
-- [ ] A `MATERIAL` order shows the material KPI tiles and the material tab set; an `ITEM` order shows
-  the item KPI tiles and the item tab set.
+- [ ] A `MATERIAL` order shows the tabs *Bedarf* · *Übergaben* · *Bearbeiter* · *Verknüpft*; an
+  `ITEM` order shows *Items* · *Materialien* · *Hersteller* · *Übergaben* · *Bearbeiter* ·
+  *Verknüpft* — each only when it applies, in that order.
+- [ ] The „Geliefert / benötigt" tile shows delivered against required per unit for a material order
+  (requirement = open amount + delivered) and delivered against ordered pieces for an item order,
+  with a meter; it is absent while nothing is required and on a redacted material order.
 - [ ] The *Offene Menge* tile shows the open SCU sum and the open whole-unit (*Stück*) sum as two
   separate numbers when the order mixes unit types, a single number when only one type is present,
   and never sums SCU and pieces together.
 - [ ] The claims KPI tile renders only for an SK-public order (claims supported); a strict-staffel
-  order omits it.
-- [ ] The *Aggregierte Materialien* pane of an SK-public order renders *Eingetragen* but **no**
+  order omits it. The requester view omits *Materialien erfüllt* and *Übergaben*.
+- [ ] *Materialien* is hidden while the aggregate is empty, and *Übergaben* while there are none
+  and the caller may not record one; a live swap that brings a count above zero shows the tab again.
+- [ ] The aggregated *Materialien* pane of an SK-public order renders *Eingetragen* but **no**
   *Offen* column, and the *Eintragen* action sits inside *Eingetragen*; the claim modal still offers
-  the full-requirement remainder as its maximum. The MATERIAL requirement table keeps its *Offen*.
-- [ ] The *Bestellte Items* tab shows the chevron/demand sub-row and the *Herstellung erfassen*
-  button only for a LOGISTICIAN+ editor of an `ITEM` order; a read-only or requester viewer sees only
-  the plain status columns (no separate *Herstellung* tab exists).
+  the full-requirement remainder as its maximum. The *Bedarf* table of a material order keeps its
+  *Offen*.
+- [ ] The *Items* tab shows the chevron/demand sub-row and the *Herstellung erfassen* button only
+  for a LOGISTICIAN+ editor of an `ITEM` order; a read-only or requester viewer sees only the plain
+  status columns. The *Hersteller* tab books nothing.
 - [ ] `?tab=<key>` selects that tab on load and is honoured over `#tab=`, `localStorage`, and the
   default; back/forward re-applies the tab.
 - [ ] Arrow-key navigation moves selection along the tablist; `aria-selected` tracks the active tab.
-- [ ] Requester-redacted views omit the same tabs (Bearbeiter, Aggregierte Materialien, Übergaben /
-  Item-Übergaben) they omitted before.
-- [ ] On the *Bestellte Items* tab a line's per-unit demand is hidden behind a chevron and revealed
-  in a sub-row on click; both Hergestellt and Geliefert render a progress bar; booking a production
-  run from that tab still works (its machine-readable demand stays on the main row).
-- [ ] The *Aggregierte Materialien* pane shows a *Vorhanden* column (linked stock,
+- [ ] Requester-redacted views omit the same tabs (*Bearbeiter*, *Materialien*, *Übergaben*) they
+  omitted before.
+- [ ] On the *Items* tab a line's per-unit demand is hidden behind a chevron and revealed in a
+  sub-row on click; both Hergestellt and Geliefert render a progress bar; booking a production run
+  from that tab still works (its machine-readable demand stays on the main row).
+- [ ] The aggregated *Materialien* pane shows a *Vorhanden* column (linked stock,
   `AggregatedMaterialDto.currentStock`) between *Gesamtmenge* and the claim columns, for both
   strict-staffel and SK-public item orders.
-- [ ] The Item-Übergaben tab shows the "record production first" hint while the order is not fully
-  delivered and nothing is manufactured-but-undelivered, and the "all delivered" note only once every
-  ordered unit is delivered (`isFullyDelivered`).
+- [ ] The item order's *Übergaben* tab shows the "record production first" hint while the order is
+  not fully delivered and nothing is manufactured-but-undelivered, and the "all delivered" note only
+  once every ordered unit is delivered (`isFullyDelivered`).
 
 **Enforced by:** `JobOrderItemDetailRenderTest` (item tab set + KPI tiles; the folded-in Herstellung
 button and per-unit-demand chevron in the items table; the `isFullyDelivered` item-handover message
-split; no separate production tab), `JobOrderListRenderTest`, `JobOrderPageControllerNoReloadMvcTest`
-(no-reload section swaps, the production-booking relay) and `JobOrderProductionE2eTest` (the full UI
-booking flow + the produce-first hint) ·
+split), `OrdersDetailPatternRenderTest` (page head, KPI grid and progress tile, tab names and order
+per kind, hidden empty tabs, requester tiles), `JobOrderHandoverButtonLayoutTest`,
+`JobOrderListRenderTest`, `JobOrderPageControllerNoReloadMvcTest` (no-reload section swaps, the
+production-booking relay) and `JobOrderProductionE2eTest` (the full UI booking flow + the
+produce-first hint) ·
 **Code:** `orders-detail.html` (`kpiSection` fragment, `.tab-nav` + `.tab-panes`), `orders-detail.js`
-(tab controller, `ORDER_SECTIONS` seam map), `JobOrderPageController` · **Issues:** #1182
+(tab controller, `ORDER_SECTIONS` seam map), `pages/orders-detail.css`,
+`JobOrderPageController#computeKpi` · **Issues:** #1182
 
 ### REQ-ORDERS-028 — Order detail surfaces the earmarked item stock (inline in the item expand row)
 
 An `ITEM` order's detail page MUST surface the **game-item stock earmarked to the order**
 ([`inventory-items.md`](inventory-items.md) REQ-INV-029/031) — the item sibling of the material
-drill-down — **inline in each ordered item's expand row** on the *Bestellte Items* tab. The leading
+drill-down — **inline in each ordered item's expand row** on the *Items* tab. The leading
 expand chevron is available to every non-requester viewer; expanding a line reveals, beneath the
 per-unit material demand (logisticians only), a read-only **earmarked-stock** block listing the game
 item's linked rows: each row shows owner, location and the **THIS-order earmark slice** in whole
@@ -350,7 +400,7 @@ page (REQ-ORDERS-031), the item sibling of the Materialsammlung.
 
 **Backend.** `GET /api/v1/orders/{id}/item-stock` (`JobOrderItemStockController`) returns the
 grouped shape (`JobOrderItemStockGroupDto` → `JobOrderItemStockEntryDto`), gated exactly like the
-sibling per-order stock reads: `isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)`; an
+sibling per-order stock reads: `isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)`; an
 unknown order is 404. The projection reuses the entity-graphed
 `InventoryItemRepository.findGameItemRowsByJobOrderIdOrdered` (owner/location display order kept
 inside each group) and reads each entry's this-order slice off the `@BatchSize`-batched allocation
@@ -373,7 +423,7 @@ units), an item handover that consumes the earmark (`REQ-ORDERS-030` — re-rend
 silently skipped.
 
 **Redaction.** The inline stock renders only for an `ITEM` order and is omitted from the
-requester-redacted view (REQ-ORDERS-023), mirroring the *Aggregierte Materialien* pane — a
+requester-redacted view (REQ-ORDERS-023), mirroring the aggregated *Materialien* pane — a
 requester-only viewer (`redacted == true`) additionally cannot reach the endpoint at all
 (`canSeeJobOrder` → 403). For a caller who *can* see the order but is on the **requesting** side of
 an **SK-public** order, the per-entry owner and location are blanked by the backend (REQ-ORDERS-029,
@@ -419,7 +469,7 @@ responsible (processing) side**. Concretely: on a Spezialkommando-responsible (S
 squadron — but the fulfilling side's owner/Standort must not leak to the requesting side (owner
 decision 2026-07-17, ADR-0107).
 
-**Gate.** `OwnerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)` — identical to
+**Gate.** `JobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)` — identical to
 `canSeeJobOrderBlueprintOwners`: membership of the order's responsible org unit (or an admin with
 matching scope), **no SK-public escape**. For a squadron-responsible order it coincides with
 `canSeeJobOrder`, so the redaction only ever engages on the SK-public path; a `null` responsible unit
@@ -458,7 +508,7 @@ SK-member / requesting-side / admin / unknown), `JobOrderInventoryOwnerRedactorT
 redaction passes blank owner/location, keep the rest, null-safe), `JobOrderItemStockControllerTest`
 + `MaterialCollectionControllerTest` + `JobOrderControllerTest` (redaction wiring: unredacted when
 entitled, redactor output otherwise) · **Code:**
-`AccessGateService.canSeeJobOrderInventoryOwners` + `OwnerScopeService` facade,
+`JobOrderAccessPolicy.canSeeJobOrderInventoryOwners`,
 `JobOrderInventoryOwnerRedactor`, `JobOrderItemStockController` / `MaterialCollectionController` /
 `JobOrderController` (the two pickers), `orders-detail.html` + `material-collection.html` (`—`
 fallbacks) · **Issues:** — · **ADR:** [ADR-0107](../adr/0107-job-order-inventory-owner-redaction.md)
@@ -563,7 +613,7 @@ after a UI handover) · **Code:** `JobOrderItemHandoverService.createItemHandove
 An `ITEM` order MUST offer an **Itemsammelübersicht** page (`/orders/{id}/item-collection`) — the
 item sibling of the Materialsammlung (`material-collection`) — where a user collects the game-item
 stock earmarked to the order: reassign each entry's **owner and location** (a full-amount transfer)
-and mark each **this-order slice delivered**. It is reached from the *Item-Übergaben* toolbar
+and mark each **this-order slice delivered**. It is reached from the toolbar of the item order's *Übergaben* tab
 (replacing the material-collection link ITEM orders previously reused).
 
 **Read.** The page reuses `GET /api/v1/orders/{id}/item-stock` (REQ-ORDERS-028) — the same grouped
@@ -594,7 +644,7 @@ move re-fetches the page's `collectionResults` fragment in place.
 
 **Acceptance**
 
-- [ ] The *Item-Übergaben* toolbar links to `/orders/{id}/item-collection` (not the
+- [ ] The item order's *Übergaben* toolbar links to `/orders/{id}/item-collection` (not the
   material-collection page); the page lists one row per earmarked item entry with owner, location,
   game item, this-order slice and a delivered toggle; an order with no earmarked item stock shows
   the empty state.
@@ -611,7 +661,7 @@ move re-fetches the page's `collectionResults` fragment in place.
 (`transfer_itemRow_fullAmount_carriesJobOrderEarmarkOntoMovedRow`), `LiveSyncSectionMapParityTest`
 (`ITEM_COLLECTION_SECTIONS` subset), `JobOrderProductionE2eTest` (delivered flip on the page
 persists) · **Code:** `ItemCollectionPageController`, `item-collection.html`, `item-collection.js`
-(`ITEM_COLLECTION_SECTIONS`), `orders-detail.html` (Item-Übergaben toolbar link),
+(`ITEM_COLLECTION_SECTIONS`), `orders-detail.html` (item *Übergaben* toolbar link),
 `InventoryCheckoutService.bookOutTransfer` / `applyTransferInherit` · **Issues:** — · **Design:**
 [`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md)
 
@@ -708,13 +758,13 @@ blueprint change on a line with booked production so this repair works).
 
 ### REQ-ORDERS-035 — An item handover can be downloaded as a PDF delivery note
 
-Every persisted item handover of an `ITEM` order MUST be downloadable from the *Item-Übergaben* tab
+Every persisted item handover of an `ITEM` order MUST be downloadable from the item order's *Übergaben* tab
 as a PDF delivery note (Übergabeprotokoll) in the KRT corporate design, listing the order number and
 the handed-over items with their whole-unit quantities. It is the item counterpart of the material
 handover protocol (`GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report`).
 
 - `GET /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report`, gated
-  `hasAnyRole(LOGISTICIAN, OFFICER, ADMIN) and @ownerScopeService.canSeeJobOrder(#jobOrderId)` —
+  `hasAnyRole(LOGISTICIAN, OFFICER, ADMIN) and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)` —
   the same gate as the material report; answers `application/pdf` as an attachment
   (`uebergabeprotokoll-<orderId>.pdf`).
 - A handover id that belongs to a different order is a 404, never another order's document.

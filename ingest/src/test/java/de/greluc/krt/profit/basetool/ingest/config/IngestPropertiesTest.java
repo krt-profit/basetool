@@ -22,6 +22,9 @@ package de.greluc.krt.profit.basetool.ingest.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +55,37 @@ class IngestPropertiesTest {
     assertThat(properties.blueprintPath()).isEqualTo("/personal-inventory/blueprints");
     assertThat(properties.maxPayloadBytes()).isEqualTo(2L * 1024 * 1024);
     assertThat(properties.maxHandoffBytes()).isEqualTo(256L * 1024);
+    assertThat(properties.verifyBackendHostname()).isTrue();
+  }
+
+  /**
+   * The shipped configuration checks the backend's host name unless the environment says otherwise,
+   * and only the {@code dev} profile opts out (ING-SEC-04, REQ-SEC-070).
+   *
+   * @throws IOException if a configuration file cannot be read from the classpath
+   */
+  @Test
+  void theHostnameCheckIsOnUnlessDevOptsOut() throws IOException {
+    assertThat(classpathText("application.yml"))
+        .contains("verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:true}");
+    assertThat(classpathText("application-dev.yml")).contains("verify-backend-hostname: false");
+    assertThat(classpathText("application-prod.yml")).doesNotContain("verify-backend-hostname");
+  }
+
+  /**
+   * Reads a classpath resource as UTF-8 text.
+   *
+   * @param name the resource name
+   * @return the resource's content
+   * @throws IOException if the resource is missing or cannot be read
+   */
+  private static String classpathText(String name) throws IOException {
+    try (InputStream in = IngestPropertiesTest.class.getClassLoader().getResourceAsStream(name)) {
+      if (in == null) {
+        throw new IOException("missing classpath resource " + name);
+      }
+      return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+    }
   }
 
   /** The per-IP budget defaults to 120 a minute (REQ-INGEST-005). */

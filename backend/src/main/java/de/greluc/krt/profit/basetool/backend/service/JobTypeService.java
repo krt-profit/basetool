@@ -19,16 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObserver;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.support.CachedEntityGraphs;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +58,7 @@ public class JobTypeService {
    * Clears the derived mission-lead flag on participants whose job type loses the Einsatzleiter
    * designation, so a stale flag cannot violate the single-lead unique index.
    */
-  private final MissionParticipantRepository missionParticipantRepository;
+  private final JobTypeDesignationObserver jobTypeDesignationObserver;
 
   /**
    * Returns the unpaged active job-type list for a dropdown, optionally filtered by archetype.
@@ -211,7 +211,7 @@ public class JobTypeService {
     if (!wants) {
       jobType.setMissionLead(false);
       if (jobType.getId() != null) {
-        missionParticipantRepository.clearMissionLeadFlagForJobType(jobType.getId());
+        jobTypeDesignationObserver.missionLeadRevoked(jobType.getId());
       }
       return;
     }
@@ -223,7 +223,7 @@ public class JobTypeService {
       if (jobType.getId() == null || !jobType.getId().equals(current.getId())) {
         current.setMissionLead(false);
         jobTypeRepository.save(current);
-        missionParticipantRepository.clearMissionLeadFlagForJobType(current.getId());
+        jobTypeDesignationObserver.missionLeadRevoked(current.getId());
       }
     }
     jobType.setMissionLead(true);

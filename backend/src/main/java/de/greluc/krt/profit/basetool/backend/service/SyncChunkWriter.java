@@ -91,7 +91,7 @@ public class SyncChunkWriter {
     for (int from = 0; from < rows.size(); from += chunkSize) {
       List<T> chunk = rows.subList(from, Math.min(rows.size(), from + chunkSize));
       try {
-        results.addAll(Objects.requireNonNull(requiresNew.execute(status -> writer.apply(chunk))));
+        results.addAll(Objects.requireNonNull(requiresNew.execute(_ -> writer.apply(chunk))));
       } catch (RuntimeException chunkFailure) {
         log.warn(
             "A chunk of {} {} row(s) failed and was rolled back; retrying its rows one by one ({})",
@@ -101,7 +101,7 @@ public class SyncChunkWriter {
         for (T row : chunk) {
           try {
             results.addAll(
-                Objects.requireNonNull(requiresNew.execute(status -> writer.apply(List.of(row)))));
+                Objects.requireNonNull(requiresNew.execute(_ -> writer.apply(List.of(row)))));
           } catch (RuntimeException rowFailure) {
             failedRows++;
             log.error("Failed to write {} {}", label, describe.apply(row), rowFailure);
@@ -121,7 +121,16 @@ public class SyncChunkWriter {
    * @return what {@code work} returned
    */
   public <R> R inNewTransaction(@NotNull Supplier<R> work) {
-    return requiresNew.execute(status -> work.get());
+    return requiresNew.execute(_ -> work.get());
+  }
+
+  /**
+   * Runs {@code work} in its own new transaction — for the audit row that closes a sync run.
+   *
+   * @param work the work to run
+   */
+  public void runInNewTransaction(@NotNull Runnable work) {
+    requiresNew.executeWithoutResult(_ -> work.run());
   }
 
   /**

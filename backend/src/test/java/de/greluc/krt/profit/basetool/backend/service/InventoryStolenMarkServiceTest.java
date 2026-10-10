@@ -30,25 +30,26 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeStockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
-import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkStolenMarkRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkStolenMarkResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.support.InventoryProperties;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -63,8 +64,8 @@ import org.springframework.security.access.AccessDeniedException;
 /**
  * Pins the rules of the „gestohlen" marker (REQ-INV-053): refused while switched off, no event
  * without a change, a whole row flips in place, a part splits off as a new row that keeps the rest
- * of the identity, a split never undercuts a Materialbörse offer or the earmarks, and a selection
- * takes only the caller's own rows.
+ * of the identity, a split never undercuts a Materialbörse offer or the earmarks, a single row is
+ * marked only by its owner or a logistician, and a selection takes only the caller's own rows.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryStolenMarkServiceTest {
@@ -93,7 +94,7 @@ class InventoryStolenMarkServiceTest {
   private InventoryStolenMarkService serviceWith(boolean enabled) {
     return new InventoryStolenMarkService(
         inventoryItemRepository,
-        materialExchangeOfferRepository,
+        new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
         inventoryCheckoutService,
         inventoryItemMapper,
         new InventoryProperties(enabled),
@@ -153,7 +154,8 @@ class InventoryStolenMarkServiceTest {
     InventoryStolenMarkService off = serviceWith(false);
     UUID id = UUID.randomUUID();
 
-    assertThatThrownBy(() -> off.mark(id, new InventoryItemStolenMarkDto(1L, true, null), CALLER))
+    assertThatThrownBy(
+            () -> off.mark(id, new InventoryItemStolenMarkDto(1L, true, null), CALLER, false))
         .isInstanceOf(BusinessConflictException.class)
         .hasMessage("error.inventory.stolen.disabled");
     assertThatThrownBy(() -> off.bulkMark(new BulkStolenMarkRequest(List.of(id), true), CALLER))
@@ -167,7 +169,7 @@ class InventoryStolenMarkServiceTest {
     item.setStolen(true);
     stubRow(item);
 
-    service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, null), CALLER);
+    service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, null), CALLER, false);
 
     verify(inventoryItemRepository, never()).saveAndFlush(any());
     verifyNoInteractions(auditService);
@@ -180,7 +182,7 @@ class InventoryStolenMarkServiceTest {
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
     when(inventoryCheckoutService.mergeStockIfRequested(item, false)).thenReturn(item);
 
-    service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, 10.0), CALLER);
+    service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, 10.0), CALLER, false);
 
     assertThat(item.getStolen()).isTrue();
     assertThat(item.getAmount()).isEqualTo(10.0);
@@ -204,7 +206,7 @@ class InventoryStolenMarkServiceTest {
             item.getId(), MaterialExchangeOfferStatus.ACTIVE))
         .thenReturn(Optional.empty());
 
-    service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER);
+    service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false);
 
     ArgumentCaptor<InventoryItem> part = ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(part.capture());
@@ -231,7 +233,7 @@ class InventoryStolenMarkServiceTest {
             item.getId(), MaterialExchangeOfferStatus.ACTIVE))
         .thenReturn(Optional.empty());
 
-    service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, false, 2.5), CALLER);
+    service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, false, 2.5), CALLER, false);
 
     verify(auditService)
         .record(
@@ -254,7 +256,9 @@ class InventoryStolenMarkServiceTest {
         .thenReturn(Optional.of(offer));
 
     assertThatThrownBy(
-            () -> service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER))
+            () ->
+                service.mark(
+                    item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false))
         .isInstanceOf(BusinessConflictException.class)
         .hasMessage("error.inventory.stolen.belowOffer");
     verify(inventoryItemRepository, never()).save(any());
@@ -272,7 +276,7 @@ class InventoryStolenMarkServiceTest {
             item.getId(), MaterialExchangeOfferStatus.ACTIVE))
         .thenReturn(Optional.of(offer));
 
-    service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER);
+    service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false);
 
     assertThat(item.getAmount()).isEqualTo(6.0);
   }
@@ -291,7 +295,9 @@ class InventoryStolenMarkServiceTest {
         .thenReturn(Optional.empty());
 
     assertThatThrownBy(
-            () -> service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER))
+            () ->
+                service.mark(
+                    item.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false))
         .isInstanceOf(OverAllocationException.class);
   }
 
@@ -301,7 +307,9 @@ class InventoryStolenMarkServiceTest {
     stubRow(item);
 
     assertThatThrownBy(
-            () -> service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, 1.5), CALLER))
+            () ->
+                service.mark(
+                    item.getId(), new InventoryItemStolenMarkDto(3L, true, 1.5), CALLER, false))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("error.inventory.stolen.wholeUnits");
   }
@@ -313,7 +321,8 @@ class InventoryStolenMarkServiceTest {
 
     assertThatThrownBy(
             () ->
-                service.mark(item.getId(), new InventoryItemStolenMarkDto(3L, true, 11.0), CALLER))
+                service.mark(
+                    item.getId(), new InventoryItemStolenMarkDto(3L, true, 11.0), CALLER, false))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("error.inventory.stolen.amountTooLarge");
   }
@@ -341,6 +350,60 @@ class InventoryStolenMarkServiceTest {
             isNull(),
             eq(CALLER),
             any());
+  }
+
+  @Test
+  void aMemberMarkingAnotherMembersRowIsRefusedBeforeAnyWrite() {
+    InventoryItem foreign = row(10.0, QuantityType.SCU);
+    User other = new User();
+    other.setId(UUID.randomUUID());
+    foreign.setUser(other);
+    stubRow(foreign);
+
+    assertThatThrownBy(
+            () ->
+                service.mark(
+                    foreign.getId(), new InventoryItemStolenMarkDto(3L, true, 4.0), CALLER, false))
+        .isInstanceOf(AccessDeniedException.class);
+    assertThat(foreign.getStolen()).isFalse();
+    assertThat(foreign.getAmount()).isEqualTo(10.0);
+    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository, never()).saveAndFlush(any());
+    verifyNoInteractions(auditService);
+  }
+
+  @Test
+  void aLogisticianMayMarkAnotherMembersRow() {
+    InventoryItem foreign = row(10.0, QuantityType.SCU);
+    User other = new User();
+    other.setId(UUID.randomUUID());
+    foreign.setUser(other);
+    stubRow(foreign);
+    when(inventoryItemRepository.saveAndFlush(foreign)).thenReturn(foreign);
+    when(inventoryCheckoutService.mergeStockIfRequested(foreign, false)).thenReturn(foreign);
+
+    service.mark(foreign.getId(), new InventoryItemStolenMarkDto(3L, true, null), CALLER, true);
+
+    assertThat(foreign.getStolen()).isTrue();
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_STOLEN_MARKED),
+            eq(foreign.getId()),
+            any(),
+            eq(CALLER),
+            any());
+  }
+
+  @Test
+  void theOwnerMayMarkTheirOwnRowWithoutBeingALogistician() {
+    InventoryItem own = row(10.0, QuantityType.SCU);
+    stubRow(own);
+    when(inventoryItemRepository.saveAndFlush(own)).thenReturn(own);
+    when(inventoryCheckoutService.mergeStockIfRequested(own, false)).thenReturn(own);
+
+    service.mark(own.getId(), new InventoryItemStolenMarkDto(3L, true, null), CALLER, false);
+
+    assertThat(own.getStolen()).isTrue();
   }
 
   @Test

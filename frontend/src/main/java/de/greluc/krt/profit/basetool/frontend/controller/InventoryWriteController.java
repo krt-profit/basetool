@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkRebookRequest;
@@ -34,7 +35,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -73,8 +73,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 public class InventoryWriteController {
 
-  /** REST client for the backend inventory write endpoints under {@code /api/v1/inventory}. */
-  private final BackendApiClient backendApiClient;
+  /** The inventory domain's typed backend client. */
+  private final InventoryBackendClient inventoryClient;
 
   /**
    * The read half of the inventory area, whose endpoint methods re-render the originating view
@@ -121,7 +121,7 @@ public class InventoryWriteController {
 
     try {
       InventoryItemCreateDto request = buildCreateRequest(form);
-      backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
+      inventoryClient.create(request);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.add");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "addInventoryItem", e);
@@ -171,7 +171,7 @@ public class InventoryWriteController {
     }
     try {
       InventoryItemCreateDto request = buildCreateRequest(form);
-      backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
+      inventoryClient.create(request);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", inventorySourceTarget(form.getSource())));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
@@ -404,7 +404,7 @@ public class InventoryWriteController {
               form.getMergeStock(),
               null,
               null);
-      backendApiClient.post("/api/v1/inventory/" + id + "/book-out", request, Void.class);
+      inventoryClient.bookOut(id, request);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.bookout");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "bookOutInventoryItem", id, e);
@@ -433,7 +433,7 @@ public class InventoryWriteController {
     try {
       java.net.URI uri = java.net.URI.create(referer);
       query = uri.getRawQuery();
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       return basePath;
     }
     if (query == null || query.isBlank()) {
@@ -469,9 +469,7 @@ public class InventoryWriteController {
   public org.springframework.http.ResponseEntity<Object> transferInventoryItem(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryItemBookOutDto dto) {
     try {
-      InventoryItemDto result =
-          backendApiClient.post(
-              "/api/v1/inventory/" + id + "/book-out", dto, InventoryItemDto.class);
+      InventoryItemDto result = inventoryClient.transfer(id, dto);
       if (result == null) {
         return org.springframework.http.ResponseEntity.noContent().build();
       }
@@ -499,9 +497,7 @@ public class InventoryWriteController {
   public org.springframework.http.ResponseEntity<Object> rebookPersonalInventoryItem(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryItemPersonalRebookDto dto) {
     try {
-      InventoryItemDto result =
-          backendApiClient.post(
-              "/api/v1/inventory/" + id + "/personal-rebook", dto, InventoryItemDto.class);
+      InventoryItemDto result = inventoryClient.personalRebook(id, dto);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -528,7 +524,7 @@ public class InventoryWriteController {
       return inventoryValidationError("VALIDATION");
     }
     try {
-      backendApiClient.post("/api/v1/inventory/bulk-checkout", request, Void.class);
+      inventoryClient.bulkCheckout(request);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Failed to bulk-checkout inventory items (ajax): {}", e.getMessage());
@@ -559,9 +555,7 @@ public class InventoryWriteController {
       return inventoryValidationError("VALIDATION");
     }
     try {
-      BulkRebookResultDto result =
-          backendApiClient.post(
-              "/api/v1/inventory/bulk-rebook", request, BulkRebookResultDto.class);
+      BulkRebookResultDto result = inventoryClient.bulkRebook(request);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Failed to bulk-rebook inventory items (ajax): {}", e.getMessage());
@@ -585,9 +579,7 @@ public class InventoryWriteController {
   public org.springframework.http.ResponseEntity<Object> addAllocation(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
     try {
-      InventoryItemDto updated =
-          backendApiClient.post(
-              "/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class);
+      InventoryItemDto updated = inventoryClient.addAllocation(id, dto);
       return org.springframework.http.ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       log.debug(
@@ -615,9 +607,7 @@ public class InventoryWriteController {
   public org.springframework.http.ResponseEntity<Object> changeAllocation(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
     try {
-      InventoryItemDto updated =
-          backendApiClient.patch(
-              "/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class);
+      InventoryItemDto updated = inventoryClient.changeAllocation(id, dto);
       return org.springframework.http.ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       log.debug(
@@ -647,9 +637,7 @@ public class InventoryWriteController {
   public org.springframework.http.ResponseEntity<Object> removeAllocation(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
     try {
-      InventoryItemDto updated =
-          backendApiClient.delete(
-              "/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class);
+      InventoryItemDto updated = inventoryClient.removeAllocation(id, dto);
       return org.springframework.http.ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       log.debug(
@@ -677,9 +665,7 @@ public class InventoryWriteController {
   public org.springframework.http.ResponseEntity<InventoryItemDto> updateInventoryItemNote(
       @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryItemNoteUpdateRequest request) {
     try {
-      InventoryItemDto updated =
-          backendApiClient.put(
-              "/api/v1/inventory/" + id + "/note", request, InventoryItemDto.class);
+      InventoryItemDto updated = inventoryClient.updateNote(id, request);
       return org.springframework.http.ResponseEntity.ok(updated);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -706,9 +692,7 @@ public class InventoryWriteController {
       @RequestBody @Valid
           de.greluc.krt.profit.basetool.frontend.model.dto.UpdateDeliveredRequest request) {
     try {
-      InventoryItemDto updated =
-          backendApiClient.patch(
-              "/api/v1/inventory/" + id + "/delivered", request, InventoryItemDto.class);
+      InventoryItemDto updated = inventoryClient.updateDelivered(id, request);
       return org.springframework.http.ResponseEntity.ok(updated);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(

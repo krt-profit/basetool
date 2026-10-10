@@ -33,6 +33,10 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.AreaLeadershipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartPositionUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.orgchart.client.OrgChartBackendClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
@@ -64,7 +68,8 @@ class OrgChartPageControllerTest {
   @Test
   void orgChart_loadsChartWithoutPreloadingUsers() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
+    OrgChartPageController controller =
+        new OrgChartPageController(new OrgChartBackendClient(backend));
     OrgChartDto chart = emptyChart();
     when(backend.get("/api/v1/org-chart", OrgChartDto.class)).thenReturn(chart);
     Model model = new ConcurrentModel();
@@ -79,7 +84,8 @@ class OrgChartPageControllerTest {
   @Test
   void orgChart_backendFailure_setsErrorAttribute() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
+    OrgChartPageController controller =
+        new OrgChartPageController(new OrgChartBackendClient(backend));
     when(backend.get("/api/v1/org-chart", OrgChartDto.class))
         .thenThrow(new BackendServiceException("boom", null, 503));
     Model model = new ConcurrentModel();
@@ -93,7 +99,8 @@ class OrgChartPageControllerTest {
   @Test
   void orgChart_fragmentChartBody_returnsChartBodySelector() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
+    OrgChartPageController controller =
+        new OrgChartPageController(new OrgChartBackendClient(backend));
     OrgChartDto chart = emptyChart();
     when(backend.get("/api/v1/org-chart", OrgChartDto.class)).thenReturn(chart);
     Model model = new ConcurrentModel();
@@ -107,12 +114,17 @@ class OrgChartPageControllerTest {
   @Test
   void createPosition_success_returns200() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
-    when(backend.post(eq("/api/v1/org-chart/positions"), any(), eq(Object.class)))
-        .thenReturn(new Object());
+    OrgChartPageController controller =
+        new OrgChartPageController(new OrgChartBackendClient(backend));
+    when(backend.post(eq("/api/v1/org-chart/positions"), any(), eq(OrgChartPositionDto.class)))
+        .thenReturn(
+            new OrgChartPositionDto(
+                UUID.randomUUID(), "AREA_COORDINATOR", null, null, null, null, null, null, 0, 0L));
 
     ResponseEntity<Object> response =
-        controller.createPosition(Map.of("positionType", "AREA_COORDINATOR"));
+        controller.createPosition(
+            new OrgChartPositionCreateRequest(
+                "AREA_COORDINATOR", null, null, null, null, null, null));
 
     assertEquals(200, response.getStatusCode().value());
   }
@@ -120,14 +132,16 @@ class OrgChartPageControllerTest {
   @Test
   void createPosition_backendValidationError_relaysStatusAndBody() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
-    when(backend.post(eq("/api/v1/org-chart/positions"), any(), eq(Object.class)))
+    OrgChartPageController controller =
+        new OrgChartPageController(new OrgChartBackendClient(backend));
+    when(backend.post(eq("/api/v1/org-chart/positions"), any(), eq(OrgChartPositionDto.class)))
         .thenThrow(
             new BackendServiceException(
                 "bad", null, 400, "BAD_REQUEST", null, List.of(), "Limit reached."));
 
     ResponseEntity<Object> response =
-        controller.createPosition(Map.of("positionType", "COMMAND_LEAD"));
+        controller.createPosition(
+            new OrgChartPositionCreateRequest("COMMAND_LEAD", null, null, null, null, null, null));
 
     assertEquals(400, response.getStatusCode().value());
     Map<String, Object> body = assertInstanceOf(Map.class, response.getBody());
@@ -138,14 +152,18 @@ class OrgChartPageControllerTest {
   @Test
   void updatePosition_optimisticLock_relays409() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
+    OrgChartPageController controller =
+        new OrgChartPageController(new OrgChartBackendClient(backend));
     UUID id = UUID.randomUUID();
-    when(backend.put(eq("/api/v1/org-chart/positions/" + id), any(), eq(Object.class)))
+    when(backend.put(
+            eq("/api/v1/org-chart/positions/{id}"), any(), eq(OrgChartPositionDto.class), eq(id)))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "Stale."));
 
-    ResponseEntity<Object> response = controller.updatePosition(id, Map.of("version", 0));
+    ResponseEntity<Object> response =
+        controller.updatePosition(
+            id, new OrgChartPositionUpdateRequest(null, null, null, 0L, null));
 
     assertEquals(409, response.getStatusCode().value());
     Map<String, Object> body = assertInstanceOf(Map.class, response.getBody());
@@ -155,21 +173,23 @@ class OrgChartPageControllerTest {
   @Test
   void deletePosition_success_returns200() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
+    OrgChartPageController controller =
+        new OrgChartPageController(new OrgChartBackendClient(backend));
     UUID id = UUID.randomUUID();
 
     ResponseEntity<Object> response = controller.deletePosition(id);
 
     assertEquals(200, response.getStatusCode().value());
-    verify(backend).delete("/api/v1/org-chart/positions/" + id, Void.class);
+    verify(backend).delete("/api/v1/org-chart/positions/{id}", Void.class, id);
   }
 
   @Test
   void deletePosition_notFound_relays404() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
+    OrgChartPageController controller =
+        new OrgChartPageController(new OrgChartBackendClient(backend));
     UUID id = UUID.randomUUID();
-    when(backend.delete("/api/v1/org-chart/positions/" + id, Void.class))
+    when(backend.delete("/api/v1/org-chart/positions/{id}", Void.class, id))
         .thenThrow(
             new BackendServiceException(
                 "missing", null, 404, "NOT_FOUND", null, List.of(), "Gone."));
@@ -183,21 +203,25 @@ class OrgChartPageControllerTest {
   @Test
   void vacateLeader_success_returns200AndRelaysVersion() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
+    OrgChartPageController controller =
+        new OrgChartPageController(new OrgChartBackendClient(backend));
     UUID id = UUID.randomUUID();
 
     ResponseEntity<Object> response = controller.vacateLeader(id, 3L);
 
     assertEquals(200, response.getStatusCode().value());
-    verify(backend).delete("/api/v1/org-chart/positions/" + id + "/leader?version=3", Void.class);
+    verify(backend)
+        .delete("/api/v1/org-chart/positions/{id}/leader?version={version}", Void.class, id, 3L);
   }
 
   @Test
   void vacateLeader_notCommand_relays400() {
     BackendApiClient backend = mock(BackendApiClient.class);
-    OrgChartPageController controller = new OrgChartPageController(backend);
+    OrgChartPageController controller =
+        new OrgChartPageController(new OrgChartBackendClient(backend));
     UUID id = UUID.randomUUID();
-    when(backend.delete("/api/v1/org-chart/positions/" + id + "/leader?version=3", Void.class))
+    when(backend.delete(
+            "/api/v1/org-chart/positions/{id}/leader?version={version}", Void.class, id, 3L))
         .thenThrow(
             new BackendServiceException(
                 "bad", null, 400, "BAD_REQUEST", null, List.of(), "Not a Kommando."));

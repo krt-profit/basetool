@@ -27,7 +27,7 @@ const MISSIONS_SECTIONS = {
     function loadResults(pushHistory) {
         const query = buildQueryString();
         window.krtFetch.swap({
-            url: '/missions' + (query ? '?' + query : ''),
+            url: `/missions${query ? `?${query}` : ''}`,
             container: resultsContainer,
             indicator: loadingIndicator,
             history: pushHistory !== false,
@@ -49,15 +49,27 @@ const MISSIONS_SECTIONS = {
 
     function onFilterChange() {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(function () {
+        debounceTimer = setTimeout(() => {
             loadResults(true);
         }, 300);
     }
 
     const FILTER_PREF_KEY = 'missions_filter';
+    const PERIODS = ['UPCOMING', 'PAST', 'ALL'];
 
-    function showPastInput() {
-        return form.querySelector('input[name="showPast"]');
+    function periodInputs() {
+        return form.querySelectorAll('input[name="period"]');
+    }
+
+    function currentPeriod() {
+        const checked = form.querySelector('input[name="period"]:checked');
+        return checked ? checked.value : 'UPCOMING';
+    }
+
+    function selectPeriod(value) {
+        periodInputs().forEach((el) => {
+            el.checked = el.value === value;
+        });
     }
 
     function readFilterPref() {
@@ -76,48 +88,48 @@ const MISSIONS_SECTIONS = {
     }
 
     function persistFilters() {
-        const input = showPastInput();
-        if (input) {
-            writeFilterPref({ showPast: input.checked });
+        writeFilterPref({ period: currentPeriod() });
+    }
+
+    function storedPeriod(saved) {
+        if (!saved) return null;
+        if (typeof saved.period === 'string' && PERIODS.indexOf(saved.period) >= 0) {
+            return saved.period;
         }
+        if (typeof saved.showPast === 'boolean') return saved.showPast ? 'ALL' : 'UPCOMING';
+        return null;
     }
 
     function restoreFilters() {
-        const input = showPastInput();
-        if (!input) return;
-        if (/[?&]showPast=/.test(window.location.search)) {
+        if (/[?&](period|showPast)=/.test(window.location.search)) {
             persistFilters();
             return;
         }
-        const saved = readFilterPref();
-        if (!saved || typeof saved.showPast !== 'boolean' || saved.showPast === input.checked) {
-            return;
-        }
-        input.checked = saved.showPast;
+        const saved = storedPeriod(readFilterPref());
+        if (!saved || saved === currentPeriod()) return;
+        selectPeriod(saved);
         loadResults();
     }
 
-    form.querySelectorAll('input, select').forEach(function (el) {
+    form.querySelectorAll('input, select').forEach((el) => {
         el.addEventListener('input', onFilterChange);
         el.addEventListener('change', onFilterChange);
     });
 
-    const showPastToggle = showPastInput();
-    if (showPastToggle) {
-        showPastToggle.addEventListener('change', persistFilters);
-    }
+    periodInputs().forEach((el) => {
+        el.addEventListener('change', persistFilters);
+    });
 
     if (resetBtn) {
-        resetBtn.addEventListener('click', function () {
+        resetBtn.addEventListener('click', () => {
             form.querySelectorAll(
-                'input[type="text"], input[type="hidden"], input[type="date"], input[type="time"]',
-            ).forEach(function (el) {
+                'input[type="search"], input[type="text"], input[type="hidden"], input[type="date"], input[type="time"]',
+            ).forEach((el) => {
                 el.value = '';
             });
-            form.querySelectorAll('input[type="checkbox"]').forEach(function (el) {
-                el.checked = false;
-            });
+            selectPeriod('UPCOMING');
             persistFilters();
+            if (window.krtFilterChips) window.krtFilterChips.refresh(form);
             loadResults();
         });
     }

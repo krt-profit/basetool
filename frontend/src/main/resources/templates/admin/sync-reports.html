@@ -12,103 +12,90 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.syncReports.title}">Sync-Berichte</h1>
-        <p th:text="#{admin.syncReports.subtitle}">Ergebnisse der UEX- und SC-Wiki-Synchronisation.</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.syncReports.title},
+        count=${totalElements}, countId='sync-count', countFor='sync-results', actions=~{::sync-actions})}">
+        <th:block th:ref="sync-actions">
+            <th:block th:replace="~{fragments/components :: overflowMenu(id='sync-menu', items=~{::sync-menu-items})}">
+                <th:block th:ref="sync-menu-items">
+                    <button type="button" id="purge-trigger" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
+                            th:text="#{admin.syncReports.delete.title}">Alte Berichte l&ouml;schen</button>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
 
-    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
-        <p th:text="#{${error}}">Fehler beim Laden.</p>
-    </div>
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
 
-    <div th:if="${deletedCount != null}" class="hud-box mt-2 krtm-border-color-var-color-success-77db">
-        <p th:text="#{admin.syncReports.delete.success(${deletedCount})}">Berichte gelöscht.</p>
-    </div>
+    <div th:if="${deletedCount != null}" class="alert alert-success" role="status"
+         th:text="#{admin.syncReports.delete.success(${deletedCount})}">Berichte gel&ouml;scht.</div>
 
-    <div class="hud-box mt-2">
-        <div class="tab-bar">
-            <a th:href="@{/admin/sync-reports}" class="btn"
-               th:classappend="${activeTab == 'ALL'} ? '' : 'btn-secondary'"
-               th:text="#{admin.syncReports.tab.all}">Alle</a>
-            <a th:href="@{/admin/sync-reports/scwiki}" class="btn"
-               th:classappend="${activeTab == 'SCWIKI'} ? '' : 'btn-secondary'"
-               th:text="#{admin.syncReports.tab.scwiki}">SC Wiki</a>
-            <a th:href="@{/admin/sync-reports/uex}" class="btn"
-               th:classappend="${activeTab == 'UEX'} ? '' : 'btn-secondary'"
-               th:text="#{admin.syncReports.tab.uex}">UEX</a>
-        </div>
+    <nav class="tab-nav sync-tabs" th:attr="aria-label=#{admin.syncReports.col.source}">
+        <a th:href="@{/admin/sync-reports}" class="tab" th:classappend="${activeTab == 'ALL'} ? 'active'"
+           th:attr="aria-current=${activeTab == 'ALL'} ? 'page' : null" th:text="#{admin.syncReports.tab.all}">Alle</a>
+        <a th:href="@{/admin/sync-reports/scwiki}" class="tab" th:classappend="${activeTab == 'SCWIKI'} ? 'active'"
+           th:attr="aria-current=${activeTab == 'SCWIKI'} ? 'page' : null" th:text="#{admin.syncReports.tab.scwiki}">SC Wiki</a>
+        <a th:href="@{/admin/sync-reports/uex}" class="tab" th:classappend="${activeTab == 'UEX'} ? 'active'"
+           th:attr="aria-current=${activeTab == 'UEX'} ? 'page' : null" th:text="#{admin.syncReports.tab.uex}">UEX</a>
+    </nav>
 
-        <p class="event-detail" th:text="#{admin.syncReports.total} + ': ' + ${totalElements}">Gesamt: 0</p>
-
-        <div id="sync-results">
-        <th:block th:fragment="results">
-        <div class="table-responsive">
-        <table id="syncReportsTable">
+    <div id="sync-results" class="card card--flush">
+    <th:block th:fragment="results">
+    <div class="table-responsive" th:if="${!#lists.isEmpty(events)}">
+        <table id="syncReportsTable" class="data-table data-table--stack">
             <thead>
                 <tr>
-                    <th th:text="#{admin.syncReports.col.ranAt}">Zeitpunkt</th>
-                    <th th:text="#{admin.syncReports.col.source}">Quelle</th>
-                    <th th:text="#{admin.syncReports.col.eventType}">Ereignis</th>
-                    <th th:text="#{admin.syncReports.col.aggregate}">Aggregat</th>
                     <th th:text="#{admin.syncReports.col.name}">Name</th>
+                    <th class="cell-status" th:text="#{admin.syncReports.col.eventType}">Ereignis</th>
+                    <th th:text="#{admin.syncReports.col.source}">Quelle</th>
+                    <th th:text="#{admin.syncReports.col.aggregate}">Aggregat</th>
+                    <th th:text="#{admin.syncReports.col.ranAt}">Zeitpunkt</th>
                     <th th:text="#{admin.syncReports.col.detail}">Detail</th>
                 </tr>
             </thead>
             <tbody>
                 <tr th:each="ev : ${events}">
-                    <td th:text="${ev.ranAt}">2026-05-28T00:00:00Z</td>
-                    <td th:text="${ev.sourceSystem}">SCWIKI</td>
-                    <td class="event-type" th:text="${ev.eventType}">CREATED_WIKI_ONLY</td>
-                    <td th:text="${ev.aggregate}">commodity</td>
-                    <td th:text="${ev.externalName}">-</td>
+                    <td><span class="cell-title" th:text="${ev.externalName != null and !#strings.isEmpty(ev.externalName)} ? ${ev.externalName} : '—'">Name</span></td>
+                    <td class="cell-status">
+                        <span class="chip event-type"
+                              th:text="${#messages.msgOrNull('admin.syncReports.event.' + ev.eventType) ?: ev.eventType}">Nur im Wiki angelegt</span>
+                    </td>
+                    <td th:attr="data-label=#{admin.syncReports.col.source}"
+                        th:text="${ev.sourceSystem == null} ? '—' : (${#messages.msgOrNull('admin.syncReports.tab.' + #strings.toLowerCase(ev.sourceSystem))} ?: ${ev.sourceSystem})">SC Wiki</td>
+                    <td th:attr="data-label=#{admin.syncReports.col.aggregate}" th:text="${ev.aggregate}">commodity</td>
+                    <td><span class="utc-time" th:text="${ev.ranAt}">2026-05-28T00:00:00Z</span></td>
                     <td class="event-detail" th:text="${ev.detail}">-</td>
-                </tr>
-                <tr th:if="${#lists.isEmpty(events)}">
-                    <td colspan="6" th:text="#{admin.syncReports.empty}">Noch keine Sync-Ereignisse.</td>
                 </tr>
             </tbody>
         </table>
-        </div>
-
-        <div class="pager" th:if="${totalPages > 1}">
-            <a th:if="${currentPage > 0}" class="btn btn-secondary" data-swap
-               th:href="@{${basePath}(page=${currentPage - 1})}"
-               th:text="#{general.pagination.previous}">Zurück</a>
-            <span th:text="${currentPage + 1} + ' / ' + ${totalPages}">1 / 1</span>
-            <a th:if="${currentPage + 1 < totalPages}" class="btn btn-secondary" data-swap
-               th:href="@{${basePath}(page=${currentPage + 1})}"
-               th:text="#{general.pagination.next}">Weiter</a>
-        </div>
-        </th:block>
-        </div>
+    </div>
+    <th:block th:if="${#lists.isEmpty(events)}">
+        <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.syncReports.empty', textKey='admin.syncReports.empty.text')}"></th:block>
+    </th:block>
+    <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${eventsPage}, baseUrl=${basePath})}"></th:block>
+    </th:block>
     </div>
 
-    <div class="hud-box mt-2">
-        <h2 class="mt-0" th:text="#{admin.syncReports.delete.title}">Alte Berichte löschen</h2>
-        <p class="event-detail" th:text="#{admin.syncReports.delete.help}">Berichte löschen, die älter als die angegebene Anzahl Tage sind.</p>
-        <form id="purge-form" th:action="@{/admin/sync-reports/delete-old}" method="post" class="purge-form">
-            <input type="hidden" name="source" th:value="${activeTab == 'ALL' ? '' : activeTab}">
-            <div class="form-group">
-                <label for="purge-days" th:text="#{admin.syncReports.delete.label}">Berichte älter als (Tage)</label>
-                <input type="number" id="purge-days" name="days" min="1" step="1" value="30" required>
-            </div>
-            <button type="button" id="purge-trigger" class="btn btn-outline-danger"
-                    th:text="#{admin.syncReports.delete.button}">Alte löschen</button>
-        </form>
-    </div>
-
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='purge-confirm-modal', titleKey='admin.syncReports.delete.confirm.title', variant='krt-modal--danger', body=~{::purge-confirm-modal-body})}">
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='purge-confirm-modal', titleKey='admin.syncReports.delete.title', variant='krt-modal--danger', body=~{::purge-confirm-modal-body})}">
         <th:block th:ref="purge-confirm-modal-body">
-            <div class="krt-modal-body">
-                <p id="purge-confirm-message" class="m-0"
-                   th:data-template="#{admin.syncReports.delete.confirm.message}">Wirklich löschen?</p>
-            </div>
-            <div class="krt-modal-foot">
-                <button type="button" class="btn btn-ghost" id="purge-cancel"
-                        th:text="#{general.cancel}">Abbrechen</button>
-                <button type="button" class="btn btn-danger" id="purge-confirm"
-                        th:text="#{admin.syncReports.delete.button}">Alte löschen</button>
-            </div>
+            <form id="purge-form" th:action="@{/admin/sync-reports/delete-old}" method="post" class="no-track purge-form">
+                <input type="hidden" name="source" th:value="${activeTab == 'ALL' ? '' : activeTab}">
+                <div class="krt-modal-body stack gap-3">
+                    <p th:text="#{admin.syncReports.delete.help}">Berichte l&ouml;schen, die &auml;lter als die angegebene Anzahl Tage sind.</p>
+                    <div class="form-group">
+                        <label for="purge-days" th:text="#{admin.syncReports.delete.label}">Berichte &auml;lter als (Tage)</label>
+                        <input type="number" id="purge-days" name="days" min="1" step="1" value="30" required>
+                    </div>
+                    <p id="purge-confirm-message" class="m-0"
+                       th:data-template="#{admin.syncReports.delete.confirm.message}"
+                       th:text="#{admin.syncReports.delete.confirm.message(30)}">Wirklich l&ouml;schen?</p>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" id="purge-cancel"
+                            th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="button" class="btn btn-danger" id="purge-confirm"
+                            th:text="#{admin.syncReports.delete.button}">Alte l&ouml;schen</button>
+                </div>
+            </form>
         </th:block>
     </th:block>
 </main>

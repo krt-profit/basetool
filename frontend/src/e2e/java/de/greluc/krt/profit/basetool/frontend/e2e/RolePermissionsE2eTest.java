@@ -174,9 +174,9 @@ class RolePermissionsE2eTest {
 
   /**
    * Logs in as the given user in a fresh context, opens the seeded order and asserts whether the
-   * LOGISTICIAN-gated edit-modal trigger and the ADMIN-gated delete form's submit button are
-   * rendered. {@code nav-logout} is asserted first, so an absent control means role-gated rather
-   * than a failed page load.
+   * LOGISTICIAN-gated edit-modal trigger and the ADMIN-gated delete form's submit button, which
+   * sits in the page head's overflow menu, are rendered. {@code nav-logout} is asserted first, so
+   * an absent control means role-gated rather than a failed page load.
    *
    * @param user the Keycloak username to log in as
    * @param password the Keycloak password
@@ -203,6 +203,7 @@ class RolePermissionsE2eTest {
           assertThat(page.locator(editTrigger)).hasCount(0);
         }
         if (deleteExpected) {
+          page.locator("#order-menu-toggle").click();
           assertThat(page.locator(deleteButton)).isVisible();
         } else {
           assertThat(page.locator(deleteButton)).hasCount(0);

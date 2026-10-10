@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.support;
 
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.service.BackendErrorMapper;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -32,8 +33,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Relays a backend {@link BackendServiceException} to the browser as {@code
@@ -41,9 +40,6 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code detail} and {@code correlationId}, for {@code krtFetch}.
  */
 public final class BackendErrorResponses {
-
-  /** Reads a backend problem body; only its tree is used. */
-  private static final ObjectMapper PROBLEM_READER = JsonMapper.builder().build();
 
   private BackendErrorResponses() {}
 
@@ -146,7 +142,7 @@ public final class BackendErrorResponses {
   @NotNull
   public static ResponseEntity<Object> propagateBackendError(
       @NotNull WebClientResponseException e) {
-    return propagateBackendError(BackendServiceException.fromProblem(e, PROBLEM_READER));
+    return propagateBackendError(BackendErrorMapper.parseProblem(e));
   }
 
   /**

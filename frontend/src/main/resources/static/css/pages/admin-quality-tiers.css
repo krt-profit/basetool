@@ -1,10 +1,15 @@
-@layer base, components, page, migration, utilities;
+@layer base, components, page, utilities;
 
 @layer page {
-    .qt-form-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 0 1rem;
+    .qt-form .form-grid input:where(:not([type='checkbox'], [type='radio'])) {
+        width: 100%;
+    }
+    .qt-form .form-grid .form-hint {
+        margin-bottom: 0;
+    }
+    .qt-form .segmented > label:has(input:disabled) {
+        cursor: not-allowed;
+        opacity: 0.6;
     }
     .qt-row--inactive td {
         color: var(--color-gray-2-text);

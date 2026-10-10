@@ -19,16 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections.Section;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
-import de.greluc.krt.profit.basetool.backend.support.DataExportSections.Section;
-import de.greluc.krt.profit.basetool.backend.support.HandleScrubber;
-import de.greluc.krt.profit.basetool.backend.support.HandleSpellings;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
@@ -62,7 +63,7 @@ public class DataExportService {
   public static final int MAX_ROWS_PER_SECTION = 5000;
 
   private final UserRepository userRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -185,7 +186,7 @@ public class DataExportService {
    */
   @Transactional
   public void recordExport(@NotNull UUID userId, @NotNull String format, int rows, boolean bySelf) {
-    auditService.record(
+    auditRecorder.record(
         AuditEventType.PERSONAL_DATA_EXPORTED,
         userId,
         null,

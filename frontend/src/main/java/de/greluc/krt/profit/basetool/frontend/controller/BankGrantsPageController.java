@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankGrantDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,13 +32,11 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Renders the grants administration page ({@code /bank/grants}, G1 mockup with the G2 grouping
@@ -51,11 +49,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class BankGrantsPageController {
 
-  /** Response type for the bank-grant list pulls ({@code GET /api/v1/bank/grants}). */
-  private static final ParameterizedTypeReference<List<BankGrantDto>> BANK_GRANT_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
-  private final BackendApiClient backendApiClient;
+  /** The bank domain's backend calls. */
+  private final BankBackendClient bankClient;
 
   /**
    * Renders the grants matrix, grouped by account (default) or by employee. User and account
@@ -80,20 +75,14 @@ public class BankGrantsPageController {
       Model model) {
     boolean byEmployee = "employee".equalsIgnoreCase(view);
 
-    UriComponentsBuilder grantsUri = UriComponentsBuilder.fromPath("/api/v1/bank/grants");
-    if (byEmployee && userId != null) {
-      grantsUri.queryParam("userId", userId);
-    } else if (!byEmployee && accountId != null) {
-      grantsUri.queryParam("accountId", accountId);
-    }
-    List<BankGrantDto> grants = backendApiClient.get(grantsUri.toUriString(), BANK_GRANT_LIST_TYPE);
+    List<BankGrantDto> grants =
+        bankClient.grants(byEmployee ? userId : null, byEmployee ? null : accountId);
     model.addAttribute("grants", grants == null ? List.<BankGrantDto>of() : grants);
     if ("grantsMatrix".equals(fragment)) {
       return "bank-grants :: grantsMatrix";
     }
 
-    List<BankGrantDto> allGrants =
-        backendApiClient.get("/api/v1/bank/grants", BANK_GRANT_LIST_TYPE);
+    List<BankGrantDto> allGrants = bankClient.grants(null, null);
 
     Map<UUID, String> grantees = new LinkedHashMap<>();
     for (BankGrantDto grant : allGrants == null ? List.<BankGrantDto>of() : allGrants) {
@@ -103,8 +92,7 @@ public class BankGrantsPageController {
     BankAccountDto selectedAccount = null;
     if (!byEmployee && accountId != null) {
       try {
-        BankAccountDetailDto detail =
-            backendApiClient.get("/api/v1/bank/accounts/" + accountId, BankAccountDetailDto.class);
+        BankAccountDetailDto detail = bankClient.account(accountId);
         selectedAccount = detail == null ? null : detail.account();
       } catch (RuntimeException e) {
         log.debug("Could not resolve selected grant-filter account {} for seeding", accountId, e);

@@ -20,16 +20,37 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.leadership.client.LeadershipBackendClient;
+import de.greluc.krt.profit.basetool.frontend.model.LeitungUnitContext;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddBereichLeaderRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AddOlMemberRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.AssignSquadronRankRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BereichChartDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CreateKommandoGroupRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.GrandAdmiralRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungMemberDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungViewDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipLeadToggleRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandChartDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronChartDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateKommandoGroupRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -48,7 +69,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 /**
  * Controller for the Leitung page ({@code /organisation/leitung}, REQ-ROLE-004), where leaders
  * appoint, change and remove the ranks their tier delegates to them in the org units the backend
- * returns as manageable.
+ * returns as manageable, shown as a unit tree with the selected unit's detail.
  *
  * <p>Gated to {@link Roles#ADMIN_OR_OFFICER}; per-unit authorisation is enforced by the backend.
  * Write proxies relay backend failures as status plus {@code {code, detail}}.
@@ -60,22 +81,46 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Slf4j
 public class LeitungPageController {
 
-  private final BackendApiClient backendApiClient;
+  /** The Staffel tab that lists the Kommandogruppen. */
+  private static final String TAB_GROUPS = "groups";
+
+  /** The default tab of every unit: its members. */
+  private static final String TAB_MEMBERS = "members";
+
+  /** The roster role of a Spezialkommando's lead. */
+  private static final String SK_LEAD = "SK_LEAD";
+
+  /** Reads the delegated view and sends the Leitung writes. */
+  private final LeadershipBackendClient leadershipClient;
 
   /**
-   * Renders the Leitung page, or only its {@code leitungSections} fragment for an in-place swap.
+   * Renders the Leitung page as unit tree and unit detail, or only its {@code leitungSections}
+   * fragment for an in-place swap.
+   *
+   * <p>Besides {@code leitung} the model carries {@code selectedUnitId} (the requested unit when
+   * the view lists it, else the first listed unit), {@code selectedTab}, {@code unitContext}
+   * (Bereich and department per unit, read from the org chart; empty when that read fails), {@code
+   * selfUserId} and, per Spezialkommando, {@code skRosters} plus {@code skFlagsKnown} for the units
+   * whose role flags the caller may read.
    *
    * @param fragment {@code "leitungSections"} for the fragment only; otherwise the full page.
-   * @param model the Thymeleaf model, populated with {@code leitung}.
+   * @param unit the id of the unit to show, from the {@code ?unit=} deep link; may be absent.
+   * @param tab {@code "groups"} to open a Staffel's Kommandogruppen tab; otherwise its members.
+   * @param model the Thymeleaf model.
    * @return the view name, or its {@code leitungSections} selector for the fragment path.
    */
   @NotNull
   @GetMapping
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public String leitung(@RequestParam(required = false) String fragment, Model model) {
+  public String leitung(
+      @RequestParam(required = false) String fragment,
+      @RequestParam(required = false) String unit,
+      @RequestParam(required = false) String tab,
+      Model model) {
+    LeitungViewDto view = null;
     try {
-      model.addAttribute(
-          "leitung", backendApiClient.get("/api/v1/leitung/view", LeitungViewDto.class));
+      view = leadershipClient.leitungView();
+      model.addAttribute("leitung", view);
     } catch (BackendServiceException e) {
       log.debug("Failed to load Leitung view", e);
       model.addAttribute("error", "leitung.error.load");
@@ -83,10 +128,221 @@ public class LeitungPageController {
       log.error("Failed to load Leitung view", e);
       model.addAttribute("error", "leitung.error.load");
     }
+    model.addAttribute("selectedTab", TAB_GROUPS.equals(tab) ? TAB_GROUPS : TAB_MEMBERS);
+    if (view != null) {
+      model.addAttribute("selectedUnitId", selectedUnitId(view, unit));
+      model.addAttribute("unitContext", unitContext());
+      model.addAttribute("selfUserId", selfUserId(view));
+      Map<UUID, List<OrgUnitMembershipDto>> rosters = new HashMap<>();
+      Set<UUID> flagsKnown = new HashSet<>();
+      for (LeitungUnitDto sk : units(view.specialCommands())) {
+        rosters.put(sk.id(), skRoster(sk, flagsKnown));
+      }
+      model.addAttribute("skRosters", rosters);
+      model.addAttribute("skFlagsKnown", flagsKnown);
+    }
     if ("leitungSections".equals(fragment)) {
       return "organisation/leitung :: leitungSections";
     }
     return "organisation/leitung";
+  }
+
+  /**
+   * Picks the unit the detail pane shows: the requested one when the view lists it, otherwise the
+   * first unit in tree order (Organisationsleitung, Bereiche, Staffeln, Spezialkommandos).
+   *
+   * @param view the delegated view.
+   * @param requested the {@code ?unit=} value; may be {@code null} or not a listed id.
+   * @return the selected unit's id as a string, or {@code null} when the view lists no unit.
+   */
+  @Nullable
+  private static String selectedUnitId(@NotNull LeitungViewDto view, @Nullable String requested) {
+    List<LeitungUnitDto> all = allUnits(view);
+    for (LeitungUnitDto u : all) {
+      if (u.id() != null && u.id().toString().equals(requested)) {
+        return requested;
+      }
+    }
+    for (LeitungUnitDto u : all) {
+      if (u.id() != null) {
+        return u.id().toString();
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Every unit of the view in tree order: Organisationsleitung, Bereiche, Staffeln,
+   * Spezialkommandos.
+   *
+   * @param view the delegated view.
+   * @return the non-null units, in tree order.
+   */
+  @NotNull
+  private static List<LeitungUnitDto> allUnits(@NotNull LeitungViewDto view) {
+    List<LeitungUnitDto> all = new ArrayList<>();
+    all.addAll(units(view.organisationsleitungen()));
+    all.addAll(units(view.bereiche()));
+    all.addAll(units(view.squadrons()));
+    all.addAll(units(view.specialCommands()));
+    return all;
+  }
+
+  /**
+   * Null-safe view of one of the view's unit lists, skipping {@code null} entries.
+   *
+   * @param list the list as decoded; may be {@code null}.
+   * @return the non-null units, in order.
+   */
+  @NotNull
+  private static List<LeitungUnitDto> units(@Nullable List<LeitungUnitDto> list) {
+    if (list == null) {
+      return List.of();
+    }
+    List<LeitungUnitDto> out = new ArrayList<>();
+    for (LeitungUnitDto u : list) {
+      if (u != null) {
+        out.add(u);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * The caller's own user id, read from the roster row the backend marks as {@code self}.
+   *
+   * @param view the delegated view.
+   * @return the caller's id, or {@code null} when the caller holds no seat in a listed unit.
+   */
+  @Nullable
+  private static UUID selfUserId(@NotNull LeitungViewDto view) {
+    List<LeitungUnitDto> all = allUnits(view);
+    for (LeitungUnitDto u : all) {
+      if (u.members() == null) {
+        continue;
+      }
+      for (LeitungMemberDto m : u.members()) {
+        if (m != null && m.self()) {
+          return m.userId();
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Reads the org chart to place each unit under its Bereich and department colour. The read is
+   * best effort: the tree renders without colour and Bereich when it fails.
+   *
+   * @return the context per unit id; empty when the chart is unavailable.
+   */
+  @NotNull
+  private Map<UUID, LeitungUnitContext> unitContext() {
+    Map<UUID, LeitungUnitContext> context = new HashMap<>();
+    OrgChartDto chart;
+    try {
+      chart = leadershipClient.orgChart();
+    } catch (RuntimeException e) {
+      log.debug("Org chart unavailable for the Leitung tree", e);
+      return context;
+    }
+    if (chart == null || chart.bereiche() == null) {
+      return context;
+    }
+    for (BereichChartDto b : chart.bereiche()) {
+      if (b == null || b.orgUnitId() == null) {
+        continue;
+      }
+      context.put(b.orgUnitId(), new LeitungUnitContext(null, b.department()));
+      LeitungUnitContext child = new LeitungUnitContext(b.name(), b.department());
+      if (b.squadrons() != null) {
+        for (SquadronChartDto s : b.squadrons()) {
+          if (s != null && s.orgUnitId() != null) {
+            context.put(s.orgUnitId(), child);
+          }
+        }
+      }
+      if (b.specialCommands() != null) {
+        for (SpecialCommandChartDto sc : b.specialCommands()) {
+          if (sc != null && sc.orgUnitId() != null) {
+            context.put(sc.orgUnitId(), child);
+          }
+        }
+      }
+    }
+    return context;
+  }
+
+  /**
+   * Builds a Spezialkommando's roster rows from the view, adding the Logistiker and Einsatzleiter
+   * flags when the caller may manage the roster and the flag read succeeds.
+   *
+   * @param sk the Spezialkommando as the view lists it.
+   * @param flagsKnown collects the ids of the SKs whose flags were read.
+   * @return one row per member, in the view's order; never {@code null}.
+   */
+  @NotNull
+  private List<OrgUnitMembershipDto> skRoster(
+      @NotNull LeitungUnitDto sk, @NotNull Set<UUID> flagsKnown) {
+    Map<UUID, OrgUnitMembershipDto> flags =
+        sk.canManageRoster() && sk.id() != null ? skFlags(sk.id()) : null;
+    if (flags != null) {
+      flagsKnown.add(sk.id());
+    }
+    List<OrgUnitMembershipDto> rows = new ArrayList<>();
+    if (sk.members() == null) {
+      return rows;
+    }
+    for (LeitungMemberDto m : sk.members()) {
+      if (m == null) {
+        continue;
+      }
+      OrgUnitMembershipDto f = flags == null ? null : flags.get(m.userId());
+      long version = f != null && f.version() != null ? f.version() : m.version();
+      rows.add(
+          new OrgUnitMembershipDto(
+              m.userId(),
+              m.userDisplayName(),
+              sk.id(),
+              OrgUnitKind.SPECIAL_COMMAND,
+              f != null && Boolean.TRUE.equals(f.isLogistician()),
+              f != null && Boolean.TRUE.equals(f.isMissionManager()),
+              SK_LEAD.equals(m.role()),
+              null,
+              version));
+    }
+    return rows;
+  }
+
+  /**
+   * Reads a Spezialkommando's member roster with its role flags.
+   *
+   * @param skId the Spezialkommando.
+   * @return the rows keyed by user id, or {@code null} when the read fails or answers empty.
+   */
+  @Nullable
+  private Map<UUID, OrgUnitMembershipDto> skFlags(@NotNull UUID skId) {
+    List<OrgUnitMembershipDto> raw;
+    try {
+      raw = leadershipClient.specialCommandMembers(skId);
+    } catch (RuntimeException e) {
+      log.debug("Spezialkommando roster flags unavailable", e);
+      return null;
+    }
+    if (raw == null) {
+      return null;
+    }
+    Map<UUID, OrgUnitMembershipDto> byUser = new HashMap<>();
+    for (OrgUnitMembershipDto row : raw) {
+      if (row == null) {
+        continue;
+      }
+      UUID userId = row.userId();
+      if (userId != null) {
+        byUser.put(userId, row);
+      }
+    }
+    return byUser;
   }
 
   /**
@@ -103,12 +359,10 @@ public class LeitungPageController {
   public ResponseEntity<Object> assignSquadronRank(
       @PathVariable @NotNull UUID squadronId,
       @PathVariable @NotNull UUID userId,
-      @RequestBody Map<String, Object> body) {
+      @RequestBody AssignSquadronRankRequest body) {
     return proxy(
         "Assign squadron rank failed",
-        () ->
-            backendApiClient.put(
-                "/api/v1/squadrons/" + squadronId + "/ranks/" + userId, body, Object.class));
+        () -> leadershipClient.assignSquadronRank(squadronId, userId, body));
   }
 
   /**
@@ -128,10 +382,7 @@ public class LeitungPageController {
       @RequestParam("version") long version) {
     return proxy(
         "Remove squadron rank failed",
-        () ->
-            backendApiClient.delete(
-                "/api/v1/squadrons/" + squadronId + "/ranks/" + userId + "?version=" + version,
-                Object.class));
+        () -> leadershipClient.removeSquadronRank(squadronId, userId, version));
   }
 
   /**
@@ -145,12 +396,10 @@ public class LeitungPageController {
   @ResponseBody
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> createKommandoGroup(
-      @PathVariable @NotNull UUID squadronId, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID squadronId, @RequestBody CreateKommandoGroupRequest body) {
     return proxy(
         "Create Kommandogruppe failed",
-        () ->
-            backendApiClient.post(
-                "/api/v1/squadrons/" + squadronId + "/kommando-groups", body, Object.class));
+        () -> leadershipClient.createKommandoGroup(squadronId, body));
   }
 
   /**
@@ -164,10 +413,9 @@ public class LeitungPageController {
   @ResponseBody
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> updateKommandoGroup(
-      @PathVariable @NotNull UUID groupId, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID groupId, @RequestBody UpdateKommandoGroupRequest body) {
     return proxy(
-        "Update Kommandogruppe failed",
-        () -> backendApiClient.put("/api/v1/kommando-groups/" + groupId, body, Object.class));
+        "Update Kommandogruppe failed", () -> leadershipClient.updateKommandoGroup(groupId, body));
   }
 
   /**
@@ -182,7 +430,10 @@ public class LeitungPageController {
   public ResponseEntity<Object> deleteKommandoGroup(@PathVariable @NotNull UUID groupId) {
     return proxy(
         "Delete Kommandogruppe failed",
-        () -> backendApiClient.delete("/api/v1/kommando-groups/" + groupId, Object.class));
+        () -> {
+          leadershipClient.deleteKommandoGroup(groupId);
+          return null;
+        });
   }
 
   /**
@@ -196,12 +447,9 @@ public class LeitungPageController {
   @ResponseBody
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> addBereichLeader(
-      @PathVariable @NotNull UUID bereichId, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID bereichId, @RequestBody AddBereichLeaderRequest body) {
     return proxy(
-        "Add Bereich leader failed",
-        () ->
-            backendApiClient.post(
-                "/api/v1/org-hierarchy/bereiche/" + bereichId + "/members", body, Object.class));
+        "Add Bereich leader failed", () -> leadershipClient.addBereichLeader(bereichId, body));
   }
 
   /**
@@ -218,10 +466,10 @@ public class LeitungPageController {
       @PathVariable @NotNull UUID bereichId, @PathVariable @NotNull UUID userId) {
     return proxy(
         "Remove Bereich leader failed",
-        () ->
-            backendApiClient.delete(
-                "/api/v1/org-hierarchy/bereiche/" + bereichId + "/members/" + userId,
-                Object.class));
+        () -> {
+          leadershipClient.removeBereichLeader(bereichId, userId);
+          return null;
+        });
   }
 
   /**
@@ -235,14 +483,8 @@ public class LeitungPageController {
   @ResponseBody
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> addOlMember(
-      @PathVariable @NotNull UUID olId, @RequestBody Map<String, Object> body) {
-    return proxy(
-        "Add OL member failed",
-        () ->
-            backendApiClient.post(
-                "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/members",
-                body,
-                Object.class));
+      @PathVariable @NotNull UUID olId, @RequestBody AddOlMemberRequest body) {
+    return proxy("Add OL member failed", () -> leadershipClient.addOlMember(olId, body));
   }
 
   /**
@@ -259,10 +501,10 @@ public class LeitungPageController {
       @PathVariable @NotNull UUID olId, @PathVariable @NotNull UUID userId) {
     return proxy(
         "Remove OL member failed",
-        () ->
-            backendApiClient.delete(
-                "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/members/" + userId,
-                Object.class));
+        () -> {
+          leadershipClient.removeOlMember(olId, userId);
+          return null;
+        });
   }
 
   /**
@@ -277,14 +519,13 @@ public class LeitungPageController {
   @ResponseBody
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> setGrandAdmiral(
-      @PathVariable @NotNull UUID olId, @RequestBody Map<String, Object> body) {
+      @PathVariable @NotNull UUID olId, @RequestBody GrandAdmiralRequest body) {
     return proxy(
         "Set Grand Admiral failed",
-        () ->
-            backendApiClient.put(
-                "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/grand-admiral",
-                body,
-                Object.class));
+        () -> {
+          leadershipClient.setGrandAdmiral(olId, body);
+          return null;
+        });
   }
 
   /**
@@ -299,10 +540,10 @@ public class LeitungPageController {
   public ResponseEntity<Object> removeGrandAdmiral(@PathVariable @NotNull UUID olId) {
     return proxy(
         "Remove Grand Admiral failed",
-        () ->
-            backendApiClient.delete(
-                "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/grand-admiral",
-                Object.class));
+        () -> {
+          leadershipClient.removeGrandAdmiral(olId);
+          return null;
+        });
   }
 
   /**
@@ -319,14 +560,8 @@ public class LeitungPageController {
   public ResponseEntity<Object> toggleSkLead(
       @PathVariable @NotNull UUID skId,
       @PathVariable @NotNull UUID userId,
-      @RequestBody Map<String, Object> body) {
-    return proxy(
-        "Toggle SK lead failed",
-        () ->
-            backendApiClient.patch(
-                "/api/v1/special-commands/" + skId + "/members/" + userId + "/lead",
-                body,
-                Object.class));
+      @RequestBody MembershipLeadToggleRequest body) {
+    return proxy("Toggle SK lead failed", () -> leadershipClient.toggleSkLead(skId, userId, body));
   }
 
   /**

@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
@@ -30,8 +32,6 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +44,7 @@ class InventoryItemMapperTest {
   private static final StockViewerAccess ALWAYS_ALLOWED =
       new StockViewerAccess() {
         @Override
-        public boolean canEditInventoryItem(java.util.UUID inventoryItemId) {
+        public boolean mayEditInventoryItem(java.util.UUID inventoryItemId, UUID ownerId) {
           return true;
         }
 
@@ -162,6 +162,66 @@ class InventoryItemMapperTest {
     assertTrue(dto.jobOrderAllocations().isEmpty());
     assertTrue(dto.missionAllocations().isEmpty());
     assertTrue(dto.personal());
+  }
+
+  @Test
+  void toDto_canEdit_shouldCarryTheGateAnswerForTheRowAndItsOwner() {
+    UUID itemId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+    UUID[] asked = new UUID[2];
+    ReflectionTestUtils.setField(
+        mapper,
+        "stockAccess",
+        new StockViewerAccess() {
+          @Override
+          public boolean mayEditInventoryItem(UUID inventoryItemId, UUID rowOwnerId) {
+            asked[0] = inventoryItemId;
+            asked[1] = rowOwnerId;
+            return false;
+          }
+
+          @Override
+          public boolean mayEditJobOrder(UUID jobOrderId) {
+            return true;
+          }
+        });
+    User owner = new User();
+    owner.setId(ownerId);
+    Material material = new Material();
+    material.setId(UUID.randomUUID());
+    InventoryItem item = new InventoryItem();
+    item.setId(itemId);
+    item.setUser(owner);
+    item.setMaterial(material);
+    item.setAmount(1.0);
+
+    InventoryItemDto dto = mapper.toDto(item);
+
+    assertFalse(dto.canEdit());
+    assertEquals(itemId, asked[0]);
+    assertEquals(ownerId, asked[1]);
+  }
+
+  @Test
+  void toDto_canEdit_shouldBeFalseForAnUnsavedRowWithoutAskingTheGate() {
+    ReflectionTestUtils.setField(
+        mapper,
+        "stockAccess",
+        new StockViewerAccess() {
+          @Override
+          public boolean mayEditInventoryItem(UUID inventoryItemId, UUID ownerId) {
+            throw new AssertionError("an id-less row must not reach the gate");
+          }
+
+          @Override
+          public boolean mayEditJobOrder(UUID jobOrderId) {
+            return true;
+          }
+        });
+    InventoryItem item = new InventoryItem();
+    item.setAmount(1.0);
+
+    assertFalse(mapper.toDto(item).canEdit());
   }
 
   @Test

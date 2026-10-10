@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.integration;
 
 import de.greluc.krt.profit.basetool.backend.config.ResponseSizeLimitInterceptor;
+import de.greluc.krt.profit.basetool.backend.config.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.config.UexProperties;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCategoryDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCityDto;
@@ -53,8 +54,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
+import org.springframework.resilience.annotation.ConcurrencyLimit;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -69,7 +72,14 @@ import org.springframework.web.client.RestClient;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConcurrencyLimit(UexClient.MAX_CONCURRENT_CALLS)
 public class UexClient {
+
+  /**
+   * Most calls in flight at once through this client; further callers wait. Equal to the UEX
+   * executor's maximum pool size.
+   */
+  static final int MAX_CONCURRENT_CALLS = 4;
 
   /**
    * Largest response body one UEX call may deliver (16 MiB). An oversized body fails the fetch into
@@ -93,9 +103,10 @@ public class UexClient {
   private static final int MAX_STATUS_LOG_LENGTH = 32;
 
   /**
-   * A fresh, observed builder from {@code RestClientConfig} (prototype-scoped), so the base URL set
-   * here does not leak into any other client.
+   * A fresh, observed builder for external hosts from {@code RestClientConfig} (prototype-scoped),
+   * so the base URL set here does not leak into any other client.
    */
+  @Qualifier(RestClientConfig.EXTERNAL_REST_CLIENT_BUILDER)
   private final RestClient.Builder restClientBuilder;
 
   /** The {@code app.uex.*} configuration: base URL and one path per endpoint. */
@@ -412,7 +423,7 @@ public class UexClient {
     }
     try {
       return request.exchangeForRequiredValue(
-          (clientRequest, response) -> {
+          (_, response) -> {
             if (response.getStatusCode().value() == 304) {
               log.info(
                   "Fetched 0 {} from UEX API: unchanged since the last sync (304 Not Modified) —"

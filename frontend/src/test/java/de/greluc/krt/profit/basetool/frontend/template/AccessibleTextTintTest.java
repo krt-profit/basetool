@@ -55,15 +55,10 @@ class AccessibleTextTintTest {
   private static final Pattern RULE = Pattern.compile("([^{}]+)\\{([^{}]*)\\}");
 
   /**
-   * The rules allowed to keep canonical Grau 2, as {@code "<file> <selector>"}. REQ-UI-006 keeps
-   * the canonical grey for purely decorative glyphs; both of these are {@code aria-hidden}: the
-   * unsorted-column indicator on the material demand table (the header's {@code aria-sort} carries
-   * the state) and the search icon inside the labelled blueprint search field.
+   * The rules allowed to keep canonical Grau 2, as {@code "<file> <selector>"}. Empty: DS-1
+   * (REQ-UI-027) gives every text use, decorative glyphs included, the {@code -text} tint.
    */
-  private static final Set<String> DECORATIVE =
-      Set.of(
-          "styles.css .demand-sortable[aria-sort='none'] .demand-sort-indicator",
-          "personal-inventory.css .krt-bp-search-icon");
+  private static final Set<String> DECORATIVE = Set.of();
 
   /** A script writing a failing hue into {@code style.color}. */
   private static final Pattern JS_TEXT_COLOUR =

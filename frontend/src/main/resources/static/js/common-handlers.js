@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    window.addEventListener('pageshow', function (event) {
+    window.addEventListener('pageshow', (event) => {
         if (event.persisted) {
             window.location.reload();
         }
@@ -42,7 +42,7 @@
             shift = maxX - rect.right;
         }
         if (shift !== 0) {
-            bubble.style.setProperty('--hint-shift', Math.round(shift) + 'px');
+            bubble.style.setProperty('--hint-shift', `${Math.round(shift)}px`);
         }
     }
 
@@ -53,10 +53,10 @@
         }
     }
 
-    document.addEventListener('mouseover', function (event) {
+    document.addEventListener('mouseover', (event) => {
         repositionHintFrom(event.target);
     });
-    document.addEventListener('focusin', function (event) {
+    document.addEventListener('focusin', (event) => {
         repositionHintFrom(event.target);
     });
 
@@ -95,7 +95,7 @@
     /**
      * Navigates to the same-origin URL in `data-href` through {@link navigateSafe}.
      */
-    on('click', 'navigate-href', function (el, event) {
+    on('click', 'navigate-href', (el, event) => {
         if (navigateSafe(el.getAttribute('data-href'))) {
             event.preventDefault();
         }
@@ -105,7 +105,7 @@
      * Navigates to `data-url-template` with its `{value}` placeholder replaced by the URL-encoded
      * selected value, through {@link navigateSafe}.
      */
-    on('change', 'navigate-select', function (el) {
+    on('change', 'navigate-select', (el) => {
         if (!el.value) return;
         const template = el.getAttribute('data-url-template');
         if (!template) return;
@@ -115,7 +115,7 @@
     /**
      * Goes back in browser history, preventing the element's own default navigation.
      */
-    on('click', 'history-back', function (el, event) {
+    on('click', 'history-back', (el, event) => {
         event.preventDefault();
         window.history.back();
     });
@@ -123,14 +123,14 @@
     /**
      * Stops click propagation so a nested action does not trigger a clickable row's handler.
      */
-    on('click', 'stop-propagation', function (el, event) {
+    on('click', 'stop-propagation', (el, event) => {
         event.stopPropagation();
     });
 
     /**
      * Submits the control's form whenever the control changes.
      */
-    on('change', 'submit-form', function (el) {
+    on('change', 'submit-form', (el) => {
         if (el.form && typeof el.form.submit === 'function') {
             el.form.submit();
         }
@@ -167,22 +167,22 @@
     on('keyup', 'filter-table', filterTableHandler);
 
     /**
-     * Toggles the `krtm-hidden` class on the element whose id is in `data-target`, without writing
+     * Toggles the `is-hidden` class on the element whose id is in `data-target`, without writing
      * an inline style.
      */
-    on('click', 'toggle-display', function (el, event) {
+    on('click', 'toggle-display', (el, event) => {
         const id = el.getAttribute('data-target');
         if (!id) return;
         const target = document.getElementById(id);
         if (!target) return;
         event.preventDefault();
-        target.classList.toggle('krtm-hidden');
+        target.classList.toggle('is-hidden');
     });
 
     /**
      * Opens the dialog named by `data-modal-id` through `window.krtModal.open`.
      */
-    on('click', 'open-modal-display', function (el, event) {
+    on('click', 'open-modal-display', (el, event) => {
         const id = el.getAttribute('data-modal-id');
         if (!id || !document.getElementById(id)) return;
         event.preventDefault();
@@ -192,7 +192,7 @@
     /**
      * Closes the dialog named by `data-modal-id` through `window.krtModal.close`.
      */
-    on('click', 'close-modal-display', function (el, event) {
+    on('click', 'close-modal-display', (el, event) => {
         const id = el.getAttribute('data-modal-id');
         if (!id || !document.getElementById(id)) return;
         event.preventDefault();

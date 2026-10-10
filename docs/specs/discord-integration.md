@@ -511,8 +511,17 @@ no persisted "announced" flag, no double-fire on a scheduler-first row or a logi
 same after-commit trigger additionally e-mails every admin the same notice on a second channel
 (REQ-NOTIF-015).
 
+The notice disappears from **every** admin's inbox once the registration leaves the queue: approve
+and reject (`UserRegistrationService#decide`) and the deletion of a still-pending registration
+(`UserDeletionService#deleteUser`, the path linking onto an existing account takes too) publish the
+notify-nobody `DISCORD_REGISTRATION_DECIDED`, which supersedes `DISCORD_REGISTRATION_PENDING` for that
+registration (REQ-NOTIF-018). A merge keeps the registration pending and clears nothing; a reopened
+rejection raises no new notice.
+
 **Acceptance**
 
+- [x] Approving, rejecting or deleting a pending registration clears every admin's
+  `DISCORD_REGISTRATION_PENDING` notice for it, after commit; a refused deletion clears nothing.
 - [x] A new PENDING registration publishes a `DISCORD_REGISTRATION_PENDING` after-commit event whose
   default rule (V174) resolves to every admin via a `ROLE` selector — fired on the PENDING transition,
   **not** gated on the `discord_user_id` claim, and from **both** the interactive and the scheduled
@@ -521,7 +530,7 @@ same after-commit trigger additionally e-mails every admin the same notice on a 
 - [x] Exactly one notification per admin, end to end (the `created` gate makes the two sync paths
   mutually exclusive for a given row).
 
-**Enforced by:** `NotificationRuleEngineIntegrationTest#discordRegistrationPendingRuleNotifiesEveryAdmin` (V174 rule → ADMIN recipient → exactly one unread row, end to end) · `UserReconciliationServiceTest` — `DiscordSyncTests#newPendingRegistration_notifiesAdmins_evenWithoutDiscordClaim` (fires with the claim absent) and `SyncKeycloakUserTests` (scheduled path fires for a new non-admin, stays silent for an admin and for an already-persisted row) · `DiscordRegistrationPendingEvent` (no PII by construction) + `V174` seed · **Code:** `UserReconciliationService.syncUser(Jwt)` / `.syncUser(KeycloakUserDto)`, `UserRegistrationService.stampNewPendingRegistration`, `DiscordRegistrationPendingEvent`, `V174` · **Issues:** #724
+**Enforced by:** `NotificationRuleEngineIntegrationTest#discordRegistrationPendingRuleNotifiesEveryAdmin` (V174 rule → ADMIN recipient → exactly one unread row, end to end) · `UserReconciliationServiceTest` — `DiscordSyncTests#newPendingRegistration_notifiesAdmins_evenWithoutDiscordClaim` (fires with the claim absent) and `SyncKeycloakUserTests` (scheduled path fires for a new non-admin, stays silent for an admin and for an already-persisted row) · `DiscordRegistrationPendingEvent` (no PII by construction) + `V174` seed · the clearing: `NotificationRuleEngineIntegrationTest#discordRegistrationPendingRuleNotifiesEveryAdmin` (end to end), `UserRegistrationServiceTest`, `UserDeletionServiceTest`, `NotificationLifecycleEventsTest` · **Code:** `UserReconciliationService.syncUser(Jwt)` / `.syncUser(KeycloakUserDto)`, `UserRegistrationService.stampNewPendingRegistration`, `DiscordRegistrationPendingEvent`, `DiscordRegistrationDecidedEvent`, `UserRegistrationService#decide`, `UserDeletionService#deleteUser`, `V174` · **Issues:** #724, #2413
 
 ### REQ-NOTIF-014 — User notified by e-mail on approval / rejection (reason included)
 
@@ -555,7 +564,7 @@ reason are **never logged** (REQ-OBS).
 **Enforced by:** `UserRegistrationServiceTest` (publish on decide, none on 409) · `UserApprovalMailServiceTest`
 (approval/rejection composition, reason placeholder, skip-on-no-email) · `UserApprovalMailEventListenerTest`
 (delegate + swallow) · `MessageBundleConsistencyTest` (key parity + umlaut escaping) · **Code:**
-`UserRegistrationService.approveUser`/`rejectUser`, `event/UserApprovalDecidedEvent`, `service/UserApprovalMailService`,
+`UserRegistrationService.approveUser`/`rejectUser`, `identity/api/events/UserApprovalDecidedEvent`, `service/UserApprovalMailService`,
 `service/UserApprovalMailEventListener`, `messages*.properties` (`email.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
 ### REQ-NOTIF-015 — Admins notified by e-mail on new PENDING registration
@@ -600,7 +609,7 @@ and the username are **never logged** (REQ-OBS) — only the recipient count.
 name-less body, empty-admins no-op) · `PendingRegistrationMailEventListenerTest` (delegate + swallow) ·
 `MessageBundleConsistencyTest` (key parity + umlaut escaping) · **Code:**
 `service/PendingRegistrationMailService`, `service/PendingRegistrationMailEventListener`,
-`event/DiscordRegistrationPendingEvent`, `repository/UserRepository#findAllAdmins`,
+`identity/api/events/DiscordRegistrationPendingEvent`, `repository/UserRepository#findAllAdmins`,
 `messages*.properties` (`email.pendingRegistration.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
 ### REQ-DATA-018 — Discord guild nickname captured at login & shown at approval (admin-only)

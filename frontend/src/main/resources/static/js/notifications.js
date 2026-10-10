@@ -52,35 +52,38 @@
         };
     }
 
-    function csrfRequestInit() {
-        return {
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        };
+    /**
+     * Reads one of this module's JSON endpoints through the shared read path (REQ-FE-031).
+     *
+     * @param {string} url the endpoint
+     * @returns {Promise<Response | null>} the response, or null when a gate took over
+     */
+    function readNotifications(url) {
+        return window.krtFetch.get(url, { accept: 'application/json' });
     }
 
     /**
      * Reads the JSON payload of one of this module's GETs, or resolves to `fallback` when the
      * answer is not that payload.
      *
-     * The re-auth (REQ-SEC-012) and consent (REQ-SEC-028) gates navigate the page; a redirected
-     * answer is never parsed.
+     * A null response means `krtFetch.get` handed the answer to the re-auth (REQ-SEC-012) or
+     * consent (REQ-SEC-028) gate or refused it as redirected; the stream and the badge poll then
+     * stop, because the page is leaving or the session is unusable.
      *
-     * @param {Response} res the response to read
+     * @param {Response | null} res the response to read
      * @param {any} fallback the value to resolve to when the answer is not the payload
      * @returns {any} the parsed body, or the fallback
      */
     function readJson(res, fallback) {
-        if (res.status === 401) {
+        if (!res) {
             stopSse();
-        }
-        if (window.krtReauth && window.krtReauth.check(res)) {
-            return fallback;
-        }
-        if (window.krtTermsGate && window.krtTermsGate.check(res)) {
             stopPolling();
             return fallback;
         }
-        if (res.redirected || !res.ok) {
+        if (res.status === 401) {
+            stopSse();
+        }
+        if (!res.ok) {
             return fallback;
         }
         return res.json();
@@ -93,42 +96,60 @@
         }
         const n = typeof count === 'number' ? count : 0;
         const text = n > 99 ? '99+' : String(n);
-        [badge, ...Array.from(document.querySelectorAll('[data-notif-badge]'))].forEach(
-            function (el) {
-                el.textContent = text;
-                el.classList.toggle('notification-badge-hidden', n <= 0);
-            },
-        );
+        [badge, ...Array.from(document.querySelectorAll('[data-notif-badge]'))].forEach((el) => {
+            el.textContent = text;
+            el.classList.toggle('notification-badge-hidden', n <= 0);
+        });
     }
 
     function refreshUnreadCount() {
-        return fetch('/notifications/unread-count', csrfRequestInit())
-            .then(function (res) {
+        return readNotifications('/notifications/unread-count')
+            .then((res) => {
                 return readJson(res, null);
             })
-            .then(function (data) {
+            .then((data) => {
                 if (data && data.count != null) {
                     setBadge(Number(data.count));
                 }
             })
-            .catch(function () {});
+            .catch(() => {});
     }
 
-    function buildItem(item) {
+    /**
+     * Builds one notification row.
+     *
+     * @param {any} item the server-localized notification view
+     * @param {boolean} [linkable] whether the row links to the page the notification is about
+     * @returns {HTMLLIElement} the row
+     */
+    function buildItem(item, linkable) {
         const li = document.createElement('li');
-        li.className = 'notification-item' + (item.read ? ' is-read' : '');
+        li.className = `notification-item${item.read ? ' is-read' : ''}`;
         li.setAttribute('data-notif-id', item.id);
         li.setAttribute('data-notif-read', item.read ? 'true' : 'false');
 
+        const href =
+            linkable && typeof window.safeSameOriginUrl === 'function'
+                ? window.safeSameOriginUrl(item.href)
+                : null;
         const body = document.createElement('div');
         body.className = 'notification-item-body';
-        const text = document.createElement('p');
+        const text = document.createElement(href ? 'span' : 'p');
         text.className = 'notification-item-text';
         text.textContent = item.text != null ? item.text : '';
         const time = document.createElement('span');
         time.className = 'notification-item-time';
         time.textContent = item.createdAtDisplay != null ? item.createdAtDisplay : '';
-        body.appendChild(text);
+        if (href) {
+            const link = document.createElement('a');
+            link.className = 'row-link';
+            link.setAttribute('data-testid', 'row-link');
+            link.href = href;
+            link.appendChild(text);
+            body.appendChild(link);
+        } else {
+            body.appendChild(text);
+        }
         body.appendChild(time);
 
         const actions = document.createElement('div');
@@ -146,24 +167,42 @@
                 'btn btn-quiet-danger btn-icon',
             ),
         );
+        if (href) {
+            actions.appendChild(chevron());
+        }
 
         li.appendChild(body);
         li.appendChild(actions);
         return li;
     }
 
+    /**
+     * The decorative chevron that ends a linked row.
+     *
+     * @returns {SVGSVGElement} the icon
+     */
+    function chevron() {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'row-chevron');
+        svg.setAttribute('aria-hidden', 'true');
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        use.setAttribute('href', '#krt-icon-chevron-right');
+        svg.appendChild(use);
+        return svg;
+    }
+
     function actionButton(attr, label, icon, className) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = className;
-        btn.setAttribute('data-' + attr, '');
+        btn.setAttribute(`data-${attr}`, '');
         btn.setAttribute('aria-label', label);
         btn.title = label;
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('class', 'krt-icon');
         svg.setAttribute('aria-hidden', 'true');
         const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-        use.setAttribute('href', '#' + icon);
+        use.setAttribute('href', `#${icon}`);
         svg.appendChild(use);
         btn.appendChild(svg);
         return btn;
@@ -175,26 +214,26 @@
         if (!list) {
             return;
         }
-        list.innerHTML = '';
+        list.replaceChildren();
         if (empty) {
             empty.classList.add('notification-badge-hidden');
         }
-        fetch('/notifications/recent', csrfRequestInit())
-            .then(function (res) {
+        readNotifications('/notifications/recent')
+            .then((res) => {
                 return readJson(res, []);
             })
-            .then(function (items) {
+            .then((items) => {
                 if (!Array.isArray(items) || items.length === 0) {
                     if (empty) {
                         empty.classList.remove('notification-badge-hidden');
                     }
                     return;
                 }
-                items.forEach(function (item) {
+                items.forEach((item) => {
                     list.appendChild(buildItem(item));
                 });
             })
-            .catch(function () {
+            .catch(() => {
                 if (empty) {
                     empty.classList.remove('notification-badge-hidden');
                 }
@@ -239,7 +278,7 @@
     }
 
     function eachItem(id, fn) {
-        const nodes = document.querySelectorAll('[data-notif-id="' + cssEscape(id) + '"]');
+        const nodes = document.querySelectorAll(`[data-notif-id="${cssEscape(id)}"]`);
         Array.prototype.forEach.call(nodes, fn);
     }
 
@@ -289,7 +328,7 @@
         window.krtFetch
             .write({
                 method: 'POST',
-                url: '/notifications/' + encodeURIComponent(id) + '/read',
+                url: `/notifications/${encodeURIComponent(id)}/read`,
                 toast: false,
                 errorMessage: i18n.error,
                 submitter,
@@ -307,7 +346,7 @@
         window.krtFetch
             .write({
                 method: 'DELETE',
-                url: '/notifications/' + encodeURIComponent(id),
+                url: `/notifications/${encodeURIComponent(id)}`,
                 successMessage: i18n.deleted,
                 errorMessage: i18n.error,
                 submitter,
@@ -341,7 +380,7 @@
         if (!window.krtFetch) {
             return;
         }
-        confirmThen(i18n.confirmClearTitle, i18n.confirmClearBody, function () {
+        confirmThen(i18n.confirmClearTitle, i18n.confirmClearBody, () => {
             window.krtFetch
                 .write({
                     method: 'DELETE',
@@ -365,17 +404,17 @@
         }
         const page = parseInt(btn.getAttribute('data-notif-next-page'), 10) || 1;
         btn.disabled = true;
-        fetch('/notifications/page-items?page=' + page, csrfRequestInit())
-            .then(function (res) {
+        readNotifications(`/notifications/page-items?page=${page}`)
+            .then((res) => {
                 return readJson(res, null);
             })
-            .then(function (data) {
+            .then((data) => {
                 if (!data || !Array.isArray(data.items)) {
                     return;
                 }
-                data.items.forEach(function (item) {
-                    if (!list.querySelector('[data-notif-id="' + cssEscape(item.id) + '"]')) {
-                        list.appendChild(buildItem(item));
+                data.items.forEach((item) => {
+                    if (!list.querySelector(`[data-notif-id="${cssEscape(item.id)}"]`)) {
+                        list.appendChild(buildItem(item, true));
                     }
                 });
                 btn.setAttribute('data-notif-next-page', String(page + 1));
@@ -389,8 +428,8 @@
                     }
                 }
             })
-            .catch(function () {})
-            .finally(function () {
+            .catch(() => {})
+            .finally(() => {
                 btn.disabled = false;
             });
     }
@@ -409,13 +448,11 @@
 
     function confirmThen(title, body, action) {
         if (typeof window.showKrtConfirm === 'function') {
-            window
-                .showKrtConfirm(title, body, i18n.confirmOk, i18n.confirmCancel)
-                .then(function (ok) {
-                    if (ok) {
-                        action();
-                    }
-                });
+            window.showKrtConfirm(title, body, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
+                if (ok) {
+                    action();
+                }
+            });
         } else {
             action();
         }
@@ -554,7 +591,7 @@
         const base =
             SSE_RECONNECT_BASE_MS * Math.pow(2, Math.min(sseRefusals, SSE_MAX_BACKOFF_STEPS));
         const delay = base + Math.floor(Math.random() * base);
-        sseReconnectTimer = window.setTimeout(function () {
+        sseReconnectTimer = window.setTimeout(() => {
             sseReconnectTimer = null;
             if (!sseStopped) {
                 startSse();
@@ -598,12 +635,12 @@
             const source = new EventSource('/notifications/stream');
             sseSource = source;
             let opened = false;
-            source.addEventListener('open', function () {
+            source.addEventListener('open', () => {
                 opened = true;
                 sseRefusals = 0;
                 markSseHealthy();
             });
-            source.addEventListener('error', function () {
+            source.addEventListener('error', () => {
                 markSseUnhealthy();
                 try {
                     source.close();
@@ -617,10 +654,10 @@
                 }
                 scheduleSseReconnect();
             });
-            source.addEventListener('heartbeat', function () {
+            source.addEventListener('heartbeat', () => {
                 markSseHealthy();
             });
-            source.addEventListener('notification', function () {
+            source.addEventListener('notification', () => {
                 markSseHealthy();
                 refreshUnreadCount();
                 const dropdown = document.getElementById('notification-dropdown');
@@ -628,7 +665,7 @@
                     loadDropdown();
                 }
             });
-            source.addEventListener('reauth', function (event) {
+            source.addEventListener('reauth', (event) => {
                 sseStopped = true;
                 if (sseReconnectTimer !== null) {
                     window.clearTimeout(sseReconnectTimer);
@@ -638,7 +675,7 @@
                     window.krtReauth.redirect(event && event.data ? event.data : null);
                 }
             });
-            source.addEventListener('terms-gate', function (event) {
+            source.addEventListener('terms-gate', (event) => {
                 sseStopped = true;
                 if (sseReconnectTimer !== null) {
                     window.clearTimeout(sseReconnectTimer);
@@ -654,7 +691,7 @@
                     window.krtTermsGate.redirect(event && event.data ? event.data : null);
                 }
             });
-            source.addEventListener('replaced', function () {
+            source.addEventListener('replaced', () => {
                 sseStopped = true;
                 if (sseReconnectTimer !== null) {
                     window.clearTimeout(sseReconnectTimer);

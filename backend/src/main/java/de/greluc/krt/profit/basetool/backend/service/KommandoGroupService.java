@@ -19,23 +19,25 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mapper.KommandoGroupMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateKommandoGroupRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateKommandoGroupRequest;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver;
+import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.support.OrgUnitLabels;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -65,8 +67,8 @@ public class KommandoGroupService {
   private final KommandoGroupRepository kommandoGroupRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipRepository membershipRepository;
-  private final AuditService auditService;
-  private final OrgChartService orgChartService;
+  private final AuditRecorder auditRecorder;
+  private final MembershipChangeObserver membershipChangeObserver;
   private final KommandoGroupMapper kommandoGroupMapper;
 
   /**
@@ -111,8 +113,8 @@ public class KommandoGroupService {
             .sortIndex((int) existing)
             .build();
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
-    orgChartService.mirrorCreateKommandoGroup(saved);
-    auditService.record(
+    membershipChangeObserver.onKommandoGroupCreated(saved);
+    auditRecorder.record(
         AuditEventType.KOMMANDO_GROUP_CREATED,
         saved.getId(),
         saved.getName(),
@@ -140,8 +142,8 @@ public class KommandoGroupService {
     group.setName(request.name().strip());
     group.setSortIndex(request.sortIndex());
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
-    orgChartService.mirrorUpdateKommandoGroup(saved);
-    auditService.record(
+    membershipChangeObserver.onKommandoGroupUpdated(saved);
+    auditRecorder.record(
         AuditEventType.KOMMANDO_GROUP_UPDATED, saved.getId(), saved.getName(), null, null);
     return kommandoGroupMapper.toDto(saved);
   }
@@ -162,9 +164,9 @@ public class KommandoGroupService {
           "Kommandogruppe still has assigned members — reassign them before deleting it");
     }
     String name = group.getName();
-    orgChartService.mirrorDeleteKommandoGroup(groupId);
+    membershipChangeObserver.onKommandoGroupDeleted(groupId);
     kommandoGroupRepository.delete(group);
-    auditService.record(AuditEventType.KOMMANDO_GROUP_DELETED, groupId, name, null, null);
+    auditRecorder.record(AuditEventType.KOMMANDO_GROUP_DELETED, groupId, name, null, null);
   }
 
   /**

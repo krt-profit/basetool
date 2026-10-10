@@ -62,7 +62,7 @@ public final class MissionDetailModelBuilder {
    * @param unassignedParticipants participants not yet crewed into any unit, in sorted order
    * @param participantsById participant id → full participant payload
    * @param participationPercentages participant id → share of total participant-time (0.0 default)
-   * @param frequencyByTypeId typed (global) channel by frequency-type id (string key)
+   * @param frequencyByTypeId typed (global) channel by frequency-type id
    * @param customFrequencies mission-specific channels, sorted case-insensitively by name
    */
   public record MissionDetailViewModel(
@@ -76,7 +76,7 @@ public final class MissionDetailModelBuilder {
       List<MissionParticipantDto> unassignedParticipants,
       Map<UUID, MissionParticipantDto> participantsById,
       Map<UUID, Double> participationPercentages,
-      Map<String, MissionFrequencyDto> frequencyByTypeId,
+      Map<UUID, MissionFrequencyDto> frequencyByTypeId,
       List<MissionFrequencyDto> customFrequencies) {}
 
   /**
@@ -139,7 +139,7 @@ public final class MissionDetailModelBuilder {
       JobTypeDto job = p.plannedMissionJobType();
       if (job != null && job.isLeadershipRole()) {
         UUID jobId = job.id();
-        participantsByLeadType.computeIfAbsent(jobId.toString(), k -> new ArrayList<>()).add(p);
+        participantsByLeadType.computeIfAbsent(jobId.toString(), _ -> new ArrayList<>()).add(p);
         if (addedLeadTypes.add(jobId)) {
           missionLeadTypes.add(job);
         }
@@ -329,12 +329,12 @@ public final class MissionDetailModelBuilder {
    */
   @NotNull
   private static FrequencyGrouping groupFrequencies(MissionDto mission) {
-    Map<String, MissionFrequencyDto> frequencyByTypeId = new HashMap<>();
+    Map<UUID, MissionFrequencyDto> frequencyByTypeId = new HashMap<>();
     List<MissionFrequencyDto> customFrequencies = new ArrayList<>();
     if (mission.frequencies() != null) {
       for (MissionFrequencyDto f : mission.frequencies()) {
         if (f.frequencyTypeId() != null) {
-          frequencyByTypeId.put(f.frequencyTypeId().toString(), f);
+          frequencyByTypeId.put(f.frequencyTypeId(), f);
         } else if (f.name() != null) {
           customFrequencies.add(f);
         }
@@ -394,9 +394,9 @@ public final class MissionDetailModelBuilder {
    * Paired output of {@link #groupFrequencies}: the typed-channel lookup and the ordered custom
    * channels.
    *
-   * @param byTypeId typed (global) channel by frequency-type id (string key)
+   * @param byTypeId typed (global) channel by frequency-type id
    * @param custom the mission-specific free-text channels, sorted by name
    */
   private record FrequencyGrouping(
-      Map<String, MissionFrequencyDto> byTypeId, List<MissionFrequencyDto> custom) {}
+      Map<UUID, MissionFrequencyDto> byTypeId, List<MissionFrequencyDto> custom) {}
 }

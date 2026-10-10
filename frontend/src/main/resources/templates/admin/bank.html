@@ -12,26 +12,17 @@
 <th:block th:replace="~{fragments/header :: header}" />
 
 <main>
-    <div class="greeting hud-box">
-        <h1 th:text="#{admin.bank.title}">Bank-Administration</h1>
-        <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
-           th:text="#{admin.bank.subtitle}">Gef&auml;hrliche Wartungsaktionen der Kartellbank.</p>
-    </div>
+    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.bank', titleText=#{admin.bank.title})}"></th:block>
 
-    <div th:if="${wipeResult != null}" class="hud-box mt-2 krtm-border-color-var-color-success-77db"
-         data-testid="bank-wipe-success">
-        <p th:text="#{admin.bank.wipe.success(${wipeResult.accountsReset()}, ${wipeResult.holderStashesZeroed()})}">
-            5 Konten und 12 Halter-Best&auml;nde auf 0 gesetzt.</p>
-    </div>
-    <div th:if="${wipeNoop != null}" class="hud-box mt-2" data-testid="bank-wipe-noop">
-        <p th:text="#{admin.bank.wipe.noop}">Alle Salden waren bereits 0 — nichts zu tun.</p>
-    </div>
-    <div th:if="${error != null}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169"
-         data-testid="bank-wipe-error">
-        <p th:text="#{${error}}">Fehler.</p>
-    </div>
+    <div th:if="${wipeResult != null}" class="alert alert-success" role="status" data-testid="bank-wipe-success"
+         th:text="#{admin.bank.wipe.success(${wipeResult.accountsReset()}, ${wipeResult.holderStashesZeroed()})}">
+        5 Konten und 12 Halter-Best&auml;nde auf 0 gesetzt.</div>
+    <div th:if="${wipeNoop != null}" class="alert alert-info" role="status" data-testid="bank-wipe-noop"
+         th:text="#{admin.bank.wipe.noop}">Alle Salden waren bereits 0 — nichts zu tun.</div>
+    <div th:if="${error != null}" class="alert alert-danger" role="alert" data-testid="bank-wipe-error"
+         th:text="#{${error}}">Fehler.</div>
 
-    <div class="bank-danger-card mt-2" data-testid="bank-wipe-card">
+    <div class="bank-danger-card" data-testid="bank-wipe-card">
         <div class="bank-danger-head">
             <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-reset"/></svg>
             <h2 th:text="#{admin.bank.wipe.title}">Wipe-Reset</h2>

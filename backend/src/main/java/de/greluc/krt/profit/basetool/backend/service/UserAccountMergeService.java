@@ -19,13 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import jakarta.persistence.EntityManager;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,7 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserAccountMergeService {
 
   private final UserRepository userRepository;
-  private final AuditService auditService;
+  private final AuditRecorder auditRecorder;
   private final EntityManager entityManager;
 
   /**
@@ -117,6 +118,7 @@ public class UserAccountMergeService {
           OwnedRows.of("bank_holder", "user_id"),
           OwnedRows.of("notification", "recipient_user_id"),
           OwnedRows.of("notification_rule_selector", "user_id"),
+          OwnedRows.deduped("notification_mute", "user_id", "notification_type"),
           OwnedRows.deduped("member_evaluation", "user_id", "category_id"),
           OwnedRows.deduped(
               "exchange_installation", "user_id", "exchange_client_id", "key_thumbprint"),
@@ -219,7 +221,7 @@ public class UserAccountMergeService {
     for (Map.Entry<String, Integer> entry : moved.entrySet()) {
       details = details.with(entry.getKey(), entry.getValue());
     }
-    auditService.record(AuditEventType.USER_MERGED, null, null, targetUserId, details);
+    auditRecorder.record(AuditEventType.USER_MERGED, null, null, targetUserId, details);
 
     log.info(
         "Merged account {} into {}: {} row(s) moved across {} table(s) (acting admin {})",

@@ -22,10 +22,13 @@ package de.greluc.krt.profit.basetool.backend;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -41,8 +44,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
-import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeOfferRatchet;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -57,6 +58,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 /** Unit tests for the bulk checkout functionality in {@link InventoryCheckoutService}. */
@@ -74,8 +76,9 @@ class InventoryItemServiceBulkCheckoutTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
 
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService inventoryItemService;
 
   private User userWithId(UUID id) {
@@ -110,7 +113,7 @@ class InventoryItemServiceBulkCheckoutTest {
     InOrder order = inOrder(offerRatchet, inventoryItemRepository);
     order
         .verify(offerRatchet)
-        .beforeDelete(List.of(itemId1, itemId2), MaterialExchangeOfferRatchet.Reason.BULK_CHECKOUT);
+        .beforeDelete(List.of(itemId1, itemId2), StockChangeReason.BULK_CHECKOUT);
     order.verify(inventoryItemRepository).deleteAllById(List.of(itemId1, itemId2));
   }
 
