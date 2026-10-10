@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.notification.client;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationCountResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationPreferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationPreferenceWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -58,6 +60,9 @@ public class NotificationBackendClient {
   private static final ParameterizedTypeReference<List<NotificationRuleDto>> RULE_LIST =
       new ParameterizedTypeReference<>() {};
 
+  private static final ParameterizedTypeReference<List<NotificationPreferenceDto>> PREFERENCE_LIST =
+      new ParameterizedTypeReference<>() {};
+
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
 
@@ -87,6 +92,32 @@ public class NotificationBackendClient {
         NOTIFICATION_PAGE,
         Integer.valueOf(page),
         Integer.valueOf(size));
+  }
+
+  /**
+   * Reads the caller's notification preferences, one entry per type (REQ-NOTIF-027).
+   *
+   * @return the preferences, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<NotificationPreferenceDto> preferences() {
+    return backendApiClient.get(NOTIFICATIONS + "/preferences", PREFERENCE_LIST);
+  }
+
+  /**
+   * Mutes or unmutes one notification type for the caller (REQ-NOTIF-027).
+   *
+   * @param type the notification type name
+   * @param muted {@code true} to stop receiving the type
+   * @return the preference as stored, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public NotificationPreferenceDto setPreference(@NotNull String type, boolean muted) {
+    return backendApiClient.put(
+        NOTIFICATIONS + "/preferences/{type}",
+        new NotificationPreferenceWriteRequest(muted),
+        NotificationPreferenceDto.class,
+        type);
   }
 
   /**

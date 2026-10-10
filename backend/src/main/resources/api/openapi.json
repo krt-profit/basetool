@@ -37245,6 +37245,252 @@
         "x-domain" : "notification"
       }
     },
+    "/api/v1/notifications/preferences" : {
+      "get" : {
+        "operationId" : "preferences",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/NotificationPreferenceDto"
+                  }
+                }
+              }
+            },
+            "description" : "The preferences.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List the caller's notification preferences, one entry per type.",
+        "tags" : [ "notification" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "notification"
+      }
+    },
+    "/api/v1/notifications/preferences/{type}" : {
+      "put" : {
+        "operationId" : "setPreference",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "type",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED" ]
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/NotificationPreferenceWriteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationPreferenceDto"
+                }
+              }
+            },
+            "description" : "The preference was stored."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Mute or unmute one notification type for the caller.",
+        "tags" : [ "notification" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "notification"
+      }
+    },
     "/api/v1/notifications/read" : {
       "delete" : {
         "operationId" : "deleteAllRead",
@@ -77891,6 +78137,32 @@
             "format" : "int64"
           }
         }
+      },
+      "NotificationPreferenceDto" : {
+        "type" : "object",
+        "description" : "One notification type and whether the caller receives it.",
+        "properties" : {
+          "mutable" : {
+            "type" : "boolean"
+          },
+          "muted" : {
+            "type" : "boolean"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED" ]
+          }
+        }
+      },
+      "NotificationPreferenceWriteRequest" : {
+        "type" : "object",
+        "description" : "Sets whether the caller receives one notification type.",
+        "properties" : {
+          "muted" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "muted" ]
       },
       "NotificationRuleDto" : {
         "type" : "object",

@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.ProfileBlueprintSharing
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileRsiHandleForm;
+import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -78,6 +79,9 @@ public class ProfileController {
 
   /** Reads and writes the member's profile on the backend. */
   private final IdentityBackendClient identityClient;
+
+  /** Reads the member's notification preferences for the profile card. */
+  private final NotificationBackendClient notificationClient;
 
   private final MessageSource messageSource;
 
@@ -137,6 +141,7 @@ public class ProfileController {
           "Could not load the default payout preference; defaulting the selector to PAYOUT", e);
     }
     model.addAttribute("defaultPayoutPreference", defaultPayoutPreference);
+    NotificationPreferenceProxyController.populate(model, notificationClient);
 
     boolean shareBlueprintsGlobally = false;
     try {
