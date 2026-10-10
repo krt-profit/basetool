@@ -35,6 +35,7 @@
       "materialexchange::api",
       "mission::api",
       "notification::api",
+      "operation::api",
       "orgunit::api",
       "personalinventory::api",
       "platform::api",

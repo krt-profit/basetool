@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.web;
 
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankDirectBookingNotifier;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderBookingDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderService;
@@ -66,6 +67,7 @@ public class BankHolderController {
 
   private final BankHolderService bankHolderService;
   private final BankLedgerService bankLedgerService;
+  private final BankDirectBookingNotifier bankDirectBookingNotifier;
 
   /**
    * Lists the full holder registry with cross-account custody totals.
@@ -171,6 +173,8 @@ public class BankHolderController {
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankTransactionDto transfer(@RequestBody @Valid BankHolderTransferRequest request) {
-    return bankLedgerService.bookHolderTransfer(request);
+    BankTransactionDto booked = bankLedgerService.bookHolderTransfer(request);
+    bankDirectBookingNotifier.holderTransferBooked(request, booked);
+    return booked;
   }
 }

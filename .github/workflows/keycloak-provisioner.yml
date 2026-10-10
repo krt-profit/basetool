@@ -8,6 +8,9 @@ on:
       - "scripts/provision-keycloak-mobile-client.test.sh"
       - "scripts/provision-keycloak-realm.py"
       - "scripts/provision-keycloak-realm.test.sh"
+      - "scripts/harden-keycloak-realm.py"
+      - "scripts/harden-keycloak-realm.integration.py"
+      - "scripts/keycloak/**"
       - ".github/workflows/keycloak-provisioner.yml"
   push:
     branches: [main]
@@ -16,6 +19,9 @@ on:
       - "scripts/provision-keycloak-mobile-client.test.sh"
       - "scripts/provision-keycloak-realm.py"
       - "scripts/provision-keycloak-realm.test.sh"
+      - "scripts/harden-keycloak-realm.py"
+      - "scripts/harden-keycloak-realm.integration.py"
+      - "scripts/keycloak/**"
       - ".github/workflows/keycloak-provisioner.yml"
   workflow_dispatch:
 
@@ -58,7 +64,14 @@ jobs:
 
       - name: Compile the provisioners
         shell: bash
-        run: python3 -m py_compile scripts/provision-keycloak-realm.py scripts/provision-keycloak-mobile-client.py
+        run: |
+          python3 -m py_compile scripts/provision-keycloak-realm.py scripts/provision-keycloak-mobile-client.py
+          python3 -m py_compile scripts/harden-keycloak-realm.py scripts/harden-keycloak-realm.integration.py
+          python3 -m py_compile scripts/keycloak/hardening_probe.py
+
+      - name: Run the realm hardening self-test
+        shell: bash
+        run: python3 scripts/harden-keycloak-realm.py --selftest
 
       - name: Run realm provisioner self-tests
         shell: bash

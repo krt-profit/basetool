@@ -145,6 +145,8 @@ T1 PUT /api/v1/missions/{id}/units/{unitId}/slim
 T1 GET /api/v1/missions/{missionId}/finance-entries
 T1 GET /api/v1/missions/{missionId}/finance-entries/summary
 T1 GET /api/v1/notifications
+T1 GET /api/v1/notifications/preferences
+T1 PUT /api/v1/notifications/preferences/{type}
 T1 DELETE /api/v1/notifications/read
 T1 POST /api/v1/notifications/read-all
 T1 GET /api/v1/notifications/unread-count
