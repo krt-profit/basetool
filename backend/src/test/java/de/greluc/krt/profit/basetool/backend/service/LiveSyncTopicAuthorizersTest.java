@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPol
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
@@ -49,6 +51,8 @@ class LiveSyncTopicAuthorizersTest {
 
   @Mock private OwnerScopeService ownerScopeService;
 
+  @Mock private MissionAccessPolicy missionAccessPolicy;
+
   @Mock private OperationAccessPolicy operationAccessPolicy;
 
   @Mock private RefineryAccessPolicy refineryAccessPolicy;
@@ -60,8 +64,8 @@ class LiveSyncTopicAuthorizersTest {
   @DisplayName("the mission authorizer decides the Einsatz room by canSeeMission")
   void missionAuthorizerAsksTheMissionGate() {
     MissionLiveSyncTopicAuthorizer authorizer =
-        new MissionLiveSyncTopicAuthorizer(ownerScopeService);
-    when(ownerScopeService.canSeeMission(RESOURCE)).thenReturn(true, false);
+        new MissionLiveSyncTopicAuthorizer(missionAccessPolicy);
+    when(missionAccessPolicy.canSeeMission(RESOURCE)).thenReturn(true, false);
 
     assertThat(authorizer.authorizations()).containsExactly(LiveSyncAuthorization.MISSION);
     assertThat(authorizer.mayJoin(LiveSyncTopic.parse("mission:" + RESOURCE))).isTrue();

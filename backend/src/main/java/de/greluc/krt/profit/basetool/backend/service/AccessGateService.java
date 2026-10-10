@@ -19,14 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import java.util.Optional;
@@ -55,8 +51,6 @@ public class AccessGateService {
 
   private final RequestScopeResolver requestScopeResolver;
   private final AuthHelperService authHelper;
-  private final MissionRepository missionRepository;
-  private final InventoryItemRepository inventoryItemRepository;
   private final ShipRepository shipRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
 
@@ -134,67 +128,6 @@ public class AccessGateService {
       }
     }
     return false;
-  }
-
-  /**
-   * Checks whether the caller may read mission {@code missionId}: non-internal missions are visible
-   * organisation-wide, internal ones only within the owning org unit. Access is denied when any
-   * ancestor mission is internal and foreign; unknown ids return {@code false}.
-   *
-   * @param missionId mission to inspect; never {@code null}
-   * @return {@code true} iff the caller may read the mission
-   */
-  public boolean canSeeMission(@NotNull UUID missionId) {
-    return missionRepository
-        .findByIdForAuthorization(missionId)
-        .map(
-            m -> {
-              for (Mission ancestor = m; ancestor != null; ancestor = ancestor.getParent()) {
-                if (!canSeeMissionRow(ancestor)) {
-                  return false;
-                }
-              }
-              return true;
-            })
-        .orElse(false);
-  }
-
-  /**
-   * Per-row visibility check for {@link #canSeeMission(UUID)} and its parent-chain walk.
-   *
-   * <ul>
-   *   <li>Ownerless mission: visible to everyone when non-internal, to members-or-above ({@link
-   *       AuthHelperService#isMemberOrAbove()}) when internal.
-   *   <li>Org-owned mission: visible when the caller may see the owning org unit or the mission is
-   *       non-internal (REQ-ORG-009).
-   * </ul>
-   */
-  private boolean canSeeMissionRow(Mission m) {
-    if (m.getOwningOrgUnit() == null) {
-      if (!Boolean.TRUE.equals(m.getIsInternal())) {
-        return true;
-      }
-      return authHelper.isMemberOrAbove();
-    }
-    if (canSeeSquadron(m.getOwningOrgUnit().getId())) {
-      return true;
-    }
-    return !Boolean.TRUE.equals(m.getIsInternal());
-  }
-
-  /**
-   * Checks whether the caller may edit mission {@code missionId}: strict owning-org-unit check
-   * without the public escape. An ownerless mission passes, leaving the decision to {@code
-   * MissionSecurityService.canManageMission}; unknown ids return {@code false}.
-   *
-   * @param missionId mission to inspect; never {@code null}
-   * @return {@code true} iff the caller may edit the mission
-   */
-  public boolean canEditMission(@NotNull UUID missionId) {
-    return missionRepository
-        .findByIdForAuthorization(missionId)
-        .map(m -> m.getOwningOrgUnit() == null || canEditSquadron(m.getOwningOrgUnit().getId()))
-        .orElse(false);
   }
 
   /**
@@ -278,50 +211,6 @@ public class AccessGateService {
   public boolean canActOnTargetUser(@NotNull UUID targetUserId, boolean edit) {
     return canActOnTargetUserScoped(
         targetUserId, edit ? this::canEditSquadron : this::canSeeSquadron);
-  }
-
-  /**
-   * Checks whether the caller may read inventory item {@code itemId} directly, applying the owner
-   * escape (REQ-ORG-011), then the ownerless rule, then {@link #canSeeSquadron(UUID)}. Unknown ids
-   * return {@code false}.
-   *
-   * @param itemId inventory item to inspect; never {@code null}
-   * @return {@code true} iff the caller may read the item
-   */
-  public boolean canSeeInventoryItem(@NotNull UUID itemId) {
-    return permitsRow(
-        inventoryItemRepository.findById(itemId),
-        InventoryItem::getUser,
-        InventoryItem::getOwningOrgUnit,
-        false);
-  }
-
-  /**
-   * Checks whether the caller may edit inventory item {@code itemId} directly, applying the owner
-   * escape (REQ-ORG-011), then the ownerless rule, then {@link #canEditSquadron(UUID)}. Unknown ids
-   * return {@code false}.
-   *
-   * @param itemId inventory item to inspect; never {@code null}
-   * @return {@code true} iff the caller may edit the item
-   */
-  public boolean canEditInventoryItem(@NotNull UUID itemId) {
-    return permitsRow(
-        inventoryItemRepository.findById(itemId),
-        InventoryItem::getUser,
-        InventoryItem::getOwningOrgUnit,
-        true);
-  }
-
-  /**
-   * Coarse pre-check for creating inventory in another member's name: admin, self, or a shared
-   * editable org unit, like the refinery's on-behalf pre-check (REQ-SEC-005). The per-row bound is
-   * the stamp validation.
-   *
-   * @param targetUserId the member whose inventory would receive the row; never {@code null}
-   * @return {@code true} iff the caller may create inventory rows in that member's name
-   */
-  public boolean canManageUserInventory(@NotNull UUID targetUserId) {
-    return canActOnTargetUserScoped(targetUserId, this::canEditSquadron);
   }
 
   /**

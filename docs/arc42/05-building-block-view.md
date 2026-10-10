@@ -128,9 +128,10 @@ window, the resilient Redis listener container and the shared rate-limit, role-s
 authorities-cache settings; `platform.internal`: the metric client list and the body limit);
 every other helper sits in `<module>.internal`, or in `<module>.api` when another module uses it
 (for example `inventory.api.InventoryAllocations`, `livesync.api.LiveSyncTopic`,
-`catalogue.api.QuantityTypeRounding`, `orgunit.api.StaffelMembershipResolver`). `mission` is the
-first module that publishes nothing yet: its section-version counters, peer redaction and
-viewer-access SPI are internal, and no other module may depend on it. The helpers stay
+`catalogue.api.QuantityTypeRounding`, `orgunit.api.StaffelMembershipResolver`). `mission`
+publishes one command (`MissionCommands`); its section-version counters and peer redaction are
+internal, and the mapper's viewer-access seam `MissionViewerAccess` sits beside `MissionMapper` in
+`mapper`. The helpers stay
 dependency leaves — they may use only each other, the entity model and the repositories
 (`ArchitectureTest.LEAF_HELPER_CLASSES`).
 
@@ -148,6 +149,7 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | `materialexchange` | the two after-commit events | the offer and request entities, repositories and DTOs, the board services, `MaterialExchangeOfferRatchet` (the Lager's `StockChangeObserver`) and `MaterialExchangeStockOfferLookup` (its `StockOfferLookup`) | `MaterialExchangeController`, `MaterialRequestController` |
 | `refinery` | `RefineryDraftBuilder` (the exchange's refinery draft), the screenshot-extract and draft records, the problem codes | `RefineryOrderService` (also the blueprint craftability's `CraftabilityYieldSource`), `RefineryImportService`, `RefineryAccessPolicy`, the live-sync authorizer, the import settings and the store requests | `RefineryOrderController`, `RefineryImportController` |
 | `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the live-sync authorizer, the integrity task, its own repositories and the request DTOs | `JobOrderController`, `MaterialClaimController`, `MaterialCollectionController`, `JobOrderItemStockController` |
+| `mission` | `MissionCommands` (`detachFromOperation`) | the mission, structure, participant, timeline and finance services, `MissionSecurityService`, `MissionAccessPolicy`, the viewer-access service, the section counters, the peer redaction, the hangar's `ShipDeletionObserver` and the catalogue's `JobTypeDesignationObserver` implementations, the live-sync authorizer, its own repositories and the request DTOs | `MissionController`, `MissionFinanceEntryController` |
 | `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
 | `promotion` | — (publishes nothing; the GDPR deletion calls `service.MemberEvaluationErasure`, which the module implements) | the entities, repositories, services, mappers and records, `PromotionAccessPolicy` | the six promotion controllers |
 

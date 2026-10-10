@@ -25,8 +25,9 @@ supersede, REQ-NOTIF-025); keeping the same ship announces nothing. The notice b
 
 ### REQ-HANGAR-006 — A deleted ship tells the mission about its gap
 
-`HangarService#deleteShip` and `#deleteAllShipsForUser` publish `HANGAR_SHIP_DELETED_FROM_MISSION` for
-every unit the ship was assigned to, unless the unit's mission is `COMPLETED` or `CANCELLED`. The default
+Deleting a ship (`HangarService#deleteShip`, `#deleteAllShipsForUser`) runs the mission module's
+`MissionUnitShipRelease`, which publishes `HANGAR_SHIP_DELETED_FROM_MISSION` for every unit the ship was
+assigned to, unless the unit's mission is `COMPLETED` or `CANCELLED`. The default
 rule notifies the mission leadership (`MISSION_LEADERSHIP`) and the unit's responsible member
 (`EVENT_RECIPIENT`), names the ship **type** (never the ship's own name), the mission and the unit, and
 excludes the actor.
@@ -56,11 +57,12 @@ nothing.
 - [x] One notice per member per reset or purge, with that member's count.
 - [x] The default rules exist, are enabled, and use the intended selector kinds.
 
-**Enforced by:** `HangarNoticeIntegrationTest`, `MissionStructureShipNoticeTest`, `HangarServiceTest`,
+**Enforced by:** `HangarNoticeIntegrationTest`, `MissionStructureShipNoticeTest`, `MissionUnitShipReleaseTest`,
+`HangarServiceTest`,
 `PersonalBlueprintServiceTest`, `SeededNotificationRulesIntegrationTest`,
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `mission/api/events/MissionNotices`,
-`admin/api/events/HangarNotices`, `service/MissionNotificationPublisher`,
-`service/MissionStructureService`, `service/HangarService`, `service/PersonalBlueprintService`,
+`admin/api/events/HangarNotices`, `mission/internal/MissionNotificationPublisher`,
+`mission/internal/MissionStructureService`, `mission/internal/MissionUnitShipRelease`, `service/HangarService`, `service/PersonalBlueprintService`,
 `repository/ShipRepository#countFittedByOwnerScoped`,
 `repository/PersonalBlueprintRepository#countRemovableByOwner`,
 `V280__seed_hangar_and_blueprint_notification_rules.sql` · **Issues:** #2414

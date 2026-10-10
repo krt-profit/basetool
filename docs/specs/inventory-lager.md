@@ -315,7 +315,7 @@ The operation is an **append-only split** (REQ-INV-001), structurally identical 
 `TRANSFER` branch: the moved `amount` is decremented off the source row (the source row is deleted
 when it depletes below the quantity epsilon) and inserted as its own new row with the opposite
 `personal` flag — it is never folded into an existing stack. It is per-entry (REQ-INV-044), guarded
-by optimistic locking on the source row's `version`, and owner-scoped (`@ownerScopeService.canEditInventoryItem`;
+by optimistic locking on the source row's `version`, and owner-scoped (`@inventoryAccessPolicy.canEditInventoryItem`;
 an admin/logistician may act within scope). Every rebooking records its own audit event
 (`INVENTORY_ITEM_DEPERSONALIZED` / `INVENTORY_ITEM_PERSONALIZED`, REQ-AUDIT-001).
 
@@ -524,7 +524,7 @@ their hints — renders **whole (no decimals) for a `PIECE` material** and to th
 
 **Assignment writes.** The earmarks are edited through dedicated per-allocation endpoints `POST` /
 `PATCH` / `DELETE /api/v1/inventory/{id}/allocation` (add / change amount / remove), each gated by
-`isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)` — the same owner-scoped
+`isAuthenticated() and @inventoryAccessPolicy.canEditInventoryItem(#id)` — the same owner-scoped
 inventory-edit gate, **no new role** — and, like every other per-row write, the service then refuses
 a caller who neither owns the entry nor is Logistician or above (`403`,
 `AuthHelperService.isLogisticianOrAbove()`); until 2026-10-04 that second gate was missing, so any

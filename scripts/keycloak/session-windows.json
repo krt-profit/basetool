@@ -1,0 +1,14 @@
+{
+  "active": {
+    "ssoSessionIdleTimeout": 2592000,
+    "ssoSessionMaxLifespan": 15552000,
+    "ssoSessionIdleTimeoutRememberMe": 2592000,
+    "ssoSessionMaxLifespanRememberMe": 15552000
+  },
+  "proposal": {
+    "ssoSessionIdleTimeout": 2592000,
+    "ssoSessionMaxLifespan": 7776000,
+    "ssoSessionIdleTimeoutRememberMe": 2592000,
+    "ssoSessionMaxLifespanRememberMe": 7776000
+  }
+}
