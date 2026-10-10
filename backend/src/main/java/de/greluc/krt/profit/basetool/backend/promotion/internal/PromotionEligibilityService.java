@@ -240,7 +240,7 @@ public class PromotionEligibilityService {
     Map<UUID, List<RankRequirement>> byTopic = new LinkedHashMap<>();
     for (RankRequirement req : requirements) {
       if (req.getCategory() == null && req.getTopic() != null) {
-        byTopic.computeIfAbsent(req.getTopic().getId(), k -> new ArrayList<>()).add(req);
+        byTopic.computeIfAbsent(req.getTopic().getId(), _ -> new ArrayList<>()).add(req);
       }
     }
 

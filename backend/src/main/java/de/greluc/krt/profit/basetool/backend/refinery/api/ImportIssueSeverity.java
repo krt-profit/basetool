@@ -17,11 +17,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.refinery.api;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
-import java.util.List;
+/**
+ * Severity grading of an {@link ImportIssueDto}, driving its styling in the review UI.
+ *
+ * <p>Never blocks the response: even a {@link #BLOCKING} issue returns 200 with the draft.
+ */
+public enum ImportIssueSeverity {
 
-/** Data transfer record carrying Refinery Order Store payload. */
-public record RefineryOrderStoreDto(@NotEmpty List<@Valid RefineryOrderStoreItemDto> items) {}
+  /**
+   * A required pre-fill is impossible (e.g. every row un-quoted). The draft is returned but the
+   * user cannot meaningfully save without resolving the underlying capture problem.
+   */
+  BLOCKING,
+
+  /** Something needs user review before saving (unmatched name, checksum mismatch, skip). */
+  WARNING,
+
+  /** Heads-up with no required action (e.g. a missing admin-curated refined-material link). */
+  INFO
+}

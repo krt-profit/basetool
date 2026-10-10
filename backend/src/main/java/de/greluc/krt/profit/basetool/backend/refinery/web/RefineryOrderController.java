@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.refinery.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.RefineryOrderMapper;
@@ -26,10 +26,10 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
@@ -75,7 +75,7 @@ public class RefineryOrderController {
   private final UserService userService;
   private final RefineryOrderMapper mapper;
   private final AuthHelperService authHelperService;
-  private final OwnerScopeService ownerScopeService;
+  private final RefineryAccessPolicy refineryAccessPolicy;
 
   /**
    * Lists the calling user's own refinery orders, one page under the list filters
@@ -113,13 +113,13 @@ public class RefineryOrderController {
 
   /**
    * Fetches a single refinery order. Read access is gated entirely by the {@code @PreAuthorize}
-   * SpEL ({@code @ownerScopeService.canSeeRefineryOrder(#id)}); the body just maps the resolved
+   * SpEL ({@code @refineryAccessPolicy.canSeeRefineryOrder(#id)}); the body just maps the resolved
    * order to its DTO, enriched with the per-material yield bonus for the order's location.
    *
    * @return the refinery-order DTO
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeRefineryOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @refineryAccessPolicy.canSeeRefineryOrder(#id)")
   @Transactional(readOnly = true)
   public RefineryOrderDto getRefineryOrder(@PathVariable @NotNull UUID id) {
     RefineryOrder order = refineryOrderService.getRefineryOrder(id);
@@ -187,7 +187,7 @@ public class RefineryOrderController {
     UUID userId = userService.getUserIdFromJwt(jwt);
     if (orderDto.owner() != null && orderDto.owner().id() != null) {
       UUID requestedOwnerId = orderDto.owner().id();
-      if (ownerScopeService.canManageUserRefineryOrders(requestedOwnerId)) {
+      if (refineryAccessPolicy.canManageUserRefineryOrders(requestedOwnerId)) {
         userId = requestedOwnerId;
       }
     }
@@ -207,7 +207,7 @@ public class RefineryOrderController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditRefineryOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @refineryAccessPolicy.canEditRefineryOrder(#id)")
   public RefineryOrderDto updateMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -242,7 +242,7 @@ public class RefineryOrderController {
    * #updateMyRefineryOrder}.
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditRefineryOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @refineryAccessPolicy.canEditRefineryOrder(#id)")
   public void deleteMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
     refineryOrderService.deleteRefineryOrder(
@@ -254,7 +254,7 @@ public class RefineryOrderController {
    * target location.
    */
   @PostMapping("/{id}/store")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditRefineryOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @refineryAccessPolicy.canEditRefineryOrder(#id)")
   public void storeMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -308,7 +308,7 @@ public class RefineryOrderController {
   @PreAuthorize(
       "hasRole('"
           + Roles.LOGISTICIAN
-          + "') and @ownerScopeService.canViewUserRefineryOrders(#userId)")
+          + "') and @refineryAccessPolicy.canViewUserRefineryOrders(#userId)")
   @Transactional(readOnly = true)
   public PageResponse<RefineryOrderListDto> getUserRefineryOrders(
       @PathVariable @NotNull UUID userId,
@@ -336,7 +336,7 @@ public class RefineryOrderController {
   @PreAuthorize(
       "hasRole('"
           + Roles.LOGISTICIAN
-          + "') and @ownerScopeService.canManageUserRefineryOrders(#userId)")
+          + "') and @refineryAccessPolicy.canManageUserRefineryOrders(#userId)")
   public RefineryOrderDto createUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
     RefineryOrder saved =
@@ -353,7 +353,9 @@ public class RefineryOrderController {
    */
   @PutMapping("/users/{userId}/{orderId}")
   @PreAuthorize(
-      "hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditRefineryOrder(#orderId)")
+      "hasRole('"
+          + Roles.LOGISTICIAN
+          + "') and @refineryAccessPolicy.canEditRefineryOrder(#orderId)")
   public RefineryOrderDto updateUserRefineryOrder(
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID orderId,
@@ -367,7 +369,9 @@ public class RefineryOrderController {
   /** Logistician-only: cancels a target user's refinery order. */
   @DeleteMapping("/users/{userId}/{orderId}")
   @PreAuthorize(
-      "hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditRefineryOrder(#orderId)")
+      "hasRole('"
+          + Roles.LOGISTICIAN
+          + "') and @refineryAccessPolicy.canEditRefineryOrder(#orderId)")
   public void deleteUserRefineryOrder(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID orderId) {
     refineryOrderService.deleteRefineryOrder(userId, orderId, true);

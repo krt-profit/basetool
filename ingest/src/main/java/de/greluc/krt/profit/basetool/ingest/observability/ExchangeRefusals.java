@@ -178,7 +178,7 @@ public class ExchangeRefusals {
     }
     try {
       return clientLabel(azp, registryReader.current());
-    } catch (ExchangeUnavailableException e) {
+    } catch (ExchangeUnavailableException _) {
       return MetricNames.EXCHANGE_CLIENT_UNKNOWN;
     }
   }

@@ -109,7 +109,7 @@ public record LiveSyncTopic(
     try {
       UUID parsed = UUID.fromString(candidate);
       return parsed.toString().equals(candidate.toLowerCase(Locale.ROOT)) ? parsed : null;
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

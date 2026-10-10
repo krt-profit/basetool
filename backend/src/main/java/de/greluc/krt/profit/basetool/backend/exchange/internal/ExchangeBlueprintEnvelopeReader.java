@@ -66,7 +66,7 @@ public class ExchangeBlueprintEnvelopeReader implements BlueprintEnvelopeReader 
     ExchangeBlueprintDraftDto draft;
     try {
       draft = objectMapper.treeToValue(envelope, ExchangeBlueprintDraftDto.class);
-    } catch (JacksonException e) {
+    } catch (JacksonException _) {
       throw new BadRequestException(INVALID_ENVELOPE);
     }
     if (draft == null || !validator.validate(draft).isEmpty()) {

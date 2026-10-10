@@ -17,14 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 
-import de.greluc.krt.profit.basetool.backend.config.RefineryImportProperties;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
@@ -41,21 +40,22 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.ImportIssueCode;
-import de.greluc.krt.profit.basetool.backend.model.dto.ImportIssueDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.ImportIssueSeverity;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractGoodDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractImageDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
+import de.greluc.krt.profit.basetool.backend.refinery.api.ImportIssueCode;
+import de.greluc.krt.profit.basetool.backend.refinery.api.ImportIssueDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.ImportIssueSeverity;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractGoodDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractImageDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.time.Instant;
 import java.util.List;

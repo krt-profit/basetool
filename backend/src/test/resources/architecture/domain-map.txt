@@ -159,6 +159,7 @@ class BlueprintReferenceDto catalogue recipe reference DTO
 class BlueprintIngredientKind catalogue recipe graph enum
 class UexCategory catalogue UEX category reference row
 class JobOrderAllocationDto inventory job-order slice of an inventory entry (REQ-INV-027), mapped by InventoryItemMapper
+class CraftabilityYieldSource blueprint pending-yield SPI of the craftability, implemented by the refinery (plan 5.3)
 class BlueprintEnvelopeReader blueprint upload-preview envelope SPI, implemented by the exchange (plan 5.3)
 class BlueprintPackTags blueprint log-name clean-up used only by BlueprintImportService
 class BasetoolErrorController platform container error dispatch as RFC 7807

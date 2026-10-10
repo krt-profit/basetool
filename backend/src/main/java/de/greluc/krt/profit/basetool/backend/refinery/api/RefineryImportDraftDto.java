@@ -17,8 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.refinery.api;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import java.util.List;
 
 /**

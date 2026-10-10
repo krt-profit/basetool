@@ -123,7 +123,7 @@ public class ProfileController {
           model.addAttribute("profileSquadrons", user.squadrons());
         }
       }
-    } catch (Exception ignored) {
+    } catch (Exception _) {
     }
 
     PayoutPreference defaultPayoutPreference = PayoutPreference.PAYOUT;
@@ -555,7 +555,7 @@ public class ProfileController {
       if (me != null && me.version() != null) {
         return me.version();
       }
-    } catch (Exception ignored) {
+    } catch (Exception _) {
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
   }
@@ -616,7 +616,7 @@ public class ProfileController {
   private Object getSingleClaim(@NotNull OidcUser principal, String claim) {
     Object value = principal.getAttribute(claim);
     if (value instanceof java.util.List<?> list && !list.isEmpty()) {
-      return list.get(0);
+      return list.getFirst();
     }
     return value;
   }

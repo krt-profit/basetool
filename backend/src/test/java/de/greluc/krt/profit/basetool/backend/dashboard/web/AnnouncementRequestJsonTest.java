@@ -35,7 +35,7 @@ class AnnouncementRequestJsonTest {
     try {
       AnnouncementController.AnnouncementRequest request =
           mapper.readValue(json, AnnouncementController.AnnouncementRequest.class);
-      assertEquals("test content", request.getContent());
+      assertEquals("test content", request.content());
     } catch (Exception e) {
       fail("Parsing failed: " + e.getMessage());
     }
