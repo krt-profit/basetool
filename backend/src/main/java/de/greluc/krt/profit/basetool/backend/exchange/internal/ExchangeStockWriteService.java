@@ -216,20 +216,23 @@ public class ExchangeStockWriteService {
     List<ExchangeChangeResultDto.OpResult> results = new ArrayList<>();
     for (int i = 0; i < plan.size(); i++) {
       String opId = changeSet.ops().get(i).opId();
-      if (plan.get(i) instanceof Change change) {
-        if (!changeSet.dryRun()) {
-          execute(caller, batch, change, moves, flipped, offers);
-          counter(caller, APPLIED).increment();
+      switch (plan.get(i)) {
+        case Change change -> {
+          if (!changeSet.dryRun()) {
+            execute(caller, batch, change, moves, flipped, offers);
+            counter(caller, APPLIED).increment();
+          }
+          applied++;
         }
-        applied++;
-      } else if (plan.get(i) instanceof Skip skip) {
-        if (UNCHANGED.equals(skip.result())) {
-          unchanged++;
+        case Skip skip -> {
+          if (UNCHANGED.equals(skip.result())) {
+            unchanged++;
+          }
+          if (!changeSet.dryRun()) {
+            counter(caller, skip.result()).increment();
+          }
+          results.add(new ExchangeChangeResultDto.OpResult(i, opId, skip.result(), skip.reason()));
         }
-        if (!changeSet.dryRun()) {
-          counter(caller, skip.result()).increment();
-        }
-        results.add(new ExchangeChangeResultDto.OpResult(i, opId, skip.result(), skip.reason()));
       }
     }
     if (!changeSet.dryRun() && applied > 0) {
@@ -314,7 +317,7 @@ public class ExchangeStockWriteService {
             .map(i -> new Lot(null, i, location.get(), null, stolen, unit));
       }
       return Optional.empty();
-    } catch (IllegalArgumentException ignored) {
+    } catch (IllegalArgumentException _) {
       return Optional.empty();
     }
   }
@@ -372,7 +375,7 @@ public class ExchangeStockWriteService {
       Lot lot = lots.get(i);
       String unit = lot.unit();
       List<InventoryItem> rows = locked.get(lot.key());
-      BigDecimal current = quantities.computeIfAbsent(lot.key(), k -> round(sum(rows), unit));
+      BigDecimal current = quantities.computeIfAbsent(lot.key(), _ -> round(sum(rows), unit));
       BigDecimal expected = round(op.expectedQuantity().amount(), unit);
       BigDecimal target = round(op.quantity().amount(), unit);
       if (current.compareTo(expected) != 0) {

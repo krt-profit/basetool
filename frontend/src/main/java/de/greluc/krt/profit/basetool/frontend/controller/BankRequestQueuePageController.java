@@ -234,8 +234,8 @@ public class BankRequestQueuePageController {
     if (known.isEmpty()) {
       return DEFAULT_SEGMENT;
     }
-    if (known.size() == 1 && COUNTED_SEGMENTS.contains(known.get(0))) {
-      return known.get(0);
+    if (known.size() == 1 && COUNTED_SEGMENTS.contains(known.getFirst())) {
+      return known.getFirst();
     }
     return ALL_SEGMENT;
   }

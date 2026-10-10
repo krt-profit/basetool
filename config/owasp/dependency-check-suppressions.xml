@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
+  <suppress until="2027-04-10Z">
+    <notes>Compile-time only: the Guava 30.1.1 shaded into dataflow-errorprone (NullAway's dataflow engine, ADR-0237) runs inside javac on the errorprone processor path and never reaches a runtime classpath, an image or an SBOM. CVE-2023-2976 and CVE-2020-8908 concern temporary files created by FileBackedOutputStream and Files.createTempDir, which the compiler plugin does not use. Drop when NullAway ships a dataflow build on a current Guava.</notes>
+    <filePath regex="true">.*dataflow-errorprone-.*\.jar.*</filePath>
+    <cve>CVE-2023-2976</cve>
+    <cve>CVE-2020-8908</cve>
+  </suppress>
+
   <suppress until="2026-12-22Z">
     <notes>False positive: CPE confusion. CVE-2015-0897 targets the "LINE" Android/iOS messenger app (cpe:2.3:a:line:line) and has nothing to do with the pitest mutation testing library.</notes>
     <packageUrl regex="true">^pkg:maven/org\.pitest/pitest-command-line@.*$</packageUrl>

@@ -28,8 +28,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreItemDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.time.Instant;

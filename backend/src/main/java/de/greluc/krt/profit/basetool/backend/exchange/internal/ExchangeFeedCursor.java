@@ -122,7 +122,7 @@ public record ExchangeFeedCursor(@NotNull ExchangeFeedPosition position, @Nullab
   private static @NotNull ExchangeFeedPosition position(@NotNull String tx, @NotNull String seq) {
     try {
       return new ExchangeFeedPosition(Long.parseLong(tx), Long.parseLong(seq));
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       throw ExchangeProblemException.cursorExpired();
     }
   }

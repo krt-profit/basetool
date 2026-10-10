@@ -990,7 +990,7 @@ their "must stay green" period here (D-01).
 In dependency order, each with its command API, its observer SPIs, its access policy and its REST
 wave: `materialexchange` (the offer ratchet as `StockChangeObserver`), `refinery`, `joborder`,
 `mission`, `inventory` (`StockCommands`, the earmark target SPI, the lot-lock protocol of ADR-0229
-moved into inventory), `hangar`, `blueprint`. The eight business associations become id references
+moved into inventory, and `MaterialExchangeOffer.inventoryItem` as an id), `hangar`, `blueprint`. The eight business associations become id references
 as each pair is decoupled.
 
 - `materialexchange` — **done 2026-10-10.**
@@ -1016,9 +1016,44 @@ as each pair is decoupled.
   the stock observer rather than a GDPR participant until §7.6 introduces those. (2)
   `MaterialExchangeOffer.inventoryItem` stays an association for now: converting it rewrites the
   fetch plan of eight queries and two entity graphs, and nothing needs the id until `InventoryItem`
-  leaves `model` with the inventory move (P3-5), where it belongs. (3)
+  leaves `model` with the inventory move (P3-5), where it belongs. **Tracked for P3-5:** convert
+  `MaterialExchangeOffer.inventoryItem` to the item id when `InventoryItem` moves. (3)
   `ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE` is public, because the offer board's JPQL
   splices it from another package.
+- `refinery` — **done 2026-10-10.**
+  1. *Characterise*: `RefineryModuleContractTest` pins that create, update and cancel each record
+     their audit event in the command's transaction, and that a member of another org unit is
+     refused on every per-order entry point (read, update, cancel, store) and a logistician of
+     another org unit on every on-behalf entry point (the "403 per foreign entry point" of the
+     risk table).
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `RefineryAccessPolicy` (bean
+     `refineryAccessPolicy`) holds `canSeeRefineryOrder` (id and entity), `canEditRefineryOrder`,
+     `canViewUserRefineryOrders` and `canManageUserRefineryOrders`. The scope kernel publishes the
+     two blocks those gates shared privately, unchanged: `permitsOwnedRow` (owner escape, ownerless
+     rule, org-unit scope) and `canActOnTargetUser`. The eight refinery-order endpoints, the
+     controller's on-behalf owner check and the live-sync room ask the policy; the authorization
+     matrix changed on exactly those eight lines, in expression text. The differential verdict
+     test compared old and new over 9 callers × (7 orders × 2 gates + 5 target members × 2
+     gates) = 216 verdicts before the old methods went (proven able to fail by dropping the owner
+     from the edit gate) and keeps comparing against a restatement on the kernel primitives.
+  3. *Inversions*: the blueprint craftability asks its own SPI `CraftabilityYieldSource` (with its
+     own `YieldSlice` record, so the SPI adds no `blueprint -> inventory` edge), implemented by
+     `RefineryOrderService`; the exchange's refinery draft asks the published
+     `refinery.api.RefineryDraftBuilder`.
+  4. *Move*: controllers into `refinery.web`; the extract and draft records into `refinery.api`
+     (the exchange uses them); the two services, the policy, the live-sync authorizer, the import
+     settings and the store requests into `refinery.internal`.
+  Baseline **96 → 92** (`scope -> refinery` 3, `blueprint -> refinery` 1).
+  **Corrections:** (1) like the operation, `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`,
+  `RefineryOrderRepository` (with `RefineryMissionProfitAggregate`), `RefineryOrderMapper` and
+  `RefineryOrderDto`/`RefineryGoodDto`/`RefineryOrderListDto` stay in the layer packages: `Mission`,
+  `MissionFinanceSummaryDto`, `MissionService`, `MissionFinanceEntryService`, `LocationService` and
+  `UserDeletionService` use them, so a move closes a package cycle. They move with P3-8 (the
+  `mission -> refinery` association and the `MissionFinanceContributor` SPI), where
+  `RefineryOrder.mission` becomes an id. So the policy does not own the refinery's JPQL scope
+  fragment yet either. (2) No command API: no other module writes a refinery order. The
+  store still creates Lager rows itself (write family 2 of the evidence appendix); that write
+  becomes a call of the Lager's `StockCommands` with P3-5.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1160,16 +1195,16 @@ features only, no preview flags) stands; every proposal below uses final feature
 | --- | --- | --- | --- | --- |
 | **Exhaustive enum switches** — **done 2026-10-10** (nine dead `default` arms became `case null`; the deliberate subsets keep theirs; ADR-0238 *Implementation*). *Correction:* the 20 statements of the audit are 51 `default` arms across `main` today, nine of them dead. Checkstyle's `MissingSwitchDefault` forces a `default` into all 20 switch statements; on nine of them every constant is already covered, so the `default` hides the next constant. Write them as switch expressions or with `case null ->`, which javac 25 checks for exhaustiveness and Checkstyle 14.3.0 accepts (probed). Policy: no `default` on a switch over a project enum unless it handles a deliberate subset (decided, D-15) | A new `BankAccountType`, `OrgUnitKind` or `SelectorKind` breaks the build at every decision site instead of shipping a 400, an exception or a silent no-op | `case null ->` is an unfamiliar idiom | The compiler; existing service tests | S |
 | **Enum predicates instead of `==` chains** — **done 2026-10-10** for the multi-constant rules: `OrgUnitKind.isTenantUnit()` (three sites) and `FinanceType.signed` (payout totals). *Correction:* of the 43 `OrgUnitKind` comparisons only three are chains; the rest compare one constant, which a predicate would only rename. `OrgUnitKind` is compared 43 times in 19 files; add behaviour on the enum as `switch (this)` without `default` (precedent `OperationStatus.canTransitionTo`), with a `values()` test per predicate; the same for `FinanceType` in payout arithmetic | Tenancy rules stated once, as the kernel's API | Each site's current fail-open or fail-closed behaviour must be kept exactly — one predicate per rule, never two rules merged | Access-gate and scope tests | M |
-| **Sealed types where they are legal.** Exhaustive `switch` over the exchange's private sealed `Planned` types (two are read with `if/else` without `else`, so a new variant is silently dropped); name the last constant instead of `default` in three exchange switches; the exchange's resource and operation vocabulary as one enum mapped at the boundary (the mass-change capability is chosen from a string with `default -> HANGAR_WRITE` today, which Bean Validation happens to shield) | No silently dropped external write; no path can default to a capability | Must keep the external contract byte-identical | Exchange contract tests; a test that an unknown value never reaches the capability choice | S |
+| **Sealed types where they are legal** — **done 2026-10-10**: the blueprint and stock write loops switch over `Planned` (the ship loop already did); the resolve status, the journal labels and the undo refresh name their last constant; `ExchangeResource` carries the mass-change name, the write capability and the metric tag, and the mass-change service maps the request's name to it before the capability is chosen (`ExchangeMassChangeServiceResourceTest`); the ship operation names `remove` and refuses any other value instead of defaulting to a removal. Exhaustive `switch` over the exchange's private sealed `Planned` types (two are read with `if/else` without `else`, so a new variant is silently dropped); name the last constant instead of `default` in three exchange switches; the exchange's resource and operation vocabulary as one enum mapped at the boundary (the mass-change capability is chosen from a string with `default -> HANGAR_WRITE` today, which Bean Validation happens to shield) | No silently dropped external write; no path can default to a capability | Must keep the external contract byte-identical | Exchange contract tests; a test that an unknown value never reaches the capability choice | S |
 | **Never seal across packages or entities.** Sealed hierarchies stay inside one package (class-path rule) and never cover JPA entities (a Hibernate proxy cannot subclass a sealed class) | Avoids a refactor dead end | — | javac | — |
-| **Unnamed variables `_`** (final since 22) for 107 unused lambda parameters, meaningless catch parameters and unused pattern components; empty catches too, with the ADR-0214 amendment and the Checkstyle `EmptyCatchBlock` pattern change this needs (decided, D-14); descriptive names stay where the name states intent; not in keycloak-spi (Java 21 bytecode) | The compiler forbids accidental use | About 260 edits in `main` | Compile and Checkstyle | S–M |
-| **`ScopedValue`** (final in 25) for the backend's `ChangeSource.ON_BEHALF` `ThreadLocal`, which attributes exchange writes in the change feed; the frontend holders stay `ThreadLocal` (ADR-0223 decision 4) | A binding cannot leak into a reused thread | ADR-0223 amendment | `ChangeSourceTransactionManager` integration test | S |
-| **Records** for the last three `@Data` request classes and one hand-written carrier; defensive `List.copyOf` only for records that become cached, shared or module-API values; redaction DTOs keep their canonical constructors | Immutability where values cross a boundary | `List.copyOf` rejects `null` elements | Contract tests; `toString` ratchet (G-22) | S |
-| **Small idioms**: `Math.clamp` for 11 constant bounds, `getFirst()` in frontend and ingest, `Environment.matchesProfiles`, `Optional` chains instead of `isPresent()`/`get()`, text blocks for the 47 concatenated `@Query` strings and test JSON; keep `trim()`/`strip()` and `Collections.unmodifiable*` where they are deliberate | Consistency with the 90 % that already uses the modern form | Diff churn — batch into files the refactor touches anyway | Compile, tests | S |
+| **Unnamed variables `_`** — **done 2026-10-10** in `main` (225 sites: 114 catch, 110 lambda, 1 pattern; descriptive names kept; ADR-0214 amendment) (final since 22) for 107 unused lambda parameters, meaningless catch parameters and unused pattern components; empty catches too, with the ADR-0214 amendment and the Checkstyle `EmptyCatchBlock` pattern change this needs (decided, D-14); descriptive names stay where the name states intent; not in keycloak-spi (Java 21 bytecode) | The compiler forbids accidental use | About 260 edits in `main` | Compile and Checkstyle | S–M |
+| **`ScopedValue`** — **done 2026-10-10** (final in 25) for the backend's `ChangeSource.ON_BEHALF` `ThreadLocal`, which attributes exchange writes in the change feed; the frontend holders stay `ThreadLocal` (ADR-0223 decision 4) | A binding cannot leak into a reused thread | ADR-0223 amendment | `ChangeSourceTransactionManager` integration test | S |
+| **Records** — **done 2026-10-10** (`AnnouncementRequest`, `UserAttributesRequest`, `UserDescriptionRequest`, `ShipTypeMatcher.TokenView`; their frontend mirrors are now paired by `DtoMirrorConsistencyTest`) — for the last three `@Data` request classes and one hand-written carrier; defensive `List.copyOf` only for records that become cached, shared or module-API values; redaction DTOs keep their canonical constructors | Immutability where values cross a boundary | `List.copyOf` rejects `null` elements | Contract tests; `toString` ratchet (G-22) | S |
+| **Small idioms** — **done 2026-10-10** outside the job-order, refinery and Materialbörse code the Phase 3 moves touch (`Math.clamp` 9 sites, `getFirst()` 9, `Environment.matchesProfiles` 4, 27 `@Query` text blocks, 6 `isPresent() && get()` pairs as `Optional.filter`; a query that mixes literals with a constant or splits a token keeps its concatenation; `isPresent()` used as a plain boolean stays). *Correction:* of the 68 `isPresent()` calls only these few are followed by `get()`: `Math.clamp` for 11 constant bounds, `getFirst()` in frontend and ingest, `Environment.matchesProfiles`, `Optional` chains instead of `isPresent()`/`get()`, text blocks for the 47 concatenated `@Query` strings and test JSON; keep `trim()`/`strip()` and `Collections.unmodifiable*` where they are deliberate | Consistency with the 90 % that already uses the modern form | Diff churn — batch into files the refactor touches anyway | Compile, tests | S |
 | **Do not adopt** Markdown documentation comments (`///`, JEP 467): Checkstyle 14.3.0 does not treat them as Javadoc; gatherers: no loop here is clearer as one | — | — | — | — |
-| **ADR-0223 corrections**: JDK 26 does add a final library feature (JEP 517, HTTP/3 for the HTTP client); JEP 510 (KDF) is final in 25; Checkstyle already enforces the module-import and compact-source bans in `main` (not in `test`/`e2e`); there are 42 `super(…)` calls, not 34; a `--enable-preview` gate is still missing | The decision record stays authoritative | — | Review | S |
+| **ADR-0223 corrections** — **done 2026-10-10** (the corrections were recorded in the ADR on 2026-10-02; the missing gate is `scripts/check-final-java-only.py`, REQ-OPS-043): JDK 26 does add a final library feature (JEP 517, HTTP/3 for the HTTP client); JEP 510 (KDF) is final in 25; Checkstyle already enforces the module-import and compact-source bans in `main` (not in `test`/`e2e`); there are 42 `super(…)` calls, not 34; a `--enable-preview` gate is still missing | The decision record stays authoritative | — | Review | S |
 
-**Nullness.** Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
+**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
 annotations by simple name; Spring Framework builds itself with the same pair. Starting with the new
 module API packages, it would turn the annotations into a checked contract and close arc42 §11.4
 ("derived nullity annotations have no gate"). Cost: a compile-time dependency, about ten javac

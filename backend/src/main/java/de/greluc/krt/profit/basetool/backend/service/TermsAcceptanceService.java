@@ -150,7 +150,7 @@ public class TermsAcceptanceService implements TermsConsentCheck {
             .build();
     try {
       termsAcceptanceRepository.save(acceptance);
-    } catch (DataIntegrityViolationException e) {
+    } catch (DataIntegrityViolationException _) {
       log.debug("Concurrent terms acceptance for the same user and version; keeping the first");
       return false;
     }

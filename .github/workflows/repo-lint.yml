@@ -125,6 +125,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/check-gradle-input-paths.py
 
+      - name: final-java-only / Self-test the preview and incubator checker
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-final-java-only.py --selftest
+
+      - name: final-java-only / Check that only final Java features are used
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-final-java-only.py
+
       - name: pid1-reaping / Self-test the detector
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/check_pid1_reaping.py --selftest

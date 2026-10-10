@@ -385,7 +385,7 @@ public class JobOrderStockProjectionService {
       Map<UUID, List<Integer>> indexesByMaterial = new LinkedHashMap<>();
       for (int i = 0; i < requirements.size(); i++) {
         indexesByMaterial
-            .computeIfAbsent(requirements.get(i).material().id(), unused -> new ArrayList<>())
+            .computeIfAbsent(requirements.get(i).material().id(), _ -> new ArrayList<>())
             .add(i);
       }
       indexesByMaterial.forEach(

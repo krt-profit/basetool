@@ -176,7 +176,7 @@ public class OssLicenseCatalog {
       for (OssLicense license : component.licenses()) {
         String key = license.groupKey();
         licenseByKey.putIfAbsent(key, license);
-        componentsByKey.computeIfAbsent(key, k -> new ArrayList<>()).add(component);
+        componentsByKey.computeIfAbsent(key, _ -> new ArrayList<>()).add(component);
       }
     }
     List<OssLicenseGroup> result = new ArrayList<>();

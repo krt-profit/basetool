@@ -603,7 +603,7 @@ public class ExchangeResolveService {
   private static <K> void add(
       @NotNull Map<K, Set<Entry>> index, @Nullable K key, @Nullable Entry entry) {
     if (key != null && entry != null) {
-      index.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(entry);
+      index.computeIfAbsent(key, _ -> new LinkedHashSet<>()).add(entry);
     }
   }
 
@@ -647,7 +647,7 @@ public class ExchangeResolveService {
     }
     try {
       return UUID.fromString(value);
-    } catch (IllegalArgumentException ignored) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }
