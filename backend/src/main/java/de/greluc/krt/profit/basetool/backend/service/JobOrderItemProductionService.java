@@ -28,6 +28,8 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ProductionAllocationException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -88,7 +90,7 @@ public class JobOrderItemProductionService {
 
   private final JobOrderRepository jobOrderRepository;
   private final InventoryItemRepository inventoryItemRepository;
-  private final MaterialExchangeOfferRatchet offerRatchet;
+  private final StockChangeObserver stockChangeObserver;
   private final JobOrderItemService jobOrderItemService;
   private final AuditRecorder auditRecorder;
   private final UserService userService;
@@ -263,8 +265,8 @@ public class JobOrderItemProductionService {
               depleted));
 
       if (depleted) {
-        offerRatchet.beforeDelete(
-            List.of(inventoryItem.getId()), MaterialExchangeOfferRatchet.Reason.PRODUCTION);
+        stockChangeObserver.beforeDelete(
+            List.of(inventoryItem.getId()), StockChangeReason.PRODUCTION);
         inventoryItemRepository.delete(inventoryItem);
       } else {
         Map<UUID, Double> missionPlan =
@@ -281,8 +283,7 @@ public class JobOrderItemProductionService {
 
     for (ConsumedItem ci : consumedItems) {
       if (!ci.depleted()) {
-        offerRatchet.lower(
-            ci.itemId(), ci.remaining(), MaterialExchangeOfferRatchet.Reason.PRODUCTION);
+        stockChangeObserver.lower(ci.itemId(), ci.remaining(), StockChangeReason.PRODUCTION);
       }
       auditRecorder.record(
           AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION,
