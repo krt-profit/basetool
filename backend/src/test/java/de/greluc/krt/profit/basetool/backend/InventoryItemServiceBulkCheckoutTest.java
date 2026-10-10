@@ -25,6 +25,8 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -42,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
-import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeOfferRatchet;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -75,7 +76,7 @@ class InventoryItemServiceBulkCheckoutTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
 
-  @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @InjectMocks private InventoryCheckoutService inventoryItemService;
@@ -112,7 +113,7 @@ class InventoryItemServiceBulkCheckoutTest {
     InOrder order = inOrder(offerRatchet, inventoryItemRepository);
     order
         .verify(offerRatchet)
-        .beforeDelete(List.of(itemId1, itemId2), MaterialExchangeOfferRatchet.Reason.BULK_CHECKOUT);
+        .beforeDelete(List.of(itemId1, itemId2), StockChangeReason.BULK_CHECKOUT);
     order.verify(inventoryItemRepository).deleteAllById(List.of(itemId1, itemId2));
   }
 
