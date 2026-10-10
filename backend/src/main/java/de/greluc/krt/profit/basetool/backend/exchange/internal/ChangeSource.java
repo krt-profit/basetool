@@ -41,8 +41,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ChangeSource {
 
-  /** The client a write in this thread is recorded for, while {@link #asClient} runs it. */
-  private static final ThreadLocal<String> ON_BEHALF = new ThreadLocal<>();
+  /** The client a write is recorded for, bound while {@link #asClient} runs it. */
+  private static final ScopedValue<String> ON_BEHALF = ScopedValue.newInstance();
 
   /**
    * Runs a write the member confirmed in the browser as the exchange client's own, so the change
@@ -56,17 +56,8 @@ public class ChangeSource {
    */
   public static <T> T asClient(
       @NotNull String clientId, @NotNull String installationKey, @NotNull Supplier<T> write) {
-    String previous = ON_BEHALF.get();
-    ON_BEHALF.set("client|" + clientId + "|" + installationKey);
-    try {
-      return write.get();
-    } finally {
-      if (previous == null) {
-        ON_BEHALF.remove();
-      } else {
-        ON_BEHALF.set(previous);
-      }
-    }
+    return ScopedValue.where(ON_BEHALF, "client|" + clientId + "|" + installationKey)
+        .call(write::get);
   }
 
   /** The transaction-local variable the triggers read. */
@@ -82,9 +73,8 @@ public class ChangeSource {
    *     {@code system} when there is none
    */
   public @NotNull String current() {
-    String client = ON_BEHALF.get();
-    if (client != null) {
-      return client;
+    if (ON_BEHALF.isBound()) {
+      return ON_BEHALF.get();
     }
     return of(SecurityContextHolder.getContext().getAuthentication());
   }
