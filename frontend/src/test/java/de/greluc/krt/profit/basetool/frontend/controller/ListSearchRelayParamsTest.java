@@ -105,7 +105,7 @@ class ListSearchRelayParamsTest {
     verify(mockedBackend)
         .get(
             eq(
-                "/api/v1/missions/search?query={query}&start={start}&end={end}"
+                "/api/v1/missions?query={query}&start={start}&end={end}"
                     + "&sort=plannedStartTime,desc&status=PLANNED&status=ACTIVE&"),
             anyTypeRef(),
             eq(HOSTILE_TERM),
@@ -127,7 +127,7 @@ class ListSearchRelayParamsTest {
 
     verify(mockedBackend)
         .get(
-            eq("/api/v1/missions/search?sort=plannedStartTime,desc&status={status}&"),
+            eq("/api/v1/missions?sort=plannedStartTime,desc&status={status}&"),
             anyTypeRef(),
             eq("COMPLETED"));
   }

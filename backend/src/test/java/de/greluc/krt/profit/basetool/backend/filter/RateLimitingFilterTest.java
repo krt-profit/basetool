@@ -658,9 +658,9 @@ class RateLimitingFilterTest {
               "participant-mutations", List.of(), List.of("/api/v1/missions/*/participants/**"), 1);
       properties.setRules(List.of(mutateParticipants));
 
-      assertEquals(200, put("/api/v1/missions/abc/participants/xyz/slim", "192.0.2.71"));
+      assertEquals(200, put("/api/v1/missions/abc/participants/xyz", "192.0.2.71"));
       MockHttpServletResponse blocked =
-          postResponse("/api/v1/missions/abc/participants/xyz/check-in/slim", "192.0.2.71");
+          postResponse("/api/v1/missions/abc/participants/xyz/check-in", "192.0.2.71");
       assertEquals(429, blocked.getStatus());
     }
 
@@ -675,11 +675,11 @@ class RateLimitingFilterTest {
           newRule(
               "participant-check-in",
               List.of("POST"),
-              List.of("/api/v1/missions/*/participants/*/check-in/slim"),
+              List.of("/api/v1/missions/*/participants/*/check-in"),
               2);
       properties.setRules(List.of(wide, tight));
 
-      String path = "/api/v1/missions/m1/participants/p1/check-in/slim";
+      String path = "/api/v1/missions/m1/participants/p1/check-in";
       assertEquals(200, post(path, "192.0.2.80"));
       assertEquals(200, post(path, "192.0.2.80"));
       MockHttpServletResponse blocked = postResponse(path, "192.0.2.80");

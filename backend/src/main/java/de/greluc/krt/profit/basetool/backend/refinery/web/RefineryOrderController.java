@@ -153,11 +153,11 @@ public class RefineryOrderController {
    *
    * @return list of refinery-order list DTOs
    */
-  @GetMapping("/mission/{missionId}")
+  @GetMapping
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public List<RefineryOrderListDto> getMissionRefineryOrders(
-      @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID missionId) {
+      @AuthenticationPrincipal Jwt jwt, @RequestParam @NotNull UUID missionId) {
     boolean isLogistician = authHelperService.isLogisticianOrAbove();
     if (isLogistician) {
       return refineryOrderService.getMissionRefineryOrdersScoped(missionId).stream()

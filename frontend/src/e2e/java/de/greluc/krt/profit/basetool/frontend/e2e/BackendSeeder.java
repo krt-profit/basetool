@@ -1610,7 +1610,7 @@ public final class BackendSeeder {
 
   /**
    * Registers an existing app user as a mission participant via {@code POST
-   * /api/v1/missions/{id}/participants/slim}.
+   * /api/v1/missions/{id}/participants}.
    *
    * @param username the Keycloak username of the mission's manager (its creator)
    * @param password the Keycloak password
@@ -1629,7 +1629,7 @@ public final class BackendSeeder {
   }
 
   /**
-   * Adds a unit to a mission via {@code POST /api/v1/missions/{id}/units/slim} with an explicit
+   * Adds a unit to a mission via {@code POST /api/v1/missions/{id}/units} with an explicit
    * responsible person, so the crew board renders the responsible chip and the unit-edit modal
    * pre-selects it. Only a registered participant (see {@link #addRegisteredParticipant}) is
    * offered in the modal's responsible picker, so the {@code responsibleUserId} must already be a

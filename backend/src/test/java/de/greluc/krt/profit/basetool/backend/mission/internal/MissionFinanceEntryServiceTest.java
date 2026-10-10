@@ -378,6 +378,7 @@ class MissionFinanceEntryServiceTest {
           NotFoundException.class,
           () ->
               service.updateEntry(
+                  MISSION_ID,
                   ENTRY_ID,
                   new MissionFinanceEntryUpdateDto(
                       "note", FinanceType.INCOME, new BigDecimal("1"), 0L)));
@@ -394,7 +395,8 @@ class MissionFinanceEntryServiceTest {
 
       BusinessConflictException ex =
           assertThrows(
-              BusinessConflictException.class, () -> service.updateEntry(ENTRY_ID, staleDto));
+              BusinessConflictException.class,
+              () -> service.updateEntry(MISSION_ID, ENTRY_ID, staleDto));
       assert ex.getMessage().contains("updated by someone else");
       verify(financeEntryRepository, never()).save(any());
     }
@@ -419,6 +421,7 @@ class MissionFinanceEntryServiceTest {
 
       MissionFinanceEntryDto result =
           service.updateEntry(
+              MISSION_ID,
               ENTRY_ID,
               new MissionFinanceEntryUpdateDto(
                   "new-note", FinanceType.EXPENSE, new BigDecimal("999.99"), 2L));
@@ -438,7 +441,16 @@ class MissionFinanceEntryServiceTest {
     void throwsNotFound_whenEntryDoesNotExist() {
       when(financeEntryRepository.findById(ENTRY_ID)).thenReturn(Optional.empty());
 
-      assertThrows(NotFoundException.class, () -> service.deleteEntry(ENTRY_ID));
+      assertThrows(NotFoundException.class, () -> service.deleteEntry(MISSION_ID, ENTRY_ID));
+      verify(financeEntryRepository, never()).delete(any());
+    }
+
+    @Test
+    void throwsNotFound_whenEntryBelongsToAnotherMission() {
+      MissionFinanceEntry entry = entry(FinanceType.INCOME, new BigDecimal("1"));
+      when(financeEntryRepository.findById(ENTRY_ID)).thenReturn(Optional.of(entry));
+
+      assertThrows(NotFoundException.class, () -> service.deleteEntry(UUID.randomUUID(), ENTRY_ID));
       verify(financeEntryRepository, never()).delete(any());
     }
 
@@ -447,7 +459,7 @@ class MissionFinanceEntryServiceTest {
       MissionFinanceEntry entry = entry(FinanceType.INCOME, new BigDecimal("1"));
       when(financeEntryRepository.findById(ENTRY_ID)).thenReturn(Optional.of(entry));
 
-      service.deleteEntry(ENTRY_ID);
+      service.deleteEntry(MISSION_ID, ENTRY_ID);
 
       verify(financeEntryRepository, times(1)).delete(entry);
     }
@@ -455,6 +467,7 @@ class MissionFinanceEntryServiceTest {
 
   private static MissionFinanceEntry entry(FinanceType type, BigDecimal amount) {
     MissionFinanceEntry e = new MissionFinanceEntry();
+    e.setMission(mission(MISSION_ID));
     e.setType(type);
     e.setAmount(amount);
     return e;

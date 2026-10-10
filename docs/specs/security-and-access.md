@@ -3137,7 +3137,7 @@ one.
 
 The gate had been bare `isAuthenticated()`, which the *detail* endpoint compensated for by nulling
 the description in `cleanupOutsiderMissionForGuest`. The list and search projections run through no
-redactor, so a `GUEST` token read on `GET /api/v1/missions/search` — an operation in the frozen
+redactor, so a `GUEST` token read on `GET /api/v1/missions` — an operation in the frozen
 external contract, reachable over the public API vhost — returned the planning notes the detail
 endpoint deliberately withheld from the very same caller. Gating at the single source fixes both
 projections instead of bolting a second redactor onto the list path. Anonymous callers were
@@ -3146,7 +3146,7 @@ invisible from the anonymous surface.
 
 **Acceptance**
 
-- [x] ~~A role-less `GUEST` token gets `description == null` from `/api/v1/missions/search` and from
+- [x] ~~A role-less `GUEST` token gets `description == null` from `/api/v1/missions` and from
   the mission detail alike.~~ Such a token is refused before the mapper runs (REQ-SEC-053); the
   gate itself is unchanged and still pinned.
 - [x] A member still receives the description on both.
@@ -3156,7 +3156,7 @@ invisible from the anonymous surface.
 
 ### REQ-SEC-042 — Booking into a mission ledger is a write, and is gated like one
 
-`POST /api/v1/finance-entries` MUST be authorized by `MissionSecurityService#canCreateFinanceEntry`:
+`POST /api/v1/missions/{missionId}/finance-entries` MUST be authorized by `MissionSecurityService#canCreateFinanceEntry`:
 a caller who may manage the mission (ADMIN; an OFFICER / MISSION_MANAGER whose owning-OrgUnit scope
 covers it; the owner or a co-manager) may book for any of its participants, and every other member
 may book **only against their own participant row** on that mission.

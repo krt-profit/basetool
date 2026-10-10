@@ -140,6 +140,7 @@ public class MissionFinancePageController {
     }
     try {
       missionClient.updateFinanceEntry(
+          id,
           entryId,
           new MissionFinanceEntryUpdateDto(
               form.getNote(), form.getType(), form.getAmount(), form.getVersion()));
@@ -171,7 +172,7 @@ public class MissionFinancePageController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      missionClient.deleteFinanceEntry(entryId);
+      missionClient.deleteFinanceEntry(id, entryId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "deleteFinanceEntry", entryId, e);
@@ -230,7 +231,7 @@ public class MissionFinancePageController {
         log,
         "update finance entry (ajax) for mission " + id + " entry " + entryId,
         () -> {
-          MissionFinanceEntryDto result = missionClient.updateFinanceEntryJson(entryId, body);
+          MissionFinanceEntryDto result = missionClient.updateFinanceEntryJson(id, entryId, body);
           return ResponseEntity.ok(result);
         });
   }
@@ -251,7 +252,7 @@ public class MissionFinancePageController {
         log,
         "delete finance entry (ajax) for mission " + id + " entry " + entryId,
         () -> {
-          missionClient.deleteFinanceEntry(entryId);
+          missionClient.deleteFinanceEntry(id, entryId);
           return ResponseEntity.noContent().build();
         });
   }

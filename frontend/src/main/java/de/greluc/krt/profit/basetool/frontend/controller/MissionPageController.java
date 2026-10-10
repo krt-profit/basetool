@@ -90,9 +90,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 public class MissionPageController {
 
   /**
-   * The mission statuses {@code GET /api/v1/missions/search} filters on — the only {@code status}
-   * values the list page relays (REQ-SEC-051). The backend stores the status as a string, so this
-   * set is the vocabulary rather than an enum.
+   * The mission statuses {@code GET /api/v1/missions} filters on — the only {@code status} values
+   * the list page relays (REQ-SEC-051). The backend stores the status as a string, so this set is
+   * the vocabulary rather than an enum.
    */
   static final Set<String> MISSION_STATUSES = Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
 

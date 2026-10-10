@@ -521,11 +521,7 @@ class OperationPageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/operations/{id}"), eq(OperationDto.class), eq(opId)))
         .thenReturn(operation);
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId={id}"),
-            anyTypeRef(),
-            eq(opId),
-            any(),
-            any()))
+            contains("/api/v1/missions?operationId={id}"), anyTypeRef(), eq(opId), any(), any()))
         .thenReturn(new PageResponse<>(List.<MissionListDto>of(), 0, 10, 0L, 0, List.of()));
     when(backendApiClient.get(
             eq("/api/v1/operations/{id}/finance-summary"),
@@ -569,11 +565,7 @@ class OperationPageControllerMvcTest {
     PageResponse<MissionListDto> missionsPage =
         new PageResponse<>(List.of(mission), 0, 10, 1L, 1, List.of("plannedStartTime,asc"));
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId={id}"),
-            anyTypeRef(),
-            eq(opId),
-            any(),
-            any()))
+            contains("/api/v1/missions?operationId={id}"), anyTypeRef(), eq(opId), any(), any()))
         .thenReturn(missionsPage);
 
     when(backendApiClient.get(
@@ -624,11 +616,7 @@ class OperationPageControllerMvcTest {
             false,
             0L);
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId={id}"),
-            anyTypeRef(),
-            eq(opId),
-            any(),
-            any()))
+            contains("/api/v1/missions?operationId={id}"), anyTypeRef(), eq(opId), any(), any()))
         .thenReturn(
             new PageResponse<>(List.of(mission), 0, 10, 15L, 2, List.of("plannedStartTime,asc")));
 
@@ -690,12 +678,7 @@ class OperationPageControllerMvcTest {
             eq(OperationFinanceSummaryDto.class),
             eq(opId));
     verify(backendApiClient, never())
-        .get(
-            contains("/api/v1/missions/search?operationId={id}"),
-            anyTypeRef(),
-            eq(opId),
-            any(),
-            any());
+        .get(contains("/api/v1/missions?operationId={id}"), anyTypeRef(), eq(opId), any(), any());
   }
 
   @Test
@@ -712,11 +695,7 @@ class OperationPageControllerMvcTest {
             eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId={id}"),
-            anyTypeRef(),
-            eq(opId),
-            any(),
-            any()))
+            contains("/api/v1/missions?operationId={id}"), anyTypeRef(), eq(opId), any(), any()))
         .thenReturn(new PageResponse<>(List.<MissionListDto>of(), 0, 10, 0L, 0, List.of()));
 
     mockMvc
@@ -730,12 +709,7 @@ class OperationPageControllerMvcTest {
     verify(backendApiClient, never())
         .get(eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId));
     verify(backendApiClient, never())
-        .get(
-            contains("/api/v1/missions/search?operationId={id}"),
-            anyTypeRef(),
-            eq(opId),
-            any(),
-            any());
+        .get(contains("/api/v1/missions?operationId={id}"), anyTypeRef(), eq(opId), any(), any());
   }
 
   @Test

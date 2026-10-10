@@ -45,12 +45,12 @@ class NoStoreApiScopesTest {
         "/api/v1/me/capabilities",
         "/api/v1/notifications",
         "/api/v1/notifications/stream",
-        "/api/v1/finance-entries",
+        "/api/v1/missions/{missionId}/finance-entries",
         "/api/v1/missions/00000000-0000-4000-8000-000000000000/finance-entries",
         "/api/v1/operations/00000000-0000-4000-8000-000000000000/payouts",
         "/api/v1/personal-inventory",
         "/api/v1/personal-blueprints",
-        "/api/v1/inventory/mission/00000000-0000-4000-8000-000000000000",
+        "/api/v1/inventory/allocations",
         "/api/v1/hangar/ships",
         "/api/v1/refinery-orders/all",
         "/api/v1/promotion/eligibility",
@@ -90,7 +90,7 @@ class NoStoreApiScopesTest {
   @ValueSource(
       strings = {
         "/api/v1/missions",
-        "/api/v1/missions/search",
+        "/api/v1/missions",
         "/api/v1/materials/matrix",
         "/api/v1/job-types",
         "/api/v1/org-units/active",

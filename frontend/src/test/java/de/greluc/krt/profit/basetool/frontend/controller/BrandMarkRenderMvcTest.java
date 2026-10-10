@@ -67,8 +67,7 @@ class BrandMarkRenderMvcTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
-        .thenReturn(null);
+    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef())).thenReturn(null);
   }
 
   /**

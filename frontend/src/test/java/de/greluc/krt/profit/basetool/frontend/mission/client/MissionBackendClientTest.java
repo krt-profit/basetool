@@ -108,7 +108,7 @@ class MissionBackendClientTest {
     backend.expect(
         "GET",
         sent(
-            "/api/v1/missions/search?query={query}&start={start}&end={end}&page={page}&size={size}&"
+            "/api/v1/missions?q={q}&start={start}&end={end}&page={page}&size={size}&"
                 + "sort=plannedStartTime,desc&status=PLANNED&status=ACTIVE&",
             "a&b c",
             START,
@@ -118,19 +118,18 @@ class MissionBackendClientTest {
     backend.expect(
         "GET",
         sent(
-            "/api/v1/missions/search?sort=plannedStartTime,desc&status={status}&status={status}&",
+            "/api/v1/missions?sort=plannedStartTime,desc&status={status}&status={status}&",
             "COMPLETED",
             "ACTIVE"));
     backend.expect(
         "GET",
         sent(
-            "/api/v1/missions/search?sort=plannedStartTime,desc&"
+            "/api/v1/missions?sort=plannedStartTime,desc&"
                 + "status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELLED&"));
     backend.expect(
         "GET",
         sent(
-            "/api/v1/missions/search?sort=plannedStartTime,desc"
-                + "&status=COMPLETED&status=CANCELLED&"));
+            "/api/v1/missions?sort=plannedStartTime,desc" + "&status=COMPLETED&status=CANCELLED&"));
   }
 
   /**
@@ -182,8 +181,8 @@ class MissionBackendClientTest {
     backend.expect("GET", M + "/unit-ship-options");
     backend.expect("GET", M + "/finance-entries/summary");
     backend.expect("GET", M + "/finance-entries?size=200");
-    backend.expect("GET", "/api/v1/refinery-orders/mission/" + ID);
-    backend.expect("GET", "/api/v1/inventory/mission/" + ID);
+    backend.expect("GET", "/api/v1/refinery-orders?missionId=" + ID);
+    backend.expect("GET", "/api/v1/inventory/allocations?missionId=" + ID);
     backend.expect("GET", "/api/v1/org-units/me/pickable");
     backend.expect("GET", M + "/participants/unassigned");
     backend.expect("GET", "/api/v1/settings/refinery.rounding.mode");
@@ -482,9 +481,9 @@ class MissionBackendClientTest {
 
     client.addFinanceEntry(create);
     assertThat(client.addFinanceEntryJson(create)).isNotNull();
-    client.updateFinanceEntry(OTHER, update);
-    assertThat(client.updateFinanceEntryJson(OTHER, update)).isNotNull();
-    client.deleteFinanceEntry(OTHER);
+    client.updateFinanceEntry(ID, OTHER, update);
+    assertThat(client.updateFinanceEntryJson(ID, OTHER, update)).isNotNull();
+    client.deleteFinanceEntry(ID, OTHER);
 
     String createJson =
         "{\"missionId\":\""
@@ -493,10 +492,10 @@ class MissionBackendClientTest {
             + THIRD
             + "\",\"note\":null,\"type\":\"INCOME\",\"amount\":250}";
     String updateJson = "{\"note\":\"Sale\",\"type\":\"EXPENSE\",\"amount\":99,\"version\":4}";
-    backend.expect("POST", "/api/v1/finance-entries", createJson);
-    backend.expect("POST", "/api/v1/finance-entries", createJson);
-    backend.expect("PUT", "/api/v1/finance-entries/" + OTHER, updateJson);
-    backend.expect("PUT", "/api/v1/finance-entries/" + OTHER, updateJson);
-    backend.expect("DELETE", "/api/v1/finance-entries/" + OTHER);
+    backend.expect("POST", "/api/v1/missions/" + ID + "/finance-entries", createJson);
+    backend.expect("POST", "/api/v1/missions/" + ID + "/finance-entries", createJson);
+    backend.expect("PUT", "/api/v1/missions/" + ID + "/finance-entries/" + OTHER, updateJson);
+    backend.expect("PUT", "/api/v1/missions/" + ID + "/finance-entries/" + OTHER, updateJson);
+    backend.expect("DELETE", "/api/v1/missions/" + ID + "/finance-entries/" + OTHER);
   }
 }

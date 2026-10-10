@@ -67,7 +67,7 @@ public class DashboardBackendClient {
   public PageResponse<MissionListDto> upcomingMissions(
       @NotNull Instant start, @NotNull Instant end) {
     String uri =
-        UriComponentsBuilder.fromPath("/api/v1/missions/search")
+        UriComponentsBuilder.fromPath("/api/v1/missions")
             .queryParam("start", start)
             .queryParam("end", end)
             .queryParam("sort", "plannedStartTime,asc")

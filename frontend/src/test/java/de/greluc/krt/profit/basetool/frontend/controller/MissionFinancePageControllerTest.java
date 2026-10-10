@@ -122,7 +122,10 @@ class MissionFinancePageControllerTest {
       assertEquals("redirect:/missions/" + MISSION_ID, view);
       ArgumentCaptor<MissionFinanceEntryCreateDto> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
-          .post(eq("/api/v1/finance-entries"), bodyCaptor.capture(), eq(Void.class));
+          .post(
+              eq("/api/v1/missions/{missionId}/finance-entries"),
+              bodyCaptor.capture(),
+              eq(Void.class));
       assertEquals(
           new MissionFinanceEntryCreateDto(
               MISSION_ID,
@@ -284,7 +287,9 @@ class MissionFinancePageControllerTest {
       MissionFinanceEntryDto created =
           new MissionFinanceEntryDto(ENTRY_ID, MISSION_ID, null, null, null, null, 0L);
       when(backendApiClient.post(
-              eq("/api/v1/finance-entries"), any(), eq(MissionFinanceEntryDto.class)))
+              eq("/api/v1/missions/{missionId}/finance-entries"),
+              any(),
+              eq(MissionFinanceEntryDto.class)))
           .thenReturn(created);
 
       ResponseEntity<Object> resp = controller.addFinanceEntryAjax(MISSION_ID, body, principal);
@@ -293,7 +298,7 @@ class MissionFinancePageControllerTest {
       assertEquals(created, resp.getBody());
       verify(backendApiClient)
           .post(
-              "/api/v1/finance-entries",
+              "/api/v1/missions/{missionId}/finance-entries",
               new MissionFinanceEntryCreateDto(
                   MISSION_ID, participantId, null, FinanceType.INCOME, new BigDecimal("250")),
               MissionFinanceEntryDto.class);

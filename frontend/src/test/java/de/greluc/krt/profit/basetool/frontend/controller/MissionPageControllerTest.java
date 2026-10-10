@@ -304,7 +304,7 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}"),
             eq(Void.class),
             eq(id),
             eq(participantId));
@@ -334,7 +334,7 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}"),
             eq(Void.class),
             eq(id),
             eq(participantId));
@@ -373,7 +373,7 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}"),
             any(),
             eq(Void.class),
             eq(id),
@@ -412,7 +412,7 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}"),
             any(),
             eq(Void.class),
             eq(id),
@@ -703,7 +703,7 @@ class MissionPageControllerTest {
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 200, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(id)))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders?missionId={id}"), anyTypeRef(), eq(id)))
         .thenReturn(Collections.emptyList());
 
     controller.missionDetail(id, model, null, null);
@@ -716,6 +716,7 @@ class MissionPageControllerTest {
     verify(backendApiClient)
         .get(
             eq("/api/v1/missions/{id}/finance-entries?size={size}"), anyTypeRef(), eq(id), eq(200));
-    verify(backendApiClient).get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(id));
+    verify(backendApiClient)
+        .get(eq("/api/v1/refinery-orders?missionId={id}"), anyTypeRef(), eq(id));
   }
 }

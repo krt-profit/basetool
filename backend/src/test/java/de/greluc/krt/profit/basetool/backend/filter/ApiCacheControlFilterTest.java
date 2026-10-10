@@ -100,7 +100,7 @@ class ApiCacheControlFilterTest {
       strings = {
         "/api/v1/org-units/bank/balances",
         "/api/v1/org-units/bank/accounts/42/transactions",
-        "/api/v1/finance-entries",
+        "/api/v1/missions/{missionId}/finance-entries",
         "/api/v1/finance-entries/42",
         "/api/v1/missions/42/finance-entries",
         "/api/v1/missions/42/finance-entries/summary",

@@ -53,7 +53,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateCustomFreque
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionObjectiveRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwnerRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwningOrgUnitRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionStepRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdatePayoutPreferenceRequest;
@@ -143,15 +142,28 @@ public class MissionController {
   private final ParticipantTargetResolver participantTargetResolver;
 
   /**
-   * Pages the missions visible to the calling member.
+   * Pages the missions visible to the calling member, optionally narrowed by a name fragment, a
+   * planned-start window, statuses and an operation; without filters every status is listed.
    *
+   * @param q free-text name fragment
+   * @param start lower bound on planned start time
+   * @param end upper bound on planned start time
+   * @param status status filter (one or more)
+   * @param operationId optional operation filter
    * @return paged mission list DTOs, each saying whether the caller is signed up
    */
   @GetMapping
-  @Operation(summary = "List all missions (paginated)")
+  @Operation(summary = "List missions (paginated, filterable)")
   @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Transactional(readOnly = true)
   public PageResponse<MissionListDto> getAllMissions(
+      @RequestParam(required = false) String q,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant start,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant end,
+      @RequestParam(required = false) List<String> status,
+      @RequestParam(required = false) UUID operationId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
@@ -163,14 +175,7 @@ public class MissionController {
             Set.of("plannedStartTime", "name", "status", "id"),
             "plannedStartTime");
     Page<Mission> pageResult =
-        missionService.searchMissions(
-            null,
-            null,
-            null,
-            List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"),
-            null,
-            null,
-            pageable);
+        missionService.searchMissions(q, start, end, status, null, operationId, pageable);
     return PageResponse.of(toListRows(pageResult));
   }
 
@@ -192,43 +197,6 @@ public class MissionController {
   @Transactional(readOnly = true)
   public List<MissionReferenceDto> lookupMissions() {
     return missionService.findAllActiveReference();
-  }
-
-  /**
-   * Filtered, paged mission search scoped to the calling member.
-   *
-   * @param query free-text name fragment
-   * @param start lower bound on planned start time
-   * @param end upper bound on planned start time
-   * @param status status filter (one or more)
-   * @param operationId optional operation filter
-   * @return paged mission list DTOs, each saying whether the caller is signed up
-   */
-  @GetMapping("/search")
-  @Operation(summary = "Search missions (paginated)")
-  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
-  @Transactional(readOnly = true)
-  public PageResponse<MissionListDto> searchMissions(
-      @RequestParam(required = false) String query,
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-          Instant start,
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-          Instant end,
-      @RequestParam(required = false) List<String> status,
-      @RequestParam(required = false) UUID operationId,
-      @RequestParam(required = false) Integer page,
-      @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
-    Pageable pageable =
-        PaginationUtil.createPageRequest(
-            page,
-            size,
-            sort,
-            Set.of("plannedStartTime", "name", "status", "id"),
-            "plannedStartTime");
-    Page<Mission> pageResult =
-        missionService.searchMissions(query, start, end, status, null, operationId, pageable);
-    return PageResponse.of(toListRows(pageResult));
   }
 
   /**
@@ -293,27 +261,6 @@ public class MissionController {
   public MissionDto createSubMission(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull CreateMissionRequest request) {
     return redactForPeer(missionMapper.toDto(missionService.addSubMission(id, request)));
-  }
-
-  /**
-   * Full-replace update that bumps {@code Mission.version}; prefer the section patches ({@link
-   * #patchMissionCore}, {@link #patchMissionSchedule}, {@link #patchMissionFlags}).
-   *
-   * @param id mission id
-   * @param request update payload (carries the expected version; excludes server-managed fields)
-   * @return the persisted DTO
-   */
-  @PutMapping("/{id}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @Operation(
-      summary = "Update a mission (full replace)",
-      description =
-          "Replaces the entire mission in a single request. For a better multi-user experience, "
-              + "prefer the section PATCH endpoints (/core, /schedule, /flags) instead, so "
-              + "concurrent edits to other sections do not trigger optimistic-lock conflicts.")
-  public MissionDto updateMission(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull UpdateMissionRequest request) {
-    return redactForPeer(missionMapper.toDto(missionService.updateMission(id, request)));
   }
 
   /**
@@ -450,56 +397,6 @@ public class MissionController {
                 null,
                 null,
                 request == null ? null : request.payoutPreference()));
-    return redactForPeer(dto);
-  }
-
-  /**
-   * Adds a participant by {@code userId} or by free-text {@code guestName}.
-   *
-   * <p>A name resolves case-insensitively: a unique member match links that member, no match
-   * records an external participant, several matches are a 409. Naming anyone other than the caller
-   * requires {@code canManageMission}.
-   *
-   * @param id mission id
-   * @param request add-participant payload (userId XOR guestName + comment + squadron)
-   * @return the persisted parent DTO
-   */
-  @PostMapping("/{id}/participants/add")
-  @Operation(
-      summary = "Add a participant",
-      description =
-          "Adds a participant by explicit userId (from autocomplete) or by free-text guestName."
-              + " Free-text names are resolved case-insensitively against existing users: a unique"
-              + " match links the participant as a registered member; no match records an external"
-              + " participant; multiple matches return 409 (ambiguous name).")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Participant added"),
-    @ApiResponse(responseCode = "400", description = "Validation error"),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Only mission managers may add somebody other than themselves"),
-    @ApiResponse(
-        responseCode = "409",
-        description = "Participant name is ambiguous and matches more than one registered user")
-  })
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionAccessPolicy.canSeeMission(#id)")
-  public MissionDto addParticipantPublic(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @Valid @NotNull AddExternalParticipantRequest request,
-      Authentication authentication) {
-    ParticipantTarget target = resolveParticipantTarget(id, request, authentication);
-    MissionDto dto =
-        missionMapper.toDto(
-            missionService.addParticipant(
-                id,
-                target.userId(),
-                target.guestName(),
-                request.desiredJobTypeId(),
-                request.comment(),
-                request.orgUnitIds(),
-                request.payoutPreference()));
     return redactForPeer(dto);
   }
 
@@ -668,7 +565,7 @@ public class MissionController {
    * @param request unit payload
    * @return the updated unit list
    */
-  @PostMapping("/{id}/units/slim")
+  @PostMapping("/{id}/units")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Add a unit to a mission (slim response)",
@@ -700,7 +597,7 @@ public class MissionController {
    * @param request unit payload
    * @return the updated unit DTO
    */
-  @PutMapping("/{id}/units/{unitId}/slim")
+  @PutMapping("/{id}/units/{unitId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Update a mission unit (slim response)",
@@ -731,7 +628,7 @@ public class MissionController {
    * @param unitId unit id
    * @return 204 No Content
    */
-  @DeleteMapping("/{id}/units/{unitId}/slim")
+  @DeleteMapping("/{id}/units/{unitId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Delete a mission unit (slim response)",
@@ -750,7 +647,7 @@ public class MissionController {
    * @param request the step payload (title, optional meta, expected stepsVersion)
    * @return the mission's ordered Ablauf steps after the add
    */
-  @PostMapping("/{id}/steps/slim")
+  @PostMapping("/{id}/steps")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Add an Ablauf step to a mission (slim response)",
@@ -772,7 +669,7 @@ public class MissionController {
    * @param request the step payload (title, optional meta, expected stepsVersion)
    * @return the mission's ordered Ablauf steps after the edit
    */
-  @PutMapping("/{id}/steps/{stepId}/slim")
+  @PutMapping("/{id}/steps/{stepId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Update an Ablauf step (slim response)",
@@ -795,7 +692,7 @@ public class MissionController {
    * @param stepsVersion the expected mission steps-section version (optimistic-lock guard)
    * @return the mission's ordered Ablauf steps after the removal
    */
-  @DeleteMapping("/{id}/steps/{stepId}/slim")
+  @DeleteMapping("/{id}/steps/{stepId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Delete an Ablauf step (slim response)",
@@ -815,7 +712,7 @@ public class MissionController {
    * @param request the desired step-id order + expected stepsVersion
    * @return the mission's ordered Ablauf steps after the reorder
    */
-  @PutMapping("/{id}/steps/reorder/slim")
+  @PutMapping("/{id}/steps/reorder")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Reorder a mission's Ablauf steps (slim response)",
@@ -835,7 +732,7 @@ public class MissionController {
    * @param request the new done state + expected stepsVersion
    * @return the mission's ordered Ablauf steps after the toggle
    */
-  @PatchMapping("/{id}/steps/{stepId}/done/slim")
+  @PatchMapping("/{id}/steps/{stepId}/done")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Toggle an Ablauf step's done flag (slim response)",
@@ -866,7 +763,7 @@ public class MissionController {
    * @param request the goal payload (title, kind, expected objectivesVersion)
    * @return the mission's ordered goals after the add
    */
-  @PostMapping("/{id}/objectives/slim")
+  @PostMapping("/{id}/objectives")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Add a goal (Ziel) to a mission (slim response)",
@@ -889,7 +786,7 @@ public class MissionController {
    * @param request the goal payload (title, kind, expected objectivesVersion)
    * @return the mission's ordered goals after the edit
    */
-  @PutMapping("/{id}/objectives/{objectiveId}/slim")
+  @PutMapping("/{id}/objectives/{objectiveId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Update a mission goal (slim response)",
@@ -912,7 +809,7 @@ public class MissionController {
    * @param objectivesVersion the expected mission goals-section version (optimistic-lock guard)
    * @return the mission's ordered goals after the removal
    */
-  @DeleteMapping("/{id}/objectives/{objectiveId}/slim")
+  @DeleteMapping("/{id}/objectives/{objectiveId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Delete a mission goal (slim response)",
@@ -932,7 +829,7 @@ public class MissionController {
    * @param request the desired goal-id order + expected objectivesVersion
    * @return the mission's ordered goals after the reorder
    */
-  @PutMapping("/{id}/objectives/reorder/slim")
+  @PutMapping("/{id}/objectives/reorder")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Reorder a mission's goals (slim response)",
@@ -982,7 +879,7 @@ public class MissionController {
    * @param request crew payload (participant + job types)
    * @return the updated crew list of the unit
    */
-  @PostMapping("/{id}/units/{missionUnitId}/crew/slim")
+  @PostMapping("/{id}/units/{missionUnitId}/crew")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Add crew to a mission unit (slim response)",
@@ -1008,7 +905,7 @@ public class MissionController {
    * @param request crew payload (job-type set)
    * @return the updated crew DTO
    */
-  @PutMapping("/{id}/units/{missionUnitId}/crew/{crewId}/slim")
+  @PutMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Update crew in a mission unit (slim response)",
@@ -1033,7 +930,7 @@ public class MissionController {
    * @param crewId crew entry id
    * @return 204 No Content
    */
-  @DeleteMapping("/{id}/units/{missionUnitId}/crew/{crewId}/slim")
+  @DeleteMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Remove crew from a mission unit (slim response)",
@@ -1054,7 +951,7 @@ public class MissionController {
    * @param request participant payload (carries the expected participant version)
    * @return the updated participant DTO
    */
-  @PutMapping("/{id}/participants/{participantId}/slim")
+  @PutMapping("/{id}/participants/{participantId}")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
           + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
@@ -1091,7 +988,7 @@ public class MissionController {
    * @param participantId participant id
    * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
    */
-  @PostMapping("/{id}/participants/{participantId}/check-in/slim")
+  @PostMapping("/{id}/participants/{participantId}/check-in")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
           + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
@@ -1113,7 +1010,7 @@ public class MissionController {
    * @param participantId participant id
    * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
    */
-  @PostMapping("/{id}/participants/{participantId}/check-out/slim")
+  @PostMapping("/{id}/participants/{participantId}/check-out")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
           + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
@@ -1136,7 +1033,7 @@ public class MissionController {
    * @param request payout preference payload
    * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
    */
-  @PutMapping("/{id}/participants/{participantId}/payout-preference/slim")
+  @PutMapping("/{id}/participants/{participantId}/payout-preference")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
           + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
@@ -1162,7 +1059,7 @@ public class MissionController {
    * @param authentication current Spring Security authentication
    * @return the updated participant list
    */
-  @PostMapping("/{id}/participants/slim")
+  @PostMapping("/{id}/participants")
   @Operation(
       summary = "Add a participant (slim response)",
       description =
@@ -1203,7 +1100,7 @@ public class MissionController {
    * @param request the member to add
    * @return the mission's participant list after the add, peer-redacted below Logistician
    */
-  @PostMapping("/{id}/participants/by-id/slim")
+  @PostMapping("/{id}/participants/by-id")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Add a registered member by id (manager-only, slim response)",
@@ -1228,7 +1125,7 @@ public class MissionController {
    * @param authentication current Spring Security authentication
    * @return 204 No Content
    */
-  @DeleteMapping("/{id}/participants/{participantId}/slim")
+  @DeleteMapping("/{id}/participants/{participantId}")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
           + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
@@ -1269,7 +1166,7 @@ public class MissionController {
    * @param request frequency payload (type + value)
    * @return the updated frequency list
    */
-  @PostMapping("/{id}/frequencies/slim")
+  @PostMapping("/{id}/frequencies")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Add or update a frequency for a mission (slim response)",
@@ -1289,7 +1186,7 @@ public class MissionController {
    * @param frequencyId frequency id
    * @return 204 No Content
    */
-  @DeleteMapping("/{id}/frequencies/{frequencyId}/slim")
+  @DeleteMapping("/{id}/frequencies/{frequencyId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Remove a frequency from a mission (slim response)",
@@ -1307,7 +1204,7 @@ public class MissionController {
    * @param request the custom-frequency payload (name + value)
    * @return the updated frequency list
    */
-  @PostMapping("/{id}/frequencies/custom/slim")
+  @PostMapping("/{id}/frequencies/custom")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Add a custom (mission-specific) frequency (slim response)",
@@ -1329,7 +1226,7 @@ public class MissionController {
    * @param request the custom-frequency payload (name + value + version)
    * @return the updated frequency list
    */
-  @PutMapping("/{id}/frequencies/custom/{frequencyId}/slim")
+  @PutMapping("/{id}/frequencies/custom/{frequencyId}")
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Update a custom (mission-specific) frequency (slim response)",
@@ -1354,7 +1251,7 @@ public class MissionController {
    * @param userId user id to add as manager
    * @return the updated manager list
    */
-  @PostMapping("/{id}/managers/{userId}/slim")
+  @PostMapping("/{id}/managers/{userId}")
   @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
   @Operation(
       summary = "Add a manager to a mission (slim response)",
@@ -1372,7 +1269,7 @@ public class MissionController {
    * @param userId user id to remove from managers
    * @return 204 No Content
    */
-  @DeleteMapping("/{id}/managers/{userId}/slim")
+  @DeleteMapping("/{id}/managers/{userId}")
   @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
   @Operation(
       summary = "Remove a manager from a mission (slim response)",

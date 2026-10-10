@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -134,6 +135,9 @@ class ApiCutMapTest {
     assertThat(escapes(Set.of("GET /api/v1/admin/c"), Set.of("GET /api/v1/admin/a")))
         .containsExactly("GET /api/v1/admin/c");
     assertThat(escapes(Set.of("GET /api/v1/admin/a"), Set.of("GET /api/v1/admin/a"))).isEmpty();
+    assertThatThrownBy(() -> waveNumber("x", "x GET /a /b T2 -"))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("x GET /a /b T2 -");
   }
 
   /**
@@ -254,7 +258,7 @@ class ApiCutMapTest {
       assertThat(f).as("fields of '%s'", line).hasSize(6);
       entries.add(
           new Entry(
-              Integer.parseInt(f[0]),
+              waveNumber(f[0], line),
               f[1],
               f[2],
               "-".equals(f[3]) ? null : f[3],
@@ -296,6 +300,22 @@ class ApiCutMapTest {
       }
     }
     return operations;
+  }
+
+  /**
+   * Parses the wave column of a map line, failing the test with the line when it is not a number.
+   *
+   * @param text the first field of the line
+   * @param line the whole line, for the failure message
+   * @return the wave number
+   * @throws AssertionError if the field is not an integer in range
+   */
+  private static int waveNumber(String text, String line) {
+    if (!text.matches("\\d{1,2}")) {
+      throw new AssertionError(
+          "api-cut-map.txt: `" + text + "` is not a wave number in '" + line + "'");
+    }
+    return Integer.parseInt(text);
   }
 
   /**

@@ -378,7 +378,7 @@ class RefineryOrderTenancyE2eTest {
    */
   @Test
   void missionRefineryRollupIsOrgScoped() {
-    String missionPath = "/api/v1/refinery-orders/mission/" + bacMissionId;
+    String missionPath = "/api/v1/refinery-orders?missionId=" + bacMissionId;
     assertTrue(
         seeder.getBody(ADMIN_USER, ADMIN_PASSWORD, missionPath).contains(bacOrderId),
         "an all-scope admin sees the A-owned refinery order on the public mission");

@@ -680,7 +680,7 @@ frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
 ### REQ-MISSION-020 — Manager-only add-by-id for the app
 
 A mission manager adds a registered member to the roster by user id through
-`POST /api/v1/missions/{id}/participants/by-id/slim` (owner decision 2026-09-22, ADR-0170 amendment).
+`POST /api/v1/missions/{id}/participants/by-id` (owner decision 2026-09-22, ADR-0170 amendment).
 It replaces the deprecated `POST …/participants` deleted the same day and exists for the Android
 app's "Teilnehmer hinzufügen" on the public API vhost.
 

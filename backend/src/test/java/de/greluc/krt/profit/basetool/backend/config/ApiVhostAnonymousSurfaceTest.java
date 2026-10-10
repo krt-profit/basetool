@@ -524,7 +524,7 @@ class ApiVhostAnonymousSurfaceTest {
   void shouldRefuseAnonymousFinanceWritesWithUnauthorized() throws Exception {
     mockMvc
         .perform(
-            post("/api/v1/finance-entries")
+            post("/api/v1/missions/{missionId}/finance-entries")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(

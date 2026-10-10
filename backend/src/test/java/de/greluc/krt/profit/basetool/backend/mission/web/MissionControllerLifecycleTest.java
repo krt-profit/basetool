@@ -246,7 +246,7 @@ class MissionControllerLifecycleTest {
         .thenReturn(page);
     when(missionService.registeredCounts(any())).thenReturn(Map.of(crowded.getId(), 7L));
 
-    controller.getAllMissions(null, null, null);
+    controller.getAllMissions(null, null, null, null, null, null, null, null);
 
     ArgumentCaptor<Long> counts = ArgumentCaptor.forClass(Long.class);
     verify(missionMapper, times(2)).toListDto(any(Mission.class), counts.capture(), anyBoolean());
@@ -271,7 +271,7 @@ class MissionControllerLifecycleTest {
     when(missionService.registeredCounts(any())).thenReturn(Map.of());
     when(missionService.signedUpMissionIds(any())).thenReturn(Set.of(joined.getId()));
 
-    controller.searchMissions(null, null, null, List.of("PLANNED"), null, 0, 50, null);
+    controller.getAllMissions(null, null, null, List.of("PLANNED"), null, 0, 50, null);
 
     ArgumentCaptor<Boolean> flags = ArgumentCaptor.forClass(Boolean.class);
     verify(missionMapper, times(2)).toListDto(any(Mission.class), anyLong(), flags.capture());
@@ -314,7 +314,8 @@ class MissionControllerLifecycleTest {
         .thenReturn(page);
     when(missionMapper.toListDto(eq(m), anyLong(), anyBoolean())).thenReturn(listDto);
 
-    PageResponse<MissionListDto> result = controller.getAllMissions(0, 20, null);
+    PageResponse<MissionListDto> result =
+        controller.getAllMissions(null, null, null, null, null, 0, 20, null);
 
     assertThat(result.content()).containsExactly(listDto);
     verify(missionService)
@@ -367,7 +368,7 @@ class MissionControllerLifecycleTest {
     when(missionMapper.toListDto(eq(m), anyLong(), anyBoolean())).thenReturn(listDto);
 
     PageResponse<MissionListDto> result =
-        controller.searchMissions(
+        controller.getAllMissions(
             "foo", start, end, List.of("COMPLETED"), operationId, 0, 20, null);
 
     assertThat(result.content()).containsExactly(listDto);

@@ -288,7 +288,7 @@ class ExternalContractTest {
               "get",
               Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "kind")),
           new ContractOperation(
-                  "/api/v1/missions/search",
+                  "/api/v1/missions",
                   "get",
                   Set.of(
                       "content",
@@ -308,7 +308,7 @@ class ExternalContractTest {
                       "meetingPoint"))
               .addressedBy(
                   Set.of(
-                      "query:string",
+                      "q:string",
                       "status:array",
                       "start:string",
                       "end:string",
@@ -321,17 +321,17 @@ class ExternalContractTest {
               "post",
               Set.of("id", "participants", "user", "registeredParticipants")),
           new ContractOperation(
-              "/api/v1/missions/{id}/participants/{participantId}/slim", "delete", Set.of()),
+              "/api/v1/missions/{id}/participants/{participantId}", "delete", Set.of()),
           new ContractOperation(
-              "/api/v1/missions/{id}/participants/{participantId}/check-in/slim",
+              "/api/v1/missions/{id}/participants/{participantId}/check-in",
               "post",
               Set.of("id", "user", "startTime")),
           new ContractOperation(
-              "/api/v1/missions/{id}/participants/{participantId}/check-out/slim",
+              "/api/v1/missions/{id}/participants/{participantId}/check-out",
               "post",
               Set.of("id", "user", "endTime")),
           new ContractOperation(
-              "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim",
+              "/api/v1/missions/{id}/participants/{participantId}/payout-preference",
               "put",
               Set.of("id", "payoutPreference"),
               Set.of("preference")),
@@ -353,7 +353,7 @@ class ExternalContractTest {
               "get",
               Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")),
           new ContractOperation(
-              "/api/v1/finance-entries",
+              "/api/v1/missions/{missionId}/finance-entries",
               "post",
               Set.of("id", "missionId", "participant", "type", "amount", "note", "version"),
               Set.of("amount", "missionId", "participantId", "type")),
@@ -1412,7 +1412,7 @@ class ExternalContractTest {
               Set.of(),
               Set.of("delivered", "jobOrderId", "version")),
           new ContractOperation(
-              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "delete", Set.of()),
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}", "delete", Set.of()),
           new ContractOperation(
               "/api/v1/bank/deposits", "post", Set.of(), Set.of("accountId", "amount", "holderId")),
           new ContractOperation(
@@ -1642,67 +1642,63 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/missions/{id}/party-lead", "put", MISSION_DETAIL, Set.of("version")),
           new ContractOperation(
-              "/api/v1/missions/{id}/participants/by-id/slim", "post", Set.of(), Set.of("userId")),
+              "/api/v1/missions/{id}/participants/by-id", "post", Set.of(), Set.of("userId")),
           new ContractOperation(
               "/api/v1/missions/{id}/unit-ship-options", "get", Set.of("id", "name", "shipType")),
+          new ContractOperation("/api/v1/missions/{id}/units", "post", Set.of(), Set.of("name")),
           new ContractOperation(
-              "/api/v1/missions/{id}/units/slim", "post", Set.of(), Set.of("name")),
+              "/api/v1/missions/{id}/units/{unitId}", "put", Set.of(), Set.of("name")),
+          new ContractOperation("/api/v1/missions/{id}/units/{unitId}", "delete", Set.of()),
           new ContractOperation(
-              "/api/v1/missions/{id}/units/{unitId}/slim", "put", Set.of(), Set.of("name")),
-          new ContractOperation("/api/v1/missions/{id}/units/{unitId}/slim", "delete", Set.of()),
-          new ContractOperation(
-              "/api/v1/missions/{id}/units/{missionUnitId}/crew/slim",
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew",
               "post",
               Set.of(),
               Set.of("participantId")),
           new ContractOperation(
-              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "put", Set.of()),
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}", "put", Set.of()),
           new ContractOperation(
-              "/api/v1/missions/{id}/frequencies/custom/slim",
+              "/api/v1/missions/{id}/frequencies/custom",
               "post",
               Set.of("id", "frequencyType", "name", "value"),
               Set.of("name", "value")),
           new ContractOperation(
-              "/api/v1/missions/{id}/frequencies/{frequencyId}/slim", "delete", Set.of()),
-          new ContractOperation("/api/v1/missions/{id}/managers/{userId}/slim", "post", Set.of()),
-          new ContractOperation("/api/v1/missions/{id}/managers/{userId}/slim", "delete", Set.of()),
+              "/api/v1/missions/{id}/frequencies/{frequencyId}", "delete", Set.of()),
+          new ContractOperation("/api/v1/missions/{id}/managers/{userId}", "post", Set.of()),
+          new ContractOperation("/api/v1/missions/{id}/managers/{userId}", "delete", Set.of()),
           new ContractOperation(
-              "/api/v1/missions/{id}/steps/slim",
-              "post",
-              STEP_ROW,
-              Set.of("stepsVersion", "title")),
+              "/api/v1/missions/{id}/steps", "post", STEP_ROW, Set.of("stepsVersion", "title")),
           new ContractOperation(
-              "/api/v1/missions/{id}/steps/{stepId}/slim",
+              "/api/v1/missions/{id}/steps/{stepId}",
               "put",
               STEP_ROW,
               Set.of("stepsVersion", "title")),
-          new ContractOperation("/api/v1/missions/{id}/steps/{stepId}/slim", "delete", STEP_ROW)
+          new ContractOperation("/api/v1/missions/{id}/steps/{stepId}", "delete", STEP_ROW)
               .addressedBy(Set.of("stepsVersion:integer")),
           new ContractOperation(
-              "/api/v1/missions/{id}/steps/{stepId}/done/slim",
+              "/api/v1/missions/{id}/steps/{stepId}/done",
               "patch",
               STEP_ROW,
               Set.of("done", "stepsVersion")),
           new ContractOperation(
-              "/api/v1/missions/{id}/steps/reorder/slim",
+              "/api/v1/missions/{id}/steps/reorder",
               "put",
               STEP_ROW,
               Set.of("stepIds", "stepsVersion")),
           new ContractOperation(
-              "/api/v1/missions/{id}/objectives/slim",
+              "/api/v1/missions/{id}/objectives",
               "post",
               OBJECTIVE_ROW,
               Set.of("kind", "objectivesVersion", "title")),
           new ContractOperation(
-              "/api/v1/missions/{id}/objectives/{objectiveId}/slim",
+              "/api/v1/missions/{id}/objectives/{objectiveId}",
               "put",
               OBJECTIVE_ROW,
               Set.of("kind", "objectivesVersion", "title")),
           new ContractOperation(
-                  "/api/v1/missions/{id}/objectives/{objectiveId}/slim", "delete", OBJECTIVE_ROW)
+                  "/api/v1/missions/{id}/objectives/{objectiveId}", "delete", OBJECTIVE_ROW)
               .addressedBy(Set.of("objectivesVersion:integer")),
           new ContractOperation(
-              "/api/v1/missions/{id}/objectives/reorder/slim",
+              "/api/v1/missions/{id}/objectives/reorder",
               "put",
               OBJECTIVE_ROW,
               Set.of("objectiveIds", "objectivesVersion")),
@@ -1847,7 +1843,7 @@ class ExternalContractTest {
           new ContractOperation("/api/v1/hangar/ships", "delete", Set.of()),
           new ContractOperation("/api/v1/personal-blueprints", "delete", Set.of("deleted")),
           new ContractOperation(
-              "/api/v1/missions/{id}/participants/{participantId}/slim",
+              "/api/v1/missions/{id}/participants/{participantId}",
               "put",
               Set.of("id", "user", "guestName", "startTime", "endTime", "payoutPreference"),
               Set.of("version")));

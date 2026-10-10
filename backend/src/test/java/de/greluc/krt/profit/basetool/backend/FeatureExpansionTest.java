@@ -269,7 +269,7 @@ class FeatureExpansionTest {
     String response =
         mockMvc
             .perform(
-                post("/api/v1/finance-entries")
+                post("/api/v1/missions/{missionId}/finance-entries")
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(normalUser.getId().toString()))
@@ -333,7 +333,7 @@ class FeatureExpansionTest {
     String response =
         mockMvc
             .perform(
-                post("/api/v1/finance-entries")
+                post("/api/v1/missions/{missionId}/finance-entries")
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(otherUser.getId().toString()))
