@@ -195,7 +195,7 @@ tasks.named<Test>("test") {
         "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/observability/ObservationPrivacyFilter.java"
       ),
       rootProject.file(
-        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ObservationPrivacyFilter.java"
+        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/observability/ObservationPrivacyFilter.java"
       ),
       rootProject.file(
         "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/KeycloakTrustSupport.java"
@@ -204,7 +204,7 @@ tasks.named<Test>("test") {
         "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/assembly/ManagementPortSecurityConfig.java"
       ),
       rootProject.file(
-        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ManagementPortSecurityConfig.java"
+        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/security/ManagementPortSecurityConfig.java"
       ),
       rootProject.file("ingest/src/main/resources/application.yml"),
       rootProject.file("frontend/src/main/resources/application.yml"),
@@ -234,7 +234,7 @@ tasks.named<Test>("test") {
   inputs
     .file(
       rootProject.file(
-        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/websocket/LiveSyncTopicClass.java"
+        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/livesync/LiveSyncTopicClass.java"
       )
     )
     .withPropertyName("liveSyncTopicRegistrySource")

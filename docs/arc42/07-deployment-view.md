@@ -293,6 +293,14 @@ job in `release-images.yml`), and only the jobs that sign hold the OIDC token th
 the jobs that run the build do not. `promote.yml`, `promote-testing.yml` and `deploy.sh` trust the
 same anchored signer identity (REQ-OPS-015).
 
+**Everything above starts at a push to `main`, and `main` is advanced only by the GitHub merge
+queue** (REQ-OPS-044, ADR-0246): a `merge_queue` rule in the `main` ruleset merges one pull request
+(merge commit) per group after building `main` plus the pull request, so the strict up-to-date policy is off and a
+PR is never behind. The tree-dependent required checks and both CodeQL analyses (without an upload)
+run on the `merge_group` event; DCO and gitleaks are answered there by same-named shim jobs; the E2E
+suite never runs in a group. One PR per group keeps one merge commit per push, which the release and
+image workflows inspect. The queue exists only while the repository is public.
+
 **The three app images come from one Dockerfile** (`docker/app/Dockerfile`, since 2026-09-23), with
 `MODULE` selecting the Gradle project, the training stubs and a per-module tail stage for the port and
 the healthcheck. The build runs `:<module>:bootJar` — exactly the artefact that ships, none of the
