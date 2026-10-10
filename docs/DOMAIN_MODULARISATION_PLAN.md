@@ -1050,8 +1050,9 @@ as each pair is decoupled.
   `UserDeletionService` use them, so a move closes a package cycle. They move with P3-8 (the
   `mission -> refinery` association and the `MissionFinanceContributor` SPI), where
   `RefineryOrder.mission` becomes an id. So the policy does not own the refinery's JPQL scope
-  fragment yet either. (2) No command API: no other module writes a refinery order; the store
-  writes Lager rows through the Lager's own services and becomes a stock command with P3-5.
+  fragment yet either. (2) No command API: no other module writes a refinery order. The
+  store still creates Lager rows itself (write family 2 of the evidence appendix); that write
+  becomes a call of the Lager's `StockCommands` with P3-5.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
