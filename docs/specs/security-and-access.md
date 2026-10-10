@@ -1143,7 +1143,7 @@ so a bare id was not an authorization secret.
   `X-Guest-Edit-Token`) that hashed to the stored hash, OR (b) held a mission-management role in
   scope (`canManageMission`). Only branch (b) survives, and it is now unconditional.
 - **The token proves *which row*, never *whether the mission is still open*.** Branch (a) MUST
-  additionally require `OwnerScopeService.canSeeMission(missionId)`. Without it the capability
+  additionally require `MissionAccessPolicy.canSeeMission(missionId)`. Without it the capability
   outlived the surface that granted it: a guest who signed up while the mission was public kept
   `PUT` / `DELETE` / check-in on their row after the mission was flipped to `isInternal = true` and
   after it reached `COMPLETED` / `CANCELLED`. Because `OperationPayoutService` recomputes the time
@@ -3159,7 +3159,7 @@ a caller who may manage the mission (ADMIN; an OFFICER / MISSION_MANAGER whose o
 covers it; the owner or a co-manager) may book for any of its participants, and every other member
 may book **only against their own participant row** on that mission.
 
-It MUST NOT be gated on `OwnerScopeService#canSeeMission`, which deliberately grants the
+It MUST NOT be gated on `MissionAccessPolicy#canSeeMission`, which deliberately grants the
 cross-squadron **public escape** on a non-internal mission. That is the correct rule for a read and
 the wrong one for a write: combined with a service that checked only that the participant belonged
 to the mission, any member could post income/expense rows into another squadron's payout ledger and

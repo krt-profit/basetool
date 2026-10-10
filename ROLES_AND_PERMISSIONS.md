@@ -150,7 +150,7 @@ through [`MissionPeerRedactor`](backend/src/main/java/de/greluc/krt/profit/baset
 role-less callers, which additionally hid the description and each participant's payout preference
 and comment (ADR-0034), and refused internal and terminal missions outright. Its whole audience was
 people outside the organisation, and ADR-0159 removed that audience; the tier went with it. Which
-missions a member may see at all is decided upstream by `@ownerScopeService.canSeeMission` — own
+missions a member may see at all is decided upstream by `@missionAccessPolicy.canSeeMission` — own
 Staffel, or any non-internal mission organisation-wide — which is where the internal-mission rule
 always lived for members.
 
