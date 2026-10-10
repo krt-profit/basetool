@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -60,7 +62,15 @@ class NotificationCreationServiceTest {
   @Mock private RuleEvaluationService ruleEvaluationService;
   @Mock private NotificationRepository notificationRepository;
   @Mock private NotificationParamsCodec notificationParamsCodec;
+  @Mock private NotificationMuteService notificationMuteService;
   @InjectMocks private NotificationCreationService service;
+
+  @BeforeEach
+  void muteNobody() {
+    lenient()
+        .when(notificationMuteService.withoutMuted(any()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+  }
 
   private static JobOrderCreatedEvent event() {
     return new JobOrderCreatedEvent(

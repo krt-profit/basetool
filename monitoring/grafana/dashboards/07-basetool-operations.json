@@ -4066,6 +4066,55 @@
         }
       ],
       "description": "Notifications raised by the one-minute time-based producer (REQ-NOTIF-026), by producer kind."
+    },
+    {
+      "id": 84,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 288
+      },
+      "type": "timeseries",
+      "title": "Notifications dropped by mute/hour by type",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (notification_type) (increase(basetool_notification_muted_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{notification_type}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "Recipients the engine dropped because they muted the notification type (REQ-NOTIF-027)."
     }
   ]
 }

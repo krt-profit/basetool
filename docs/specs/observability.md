@@ -1555,6 +1555,10 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   cannot double-count. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
   who it was is in the ROLE audit trail. Backs `AdminAccountAutoActivated` (any occurrence in
   24 h, warning; added 2026-09-17).
+- `basetool_notification_muted_total{notification_type}` counter (`NotificationMuteService`, bounded by
+  the notification types) counts the recipients the engine dropped because they muted the type
+  (REQ-NOTIF-027); a panel on `07-basetool-operations.json` charts it per type. Added with issue
+  #2414.
 - `basetool_notification_timed_produced_total{kind}` counter (`NotificationTimedRunner`, one series
   per `TimedNoticeProducer`, bounded by the number of producers) counts the notices the one-minute
   time-based producer raised (REQ-NOTIF-026). The producer is the `notification_timed` scheduled
