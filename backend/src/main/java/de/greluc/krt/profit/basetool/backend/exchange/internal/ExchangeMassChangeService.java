@@ -63,9 +63,6 @@ public class ExchangeMassChangeService {
   /** How far a staging time may lie ahead of the backend's clock. */
   static final Duration CLOCK_SKEW = Duration.ofMinutes(1);
 
-  private static final String BLUEPRINTS = "blueprints";
-  private static final String STOCK = "stock";
-
   private final ExchangeSettingsRepository settingsRepository;
   private final ExchangeClientRepository clientRepository;
   private final ExchangeClientRevocationRepository revocationRepository;
@@ -98,7 +95,7 @@ public class ExchangeMassChangeService {
     ExchangeClient client = admit(member, request);
     ExchangeCaller caller =
         new ExchangeCaller(member, request.clientId(), request.installationKey());
-    ExchangeChangeResultDto result = run(caller, request, true);
+    ExchangeChangeResultDto result = run(caller, resourceOf(request), request, true);
     return toDto(client, request.resource(), result);
   }
 
@@ -129,7 +126,8 @@ public class ExchangeMassChangeService {
             () ->
                 transaction.execute(
                     _ -> {
-                      ExchangeChangeResultDto applied = run(caller, request, false);
+                      ExchangeChangeResultDto applied =
+                          run(caller, resourceOf(request), request, false);
                       auditRecorder.record(
                           AuditEventType.EXCHANGE_MASS_CHANGE_CONFIRMED,
                           client.getId(),
@@ -142,7 +140,7 @@ public class ExchangeMassChangeService {
     if (result == null) {
       throw new IllegalStateException("The confirmed change set returned no result");
     }
-    counter(client.getClientId(), request.resource()).increment();
+    counter(client.getClientId(), resourceOf(request)).increment();
     return toDto(client, request.resource(), result);
   }
 
@@ -167,8 +165,9 @@ public class ExchangeMassChangeService {
         Entities.require(
             clientRepository.findWithCapabilitiesByClientId(request.clientId()),
             () -> "Client not found");
+    ExchangeCapability needed = resourceOf(request).writeCapability();
     if (client.getStatus() != ExchangeClientStatus.ACTIVE
-        || !client.getCapabilities().contains(capability(request.resource()))) {
+        || !client.getCapabilities().contains(needed)) {
       throw new AccessDeniedException("The client may not write this");
     }
     Instant stagedAt = request.stagedAt();
@@ -208,10 +207,11 @@ public class ExchangeMassChangeService {
    */
   private @NotNull ExchangeChangeResultDto run(
       @NotNull ExchangeCaller caller,
+      @NotNull ExchangeResource resource,
       @NotNull ConnectedAppMassChangeRequestDto request,
       boolean dryRun) {
-    return switch (request.resource()) {
-      case BLUEPRINTS -> {
+    return switch (resource) {
+      case BLUEPRINT -> {
         ExchangeBlueprintChangeSet read = read(request, ExchangeBlueprintChangeSet.class);
         ExchangeBlueprintChangeSet changeSet = new ExchangeBlueprintChangeSet(read.ops(), dryRun);
         yield dryRun
@@ -225,7 +225,7 @@ public class ExchangeMassChangeService {
             ? stockWriteService.apply(caller, changeSet)
             : stockWriteService.applyConfirmed(caller, changeSet);
       }
-      default -> {
+      case SHIP -> {
         ExchangeShipChangeSet read = read(request, ExchangeShipChangeSet.class);
         ExchangeShipChangeSet changeSet = new ExchangeShipChangeSet(read.ops(), dryRun);
         yield dryRun
@@ -259,17 +259,16 @@ public class ExchangeMassChangeService {
   }
 
   /**
-   * Names the write capability a resource needs.
+   * Maps the staged change set's resource name to its resource before anything depends on it.
    *
-   * @param resource the resource
-   * @return the capability
+   * @param request the staged change set
+   * @return the resource
+   * @throws BadRequestException when the name is none of the three resources
    */
-  private static @NotNull ExchangeCapability capability(@NotNull String resource) {
-    return switch (resource) {
-      case BLUEPRINTS -> ExchangeCapability.BLUEPRINTS_WRITE;
-      case STOCK -> ExchangeCapability.STOCK_WRITE;
-      default -> ExchangeCapability.HANGAR_WRITE;
-    };
+  private static @NotNull ExchangeResource resourceOf(
+      @NotNull ConnectedAppMassChangeRequestDto request) {
+    return ExchangeResource.fromMassChangeName(request.resource())
+        .orElseThrow(() -> new BadRequestException("The staged change set names no resource"));
   }
 
   /**
@@ -297,16 +296,11 @@ public class ExchangeMassChangeService {
    * Returns the confirmation counter of a client and resource.
    *
    * @param clientId the client, a registered one
-   * @param resource {@code blueprints}, {@code stock} or {@code ships}
+   * @param resource the resource
    * @return the counter
    */
-  private @NotNull Counter counter(@NotNull String clientId, @NotNull String resource) {
-    String tag =
-        switch (resource) {
-          case BLUEPRINTS -> "blueprint";
-          case STOCK -> "stock";
-          default -> "ship";
-        };
+  private @NotNull Counter counter(@NotNull String clientId, @NotNull ExchangeResource resource) {
+    String tag = resource.metricTag();
     return meterRegistry.counter(
         MetricNames.EXCHANGE_MASS_CHANGES_CONFIRMED,
         MetricNames.TAG_CLIENT_ID,

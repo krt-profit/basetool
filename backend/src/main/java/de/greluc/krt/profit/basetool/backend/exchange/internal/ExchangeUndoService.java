@@ -419,7 +419,8 @@ public class ExchangeUndoService {
     switch (resource) {
       case BLUEPRINT -> liveSync.blueprintsChanged(member);
       case STOCK -> liveSync.stockChanged(false);
-      default -> liveSync.hangarChanged(member);
+      case SHIP -> liveSync.hangarChanged(member);
+      case null -> throw new NullPointerException("resource");
     }
   }
 
