@@ -2757,6 +2757,24 @@ the apps are recreated (the brief all-vhost outage of an edge recreate included)
 (`reconcile_edge`) · **Runbook:** `docs/deployment.md` → *The edge* · **Related:** REQ-API-021,
 REQ-SEC-037, ADR-0135, ADR-0162
 
+### REQ-OPS-043 — Only final Java features: no preview flag, no incubator module, no module import
+
+ADR-0223 decision 1: the build, the tests, the images and every launch configuration use final Java
+features only. No tracked file outside Markdown and the audit archive names `--enable-preview` or a
+`jdk.incubator` module, and no Java source in any source set carries an `import module` declaration
+(Checkstyle's `AvoidModuleImport` covers `main` only).
+
+**Acceptance**
+
+- [x] `scripts/check-final-java-only.py` reports a planted preview flag in a build script, an
+  incubator module in a Dockerfile and a module import in a test source, and passes the clean files
+  beside them (its `--selftest`).
+- [x] The check scans at least 5,000 tracked files and 3,800 Java files, so a scan that loses its
+  selection fails instead of passing.
+
+**Enforced by:** `scripts/check-final-java-only.py` (`repo-lint.yml`, `final-java-only`) ·
+**Related:** ADR-0223, REQ-OPS-038
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not

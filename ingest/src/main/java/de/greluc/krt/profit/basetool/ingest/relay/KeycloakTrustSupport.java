@@ -80,7 +80,7 @@ public final class KeycloakTrustSupport {
       JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
       factory.setReadTimeout(RestClientConfig.KEYCLOAK_READ_TIMEOUT_CEILING);
       return factory;
-    } catch (NoSuchSslBundleException ex) {
+    } catch (NoSuchSslBundleException _) {
       return null;
     } catch (GeneralSecurityException ex) {
       throw new IllegalStateException(

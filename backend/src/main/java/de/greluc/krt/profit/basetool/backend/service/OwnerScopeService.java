@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import java.util.Optional;
@@ -531,60 +530,28 @@ public class OwnerScopeService {
   }
 
   /**
-   * Delegates to {@link AccessGateService#canSeeRefineryOrder(UUID)}: whether the caller may read
-   * refinery order {@code orderId}.
+   * Delegates to {@link AccessGateService#permitsOwnedRow}: the scope kernel's per-row gate over a
+   * row's per-user owner and owning org unit, for the module access policies (plan §5.4).
    *
-   * @param orderId refinery order to inspect; never {@code null}.
-   * @return {@code true} iff the caller may read the order.
+   * @param owner the row's per-user owner, or {@code null}
+   * @param orgUnit the row's owning org unit; {@code null} marks an ownerless row
+   * @param edit {@code true} for the edit check, {@code false} for the read check
+   * @return {@code true} iff the caller may access the row
    */
-  public boolean canSeeRefineryOrder(@NotNull UUID orderId) {
-    return accessGateService.canSeeRefineryOrder(orderId);
+  public boolean permitsOwnedRow(@Nullable User owner, @Nullable OrgUnit orgUnit, boolean edit) {
+    return accessGateService.permitsOwnedRow(owner, orgUnit, edit);
   }
 
   /**
-   * Delegates to {@link AccessGateService#canSeeRefineryOrder(RefineryOrder)}: the managed-entity
-   * overload of {@link #canSeeRefineryOrder(UUID)}.
+   * Delegates to {@link AccessGateService#canActOnTargetUser}: the scope kernel's coarse on-behalf
+   * pre-check, for the module access policies (plan §5.4).
    *
-   * @param order the refinery order to inspect; never {@code null}.
-   * @return {@code true} iff the caller may read the order.
+   * @param targetUserId the member being acted upon; never {@code null}
+   * @param edit {@code true} for the write check, {@code false} for the read check
+   * @return {@code true} iff the caller shares at least one in-scope org unit with the member
    */
-  public boolean canSeeRefineryOrder(@NotNull RefineryOrder order) {
-    return accessGateService.canSeeRefineryOrder(order);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canEditRefineryOrder(UUID)}: whether the caller may edit
-   * refinery order {@code orderId}.
-   *
-   * @param orderId refinery order to inspect; never {@code null}.
-   * @return {@code true} iff the caller may edit the order.
-   */
-  public boolean canEditRefineryOrder(@NotNull UUID orderId) {
-    return accessGateService.canEditRefineryOrder(orderId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canViewUserRefineryOrders(UUID)}: the coarse user-level
-   * read pre-check for the per-user refinery list endpoint.
-   *
-   * @param targetUserId the user whose refinery orders the caller wants to read; never {@code
-   *     null}.
-   * @return {@code true} iff the caller may read the target user's in-scope refinery orders.
-   */
-  public boolean canViewUserRefineryOrders(@NotNull UUID targetUserId) {
-    return accessGateService.canViewUserRefineryOrders(targetUserId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canManageUserRefineryOrders(UUID)}: the coarse user-level
-   * write pre-check for the create-on-behalf refinery endpoint.
-   *
-   * @param targetUserId the user the caller wants to create a refinery order for; never {@code
-   *     null}.
-   * @return {@code true} iff the caller may create a refinery order on that user's behalf.
-   */
-  public boolean canManageUserRefineryOrders(@NotNull UUID targetUserId) {
-    return accessGateService.canManageUserRefineryOrders(targetUserId);
+  public boolean canActOnTargetUser(@NotNull UUID targetUserId, boolean edit) {
+    return accessGateService.canActOnTargetUser(targetUserId, edit);
   }
 
   /**

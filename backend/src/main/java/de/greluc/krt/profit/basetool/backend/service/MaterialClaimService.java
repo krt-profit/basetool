@@ -169,7 +169,7 @@ public class MaterialClaimService {
       claimsByBucket
           .computeIfAbsent(
               new Bucket(claim.getMaterial().getId(), claim.getQualityTier().getId()),
-              k -> new ArrayList<>())
+              _ -> new ArrayList<>())
           .add(claim);
     }
 

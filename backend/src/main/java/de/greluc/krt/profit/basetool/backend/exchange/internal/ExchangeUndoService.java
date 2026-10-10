@@ -194,7 +194,7 @@ public class ExchangeUndoService {
       }
       groups
           .computeIfAbsent(
-              entry.getResource().name() + ':' + entry.getEntityKey(), k -> new ArrayList<>())
+              entry.getResource().name() + ':' + entry.getEntityKey(), _ -> new ArrayList<>())
           .add(entry);
     }
     stockWriteService.lockLots(
@@ -376,7 +376,7 @@ public class ExchangeUndoService {
     links.forEach(
         entry ->
             byInstallation
-                .computeIfAbsent(entry.getInstallationKey(), k -> new ArrayList<>())
+                .computeIfAbsent(entry.getInstallationKey(), _ -> new ArrayList<>())
                 .add(entry));
     byInstallation.forEach(
         (installation, entries) -> {
@@ -419,7 +419,8 @@ public class ExchangeUndoService {
     switch (resource) {
       case BLUEPRINT -> liveSync.blueprintsChanged(member);
       case STOCK -> liveSync.stockChanged(false);
-      default -> liveSync.hangarChanged(member);
+      case SHIP -> liveSync.hangarChanged(member);
+      case null -> throw new NullPointerException("resource");
     }
   }
 

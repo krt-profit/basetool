@@ -147,7 +147,7 @@ public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuc
     String path;
     try {
       path = URI.create(url).getPath();
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       return false;
     }
     if (path == null || path.isEmpty()) {
