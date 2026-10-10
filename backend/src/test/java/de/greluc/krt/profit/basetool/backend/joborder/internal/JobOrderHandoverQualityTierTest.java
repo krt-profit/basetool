@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
@@ -85,6 +86,11 @@ class JobOrderHandoverQualityTierTest {
 
   @BeforeEach
   void setUp() {
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        service,
+        "stockCommands",
+        new InventoryStockCommands(
+            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
     orderId = UUID.randomUUID();
     order = new JobOrder();
     order.setId(orderId);

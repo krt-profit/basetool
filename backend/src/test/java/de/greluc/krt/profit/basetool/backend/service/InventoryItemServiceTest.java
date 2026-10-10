@@ -138,6 +138,8 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             ownerScopeService,
             inventoryAccessPolicy,
+            new InventoryStockCommands(
+                null, null, null, null, null, inventoryAccessPolicy, null, null),
             jobOrderItemService,
             auditService,
             realAggregationService,
@@ -653,6 +655,8 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             ownerScopeService,
             inventoryAccessPolicy,
+            new InventoryStockCommands(
+                null, null, null, null, null, inventoryAccessPolicy, null, null),
             jobOrderItemService,
             auditService,
             realAggregationService,
@@ -1093,13 +1097,13 @@ class InventoryItemServiceTest {
             null,
             null,
             null);
-    when(inventoryAccessPolicy.canManageUserInventory(foreignUserId)).thenReturn(false);
+    when(inventoryAccessPolicy.mayBookInFor(foreignUserId)).thenReturn(false);
 
     assertThrows(
         AccessDeniedException.class,
         () -> inventoryItemService.createInventoryItem(dto, currentUserId));
 
-    verify(inventoryAccessPolicy).canManageUserInventory(foreignUserId);
+    verify(inventoryAccessPolicy).mayBookInFor(foreignUserId);
     verify(userRepository, never()).findById(any());
   }
 
@@ -1124,7 +1128,7 @@ class InventoryItemServiceTest {
             null,
             null,
             null);
-    when(inventoryAccessPolicy.canManageUserInventory(foreignUserId)).thenReturn(true);
+    when(inventoryAccessPolicy.mayBookInFor(foreignUserId)).thenReturn(true);
 
     assertThrows(
         AccessDeniedException.class,
@@ -1158,7 +1162,7 @@ class InventoryItemServiceTest {
             null);
     User target = new User();
     target.setId(targetUserId);
-    when(inventoryAccessPolicy.canManageUserInventory(targetUserId)).thenReturn(true);
+    when(inventoryAccessPolicy.mayBookInFor(targetUserId)).thenReturn(true);
     when(userRepository.findById(targetUserId)).thenReturn(Optional.of(target));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(new Location()));
