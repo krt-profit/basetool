@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MissionLiveSyncTopicAuthorizer implements LiveSyncTopicAuthorizer {
 
-  private final OwnerScopeService ownerScopeService;
+  private final MissionAccessPolicy missionAccessPolicy;
 
   /**
    * Decides the mission rooms.
@@ -49,13 +49,13 @@ public class MissionLiveSyncTopicAuthorizer implements LiveSyncTopicAuthorizer {
   }
 
   /**
-   * Asks {@code ownerScopeService.canSeeMission(id)}.
+   * Asks {@code missionAccessPolicy.canSeeMission(id)}.
    *
    * @param topic a parsed mission topic
    * @return {@code true} if the room may be opened for the caller
    */
   @Override
   public boolean mayJoin(@NotNull LiveSyncTopic topic) {
-    return ownerScopeService.canSeeMission(topic.requiredResourceId());
+    return missionAccessPolicy.canSeeMission(topic.requiredResourceId());
   }
 }

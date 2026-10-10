@@ -58,7 +58,7 @@ class MissionSecurityServiceTest {
   private de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository
       missionFinanceEntryRepository;
 
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private MissionAccessPolicy missionAccessPolicy;
 
   private RoleHierarchy roleHierarchy;
 
@@ -80,7 +80,7 @@ class MissionSecurityServiceTest {
             roleHierarchy,
             missionParticipantRepository,
             missionFinanceEntryRepository,
-            ownerScopeService);
+            missionAccessPolicy);
 
     missionId = UUID.randomUUID();
     userId = UUID.randomUUID();
@@ -97,7 +97,7 @@ class MissionSecurityServiceTest {
     when(authentication.getAuthorities())
         .thenAnswer(
             i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(missionSecurityService.canManageManagers(missionId, authentication));
   }
@@ -107,7 +107,7 @@ class MissionSecurityServiceTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(missionSecurityService.canManageManagers(missionId, authentication));
   }
@@ -117,7 +117,7 @@ class MissionSecurityServiceTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("MISSION_MANAGE")));
-    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(missionSecurityService.canManageManagers(missionId, authentication));
   }
@@ -160,7 +160,7 @@ class MissionSecurityServiceTest {
     when(authentication.getAuthorities())
         .thenAnswer(
             i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    when(ownerScopeService.canEditMission(missionId)).thenReturn(false);
+    when(missionAccessPolicy.canEditMission(missionId)).thenReturn(false);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
@@ -222,7 +222,7 @@ class MissionSecurityServiceTest {
     when(authentication.getAuthorities())
         .thenAnswer(
             i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(
         missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
@@ -244,7 +244,7 @@ class MissionSecurityServiceTest {
     when(authentication.getAuthorities())
         .thenAnswer(
             i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    when(ownerScopeService.canEditMission(missionId)).thenReturn(false);
+    when(missionAccessPolicy.canEditMission(missionId)).thenReturn(false);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
@@ -392,7 +392,7 @@ class MissionSecurityServiceTest {
     when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(missionSecurityService.canChangeOwner(missionId, authentication));
   }
@@ -485,7 +485,7 @@ class MissionSecurityServiceTest {
     when(authentication.getAuthorities())
         .thenAnswer(
             i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(
         missionSecurityService.canCreateFinanceEntry(missionId, UUID.randomUUID(), authentication));
@@ -573,7 +573,7 @@ class MissionSecurityServiceTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canEditMission(missionId)).thenReturn(true);
 
     assertTrue(missionSecurityService.canEditFinanceEntry(entryId, authentication));
   }
@@ -593,7 +593,7 @@ class MissionSecurityServiceTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    when(ownerScopeService.canEditMission(missionId)).thenReturn(false);
+    when(missionAccessPolicy.canEditMission(missionId)).thenReturn(false);
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
     assertFalse(missionSecurityService.canEditFinanceEntry(entryId, authentication));

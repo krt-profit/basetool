@@ -93,7 +93,7 @@ public class MissionFinanceEntryController {
   @GetMapping("/missions/{missionId}/finance-entries")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @ownerScopeService.canSeeMission(#missionId)")
+          + " and @missionAccessPolicy.canSeeMission(#missionId)")
   public PageResponse<MissionFinanceEntryDto> getFinanceEntries(
       @PathVariable UUID missionId,
       @RequestParam(required = false, defaultValue = "0") int page,
@@ -117,7 +117,7 @@ public class MissionFinanceEntryController {
   @GetMapping("/missions/{missionId}/finance-entries/sum")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @ownerScopeService.canSeeMission(#missionId)")
+          + " and @missionAccessPolicy.canSeeMission(#missionId)")
   public BigDecimal getFinanceEntriesSum(@PathVariable UUID missionId) {
     return financeEntryService.calculateTotalSum(missionId);
   }
@@ -132,7 +132,7 @@ public class MissionFinanceEntryController {
   @GetMapping("/missions/{missionId}/finance-entries/summary")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @ownerScopeService.canSeeMission(#missionId)")
+          + " and @missionAccessPolicy.canSeeMission(#missionId)")
   public MissionFinanceTotalsDto getFinanceSummary(@PathVariable UUID missionId) {
     return financeEntryService.calculateTotals(missionId);
   }

@@ -242,7 +242,7 @@ public class MissionController {
   @Operation(summary = "Get mission by ID")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @ownerScopeService.canSeeMission(#id)")
+          + " and @missionAccessPolicy.canSeeMission(#id)")
   @Transactional(readOnly = true)
   public MissionDto getMissionById(@PathVariable @NotNull UUID id) {
     return redactForPeer(missionMapper.toDto(missionService.getMissionById(id)));
@@ -435,7 +435,7 @@ public class MissionController {
               + " REQ-MISSION-002.")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @ownerScopeService.canSeeMission(#id)")
+          + " and @missionAccessPolicy.canSeeMission(#id)")
   public MissionDto joinMission(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -484,7 +484,7 @@ public class MissionController {
   })
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @ownerScopeService.canSeeMission(#id)")
+          + " and @missionAccessPolicy.canSeeMission(#id)")
   public MissionDto addParticipantPublic(
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull AddExternalParticipantRequest request,
@@ -1173,7 +1173,7 @@ public class MissionController {
               + " managers/officers/admins.")
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @ownerScopeService.canSeeMission(#id)")
+          + " and @missionAccessPolicy.canSeeMission(#id)")
   public List<MissionParticipantDto> addParticipantSlim(
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull AddExternalParticipantRequest request,

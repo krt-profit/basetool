@@ -57,7 +57,7 @@ public class MissionSecurityService {
   private final RoleHierarchy roleHierarchy;
   private final MissionParticipantRepository missionParticipantRepository;
   private final MissionFinanceEntryRepository missionFinanceEntryRepository;
-  private final OwnerScopeService ownerScopeService;
+  private final MissionAccessPolicy missionAccessPolicy;
 
   /**
    * Authorizes access to a single participant: elevated callers always, otherwise only the
@@ -161,7 +161,7 @@ public class MissionSecurityService {
 
     boolean isOfficer =
         reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
-    if (isOfficer && ownerScopeService.canEditMission(entry.getMission().getId())) {
+    if (isOfficer && missionAccessPolicy.canEditMission(entry.getMission().getId())) {
       return true;
     }
 
@@ -210,7 +210,7 @@ public class MissionSecurityService {
                         || a.getAuthority().equals(Roles.MISSION_MANAGER)
                         || a.getAuthority().equals(Permissions.MISSION_MANAGE)
                         || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
-    if (hasElevatedMissionAuthority && ownerScopeService.canEditMission(missionId)) {
+    if (hasElevatedMissionAuthority && missionAccessPolicy.canEditMission(missionId)) {
       return true;
     }
 
@@ -259,7 +259,7 @@ public class MissionSecurityService {
                         || a.getAuthority().equals(Permissions.MISSION_MANAGE)
                         || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
 
-    if (hasElevatedAuthority && ownerScopeService.canEditMission(missionId)) {
+    if (hasElevatedAuthority && missionAccessPolicy.canEditMission(missionId)) {
       log.debug(
           "Access granted for user {} via elevated authority + squadron scope for mission {}",
           authentication.getName(),
@@ -307,7 +307,7 @@ public class MissionSecurityService {
     }
     boolean isOfficer =
         reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
-    if (isOfficer && ownerScopeService.canEditMission(missionId)) {
+    if (isOfficer && missionAccessPolicy.canEditMission(missionId)) {
       return true;
     }
 
@@ -347,7 +347,7 @@ public class MissionSecurityService {
                         || a.getAuthority().equals(Roles.MISSION_MANAGER)
                         || a.getAuthority().equals(Permissions.MISSION_MANAGE)
                         || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
-    if (hasElevatedMissionAuthority && ownerScopeService.canEditMission(mission.getId())) {
+    if (hasElevatedMissionAuthority && missionAccessPolicy.canEditMission(mission.getId())) {
       return true;
     }
     return isOwnerOrManager(mission, authentication);

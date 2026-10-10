@@ -67,6 +67,7 @@ import de.greluc.krt.profit.basetool.backend.promotion.web.RankRequirementContro
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
 import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.service.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -104,6 +105,7 @@ class TenancyGuardTest {
           OperationAccessPolicy.class,
           RefineryAccessPolicy.class,
           JobOrderAccessPolicy.class,
+          MissionAccessPolicy.class,
           MissionSecurityService.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class);

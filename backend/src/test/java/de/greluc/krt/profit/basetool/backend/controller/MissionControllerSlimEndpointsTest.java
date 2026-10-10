@@ -73,12 +73,12 @@ class MissionControllerSlimEndpointsTest {
   @MockitoBean private de.greluc.krt.profit.basetool.backend.service.UserService userService;
 
   @MockitoBean
-  private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService ownerScopeService;
+  private de.greluc.krt.profit.basetool.backend.service.MissionAccessPolicy missionAccessPolicy;
 
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    when(ownerScopeService.canSeeMission(any(UUID.class))).thenReturn(true);
+    when(missionAccessPolicy.canSeeMission(any(UUID.class))).thenReturn(true);
   }
 
   private SimpleGrantedAuthority officer() {

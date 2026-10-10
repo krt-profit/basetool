@@ -49,6 +49,8 @@ class LiveSyncTopicAuthorizersTest {
 
   @Mock private OwnerScopeService ownerScopeService;
 
+  @Mock private MissionAccessPolicy missionAccessPolicy;
+
   @Mock private OperationAccessPolicy operationAccessPolicy;
 
   @Mock private RefineryAccessPolicy refineryAccessPolicy;
@@ -60,8 +62,8 @@ class LiveSyncTopicAuthorizersTest {
   @DisplayName("the mission authorizer decides the Einsatz room by canSeeMission")
   void missionAuthorizerAsksTheMissionGate() {
     MissionLiveSyncTopicAuthorizer authorizer =
-        new MissionLiveSyncTopicAuthorizer(ownerScopeService);
-    when(ownerScopeService.canSeeMission(RESOURCE)).thenReturn(true, false);
+        new MissionLiveSyncTopicAuthorizer(missionAccessPolicy);
+    when(missionAccessPolicy.canSeeMission(RESOURCE)).thenReturn(true, false);
 
     assertThat(authorizer.authorizations()).containsExactly(LiveSyncAuthorization.MISSION);
     assertThat(authorizer.mayJoin(LiveSyncTopic.parse("mission:" + RESOURCE))).isTrue();

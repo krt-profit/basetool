@@ -92,13 +92,11 @@ class MissionAccessPolicyDifferentialTest {
    * One mission gate, as the scope hub and as the policy decide it.
    *
    * @param name the gate's method name
-   * @param live the live scope hub's verdict
    * @param scopeHub the restated scope hub's verdict
    * @param policy the policy's verdict
    */
   private record Gate(
       String name,
-      BiPredicate<AccessGateService, UUID> live,
       BiPredicate<ScopeHubMissionGates, UUID> scopeHub,
       BiPredicate<MissionAccessPolicy, UUID> policy) {}
 
@@ -140,10 +138,7 @@ class MissionAccessPolicyDifferentialTest {
       Fixture fixture = new Fixture(caller);
       for (Map.Entry<String, UUID> mission : fixture.missions.entrySet()) {
         for (Gate gate : gates()) {
-          boolean old = gate.live().test(fixture.liveScopeHub, mission.getValue());
-          assertThat(gate.scopeHub().test(fixture.scopeHub, mission.getValue()))
-              .as("restated %s on %s for %s", gate.name(), mission.getKey(), caller.name())
-              .isEqualTo(old);
+          boolean old = gate.scopeHub().test(fixture.scopeHub, mission.getValue());
           boolean now = gate.policy().test(fixture.policy, mission.getValue());
           assertThat(now)
               .as("%s on %s for %s", gate.name(), mission.getKey(), caller.name())
@@ -162,12 +157,10 @@ class MissionAccessPolicyDifferentialTest {
     return List.of(
         new Gate(
             "canSeeMission",
-            AccessGateService::canSeeMission,
             ScopeHubMissionGates::canSeeMission,
             MissionAccessPolicy::canSeeMission),
         new Gate(
             "canEditMission",
-            AccessGateService::canEditMission,
             ScopeHubMissionGates::canEditMission,
             MissionAccessPolicy::canEditMission));
   }
@@ -178,8 +171,6 @@ class MissionAccessPolicyDifferentialTest {
     private final ScopeHubMissionGates scopeHub;
 
     private final MissionAccessPolicy policy;
-
-    private final AccessGateService liveScopeHub;
 
     private final Map<String, UUID> missions = new LinkedHashMap<>();
 
@@ -257,7 +248,6 @@ class MissionAccessPolicyDifferentialTest {
           new AccessGateService(
               resolver,
               authHelper,
-              repository,
               mock(InventoryItemRepository.class),
               mock(ShipRepository.class),
               memberships);
@@ -269,7 +259,6 @@ class MissionAccessPolicyDifferentialTest {
                   resolver, accessGateService, authHelper, memberships, orgUnits));
       scopeHub = new ScopeHubMissionGates(accessGateService, authHelper, repository);
       policy = new MissionAccessPolicy(ownerScopeService, authHelper, repository);
-      liveScopeHub = accessGateService;
     }
 
     private static Mission mission(UUID unit, boolean internal, Mission parent) {

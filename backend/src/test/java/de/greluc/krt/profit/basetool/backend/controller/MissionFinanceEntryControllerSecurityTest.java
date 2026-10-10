@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.backend.service.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.MissionFinanceEntryService;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -73,6 +74,8 @@ class MissionFinanceEntryControllerSecurityTest {
 
   @MockitoBean private MissionFinanceEntryService financeEntryService;
   @MockitoBean private OwnerScopeService ownerScopeService;
+
+  @MockitoBean private MissionAccessPolicy missionAccessPolicy;
   @MockitoBean private MissionSecurityService missionSecurityService;
 
   @BeforeEach
@@ -156,7 +159,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_roleLessRoleLess_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canSeeMission(missionId)).thenReturn(true);
 
     mockMvc
         .perform(
@@ -238,7 +241,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_memberWhoMayOnlySeeTheMission_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canSeeMission(missionId)).thenReturn(true);
     when(missionSecurityService.canCreateFinanceEntry(any(), any(), any())).thenReturn(false);
 
     mockMvc
@@ -260,7 +263,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_noteOver2000Chars_isBadRequest() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canSeeMission(missionId)).thenReturn(true);
 
     String oversizedNote = "a".repeat(2001);
     mockMvc
@@ -284,7 +287,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_amountOverCap_isBadRequest() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canSeeMission(missionId)).thenReturn(true);
 
     mockMvc
         .perform(
@@ -305,7 +308,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void getFinanceEntries_authenticatedNonMember_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(false);
+    when(missionAccessPolicy.canSeeMission(missionId)).thenReturn(false);
 
     mockMvc
         .perform(
@@ -319,7 +322,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void getFinanceEntriesSum_authenticatedNonMember_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(false);
+    when(missionAccessPolicy.canSeeMission(missionId)).thenReturn(false);
 
     mockMvc
         .perform(
@@ -333,7 +336,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void getFinanceEntries_roleLessRoleLess_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canSeeMission(missionId)).thenReturn(true);
 
     mockMvc
         .perform(
@@ -347,7 +350,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void getFinanceEntries_inScopeMember_redactsParticipantPii() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canSeeMission(missionId)).thenReturn(true);
     when(financeEntryService.getEntriesByMission(any(), any()))
         .thenReturn(new PageImpl<>(List.of(persistedEntryWithUserPii(missionId))));
 
@@ -370,7 +373,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void getFinanceEntries_officer_alsoRedactsParticipantEmail() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(missionAccessPolicy.canSeeMission(missionId)).thenReturn(true);
     when(financeEntryService.getEntriesByMission(any(), any()))
         .thenReturn(new PageImpl<>(List.of(persistedEntryWithUserPii(missionId))));
 
