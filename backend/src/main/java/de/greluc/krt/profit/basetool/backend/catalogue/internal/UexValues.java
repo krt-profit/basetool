@@ -66,7 +66,7 @@ public final class UexValues {
       int min = Integer.parseInt(parts[0].trim());
       int max = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : min;
       return new CrewRange(min, Math.max(min, max));
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       log.debug("Non-numeric UEX crew value '{}' — leaving crew_min / crew_max null", crew);
       return CrewRange.UNKNOWN;
     }

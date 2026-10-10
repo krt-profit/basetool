@@ -128,7 +128,7 @@ public class ExchangeRegistryMirrorClosure {
     if (left.isEmpty() || !left.get().enabled()) {
       return false;
     }
-    Long revision = transaction.execute(status -> settingsRepository.nextRevision());
+    Long revision = transaction.execute(_ -> settingsRepository.nextRevision());
     if (revision == null) {
       throw new IllegalStateException("No mirror revision was drawn");
     }

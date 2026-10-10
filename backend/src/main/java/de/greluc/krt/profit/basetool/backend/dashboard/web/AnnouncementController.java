@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.dashboard.internal.AnnouncementServ
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
@@ -89,7 +88,7 @@ public class AnnouncementController {
   public AnnouncementDto updateAnnouncement(
       @NotNull @RequestBody @Valid AnnouncementRequest request) {
     return announcementMapper.toDto(
-        announcementService.updateAnnouncement(request.getContent(), request.getVersion()));
+        announcementService.updateAnnouncement(request.content(), request.version()));
   }
 
   /** Removes the announcement entirely. Next PUT creates a fresh row. */
@@ -99,10 +98,12 @@ public class AnnouncementController {
     announcementService.deleteAnnouncement();
   }
 
-  /** Request body for {@link #updateAnnouncement}. */
-  @Data
-  public static class AnnouncementRequest {
-    @NotBlank private String content;
-    @jakarta.validation.constraints.NotNull private Long version;
-  }
+  /**
+   * Request body for {@link #updateAnnouncement}.
+   *
+   * @param content the announcement text
+   * @param version the expected version of the announcement row
+   */
+  public record AnnouncementRequest(
+      @NotBlank String content, @jakarta.validation.constraints.NotNull Long version) {}
 }

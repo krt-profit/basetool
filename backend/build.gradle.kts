@@ -1,3 +1,6 @@
+import net.ltgt.gradle.errorprone.CheckSeverity
+import net.ltgt.gradle.errorprone.errorprone
+
 buildscript {
   dependencies {
     constraints {
@@ -18,6 +21,7 @@ plugins {
   alias(libs.plugins.licensee)
   alias(libs.plugins.spotbugs.base)
   alias(libs.plugins.pitest)
+  alias(libs.plugins.errorprone)
   id("com.diffplug.spotless")
 }
 
@@ -49,6 +53,9 @@ dependencies {
   implementation(libs.semver4j.core)
   implementation(libs.logstash.logback.encoder)
   implementation(project(":logging-support"))
+
+  errorprone(libs.errorprone.core)
+  errorprone(libs.nullaway)
 
   implementation(libs.mapstruct.core)
   annotationProcessor(libs.mapstruct.processor)
@@ -93,6 +100,45 @@ idea {
 tasks.named<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   excludeFilter.set(rootProject.file("config/spotbugs/exclude.xml"))
 }
+
+val nullAwayPackages =
+  listOf(
+      "admin",
+      "audit",
+      "bank",
+      "catalogue",
+      "exchange",
+      "identity",
+      "inventory",
+      "joborder",
+      "livesync",
+      "materialexchange",
+      "mission",
+      "notification",
+      "orgunit",
+      "personalinventory",
+      "platform",
+      "privacy",
+      "refinery",
+      "scope",
+    )
+    .joinToString(",") { "de.greluc.krt.profit.basetool.backend.$it.api" }
+
+tasks.named<JavaCompile>("compileJava") {
+  options.errorprone {
+    disableWarningsInGeneratedCode.set(true)
+    check("NullAway", CheckSeverity.ERROR)
+    disable("StringConcatToTextBlock")
+    option("NullAway:AnnotatedPackages", nullAwayPackages)
+  }
+}
+
+tasks
+  .withType<JavaCompile>()
+  .matching { it.name != "compileJava" }
+  .configureEach {
+    options.errorprone.enabled.set(false)
+  }
 
 tasks.javadoc {
   options { (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet") }

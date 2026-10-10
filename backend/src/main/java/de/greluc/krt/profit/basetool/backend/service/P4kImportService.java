@@ -1440,7 +1440,7 @@ public class P4kImportService {
     }
     try {
       return UUID.fromString(guid.trim());
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException _) {
       log.debug("P4K import: ignoring unparseable GUID '{}'", guid);
       return null;
     }

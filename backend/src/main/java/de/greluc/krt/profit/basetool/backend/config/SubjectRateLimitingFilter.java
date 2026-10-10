@@ -221,7 +221,7 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
         && !tryConsume(
             request,
             response,
-            exportBuckets.get(subject.get(), key -> newExportBucket()),
+            exportBuckets.get(subject.get(), _ -> newExportBucket()),
             MetricNames.BUCKET_SUBJECT_EXPORT,
             properties.subject().export().capacity(),
             properties.subject().export().refillPeriod())) {
@@ -231,7 +231,7 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
         && !tryConsume(
             request,
             response,
-            buckets.get(subject.get(), key -> newBucket()),
+            buckets.get(subject.get(), _ -> newBucket()),
             MetricNames.BUCKET_SUBJECT,
             properties.subject().capacity(),
             properties.subject().refillPeriod())) {

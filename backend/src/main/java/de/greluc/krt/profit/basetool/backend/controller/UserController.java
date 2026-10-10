@@ -48,7 +48,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -451,9 +450,9 @@ public class UserController {
     User me =
         userService.updateUserDescription(
             userService.getUserIdFromJwt(jwt),
-            request.getDescription(),
-            request.getDisplayName(),
-            request.getVersion());
+            request.description(),
+            request.displayName(),
+            request.version());
     return withSelfEmail(userMapper.toDto(me), me);
   }
 
@@ -623,11 +622,11 @@ public class UserController {
     return userMapper.toDto(
         userService.updateUserAttributes(
             id,
-            request.getRank(),
-            request.getDescription(),
-            request.getDisplayName(),
-            request.getVersion(),
-            request.getJoinDate()));
+            request.rank(),
+            request.description(),
+            request.displayName(),
+            request.version(),
+            request.joinDate()));
   }
 
   /**
@@ -703,32 +702,33 @@ public class UserController {
             id, body.targetUserId(), body.version(), adminUserId));
   }
 
-  /** Body for {@link #updateUserAttributes}. */
-  @Data
-  public static class UserAttributesRequest {
-    @jakarta.validation.constraints.NotNull private Integer rank;
+  /**
+   * Body for {@link #updateUserAttributes}.
+   *
+   * @param rank the member's rank
+   * @param description the profile description
+   * @param displayName the display name
+   * @param version the user row's expected version
+   * @param joinDate the join date, or {@code null} to clear it
+   */
+  public record UserAttributesRequest(
+      @jakarta.validation.constraints.NotNull Integer rank,
+      @Size(max = 10_000) String description,
+      @Size(max = 255) String displayName,
+      @jakarta.validation.constraints.NotNull Long version,
+      @Nullable LocalDate joinDate) {}
 
-    @Size(max = 10_000)
-    private String description;
-
-    @Size(max = 255)
-    private String displayName;
-
-    @jakarta.validation.constraints.NotNull private Long version;
-    @Nullable private LocalDate joinDate;
-  }
-
-  /** Body for {@link #updateMyDescription}. */
-  @Data
-  public static class UserDescriptionRequest {
-    @Size(max = 10_000)
-    private String description;
-
-    @Size(max = 255)
-    private String displayName;
-
-    @jakarta.validation.constraints.NotNull private Long version;
-  }
+  /**
+   * Body for {@link #updateMyDescription}.
+   *
+   * @param description the profile description
+   * @param displayName the display name
+   * @param version the user row's expected version
+   */
+  public record UserDescriptionRequest(
+      @Size(max = 10_000) String description,
+      @Size(max = 255) String displayName,
+      @jakarta.validation.constraints.NotNull Long version) {}
 
   /**
    * Response for {@link #getMyPayoutPreference} / {@link #updateMyPayoutPreference}: the user's

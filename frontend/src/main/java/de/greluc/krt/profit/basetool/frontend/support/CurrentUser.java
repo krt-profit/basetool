@@ -48,7 +48,7 @@ public final class CurrentUser {
     }
     try {
       return UUID.fromString(raw);
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       return null;
     }
   }

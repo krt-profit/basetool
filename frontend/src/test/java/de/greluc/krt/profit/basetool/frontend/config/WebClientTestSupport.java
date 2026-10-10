@@ -81,7 +81,7 @@ final class WebClientTestSupport {
     when(locale.relayUserLocale()).thenReturn(passthrough);
 
     Environment environment = mock(Environment.class);
-    when(environment.getActiveProfiles()).thenReturn(new String[] {"test"});
+    when(environment.matchesProfiles("dev", "test")).thenReturn(true);
 
     return new WebClientConfig(
         new AppBackendProperties(backendUrl),
