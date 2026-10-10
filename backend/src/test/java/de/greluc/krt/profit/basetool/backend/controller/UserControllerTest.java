@@ -303,10 +303,8 @@ class UserControllerTest {
   void updateMyDescription_resolvesIdFromJwt_andForwardsAllFields() {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
 
-    UserController.UserDescriptionRequest req = new UserController.UserDescriptionRequest();
-    req.setDescription("Pilot extraordinaire");
-    req.setDisplayName("Ace");
-    req.setVersion(2L);
+    UserController.UserDescriptionRequest req =
+        new UserController.UserDescriptionRequest("Pilot extraordinaire", "Ace", 2L);
 
     User updated = new User();
     updated.setEmail("me@example.invalid");
@@ -428,12 +426,8 @@ class UserControllerTest {
   void updateUserAttributes_forwardsAllFieldsToService() {
     UUID id = UUID.randomUUID();
 
-    UserController.UserAttributesRequest req = new UserController.UserAttributesRequest();
-    req.setRank(7);
-    req.setDescription("desc");
-    req.setDisplayName("name");
-    req.setVersion(3L);
-    req.setJoinDate(LocalDate.of(2024, 1, 15));
+    UserController.UserAttributesRequest req =
+        new UserController.UserAttributesRequest(7, "desc", "name", 3L, LocalDate.of(2024, 1, 15));
 
     User updated = new User();
     UserDto dto = mockDto(id);
@@ -450,10 +444,8 @@ class UserControllerTest {
   @Test
   void updateUserAttributes_withNullJoinDate_forwardsNull() {
     UUID id = UUID.randomUUID();
-    UserController.UserAttributesRequest req = new UserController.UserAttributesRequest();
-    req.setRank(3);
-    req.setVersion(1L);
-    req.setJoinDate(null);
+    UserController.UserAttributesRequest req =
+        new UserController.UserAttributesRequest(3, null, null, 1L, null);
 
     when(userService.updateUserAttributes(eq(id), eq(3), any(), any(), eq(1L), eq(null)))
         .thenReturn(new User());

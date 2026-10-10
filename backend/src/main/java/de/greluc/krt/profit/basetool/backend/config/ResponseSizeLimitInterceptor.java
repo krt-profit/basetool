@@ -219,7 +219,7 @@ public final class ResponseSizeLimitInterceptor implements ClientHttpRequestInte
      */
     @Override
     public long skip(long n) throws IOException {
-      byte[] scratch = new byte[(int) Math.min(8192, Math.max(0, n))];
+      byte[] scratch = new byte[Math.clamp(n, 0, 8192)];
       long skipped = 0;
       while (skipped < n) {
         int r = read(scratch, 0, (int) Math.min(scratch.length, n - skipped));

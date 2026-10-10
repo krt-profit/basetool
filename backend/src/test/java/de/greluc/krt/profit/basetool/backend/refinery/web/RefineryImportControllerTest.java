@@ -1,0 +1,257 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.refinery.web;
+
+import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryImportService;
+import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
+import java.util.Collections;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Web-layer tests for {@link RefineryImportController}: the {@code isAuthenticated()} gate, the
+ * envelope-level 400s with their problem detail, and the bean-validation 400.
+ */
+@LeafServiceMockTest
+class RefineryImportControllerTest {
+
+  private static final String ENDPOINT = "/api/v1/refinery-orders/import-extract";
+
+  /** A realistic member subject: the backend resolves every owner as a UUID (ADR-0129). */
+  private static final String MEMBER_SUB = "33333333-3333-3333-3333-333333333333";
+
+  private static final String VALID_BODY =
+      """
+      {
+        "schemaVersion": 1,
+        "orders": [
+          {
+            "panelType": "SETUP",
+            "quoted": true,
+            "sourceImages": [
+              { "name": "panel.png", "width": 1920, "height": 1080, "cropMode": "vlm" }
+            ],
+            "goods": [
+              {
+                "rawMaterialName": "STILERON (ORE)",
+                "quality": 618,
+                "inputQuantity": 957,
+                "outputQuantity": 448,
+                "refine": true
+              }
+            ]
+          }
+        ]
+      }
+      """;
+
+  @Autowired private WebApplicationContext context;
+
+  @Autowired private RefineryImportService refineryImportService;
+
+  private MockMvc mockMvc;
+
+  @BeforeEach
+  void setUp() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  @Test
+  void importExtract_unauthenticated_returns401() throws Exception {
+    mockMvc
+        .perform(
+            post(ENDPOINT).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void importExtract_authenticatedMember_returnsDraft() throws Exception {
+    when(refineryImportService.buildDraft(any(), any()))
+        .thenReturn(new RefineryImportDraftDto(null, List.of(), 1, 1, 0));
+
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_BODY))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.goodsMatched").value(1))
+        .andExpect(jsonPath("$.goodsTotal").value(1))
+        .andExpect(jsonPath("$.rowsSkipped").value(0));
+  }
+
+  @Test
+  void importExtract_unsupportedSchemaVersion_returns400WithLocalizedDetail() throws Exception {
+    when(refineryImportService.buildDraft(any(), any()))
+        .thenThrow(new BadRequestException("error.refineryImport.unsupportedSchemaVersion"));
+
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_BODY.replace("\"schemaVersion\": 1", "\"schemaVersion\": 2")))
+        .andExpect(status().isBadRequest())
+        .andExpect(
+            jsonPath("$.detail").value(not("error.refineryImport.unsupportedSchemaVersion")));
+  }
+
+  @Test
+  void importExtract_processingPanel_returns400WithLocalizedDetail() throws Exception {
+    when(refineryImportService.buildDraft(any(), any()))
+        .thenThrow(new BadRequestException("error.refineryImport.unsupportedPanelType"));
+
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_BODY.replace("SETUP", "PROCESSING")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.detail").value(not("error.refineryImport.unsupportedPanelType")));
+  }
+
+  @Test
+  void importExtract_missingOrders_returns400FromBeanValidation() throws Exception {
+    String emptyOrders = "{\"schemaVersion\": 1, \"orders\": []}";
+
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(emptyOrders))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void importExtract_nullOrderElement_returns400FromBeanValidation() throws Exception {
+    String nullElement = "{\"schemaVersion\": 1, \"orders\": [null]}";
+
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(nullElement))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void importExtract_nullGoodElement_returns400FromBeanValidation() throws Exception {
+    String body =
+        "{\"schemaVersion\":1,\"orders\":[{\"panelType\":\"SETUP\",\"quoted\":true,"
+            + "\"goods\":[{\"rawMaterialName\":\"STILERON (ORE)\",\"quality\":618,"
+            + "\"inputQuantity\":957,\"outputQuantity\":448,\"refine\":true},null]}]}";
+
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void importExtract_tooManyOrders_returns400FromSizeCap() throws Exception {
+    String order =
+        """
+        { "panelType": "SETUP", "quoted": true, "goods": [] }\
+        """;
+    String sixOrders =
+        "{\"schemaVersion\": 1, \"orders\": ["
+            + String.join(",", Collections.nCopies(6, order))
+            + "]}";
+
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(sixOrders))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void importExtract_missingRawMaterialName_returns400FromBeanValidation() throws Exception {
+    String body = VALID_BODY.replace("\"rawMaterialName\": \"STILERON (ORE)\",", "");
+
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest());
+  }
+}

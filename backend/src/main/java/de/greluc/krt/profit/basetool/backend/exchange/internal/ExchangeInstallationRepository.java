@@ -176,8 +176,10 @@ public interface ExchangeInstallationRepository extends JpaRepository<ExchangeIn
    */
   @EntityGraph(attributePaths = "client")
   @Query(
-      "SELECT i FROM ExchangeInstallation i WHERE i.user.id = :userId"
-          + " AND i.keyThumbprint IN :keyThumbprints")
+      """
+      SELECT i FROM ExchangeInstallation i WHERE i.user.id = :userId
+      AND i.keyThumbprint IN :keyThumbprints
+      """)
   List<ExchangeInstallation> findAllByUserAndKeys(
       @Param("userId") UUID userId, @Param("keyThumbprints") Collection<String> keyThumbprints);
 

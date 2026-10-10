@@ -46,7 +46,9 @@ public enum LiveSyncAuthorization {
    */
   JOB_ORDER_QUEUE,
 
-  /** {@code ownerScopeService.canSeeRefineryOrder(id)} — the gate of the Raffinerie-Order read. */
+  /**
+   * {@code refineryAccessPolicy.canSeeRefineryOrder(id)} — the gate of the Raffinerie-Order read.
+   */
   REFINERY_ORDER,
 
   /**
