@@ -54,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.Collections;
@@ -122,6 +123,19 @@ class RefineryOrderServiceTest {
 
   @BeforeEach
   void setUpEntities() {
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        refineryOrderService,
+        "stockCommands",
+        new InventoryStockCommands(
+            inventoryItemRepository,
+            userRepository,
+            null,
+            null,
+            auditService,
+            bookInPolicy,
+            null,
+            de.greluc.krt.profit.basetool.backend.service.ReferenceResolvingEntityManager
+                .create()));
     owner = new User();
     owner.setId(OWNER_ID);
     owner.setUsername("alice");

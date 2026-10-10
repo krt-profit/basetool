@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -137,6 +138,8 @@ class JobOrderServiceTest {
             jobOrderRepository,
             materialRepository,
             inventoryItemRepository,
+            new InventoryStockCommands(
+                inventoryItemRepository, null, null, null, null, null, null, null),
             null,
             orgUnitRepository,
             jobOrderOrgUnitResolver,

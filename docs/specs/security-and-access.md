@@ -402,6 +402,15 @@ so a personal on-behalf create folded the target's own private rows — amounts,
 into the response. The specified personal-for-someone-else capability lives in the refinery store
 dialog (REQ-INV-035) and is unaffected.
 
+> [!note] One book-in rule, one deliberate difference (2026-10-10, P3-5c)
+> The Lager's Einbuchen, the production book-in and the refinery store decide whose Lager they may
+> book into through one rule, `StockCommands#requireBookIn` with the shared owner check of
+> `BookInPolicy`. The refinery store differs on two points, by design until the owner decides,
+> named as `BookInRule.refineryStore()` and pinned by `InventoryStockCommandsTest`: a personal
+> book-in for another member passes the owner check alone (REQ-INV-035), and a book-in without a
+> named owner (an ownerless refinery order) needs Logistician+. The two other paths refuse the
+> first and do not ask for the second.
+
 **Authority resolution is memoised per token, not per request (#1141).** `CustomJwtGrantedAuthoritiesConverter`
 runs on *every* authenticated API call, and each miss pays `UserService.syncUser` (a write-capable
 transaction) plus ~5–8 SELECTs (user load, `user_roles`, one role lookup per realm role, and the

@@ -1171,6 +1171,25 @@ as each pair is decoupled.
     `UnnecessaryParentheses`/`ThreadJoinLoop` on a record of `ExchangeStockWriteService`); a full
     recompile passes, so it is a stale end-position table of the incremental build, not a code
     fault.
+  - **5c — done 2026-10-10.** The job order and the refinery write no Lager row any more:
+    `StockCommands` gains `takeFromEarmarkedRow` (the material handover and the production
+    consumption: delete a depleted row after its offers are told, else lower the order slice and
+    the mission slices), `consumeEarmarkedItems` (the item handover, oldest row first),
+    `lowered` (the observers' notice after the order is saved, in the old order),
+    `releaseJobOrderEarmarks` / `…MaterialEarmarks` / `…GameItemEarmarks` (the bulk earmark
+    releases, after the loop as before), `bookInFromProduction` and `bookInFromRefinery` (row,
+    earmarks, merge and audit verbatim; the job order and the mission go in by id, so
+    `StockCommands` names no foreign entity and the baseline gains no edge), all `MANDATORY`, and `requireBookIn`, the one book-in rule
+    the Einbuchen, the production and the refinery store share (APPSEC-01). The production still
+    checks before any lookup and the refinery store where it did. *Behaviour unchanged by owner
+    decision:* the refinery store keeps its two differences — a personal book-in for another
+    member passes the owner check alone, an ownerless order needs Logistician+ — as the named
+    `BookInRule.refineryStore()`, pinned by `InventoryStockCommandsTest` and noted in REQ-INV-032 and
+    REQ-SEC-005 until the owner decides. `StockWriteOwnershipTest` makes "only inventory writes
+    Lager rows" a gate (a `save*`/`delete*`/`@Modifying` call on the Lager repository, a row or
+    earmark setter, an earmark mutator), proven able to fail on a planted writer; the GDPR
+    orchestrator is its one listed exception until Phase 4. The job-order and refinery unit tests
+    run against a real `InventoryStockCommands` over their mocks, so they still verify the writes.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
