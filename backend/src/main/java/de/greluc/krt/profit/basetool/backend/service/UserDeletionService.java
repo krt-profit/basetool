@@ -23,8 +23,10 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
@@ -51,6 +53,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
@@ -145,6 +148,12 @@ public class UserDeletionService {
   private final UserService userService;
 
   /**
+   * Publishes the event that clears the admins' notices about a pending registration this deletion
+   * removes (REQ-NOTIF-012).
+   */
+  private final ApplicationEventPublisher eventPublisher;
+
+  /**
    * Hard-deletes a user no longer present in Keycloak, keeping only the shared and historical
    * records the organisation still needs.
    *
@@ -204,6 +213,9 @@ public class UserDeletionService {
         && keycloakService.userExists(userId)
         && !isConfiguredGatewayServiceAccount(userId)) {
       throw new BadRequestException(ERROR_STILL_IN_KEYCLOAK);
+    }
+    if (user.getApprovalStatus() == ApprovalStatus.PENDING) {
+      eventPublisher.publishEvent(new DiscordRegistrationDecidedEvent(userId, null));
     }
 
     User admin =

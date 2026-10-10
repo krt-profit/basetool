@@ -63,6 +63,8 @@ tasks.openApiGenerate.configure {
 
 sourceSets.named("test") { java.srcDir(generatedContract.map { it.dir("src/main/java") }) }
 
+spotless { java { target("src/**/*.java") } }
+
 tasks.named<JavaCompile>("compileTestJava") { dependsOn(tasks.openApiGenerate) }
 
 val projectVersion = project.version.toString()

@@ -75,7 +75,7 @@ public class BankHolderReconciliationService implements UserSyncFollowUp {
     Map<UUID, BankHolder> holderByUser =
         staffHolders.stream()
             .filter(h -> h.getUser() != null)
-            .collect(Collectors.toMap(h -> h.getUser().getId(), h -> h, (a, b) -> a));
+            .collect(Collectors.toMap(h -> h.getUser().getId(), h -> h, (a, _) -> a));
 
     int created = 0;
     Set<UUID> missing =

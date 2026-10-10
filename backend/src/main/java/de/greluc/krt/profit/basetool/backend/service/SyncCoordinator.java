@@ -82,7 +82,7 @@ public class SyncCoordinator {
     boolean acquired;
     try {
       acquired = lock.tryLock(maxWaitMillis, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
+    } catch (InterruptedException _) {
       Thread.currentThread().interrupt();
       log.warn("Interrupted while waiting to start {} sync — skipping this run.", label);
       return false;

@@ -26,8 +26,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestNoticesReconciledEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
@@ -129,7 +132,7 @@ class NotificationCreationServiceTest {
     BankBookingRequestConfirmedEvent event =
         new BankBookingRequestConfirmedEvent(
             requestId, UUID.randomUUID(), "KB-0001", new BigDecimal("500"), requester, staffA);
-    Set<NotificationType> superseded = Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+    Set<NotificationType> superseded = BankBookingRequestEvent.OPEN_REQUEST_NOTICES;
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             superseded, "BANK_BOOKING_REQUEST", requestId))
         .thenReturn(List.of(staffA, staffB));
@@ -162,7 +165,7 @@ class NotificationCreationServiceTest {
     UUID staff = UUID.fromString("00000000-0000-0000-0000-0000000000e1");
     BankBookingRequestCancelledEvent event =
         new BankBookingRequestCancelledEvent(requestId, UUID.randomUUID(), UUID.randomUUID());
-    Set<NotificationType> superseded = Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+    Set<NotificationType> superseded = BankBookingRequestEvent.OPEN_REQUEST_NOTICES;
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             superseded, "BANK_BOOKING_REQUEST", requestId))
         .thenReturn(List.of(staff));
@@ -183,7 +186,7 @@ class NotificationCreationServiceTest {
     BankBookingRequestCancelledEvent event =
         new BankBookingRequestCancelledEvent(requestId, UUID.randomUUID(), UUID.randomUUID());
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
-            eq(Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED)),
+            eq(BankBookingRequestEvent.OPEN_REQUEST_NOTICES),
             eq("BANK_BOOKING_REQUEST"),
             eq(requestId)))
         .thenReturn(List.of());
@@ -194,6 +197,104 @@ class NotificationCreationServiceTest {
     assertThat(affected).isEmpty();
     verify(notificationRepository, never()).deleteByTypeInAndEntity(any(), any(), any());
     verify(notificationRepository, never()).saveAll(any());
+  }
+
+  /**
+   * A reconciling event for one request whose notices two staff members, the former holder and
+   * nobody else already hold.
+   *
+   * @param changed the members who became or stopped being responsible
+   * @return the event
+   */
+  private static BankBookingRequestNoticesReconciledEvent reconciled(Set<UUID> changed) {
+    return new BankBookingRequestNoticesReconciledEvent(
+        UUID.fromString("00000000-0000-0000-0000-00000000f001"),
+        UUID.fromString("00000000-0000-0000-0000-00000000f002"),
+        BankBookingRequestType.WITHDRAWAL,
+        new BigDecimal("500"),
+        "KB-0007",
+        "requester",
+        "IRI",
+        UUID.fromString("00000000-0000-0000-0000-00000000f003"),
+        changed);
+  }
+
+  @Test
+  void reconcileMovesTheNoticeFromTheFormerToTheNewHolderOnly() {
+    UUID formerHolder = UUID.fromString("00000000-0000-0000-0000-0000000000f1");
+    UUID newHolder = UUID.fromString("00000000-0000-0000-0000-0000000000f2");
+    UUID staff = UUID.fromString("00000000-0000-0000-0000-0000000000f3");
+    BankBookingRequestNoticesReconciledEvent event = reconciled(Set.of(formerHolder, newHolder));
+    Set<NotificationType> notices = BankBookingRequestEvent.OPEN_REQUEST_NOTICES;
+    when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+            notices, "BANK_BOOKING_REQUEST", event.entityId()))
+        .thenReturn(List.of(formerHolder, staff));
+    when(ruleEvaluationService.resolveRecipients(event))
+        .thenReturn(
+            Map.of(NotificationType.BANK_BOOKING_REQUEST_CREATED, Set.of(staff, newHolder)));
+    when(notificationRepository.deleteByTypeInAndEntityForRecipients(
+            notices, "BANK_BOOKING_REQUEST", event.entityId(), Set.of(formerHolder)))
+        .thenReturn(1);
+    when(notificationParamsCodec.serialize(any())).thenReturn("{}");
+
+    Set<UUID> affected = flatten(service.createFromEvent(event));
+
+    assertThat(affected).containsExactlyInAnyOrder(formerHolder, newHolder);
+    verify(notificationRepository, never()).deleteByTypeInAndEntity(any(), any(), any());
+    ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.captor();
+    verify(notificationRepository).saveAll(captor.capture());
+    assertThat(captor.getValue())
+        .singleElement()
+        .satisfies(
+            n -> {
+              assertThat(n.getRecipientUserId()).isEqualTo(newHolder);
+              assertThat(n.getType()).isEqualTo(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+              assertThat(n.getEntityId()).isEqualTo(event.entityId());
+            });
+  }
+
+  @Test
+  void reconcileKeepsTheNoticeOfAFormerHolderAnotherSelectorStillReaches() {
+    UUID formerHolder = UUID.fromString("00000000-0000-0000-0000-0000000000f1");
+    BankBookingRequestNoticesReconciledEvent event = reconciled(Set.of(formerHolder));
+    Set<NotificationType> notices = BankBookingRequestEvent.OPEN_REQUEST_NOTICES;
+    when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+            notices, "BANK_BOOKING_REQUEST", event.entityId()))
+        .thenReturn(List.of(formerHolder));
+    when(ruleEvaluationService.resolveRecipients(event))
+        .thenReturn(Map.of(NotificationType.BANK_BOOKING_REQUEST_CREATED, Set.of(formerHolder)));
+
+    Set<UUID> affected = flatten(service.createFromEvent(event));
+
+    assertThat(affected).isEmpty();
+    verify(notificationRepository, never())
+        .deleteByTypeInAndEntityForRecipients(any(), any(), any(), any());
+    verify(notificationRepository, never()).saveAll(any());
+  }
+
+  @Test
+  void reconcileNeverNotifiesAnEntitledMemberWhoIsNotACandidate() {
+    UUID newHolder = UUID.fromString("00000000-0000-0000-0000-0000000000f2");
+    UUID staffWhoDeletedTheirNotice = UUID.fromString("00000000-0000-0000-0000-0000000000f4");
+    BankBookingRequestNoticesReconciledEvent event = reconciled(Set.of(newHolder));
+    when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+            BankBookingRequestEvent.OPEN_REQUEST_NOTICES, "BANK_BOOKING_REQUEST", event.entityId()))
+        .thenReturn(List.of());
+    when(ruleEvaluationService.resolveRecipients(event))
+        .thenReturn(
+            Map.of(
+                NotificationType.BANK_BOOKING_REQUEST_CREATED,
+                Set.of(newHolder, staffWhoDeletedTheirNotice)));
+    when(notificationParamsCodec.serialize(any())).thenReturn("{}");
+
+    Set<UUID> affected = flatten(service.createFromEvent(event));
+
+    assertThat(affected).containsExactly(newHolder);
+    ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.captor();
+    verify(notificationRepository).saveAll(captor.capture());
+    assertThat(captor.getValue())
+        .extracting(Notification::getRecipientUserId)
+        .containsExactly(newHolder);
   }
 
   /**
