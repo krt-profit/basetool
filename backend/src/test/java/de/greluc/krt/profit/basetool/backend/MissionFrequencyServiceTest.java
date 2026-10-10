@@ -21,9 +21,10 @@ package de.greluc.krt.profit.basetool.backend;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFrequencyRepository;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.repository.*;
-import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

@@ -25,12 +25,12 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
@@ -39,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -78,7 +77,7 @@ public class HangarService {
   private final UserRepository userRepository;
   private final ShipTypeRepository shipTypeRepository;
   private final LocationRepository locationRepository;
-  private final MissionUnitRepository missionUnitRepository;
+  private final ShipDeletionObserver shipDeletionObserver;
   private final ShipTypeMapper shipTypeMapper;
   private final EntityManager entityManager;
   private final OwnerScopeService ownerScopeService;
@@ -359,7 +358,7 @@ public class HangarService {
       throw new AccessDeniedException("Access denied: You do not own this ship");
     }
 
-    int detached = detachFromMissionUnits(shipId);
+    int detached = shipDeletionObserver.beforeShipDelete(shipId);
 
     entityManager.flush();
     shipRepository.delete(ship);
@@ -388,7 +387,7 @@ public class HangarService {
     log.info("deleteAllShipsForUser: unlinking {} ships for user {}", ships.size(), userId);
     int detached = 0;
     for (Ship ship : ships) {
-      detached += detachFromMissionUnits(ship.getId());
+      detached += shipDeletionObserver.beforeShipDelete(ship.getId());
     }
     entityManager.flush();
     shipRepository.deleteAll(ships);
@@ -451,27 +450,5 @@ public class HangarService {
           AuditDetails.of("ships", updated));
     }
     return updated;
-  }
-
-  /**
-   * Detaches a ship from every mission unit it is assigned to, recording one {@code
-   * MISSION_UNIT_UPDATED} event per unit so the mission trail shows the change (REQ-AUDIT-001).
-   *
-   * @param shipId the ship about to be deleted
-   * @return how many mission units were detached
-   */
-  private int detachFromMissionUnits(@NotNull UUID shipId) {
-    List<MissionUnit> units = missionUnitRepository.findByShipId(shipId);
-    for (MissionUnit unit : units) {
-      unit.setShip(null);
-      missionUnitRepository.save(unit);
-      auditRecorder.record(
-          AuditEventType.MISSION_UNIT_UPDATED,
-          unit.getMission().getId(),
-          unit.getMission().getName(),
-          null,
-          AuditDetails.of("unit", unit.getId()).with("shipDetached", shipId));
-    }
-    return units.size();
   }
 }

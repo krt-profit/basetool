@@ -34,23 +34,23 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificationPublisher;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver;
+import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.MissionNotificationPublisher;
-import de.greluc.krt.profit.basetool.backend.service.MissionParticipantService;
-import de.greluc.krt.profit.basetool.backend.service.MissionService;
-import de.greluc.krt.profit.basetool.backend.service.ParticipantTargetResolver;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -521,7 +521,7 @@ class MissionServiceTest {
 
     Mission saved =
         missionService.createMission(
-            new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
+            new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
                 "Test", null, null, "PLANNED", null, null, null, false, null, null, null, null,
                 null));
 
@@ -540,7 +540,7 @@ class MissionServiceTest {
 
     Mission saved =
         missionService.createMission(
-            new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
+            new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
                 "Bereichsleitung-Einsatz",
                 null,
                 null,
@@ -570,7 +570,7 @@ class MissionServiceTest {
 
     Mission saved =
         missionService.createMission(
-            new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
+            new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
                 "Test", null, null, "PLANNED", null, null, null, false, null, null, null, null,
                 null));
 
@@ -591,7 +591,7 @@ class MissionServiceTest {
 
     Mission saved =
         missionService.createMission(
-            new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
+            new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
                 "Test",
                 null,
                 null,
@@ -624,7 +624,7 @@ class MissionServiceTest {
     Mission saved =
         missionService.addSubMission(
             parentId,
-            new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
+            new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
                 "Sub", null, null, "PLANNED", null, null, null, false, null, null, null, null,
                 null));
 

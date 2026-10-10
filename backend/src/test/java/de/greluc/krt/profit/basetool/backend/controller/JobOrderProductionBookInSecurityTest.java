@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.service.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,8 @@ class JobOrderProductionBookInSecurityTest {
   private MockMvc mockMvc;
 
   @MockitoBean private OwnerScopeService ownerScopeService;
+
+  @MockitoBean private InventoryAccessPolicy inventoryAccessPolicy;
 
   @MockitoBean private JobOrderAccessPolicy jobOrderAccessPolicy;
 
@@ -82,7 +85,7 @@ class JobOrderProductionBookInSecurityTest {
     UUID callerId = UUID.randomUUID();
     UUID foreignOwnerId = UUID.randomUUID();
     when(jobOrderAccessPolicy.canEditJobOrder(any())).thenReturn(true);
-    when(ownerScopeService.canManageUserInventory(foreignOwnerId)).thenReturn(false);
+    when(inventoryAccessPolicy.mayBookInFor(foreignOwnerId)).thenReturn(false);
 
     mockMvc
         .perform(
@@ -95,6 +98,6 @@ class JobOrderProductionBookInSecurityTest {
                 .content(productionBody(foreignOwnerId)))
         .andExpect(status().isForbidden());
 
-    verify(ownerScopeService).canManageUserInventory(foreignOwnerId);
+    verify(inventoryAccessPolicy).mayBookInFor(foreignOwnerId);
   }
 }
