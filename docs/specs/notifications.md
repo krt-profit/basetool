@@ -233,7 +233,7 @@ manual sync) — an accepted eventual-consistency window. A login re-syncs the r
   selectors and `exclude_actor = true`.
 
 **Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`,
-`JobOrderServiceTest` · **Code:** `service/JobOrderService#publishJobOrderCreated`,
+`JobOrderServiceTest` · **Code:** `joborder/internal/JobOrderService#publishJobOrderCreated`,
 `joborder/api/events/JobOrderCreatedEvent`, `service/RecipientResolutionService`
 
 ### REQ-NOTIF-009 — Retention
@@ -620,7 +620,7 @@ never the editing member's personal name (no PII in params).
   bundles, named placeholders `{displayId}`/`{orgUnit}`/`{requester}`).
 
 **Enforced by:** `JobOrderServiceTest`, `MessageBundleConsistencyTest` · **Code:**
-`joborder/api/events/JobOrderUpdatedByRequesterEvent`, `service/JobOrderService#publishJobOrderUpdatedByRequester`,
+`joborder/api/events/JobOrderUpdatedByRequesterEvent`, `joborder/internal/JobOrderService#publishJobOrderUpdatedByRequester`,
 `model/NotificationEventType`, `model/NotificationType`,
 `db/migration/V214__seed_job_order_requester_update_notification_rule.sql` · **Issues:** #1186
 

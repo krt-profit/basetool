@@ -373,4 +373,5 @@ with its own access policy (`promotionAccessPolicy`), `personalinventory` withou
 scope gate), then `exchange` and the bank as packages (2026-10-10), which enter their "must stay green"
 boundary before their Gradle extraction. Phase 3 began with `materialexchange` (2026-10-10), the
 Lager reaching it only through its own `StockChangeObserver` and `StockOfferLookup`, then `refinery`
-with the second module access policy; the baseline is at 92 class edges.
+with the second module access policy and `joborder` with the third; the baseline is at 87 class
+edges.

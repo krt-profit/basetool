@@ -1054,6 +1054,44 @@ as each pair is decoupled.
   fragment yet either. (2) No command API: no other module writes a refinery order. The
   store still creates Lager rows itself (write family 2 of the evidence appendix); that write
   becomes a call of the Lager's `StockCommands` with P3-5.
+- `joborder` — **done 2026-10-10.**
+  1. *Characterise*: `JobOrderModuleContractTest` pins that create, priority change, assignee add,
+     status change and delete each record their audit event in the command's transaction, and that
+     a member of another org unit is refused on every per-order read and write entry point (the
+     "403 per foreign entry point" of the risk table).
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `JobOrderAccessPolicy` (bean
+     `jobOrderAccessPolicy`) holds `canSeeJobOrder` (id and entity), `canEditJobOrder`,
+     `canSeeJobOrderBlueprintOwners`, `canSeeJobOrderInventoryOwners`, `canSeeJobOrderAsRequester`
+     and `canEditJobOrderAsRequester`, on the kernel's `canViewJobOrders`, `canSeeSquadron`,
+     `canEditSquadron` and `currentUserIsMemberOfOrgUnit`; the queue capabilities
+     (`canViewJobOrders`, `canViewOwnJobOrders`) stay in the kernel, which identity and the
+     exchange ask too. The Lager's row flag for earmarked stock asks its own SPI
+     `inventory.api.EarmarkTargetPolicy` (`mayEditJobOrderEarmarks`), which the policy implements,
+     so the earmark target SPI of P3-5 starts here. The order, claim, item-stock and
+     material-collection endpoints, the order query and the live-sync room ask the policy; the
+     authorization matrix changed on exactly 28 lines, in expression text. The differential verdict
+     test compared old and new over 28 callers × 21 orders × 7 gates = 4116 verdicts before the old
+     methods went (proven able to fail by dropping the Spezialkommando escape) and keeps comparing
+     against a restatement on the kernel primitives. Baseline **92 → 87**
+     (`scope -> joborder` is gone).
+  3. *Inversion*: the order's stock projection asks `service.ClaimBucketSource` for the
+     Spezialkommando claim view, implemented by `MaterialClaimService`, so the claim service moves.
+  4. *Move*: the four controllers into `joborder.web`; the order, assignee, priority, item
+     production, handover, handover-report, blueprint-owner, integrity, demand and claim services,
+     the policy, the live-sync authorizer, the org-unit resolver, the integrity task, the item,
+     material and handover-item repositories and the request DTOs into `joborder.internal`.
+  The move leaves the baseline at **87**: the 18 edges still into the job order are the Lager's
+  (17, the earmark and its reads, P3-5) and the assignee redaction in identity (1).
+  **Corrections:** (1) `JobOrder` and its items, materials, handovers and claims, their
+  repositories, `JobOrderMapper`, `JobOrderHandoverMapper`, `JobOrderItemHandoverMapper`, the
+  response DTOs, `JobOrderItemService`, `JobOrderStockProjectionService`,
+  `JobOrderMaterialRequirementResolver` and `QualityBucketAllocator` stay in the layer packages:
+  the Lager's earmark (`InventoryJobOrderAllocation`) holds the job-order association, and the Lager, the refinery, the exchange's
+  demand board, the GDPR services and the business metrics read them, so a move closes a package
+  cycle. They move once the earmark becomes an id with P3-5. (2) No command API: no other module
+  writes a job order; the exchange only reads the demand. (3) The earmark caller rule of the risk
+  table (the ungated order-linked stock query callable only from joborder) is P3-5's: that query
+  is the Lager's and still has no module to be guarded from.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
