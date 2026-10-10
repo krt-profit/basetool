@@ -116,6 +116,8 @@ class OwnerScopeServiceTest {
 
   private MissionAccessPolicy missionPolicy;
 
+  private InventoryAccessPolicy inventoryPolicy;
+
   private JobOrderAccessPolicy jobOrderPolicy;
 
   private static final UUID MEMBER_USER_ID = UUID.randomUUID();
@@ -182,11 +184,7 @@ class OwnerScopeServiceTest {
             request);
     AccessGateService accessGateService =
         new AccessGateService(
-            requestScopeResolver,
-            authHelper,
-            inventoryItemRepository,
-            shipRepository,
-            orgUnitMembershipRepository);
+            requestScopeResolver, authHelper, shipRepository, orgUnitMembershipRepository);
     OrgUnitStampingService orgUnitStampingService =
         new OrgUnitStampingService(
             requestScopeResolver,
@@ -199,6 +197,7 @@ class OwnerScopeServiceTest {
     operationPolicy = new OperationAccessPolicy(service, authHelper, operationRepository);
     refineryPolicy = new RefineryAccessPolicy(service, refineryOrderRepository);
     missionPolicy = new MissionAccessPolicy(service, authHelper, missionRepository);
+    inventoryPolicy = new InventoryAccessPolicy(service, inventoryItemRepository);
     jobOrderPolicy =
         new JobOrderAccessPolicy(
             service,
@@ -1023,7 +1022,7 @@ class OwnerScopeServiceTest {
       when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
       stubMemberInSquadronA();
 
-      assertTrue(service.canSeeInventoryItem(itemId));
+      assertTrue(inventoryPolicy.canSeeInventoryItem(itemId));
     }
 
     @Test
@@ -1035,7 +1034,7 @@ class OwnerScopeServiceTest {
       when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
       stubMemberInSquadronA();
 
-      assertFalse(service.canSeeInventoryItem(itemId));
+      assertFalse(inventoryPolicy.canSeeInventoryItem(itemId));
     }
 
     @Test
@@ -1043,7 +1042,7 @@ class OwnerScopeServiceTest {
       UUID itemId = UUID.randomUUID();
       when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.empty());
 
-      assertFalse(service.canSeeInventoryItem(itemId));
+      assertFalse(inventoryPolicy.canSeeInventoryItem(itemId));
     }
   }
 
@@ -1085,10 +1084,10 @@ class OwnerScopeServiceTest {
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
       assertTrue(
-          service.canSeeInventoryItem(item.getId()),
+          inventoryPolicy.canSeeInventoryItem(item.getId()),
           "owner sees their own item even when it is stamped to a foreign org unit");
       assertTrue(
-          service.canEditInventoryItem(item.getId()),
+          inventoryPolicy.canEditInventoryItem(item.getId()),
           "owner edits their own item even when it is stamped to a foreign org unit");
     }
 
@@ -1098,8 +1097,10 @@ class OwnerScopeServiceTest {
       when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
-      assertTrue(service.canSeeInventoryItem(item.getId()), "owner sees their own stamped item");
-      assertTrue(service.canEditInventoryItem(item.getId()), "owner edits their own stamped item");
+      assertTrue(
+          inventoryPolicy.canSeeInventoryItem(item.getId()), "owner sees their own stamped item");
+      assertTrue(
+          inventoryPolicy.canEditInventoryItem(item.getId()), "owner edits their own stamped item");
     }
 
     @Test
@@ -1111,10 +1112,10 @@ class OwnerScopeServiceTest {
       stubMemberInSquadronA();
 
       assertFalse(
-          service.canSeeInventoryItem(item.getId()),
+          inventoryPolicy.canSeeInventoryItem(item.getId()),
           "a non-owner member of another org unit must not see the item");
       assertFalse(
-          service.canEditInventoryItem(item.getId()),
+          inventoryPolicy.canEditInventoryItem(item.getId()),
           "a non-owner member of another org unit must not edit the item");
     }
 
@@ -1429,8 +1430,8 @@ class OwnerScopeServiceTest {
       when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
 
-      assertTrue(service.canSeeInventoryItem(item.getId()));
-      assertTrue(service.canEditInventoryItem(item.getId()));
+      assertTrue(inventoryPolicy.canSeeInventoryItem(item.getId()));
+      assertTrue(inventoryPolicy.canEditInventoryItem(item.getId()));
     }
 
     @Test
@@ -1440,8 +1441,8 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
 
-      assertFalse(service.canSeeInventoryItem(item.getId()));
-      assertFalse(service.canEditInventoryItem(item.getId()));
+      assertFalse(inventoryPolicy.canSeeInventoryItem(item.getId()));
+      assertFalse(inventoryPolicy.canEditInventoryItem(item.getId()));
     }
   }
 

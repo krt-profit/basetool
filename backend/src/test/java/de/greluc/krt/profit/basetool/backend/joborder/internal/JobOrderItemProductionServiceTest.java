@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
@@ -96,6 +97,7 @@ class JobOrderItemProductionServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private LocationRepository locationRepository;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private BookInPolicy bookInPolicy;
   @Mock private InventoryCheckoutService inventoryCheckoutService;
   @Mock private AuthHelperService authHelperService;
   @InjectMocks private JobOrderItemProductionService service;
@@ -477,7 +479,7 @@ class JobOrderItemProductionServiceTest {
     UUID orgUnitId = UUID.randomUUID();
     Squadron orgUnit = new Squadron();
     orgUnit.setId(orgUnitId);
-    when(ownerScopeService.canManageUserInventory(ownerId)).thenReturn(true);
+    when(bookInPolicy.mayBookInFor(ownerId)).thenReturn(true);
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, orgUnitId))
@@ -599,7 +601,7 @@ class JobOrderItemProductionServiceTest {
   void bookProduction_bookIn_unknownOwner_throwsNotFound() {
     givenProducibleLineWithoutMaterials();
     UUID unknownOwnerId = UUID.randomUUID();
-    when(ownerScopeService.canManageUserInventory(unknownOwnerId)).thenReturn(true);
+    when(bookInPolicy.mayBookInFor(unknownOwnerId)).thenReturn(true);
     when(userRepository.findById(unknownOwnerId)).thenReturn(Optional.empty());
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
@@ -665,7 +667,7 @@ class JobOrderItemProductionServiceTest {
     UUID callerId = UUID.randomUUID();
     UUID foreignOwnerId = UUID.randomUUID();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(ownerScopeService.canManageUserInventory(foreignOwnerId)).thenReturn(false);
+    when(bookInPolicy.mayBookInFor(foreignOwnerId)).thenReturn(false);
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
             1,
@@ -688,7 +690,7 @@ class JobOrderItemProductionServiceTest {
     UUID callerId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(ownerScopeService.canManageUserInventory(ownerId)).thenReturn(true);
+    when(bookInPolicy.mayBookInFor(ownerId)).thenReturn(true);
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
             1,
@@ -712,7 +714,7 @@ class JobOrderItemProductionServiceTest {
     User owner = new User();
     owner.setId(ownerId);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(ownerScopeService.canManageUserInventory(ownerId)).thenReturn(true);
+    when(bookInPolicy.mayBookInFor(ownerId)).thenReturn(true);
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
@@ -724,7 +726,7 @@ class JobOrderItemProductionServiceTest {
 
     service.bookProduction(orderId, lineId, dto);
 
-    verify(ownerScopeService).canManageUserInventory(ownerId);
+    verify(bookInPolicy).mayBookInFor(ownerId);
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
@@ -749,7 +751,7 @@ class JobOrderItemProductionServiceTest {
 
     service.bookProduction(orderId, lineId, dto);
 
-    verify(ownerScopeService, never()).canManageUserInventory(any());
+    verify(bookInPolicy, never()).mayBookInFor(any());
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());

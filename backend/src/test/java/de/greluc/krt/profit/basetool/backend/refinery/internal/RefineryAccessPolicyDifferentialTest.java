@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
@@ -255,12 +254,7 @@ class RefineryAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
       AccessGateService accessGateService =
-          new AccessGateService(
-              resolver,
-              authHelper,
-              mock(InventoryItemRepository.class),
-              mock(ShipRepository.class),
-              memberships);
+          new AccessGateService(resolver, authHelper, mock(ShipRepository.class), memberships);
       OwnerScopeService ownerScopeService =
           new OwnerScopeService(
               resolver,

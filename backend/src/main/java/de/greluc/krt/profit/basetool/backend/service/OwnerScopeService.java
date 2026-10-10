@@ -400,28 +400,6 @@ public class OwnerScopeService {
   }
 
   /**
-   * Delegates to {@link AccessGateService#canSeeInventoryItem(UUID)}: whether the caller may read
-   * inventory item {@code itemId} (owner escape → ownerless → strict scope).
-   *
-   * @param itemId inventory item to inspect; never {@code null}.
-   * @return {@code true} iff the caller may read the item.
-   */
-  public boolean canSeeInventoryItem(@NotNull UUID itemId) {
-    return accessGateService.canSeeInventoryItem(itemId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canEditInventoryItem(UUID)}: whether the caller may edit
-   * inventory item {@code itemId} (owner escape → ownerless → strict scope).
-   *
-   * @param itemId inventory item to inspect; never {@code null}.
-   * @return {@code true} iff the caller may edit the item.
-   */
-  public boolean canEditInventoryItem(@NotNull UUID itemId) {
-    return accessGateService.canEditInventoryItem(itemId);
-  }
-
-  /**
    * Delegates to {@link AccessGateService#permitsOwnedRow}: the scope kernel's per-row gate over a
    * row's per-user owner and owning org unit, for the module access policies (plan §5.4).
    *
@@ -444,18 +422,6 @@ public class OwnerScopeService {
    */
   public boolean canActOnTargetUser(@NotNull UUID targetUserId, boolean edit) {
     return accessGateService.canActOnTargetUser(targetUserId, edit);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canManageUserInventory(UUID)}: the coarse user-level
-   * write pre-check shared by the two "create stock for another member" entry points, Einbuchen
-   * ({@code POST /api/v1/inventory}) and the per-item receiver of the refinery store.
-   *
-   * @param targetUserId the member whose inventory would receive the row; never {@code null}.
-   * @return {@code true} iff the caller may create inventory rows in that member's name.
-   */
-  public boolean canManageUserInventory(@NotNull UUID targetUserId) {
-    return accessGateService.canManageUserInventory(targetUserId);
   }
 
   /**

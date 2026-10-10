@@ -19,12 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import java.util.Optional;
@@ -53,7 +51,6 @@ public class AccessGateService {
 
   private final RequestScopeResolver requestScopeResolver;
   private final AuthHelperService authHelper;
-  private final InventoryItemRepository inventoryItemRepository;
   private final ShipRepository shipRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
 
@@ -214,50 +211,6 @@ public class AccessGateService {
   public boolean canActOnTargetUser(@NotNull UUID targetUserId, boolean edit) {
     return canActOnTargetUserScoped(
         targetUserId, edit ? this::canEditSquadron : this::canSeeSquadron);
-  }
-
-  /**
-   * Checks whether the caller may read inventory item {@code itemId} directly, applying the owner
-   * escape (REQ-ORG-011), then the ownerless rule, then {@link #canSeeSquadron(UUID)}. Unknown ids
-   * return {@code false}.
-   *
-   * @param itemId inventory item to inspect; never {@code null}
-   * @return {@code true} iff the caller may read the item
-   */
-  public boolean canSeeInventoryItem(@NotNull UUID itemId) {
-    return permitsRow(
-        inventoryItemRepository.findById(itemId),
-        InventoryItem::getUser,
-        InventoryItem::getOwningOrgUnit,
-        false);
-  }
-
-  /**
-   * Checks whether the caller may edit inventory item {@code itemId} directly, applying the owner
-   * escape (REQ-ORG-011), then the ownerless rule, then {@link #canEditSquadron(UUID)}. Unknown ids
-   * return {@code false}.
-   *
-   * @param itemId inventory item to inspect; never {@code null}
-   * @return {@code true} iff the caller may edit the item
-   */
-  public boolean canEditInventoryItem(@NotNull UUID itemId) {
-    return permitsRow(
-        inventoryItemRepository.findById(itemId),
-        InventoryItem::getUser,
-        InventoryItem::getOwningOrgUnit,
-        true);
-  }
-
-  /**
-   * Coarse pre-check for creating inventory in another member's name: admin, self, or a shared
-   * editable org unit, like the refinery's on-behalf pre-check (REQ-SEC-005). The per-row bound is
-   * the stamp validation.
-   *
-   * @param targetUserId the member whose inventory would receive the row; never {@code null}
-   * @return {@code true} iff the caller may create inventory rows in that member's name
-   */
-  public boolean canManageUserInventory(@NotNull UUID targetUserId) {
-    return canActOnTargetUserScoped(targetUserId, this::canEditSquadron);
   }
 
   /**

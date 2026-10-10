@@ -119,10 +119,7 @@ class InventoryAccessPolicyDifferentialTest {
       Fixture fixture = new Fixture(caller);
       for (Map.Entry<String, UUID> row : fixture.rows.entrySet()) {
         for (Gate gate : rowGates()) {
-          boolean old = gate.live().test(fixture.liveScopeHub, row.getValue());
-          assertThat(gate.scopeHub().test(fixture.scopeHub, row.getValue()))
-              .as("restated %s on %s for %s", gate.name(), row.getKey(), caller.name())
-              .isEqualTo(old);
+          boolean old = gate.scopeHub().test(fixture.scopeHub, row.getValue());
           boolean now = gate.policy().test(fixture.policy, row.getValue());
           assertThat(now)
               .as("%s on %s for %s", gate.name(), row.getKey(), caller.name())
@@ -133,10 +130,7 @@ class InventoryAccessPolicyDifferentialTest {
       }
       for (Map.Entry<String, UUID> target : fixture.targets.entrySet()) {
         for (Gate gate : userGates()) {
-          boolean old = gate.live().test(fixture.liveScopeHub, target.getValue());
-          assertThat(gate.scopeHub().test(fixture.scopeHub, target.getValue()))
-              .as("restated %s on %s for %s", gate.name(), target.getKey(), caller.name())
-              .isEqualTo(old);
+          boolean old = gate.scopeHub().test(fixture.scopeHub, target.getValue());
           boolean now = gate.policy().test(fixture.policy, target.getValue());
           assertThat(now)
               .as("%s on %s for %s", gate.name(), target.getKey(), caller.name())
@@ -152,16 +146,14 @@ class InventoryAccessPolicyDifferentialTest {
   }
 
   /**
-   * One inventory gate, as the live scope hub, its restatement and the policy decide it.
+   * One inventory gate, as the restated scope hub and the policy decide it.
    *
    * @param name the gate's method name
-   * @param live the live scope hub's verdict
    * @param scopeHub the restated scope hub's verdict
    * @param policy the policy's verdict
    */
   private record Gate(
       String name,
-      BiPredicate<AccessGateService, UUID> live,
       BiPredicate<ScopeHubInventoryGates, UUID> scopeHub,
       BiPredicate<InventoryAccessPolicy, UUID> policy) {}
 
@@ -169,12 +161,10 @@ class InventoryAccessPolicyDifferentialTest {
     return List.of(
         new Gate(
             "canSeeInventoryItem",
-            AccessGateService::canSeeInventoryItem,
             ScopeHubInventoryGates::canSeeInventoryItem,
             InventoryAccessPolicy::canSeeInventoryItem),
         new Gate(
             "canEditInventoryItem",
-            AccessGateService::canEditInventoryItem,
             ScopeHubInventoryGates::canEditInventoryItem,
             InventoryAccessPolicy::canEditInventoryItem));
   }
@@ -183,7 +173,6 @@ class InventoryAccessPolicyDifferentialTest {
     return List.of(
         new Gate(
             "canManageUserInventory",
-            AccessGateService::canManageUserInventory,
             ScopeHubInventoryGates::canManageUserInventory,
             InventoryAccessPolicy::canManageUserInventory));
   }
@@ -194,8 +183,6 @@ class InventoryAccessPolicyDifferentialTest {
     private final ScopeHubInventoryGates scopeHub;
 
     private final InventoryAccessPolicy policy;
-
-    private final AccessGateService liveScopeHub;
 
     private final Map<String, UUID> rows = new LinkedHashMap<>();
 
@@ -265,8 +252,7 @@ class InventoryAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
       AccessGateService accessGateService =
-          new AccessGateService(
-              resolver, authHelper, repository, mock(ShipRepository.class), memberships);
+          new AccessGateService(resolver, authHelper, mock(ShipRepository.class), memberships);
       OwnerScopeService ownerScopeService =
           new OwnerScopeService(
               resolver,
@@ -277,7 +263,6 @@ class InventoryAccessPolicyDifferentialTest {
           new ScopeHubInventoryGates(
               accessGateService, authHelper, resolver, repository, memberships);
       policy = new InventoryAccessPolicy(ownerScopeService, repository);
-      liveScopeHub = accessGateService;
     }
 
     private void row(InventoryItemRepository repository, String label, UUID unit, UUID owner) {
