@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -33,8 +34,13 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository.OfferStock;
+import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -43,6 +49,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Verifies that the offer ratchet lowers and audits exactly the offers a stock change moves, with
@@ -56,6 +63,9 @@ class MaterialExchangeOfferRatchetTest {
 
   @Mock private MaterialExchangeOfferRepository offerRepository;
   @Mock private AuditService auditService;
+  @Mock private MaterialExchangeInterestRepository interestRepository;
+  @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private AuthHelperService authHelperService;
 
   @InjectMocks private MaterialExchangeOfferRatchet ratchet;
 
@@ -128,12 +138,43 @@ class MaterialExchangeOfferRatchetTest {
   }
 
   @Test
+  void beforeDeleteTellsTheInterestedMembersTheirOfferIsGoneOnePerOffer() {
+    OfferStock first = material(4.0, "Laranite");
+    OfferStock second = item(2, "Arden-SL Helmet");
+    UUID fan = UUID.randomUUID();
+    UUID actor = UUID.randomUUID();
+    when(offerRepository.findActiveStockByInventoryItemIds(List.of(ROW)))
+        .thenReturn(List.of(first, second));
+    when(interestRepository.findRecipientsByOfferIdIn(List.of(first.getId(), second.getId())))
+        .thenReturn(List.of(new MaterialExchangeInterestRecipient(first.getId(), fan)));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(actor));
+
+    ratchet.beforeDelete(List.of(ROW), StockChangeReason.CHECKOUT);
+
+    ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, times(2)).publishEvent(published.capture());
+    NoticeEvent toFirst = (NoticeEvent) published.getAllValues().get(0);
+    NoticeEvent toSecond = (NoticeEvent) published.getAllValues().get(1);
+    assertThat(toFirst.eventType())
+        .isEqualTo(NotificationEventType.MATERIAL_EXCHANGE_OFFER_UNAVAILABLE);
+    assertThat(toFirst.entityId()).isEqualTo(first.getId());
+    assertThat(toFirst.contextRecipientUserIds()).containsExactly(fan);
+    assertThat(toFirst.actorSub()).isEqualTo(actor);
+    assertThat(toFirst.renderParams())
+        .containsEntry("item", "Laranite")
+        .containsEntry("reasonCode", "STOCK_GONE");
+    assertThat(toSecond.contextRecipientUserIds()).isEmpty();
+    assertThat(toSecond.resolvesNotificationTypes())
+        .containsExactly(NotificationType.MATERIAL_EXCHANGE_INTEREST_REGISTERED);
+  }
+
+  @Test
   void beforeDeleteOfNoRowsQueriesNothing() {
     int removed = ratchet.beforeDelete(List.of(), StockChangeReason.CHECKOUT);
 
     assertThat(removed).isZero();
     verify(offerRepository, never()).findActiveStockByInventoryItemIds(anyCollection());
-    verifyNoInteractions(auditService);
+    verifyNoInteractions(auditService, eventPublisher);
   }
 
   @Test

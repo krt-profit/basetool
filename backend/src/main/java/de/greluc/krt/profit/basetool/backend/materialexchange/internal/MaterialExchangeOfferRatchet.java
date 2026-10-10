@@ -24,14 +24,20 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository.OfferStock;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +56,9 @@ public class MaterialExchangeOfferRatchet implements StockChangeObserver {
 
   private final MaterialExchangeOfferRepository offerRepository;
   private final AuditRecorder auditRecorder;
+  private final MaterialExchangeInterestRepository interestRepository;
+  private final ApplicationEventPublisher eventPublisher;
+  private final AuthHelperService authHelperService;
 
   /**
    * Lowers the active offers on a Lager row to the row's reduced stock and records {@code
@@ -145,6 +154,7 @@ public class MaterialExchangeOfferRatchet implements StockChangeObserver {
    * @return the number of offers
    */
   private int removed(@NotNull List<OfferStock> offers, @NotNull StockChangeReason reason) {
+    announceGone(offers);
     for (OfferStock offer : offers) {
       auditRecorder.record(
           AuditEventType.MARKET_OFFER_REMOVED,
@@ -154,6 +164,36 @@ public class MaterialExchangeOfferRatchet implements StockChangeObserver {
           AuditDetails.of("kind", offer.getKind()).with("reason", reason.getCode()));
     }
     return offers.size();
+  }
+
+  /**
+   * Tells the members who registered interest that their offers are gone because the stock is
+   * (REQ-MARKET-021), one notice per offer, and clears the owners' interest notices.
+   *
+   * @param offers the offers about to be removed
+   */
+  private void announceGone(@NotNull List<OfferStock> offers) {
+    if (offers.isEmpty()) {
+      return;
+    }
+    Map<UUID, Set<UUID>> interested = new HashMap<>();
+    for (MaterialExchangeInterestRecipient recipient :
+        interestRepository.findRecipientsByOfferIdIn(
+            offers.stream().map(OfferStock::getId).toList())) {
+      interested
+          .computeIfAbsent(recipient.offerId(), _ -> new LinkedHashSet<>())
+          .add(recipient.userId());
+    }
+    UUID actor = authHelperService.currentUserId().orElse(null);
+    for (OfferStock offer : offers) {
+      eventPublisher.publishEvent(
+          MarketNotices.offerUnavailable(
+              offer.getId(),
+              label(offer),
+              "STOCK_GONE",
+              interested.getOrDefault(offer.getId(), Set.of()),
+              actor));
+    }
   }
 
   /**

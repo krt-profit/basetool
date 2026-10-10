@@ -283,6 +283,7 @@ public final class PersonSearchTargets {
           "mission_objective.kind",
           "mission_participant.payout_preference",
           "notification.type",
+          "notification_mute.notification_type",
           "notification_rule.event_type",
           "notification_rule.notification_type",
           "notification_rule_selector.context_role",

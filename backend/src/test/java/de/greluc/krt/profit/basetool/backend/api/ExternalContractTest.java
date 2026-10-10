@@ -614,6 +614,13 @@ class ExternalContractTest {
                       "read",
                       "createdAt"))
               .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
+          new ContractOperation(
+              "/api/v1/notifications/preferences", "get", Set.of("type", "mutable", "muted")),
+          new ContractOperation(
+              "/api/v1/notifications/preferences/{type}",
+              "put",
+              Set.of("type", "mutable", "muted"),
+              Set.of("muted")),
           new ContractOperation("/api/v1/notifications/unread-count", "get", Set.of("count")),
           new ContractOperation("/api/v1/notifications/stream", "get", Set.of()),
           new ContractOperation("/api/v1/notifications/{id}/read", "post", Set.of("id", "read")),

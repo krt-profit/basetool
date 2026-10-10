@@ -501,6 +501,8 @@
 /profile/deletion-request POST headers=[X-Requested-With=XMLHttpRequest] -> DeletionRequestProxyController#request gate=method:isAuthenticated() layout=yes
 /profile/description POST -> ProfileController#updateDescription gate=class:isAuthenticated() layout=yes
 /profile/description POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileController#updateDescriptionAjax gate=class:isAuthenticated() layout=yes
+/profile/notification-preferences GET params=[fragment=card] -> NotificationPreferenceProxyController#card gate=method:isAuthenticated() layout=yes
+/profile/notification-preferences/{type} PUT headers=[X-Requested-With=XMLHttpRequest] -> NotificationPreferenceWriteController#setPreference gate=method:isAuthenticated() layout=no
 /profile/payout-preference POST -> ProfileController#updatePayoutPreference gate=class:isAuthenticated() layout=yes
 /profile/payout-preference POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileController#updatePayoutPreferenceAjax gate=class:isAuthenticated() layout=yes
 /profile/rsi-handle POST -> ProfileController#updateRsiHandle gate=class:isAuthenticated() layout=yes

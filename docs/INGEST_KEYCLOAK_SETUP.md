@@ -170,9 +170,11 @@ What to know before running it:
   it) have it withheld wherever found, as `basetool-android` always had, and it leaves the realm's
   default client scopes — see
   [*Withholding `offline_access` from the first-party clients*](#withholding-offline_access-from-the-first-party-clients).
-- **It does not do** the rest of the realm-wide hardening (Require SSL, events, OTP —
+- **It does not do** the rest of the realm-wide hardening (Require SSL, events —
   [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md); its step 10 is reversed by the
-  bullet above), the Discord identity provider
+  bullet above). OTP for admins, the forgot-password switch and the session windows are
+  `scripts/harden-keycloak-realm.py` (REQ-SEC-082); the two SSO windows are the file
+  `keycloak/session-windows.json`, which this script reads and the provisioner must find beside it, the Discord identity provider
   ([`DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md)), or the realm's default client
   scopes; an ingest scope that is a realm default is reported, because every client created later
   would inherit its audience.
@@ -187,7 +189,7 @@ install -d -m 0700 /root/kc-realm /root/kc-realm/keycloak
 #    approved-client list into keycloak/ beside them: the provisioner reads it from there by default
 #    and stops with "cannot read the third-party client list" without it (or pass --external-clients)
 install -m 0700 provision-keycloak-realm.py provision-keycloak-mobile-client.py /root/kc-realm/
-install -m 0600 keycloak/external-clients.json /root/kc-realm/keycloak/
+install -m 0600 keycloak/external-clients.json keycloak/session-windows.json /root/kc-realm/keycloak/
 # 2. open a kcadm session: the KCCFG/kc/KCADM definitions and the truststore + credentials
 #    commands of docs/keycloak/README.md, "Runbook — provisioning the mobile client", steps 1-2
 # 3. the rollback basis

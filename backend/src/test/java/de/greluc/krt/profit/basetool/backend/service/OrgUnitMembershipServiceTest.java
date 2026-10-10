@@ -92,6 +92,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private InventoryOrgUnitReconciler inventoryReconciler;
   @Mock private AuditService auditService;
   @Mock private MembershipChangeObserver membershipChangeObserver;
+  @Mock private OrgUnitSeatNotifier seatNotifier;
 
   @Mock private ObjectProvider<ResponsibleHolderTracker> responsibleHolderTrackerProvider;
 
@@ -325,6 +326,8 @@ class OrgUnitMembershipServiceTest {
 
     assertEquals(MembershipRole.SK_LEAD, updated.getRole());
     verify(membershipChangeObserver).onSkLeadChanged(scId, userId, true);
+    verify(seatNotifier)
+        .seatChanged(eq(userId), any(), eq(MembershipRole.SK_LEAD), eq(true), isNull());
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(scId), any(), eq(userId), any());
   }
@@ -343,6 +346,8 @@ class OrgUnitMembershipServiceTest {
 
     assertEquals(MembershipRole.MEMBER, updated.getRole());
     verify(membershipChangeObserver).onSkLeadChanged(scId, userId, false);
+    verify(seatNotifier)
+        .seatChanged(eq(userId), any(), eq(MembershipRole.SK_LEAD), eq(false), isNull());
     verify(auditService)
         .record(eq(AuditEventType.ROLE_REVOKED), eq(scId), any(), eq(userId), any());
   }
@@ -534,6 +539,8 @@ class OrgUnitMembershipServiceTest {
         .onBereichRoleGranted(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(bereichId), any(), eq(userId), any());
+    verify(seatNotifier)
+        .seatChanged(eq(userId), any(), eq(MembershipRole.BEREICHSKOORDINATOR), eq(true), isNull());
   }
 
   @Test
@@ -610,6 +617,8 @@ class OrgUnitMembershipServiceTest {
     verify(membershipChangeObserver).onOlMemberAdded(olId, userId);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(olId), any(), eq(userId), any());
+    verify(seatNotifier)
+        .seatChanged(eq(userId), any(), eq(MembershipRole.OL_MEMBER), eq(true), isNull());
   }
 
   @Test
@@ -703,6 +712,8 @@ class OrgUnitMembershipServiceTest {
             eq(squadronId), eq(userId), eq(MembershipRole.STAFFELLEITER), isNull());
     verify(auditService)
         .record(eq(AuditEventType.ROLE_GRANTED), eq(squadronId), any(), eq(userId), any());
+    verify(seatNotifier)
+        .seatChanged(eq(userId), any(), eq(MembershipRole.STAFFELLEITER), eq(true), isNull());
   }
 
   @Test
@@ -805,6 +816,8 @@ class OrgUnitMembershipServiceTest {
     verify(membershipChangeObserver).onSquadronRankCleared(squadronId, userId);
     verify(auditService)
         .record(eq(AuditEventType.ROLE_REVOKED), eq(squadronId), any(), eq(userId), any());
+    verify(seatNotifier)
+        .seatChanged(eq(userId), any(), eq(MembershipRole.STAFFELLEITER), eq(false), isNull());
   }
 
   @Test

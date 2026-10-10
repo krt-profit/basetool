@@ -124,6 +124,42 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
+   * Counts, per owner, the fitted ships {@link #resetAllFittedScoped} is about to clear
+   * (REQ-HANGAR-007).
+   *
+   * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
+   * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @return one row per owner with at least one fitted ship in scope
+   */
+  @Query(
+      "SELECT s.owner.id AS ownerId, COUNT(s) AS shipCount FROM Ship s WHERE s.fitted = true AND "
+          + ScopeSpecifications.SHIP_SCOPE_TRIPLE
+          + " GROUP BY s.owner.id")
+  List<OwnerShipCount> countFittedByOwnerScoped(
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+
+  /** Row of {@link #countFittedByOwnerScoped}: an owner and how many of their ships it counts. */
+  interface OwnerShipCount {
+
+    /**
+     * The ships' owner.
+     *
+     * @return the owner id
+     */
+    UUID getOwnerId();
+
+    /**
+     * How many ships of the owner the query counted.
+     *
+     * @return the count, at least one
+     */
+    long getShipCount();
+  }
+
+  /**
    * Bulk-sets the location of every ship owned by {@code ownerId}, backing the hangar "set home
    * location" action.
    *
