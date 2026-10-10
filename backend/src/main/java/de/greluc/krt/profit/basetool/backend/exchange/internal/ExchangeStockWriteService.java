@@ -314,7 +314,7 @@ public class ExchangeStockWriteService {
             .map(i -> new Lot(null, i, location.get(), null, stolen, unit));
       }
       return Optional.empty();
-    } catch (IllegalArgumentException ignored) {
+    } catch (IllegalArgumentException _) {
       return Optional.empty();
     }
   }
@@ -372,7 +372,7 @@ public class ExchangeStockWriteService {
       Lot lot = lots.get(i);
       String unit = lot.unit();
       List<InventoryItem> rows = locked.get(lot.key());
-      BigDecimal current = quantities.computeIfAbsent(lot.key(), k -> round(sum(rows), unit));
+      BigDecimal current = quantities.computeIfAbsent(lot.key(), _ -> round(sum(rows), unit));
       BigDecimal expected = round(op.expectedQuantity().amount(), unit);
       BigDecimal target = round(op.quantity().amount(), unit);
       if (current.compareTo(expected) != 0) {

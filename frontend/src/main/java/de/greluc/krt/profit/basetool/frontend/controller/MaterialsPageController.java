@@ -188,7 +188,7 @@ public class MaterialsPageController {
                     && !mat.category().name().isBlank()
                 ? mat.category().name()
                 : "Unsortiert";
-        materialsByKind.computeIfAbsent(kind, k -> new ArrayList<>()).add(mat);
+        materialsByKind.computeIfAbsent(kind, _ -> new ArrayList<>()).add(mat);
       }
       materialsByKind
           .values()
@@ -304,7 +304,7 @@ public class MaterialsPageController {
       List<String> materials, List<String> systems, boolean loadingDock, boolean autoLoad) {
     try {
       filteredMatrixFetchGuard.acquire();
-    } catch (InterruptedException e) {
+    } catch (InterruptedException _) {
       Thread.currentThread().interrupt();
       log.warn("Interrupted while waiting to fetch a filtered materials matrix slice");
       return new ArrayList<>();
@@ -375,7 +375,7 @@ public class MaterialsPageController {
                   && !item.category().name().isBlank()
               ? item.category().name()
               : "Unsortiert");
-      boolean[] flags = flagsByMaterial.computeIfAbsent(material, k -> new boolean[3]);
+      boolean[] flags = flagsByMaterial.computeIfAbsent(material, _ -> new boolean[3]);
       if (Boolean.TRUE.equals(item.isIllegal())) {
         flags[0] = true;
       }
@@ -386,7 +386,7 @@ public class MaterialsPageController {
         flags[2] = true;
       }
       pricesByMaterial
-          .computeIfAbsent(material, k -> new HashMap<>())
+          .computeIfAbsent(material, _ -> new HashMap<>())
           .put(item.terminalName(), new MatrixGridDto.Cell(item.priceBuy(), item.priceSell()));
     }
 
@@ -427,7 +427,7 @@ public class MaterialsPageController {
       String material = entry.getKey();
       boolean[] flags = flagsByMaterial.getOrDefault(material, new boolean[3]);
       rowsByKind
-          .computeIfAbsent(kindByMaterial.get(material), k -> new ArrayList<>())
+          .computeIfAbsent(kindByMaterial.get(material), _ -> new ArrayList<>())
           .add(new MatrixGridDto.Row(material, flags[0], flags[1], flags[2], entry.getValue()));
     }
     rowsByKind

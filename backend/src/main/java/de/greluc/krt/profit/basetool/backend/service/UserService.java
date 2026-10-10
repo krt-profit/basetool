@@ -150,7 +150,7 @@ public class UserService {
 
     try {
       return UUID.fromString(sub);
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException _) {
       log.error(
           "JWT subject is not a valid UUID: '{}'. Refusing the request to avoid identity mix-up.",
           sub);
@@ -292,7 +292,7 @@ public class UserService {
     user.setRsiHandle(candidate);
     try {
       return userRepository.saveAndFlush(user);
-    } catch (DataIntegrityViolationException e) {
+    } catch (DataIntegrityViolationException _) {
       throw new DuplicateEntityException(RSI_HANDLE_TAKEN);
     }
   }

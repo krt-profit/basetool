@@ -763,7 +763,7 @@ public class HangarPageController {
         return number.longValue();
       }
       return Long.parseLong(o.toString());
-    } catch (Exception e) {
+    } catch (Exception _) {
       return null;
     }
   }

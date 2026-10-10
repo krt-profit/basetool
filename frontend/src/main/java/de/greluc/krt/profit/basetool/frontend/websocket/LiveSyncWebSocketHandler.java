@@ -533,7 +533,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private void joinRoom(@NotNull WebSocketSession decorated, @NotNull LiveSyncTopic topic) {
     sessionsByTopic.compute(
         topic.canonical(),
-        (ignored, set) -> {
+        (_, set) -> {
           Set<WebSocketSession> mates = (set != null) ? set : ConcurrentHashMap.newKeySet();
           mates.add(decorated);
           return mates;
@@ -602,7 +602,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       Set<WebSocketSession> mates =
           sessionsByTopic.computeIfPresent(
               canonical,
-              (ignored, set) -> {
+              (_, set) -> {
                 set.remove(decorated);
                 return set.isEmpty() ? null : set;
               });
@@ -671,7 +671,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     try {
       authExecutor.execute(
           () -> authorizeAndRegister(session, topic, token, pin, authorities, subject));
-    } catch (RejectedExecutionException e) {
+    } catch (RejectedExecutionException _) {
       LiveSyncSubscriptionAuthorizer.Decision verdict =
           LiveSyncSubscriptionAuthorizer.indeterminate(topic);
       droppedCounter(topic, MetricNames.DROPPED_AUTHORIZE_SATURATED).increment();
@@ -876,7 +876,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private void leaveRoom(@NotNull WebSocketSession decorated, @NotNull LiveSyncTopic topic) {
     sessionsByTopic.computeIfPresent(
         topic.canonical(),
-        (ignored, set) -> {
+        (_, set) -> {
           set.remove(decorated);
           return set.isEmpty() ? null : set;
         });
@@ -1471,7 +1471,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     long now = nanoClock.getAsLong();
     TopicRateState state =
         changedRateByTopic.computeIfAbsent(
-            topic.canonical(), ignored -> new TopicRateState(TOPIC_CHANGED_BURST, now));
+            topic.canonical(), _ -> new TopicRateState(TOPIC_CHANGED_BURST, now));
     synchronized (state) {
       double elapsedSeconds = (now - state.lastRefillNanos) / 1_000_000_000.0;
       state.tokens =
@@ -1536,8 +1536,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * @param userId the closing socket owner's stable id
    */
   private void releaseUserSocket(@NotNull String userId) {
-    socketsByUser.compute(
-        userId, (ignored, count) -> (count == null || count <= 1) ? null : count - 1);
+    socketsByUser.compute(userId, (_, count) -> (count == null || count <= 1) ? null : count - 1);
   }
 
   /**

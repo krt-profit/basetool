@@ -75,7 +75,7 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
     String sub = requireSubject(webRequest);
     try {
       return UUID.fromString(sub);
-    } catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException _) {
       throw new AccessDeniedException("JWT subject claim is not a valid identifier.");
     }
   }
