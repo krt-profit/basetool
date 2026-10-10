@@ -37360,7 +37360,7 @@
         } ],
         "summary" : "List the caller's notification preferences, one entry per type.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T2",
+        "x-contract-tier" : "T1",
         "x-domain" : "notification"
       }
     },
@@ -37487,7 +37487,7 @@
         } ],
         "summary" : "Mute or unmute one notification type for the caller.",
         "tags" : [ "notification" ],
-        "x-contract-tier" : "T2",
+        "x-contract-tier" : "T1",
         "x-domain" : "notification"
       }
     },
