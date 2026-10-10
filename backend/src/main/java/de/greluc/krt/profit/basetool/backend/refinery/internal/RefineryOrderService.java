@@ -24,12 +24,11 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -45,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -100,12 +98,11 @@ public class RefineryOrderService implements CraftabilityYieldSource {
   private final MissionParticipantRepository missionParticipantRepository;
   private final RefiningMethodRepository refiningMethodRepository;
   private final MaterialRepository materialRepository;
-  private final InventoryItemRepository inventoryItemRepository;
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderItemService jobOrderItemService;
   private final RefineryYieldRepository refineryYieldRepository;
   private final OwnerScopeService ownerScopeService;
-  private final BookInPolicy bookInPolicy;
+  private final StockCommands stockCommands;
   private final AuditRecorder auditRecorder;
 
   /** Publishes the refinery notices after the commit (REQ-REFINERY-024). */
@@ -674,16 +671,12 @@ public class RefineryOrderService implements CraftabilityYieldSource {
           itemDto.userId() != null
               ? itemDto.userId()
               : (order.getOwner() != null ? order.getOwner().getId() : null);
-      if (targetUserId != null
-          && !userId.equals(targetUserId)
-          && !bookInPolicy.mayBookInFor(targetUserId)) {
-        throw new AccessDeniedException(
-            "Access denied: You are not allowed to store refinery output for other users");
-      }
-      if (targetUserId == null && !isLogistician) {
-        throw new AccessDeniedException(
-            "Access denied: You are not allowed to store refinery output for other users");
-      }
+      stockCommands.requireBookIn(
+          targetUserId,
+          userId,
+          isLogistician,
+          Boolean.TRUE.equals(itemDto.personal()),
+          BookInRule.refineryStore());
 
       User assignee;
       if (itemDto.userId() != null) {
@@ -716,36 +709,20 @@ public class RefineryOrderService implements CraftabilityYieldSource {
 
       String incomingNote = StringNormalization.trimToNull(itemDto.note());
 
-      InventoryItem item = new InventoryItem();
-      item.setUser(assignee);
-      item.setOwningOrgUnit(owningOrgUnit);
-      item.setMaterial(mat);
-      item.setLocation(loc);
-      item.setQuality(itemDto.quality());
-      item.setAmount(InventoryItem.roundToScuScale(itemDto.amount()));
-      item.setNote(incomingNote);
-      item.setPersonal(personal);
-      if (jobOrder != null) {
-        InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
-      }
-      if (!personal && order.getMission() != null) {
-        InventoryAllocations.addMission(item, order.getMission(), item.getAmount());
-      }
-
-      inventoryItemRepository.save(item);
+      stockCommands.bookInFromRefinery(
+          orderId,
+          assignee,
+          owningOrgUnit,
+          mat,
+          loc,
+          itemDto.quality(),
+          itemDto.amount(),
+          incomingNote,
+          personal,
+          jobOrder != null ? jobOrder.getId() : null,
+          jobOrder != null ? jobOrder.getDisplayId() : null,
+          order.getMission() != null ? order.getMission().getId() : null);
       bookedOnto.add(assignee.getId());
-      auditRecorder.record(
-          AuditEventType.INVENTORY_RECEIVED_FROM_REFINERY,
-          item.getId(),
-          mat.getName() + " @ " + loc.getName(),
-          assignee.getId(),
-          AuditDetails.of("source", "REFINERY")
-              .with("refineryOrder", orderId)
-              .with("material", mat.getName())
-              .with("amount", item.getAmount())
-              .with("q", itemDto.quality())
-              .with("personal", personal)
-              .with("jobOrder", jobOrder != null ? "#" + jobOrder.getDisplayId() : "-"));
 
       updateGoodOutputQuantity(order, itemDto);
     }

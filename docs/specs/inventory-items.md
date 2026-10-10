@@ -126,6 +126,15 @@ existence oracle — and a `personal = true` book-in on behalf of someone else i
 refused outright. Before this, a logistician could book produced stock into any
 member's ledger, another Staffel's and a private pool included.
 
+> [!note] One book-in rule, one deliberate difference (2026-10-10, P3-5c)
+> The Lager's Einbuchen, the production book-in and the refinery store decide whose Lager they may
+> book into through one rule, `StockCommands#requireBookIn` with the shared owner check of
+> `BookInPolicy`. The refinery store differs on two points, by design until the owner decides,
+> named as `BookInRule.refineryStore()` and pinned by `InventoryStockCommandsTest`: a personal
+> book-in for another member passes the owner check alone (REQ-INV-035), and a book-in without a
+> named owner (an ownerless refinery order) needs Logistician+. The two other paths refuse the
+> first and do not ask for the second.
+
 **Acceptance**
 
 - [ ] A production booking with `bookIn` creates (or merges into) the matching item
@@ -145,7 +154,8 @@ member's ledger, another Staffel's and a private pool included.
 **Enforced by:** `JobOrderItemProductionServiceTest` book-in cases,
 `JobOrderItemProductionCreateDtoValidationTest`, `JobOrderProductionBookInSecurityTest`
 (the 403 through the HTTP chain) · **Code:**
-`JobOrderItemProductionService`, `JobOrderItemProductionCreateDto` · **Issues:** —
+`JobOrderItemProductionService`, `JobOrderItemProductionCreateDto`,
+`InventoryStockCommands#requireBookIn`, `BookInRule` · **Issues:** —
 
 ## Out of scope
 

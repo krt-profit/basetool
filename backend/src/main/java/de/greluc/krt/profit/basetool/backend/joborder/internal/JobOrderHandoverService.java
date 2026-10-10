@@ -25,8 +25,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
@@ -44,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.service.AllocationReductions;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.ArrayList;
@@ -53,7 +52,6 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -98,7 +96,7 @@ public class JobOrderHandoverService {
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final InventoryItemRepository inventoryItemRepository;
-  private final StockChangeObserver stockChangeObserver;
+  private final StockCommands stockCommands;
   private final JobOrderHandoverMapper jobOrderHandoverMapper;
   private final JobOrderMaterialRepository jobOrderMaterialRepository;
   private final JobOrderService jobOrderService;
@@ -328,19 +326,12 @@ public class JobOrderHandoverService {
               itemDepleted,
               null));
 
-      if (remainingAmount <= QUANTITY_EPSILON) {
-        stockChangeObserver.beforeDelete(
-            List.of(inventoryItem.getId()), StockChangeReason.HANDOVER);
-        inventoryItemRepository.delete(inventoryItem);
-      } else {
-        Map<UUID, Double> missionPlan =
-            AllocationReductions.resolveReductionPlan(
-                inventoryItem, itemDto.missionReductions(), itemDto.amount(), false);
-        InventoryAllocations.reduceJobOrder(inventoryItem, jobOrderId, itemDto.amount());
-        AllocationReductions.applyPlan(inventoryItem, missionPlan, false);
-        inventoryItem.setAmount(remainingAmount);
-        inventoryItemRepository.save(inventoryItem);
-      }
+      stockCommands.takeFromEarmarkedRow(
+          inventoryItem,
+          jobOrderId,
+          itemDto.amount(),
+          itemDto.missionReductions(),
+          StockChangeReason.HANDOVER);
 
       String tierCode =
           bookAgainstLines(jobOrder, inventoryItem, itemDto.amount(), itemDto.qualityRequirement());
@@ -362,8 +353,7 @@ public class JobOrderHandoverService {
     final JobOrderHandoverDto resultDto = jobOrderHandoverMapper.toDto(savedHandover);
 
     for (UUID materialId : materialsToUnlink) {
-      inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(
-          jobOrderId, materialId);
+      stockCommands.releaseJobOrderMaterialEarmarks(jobOrderId, materialId);
     }
 
     JobOrder managedJobOrder =
@@ -379,7 +369,7 @@ public class JobOrderHandoverService {
 
     for (HandedItem h : handedItems) {
       if (!h.depleted()) {
-        stockChangeObserver.lower(h.itemId(), h.remaining(), StockChangeReason.HANDOVER);
+        stockCommands.lowered(h.itemId(), h.remaining(), StockChangeReason.HANDOVER);
       }
       auditRecorder.record(
           AuditEventType.INVENTORY_HANDED_OVER,

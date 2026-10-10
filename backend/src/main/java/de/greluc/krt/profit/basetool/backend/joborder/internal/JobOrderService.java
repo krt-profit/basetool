@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
@@ -92,6 +93,7 @@ public class JobOrderService {
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
+  private final StockCommands stockCommands;
   private final JobOrderAssigneeService jobOrderAssigneeService;
   private final OrgUnitRepository orgUnitRepository;
   private final JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
@@ -322,7 +324,7 @@ public class JobOrderService {
     }
 
     if (isTerminal && !wasTerminal) {
-      inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(jobOrder.getId());
+      stockCommands.releaseJobOrderEarmarks(jobOrder.getId());
       publishJobOrderClosed(jobOrder.getId());
       publishJobOrderFinished(jobOrder, status.name());
     }
@@ -480,7 +482,7 @@ public class JobOrderService {
     jobOrderRepository.saveAndFlush(managed);
 
     for (UUID removedId : removedMaterialIds) {
-      inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(id, removedId);
+      stockCommands.releaseJobOrderMaterialEarmarks(id, removedId);
     }
 
     JobOrder refreshed =
@@ -812,10 +814,10 @@ public class JobOrderService {
     Set<UUID> noLongerRequestedGameItems = new LinkedHashSet<>(requiredGameItemsBefore);
     noLongerRequestedGameItems.removeAll(jobOrderItemService.requiredGameItemIds(jobOrder));
     for (UUID removedMaterialId : noLongerRequired) {
-      inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(id, removedMaterialId);
+      stockCommands.releaseJobOrderMaterialEarmarks(id, removedMaterialId);
     }
     for (UUID removedGameItemId : noLongerRequestedGameItems) {
-      inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndGameItem(id, removedGameItemId);
+      stockCommands.releaseJobOrderGameItemEarmarks(id, removedGameItemId);
     }
 
     JobOrder refreshed =
@@ -919,7 +921,7 @@ public class JobOrderService {
     }
 
     final String label = orderLabel(jobOrder);
-    inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(jobOrderId, materialId);
+    stockCommands.releaseJobOrderMaterialEarmarks(jobOrderId, materialId);
 
     jobOrder.getMaterials().removeIf(m -> m.getMaterial().getId().equals(materialId));
     jobOrderRepository.save(jobOrder);
@@ -1032,7 +1034,7 @@ public class JobOrderService {
     if (!wasTerminal) {
       jobOrderRepository.flush();
       jobOrderPriorityService.normalizePriorities();
-      inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(jobOrder.getId());
+      stockCommands.releaseJobOrderEarmarks(jobOrder.getId());
       auditRecorder.record(
           AuditEventType.JOB_ORDER_COMPLETED,
           jobOrder.getId(),
