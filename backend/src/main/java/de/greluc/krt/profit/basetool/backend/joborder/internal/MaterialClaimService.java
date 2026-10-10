@@ -57,6 +57,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -176,7 +177,7 @@ public class MaterialClaimService implements ClaimBucketSource {
       List<MaterialClaim> claims = claimsByBucket.getOrDefault(bucket, List.of());
       double claimedAmount = round3(claims.stream().mapToDouble(MaterialClaim::getAmount).sum());
       double openRemaining = round3(Math.max(0.0, requiredAmount - claimedAmount));
-      QualityTier tier = tiers.get(bucket.tierId());
+      QualityTier tier = Objects.requireNonNull(tiers.get(bucket.tierId()));
       buckets.add(
           new ClaimBucketDto(
               materialMapper.toDto(materials.get(bucket.materialId())),

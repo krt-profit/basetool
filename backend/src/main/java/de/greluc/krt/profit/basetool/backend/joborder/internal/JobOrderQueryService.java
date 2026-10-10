@@ -54,6 +54,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -92,7 +93,8 @@ public class JobOrderQueryService {
    * @param pageable page request
    * @return paged job orders as DTOs
    */
-  public Page<JobOrderDto> getAllJobOrders(List<JobOrderStatus> statuses, Pageable pageable) {
+  public Page<JobOrderDto> getAllJobOrders(
+      @Nullable List<JobOrderStatus> statuses, Pageable pageable) {
     return getAllJobOrders(statuses, null, pageable);
   }
 
@@ -111,7 +113,9 @@ public class JobOrderQueryService {
    * @return paged job orders as DTOs, scoped to the caller's visibility
    */
   public Page<JobOrderDto> getAllJobOrders(
-      List<JobOrderStatus> statuses, Collection<UUID> squadronIds, Pageable pageable) {
+      @Nullable List<JobOrderStatus> statuses,
+      @Nullable Collection<UUID> squadronIds,
+      Pageable pageable) {
     return getAllJobOrders(statuses, squadronIds, false, pageable);
   }
 
@@ -132,8 +136,8 @@ public class JobOrderQueryService {
    * @return paged job orders as DTOs, scoped to the caller's visibility
    */
   public Page<JobOrderDto> getAllJobOrders(
-      List<JobOrderStatus> statuses,
-      Collection<UUID> squadronIds,
+      @Nullable List<JobOrderStatus> statuses,
+      @Nullable Collection<UUID> squadronIds,
       boolean toProcess,
       Pageable pageable) {
     if (!ownerScopeService.canViewJobOrders()) {

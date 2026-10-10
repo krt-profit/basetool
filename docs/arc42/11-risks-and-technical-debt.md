@@ -51,8 +51,9 @@ noticed.
 starting with the module `api` packages and widening package by package
 ([ADR-0237](../adr/0237-error-prone-and-nullaway-check-the-nullness-annotations-at-compile-time.md),
 2026-10-01). Until a package is covered, this entry holds for it. Since 2026-10-10 the backend's `compileJava` runs Error Prone
-2.50.0 with NullAway 0.14.2 over the 18 module `api` packages and their sub-packages, with NullAway
-findings as errors; outside them this entry still holds.
+2.50.0 with NullAway 0.14.2 over the 18 module `api` packages and their sub-packages and over the
+whole `joborder`, `refinery` and `materialexchange` modules, with NullAway findings as errors;
+outside them this entry still holds.
 
 ## 11.5 One host, no failover
 

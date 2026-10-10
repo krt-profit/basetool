@@ -38,6 +38,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.openpdf.text.pdf.PdfPTable;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
@@ -202,7 +203,7 @@ public class JobOrderHandoverReportService {
     }
   }
 
-  private @NotNull String formatAmount(double amount, String quantityType) {
+  private @NotNull String formatAmount(double amount, @Nullable String quantityType) {
     if ("PIECE".equalsIgnoreCase(quantityType)) {
       return String.valueOf((long) amount);
     }
@@ -211,7 +212,11 @@ public class JobOrderHandoverReportService {
 
   /** Internal value record for a single material row in the PDF. */
   private record ItemRow(
-      String materialName, String locationName, double amount, int quality, String quantityType) {}
+      String materialName,
+      String locationName,
+      double amount,
+      int quality,
+      @Nullable String quantityType) {}
 
   /**
    * Resolves a German PDF label from the backend message bundle, used for the shared erased-handle

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The material demand of one responsible (processing) org unit in the cross-order overview
@@ -32,4 +33,4 @@ import java.util.List;
  *     GOOD} before {@code NONE}; never empty
  */
 public record MaterialDemandGroupDto(
-    SquadronReferenceDto orgUnit, List<MaterialDemandRowDto> materials) {}
+    @Nullable SquadronReferenceDto orgUnit, List<MaterialDemandRowDto> materials) {}

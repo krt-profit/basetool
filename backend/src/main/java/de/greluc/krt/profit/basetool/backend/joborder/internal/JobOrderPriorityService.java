@@ -94,7 +94,7 @@ public class JobOrderPriorityService {
 
     activeOrders.remove(targetOrder);
 
-    int clampedPriority = Math.max(1, Math.min(activeOrders.size() + 1, newPriority));
+    int clampedPriority = Math.clamp(newPriority, 1, activeOrders.size() + 1);
     int newIndex = clampedPriority - 1;
 
     activeOrders.add(newIndex, targetOrder);

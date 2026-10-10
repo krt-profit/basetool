@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionServ
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -166,7 +167,8 @@ public class JobOrderAssigneeService {
    * @param version the edge version the client last saw, or {@code null} to skip the check
    * @return the order with its refreshed assignee list
    */
-  private JobOrderDto setAssigneeNote(UUID jobOrderId, UUID userId, String note, Long version) {
+  private JobOrderDto setAssigneeNote(
+      UUID jobOrderId, UUID userId, @Nullable String note, Long version) {
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);

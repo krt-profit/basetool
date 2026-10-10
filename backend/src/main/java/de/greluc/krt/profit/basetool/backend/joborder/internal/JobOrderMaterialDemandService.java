@@ -301,7 +301,7 @@ public class JobOrderMaterialDemandService {
   private static final class GroupAccumulator {
 
     /** The group's org unit, or {@code null} for the unresolved-unit fallback group. */
-    private final SquadronReferenceDto orgUnit;
+    @Nullable private final SquadronReferenceDto orgUnit;
 
     /** The group's buckets, insertion-ordered by first appearance. */
     private final Map<BucketKey, BucketAccumulator> buckets = new LinkedHashMap<>();

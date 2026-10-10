@@ -122,7 +122,13 @@ val nullAwayPackages =
       "refinery",
       "scope",
     )
-    .joinToString(",") { "de.greluc.krt.profit.basetool.backend.$it.api" }
+    .map { "de.greluc.krt.profit.basetool.backend.$it.api" }
+    .plus(
+      listOf("joborder", "materialexchange", "refinery").map {
+        "de.greluc.krt.profit.basetool.backend.$it"
+      }
+    )
+    .joinToString(",")
 
 tasks.named<JavaCompile>("compileJava") {
   options.errorprone {

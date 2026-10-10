@@ -126,7 +126,7 @@ public class JobOrderHandoverService {
       double amount,
       double remaining,
       boolean depleted,
-      String quality) {
+      @Nullable String quality) {
 
     /**
      * Returns this snapshot with the tier it was booked against.
@@ -134,7 +134,7 @@ public class JobOrderHandoverService {
      * @param tierCode the tier's code
      * @return the completed snapshot
      */
-    HandedItem withQuality(String tierCode) {
+    HandedItem withQuality(@Nullable String tierCode) {
       return new HandedItem(itemId, label, material, amount, remaining, depleted, tierCode);
     }
   }

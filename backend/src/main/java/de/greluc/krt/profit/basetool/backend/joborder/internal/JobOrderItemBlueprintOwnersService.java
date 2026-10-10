@@ -37,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -88,7 +89,7 @@ public class JobOrderItemBlueprintOwnersService {
     for (JobOrderItem item : order.getItems()) {
       String outputName = item.getBlueprint() == null ? null : item.getBlueprint().getOutputName();
       String matchKey = familyResolver.matchKey(outputName, countWithVariants);
-      if (matchKey.isEmpty()) {
+      if (outputName == null || matchKey.isEmpty()) {
         continue;
       }
       String displayName = item.getGameItem() != null ? item.getGameItem().getName() : outputName;
@@ -168,7 +169,7 @@ public class JobOrderItemBlueprintOwnersService {
         .map(
             e ->
                 new JobOrderBlueprintOwnerDto(
-                    nameById.get(e.getKey()),
+                    Objects.requireNonNull(nameById.get(e.getKey())),
                     e.getValue().stream().sorted(String.CASE_INSENSITIVE_ORDER).toList(),
                     memberSubs.contains(e.getKey())))
         .sorted(

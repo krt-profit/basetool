@@ -155,11 +155,13 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * @return one aggregate per mission with at least one refinery order; the sum may be {@code null}
    */
   @Query(
-      "select new de.greluc.krt.profit.basetool.backend.repository.RefineryMissionProfitAggregate("
-          + "r.mission.id,"
-          + " sum(coalesce(r.oreSales, 0.0) - coalesce(r.expenses, 0.0)"
-          + " - coalesce(r.otherExpenses, 0.0)))"
-          + " from RefineryOrder r where r.mission.id in :missionIds group by r.mission.id")
+      """
+      select new de.greluc.krt.profit.basetool.backend.repository.RefineryMissionProfitAggregate(
+      r.mission.id,
+      sum(coalesce(r.oreSales, 0.0) - coalesce(r.expenses, 0.0)
+      - coalesce(r.otherExpenses, 0.0)))
+      from RefineryOrder r where r.mission.id in :missionIds group by r.mission.id
+      """)
   List<RefineryMissionProfitAggregate> aggregateProfitByMissionIds(
       @Param("missionIds") List<UUID> missionIds);
 

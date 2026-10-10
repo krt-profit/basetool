@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One order's outstanding need for a {@code (material, quality)} bucket, labelling the Lager's
@@ -34,7 +35,7 @@ import java.util.UUID;
  */
 public record JobOrderMaterialNeedDto(
     UUID materialId,
-    Integer qualityFloor,
+    @Nullable Integer qualityFloor,
     Double requiredAmount,
     Double bookedAmount,
     Double outstandingAmount) {}
