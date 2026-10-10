@@ -1396,6 +1396,12 @@ Full tables, per finding with status, evidence and verdict:
   read models), REQ-DATA-010 (one scope fragment per aggregate), REQ-AUDIT-001 (the audit contract
   per command), REQ-XCH-009/011/026 (domain APIs; build-time contract test), REQ-FE-018 (baseline and
   counts — done 2026-10-02), REQ-OBS (event-publication metrics, only if an outbox is ever adopted).
+  **Status 2026-10-10:** done — REQ-API-002 (the enforced rules, in place of the convention),
+  REQ-API-007 (the annotation sentence corrected to what the build requires), REQ-DATA-001 (one
+  location, one sequence; it keeps the plan's "REQ-DATA" row). Waiting for a later move — REQ-DATA-010
+  (the fragment per aggregate moves into each module with its repository, Phase 3), REQ-AUDIT-001
+  (the per-command contract, P3-11), REQ-XCH-009/011 (they name the domain APIs the exchange calls,
+  which exist when blueprint, inventory and hangar publish theirs, Phase 3).
 - **arc42:** §4.1, §4.2, §5.3 and §5.5 (corrected with this plan), §5.2 and §5.3 rewritten per
   module as the moves land, §8 (module rules, interaction styles — §8.14, done 2026-10-02), §11.9
   (the domain coupling as debt, opened with this plan; its decisions linked 2026-10-02).
