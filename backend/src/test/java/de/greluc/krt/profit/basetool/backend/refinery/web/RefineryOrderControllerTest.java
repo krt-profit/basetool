@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.refinery.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -39,9 +39,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.RefineryAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.List;
@@ -350,8 +350,8 @@ class RefineryOrderControllerTest {
     @Test
     void storeMyRefineryOrder_delegatesWithLogisticianFlag() {
       when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-      de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto dto =
-          new de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto(
+      de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto dto =
+          new de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto(
               java.util.List.of());
 
       controller.storeMyRefineryOrder(jwt, ORDER_ID, dto);

@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.api;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

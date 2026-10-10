@@ -26,12 +26,12 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefin
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractGoodDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractImageDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryDraftBuilder;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractGoodDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractImageDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintExportParser;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import java.time.Instant;
