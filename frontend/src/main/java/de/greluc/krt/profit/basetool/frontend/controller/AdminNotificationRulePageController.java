@@ -131,7 +131,13 @@ public class AdminNotificationRulePageController {
           "HANGAR_FITTED_RESET_FOR_OWNER",
           "HANGAR_CHANGED_BY_ADMIN",
           "BLUEPRINT_CHANGED_BY_ADMIN",
-          "BLUEPRINT_PURGED_BY_ADMIN");
+          "BLUEPRINT_PURGED_BY_ADMIN",
+          "EXCHANGE_CLIENT_SUSPENDED",
+          "EXCHANGE_CLIENT_ACTIVATED",
+          "EXCHANGE_CLIENT_UPDATE_REQUIRED",
+          "EXCHANGE_CLIENT_CAPABILITY_REMOVED",
+          "EXCHANGE_SWITCHED_OFF",
+          "EXCHANGE_SWITCHED_ON");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -191,7 +197,12 @@ public class AdminNotificationRulePageController {
           "HANGAR_FITTED_RESET",
           "HANGAR_CHANGED_BY_ADMIN",
           "BLUEPRINT_CHANGED_BY_ADMIN",
-          "BLUEPRINT_PURGED_BY_ADMIN");
+          "BLUEPRINT_PURGED_BY_ADMIN",
+          "EXCHANGE_CLIENT_SUSPENDED",
+          "EXCHANGE_CLIENT_ACTIVATED",
+          "EXCHANGE_CLIENT_UPDATE_REQUIRED",
+          "EXCHANGE_CLIENT_CAPABILITY_REMOVED",
+          "EXCHANGE_SWITCHED_OFF");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but

@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Benachrichtigungen zu verbundenen Anwendungen.** Wer eine Anwendung verbunden hat, erfährt, wenn sie gesperrt oder wieder aktiv ist, eine neuere Version braucht, eine Fähigkeit verliert oder wenn der Austausch ganz abgeschaltet wird (REQ-XCH-040, -041, Migration V281, #2414).
+
 - **Benachrichtigungen zu Hangar und Blueprints.** Wessen Schiff einem Einsatz zugeteilt wird, erfährt es; fällt ein gelöschtes Schiff aus einem geplanten Einsatz, hören die Einsatzleitung und der Verantwortliche der Einheit davon. Wer Ausgerüstet-Markierungen zurückgesetzt bekommt oder wessen Hangar oder Blueprints ein Admin ändert oder leert, wird benachrichtigt (REQ-HANGAR-005…008, Migration V280, #2414).
 
 - **Benachrichtigungen zur Organisation.** Admins erfahren, wenn nach einer Leitungsänderung die OFFICER-Rolle eines Mitglieds nicht zu seinen Posten passt; die Leitung einer Einheit erfährt, wenn ein Mitglied ausgeschieden ist, und die des übergeordneten Bereichs, wenn dadurch ein Leitungsposten frei wird (REQ-ORG-029, -030, Migration V279, #2414).
