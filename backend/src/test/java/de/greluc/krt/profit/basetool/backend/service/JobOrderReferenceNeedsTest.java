@@ -88,6 +88,7 @@ class JobOrderReferenceNeedsTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
 
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
   @Mock private JobOrderMapper jobOrderMapper;
 
@@ -118,6 +119,7 @@ class JobOrderReferenceNeedsTest {
             null,
             inventoryItemRepository,
             ownerScopeService,
+            jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
             jobOrderItemService,
@@ -125,7 +127,7 @@ class JobOrderReferenceNeedsTest {
             requirementResolver,
             null);
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
-    when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
+    when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
     when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class))).thenReturn(Set.of());
     when(jobOrderItemService.requiredGameItemIds(any(JobOrder.class))).thenReturn(Set.of());
   }

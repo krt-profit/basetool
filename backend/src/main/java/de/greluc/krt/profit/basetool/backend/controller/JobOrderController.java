@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemBlueprintOwnersService;
@@ -57,7 +58,6 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialDemandService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
@@ -115,7 +115,7 @@ public class JobOrderController {
   private final JobOrderService jobOrderService;
   private final JobOrderQueryService jobOrderQueryService;
   private final JobOrderMaterialDemandService jobOrderMaterialDemandService;
-  private final OwnerScopeService ownerScopeService;
+  private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
   private final JobOrderItemHandoverService jobOrderItemHandoverService;
@@ -147,7 +147,7 @@ public class JobOrderController {
           + Roles.OFFICER
           + "') or hasRole('"
           + Roles.ADMIN
-          + "')) and @ownerScopeService.canEditJobOrder(#id)")
+          + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderHandoverDto createHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderHandoverCreateDto dto) {
     return jobOrderHandoverService.createHandover(id, dto);
@@ -174,7 +174,7 @@ public class JobOrderController {
           + Roles.OFFICER
           + "') or hasRole('"
           + Roles.ADMIN
-          + "')) and @ownerScopeService.canEditJobOrder(#id)")
+          + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderItemHandoverDto createItemHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderItemHandoverCreateDto dto) {
     return jobOrderItemHandoverService.createItemHandover(id, dto);
@@ -229,7 +229,7 @@ public class JobOrderController {
           + Roles.OFFICER
           + "') or hasRole('"
           + Roles.ADMIN
-          + "')) and @ownerScopeService.canEditJobOrder(#id)")
+          + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderItemDto bookProduction(
       @PathVariable UUID id,
       @PathVariable UUID itemId,
@@ -263,7 +263,7 @@ public class JobOrderController {
           + Roles.OFFICER
           + "', '"
           + Roles.ADMIN
-          + "') and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
+          + "') and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   @Parameter(
       name = "X-User-Time-Zone",
       in = ParameterIn.HEADER,
@@ -304,7 +304,7 @@ public class JobOrderController {
           + Roles.OFFICER
           + "', '"
           + Roles.ADMIN
-          + "') and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
+          + "') and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   @Parameter(
       name = "X-User-Time-Zone",
       in = ParameterIn.HEADER,
@@ -342,7 +342,7 @@ public class JobOrderController {
           + Roles.OFFICER
           + "', '"
           + Roles.ADMIN
-          + "') and @ownerScopeService.canEditJobOrder(#jobOrderId)")
+          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
   public ResponseEntity<byte[]> previewHandoverReport(
       @PathVariable UUID jobOrderId, @RequestBody @Valid HandoverReportPreviewRequestDto dto) {
     byte[] pdf = jobOrderHandoverReportService.generateHandoverReportPreview(dto);
@@ -635,8 +635,8 @@ public class JobOrderController {
       summary = "Get job order by ID",
       description = "Returns a job order and calculates the current material stock.")
   @PreAuthorize(
-      "isAuthenticated() and (@ownerScopeService.canSeeJobOrder(#id) or"
-          + " @ownerScopeService.canSeeJobOrderAsRequester(#id))")
+      "isAuthenticated() and (@jobOrderAccessPolicy.canSeeJobOrder(#id) or"
+          + " @jobOrderAccessPolicy.canSeeJobOrderAsRequester(#id))")
   @Transactional(readOnly = true)
   public JobOrderDto getJobOrderById(@PathVariable UUID id) {
     JobOrderDto dto = jobOrderQueryService.getJobOrderById(id);
@@ -665,7 +665,7 @@ public class JobOrderController {
         description = "Caller is not a member of the order's responsible squadron/SK."),
     @ApiResponse(responseCode = "404", description = "Job order not found.")
   })
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrderBlueprintOwners(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrderBlueprintOwners(#id)")
   @Transactional(readOnly = true)
   public JobOrderItemBlueprintOwnersDto getItemBlueprintOwners(@PathVariable UUID id) {
     return jobOrderItemBlueprintOwnersService.getBlueprintOwners(id);
@@ -685,13 +685,13 @@ public class JobOrderController {
   @Operation(
       summary = "Get inventory items for a job order material",
       description = "Returns all inventory items linked to a specific material in a job order.")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getInventoryItemsForJobOrderMaterial(
       @PathVariable UUID id, @PathVariable UUID matId) {
     List<InventoryItemDto> items =
         jobOrderQueryService.getInventoryItemsForJobOrderMaterial(id, matId);
-    return ownerScopeService.canSeeJobOrderInventoryOwners(id)
+    return jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(id)
         ? items
         : inventoryOwnerRedactor.redactInventoryItems(items);
   }
@@ -711,7 +711,7 @@ public class JobOrderController {
       summary = "Get the quality-bucket attribution of a job order material's linked stock",
       description =
           "Returns, per linked inventory row, the amount counted toward each quality bucket.")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
   @Transactional(readOnly = true)
   public List<LinkedStockAttributionDto> getStockAttributionForJobOrderMaterial(
       @PathVariable UUID id, @PathVariable UUID matId) {
@@ -735,11 +735,11 @@ public class JobOrderController {
       description =
           "Returns inventory items linked to the order whose material is not among the order's"
               + " requirements (invisible orphaned links).")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getOrphanedLinkedInventory(@PathVariable UUID id) {
     List<InventoryItemDto> items = jobOrderQueryService.getOrphanedLinkedInventory(id);
-    return ownerScopeService.canSeeJobOrderInventoryOwners(id)
+    return jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(id)
         ? items
         : inventoryOwnerRedactor.redactInventoryItems(items);
   }
@@ -767,7 +767,8 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize(
+      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrderStatus(
       @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderStatusDto dto) {
     return jobOrderService.updateJobOrderStatus(id, dto);
@@ -786,7 +787,8 @@ public class JobOrderController {
   @Operation(
       summary = "Update job order priority",
       description = "Updates priority and shifts others.")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize(
+      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrderPriority(@PathVariable UUID id, @RequestParam Integer priority) {
     return jobOrderService.updateJobOrderPriority(id, priority);
   }
@@ -800,7 +802,8 @@ public class JobOrderController {
    */
   @PutMapping("/{id}")
   @Operation(summary = "Update job order", description = "Updates job order details and materials.")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize(
+      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
     return jobOrderService.updateJobOrder(id, dto);
@@ -832,7 +835,8 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize(
+      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateItemJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return jobOrderService.updateItemJobOrder(id, dto);
@@ -868,7 +872,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict - optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditJobOrderAsRequester(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrderAsRequester(#id)")
   public JobOrderDto updateJobOrderAsRequester(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
     return cleanupJobOrderForRequester(jobOrderService.updateJobOrderAsRequester(id, dto));
@@ -902,7 +906,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict - optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditJobOrderAsRequester(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrderAsRequester(#id)")
   public JobOrderDto updateItemJobOrderAsRequester(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return cleanupJobOrderForRequester(jobOrderService.updateItemJobOrderAsRequester(id, dto));
@@ -932,7 +936,8 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize(
+      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateBlueprintVariantCounting(
       @PathVariable UUID id, @NotNull @RequestBody @Valid UpdateJobOrderBlueprintCountingDto dto) {
     return jobOrderService.updateBlueprintVariantCounting(
@@ -954,7 +959,8 @@ public class JobOrderController {
       description =
           "Changes which org unit processes the order. Admin: free to any profit-eligible org unit;"
               + " squadron logistician/officer: escalate own squadron's order to an SK only.")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
+  @PreAuthorize(
+      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto reassignResponsibleOrgUnit(
       @PathVariable UUID id, @NotNull @RequestBody @Valid ReassignResponsibleOrgUnitRequest body) {
     return jobOrderService.reassignResponsibleOrgUnit(id, body.responsibleOrgUnitId());
@@ -1009,7 +1015,7 @@ public class JobOrderController {
           + Roles.OFFICER
           + "', '"
           + Roles.ADMIN
-          + "') and @ownerScopeService.canEditJobOrder(#jobOrderId)")
+          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
   public void unlinkMaterial(@PathVariable UUID jobOrderId, @PathVariable UUID materialId) {
     jobOrderService.unlinkMaterial(jobOrderId, materialId);
   }
@@ -1040,7 +1046,7 @@ public class JobOrderController {
           + Roles.OFFICER
           + "', '"
           + Roles.ADMIN
-          + "') and @ownerScopeService.canEditJobOrder(#jobOrderId)")
+          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
   public void unlinkInventoryItem(
       @PathVariable UUID jobOrderId, @PathVariable UUID inventoryItemId) {
     jobOrderService.unlinkInventoryItem(jobOrderId, inventoryItemId);
@@ -1058,7 +1064,7 @@ public class JobOrderController {
    */
   @PostMapping("/{id}/assignees/{userId}")
   @Operation(summary = "Add an assignee", description = "Adds a user to the job order.")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
   public JobOrderDto addAssignee(
       @PathVariable UUID id, @PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
     verifyAssigneeAccess(jwt, userId);
@@ -1075,7 +1081,7 @@ public class JobOrderController {
    */
   @DeleteMapping("/{id}/assignees/{userId}")
   @Operation(summary = "Remove an assignee", description = "Removes a user from the job order.")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
   public JobOrderDto removeAssignee(
       @PathVariable UUID id, @PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
     verifyAssigneeAccess(jwt, userId);
@@ -1110,7 +1116,7 @@ public class JobOrderController {
   @Operation(
       summary = "Set an assignee note",
       description = "Creates or replaces the note on a user's assignee entry.")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
   public JobOrderDto setAssigneeNote(
       @PathVariable UUID id,
       @PathVariable UUID userId,
@@ -1135,7 +1141,7 @@ public class JobOrderController {
   @Operation(
       summary = "Delete an assignee note",
       description = "Clears the note on a user's assignee entry.")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
   public JobOrderDto deleteAssigneeNote(
       @PathVariable UUID id,
       @PathVariable UUID userId,

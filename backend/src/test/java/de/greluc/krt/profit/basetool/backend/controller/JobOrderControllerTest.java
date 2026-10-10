@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemBlueprintOwnersService;
@@ -55,7 +56,6 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderItemProductionServi
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialDemandService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -101,7 +101,7 @@ class JobOrderControllerTest {
   @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
   @Mock private UserService userService;
   @Mock private AuthHelperService authHelperService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   @InjectMocks private JobOrderController controller;
@@ -295,7 +295,7 @@ class JobOrderControllerTest {
         }
       }
     }
-    verify(ownerScopeService, never()).canSeeJobOrder(any(UUID.class));
+    verify(jobOrderAccessPolicy, never()).canSeeJobOrder(any(UUID.class));
   }
 
   @Test
@@ -360,7 +360,7 @@ class JobOrderControllerTest {
     assertThat(result.comment()).isEqualTo("deliver to ArcCorp");
     assertThat(result.version()).isEqualTo(9L);
     assertThat(result.redacted()).isTrue();
-    verify(ownerScopeService, never()).canSeeJobOrder(any(UUID.class));
+    verify(jobOrderAccessPolicy, never()).canSeeJobOrder(any(UUID.class));
   }
 
   private static InventoryItemDto sampleInventoryItem() {
@@ -392,7 +392,7 @@ class JobOrderControllerTest {
     InventoryItemDto inv = sampleInventoryItem();
     when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
         .thenReturn(List.of(inv));
-    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
+    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<InventoryItemDto> result =
         controller.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId);
@@ -409,7 +409,7 @@ class JobOrderControllerTest {
     List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
     when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
         .thenReturn(raw);
-    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
+    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
     when(inventoryOwnerRedactor.redactInventoryItems(raw)).thenReturn(redacted);
 
     List<InventoryItemDto> result =
@@ -425,7 +425,7 @@ class JobOrderControllerTest {
     List<InventoryItemDto> raw = List.of(sampleInventoryItem());
     List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
     when(jobOrderQueryService.getOrphanedLinkedInventory(jobOrderId)).thenReturn(raw);
-    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
+    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
     when(inventoryOwnerRedactor.redactInventoryItems(raw)).thenReturn(redacted);
 
     List<InventoryItemDto> result = controller.getOrphanedLinkedInventory(jobOrderId);

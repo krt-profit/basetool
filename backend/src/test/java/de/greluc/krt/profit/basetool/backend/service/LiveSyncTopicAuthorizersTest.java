@@ -50,6 +50,8 @@ class LiveSyncTopicAuthorizersTest {
   @Mock private OperationAccessPolicy operationAccessPolicy;
 
   @Mock private RefineryAccessPolicy refineryAccessPolicy;
+
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
 
   @Test
@@ -80,8 +82,8 @@ class LiveSyncTopicAuthorizersTest {
   @DisplayName("the job-order authorizer decides the Auftrag and the queue rooms by their gates")
   void jobOrderAuthorizerAsksTheJobOrderGates() {
     JobOrderLiveSyncTopicAuthorizer authorizer =
-        new JobOrderLiveSyncTopicAuthorizer(ownerScopeService);
-    when(ownerScopeService.canSeeJobOrder(RESOURCE)).thenReturn(false);
+        new JobOrderLiveSyncTopicAuthorizer(ownerScopeService, jobOrderAccessPolicy);
+    when(jobOrderAccessPolicy.canSeeJobOrder(RESOURCE)).thenReturn(false);
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
 
     assertThat(authorizer.authorizations())

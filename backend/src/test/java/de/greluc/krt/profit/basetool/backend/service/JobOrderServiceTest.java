@@ -80,6 +80,7 @@ class JobOrderServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
 
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
   @Mock private SystemSettings systemSettings;
 
@@ -151,6 +152,7 @@ class JobOrderServiceTest {
             materialRepository,
             inventoryItemRepository,
             ownerScopeService,
+            jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
             jobOrderItemService,

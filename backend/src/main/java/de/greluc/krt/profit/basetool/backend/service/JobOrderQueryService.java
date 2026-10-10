@@ -75,6 +75,7 @@ public class JobOrderQueryService {
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final OwnerScopeService ownerScopeService;
+  private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final JobOrderMapper jobOrderMapper;
   private final SquadronMapper squadronMapper;
   private final JobOrderItemService jobOrderItemService;
@@ -199,7 +200,7 @@ public class JobOrderQueryService {
     }
     List<JobOrder> visible =
         jobOrderRepository.findAllActiveWithMaterials().stream()
-            .filter(ownerScopeService::canSeeJobOrder)
+            .filter(jobOrderAccessPolicy::canSeeJobOrder)
             .toList();
     List<UUID> needIds = withNeeds ? visible.stream().map(JobOrder::getId).toList() : List.of();
     OrderLinkedStockIndex stockIndex =
@@ -335,7 +336,7 @@ public class JobOrderQueryService {
     JobOrder jobOrder =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     JobOrderDto dto = jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
-    return ownerScopeService.canSeeJobOrder(jobOrder) ? dto : dto.withRedacted(true);
+    return jobOrderAccessPolicy.canSeeJobOrder(jobOrder) ? dto : dto.withRedacted(true);
   }
 
   /**

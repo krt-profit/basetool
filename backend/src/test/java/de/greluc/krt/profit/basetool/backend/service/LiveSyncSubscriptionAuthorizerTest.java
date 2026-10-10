@@ -60,6 +60,8 @@ class LiveSyncSubscriptionAuthorizerTest {
   @Mock private OperationAccessPolicy operationAccessPolicy;
 
   @Mock private RefineryAccessPolicy refineryAccessPolicy;
+
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private AuthHelperService authHelperService;
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
 
@@ -78,7 +80,7 @@ class LiveSyncSubscriptionAuthorizerTest {
     return List.of(
         new MissionLiveSyncTopicAuthorizer(ownerScopeService),
         new OperationLiveSyncTopicAuthorizer(operationAccessPolicy),
-        new JobOrderLiveSyncTopicAuthorizer(ownerScopeService),
+        new JobOrderLiveSyncTopicAuthorizer(ownerScopeService, jobOrderAccessPolicy),
         new RefineryLiveSyncTopicAuthorizer(refineryAccessPolicy),
         new OrgUnitBankLiveSyncTopicAuthorizer(orgUnitBankAccessService));
   }
@@ -152,7 +154,7 @@ class LiveSyncSubscriptionAuthorizerTest {
   @DisplayName("the Operation, Auftrag and Raffinerie-Order rooms each use their own scope")
   void perResourceRoomsUseTheirOwnScope() {
     when(operationAccessPolicy.canSeeOperation(RESOURCE)).thenReturn(true);
-    when(ownerScopeService.canSeeJobOrder(RESOURCE)).thenReturn(false);
+    when(jobOrderAccessPolicy.canSeeJobOrder(RESOURCE)).thenReturn(false);
     when(refineryAccessPolicy.canSeeRefineryOrder(RESOURCE)).thenReturn(true);
 
     assertThat(authorizer.maySubscribe(LiveSyncTopic.parse("operation:" + RESOURCE))).isTrue();

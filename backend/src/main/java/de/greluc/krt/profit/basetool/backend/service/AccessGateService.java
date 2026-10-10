@@ -20,17 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
@@ -61,9 +56,6 @@ public class AccessGateService {
   private final RequestScopeResolver requestScopeResolver;
   private final AuthHelperService authHelper;
   private final MissionRepository missionRepository;
-  private final JobOrderRepository jobOrderRepository;
-  private final JobOrderHandoverRepository jobOrderHandoverRepository;
-  private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final ShipRepository shipRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -203,185 +195,6 @@ public class AccessGateService {
         .findByIdForAuthorization(missionId)
         .map(m -> m.getOwningOrgUnit() == null || canEditSquadron(m.getOwningOrgUnit().getId()))
         .orElse(false);
-  }
-
-  /**
-   * Checks whether the caller may read job order {@code jobOrderId}.
-   *
-   * <ul>
-   *   <li>Spezialkommando-responsible: visible to every profit-eligible caller ({@link
-   *       RequestScopeResolver#canViewJobOrders()}).
-   *   <li>Squadron-responsible: visible only to members of that squadron and admins.
-   * </ul>
-   *
-   * <p>A caller who is not profit-eligible sees no order; a {@code null} responsible org unit is
-   * visible; unknown ids return {@code false}.
-   *
-   * @param jobOrderId job order to inspect; never {@code null}
-   * @return {@code true} iff the caller may read the order
-   */
-  public boolean canSeeJobOrder(@NotNull UUID jobOrderId) {
-    return jobOrderRepository.findById(jobOrderId).map(this::canSeeJobOrderRow).orElse(false);
-  }
-
-  /**
-   * Entity overload of {@link #canSeeJobOrder(UUID)} for callers that already hold the {@link
-   * JobOrder}.
-   *
-   * @param order the job order to inspect; never {@code null}
-   * @return {@code true} iff the caller may read the order
-   */
-  public boolean canSeeJobOrder(@NotNull JobOrder order) {
-    return canSeeJobOrderRow(order);
-  }
-
-  /**
-   * Per-row read check for {@link #canSeeJobOrder(UUID)}: applies the profit gate ({@link
-   * RequestScopeResolver#canViewJobOrders()}), then treats SK-responsible orders as public and
-   * squadron-responsible ones via {@link #canSeeSquadron(UUID)}.
-   *
-   * @param o the job order whose responsible org unit gates visibility
-   * @return {@code true} iff the caller may read the row
-   */
-  private boolean canSeeJobOrderRow(JobOrder o) {
-    if (!requestScopeResolver.canViewJobOrders()) {
-      return false;
-    }
-    OrgUnit responsible = o.getResponsibleOrgUnit();
-    if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
-      return true;
-    }
-    return canSeeSquadron(responsible.getId());
-  }
-
-  /**
-   * Checks whether the caller may see the blueprint-coverage view of a job order: only members of
-   * its responsible org unit via {@link #canSeeSquadron(UUID)}, stricter than {@link
-   * #canSeeJobOrder(UUID)}. A {@code null} responsible org unit or unknown id returns {@code
-   * false}.
-   *
-   * @param jobOrderId the job order whose blueprint coverage the caller wants to read; never {@code
-   *     null}
-   * @return {@code true} iff the caller may see the responsible org unit
-   */
-  public boolean canSeeJobOrderBlueprintOwners(@NotNull UUID jobOrderId) {
-    return jobOrderRepository
-        .findById(jobOrderId)
-        .map(JobOrder::getResponsibleOrgUnit)
-        .map(responsible -> canSeeSquadron(responsible.getId()))
-        .orElse(false);
-  }
-
-  /**
-   * Checks whether the caller may see the owner and location of inventory linked to a job order
-   * (REQ-ORDERS-029, ADR-0107): only members of its responsible org unit, stricter than {@link
-   * #canSeeJobOrder(UUID)}. A {@code null} responsible org unit or unknown id returns {@code
-   * false}.
-   *
-   * @param jobOrderId the job order whose linked-inventory owners the caller wants to read; never
-   *     {@code null}
-   * @return {@code true} iff the caller may see the responsible org unit
-   */
-  public boolean canSeeJobOrderInventoryOwners(@NotNull UUID jobOrderId) {
-    return jobOrderRepository
-        .findById(jobOrderId)
-        .map(JobOrder::getResponsibleOrgUnit)
-        .map(responsible -> canSeeSquadron(responsible.getId()))
-        .orElse(false);
-  }
-
-  /**
-   * Checks whether the caller may edit job order {@code jobOrderId}: SK-responsible orders are open
-   * to the endpoint's role gate, squadron-responsible ones follow {@link #canEditSquadron(UUID)}. A
-   * caller who is not profit-eligible edits no order; unknown ids return {@code false}.
-   *
-   * @param jobOrderId job order to inspect; never {@code null}
-   * @return {@code true} iff the caller may edit the order
-   */
-  public boolean canEditJobOrder(@NotNull UUID jobOrderId) {
-    return jobOrderRepository.findById(jobOrderId).map(this::canEditJobOrderRow).orElse(false);
-  }
-
-  /**
-   * Checks the complete write rule of the job-order endpoints: logistician-or-above and {@link
-   * #canEditJobOrder(UUID)}.
-   *
-   * @param jobOrderId the order to test
-   * @return whether the current caller may edit it
-   */
-  public boolean mayEditJobOrder(@NotNull UUID jobOrderId) {
-    return authHelper.isLogisticianOrAbove() && canEditJobOrder(jobOrderId);
-  }
-
-  /**
-   * Per-row write check for {@link #canEditJobOrder(UUID)}: applies the profit gate, then opens
-   * SK-responsible orders and checks squadron-responsible ones via {@link #canEditSquadron(UUID)}.
-   *
-   * @param o the job order whose responsible org unit gates write access
-   * @return {@code true} iff the caller may edit the row
-   */
-  private boolean canEditJobOrderRow(JobOrder o) {
-    if (!requestScopeResolver.canViewJobOrders()) {
-      return false;
-    }
-    OrgUnit responsible = o.getResponsibleOrgUnit();
-    if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
-      return true;
-    }
-    return canEditSquadron(responsible.getId());
-  }
-
-  /**
-   * Checks whether the caller may read a job order as a direct member of its requesting org unit,
-   * regardless of the profit gate (REQ-ORDERS-023). Unknown ids return {@code false}.
-   *
-   * @param jobOrderId job order to inspect; never {@code null}
-   * @return {@code true} iff the caller is a direct member of the requesting org unit
-   */
-  public boolean canSeeJobOrderAsRequester(@NotNull UUID jobOrderId) {
-    return jobOrderRepository.findById(jobOrderId).map(this::isOrderRequesterRow).orElse(false);
-  }
-
-  /**
-   * Checks whether the caller may edit a job order as its requester: a direct member of the
-   * requesting org unit while the order has no material or item handover yet (REQ-ORDERS-023).
-   * Unknown ids return {@code false}.
-   *
-   * @param jobOrderId job order to inspect; never {@code null}
-   * @return {@code true} iff the caller may edit the still-undelivered order as its requester
-   */
-  public boolean canEditJobOrderAsRequester(@NotNull UUID jobOrderId) {
-    return jobOrderRepository
-        .findById(jobOrderId)
-        .map(o -> isOrderRequesterRow(o) && !orderHasAnyDelivery(o.getId()))
-        .orElse(false);
-  }
-
-  /**
-   * Checks whether the order has a requesting org unit of which the caller is a direct member
-   * ({@link RequestScopeResolver#currentUserIsMemberOfOrgUnit(UUID)}), independent of the profit
-   * gate.
-   *
-   * @param o the job order whose requesting org unit gates the escape
-   * @return {@code true} iff the caller directly belongs to the requesting org unit
-   */
-  private boolean isOrderRequesterRow(@NotNull JobOrder o) {
-    OrgUnit requesting = o.getRequestingOrgUnit();
-    return requesting != null
-        && requestScopeResolver.currentUserIsMemberOfOrgUnit(requesting.getId());
-  }
-
-  /**
-   * Checks whether the order has at least one material ({@link
-   * de.greluc.krt.profit.basetool.backend.model.JobOrderHandover}) or item ({@link
-   * de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover}) handover.
-   *
-   * @param jobOrderId the order to inspect; never {@code null}
-   * @return {@code true} iff at least one handover exists
-   */
-  private boolean orderHasAnyDelivery(@NotNull UUID jobOrderId) {
-    return jobOrderHandoverRepository.existsByJobOrderId(jobOrderId)
-        || jobOrderItemHandoverRepository.existsByJobOrderId(jobOrderId);
   }
 
   /**

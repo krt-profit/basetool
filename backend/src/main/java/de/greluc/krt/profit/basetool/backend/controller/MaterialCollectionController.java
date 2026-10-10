@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderAccessPolicy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -48,7 +48,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MaterialCollectionController {
 
   private final InventoryItemService inventoryItemService;
-  private final OwnerScopeService ownerScopeService;
+  private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   /**
@@ -73,12 +73,12 @@ public class MaterialCollectionController {
     @ApiResponse(responseCode = "404", description = "Job order not found")
   })
   @GetMapping("/{jobOrderId}/material-collection")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   public List<MaterialCollectionEntryDto> getMaterialCollection(
       @PathVariable @NotNull UUID jobOrderId) {
     List<MaterialCollectionEntryDto> entries =
         inventoryItemService.getMaterialCollection(jobOrderId);
-    return ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)
+    return jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)
         ? entries
         : inventoryOwnerRedactor.redactMaterialCollection(entries);
   }

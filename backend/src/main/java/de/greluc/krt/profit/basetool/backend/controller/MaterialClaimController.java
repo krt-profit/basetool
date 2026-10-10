@@ -75,7 +75,7 @@ public class MaterialClaimController {
       description =
           "Returns each required material bucket with its required / claimed / open-remaining"
               + " amounts and the individual squadron claims.")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   @Transactional(readOnly = true)
   public List<ClaimBucketDto> getClaimBuckets(@PathVariable UUID jobOrderId) {
     return materialClaimService.getClaimBuckets(jobOrderId);

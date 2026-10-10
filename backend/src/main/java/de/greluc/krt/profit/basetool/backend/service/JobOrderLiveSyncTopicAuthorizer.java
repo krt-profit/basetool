@@ -36,6 +36,7 @@ import org.springframework.stereotype.Service;
 public class JobOrderLiveSyncTopicAuthorizer implements LiveSyncTopicAuthorizer {
 
   private final OwnerScopeService ownerScopeService;
+  private final JobOrderAccessPolicy jobOrderAccessPolicy;
 
   /**
    * Decides the Auftrag and the Auftrag-queue rooms.
@@ -49,7 +50,7 @@ public class JobOrderLiveSyncTopicAuthorizer implements LiveSyncTopicAuthorizer 
   }
 
   /**
-   * Asks {@code ownerScopeService.canSeeJobOrder(id)} for an Auftrag room and {@code
+   * Asks {@code jobOrderAccessPolicy.canSeeJobOrder(id)} for an Auftrag room and {@code
    * ownerScopeService.canViewJobOrders()} for the queue room.
    *
    * @param topic a parsed Auftrag or Auftrag-queue topic
@@ -60,7 +61,7 @@ public class JobOrderLiveSyncTopicAuthorizer implements LiveSyncTopicAuthorizer 
   public boolean mayJoin(@NotNull LiveSyncTopic topic) {
     LiveSyncAuthorization kind = topic.topicClass().authorization();
     if (kind == LiveSyncAuthorization.JOB_ORDER) {
-      return ownerScopeService.canSeeJobOrder(topic.requiredResourceId());
+      return jobOrderAccessPolicy.canSeeJobOrder(topic.requiredResourceId());
     }
     if (kind == LiveSyncAuthorization.JOB_ORDER_QUEUE) {
       return ownerScopeService.canViewJobOrders();

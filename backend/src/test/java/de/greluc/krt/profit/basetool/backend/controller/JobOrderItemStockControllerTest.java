@@ -27,7 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenc
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderAccessPolicy;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -44,7 +44,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class JobOrderItemStockControllerTest {
 
   @Mock private InventoryItemService inventoryItemService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   @InjectMocks private JobOrderItemStockController controller;
@@ -74,7 +74,7 @@ class JobOrderItemStockControllerTest {
     UUID jobOrderId = UUID.randomUUID();
     List<JobOrderItemStockGroupDto> expected = List.of(sampleGroup());
     when(inventoryItemService.getItemStockForJobOrder(jobOrderId)).thenReturn(expected);
-    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
+    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<JobOrderItemStockGroupDto> result = controller.getItemStock(jobOrderId);
 
@@ -89,7 +89,7 @@ class JobOrderItemStockControllerTest {
     List<JobOrderItemStockGroupDto> raw = List.of(sampleGroup());
     List<JobOrderItemStockGroupDto> redacted = List.of(sampleGroup());
     when(inventoryItemService.getItemStockForJobOrder(jobOrderId)).thenReturn(raw);
-    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
+    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
     when(inventoryOwnerRedactor.redactItemStockGroups(raw)).thenReturn(redacted);
 
     List<JobOrderItemStockGroupDto> result = controller.getItemStock(jobOrderId);
@@ -102,7 +102,7 @@ class JobOrderItemStockControllerTest {
   void getItemStock_emptyResult_isReturnedAsIs() {
     UUID jobOrderId = UUID.randomUUID();
     when(inventoryItemService.getItemStockForJobOrder(jobOrderId)).thenReturn(List.of());
-    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
+    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<JobOrderItemStockGroupDto> result = controller.getItemStock(jobOrderId);
 

@@ -57,7 +57,10 @@ import org.springframework.mock.web.MockHttpServletRequest;
 /**
  * The differential verdict test of the job-order access policy (plan §5.4, ADR-0236): over one
  * fixture matrix of callers and orders, {@link JobOrderAccessPolicy} returns exactly the verdict of
- * the scope hub's {@link AccessGateService} for every job-order gate.
+ * the scope hub's former job-order gates.
+ *
+ * <p>{@link ScopeHubJobOrderGates} restates those gates as {@link AccessGateService} decided them
+ * before they moved, on the scope kernel's primitives, so the comparison outlives their deletion.
  *
  * <p>The matrix covers an admin unpinned and pinned to either unit, members of zero, one and two
  * units, a member pinned to an own and to a foreign unit, a Bereich lead reaching a child Staffel,
@@ -105,7 +108,7 @@ class JobOrderAccessPolicyDifferentialTest {
    */
   private record Gate(
       String name,
-      BiPredicate<AccessGateService, UUID> scopeHub,
+      BiPredicate<ScopeHubJobOrderGates, UUID> scopeHub,
       BiPredicate<JobOrderAccessPolicy, UUID> policy) {}
 
   @Test
@@ -174,38 +177,38 @@ class JobOrderAccessPolicyDifferentialTest {
     return List.of(
         new Gate(
             "canSeeJobOrder",
-            AccessGateService::canSeeJobOrder,
+            ScopeHubJobOrderGates::canSeeJobOrder,
             JobOrderAccessPolicy::canSeeJobOrder),
         new Gate(
             "canSeeJobOrderBlueprintOwners",
-            AccessGateService::canSeeJobOrderBlueprintOwners,
+            ScopeHubJobOrderGates::canSeeJobOrderBlueprintOwners,
             JobOrderAccessPolicy::canSeeJobOrderBlueprintOwners),
         new Gate(
             "canSeeJobOrderInventoryOwners",
-            AccessGateService::canSeeJobOrderInventoryOwners,
+            ScopeHubJobOrderGates::canSeeJobOrderInventoryOwners,
             JobOrderAccessPolicy::canSeeJobOrderInventoryOwners),
         new Gate(
             "canEditJobOrder",
-            AccessGateService::canEditJobOrder,
+            ScopeHubJobOrderGates::canEditJobOrder,
             JobOrderAccessPolicy::canEditJobOrder),
         new Gate(
             "mayEditJobOrder",
-            AccessGateService::mayEditJobOrder,
+            ScopeHubJobOrderGates::mayEditJobOrder,
             JobOrderAccessPolicy::mayEditJobOrderEarmarks),
         new Gate(
             "canSeeJobOrderAsRequester",
-            AccessGateService::canSeeJobOrderAsRequester,
+            ScopeHubJobOrderGates::canSeeJobOrderAsRequester,
             JobOrderAccessPolicy::canSeeJobOrderAsRequester),
         new Gate(
             "canEditJobOrderAsRequester",
-            AccessGateService::canEditJobOrderAsRequester,
+            ScopeHubJobOrderGates::canEditJobOrderAsRequester,
             JobOrderAccessPolicy::canEditJobOrderAsRequester));
   }
 
   /** One caller's freshly wired scope hub and policy over the scenario mocks. */
   private static final class Fixture {
 
-    private final AccessGateService scopeHub;
+    private final ScopeHubJobOrderGates scopeHub;
 
     private final JobOrderAccessPolicy policy;
 
@@ -291,22 +294,23 @@ class JobOrderAccessPolicyDifferentialTest {
               cascade,
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
-      scopeHub =
+      AccessGateService accessGateService =
           new AccessGateService(
               resolver,
               authHelper,
               mock(MissionRepository.class),
-              repository,
-              handovers,
-              itemHandovers,
               mock(InventoryItemRepository.class),
               mock(ShipRepository.class),
               memberships);
       OwnerScopeService ownerScopeService =
           new OwnerScopeService(
               resolver,
-              scopeHub,
-              new OrgUnitStampingService(resolver, scopeHub, authHelper, memberships, orgUnits));
+              accessGateService,
+              new OrgUnitStampingService(
+                  resolver, accessGateService, authHelper, memberships, orgUnits));
+      scopeHub =
+          new ScopeHubJobOrderGates(
+              accessGateService, authHelper, resolver, repository, handovers, itemHandovers);
       policy =
           new JobOrderAccessPolicy(
               ownerScopeService, authHelper, repository, handovers, itemHandovers);
@@ -330,6 +334,86 @@ class JobOrderAccessPolicyDifferentialTest {
       Squadron squadron = new Squadron();
       squadron.setId(id);
       return squadron;
+    }
+  }
+
+  /**
+   * The job-order gates as the scope hub decided them, restated on the kernel's primitives.
+   *
+   * @param accessGateService the scope hub, for its org-unit gates
+   * @param authHelper the caller's roles
+   * @param resolver the request scope, for the queue capability and the caller's memberships
+   * @param orders the job orders
+   * @param handovers the material handovers
+   * @param itemHandovers the item handovers
+   */
+  private record ScopeHubJobOrderGates(
+      AccessGateService accessGateService,
+      AuthHelperService authHelper,
+      RequestScopeResolver resolver,
+      JobOrderRepository orders,
+      JobOrderHandoverRepository handovers,
+      JobOrderItemHandoverRepository itemHandovers) {
+
+    boolean canSeeJobOrder(UUID id) {
+      return orders.findById(id).map(o -> row(o, false)).orElse(false);
+    }
+
+    boolean canEditJobOrder(UUID id) {
+      return orders.findById(id).map(o -> row(o, true)).orElse(false);
+    }
+
+    boolean mayEditJobOrder(UUID id) {
+      return authHelper.isLogisticianOrAbove() && canEditJobOrder(id);
+    }
+
+    boolean canSeeJobOrderBlueprintOwners(UUID id) {
+      return responsibleVisible(id);
+    }
+
+    boolean canSeeJobOrderInventoryOwners(UUID id) {
+      return responsibleVisible(id);
+    }
+
+    boolean canSeeJobOrderAsRequester(UUID id) {
+      return orders.findById(id).map(this::requester).orElse(false);
+    }
+
+    boolean canEditJobOrderAsRequester(UUID id) {
+      return orders
+          .findById(id)
+          .map(
+              o ->
+                  requester(o)
+                      && !(handovers.existsByJobOrderId(o.getId())
+                          || itemHandovers.existsByJobOrderId(o.getId())))
+          .orElse(false);
+    }
+
+    private boolean row(JobOrder order, boolean edit) {
+      if (!resolver.canViewJobOrders()) {
+        return false;
+      }
+      var responsible = order.getResponsibleOrgUnit();
+      if (responsible == null || responsible.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
+        return true;
+      }
+      return edit
+          ? accessGateService.canEditSquadron(responsible.getId())
+          : accessGateService.canSeeSquadron(responsible.getId());
+    }
+
+    private boolean responsibleVisible(UUID id) {
+      return orders
+          .findById(id)
+          .map(JobOrder::getResponsibleOrgUnit)
+          .map(responsible -> accessGateService.canSeeSquadron(responsible.getId()))
+          .orElse(false);
+    }
+
+    private boolean requester(JobOrder order) {
+      var requesting = order.getRequestingOrgUnit();
+      return requesting != null && resolver.currentUserIsMemberOfOrgUnit(requesting.getId());
     }
   }
 }
