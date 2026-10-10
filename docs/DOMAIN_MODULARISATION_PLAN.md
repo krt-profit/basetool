@@ -1190,6 +1190,12 @@ as each pair is decoupled.
     earmark setter, an earmark mutator), proven able to fail on a planted writer; the GDPR
     orchestrator is its one listed exception until Phase 4. The job-order and refinery unit tests
     run against a real `InventoryStockCommands` over their mocks, so they still verify the writes.
+  - **5d-1 — done 2026-10-10.** Write family 7: `inventory.api.StockSoldForTarget`
+    (`soldForMissions`, an `@ObserverSpi`, `MANDATORY`), implemented by
+    `mission.internal.MissionSaleIncome`, books the income of stock sold out of a mission's earmark;
+    the Lager still computes each share and skips a non-positive one, the mission still books
+    nothing for a mission the seller does not take part in and saves after the loop. Baseline
+    **79 → 75**.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
