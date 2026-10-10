@@ -88,7 +88,8 @@ Like `SK_LEAD` and the area/OL ranks, a squadron rank also carries the flat back
 `hasRole('LOGISTICIAN')` gates keep working. Every such gate is **owner-scoped**, so the effective
 reach stays own-squadron: the two previously-unscoped per-user refinery endpoints (`GET` / `POST
 /api/v1/refinery-orders/users/{userId}`) were scoped with `@ownerScopeService.canViewUserRefineryOrders`
-/ `canManageUserRefineryOrders` (PR #808 security review) so the flat role can no longer act org-wide
+/ `canManageUserRefineryOrders` (PR #808 security review; since 2026-10-10 the refinery module's
+`@refineryAccessPolicy`, same verdicts) so the flat role can no longer act org-wide
 there.
 
 The `canView/canManageUserRefineryOrders` gate is a **coarse user-level pre-check**: it passes when

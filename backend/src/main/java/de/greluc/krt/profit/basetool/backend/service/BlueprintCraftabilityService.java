@@ -72,7 +72,7 @@ public class BlueprintCraftabilityService {
   private final PersonalBlueprintService personalBlueprintService;
   private final BlueprintProductService blueprintProductService;
   private final InventoryItemService inventoryItemService;
-  private final RefineryOrderService refineryOrderService;
+  private final CraftabilityYieldSource craftabilityYieldSource;
   private final BlueprintRepository blueprintRepository;
   private final GameItemRepository gameItemRepository;
   private final MaterialRepository materialRepository;
@@ -106,7 +106,10 @@ public class BlueprintCraftabilityService {
     if (includeRefinery) {
       List<OwnedStockSlice> merged =
           new ArrayList<>(inventoryItemService.getOwnedStockSlices(userId));
-      merged.addAll(refineryOrderService.getOwnedOpenRefineryYieldSlices(userId));
+      for (CraftabilityYieldSource.YieldSlice slice :
+          craftabilityYieldSource.pendingYieldSlices(userId)) {
+        merged.add(new OwnedStockSlice(slice.materialId(), slice.quality(), slice.totalScu()));
+      }
       withRefinery = slicesPerMaterial(merged);
     }
 

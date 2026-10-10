@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class RefineryLiveSyncTopicAuthorizer implements LiveSyncTopicAuthorizer {
 
-  private final OwnerScopeService ownerScopeService;
+  private final RefineryAccessPolicy refineryAccessPolicy;
 
   /**
    * Decides the refinery-order rooms.
@@ -49,13 +49,13 @@ public class RefineryLiveSyncTopicAuthorizer implements LiveSyncTopicAuthorizer 
   }
 
   /**
-   * Asks {@code ownerScopeService.canSeeRefineryOrder(id)}.
+   * Asks {@code refineryAccessPolicy.canSeeRefineryOrder(id)}.
    *
    * @param topic a parsed refinery-order topic
    * @return {@code true} if the room may be opened for the caller
    */
   @Override
   public boolean mayJoin(@NotNull LiveSyncTopic topic) {
-    return ownerScopeService.canSeeRefineryOrder(topic.requiredResourceId());
+    return refineryAccessPolicy.canSeeRefineryOrder(topic.requiredResourceId());
   }
 }

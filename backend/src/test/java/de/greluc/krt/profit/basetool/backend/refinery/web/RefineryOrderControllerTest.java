@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.refinery.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -39,9 +39,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.List;
@@ -71,7 +71,7 @@ class RefineryOrderControllerTest {
   @Mock private UserService userService;
   @Mock private RefineryOrderMapper mapper;
   @Mock private AuthHelperService authHelperService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private RefineryAccessPolicy refineryAccessPolicy;
   @Mock private Jwt jwt;
 
   @InjectMocks private RefineryOrderController controller;
@@ -220,7 +220,7 @@ class RefineryOrderControllerTest {
 
     @Test
     void inScopeCallerCanCreateForAnotherUser() {
-      when(ownerScopeService.canManageUserRefineryOrders(OTHER_USER_ID)).thenReturn(true);
+      when(refineryAccessPolicy.canManageUserRefineryOrders(OTHER_USER_ID)).thenReturn(true);
 
       RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID);
       RefineryOrder mapped = new RefineryOrder();
@@ -240,7 +240,7 @@ class RefineryOrderControllerTest {
 
     @Test
     void outOfScopeCaller_withBodyOwner_isIgnored_useCallerInstead() {
-      when(ownerScopeService.canManageUserRefineryOrders(OTHER_USER_ID)).thenReturn(false);
+      when(refineryAccessPolicy.canManageUserRefineryOrders(OTHER_USER_ID)).thenReturn(false);
 
       RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID);
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
@@ -350,8 +350,8 @@ class RefineryOrderControllerTest {
     @Test
     void storeMyRefineryOrder_delegatesWithLogisticianFlag() {
       when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-      de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto dto =
-          new de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto(
+      de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto dto =
+          new de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto(
               java.util.List.of());
 
       controller.storeMyRefineryOrder(jwt, ORDER_ID, dto);

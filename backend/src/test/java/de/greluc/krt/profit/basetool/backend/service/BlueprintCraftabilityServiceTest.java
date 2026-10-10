@@ -67,7 +67,7 @@ class BlueprintCraftabilityServiceTest {
   @Mock private PersonalBlueprintService personalBlueprintService;
   @Mock private BlueprintProductService blueprintProductService;
   @Mock private InventoryItemService inventoryItemService;
-  @Mock private RefineryOrderService refineryOrderService;
+  @Mock private CraftabilityYieldSource refineryOrderService;
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private GameItemRepository gameItemRepository;
   @Mock private MaterialRepository materialRepository;
@@ -141,8 +141,8 @@ class BlueprintCraftabilityServiceTest {
     when(inventoryItemService.getOwnedStockSlices(USER_ID))
         .thenReturn(
             List.of(new OwnedStockSlice(MAT_A, 1000, 6.0), new OwnedStockSlice(MAT_B, 600, 50.0)));
-    when(refineryOrderService.getOwnedOpenRefineryYieldSlices(USER_ID))
-        .thenReturn(List.of(new OwnedStockSlice(MAT_A, 900, 8.0)));
+    when(refineryOrderService.pendingYieldSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilityYieldSource.YieldSlice(MAT_A, 900, 8.0)));
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, true));
 
