@@ -1157,6 +1157,20 @@ as each pair is decoupled.
     (`scope -> inventory` is gone). *Correction:* the read and edit scopes coincide over this
     matrix, as for the refinery, so swapping the edit gate's scope for the read scope is not
     caught; the owner escape and the ownerless rule are.
+  - **5b — done 2026-10-10.** `inventory.api.StockCommands` (`lockLots`, `lockLotRows`, `bookIn`,
+    `bookOutRow`, `markStolen`, all `MANDATORY`), implemented by `InventoryStockCommands`, holds
+    the ADR-0229 lot-lock protocol unchanged (key, prefix, ascending order, row-lock order) and the
+    exchange's Lager writes; `ExchangeStockWriteService` and `ExchangeUndoService` go through it
+    (ADR-0229 *Implementation of the amendment*). `InventoryStockCommandsTest` pins the key
+    derivation, the lock order and the book-in's `INVENTORY_ITEM_CREATED`; the four
+    `ExchangeStockWriteConcurrencyIntegrationTest` cases stay green. `TenancyGuardRules` counts a
+    caller of a published `…Commands` interface whose implementation writes tenant data as a
+    writer, as it does for observers; the connected-apps controller is selected through the undo
+    since, and its two installation handlers are listed as no tenant write. *Correction:* an
+    incremental compile after this change crashed Error Prone (`invalid end position` in
+    `UnnecessaryParentheses`/`ThreadJoinLoop` on a record of `ExchangeStockWriteService`); a full
+    recompile passes, so it is a stale end-position table of the incremental build, not a code
+    fault.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
