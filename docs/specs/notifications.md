@@ -107,6 +107,12 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `HANGAR_CHANGED_BY_ADMIN` | `HANGAR_CHANGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (the member); coded `changeCode` | REQ-HANGAR-008 |
 | `BLUEPRINT_CHANGED_BY_ADMIN` | `BLUEPRINT_CHANGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (the member); coded `changeCode` | REQ-HANGAR-008 |
 | `BLUEPRINT_PURGED_BY_ADMIN` | `BLUEPRINT_PURGED_BY_ADMIN` | V280 | `EVENT_RECIPIENT` (each member who lost blueprints); one per member per purge | REQ-HANGAR-008 |
+| `EXCHANGE_CLIENT_SUSPENDED` | `EXCHANGE_CLIENT_SUSPENDED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); replaces a suspension and an activation | REQ-XCH-040 |
+| `EXCHANGE_CLIENT_ACTIVATED` | `EXCHANGE_CLIENT_ACTIVATED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); replaces a suspension and an activation | REQ-XCH-040 |
+| `EXCHANGE_CLIENT_UPDATE_REQUIRED` | `EXCHANGE_CLIENT_UPDATE_REQUIRED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); the new minimum version | REQ-XCH-040 |
+| `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); the removed scopes | REQ-XCH-040 |
+| `EXCHANGE_SWITCHED_OFF` | `EXCHANGE_SWITCHED_OFF` | V281 | `EXCHANGE_CLIENT_HOLDERS` (any client, `contextAllExchangeClients`) | REQ-XCH-041 |
+| `EXCHANGE_SWITCHED_ON` | none (no rule) | — | supersedes `EXCHANGE_SWITCHED_OFF` | REQ-XCH-041 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)

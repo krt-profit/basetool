@@ -431,5 +431,41 @@ public enum NotificationEventType {
    * An admin cleared the removable blueprints of every member (REQ-HANGAR-008). The default rule
    * notifies each member who lost some.
    */
-  BLUEPRINT_PURGED_BY_ADMIN
+  BLUEPRINT_PURGED_BY_ADMIN,
+
+  /**
+   * An admin suspended a connected application in the registry (REQ-XCH-040). The default rule
+   * notifies the holders of its installations.
+   */
+  EXCHANGE_CLIENT_SUSPENDED,
+
+  /**
+   * An admin activated a suspended connected application again (REQ-XCH-040). The default rule
+   * notifies its holders; the event clears the suspension notices.
+   */
+  EXCHANGE_CLIENT_ACTIVATED,
+
+  /**
+   * An admin raised the minimum client version of a connected application (REQ-XCH-040). The
+   * default rule notifies its holders.
+   */
+  EXCHANGE_CLIENT_UPDATE_REQUIRED,
+
+  /**
+   * An admin removed capabilities from a connected application (REQ-XCH-040). The default rule
+   * notifies its holders.
+   */
+  EXCHANGE_CLIENT_CAPABILITY_REMOVED,
+
+  /**
+   * An admin switched the whole exchange off (REQ-XCH-041). The default rule notifies the holders
+   * of any installation.
+   */
+  EXCHANGE_SWITCHED_OFF,
+
+  /**
+   * An admin switched the exchange on again (REQ-XCH-041). Creates no notification; clears the
+   * switched-off notices.
+   */
+  EXCHANGE_SWITCHED_ON
 }

@@ -296,6 +296,17 @@ class NotificationPageControllerTest {
   }
 
   @Test
+  void targetOf_connectedApplicationNoticesLinkTheConnectedAppsPage() {
+    UUID id = UUID.randomUUID();
+    assertEquals(
+        "/connected-apps",
+        NotificationPageController.targetOf("EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT", id));
+    assertEquals(
+        "/connected-apps",
+        NotificationPageController.targetOf("EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCH", id));
+  }
+
+  @Test
   void targetOf_jobOrderLinksTheOrder() {
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000000099");
 

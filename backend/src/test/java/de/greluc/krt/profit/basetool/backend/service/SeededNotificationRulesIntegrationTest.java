@@ -244,6 +244,31 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.EVENT_RECIPIENT),
         rule(
+            NotificationEventType.EXCHANGE_CLIENT_SUSPENDED,
+            NotificationType.EXCHANGE_CLIENT_SUSPENDED,
+            true,
+            SelectorKind.EXCHANGE_CLIENT_HOLDERS),
+        rule(
+            NotificationEventType.EXCHANGE_CLIENT_ACTIVATED,
+            NotificationType.EXCHANGE_CLIENT_ACTIVATED,
+            true,
+            SelectorKind.EXCHANGE_CLIENT_HOLDERS),
+        rule(
+            NotificationEventType.EXCHANGE_CLIENT_UPDATE_REQUIRED,
+            NotificationType.EXCHANGE_CLIENT_UPDATE_REQUIRED,
+            true,
+            SelectorKind.EXCHANGE_CLIENT_HOLDERS),
+        rule(
+            NotificationEventType.EXCHANGE_CLIENT_CAPABILITY_REMOVED,
+            NotificationType.EXCHANGE_CLIENT_CAPABILITY_REMOVED,
+            true,
+            SelectorKind.EXCHANGE_CLIENT_HOLDERS),
+        rule(
+            NotificationEventType.EXCHANGE_SWITCHED_OFF,
+            NotificationType.EXCHANGE_SWITCHED_OFF,
+            true,
+            SelectorKind.EXCHANGE_CLIENT_HOLDERS),
+        rule(
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,
