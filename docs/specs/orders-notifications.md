@@ -58,5 +58,5 @@ the member withdrew themselves (`withdrawClaim`) tells nobody.
 **Enforced by:** `JobOrderNoticeIntegrationTest`, `JobOrderServicePriorityAndStatusTest`
 (`finishedNotice…`), `MaterialClaimServiceTest` (`withdraw…tells…`), `SeededNotificationRulesIntegrationTest`,
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `joborder/api/events/JobOrderNotices`,
-`service/JobOrderService`, `service/JobOrderAssigneeService`, `service/MaterialClaimService`,
+`joborder/internal/JobOrderService`, `joborder/internal/JobOrderAssigneeService`, `joborder/internal/MaterialClaimService`,
 `V274__seed_job_order_notification_rules.sql` · **Issues:** #2414

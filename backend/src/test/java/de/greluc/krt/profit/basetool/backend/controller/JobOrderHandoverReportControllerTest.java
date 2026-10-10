@@ -24,10 +24,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverReportService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
+import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.LocalDateTime;
 import java.util.List;

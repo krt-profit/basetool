@@ -31,6 +31,7 @@ configurations { compileOnly { extendsFrom(configurations.annotationProcessor.ge
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
+  implementation("org.springframework.boot:spring-boot-http-client")
   implementation("tools.jackson.dataformat:jackson-dataformat-cbor")
   implementation("org.springframework.boot:spring-boot-starter-data-jpa") {
     exclude(group = "org.springframework", module = "spring-aspects")
@@ -122,7 +123,13 @@ val nullAwayPackages =
       "refinery",
       "scope",
     )
-    .joinToString(",") { "de.greluc.krt.profit.basetool.backend.$it.api" }
+    .map { "de.greluc.krt.profit.basetool.backend.$it.api" }
+    .plus(
+      listOf("joborder", "materialexchange", "refinery").map {
+        "de.greluc.krt.profit.basetool.backend.$it"
+      }
+    )
+    .joinToString(",")
 
 tasks.named<JavaCompile>("compileJava") {
   options.errorprone {
@@ -188,6 +195,17 @@ tasks.named<Test>("test") {
       rootProject.file(
         "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ObservationPrivacyFilter.java"
       ),
+      rootProject.file(
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/KeycloakTrustSupport.java"
+      ),
+      rootProject.file(
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/assembly/ManagementPortSecurityConfig.java"
+      ),
+      rootProject.file(
+        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ManagementPortSecurityConfig.java"
+      ),
+      rootProject.file("ingest/src/main/resources/application.yml"),
+      rootProject.file("frontend/src/main/resources/application.yml"),
     )
     .withPropertyName("crossModuleParitySources")
     .withPathSensitivity(PathSensitivity.RELATIVE)

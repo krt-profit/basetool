@@ -36,7 +36,7 @@ public enum LiveSyncAuthorization {
   /** {@code operationAccessPolicy.canSeeOperation(id)} — the gate of the Operation detail read. */
   OPERATION,
 
-  /** {@code ownerScopeService.canSeeJobOrder(id)} — the gate of the Auftrag detail read. */
+  /** {@code jobOrderAccessPolicy.canSeeJobOrder(id)} — the gate of the Auftrag detail read. */
   JOB_ORDER,
 
   /**

@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.controller.MissionFinanceEntryContr
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandController;
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandMembershipController;
 import de.greluc.krt.profit.basetool.backend.controller.UserController;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -102,6 +103,7 @@ class TenancyGuardTest {
           AccessGateService.class,
           OperationAccessPolicy.class,
           RefineryAccessPolicy.class,
+          JobOrderAccessPolicy.class,
           MissionSecurityService.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class);
