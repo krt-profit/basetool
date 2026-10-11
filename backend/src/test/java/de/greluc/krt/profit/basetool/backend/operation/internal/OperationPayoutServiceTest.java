@@ -632,7 +632,7 @@ class OperationPayoutServiceTest {
       RefineryOrder order = new RefineryOrder();
       order.setId(UUID.randomUUID());
       order.setOwner(alice);
-      order.setMission(m);
+      order.setMissionId(m.getId());
       order.setOreSales(2000d);
       order.setExpenses(500d);
       order.setOtherExpenses(200d);
@@ -734,7 +734,7 @@ class OperationPayoutServiceTest {
       RefineryOrder order = new RefineryOrder();
       order.setId(UUID.randomUUID());
       order.setOwner(alice);
-      order.setMission(m);
+      order.setMissionId(m.getId());
       order.setOreSales(1000d);
       order.setExpenses(null);
       order.setOtherExpenses(null);

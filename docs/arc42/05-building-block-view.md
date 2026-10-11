@@ -147,9 +147,9 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | `personalinventory` | `PersonalInventoryErasure` (the GDPR deletion's bulk delete) | `PersonalInventoryItem`, `PersonalInventoryLocationType`, the repository, `PersonalInventoryItemService`, the mapper and records, `UexLocationDto` | `PersonalInventoryController`, `AdminPersonalInventoryController`, `UexLocationController` |
 | `bank` | `BankConflictException`, `BankProblemCode`, `BankAmounts`, `BankBookingRequestType`, the booking-request events | the Kartellbank (entities, ledger, booking requests, audit trail, PDF formats, ledger task) and the org-unit side behind `OrgUnitBankAccessService` | the eight Kartellbank controllers, `OrgUnitBankController` |
 | `materialexchange` | the two after-commit events | the offer and request entities, repositories and DTOs, the board services, `MaterialExchangeOfferRatchet` (the Lager's `StockChangeObserver`) and `MaterialExchangeStockOfferLookup` (its `StockOfferLookup`) | `MaterialExchangeController`, `MaterialRequestController` |
-| `refinery` | `RefineryDraftBuilder` (the exchange's refinery draft), the screenshot-extract and draft records, the problem codes | `RefineryOrderService` (also the blueprint craftability's `CraftabilityYieldSource`), `RefineryImportService`, `RefineryAccessPolicy`, the live-sync authorizer, the import settings and the store requests | `RefineryOrderController`, `RefineryImportController` |
+| `refinery` | `RefineryDraftBuilder` (the exchange's refinery draft), the screenshot-extract and draft records, the problem codes | `RefineryOrderService` (also the blueprint craftability's `CraftabilityYieldSource`), `RefineryImportService`, `RefineryAccessPolicy`, the live-sync authorizer, the import settings and the store requests, `RefineryMissionFinance` (the mission's `MissionFinanceContributor`), `MissionRefineryOrderRelease` (the mission's `MissionDeletionObserver`) and `RefineryOrderMissionCache` (the per-transaction memo behind `mapper.RefineryOrderMissionLookup`) | `RefineryOrderController`, `RefineryImportController` |
 | `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the live-sync authorizer, the integrity task, its own repositories and the request DTOs | `JobOrderController`, `MaterialClaimController`, `MaterialCollectionController`, `JobOrderItemStockController` |
-| `mission` | `MissionCommands` (`detachFromOperation`), the read SPI `OperationSummaryProvider` (the operation module implements it) | the mission, structure, participant, timeline and finance services, `MissionSecurityService`, `MissionAccessPolicy`, the viewer-access service, the section counters, the peer redaction, the hangar's `ShipDeletionObserver` and the catalogue's `JobTypeDesignationObserver` implementations, `MissionOperationSummaryCache` (the per-transaction memo behind `mapper.MissionOperationLookup`), the live-sync authorizer, its own repositories and the request DTOs | `MissionController`, `MissionFinanceEntryController` |
+| `mission` | `MissionCommands` (`detachFromOperation`), the read SPI `OperationSummaryProvider` (the operation module implements it), `MissionFinanceContributor` and `MissionDeletionObserver` (the refinery module implements them), `MissionReferences` (the refinery reads a mission's reference through it) | the mission, structure, participant, timeline and finance services, `MissionSecurityService`, `MissionAccessPolicy`, the viewer-access service, the section counters, the peer redaction, the hangar's `ShipDeletionObserver` and the catalogue's `JobTypeDesignationObserver` implementations, `MissionOperationSummaryCache` (the per-transaction memo behind `mapper.MissionOperationLookup`), the live-sync authorizer, its own repositories and the request DTOs | `MissionController`, `MissionFinanceEntryController` |
 | `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
 | `promotion` | — (publishes nothing; the GDPR deletion calls `service.MemberEvaluationErasure`, which the module implements) | the entities, repositories, services, mappers and records, `PromotionAccessPolicy` | the six promotion controllers |
 
@@ -183,9 +183,22 @@ reads them and a `mapper -> mission` edge would close a package cycle with the m
 services (as `MissionViewerAccess` does). So a page of missions costs one statement
 for its operations whatever its size. `Operation.missions` is a read-only join-column view. The
 `Operation` entity, its repository and mapper and the DTOs the mission module embeds still stay in
-the layer packages, because `MissionDto` and `MissionListDto` embed `OperationDto` and the refinery
-association still ties `Mission` to `RefineryOrder` (plan §7.5), so the operation's JPQL scope
-fragment still sits in `ScopeSpecifications`.
+the layer packages, because `MissionDto`, `MissionListDto`, `MissionMapper` and `MissionPeerRedactor`
+embed or read `OperationDto` (plan §7.5, P4-4), so the operation's JPQL scope fragment still sits in
+`ScopeSpecifications`.
+
+The refinery side follows the same pattern since P3-8b. `RefineryOrder` references its mission by id
+(`RefineryOrder.missionId`, the same `mission_id` column and foreign key) and `Mission` no longer
+holds its orders. What an order shows of its mission comes from the mission module's read API
+`mission.api.MissionReferences` through the per-transaction memo `RefineryOrderMissionCache`, so a
+page of orders costs one statement for its missions whatever its size. What the mission's finance
+totals take from the orders comes through the mission-owned `MissionFinanceContributor`, which
+`RefineryMissionFinance` implements, and deleting a mission releases its orders through the mission's
+`MissionDeletionObserver` (`MANDATORY`). The operation's finance views keep reading the orders
+through the refinery's repository and mapper, since the operation ranks above the refinery;
+`MissionFinanceSummaryDto` lives in `operation.internal` for that reason. The refinery's entities,
+repository, mapper and DTOs stay in the layer packages until `LocationService` and
+`UserDeletionService` stop importing `RefineryOrderRepository` (plan §7.5, P4-3).
 
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:

@@ -1055,7 +1055,8 @@ as each pair is decoupled.
   `UserDeletionService` use them, so a move closes a package cycle. They move with P3-8 (the
   `mission -> refinery` association and the `MissionFinanceContributor` SPI), where
   `RefineryOrder.mission` becomes an id. So the policy does not own the refinery's JPQL scope
-  fragment yet either. (2) No command API: no other module writes a refinery order. The
+  fragment yet either. *(P3-8b, 2026-10-11: the association and the SPI are done; two imports still
+  block the move, now tracked as P4-3.)* (2) No command API: no other module writes a refinery order. The
   store still creates Lager rows itself (write family 2 of the evidence appendix); that write
   becomes a call of the Lager's `StockCommands` with P3-5.
 - `joborder` — **done 2026-10-10.**
@@ -1399,7 +1400,84 @@ as each pair is decoupled.
   (`mapper`) would close `model.dto ⇄ operation` and `mapper ⇄ operation` cycles, and
   `BusinessMetricsCollector` (`task`) reads the repository. They move once (2) is done. The refinery
   association (`Mission.refineryOrders`, `RefineryOrder.mission`, the `MissionFinanceContributor` SPI)
-  is the other half of P3-8 and still blocks the refinery's entities, repository and mapper.
+  is the other half of P3-8 and still blocks the refinery's entities, repository and mapper (done
+  as P3-8b below).
+
+- `refinery` ⇄ `mission` — **P3-8b done 2026-10-11, without the move.** `RefineryOrder.mission` becomes
+  `RefineryOrder.missionId` (the same `mission_id` column and foreign key, no migration) and the
+  inverse `Mission.refineryOrders` is dropped, the fifth and sixth of the eight business
+  associations of §5.6 turned into ids; only `Operation.missions`, kept as a read-only view, and
+  `MissionUnit.ship` remain.
+  1. *Characterise*: `RefineryOrderReadNoNPlusOneTest` (added before the change, green on the
+     unchanged code) pins that the my-orders page and an order's detail issue a bounded number of
+     statements whether a member's orders belong to 3 or to 25 missions, and that every row carries
+     its mission's reference. `RefineryMissionLinkContractTest` (also green on the unchanged code,
+     since it reads and writes the link through SQL) pins the mission's finance totals with a linked
+     order, the three operation finance views embedding the order with its mission reference, and
+     that deleting a mission keeps the order, clears its link and moves its row version.
+  2. *Read API* (§5.3): what an order shows of its mission comes from `mission.api.MissionReferences`
+     (the refinery sits above the mission, so this is a plain call down, not an inversion),
+     implemented by `mission.internal.MissionReferenceReader` with one projection query
+     (`MissionRepository.findReferencesByIdIn`), through the per-transaction memo
+     `refinery.internal.RefineryOrderMissionCache` (`mapper.RefineryOrderMissionLookup`): its first
+     miss loads every mission the orders of the persistence context are linked to, so a page costs
+     one statement whatever its size. `RefineryOrderMapper` builds the embedded
+     `MissionReferenceDto` through the lookup. The create and update paths keep their checks
+     (`MissionRepository.findById`, the participant requirement) and write the id. The my-orders page
+     reads 3 statements for 3 and for 25 orders (it was 2: the mission was a join fetch of the page
+     query); proven able to fail: without the context scan it is 27 against 5.
+  3. *Finance SPI* (§5.3): `mission.api.MissionFinanceContributor` (`contributionTo`) returns the
+     profit, the expense sum and the expense-line count other modules add to a mission's totals
+     (`MissionFinanceContribution`); `refinery.internal.RefineryMissionFinance` implements it over
+     the same `findByMissionId` read and the same arithmetic as before (a zero profit adds nothing, an
+     order is an expense line when its expenses are positive). `MissionFinanceEntryService` asks it
+     instead of reading `RefineryOrderRepository`; `RefineryMissionFinanceTest` carries the
+     arithmetic cases that were in `MissionFinanceEntryServiceTest`.
+  4. *Observer* (§5.3): deleting a mission calls `mission.api.MissionDeletionObserver`
+     (`@ObserverSpi`, `MANDATORY`), implemented by `refinery.internal.MissionRefineryOrderRelease`,
+     which loads the linked orders and clears their link as entities, so each order's row version and
+     update timestamp move exactly as when `Mission.refineryOrders` was walked. No audit row, as before.
+  5. *Types*: `MissionFinanceSummaryDto` moves from `model.dto` to `operation.internal`. Only
+     `OperationFinanceService` builds it and `OperationFinanceDto` and `OperationController` carry it,
+     and the name rule `^Mission` had filed it under the mission module although it embeds
+     `RefineryOrderDto`. The OpenAPI schema keeps its name.
+  Baseline **43 → 38** (`Mission -> RefineryOrder`, `MissionService -> RefineryOrder`,
+  `MissionFinanceEntryService -> RefineryOrder` and `-> RefineryOrderRepository`,
+  `MissionFinanceSummaryDto -> RefineryOrderDto`); the architecture test's to-one association floor
+  drops 147 → 146.
+  **Corrections:** (1) The finance SPI serves the mission module only. The operation module
+  (rank 11) sits above the refinery (rank 10), so `OperationFinanceService`,
+  `OperationPayoutCalculator` and `OperationPayoutService` keep reading orders through the repository
+  and mapper without an inversion; they go behind a `refinery.api` view in the same step as the
+  entity move (P4-3), because they are three of its consumers. (2) The twelve refinery types of the
+  layer packages do not move, and the probe (a class-dependency graph over the compiled `main`
+  classes with the twelve reassigned to `refinery`) names exactly two imports that close a package
+  cycle: `LocationService -> RefineryOrderRepository` (`existsByLocationId`, the in-use check of a
+  location delete) and `UserDeletionService -> RefineryOrderRepository` (`updateOwner`, the GDPR
+  reassignment), both `service -> refinery` against the refinery's own `refinery -> service`
+  (`OwnerScopeService`, `UserService`, `ScopePredicate`). With those two edges taken out the probe
+  finds no cycle for `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`,
+  `RefineryOrderRepository` with `RefineryMissionProfitAggregate`, `RefineryOrderMapper`,
+  `RefineryOrderDto`, `RefineryGoodDto`, `RefineryOrderListDto`, the create and update requests and
+  the lookup. Inverting the first is the catalogue's job and the second a GDPR participant
+  (`UserReassignmentParticipant`, §7.6), so neither belongs here. `BusinessMetricsCollector` (`app`)
+  and the operation's three finance classes need no inversion for the cycle, and
+  `REFINERY_ORDER_SCOPE_TRIPLE` is package-private to `repository` (it becomes the policy's
+  fragment with the move), so `RefineryAccessPolicy` does not own the JPQL scope fragment yet.
+  (3) The `Operation` entity, `OperationStatus`, `OperationRepository`, `OperationMapper` and the
+  operation DTOs still do not move. The refinery half is gone, but the probe still finds the three
+  edges of P3-8a plus one: `MissionDto` and `MissionListDto` (`model`) and `MissionMapper`
+  (`mapper`, with its generated implementation) embed `OperationDto` and `OperationMapper`, and
+  `MissionPeerRedactor` (`mission.internal`) reads `OperationDto`. They move once the mission DTOs
+  stop embedding the operation's DTO (§5.2). Tracked as P4-4 (§7.6). (4) The six cases of a request's
+  mission reference keep their behaviour. On create, an absent reference and one without an id
+  leave the order unlinked, and one with an id links it after the participant check. On update, an
+  absent reference unlinks, one without an id leaves the link as it was, and one with an id
+  re-links. Because `RefineryOrder` holds only the id now, the update mapping marks the transient
+  order with the `@Transient` flag `missionReferenceWithoutId` and the service reads it.
+  `RefineryOrderMissionReferenceContractTest` pins all six, green on `afbeb41ef` first. (5) The list read costs one statement more than
+  before, as the mission left the page query's join fetch for the read API above; the count
+  stays flat in the page size, which is what REQ-DATA-003 asks.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1431,6 +1509,19 @@ repository then move together; NullAway already covers the `inventory` tree.
 P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
 The five published interfaces already cover every foreign caller, so the move touches no
 other module; the §8.1 idioms go with it.
+**P4-3 — move the refinery's entities into `refinery.internal` / `refinery.api`** (carried from
+P3-8b, §7.5). It waits for the two imports the probe names: `LocationService`'s in-use check of
+`RefineryOrderRepository` (a catalogue-owned usage SPI, as for the hangar's ships) and
+`UserDeletionService`'s owner reassignment (the GDPR `UserReassignmentParticipant`). The move then
+takes `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`, the repository with
+`RefineryMissionProfitAggregate`, `RefineryOrderMapper`, the three order DTOs and the two request
+DTOs together, publishes the order DTOs and a finance view of the orders through `refinery.api` for
+`OperationFinanceService`, `OperationPayoutCalculator` and `OperationPayoutService`, and lets
+`RefineryAccessPolicy` own `REFINERY_ORDER_SCOPE_TRIPLE`.
+**P4-4 — move the operation's entity, repository, mapper and DTOs into `operation.internal` /
+`operation.api`** (carried from P3-8b, §7.5), once the mission DTOs stop embedding `OperationDto`
+(the REST DTO separation of §5.2): `MissionDto`, `MissionListDto`, `MissionMapper` and
+`MissionPeerRedactor` are the four classes that close the cycle today.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 

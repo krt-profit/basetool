@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
@@ -36,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderCreateReques
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderUpdateRequest;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -46,17 +46,21 @@ import org.mapstruct.factory.Mappers;
 
 class RefineryOrderMapperTest {
 
+  private final Map<UUID, MissionReferenceDto> missions = new HashMap<>();
+
   private RefineryOrderMapper mapper;
 
   @BeforeEach
   void setUp() {
+    missions.clear();
     mapper =
         new RefineryOrderMapperImpl(
             Mappers.getMapper(UserMapper.class),
             new MaterialMapperImpl(new MaterialCategoryMapperImpl()),
             Mappers.getMapper(SquadronMapper.class),
             new LocationMapperImpl(),
-            new RefiningMethodMapperImpl());
+            new RefiningMethodMapperImpl(),
+            missions::get);
   }
 
   @Test
@@ -190,20 +194,7 @@ class RefineryOrderMapperTest {
   }
 
   @Test
-  void missionReferenceToMission_shouldOnlyCopyId() {
-    UUID missionId = UUID.randomUUID();
-    MissionReferenceDto dto =
-        new MissionReferenceDto(missionId, "Op Sunfire", "PLANNED", Instant.now());
-
-    Mission mission = mapper.missionReferenceToMission(dto);
-
-    assertNotNull(mission);
-    assertEquals(missionId, mission.getId());
-    assertNull(mission.getName());
-  }
-
-  @Test
-  void toEntity_linksTheMissionAsAnIdOnlyStub() {
+  void toEntity_linksTheMissionByItsId() {
     UUID missionId = UUID.randomUUID();
     RefineryOrderCreateRequest request =
         new RefineryOrderCreateRequest(
@@ -220,8 +211,102 @@ class RefineryOrderMapperTest {
 
     RefineryOrder entity = mapper.toEntity(request);
 
-    assertEquals(missionId, entity.getMission().getId());
-    assertNull(entity.getMission().getName());
+    assertEquals(missionId, entity.getMissionId());
+  }
+
+  @Test
+  void toEntity_fromAnUpdateRequest_linksTheMissionByItsId() {
+    UUID missionId = UUID.randomUUID();
+    RefineryOrderUpdateRequest request =
+        new RefineryOrderUpdateRequest(
+            null,
+            new MissionReferenceDto(missionId, "Op Sunfire", "PLANNED", Instant.now()),
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            null,
+            java.util.List.of(),
+            null);
+
+    assertEquals(missionId, mapper.toEntity(request).getMissionId());
+  }
+
+  @Test
+  void toEntity_withoutAMissionReference_leavesTheOrderUnlinked() {
+    RefineryOrderUpdateRequest request =
+        new RefineryOrderUpdateRequest(
+            null, null, null, 30L, 1.0, 2.0, 3.0, null, null, java.util.List.of(), null);
+
+    assertNull(mapper.toEntity(request).getMissionId());
+  }
+
+  @Test
+  void toEntity_fromAnUpdateRequest_marksAMissionReferenceWithoutAnId() {
+    RefineryOrderUpdateRequest withoutId =
+        new RefineryOrderUpdateRequest(
+            null,
+            new MissionReferenceDto(null, "Op Sunfire", null, null),
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            null,
+            java.util.List.of(),
+            null);
+    RefineryOrderUpdateRequest absent =
+        new RefineryOrderUpdateRequest(
+            null, null, null, 30L, 1.0, 2.0, 3.0, null, null, java.util.List.of(), null);
+    RefineryOrderUpdateRequest withId =
+        new RefineryOrderUpdateRequest(
+            null,
+            new MissionReferenceDto(UUID.randomUUID(), null, null, null),
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            null,
+            java.util.List.of(),
+            null);
+
+    org.junit.jupiter.api.Assertions.assertTrue(
+        mapper.toEntity(withoutId).isMissionReferenceWithoutId());
+    org.junit.jupiter.api.Assertions.assertFalse(
+        mapper.toEntity(absent).isMissionReferenceWithoutId());
+    org.junit.jupiter.api.Assertions.assertFalse(
+        mapper.toEntity(withId).isMissionReferenceWithoutId());
+  }
+
+  @Test
+  void toDto_resolvesTheLinkedMissionThroughTheLookup() {
+    UUID missionId = UUID.randomUUID();
+    Instant planned = Instant.parse("2026-10-01T18:00:00Z");
+    missions.put(missionId, new MissionReferenceDto(missionId, "Op Sunfire", "ACTIVE", planned));
+    RefineryOrder order = new RefineryOrder();
+    order.setId(UUID.randomUUID());
+    order.setMissionId(missionId);
+
+    assertEquals(
+        new MissionReferenceDto(missionId, "Op Sunfire", "ACTIVE", planned),
+        mapper.toDto(order).mission());
+    assertEquals(
+        new MissionReferenceDto(missionId, "Op Sunfire", "ACTIVE", planned),
+        mapper.toListDto(order).mission());
+  }
+
+  @Test
+  void toDto_withoutALinkedMission_hasNoMissionReference() {
+    RefineryOrder order = new RefineryOrder();
+    order.setId(UUID.randomUUID());
+
+    assertNull(mapper.toDto(order).mission());
+    assertNull(mapper.toListDto(order).mission());
   }
 
   @Test
@@ -253,11 +338,6 @@ class RefineryOrderMapperTest {
     assertNull(entity.getOwningOrgUnit());
     assertEquals(RefineryOrderStatus.IN_PROGRESS, entity.getStatus());
     assertEquals(7L, entity.getVersion());
-  }
-
-  @Test
-  void missionReferenceToMission_nullDto_shouldReturnNull() {
-    assertNull(mapper.missionReferenceToMission(null));
   }
 
   @Test

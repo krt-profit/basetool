@@ -33,17 +33,17 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceContribution;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceContributor;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.repository.FinanceEntryAggregate;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -70,7 +70,7 @@ class MissionFinanceEntryServiceTest {
   @Mock private MissionFinanceEntryRepository financeEntryRepository;
   @Mock private MissionParticipantRepository participantRepository;
   @Mock private MissionRepository missionRepository;
-  @Mock private RefineryOrderRepository refineryOrderRepository;
+  @Mock private MissionFinanceContributor financeContributor;
   @Mock private MissionMapper missionMapper;
 
   @Mock private AuditService auditService;
@@ -104,7 +104,7 @@ class MissionFinanceEntryServiceTest {
   class CalculateTotalSumTests {
 
     @Test
-    void noEntriesAndNoRefineryOrders_returnsZero() {
+    void noEntriesAndNoContribution_returnsZero() {
       stubEmpty();
 
       assertEquals(BigDecimal.ZERO, service.calculateTotalSum(MISSION_ID));
@@ -113,7 +113,7 @@ class MissionFinanceEntryServiceTest {
     @Test
     void singleIncomeEntry_isAdded() {
       stubEntries(entry(FinanceType.INCOME, new BigDecimal("250.00")));
-      stubRefineryOrders();
+      stubNoContribution();
 
       assertEquals(new BigDecimal("250.00"), service.calculateTotalSum(MISSION_ID));
     }
@@ -121,7 +121,7 @@ class MissionFinanceEntryServiceTest {
     @Test
     void singleExpenseEntry_isSubtracted() {
       stubEntries(entry(FinanceType.EXPENSE, new BigDecimal("100.00")));
-      stubRefineryOrders();
+      stubNoContribution();
 
       assertEquals(new BigDecimal("-100.00"), service.calculateTotalSum(MISSION_ID));
     }
@@ -132,80 +132,41 @@ class MissionFinanceEntryServiceTest {
           entry(FinanceType.INCOME, new BigDecimal("500.00")),
           entry(FinanceType.EXPENSE, new BigDecimal("150.00")),
           entry(FinanceType.INCOME, new BigDecimal("75.00")));
-      stubRefineryOrders();
+      stubNoContribution();
 
       assertEquals(new BigDecimal("425.00"), service.calculateTotalSum(MISSION_ID));
     }
 
     @Test
-    void refineryOrderProfit_isAddedToTotal() {
+    void contributedProfit_isAddedToTotal() {
       stubEntries();
-      stubRefineryOrders(refineryOrder(1000.0, 200.0, 50.0));
+      stubContribution(new BigDecimal("750.0"), BigDecimal.ZERO, 0L);
 
       assertEquals(new BigDecimal("750.0"), service.calculateTotalSum(MISSION_ID));
     }
 
     @Test
-    void refineryOrderLoss_isAddedAsNegative() {
+    void contributedLoss_isAddedAsNegative() {
       stubEntries();
-      stubRefineryOrders(refineryOrder(100.0, 300.0, 50.0));
+      stubContribution(new BigDecimal("-250.0"), BigDecimal.ZERO, 0L);
 
       assertEquals(new BigDecimal("-250.0"), service.calculateTotalSum(MISSION_ID));
     }
 
     @Test
-    void refineryOrderWithZeroProfit_isSkipped() {
+    void zeroContributedProfit_keepsTheEntriesScale() {
       stubEntries(entry(FinanceType.INCOME, new BigDecimal("100.0000")));
-      stubRefineryOrders(refineryOrder(500.0, 300.0, 200.0));
+      stubNoContribution();
 
       BigDecimal result = service.calculateTotalSum(MISSION_ID);
       assertEquals(new BigDecimal("100.0000"), result);
-      assertEquals(
-          4,
-          result.scale(),
-          "scale of 4 from the entry must survive — proves the zero-profit "
-              + "refinery order skipped the .add() path");
+      assertEquals(4, result.scale());
     }
 
     @Test
-    void nullOreSales_isTreatedAsZero() {
-      stubEntries();
-      stubRefineryOrders(refineryOrder(null, 100.0, null));
-
-      assertEquals(new BigDecimal("-100.0"), service.calculateTotalSum(MISSION_ID));
-    }
-
-    @Test
-    void nullExpenses_isTreatedAsZero() {
-      stubEntries();
-      stubRefineryOrders(refineryOrder(500.0, null, 50.0));
-
-      assertEquals(new BigDecimal("450.0"), service.calculateTotalSum(MISSION_ID));
-    }
-
-    @Test
-    void nullOtherExpenses_isTreatedAsZero() {
-      stubEntries();
-      stubRefineryOrders(refineryOrder(500.0, 100.0, null));
-
-      assertEquals(new BigDecimal("400.0"), service.calculateTotalSum(MISSION_ID));
-    }
-
-    @Test
-    void allRefineryFieldsNull_skippedAsZeroProfit() {
-      stubEntries(entry(FinanceType.INCOME, new BigDecimal("10")));
-      stubRefineryOrders(refineryOrder(null, null, null));
-
-      assertEquals(new BigDecimal("10"), service.calculateTotalSum(MISSION_ID));
-    }
-
-    @Test
-    void multipleRefineryOrders_profitsAccumulate() {
+    void contributedProfit_addsToTheEntriesNetResult() {
       stubEntries(entry(FinanceType.EXPENSE, new BigDecimal("100")));
-      stubRefineryOrders(
-          refineryOrder(1000.0, 100.0, 0.0),
-          refineryOrder(0.0, 50.0, 0.0),
-          refineryOrder(200.0, 100.0, 50.0));
+      stubContribution(new BigDecimal("900.0"), BigDecimal.ZERO, 0L);
 
       assertEquals(new BigDecimal("800.0"), service.calculateTotalSum(MISSION_ID));
     }
@@ -216,7 +177,7 @@ class MissionFinanceEntryServiceTest {
           entry(FinanceType.INCOME, new BigDecimal("500.00")),
           entry(FinanceType.INCOME, new BigDecimal("75.00")),
           entry(FinanceType.EXPENSE, new BigDecimal("150.00")));
-      stubRefineryOrders();
+      stubNoContribution();
 
       MissionFinanceTotalsDto totals = service.calculateTotals(MISSION_ID);
 
@@ -228,17 +189,19 @@ class MissionFinanceEntryServiceTest {
     }
 
     @Test
-    void calculateTotals_foldsRefineryExpensesIntoBucket_butProfitIntoTotal() {
-      stubEntries(entry(FinanceType.INCOME, new BigDecimal("1000")));
-      stubRefineryOrders(refineryOrder(500.0, 300.0, 50.0));
+    void calculateTotals_foldsContributedExpensesIntoBucket_butProfitIntoTotal() {
+      stubEntries(
+          entry(FinanceType.INCOME, new BigDecimal("1000")),
+          entry(FinanceType.EXPENSE, new BigDecimal("20")));
+      stubContribution(new BigDecimal("150.0"), new BigDecimal("300.0"), 2L);
 
       MissionFinanceTotalsDto totals = service.calculateTotals(MISSION_ID);
 
-      assertEquals(new BigDecimal("1150.0"), totals.total());
+      assertEquals(new BigDecimal("1130.0"), totals.total());
       assertEquals(new BigDecimal("1000"), totals.incomeSum());
       assertEquals(1L, totals.incomeCount());
-      assertEquals(new BigDecimal("300.0"), totals.expenseSum());
-      assertEquals(1L, totals.expenseCount());
+      assertEquals(new BigDecimal("320.0"), totals.expenseSum());
+      assertEquals(3L, totals.expenseCount());
     }
 
     @Test
@@ -256,7 +219,7 @@ class MissionFinanceEntryServiceTest {
 
     private void stubEmpty() {
       stubEntries();
-      stubRefineryOrders();
+      stubNoContribution();
     }
 
     private void stubEntries(MissionFinanceEntry... entries) {
@@ -277,16 +240,14 @@ class MissionFinanceEntryServiceTest {
           .thenReturn(new FinanceEntryAggregate(incomeSum, incomeCount, expenseSum, expenseCount));
     }
 
-    private void stubRefineryOrders(RefineryOrder... orders) {
-      when(refineryOrderRepository.findByMissionId(MISSION_ID)).thenReturn(List.of(orders));
+    private void stubNoContribution() {
+      when(financeContributor.contributionTo(MISSION_ID))
+          .thenReturn(MissionFinanceContribution.NONE);
     }
 
-    private RefineryOrder refineryOrder(Double oreSales, Double expenses, Double otherExpenses) {
-      RefineryOrder o = new RefineryOrder();
-      o.setOreSales(oreSales);
-      o.setExpenses(expenses);
-      o.setOtherExpenses(otherExpenses);
-      return o;
+    private void stubContribution(BigDecimal profit, BigDecimal expenseSum, long expenseCount) {
+      when(financeContributor.contributionTo(MISSION_ID))
+          .thenReturn(new MissionFinanceContribution(profit, expenseSum, expenseCount));
     }
   }
 

@@ -27,18 +27,17 @@ import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceContribution;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceContributor;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.repository.FinanceEntryAggregate;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,7 +63,7 @@ public class MissionFinanceEntryService {
   private final MissionFinanceEntryRepository financeEntryRepository;
   private final MissionParticipantRepository participantRepository;
   private final MissionRepository missionRepository;
-  private final RefineryOrderRepository refineryOrderRepository;
+  private final MissionFinanceContributor financeContributor;
   private final MissionMapper missionMapper;
   private final AuditRecorder auditRecorder;
 
@@ -80,11 +79,12 @@ public class MissionFinanceEntryService {
   }
 
   /**
-   * Computes a mission's finance totals with one SQL aggregate plus the linked refinery orders'
-   * profit and expenses; {@code null} refinery figures count as 0.
+   * Computes a mission's finance totals with one SQL aggregate plus the {@link
+   * MissionFinanceContributor}'s share (the linked refinery orders' profit and expenses).
    *
    * @param missionId mission id
-   * @return the finance totals (sums coalesced to zero; expense bucket folds in refinery expenses)
+   * @return the finance totals (sums coalesced to zero; the expense bucket folds in the
+   *     contributor's expenses)
    */
   @NotNull
   public MissionFinanceTotalsDto calculateTotals(UUID missionId) {
@@ -94,31 +94,15 @@ public class MissionFinanceEntryService {
     BigDecimal financeExpenseSum = agg.expenseSum() != null ? agg.expenseSum() : BigDecimal.ZERO;
     long financeExpenseCount = agg.expenseCount() != null ? agg.expenseCount() : 0L;
 
-    BigDecimal refineryProfit = BigDecimal.ZERO;
-    BigDecimal refineryExpenseSum = BigDecimal.ZERO;
-    long refineryExpenseCount = 0L;
-    List<RefineryOrder> refineryOrders = refineryOrderRepository.findByMissionId(missionId);
-    for (RefineryOrder order : refineryOrders) {
-      double sales = order.getOreSales() != null ? order.getOreSales() : 0d;
-      double costs = order.getExpenses() != null ? order.getExpenses() : 0d;
-      double otherCosts = order.getOtherExpenses() != null ? order.getOtherExpenses() : 0d;
-      double profit = sales - costs - otherCosts;
-      if (profit != 0d) {
-        refineryProfit = refineryProfit.add(BigDecimal.valueOf(profit));
-      }
-      if (costs > 0d) {
-        refineryExpenseSum = refineryExpenseSum.add(BigDecimal.valueOf(costs));
-        refineryExpenseCount++;
-      }
-    }
+    MissionFinanceContribution linked = financeContributor.contributionTo(missionId);
 
-    BigDecimal total = incomeSum.subtract(financeExpenseSum).add(refineryProfit);
+    BigDecimal total = incomeSum.subtract(financeExpenseSum).add(linked.profit());
     return new MissionFinanceTotalsDto(
         total,
         incomeSum,
         incomeCount,
-        financeExpenseSum.add(refineryExpenseSum),
-        financeExpenseCount + refineryExpenseCount);
+        financeExpenseSum.add(linked.expenseSum()),
+        financeExpenseCount + linked.expenseCount());
   }
 
   /**

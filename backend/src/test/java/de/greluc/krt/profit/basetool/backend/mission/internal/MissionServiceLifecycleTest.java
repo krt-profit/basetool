@@ -34,6 +34,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
@@ -41,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
 import de.greluc.krt.profit.basetool.backend.model.MissionOwnership;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
@@ -91,6 +91,7 @@ class MissionServiceLifecycleTest {
   @Mock private MissionFrequencyRepository missionFrequencyRepository;
   @Mock private MissionOwnershipRepository missionOwnershipRepository;
   @Mock private OperationSummaryProvider operationSummaryProvider;
+  @Mock private MissionDeletionObserver missionDeletionObserver;
   @Mock private UserService userService;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private AuthHelperService authHelperService;
@@ -112,6 +113,7 @@ class MissionServiceLifecycleTest {
             missionFrequencyRepository,
             missionOwnershipRepository,
             operationSummaryProvider,
+            missionDeletionObserver,
             userService,
             ownerScopeService,
             authHelperService,
@@ -155,19 +157,16 @@ class MissionServiceLifecycleTest {
     }
 
     @Test
-    void detachesRefineryOrders_beforeDelete() {
+    void asksTheDeletionObserver_beforeDelete() {
       Mission mission = newMission();
-      RefineryOrder o1 = new RefineryOrder();
-      o1.setMission(mission);
-      mission.getRefineryOrders().add(o1);
-
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
 
       service.deleteMission(MISSION_ID);
 
-      assertNull(o1.getMission());
-      assertTrue(mission.getRefineryOrders().isEmpty());
-      verify(missionRepository).delete(mission);
+      org.mockito.InOrder inOrder =
+          org.mockito.Mockito.inOrder(missionDeletionObserver, missionRepository);
+      inOrder.verify(missionDeletionObserver).beforeMissionDelete(MISSION_ID);
+      inOrder.verify(missionRepository).delete(mission);
     }
 
     @Test
@@ -188,11 +187,8 @@ class MissionServiceLifecycleTest {
     }
 
     @Test
-    void detachesRefineryOrdersAndSubMissions_inOneCall() {
+    void asksTheDeletionObserverAndDetachesSubMissions_inOneCall() {
       Mission mission = newMission();
-      RefineryOrder order = new RefineryOrder();
-      order.setMission(mission);
-      mission.getRefineryOrders().add(order);
 
       Mission sub = new Mission();
       sub.setParent(mission);
@@ -202,7 +198,7 @@ class MissionServiceLifecycleTest {
 
       service.deleteMission(MISSION_ID);
 
-      assertNull(order.getMission());
+      verify(missionDeletionObserver).beforeMissionDelete(MISSION_ID);
       assertNull(sub.getParent());
       verify(missionRepository).delete(mission);
     }
@@ -506,7 +502,6 @@ class MissionServiceLifecycleTest {
     m.setVersion(1L);
     m.setParticipants(new HashSet<>());
     m.setAssignedUnits(new HashSet<>());
-    m.setRefineryOrders(new HashSet<>());
     m.setSubMissions(new HashSet<>());
     m.setFrequencies(new HashSet<>());
     m.setManagers(new HashSet<>());

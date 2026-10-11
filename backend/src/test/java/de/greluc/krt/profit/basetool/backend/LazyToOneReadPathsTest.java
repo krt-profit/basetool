@@ -392,7 +392,7 @@ class LazyToOneReadPathsTest {
             RefineryOrder order = new RefineryOrder();
             order.setOwner(admin);
             order.setLocation(location);
-            order.setMission(mission);
+            order.setMissionId(mission.getId());
             order.setDurationMinutes(60L);
             order.setExpenses(100.0);
             RefineryGood good = new RefineryGood();

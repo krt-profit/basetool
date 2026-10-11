@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -99,6 +100,7 @@ public class MissionService implements MissionCommands {
   private final MissionFrequencyRepository missionFrequencyRepository;
   private final MissionOwnershipRepository missionOwnershipRepository;
   private final OperationSummaryProvider operationSummaryProvider;
+  private final MissionDeletionObserver missionDeletionObserver;
   private final UserService userService;
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
@@ -541,10 +543,7 @@ public class MissionService implements MissionCommands {
     final String deletedMissionName = mission.getName();
     final Set<UUID> deletedParticipants = MissionNotificationPublisher.participantUserIds(mission);
 
-    if (mission.getRefineryOrders() != null) {
-      mission.getRefineryOrders().forEach(order -> order.setMission(null));
-      mission.getRefineryOrders().clear();
-    }
+    missionDeletionObserver.beforeMissionDelete(missionId);
 
     if (mission.getSubMissions() != null) {
       mission.getSubMissions().forEach(sub -> sub.setParent(null));

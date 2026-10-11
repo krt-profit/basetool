@@ -73,6 +73,11 @@ a per-transaction memo whose first miss loads everything the persistence context
 statement. The mission's operation is the case: `Mission.operationId` is resolved by
 `MissionOperationSummaryCache` over `mission.api.OperationSummaryProvider`, so a page of missions
 costs one statement for its operations whatever its size (`MissionOperationReadNoNPlusOneTest`).
+The refinery order's mission is the second case: `RefineryOrder.missionId` is resolved by
+`RefineryOrderMissionCache` over `mission.api.MissionReferences`, so a page of orders costs one
+statement for its missions whatever its size (`RefineryOrderReadNoNPlusOneTest`). Deleting a mission
+clears the link through `mission.api.MissionDeletionObserver`, which updates each order as an
+entity, so its row version moves.
 
 **Writes are batched** (BE-PERF-04, 2026-09-22). `hibernate.jdbc.batch_size=50`, the driver's
 `reWriteBatchedInserts` (a Hikari data-source property, so no URL change is needed), and
