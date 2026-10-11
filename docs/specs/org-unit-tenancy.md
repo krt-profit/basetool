@@ -60,7 +60,7 @@ non-admins see the union of their memberships unless they pin one.
 > implementation detail; the scope semantics documented here are unchanged.
 >
 > [!important] `InventoryItem`'s mission link is **not** a cross-staffel escape
-> `GET /api/v1/inventory/mission/{missionId}` was unscoped, and because a mission is visible
+> `GET /api/v1/inventory/allocations?missionId=` (formerly `…/inventory/mission/{missionId}`) was unscoped, and because a mission is visible
 > cross-staffel whenever `is_internal = false`, that made the mission link a third, undocumented
 > widener: any member could read a foreign Staffel's mission stock — owner callsign, location,
 > material, quantity, quality, linked job-order ids — by enumerating public missions. It now carries

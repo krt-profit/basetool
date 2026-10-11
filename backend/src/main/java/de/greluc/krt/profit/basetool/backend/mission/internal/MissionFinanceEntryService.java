@@ -173,19 +173,37 @@ public class MissionFinanceEntryService {
   }
 
   /**
+   * Loads an entry of the given mission.
+   *
+   * @param missionId the mission from the request path
+   * @param entryId the entry from the request path
+   * @return the entry
+   * @throws NotFoundException when the entry does not exist or belongs to another mission
+   */
+  private MissionFinanceEntry requireEntryOf(UUID missionId, UUID entryId) {
+    MissionFinanceEntry entry =
+        Entities.require(financeEntryRepository.findById(entryId), "Finance entry not found");
+    if (entry.getMission() == null || !entry.getMission().getId().equals(missionId)) {
+      throw new NotFoundException("Finance entry not found");
+    }
+    return entry;
+  }
+
+  /**
    * Updates an existing finance entry after an explicit version check.
    *
+   * @param missionId the mission the entry must belong to
    * @param entryId finance entry id
    * @param dto update payload (carries the expected version)
    * @return the persisted entry
-   * @throws NotFoundException when the entry does not exist
+   * @throws NotFoundException when the entry does not exist or belongs to another mission
    * @throws BusinessConflictException when the supplied version no longer matches
    */
   @Transactional
   @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
-  public MissionFinanceEntryDto updateEntry(UUID entryId, MissionFinanceEntryUpdateDto dto) {
-    MissionFinanceEntry entry =
-        Entities.require(financeEntryRepository.findById(entryId), "Finance entry not found");
+  public MissionFinanceEntryDto updateEntry(
+      UUID missionId, UUID entryId, MissionFinanceEntryUpdateDto dto) {
+    MissionFinanceEntry entry = requireEntryOf(missionId, entryId);
 
     if (!entry.getVersion().equals(dto.version())) {
       throw new BusinessConflictException(
@@ -209,14 +227,14 @@ public class MissionFinanceEntryService {
   /**
    * Deletes a finance entry.
    *
+   * @param missionId the mission the entry must belong to
    * @param entryId finance entry id
-   * @throws NotFoundException when the entry does not exist
+   * @throws NotFoundException when the entry does not exist or belongs to another mission
    */
   @Transactional
   @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
-  public void deleteEntry(UUID entryId) {
-    MissionFinanceEntry entry =
-        Entities.require(financeEntryRepository.findById(entryId), "Finance entry not found");
+  public void deleteEntry(UUID missionId, UUID entryId) {
+    MissionFinanceEntry entry = requireEntryOf(missionId, entryId);
 
     UUID auditMissionId = entry.getMission() != null ? entry.getMission().getId() : null;
     String auditMissionName = entry.getMission() != null ? entry.getMission().getName() : null;

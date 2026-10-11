@@ -74,8 +74,7 @@ class HomeControllerMvcTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
-        .thenReturn(null);
+    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef())).thenReturn(null);
   }
 
   @Test
@@ -113,7 +112,7 @@ class HomeControllerMvcTest {
             6L,
             false,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     String html =
@@ -151,7 +150,7 @@ class HomeControllerMvcTest {
   void home_ShouldShowSignedUpChip_OnlyOnMissionsTheViewerIsSignedUpFor() throws Exception {
     MissionListDto joined = upcoming("Erzkonvoi-Eskorte", true);
     MissionListDto open = upcoming("Grenzpatrouille Sol", false);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(joined, open), 0, 50, 2, 1, List.of()));
 
     String html =
@@ -176,7 +175,7 @@ class HomeControllerMvcTest {
   /** The „Angemeldet" chip is translated: an English viewer reads „Signed up". */
   @Test
   void home_ShouldTranslateSignedUpChip_ForAnEnglishViewer() throws Exception {
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(List.of(upcoming("Salvage-Lauf", true)), 0, 50, 1, 1, List.of()));
 
@@ -296,7 +295,7 @@ class HomeControllerMvcTest {
             0L,
             false,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -330,7 +329,7 @@ class HomeControllerMvcTest {
             0L,
             false,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -390,7 +389,7 @@ class HomeControllerMvcTest {
             0L,
             false,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(ownMission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -449,7 +448,7 @@ class HomeControllerMvcTest {
             0L,
             false,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(foreignMission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -511,7 +510,7 @@ class HomeControllerMvcTest {
             0L,
             false,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
+    when(backendApiClient.get(startsWith("/api/v1/missions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(skMission), 0, 50, 1, 1, List.of()));
 
     mockMvc

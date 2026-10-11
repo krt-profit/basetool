@@ -63,7 +63,7 @@ class DashboardBackendClientTest {
 
     backend.expect(
         "GET",
-        "/api/v1/missions/search?start="
+        "/api/v1/missions?start="
             + start
             + "&end="
             + end

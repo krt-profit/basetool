@@ -104,3 +104,7 @@ compatible.
   Rejected: `OPTIMISTIC_FORCE_INCREMENT` is the JPA-native tool for "force a version check even when
   only excluded fields changed"; a manual `@Modifying` bump on the `@Version` column fights
   Hibernate's own version management on the managed entity's flush.
+
+## Amendment — 2026-10-10: the full-replace path is gone
+
+The REST API cut (wave 3) deleted `PUT /missions/{id}`, `MissionService.updateMission` and `MissionRepository.findByIdForFullReplace`. No write overwrites a whole mission any more, so the row `@Version` guard described under *Legacy full-replace keeps the row `@Version`* no longer protects a path; the section counters are the only mission locks.

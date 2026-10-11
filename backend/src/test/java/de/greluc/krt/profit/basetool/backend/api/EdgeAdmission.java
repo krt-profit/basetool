@@ -157,7 +157,6 @@ final class EdgeAdmission {
           refused("GET", "/api/v1/exchange/me/blueprints"),
           refused("GET", "/api/v1/connected-apps"),
           refused("GET", "/api/v1/definitely-not-allow-listed"),
-          refused("GET", "/api/v1/missions"),
           refused("POST", "/api/v1/missions"),
           refused("POST", "/api/v1/users"),
           refused("GET", "/api/v1/operations"),

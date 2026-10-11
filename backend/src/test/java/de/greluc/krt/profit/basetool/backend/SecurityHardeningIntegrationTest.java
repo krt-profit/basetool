@@ -143,7 +143,7 @@ public class SecurityHardeningIntegrationTest {
   @Test
   void testRefineryOrders_Anonymous_Unauthorized() throws Exception {
     mockMvc
-        .perform(get("/api/v1/refinery-orders/mission/" + UUID.randomUUID()))
+        .perform(get("/api/v1/refinery-orders").param("missionId", UUID.randomUUID().toString()))
         .andExpect(status().isUnauthorized());
   }
 }

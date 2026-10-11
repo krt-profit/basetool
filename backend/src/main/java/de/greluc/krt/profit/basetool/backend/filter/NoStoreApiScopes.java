@@ -60,7 +60,6 @@ public final class NoStoreApiScopes {
           "/api/v1/catalog/admin/**",
           "/api/v1/connected-apps/**",
           "/api/v1/exchange/**",
-          "/api/v1/finance-entries/**",
           "/api/v1/hangar/**",
           "/api/v1/inventory/**",
           "/api/v1/live-sync/**",

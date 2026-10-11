@@ -111,7 +111,7 @@ class MissionUnitDecimalPlaceTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units/slim")
+            post("/api/v1/missions/" + mission.getId() + "/units")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -138,7 +138,7 @@ class MissionUnitDecimalPlaceTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units/slim")
+            post("/api/v1/missions/" + mission.getId() + "/units")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))

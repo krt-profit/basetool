@@ -119,7 +119,7 @@ class MissionUnitManagementTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/slim")
+            put("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -145,7 +145,7 @@ class MissionUnitManagementTest {
   void testDeleteUnit_Officer_Allowed() throws Exception {
     mockMvc
         .perform(
-            delete("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/slim")
+            delete("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))

@@ -14,6 +14,8 @@
 
 - **REST-API, Welle 2 (Identität und Organisationseinheiten).** Mitgliedsbezogene Endpunkte wandern aus `/users` und `/me` zu ihrem Fachbereich (`/org-units/me/…`, `/blueprints/me/sharing`, `/missions/me/payout-preference`, `/announcements/{id}/read`, `/bank/members/search`); die Hierarchie liegt unter `/org-units`, die Leitungsansicht unter `/org-chart/leadership`, das Ändern und Löschen einer Kommandogruppe unter ihrer Staffel. Die alten App-Pfade antworten `410 APP_UPDATE_REQUIRED`; die App erscheint mit dem gemeinsamen API-Schnitt neu (versionCode 19).
 
+- **REST-API, Welle 3 (Einsätze).** Die Einsatz-Endpunkte verlieren das Suffix `/slim`; die Einsatzsuche ist jetzt `GET /api/v1/missions?q=…` (der Parameter `query` heißt `q`). Finanzbuchungen werden unter `/api/v1/missions/{missionId}/finance-entries` angelegt, geändert und gelöscht, Lagerbestand und Raffinerieaufträge eines Einsatzes über `?missionId=` gelesen. `PUT /missions/{id}` und `POST /missions/{id}/participants/add` entfallen. Die alten App-Pfade antworten `410 APP_UPDATE_REQUIRED`; die App erscheint mit dem gemeinsamen API-Schnitt neu (versionCode 19).
+
 ## [v1.14.0](https://github.com/krt-profit/basetool/releases/tag/v1.14.0) - 2026-10-10
 
 ### Added

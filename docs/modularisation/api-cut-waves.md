@@ -223,6 +223,8 @@ their owners' tables is a separate migration without a path change and may follo
 | `/missions/{id}/participants/add` | `deleted` | 1 | 0 | 0 |
 | `/refinery-orders/mission/{missionId}` | `/refinery-orders` | 1 | 0 | 0 |
 
+**Status (2026-10-10):** done on branch `claude/api-cut-w3`, stacked on wave 2. The dead code of the two deleted endpoints went with them: `MissionService.updateMission`, `UpdateMissionRequest`, `MissionRepository.findByIdForFullReplace` and the tests that only exercised them (`ConcurrencyTest`; the mass-assignment and architecture rules lost the update record). The create gate now reads `#missionId` from the path, the only gate expression that changed. Floors lowered with the deletions: mission domain 53 to 50, route templates 448 to 444, no-store families 33 to 32.
+
 **Not a pure path move.**
 
 - `GET /missions/search` folds into `GET /missions` (the existing list): typed filters and `q`,

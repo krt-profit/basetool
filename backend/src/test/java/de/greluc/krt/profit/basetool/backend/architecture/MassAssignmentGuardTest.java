@@ -39,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.AddExternalPartici
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwningOrgUnitRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeRequest;
@@ -255,7 +254,6 @@ class MassAssignmentGuardTest {
           Map.entry(OperationUpdateDto.class, Map.of("status", LIFECYCLE)),
           Map.entry(
               CreateMissionRequest.class, Map.of("owningOrgUnitId", STAMP, "status", LIFECYCLE)),
-          Map.entry(UpdateMissionRequest.class, Map.of("status", LIFECYCLE)),
           Map.entry(PatchMissionCoreRequest.class, Map.of("status", LIFECYCLE)),
           Map.entry(
               UpdateMissionOwningOrgUnitRequest.class,

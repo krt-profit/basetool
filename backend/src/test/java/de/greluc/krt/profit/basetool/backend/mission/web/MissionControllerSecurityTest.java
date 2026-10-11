@@ -81,11 +81,7 @@ class MissionControllerSecurityTest {
 
     mockMvc
         .perform(
-            put(
-                    "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
-                    missionId,
-                    unitId,
-                    crewId)
+            put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"jobTypeIds\": [\"" + UUID.randomUUID() + "\"]}")
                 .with(
@@ -107,11 +103,7 @@ class MissionControllerSecurityTest {
 
     mockMvc
         .perform(
-            put(
-                    "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
-                    missionId,
-                    unitId,
-                    crewId)
+            put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"jobTypeIds\": [\"" + UUID.randomUUID() + "\"]}")
                 .with(
@@ -134,11 +126,7 @@ class MissionControllerSecurityTest {
 
     mockMvc
         .perform(
-            put(
-                    "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
-                    missionId,
-                    unitId,
-                    crewId)
+            put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"jobTypeIds\": [\"" + UUID.randomUUID() + "\"]}")
                 .with(jwt().authorities(Collections.emptyList())))
@@ -185,7 +173,7 @@ class MissionControllerSecurityTest {
     mockMvc
         .perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                    "/api/v1/missions/{id}/managers/{userId}/slim", missionId, userId)
+                    "/api/v1/missions/{id}/managers/{userId}", missionId, userId)
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"))))
         .andExpect(status().isOk());
   }
@@ -200,7 +188,7 @@ class MissionControllerSecurityTest {
     mockMvc
         .perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                    "/api/v1/missions/{id}/managers/{userId}/slim", missionId, userId)
+                    "/api/v1/missions/{id}/managers/{userId}", missionId, userId)
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }

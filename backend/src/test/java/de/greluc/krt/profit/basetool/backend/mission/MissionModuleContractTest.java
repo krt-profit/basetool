@@ -103,7 +103,7 @@ class MissionModuleContractTest {
 
     mockMvc
         .perform(
-            post(MISSIONS + "/" + id + "/steps/slim")
+            post(MISSIONS + "/" + id + "/steps")
                 .with(as(insider, MEMBER))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"title\":\"Sammeln\",\"stepsVersion\":" + section(id, "steps") + "}"))
@@ -164,7 +164,7 @@ class MissionModuleContractTest {
         .andExpect(status().isForbidden());
     mockMvc
         .perform(
-            post(mission + "/steps/slim")
+            post(mission + "/steps")
                 .with(manager)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"title\":\"fremd\",\"stepsVersion\":" + section(id, "steps") + "}"))

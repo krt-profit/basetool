@@ -109,7 +109,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/units/slim", missionId)
+            post("/api/v1/missions/{id}/units", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Alpha\",\"isHighValueUnit\":false}")
                 .with(jwt().authorities(officer())))
@@ -130,7 +130,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/{id}/units/{unitId}/slim", missionId, unitId)
+            put("/api/v1/missions/{id}/units/{unitId}", missionId, unitId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Alpha\",\"isHighValueUnit\":false}")
                 .with(jwt().authorities(officer())))
@@ -148,7 +148,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            delete("/api/v1/missions/{id}/units/{unitId}/slim", missionId, unitId)
+            delete("/api/v1/missions/{id}/units/{unitId}", missionId, unitId)
                 .with(jwt().authorities(officer())))
         .andExpect(status().isNoContent())
         .andExpect(content().string(""));
@@ -171,7 +171,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/managers/{userId}/slim", missionId, userId)
+            post("/api/v1/missions/{id}/managers/{userId}", missionId, userId)
                 .with(jwt().authorities(officer())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$").isArray())
@@ -188,7 +188,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            delete("/api/v1/missions/{id}/managers/{userId}/slim", missionId, userId)
+            delete("/api/v1/missions/{id}/managers/{userId}", missionId, userId)
                 .with(jwt().authorities(officer())))
         .andExpect(status().isNoContent())
         .andExpect(content().string(""));
@@ -213,7 +213,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/frequencies/slim", missionId)
+            post("/api/v1/missions/{id}/frequencies", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"frequencyTypeId\":\"" + frequencyTypeId + "\",\"value\":27.555}")
                 .with(jwt().authorities(officer())))
@@ -245,7 +245,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/frequencies/custom/slim", missionId)
+            post("/api/v1/missions/{id}/frequencies/custom", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Recon\",\"value\":42.10}")
                 .with(jwt().authorities(officer())))
@@ -266,7 +266,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/{id}/frequencies/custom/{fid}/slim", missionId, frequencyId)
+            put("/api/v1/missions/{id}/frequencies/custom/{fid}", missionId, frequencyId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Recon 2\",\"value\":42.10,\"version\":0}")
                 .with(jwt().authorities(officer())))
@@ -281,7 +281,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/frequencies/custom/slim", missionId)
+            post("/api/v1/missions/{id}/frequencies/custom", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"  \",\"value\":42.10}")
                 .with(jwt().authorities(officer())))
@@ -298,7 +298,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/frequencies/custom/slim", missionId)
+            post("/api/v1/missions/{id}/frequencies/custom", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Recon\",\"value\":1000.00}")
                 .with(jwt().authorities(officer())))
@@ -312,7 +312,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/frequencies/custom/slim", missionId)
+            post("/api/v1/missions/{id}/frequencies/custom", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Recon\",\"value\":42.10}")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
@@ -327,7 +327,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            delete("/api/v1/missions/{id}/units/{unitId}/slim", missionId, unitId)
+            delete("/api/v1/missions/{id}/units/{unitId}", missionId, unitId)
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }
@@ -363,7 +363,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/slim", missionId)
+            post("/api/v1/missions/{id}/participants", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}")
                 .with(
@@ -386,7 +386,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/by-id/slim", missionId)
+            post("/api/v1/missions/{id}/participants/by-id", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"" + memberId + "\"}")
                 .with(jwt().authorities(officer())))
@@ -405,7 +405,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/by-id/slim", missionId)
+            post("/api/v1/missions/{id}/participants/by-id", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"" + callerId + "\"}")
                 .with(
@@ -424,7 +424,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/by-id/slim", missionId)
+            post("/api/v1/missions/{id}/participants/by-id", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"guestName\":\"Somebody\"}")
                 .with(jwt().authorities(officer())))
@@ -444,7 +444,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/slim", missionId)
+            post("/api/v1/missions/{id}/participants", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"" + otherId + "\"}")
                 .with(
@@ -476,7 +476,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/slim", missionId)
+            post("/api/v1/missions/{id}/participants", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"guestName\":\"Anon-Guest\"}")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
@@ -522,7 +522,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/{id}/participants/{pid}/slim", missionId, participantId)
+            put("/api/v1/missions/{id}/participants/{pid}", missionId, participantId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"version\":0,\"guestName\":\"Anon-Guest\",\"comment\":\"edited\"}")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
@@ -540,7 +540,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            delete("/api/v1/missions/{id}/participants/{pid}/slim", missionId, participantId)
+            delete("/api/v1/missions/{id}/participants/{pid}", missionId, participantId)
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isNoContent());
   }
@@ -559,7 +559,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/slim", missionId)
+            post("/api/v1/missions/{id}/participants", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"" + otherId + "\"}")
                 .with(jwt().jwt(j -> j.subject(callerId.toString())).authorities(officer())))
@@ -581,7 +581,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/slim", missionId)
+            post("/api/v1/missions/{id}/participants", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"guestName\":\"alex\"}")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
@@ -607,7 +607,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/slim", missionId)
+            post("/api/v1/missions/{id}/participants", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"guestName\":\"alice\"}")
                 .with(
@@ -645,7 +645,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/slim", missionId)
+            post("/api/v1/missions/{id}/participants", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"guestName\":\"alice\"}")
                 .with(
@@ -671,7 +671,7 @@ class MissionControllerSlimEndpointsTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/{id}/participants/slim", missionId)
+            post("/api/v1/missions/{id}/participants", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}")
                 .with(
@@ -687,26 +687,6 @@ class MissionControllerSlimEndpointsTest {
         callerId,
         userIdCaptor.getValue(),
         "empty form + authenticated caller -> self-enroll with caller's id");
-  }
-
-  @Test
-  void addParticipantPublic_ambiguousName_isConflict() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    User a = new User();
-    a.setId(UUID.randomUUID());
-    a.setUsername("alex");
-    User b = new User();
-    b.setId(UUID.randomUUID());
-    b.setUsername("alex");
-    when(userService.findMatchesByExactName("alex")).thenReturn(java.util.List.of(a, b));
-
-    mockMvc
-        .perform(
-            post("/api/v1/missions/{id}/participants/add", missionId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"guestName\":\"alex\"}")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
-        .andExpect(status().isConflict());
   }
 
   /**
@@ -750,7 +730,7 @@ class MissionControllerSlimEndpointsTest {
     String body =
         mockMvc
             .perform(
-                post("/api/v1/missions/{id}/participants/slim", missionId)
+                post("/api/v1/missions/{id}/participants", missionId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"guestName\":\"Anon-Guest\"}")
                     .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
@@ -785,65 +765,7 @@ class MissionControllerSlimEndpointsTest {
     String body =
         mockMvc
             .perform(
-                post("/api/v1/missions/{id}/participants/slim", missionId)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"guestName\":\"Anon-Guest\"}")
-                    .with(jwt().jwt(j -> j.subject(callerId.toString())).authorities(officer())))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob.callsign"), "participant callsign stays visible on the roster");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("bob@example.invalid"),
-        "authenticated officer must NOT receive the participant's email");
-  }
-
-  @Test
-  void addParticipantPublic_member_redactsOtherParticipantsPii() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    UUID otherUserId = UUID.randomUUID();
-    UUID guestParticipantId = UUID.randomUUID();
-
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(missionWithOtherUserAndGuest(otherUserId, guestParticipantId));
-
-    String body =
-        mockMvc
-            .perform(
-                post("/api/v1/missions/{id}/participants/add", missionId)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"guestName\":\"Anon-Guest\"}")
-                    .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob.callsign"), "the callsign is what a peer identifies people by");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("bob@example.invalid"), "a peer must never receive a participant e-mail");
-  }
-
-  @Test
-  void addParticipantPublic_authenticatedOfficer_stripsParticipantEmail() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    UUID callerId = UUID.randomUUID();
-    UUID otherUserId = UUID.randomUUID();
-    UUID guestParticipantId = UUID.randomUUID();
-
-    when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
-    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
-    when(missionService.addParticipant(any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(missionWithOtherUserAndGuest(otherUserId, guestParticipantId));
-
-    String body =
-        mockMvc
-            .perform(
-                post("/api/v1/missions/{id}/participants/add", missionId)
+                post("/api/v1/missions/{id}/participants", missionId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"guestName\":\"Anon-Guest\"}")
                     .with(jwt().jwt(j -> j.subject(callerId.toString())).authorities(officer())))

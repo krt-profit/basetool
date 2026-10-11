@@ -58,8 +58,7 @@ import org.jetbrains.annotations.UnmodifiableView;
  *
  * <p>Every mutable column is excluded from the row {@code @Version}; each section has its own
  * counter bumped by an atomic conditional {@code UPDATE}, and {@code @DynamicUpdate} limits each
- * flush to dirtied columns. The row version guards only the full-replace {@code
- * MissionService.updateMission}, which force-increments it.
+ * flush to dirtied columns.
  */
 @TenantScoped("owningOrgUnit")
 @Entity

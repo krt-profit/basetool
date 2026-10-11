@@ -120,7 +120,7 @@ class BackendApiClientHappyPathTest {
         "Stanton",
         "Pyro & Nyx");
     client.get(
-        "/api/v1/missions/search?status={status}&status={status}&size={size}",
+        "/api/v1/missions?status={status}&status={status}&size={size}",
         new ParameterizedTypeReference<String>() {},
         "PLANNED",
         "ACTIVE",
@@ -131,7 +131,7 @@ class BackendApiClientHappyPathTest {
             + "?starSystemNames=Stanton&starSystemNames=Pyro%20%26%20Nyx",
         server.takeRequest(1, TimeUnit.SECONDS).getPath());
     assertEquals(
-        "/api/v1/missions/search?status=PLANNED&status=ACTIVE&size=20",
+        "/api/v1/missions?status=PLANNED&status=ACTIVE&size=20",
         server.takeRequest(1, TimeUnit.SECONDS).getPath());
   }
 

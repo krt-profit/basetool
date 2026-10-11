@@ -1206,7 +1206,7 @@ with the token. **Migration:** V177, undone by `V239`. **Security audit:** findi
 
 > **Renumbered 2026-09-22:** this requirement was `REQ-SEC-019` until 2026-09-22; that id also named the Discord-link indicator in member management in [`discord-integration.md`](discord-integration.md), which keeps it.
 
-`MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/finance-entries/{entryId}`) gates on
+`MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/missions/{missionId}/finance-entries/{entryId}`) gates on
 `MissionSecurityService.canEditFinanceEntry`. `ROLE_OFFICER` is a flat, cross-squadron realm
 authority, so — like every other mission write (`canManageMission`, `canManageManagers`,
 `canChangeOwner`, hardened under audit AUTHZ-1) — an officer may edit/delete a finance entry only when
@@ -2051,7 +2051,7 @@ family decides, so a sub-family can differ from its parent.
 | `/api/v1/bank/**`, `/api/v1/org-units/bank/**` | bank ledgers, balances and holder handles |
 | `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
 | `/api/v1/notifications/**` | one member's feed, including the SSE stream, and the recipient rules, whose selector can name an individual member |
-| `/api/v1/finance-entries/**`, `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
+| `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
 | `/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`, `/api/v1/hangar/**`, `/api/v1/refinery-orders/**` | holdings and profit figures |
 | `/api/v1/promotion/**` | evaluations of named members |
 | `/api/v1/roles/**`, `/api/v1/catalog/admin/**`, `/api/v1/blueprints/admin/**` | the administration of roles, of the catalogue (imports, quality tiers, sync reports) and of the default blueprints; the other administration trees sit under `users`, `terms`, `personal-*`, `hangar`, `notifications` and `connected-apps`, which are `no-store` already |
@@ -3146,7 +3146,7 @@ one.
 
 The gate had been bare `isAuthenticated()`, which the *detail* endpoint compensated for by nulling
 the description in `cleanupOutsiderMissionForGuest`. The list and search projections run through no
-redactor, so a `GUEST` token read on `GET /api/v1/missions/search` — an operation in the frozen
+redactor, so a `GUEST` token read on `GET /api/v1/missions` — an operation in the frozen
 external contract, reachable over the public API vhost — returned the planning notes the detail
 endpoint deliberately withheld from the very same caller. Gating at the single source fixes both
 projections instead of bolting a second redactor onto the list path. Anonymous callers were
@@ -3155,7 +3155,7 @@ invisible from the anonymous surface.
 
 **Acceptance**
 
-- [x] ~~A role-less `GUEST` token gets `description == null` from `/api/v1/missions/search` and from
+- [x] ~~A role-less `GUEST` token gets `description == null` from `/api/v1/missions` and from
   the mission detail alike.~~ Such a token is refused before the mapper runs (REQ-SEC-053); the
   gate itself is unchanged and still pinned.
 - [x] A member still receives the description on both.
@@ -3165,7 +3165,7 @@ invisible from the anonymous surface.
 
 ### REQ-SEC-042 — Booking into a mission ledger is a write, and is gated like one
 
-`POST /api/v1/finance-entries` MUST be authorized by `MissionSecurityService#canCreateFinanceEntry`:
+`POST /api/v1/missions/{missionId}/finance-entries` MUST be authorized by `MissionSecurityService#canCreateFinanceEntry`:
 a caller who may manage the mission (ADMIN; an OFFICER / MISSION_MANAGER whose owning-OrgUnit scope
 covers it; the owner or a co-manager) may book for any of its participants, and every other member
 may book **only against their own participant row** on that mission.

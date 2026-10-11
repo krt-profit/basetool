@@ -55,7 +55,7 @@ class ArchitectureFqcnLiteralsTest {
     List<Path> files = architectureTestSources();
     assertThat(files)
         .as("the architecture test sources this meta-test scans (selection floor)")
-        .hasSizeGreaterThanOrEqualTo(59);
+        .hasSizeGreaterThanOrEqualTo(58);
     List<String> unresolved = new ArrayList<>();
     for (Path file : files) {
       unresolvedFqcns(read(file)).forEach(name -> unresolved.add(file.getFileName() + ": " + name));

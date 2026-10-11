@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
-import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -36,7 +35,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -351,20 +349,6 @@ public interface MissionRepository
       AND m.owningOrgUnitVersion = :expected
       """)
   int bumpOwningOrgUnitVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
-
-  /**
-   * Loads a mission with its {@code participants} under {@link
-   * LockModeType#OPTIMISTIC_FORCE_INCREMENT} for the full-replace update ({@code PUT
-   * /missions/{id}}), so two concurrent full overwrites conflict.
-   *
-   * @param id the mission id.
-   * @return the mission with its participants loaded, under a forced version increment, or empty
-   *     when unknown.
-   */
-  @Lock(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
-  @EntityGraph(attributePaths = {"participants"})
-  @Query("SELECT m FROM Mission m WHERE m.id = :id")
-  Optional<Mission> findByIdForFullReplace(@Param("id") UUID id);
 
   /**
    * Returns the id of the member who owns a mission.

@@ -461,10 +461,10 @@ public class InventoryItemController {
    * @param missionId the mission whose linked inventory to list
    * @return the mission's inventory items
    */
-  @GetMapping("/mission/{missionId}")
+  @GetMapping("/allocations")
   @PreAuthorize(INVENTORY_ACCESS)
   @Transactional(readOnly = true)
-  public List<InventoryItemDto> getMissionInventory(@PathVariable @NotNull UUID missionId) {
+  public List<InventoryItemDto> getMissionInventory(@RequestParam @NotNull UUID missionId) {
     return inventoryItemService.getMissionInventory(missionId);
   }
 

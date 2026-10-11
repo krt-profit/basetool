@@ -24,8 +24,8 @@ import java.util.UUID;
 
 /**
  * Request body of the manager-only add-by-id endpoint ({@code POST
- * /api/v1/missions/{id}/participants/by-id/slim}, REQ-MISSION-020): only the registered member to
- * add, which keeps it admissible on the public API vhost.
+ * /api/v1/missions/{id}/participants/by-id}, REQ-MISSION-020): only the registered member to add,
+ * which keeps it admissible on the public API vhost.
  *
  * @param userId the {@code app_user} id of the member to add; required
  */

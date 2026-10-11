@@ -856,7 +856,7 @@ class MissionPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
     when(backendApiClient.get(
-            eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(missionId)))
+            eq("/api/v1/refinery-orders?missionId={id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(List.of(order));
 
     mockMvc
@@ -1029,7 +1029,7 @@ class MissionPageControllerMvcTest {
     UUID participantId = UUID.randomUUID();
     MissionParticipantDto row = participant(participantId, null, 7L);
     when(backendApiClient.put(
-            eq("/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/payout-preference"),
             any(),
             eq(MissionParticipantDto.class),
             eq(missionId),
@@ -1265,7 +1265,7 @@ class MissionPageControllerMvcTest {
     UUID userId = UUID.randomUUID();
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{missionUuid}/managers/{userUuid}/slim"),
+            eq("/api/v1/missions/{missionUuid}/managers/{userUuid}"),
             eq(null),
             eq(String.class),
             eq(missionId),
@@ -1294,7 +1294,7 @@ class MissionPageControllerMvcTest {
     };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/frequencies/slim"),
+            eq("/api/v1/missions/{id}/frequencies"),
             eq(new AddFrequencyRequest(freqTypeId, new BigDecimal("123.45"))),
             eq(MissionFrequencyDto[].class),
             eq(missionId)))
@@ -1317,7 +1317,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID freqTypeId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/frequencies/slim"),
+            eq("/api/v1/missions/{id}/frequencies"),
             any(),
             eq(MissionFrequencyDto[].class),
             eq(missionId)))
@@ -1341,7 +1341,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/{id}/frequencies/{frequencyId}/slim"),
+            eq("/api/v1/missions/{id}/frequencies/{frequencyId}"),
             eq(Void.class),
             eq(missionId),
             eq(freqId)))
@@ -1351,8 +1351,7 @@ class MissionPageControllerMvcTest {
         .perform(delete("/missions/" + missionId + "/frequencies/" + freqId + "/ajax").with(csrf()))
         .andExpect(status().isOk());
     verify(backendApiClient)
-        .delete(
-            "/api/v1/missions/{id}/frequencies/{frequencyId}/slim", Void.class, missionId, freqId);
+        .delete("/api/v1/missions/{id}/frequencies/{frequencyId}", Void.class, missionId, freqId);
   }
 
   @Test
@@ -1365,7 +1364,7 @@ class MissionPageControllerMvcTest {
     };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/frequencies/custom/slim"),
+            eq("/api/v1/missions/{id}/frequencies/custom"),
             eq(new AddCustomFrequencyRequest("Recon", new BigDecimal("42.10"))),
             eq(MissionFrequencyDto[].class),
             eq(missionId)))
@@ -1392,7 +1391,7 @@ class MissionPageControllerMvcTest {
     };
 
     when(backendApiClient.put(
-            eq("/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim"),
+            eq("/api/v1/missions/{id}/frequencies/custom/{frequencyId}"),
             eq(new UpdateCustomFrequencyRequest("Recon 2", new BigDecimal("43.00"), 0L)),
             eq(MissionFrequencyDto[].class),
             eq(missionId),
@@ -1416,7 +1415,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID freqId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim"),
+            eq("/api/v1/missions/{id}/frequencies/custom/{frequencyId}"),
             any(),
             eq(MissionFrequencyDto[].class),
             eq(missionId),
@@ -1445,7 +1444,7 @@ class MissionPageControllerMvcTest {
     };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/units/slim"),
+            eq("/api/v1/missions/{id}/units"),
             eq(new AddUnitRequest("Alpha", null, null, false, null, null, null)),
             eq(MissionUnitDto[].class),
             eq(missionId)))
@@ -1468,7 +1467,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/{id}/units/{unitId}/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}"),
             any(),
             eq(MissionUnitDto.class),
             eq(missionId),
@@ -1493,10 +1492,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/{id}/units/{unitId}/slim"),
-            eq(Void.class),
-            eq(missionId),
-            eq(unitId)))
+            eq("/api/v1/missions/{id}/units/{unitId}"), eq(Void.class), eq(missionId), eq(unitId)))
         .thenReturn(null);
 
     mockMvc
@@ -1511,7 +1507,7 @@ class MissionPageControllerMvcTest {
     MissionParticipantDto[] slimResponse = {participant(UUID.randomUUID(), "Guest-X", 0L)};
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/participants/slim"),
+            eq("/api/v1/missions/{id}/participants"),
             eq(new AddExternalParticipantRequest(null, "Guest-X", null, null, null, null)),
             eq(MissionParticipantDto[].class),
             eq(missionId)))
@@ -1534,7 +1530,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}"),
             any(),
             eq(MissionParticipantDto.class),
             eq(missionId),
@@ -1559,7 +1555,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/{id}/participants/{participantId}/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}"),
             eq(Void.class),
             eq(missionId),
             eq(participantId)))
@@ -1579,7 +1575,7 @@ class MissionPageControllerMvcTest {
     UUID participantId = UUID.randomUUID();
     MissionParticipantDto slimResponse = participant(participantId, null, 2L);
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/participants/{participantId}/check-in/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/check-in"),
             any(),
             eq(MissionParticipantDto.class),
             eq(missionId),
@@ -1600,7 +1596,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/participants/{participantId}/check-out/slim"),
+            eq("/api/v1/missions/{id}/participants/{participantId}/check-out"),
             any(),
             eq(MissionParticipantDto.class),
             eq(missionId),
@@ -1627,7 +1623,7 @@ class MissionPageControllerMvcTest {
     };
 
     when(backendApiClient.post(
-            eq("/api/v1/missions/{id}/units/{unitId}/crew/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/crew"),
             eq(new AddCrewRequest(participantId, List.of())),
             eq(MissionCrewDto[].class),
             eq(missionId),
@@ -1652,7 +1648,7 @@ class MissionPageControllerMvcTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
     when(backendApiClient.put(
-            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}"),
             any(),
             eq(MissionCrewDto.class),
             eq(missionId),
@@ -1679,7 +1675,7 @@ class MissionPageControllerMvcTest {
     UUID unitId = UUID.randomUUID();
     UUID crewId = UUID.randomUUID();
     when(backendApiClient.delete(
-            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim"),
+            eq("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}"),
             eq(Void.class),
             eq(missionId),
             eq(unitId),
@@ -2571,9 +2567,10 @@ class MissionPageControllerMvcTest {
             eq(200)))
         .thenReturn(financesPage);
     when(backendApiClient.get(
-            eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(missionId)))
+            eq("/api/v1/refinery-orders?missionId={id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(Collections.emptyList());
-    when(backendApiClient.get(eq("/api/v1/inventory/mission/{id}"), anyTypeRef(), eq(missionId)))
+    when(backendApiClient.get(
+            eq("/api/v1/inventory/allocations?missionId={id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2973,9 +2970,9 @@ class MissionPageControllerMvcTest {
             eq(missionId),
             eq(200));
     verify(backendApiClient, never())
-        .get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(missionId));
+        .get(eq("/api/v1/refinery-orders?missionId={id}"), anyTypeRef(), eq(missionId));
     verify(backendApiClient, never())
-        .get(eq("/api/v1/inventory/mission/{id}"), anyTypeRef(), eq(missionId));
+        .get(eq("/api/v1/inventory/allocations?missionId={id}"), anyTypeRef(), eq(missionId));
   }
 
   /**
@@ -3051,8 +3048,9 @@ class MissionPageControllerMvcTest {
             eq(missionId),
             eq(200));
     verify(backendApiClient)
-        .get(eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(missionId));
-    verify(backendApiClient).get(eq("/api/v1/inventory/mission/{id}"), anyTypeRef(), eq(missionId));
+        .get(eq("/api/v1/refinery-orders?missionId={id}"), anyTypeRef(), eq(missionId));
+    verify(backendApiClient)
+        .get(eq("/api/v1/inventory/allocations?missionId={id}"), anyTypeRef(), eq(missionId));
   }
 
   /** Verifies that only the stolen row of the mission's stock table carries the stolen chip. */
@@ -3065,7 +3063,8 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
-    when(backendApiClient.get(eq("/api/v1/inventory/mission/{id}"), anyTypeRef(), eq(missionId)))
+    when(backendApiClient.get(
+            eq("/api/v1/inventory/allocations?missionId={id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(List.of(missionStock("Titanium", false), missionStock("Quantanium", true)));
 
     String html =
@@ -3102,7 +3101,8 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
-    when(backendApiClient.get(eq("/api/v1/inventory/mission/{id}"), anyTypeRef(), eq(missionId)))
+    when(backendApiClient.get(
+            eq("/api/v1/inventory/allocations?missionId={id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(List.of(missionStock("Titanium", false)));
 
     mockMvc

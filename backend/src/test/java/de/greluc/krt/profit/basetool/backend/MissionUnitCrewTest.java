@@ -134,7 +134,7 @@ class MissionUnitCrewTest {
             crewJob.getId(), sq.getId());
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/participants/add")
+            post("/api/v1/missions/" + mission.getId() + "/participants")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(joinJson))
         .andExpect(status().isOk());
@@ -153,7 +153,7 @@ class MissionUnitCrewTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/crew/slim")
+            post("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/crew")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))

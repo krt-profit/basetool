@@ -130,8 +130,7 @@ A **by-id aggregate load must never fetch-join two sibling collections.** `@Enti
 that graphs two `@OneToMany`s produces a `|childA| × |childB|` cartesian result — every parent scalar
 (including any TEXT column) repeated across the row product. Graph at most one collection and let the
 other batch-load under `hibernate.default_batch_fetch_size` (`MissionRepository.findById` graphs only
-`participants`; `assignedUnits` batch-loads — #1138). The full-replace load
-(`findByIdForFullReplace`) follows the same rule since 2026-09-22 (BE-PERF-03).
+`participants`; `assignedUnits` batch-loads — #1138).
 
 **A paged query fetches no collection** (BE-PERF-02, 2026-09-22). Its rows are the page; any
 `@OneToMany` / `@ManyToMany` the mapper reads batch-loads under `default_batch_fetch_size`. The paged

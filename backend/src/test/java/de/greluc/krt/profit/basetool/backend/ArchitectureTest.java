@@ -122,7 +122,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipant
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -558,8 +557,7 @@ class ArchitectureTest {
   static final Set<Class<?>> SQUADRON_ID_COLUMN_GRANDFATHERED = Set.of(User.class);
 
   /** Mission write requests that must not carry server-managed components. */
-  static final Set<Class<?>> MISSION_WRITE_REQUESTS =
-      Set.of(CreateMissionRequest.class, UpdateMissionRequest.class);
+  static final Set<Class<?>> MISSION_WRITE_REQUESTS = Set.of(CreateMissionRequest.class);
 
   /** The bank ledger repositories, insert-only (REQ-BANK-004). */
   static final Set<Class<?>> LEDGER_REPOSITORIES =
@@ -761,7 +759,7 @@ class ArchitectureTest {
   @Test
   void controllerMethodsShouldNotReturnJpaEntities() {
     DescribedPredicate<JavaMethod> selection = publicMethodsOf(CONTROLLER_CODE);
-    assertMethodFloor("controllerMethodsShouldNotReturnJpaEntities", selection, 712);
+    assertMethodFloor("controllerMethodsShouldNotReturnJpaEntities", selection, 709);
     controllerMethodsShouldNotReturnJpaEntitiesRule(selection).check(CLASSES);
   }
 
@@ -1273,7 +1271,7 @@ class ArchitectureTest {
   void controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers() {
     DescribedPredicate<JavaMethod> selection = publicMethodsOf(CONTROLLER_CODE);
     assertMethodFloor(
-        "controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers", selection, 712);
+        "controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers", selection, 709);
     controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappersRule(selection).check(CLASSES);
   }
 
@@ -1389,7 +1387,7 @@ class ArchitectureTest {
   @Test
   void peerReadableMissionEndpointsMustRedactPii() {
     DescribedPredicate<JavaMethod> selection = peerReadableEndpoints(MISSION_PII_CARRYING_DTOS);
-    assertMethodFloor("peerReadableMissionEndpointsMustRedactPii", selection, 22);
+    assertMethodFloor("peerReadableMissionEndpointsMustRedactPii", selection, 20);
     peerReadableMissionEndpointsMustRedactPiiRule(selection, MISSION_PII_CARRYING_DTOS)
         .check(CLASSES);
   }
@@ -1425,12 +1423,11 @@ class ArchitectureTest {
   @Test
   void missionWriteRequestDtosMustNotCarryServerManagedFields() {
     DescribedPredicate<JavaClass> selection = classesIn(MISSION_WRITE_REQUESTS);
-    assertClassFloor("missionWriteRequestDtosMustNotCarryServerManagedFields", selection, 2);
-    missionWriteRequestDtosRule(selection, UpdateMissionRequest.class).check(CLASSES);
+    assertClassFloor("missionWriteRequestDtosMustNotCarryServerManagedFields", selection, 1);
+    missionWriteRequestDtosRule(selection).check(CLASSES);
   }
 
-  static ArchRule missionWriteRequestDtosRule(
-      DescribedPredicate<JavaClass> selection, Class<?> updateRequest) {
+  static ArchRule missionWriteRequestDtosRule(DescribedPredicate<JavaClass> selection) {
     return classes()
         .that(selection)
         .should(
@@ -1439,12 +1436,10 @@ class ArchitectureTest {
                     + " …)") {
               @Override
               public void check(JavaClass clazz, ConditionEvents events) {
-                boolean isUpdateDto = clazz.isEquivalentTo(updateRequest);
                 clazz.getFields().stream()
                     .filter(f -> !f.getModifiers().contains(JavaModifier.STATIC))
                     .map(JavaField::getName)
                     .filter(FORBIDDEN_MISSION_REQUEST_COMPONENTS::contains)
-                    .filter(name -> !(isUpdateDto && "version".equals(name)))
                     .forEach(
                         name ->
                             events.add(

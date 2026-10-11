@@ -45,7 +45,6 @@ import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureSettin
 import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureSettingsDto;
 import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureSquadron;
 import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureTopic;
-import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureUpdateRequest;
 import de.greluc.krt.profit.basetool.architecture.fixtures.modules.orders.service.OrderService;
 import de.greluc.krt.profit.basetool.architecture.fixtures.profit.MissionLedgerFixture;
 import de.greluc.krt.profit.basetool.architecture.fixtures.scope.OrgScopeFixture;
@@ -332,8 +331,7 @@ class ArchitectureRuleFailureTest {
   void missionRulesFail() {
     assertReports(
         ArchitectureTest.missionWriteRequestDtosRule(
-            ArchitectureTest.classesIn(Set.of(FixtureCreateRequest.class)),
-            FixtureUpdateRequest.class),
+            ArchitectureTest.classesIn(Set.of(FixtureCreateRequest.class))),
         MISSION,
         "`id`");
     assertReports(
