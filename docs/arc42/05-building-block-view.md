@@ -214,6 +214,7 @@ The platform modules reach the domains only through SPIs they own and the domain
 | `service.ActiveOrgUnitProvider` (platform) | the org unit for the `orgUnitId` MDC field | scope (`ScopeActiveOrgUnitProvider`) |
 | `platform.api.ClientDirectory` | whether a client id is a configured ingest gateway or a registered exchange client, for the bounded client label | exchange (`ExchangeClientDirectory`) |
 | `platform.api.UserErasureParticipant` | a module's part of the account deletion: its rows removed, reassigned to the fallback admin or unlinked, by phase (`DELETE`, `REASSIGN`, `UNLINK`) and position, inside the deletion's one transaction; the counts it returns feed the deletion's audit rows | materialexchange, inventory, hangar, personalinventory, blueprint, notification, promotion (`DELETE`); mission, refinery (`REASSIGN`); mission, joborder (`UNLINK`) |
+| `platform.api.PersonalDataExportSection` | a module's part of the Art. 15 / Art. 20 data export: the `Section` records (position, key, legal basis, statement, scrubbed and exempted columns) that select the member's own rows; `PersonalDataExportRegistry` (privacy) orders them by position and `DataExportService` runs them | identity, orgunit, orgchart, promotion, inventory, hangar, exchange, personalinventory, blueprint, notification, mission, refinery, joborder, materialexchange, bank, audit (`*ExportSections`) |
 
 ## 5.3 Level 2 — inside `frontend`
 

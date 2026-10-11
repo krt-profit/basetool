@@ -84,6 +84,13 @@ or personal data; events belong to their publishers' `api.events` packages.
   orchestrator's direct repository calls, `MemberEvaluationErasure`, `PersonalInventoryErasure`
   and `StockChangeObserver.beforeUserPurge`; the deletion audit rows stay in
   `UserDeletionService`. See plan §7.6.
+- **2026-10-11, GDPR participants, slice c (export).** `PersonalDataExportSection` is owned by
+  `platform.api` for the same reason and is a plain declaration SPI, not an `@ObserverSpi`: a
+  participant returns `Section` records (position, key, legal basis, statement, scrubbed and
+  exempted columns) and runs nothing. Sixteen implementations, one per owning module, replace
+  `DataExportSections`; the reading order is a global `position` on each section, because a
+  module's sections are not contiguous in it. `privacy.internal.PersonalDataExportRegistry`
+  orders them and refuses a duplicate key or position. See plan §7.6.
 
 ## Alternatives considered
 

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.privacy.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -167,21 +168,14 @@ class PersonalDataExportCatalogueTest {
 
     static List<Declared> inReadingOrder() {
       List<Declared> out = new ArrayList<>();
-      for (DataExportSections.Section section : DataExportSections.SECTIONS) {
-        Set<String> exempted = new TreeSet<>();
-        String prefix = section.key() + ".";
-        for (String entry : DataExportSections.UNSCRUBBED_PERSON_COLUMNS.keySet()) {
-          if (entry.startsWith(prefix)) {
-            exempted.add(entry.substring(prefix.length()));
-          }
-        }
+      for (Section section : ExportSectionDeclarations.inReadingOrder()) {
         out.add(
             new Declared(
                 section.key(),
-                section.legalBasis(),
+                section.legalBasis().name(),
                 section.sql(),
-                DataExportSections.FREE_TEXT_COLUMNS.getOrDefault(section.key(), Set.of()),
-                exempted));
+                section.scrubbedColumns(),
+                section.unscrubbedPersonColumns().keySet()));
       }
       return out;
     }

@@ -4426,6 +4426,19 @@ worse than a short document that says exactly what exists and points at the mach
 > then discarded it. The caller assembles the export and hands it to the renderer now, so the
 > audited count is the count of what was actually served.
 
+> [!note] The sections are declared by the modules (2026-10-11, plan §7.6, P4 slice c)
+> Each module that holds member data contributes its sections as a
+> `platform.api.PersonalDataExportSection`, a pure declaration without dependencies. A `Section`
+> carries its position (the reading order, unique across modules), key, legal basis, rationale,
+> the statement, the columns it scrubs (`scrubbing(...)`) and the person-name columns it keeps with
+> a reason (`keeping(...)`). `privacy.internal.PersonalDataExportRegistry` collects the beans,
+> orders them by position and refuses a duplicate key or position at startup; `DataExportService`
+> runs the statements as before, so the JSON and the PDF are unchanged
+> (`PersonalDataExportCatalogueTest`, `DataExportEndStateTest`).
+> `PersonalDataExportOwnershipTest` holds each section to the module that owns the table its
+> `:userId` condition filters, and the coverage tests read the union of the participants, found by
+> scanning, so a section a new module declares counts and a column nobody declares fails.
+
 > [!note] What the export costs, and which parts of that were changed (2026-09-17)
 > The download now carries **its own response timeout** (`app.http.export-response-timeout`,
 > default 120 s, per request). It is the one frontend→backend call expected to take a long time,
@@ -4545,11 +4558,12 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 > export handed the member a corrupted copy of their own identity while telling them third-party
 > names had been removed.
 >
-> `DataExportSections.FREE_TEXT_COLUMNS` names the prose columns per section, and
-> `UNSCRUBBED_PERSON_COLUMNS` records, with a reason, every selected column that *is* a person-name
-> surface and is still deliberately not scrubbed. `DataExportScrubCoverageTest` walks each section's
-> `SELECT` list and **fails the build** unless every such column appears in one map or the other —
-> and unless every entry in either map names a section and a column that exist. Without that gate
+> A section's `scrubbedColumns` (the former `DataExportSections.FREE_TEXT_COLUMNS`) names the
+> prose columns, and its `unscrubbedPersonColumns` (the former `UNSCRUBBED_PERSON_COLUMNS`) records,
+> with a reason, every selected column that *is* a person-name surface and is still deliberately not
+> scrubbed. `DataExportScrubCoverageTest` walks each section's `SELECT` list and **fails the
+> build** unless every such column appears in one set or the other — and unless every entry in
+> either set names a column its own section yields. Without that gate
 > `notificationRuleTargets` shipped selecting an administrator's free text unscrubbed, and a renamed
 > key would have dropped out of the scrub set while the export kept reporting success.
 >
@@ -4672,8 +4686,10 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 **Enforced by:** `DataExportIntegrationTest`, `DataExportParticipantSectionsIntegrationTest`,
 `DataExportScrubCoverageTest`, `DataExportPdfFieldLabelCoverageTest`,
 `DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`, `HandleScrubberTest`,
-`DataExportControllerSecurityTest` · **Code:** `privacy/internal/DataExportSections`,
-`kernel/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
+`DataExportControllerSecurityTest`, `PersonalDataExportCatalogueTest`,
+`DataExportEndStateTest`, `PersonalDataExportOwnershipTest`, `PersonalDataExportRegistryTest` ·
+**Code:** `platform/api/PersonalDataExportSection`, `privacy/internal/PersonalDataExportRegistry`,
+the `*ExportSections` of the modules, `kernel/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
 `service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
 `controller/AdminDataExportController`, frontend `identity/web/DataExportProxyController`,
 `templates/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
@@ -5524,8 +5540,8 @@ data lands on the main profile; the Basetool never discloses the stored handle t
 `ApiVhostAnonymousSurfaceTest`, `ProfileRsiHandleMvcTest`, `MemberManagementControllerTest`,
 `ProfileRsiHandleInPlaceE2eTest` · **Code:** `V246__add_rsi_handle_to_app_user.sql`, `User`,
 `UserService#updateUserRsiHandle`, `UserRepository#existsOtherAccountWithName`, `UserController`,
-`UserAccountMergeService`, `HandleSpellings`, `PersonSearchTargets`, `DataExportSections`,
-`HandleErasureCoverage`, frontend `ProfileRsiHandleProxyController`, `ProfileController`,
+`UserAccountMergeService`, `HandleSpellings`, `PersonSearchTargets`, the
+`PersonalDataExportSection` participants, `HandleErasureCoverage`, frontend `ProfileRsiHandleProxyController`, `ProfileController`,
 `MemberManagementController`, `profile.html`, `profile.js`, `member-edit.html` · **Record:**
 [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md) (A1) · **Related:**
 REQ-XCH-031, REQ-SEC-046, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061, REQ-SEC-062
