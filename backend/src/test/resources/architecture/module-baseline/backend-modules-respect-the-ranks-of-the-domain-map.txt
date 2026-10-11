@@ -30,4 +30,3 @@ identity -> privacy: UserRegistrationService -> UserDeletionService
 identity -> scope: MeController -> OwnerScopeService
 identity -> scope: UserService -> OwnerScopeService
 notification -> orgunit: OrgUnitRef -> OrgUnitKind
-orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler

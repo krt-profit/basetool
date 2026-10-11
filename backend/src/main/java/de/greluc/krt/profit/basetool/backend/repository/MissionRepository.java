@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -389,7 +389,7 @@ public interface MissionRepository
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark(
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark(
       m.id, m.name, m.plannedStartTime) FROM Mission m WHERE m.id IN :ids
       """)
   List<MissionEarmark> findEarmarks(@Param("ids") Collection<UUID> ids);

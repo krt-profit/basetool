@@ -19,10 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
-import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
-import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
@@ -33,6 +29,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionAllocationDto;
+import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
@@ -47,7 +45,7 @@ public abstract class InventoryItemMapper {
 
   @Autowired protected StockViewerAccess stockAccess;
 
-  @Autowired protected EarmarkTargets.Lookup earmarkTargets;
+  @Autowired protected InventoryEarmarkLookup earmarkTargets;
 
   /**
    * Resolves the caller-dependent {@code canEdit} projection of one Lager row: the row's scope

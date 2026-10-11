@@ -140,7 +140,9 @@ Since then the later phases of the plan shrank it step by step; on 2026-10-11, a
 P4-3 (the catalogue's `LocationService` asks the `catalogue.api.LocationUsage` SPI instead of the
 ship and refinery repositories), the file held 36 class edges in 8 module pairs. After P4-4 (the
 mission embeds its own `MissionOperationDto`, so the operation's types move into `operation.internal`)
-it holds **33 class edges in 7 module pairs**.
+it held 33 in 7, and after plan §7.6 P4-1 part 1 (the org-unit module's membership service asks its
+`orgunit.api.FirstMembershipObserver` SPI, which the Lager implements, instead of naming
+`InventoryOrgUnitReconciler`) it holds **32 class edges in 6 module pairs**.
 
 **Acceptance**
 

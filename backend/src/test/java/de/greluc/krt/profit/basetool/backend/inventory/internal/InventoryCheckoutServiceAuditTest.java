@@ -1,0 +1,216 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.inventory.internal;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.mapper.InventoryEarmarkLookup;
+import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
+import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.model.JobOrder;
+import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
+import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
+/**
+ * Audit tests (REQ-AUDIT-001) for the delivered-flag toggle ({@link
+ * InventoryCheckoutService#updateDelivered}) and the admin global wipe ({@link
+ * InventoryCheckoutService#deleteAllGlobalInventory}) of {@link InventoryCheckoutService}, pinning
+ * the exact audit events each records.
+ */
+@ExtendWith(MockitoExtension.class)
+class InventoryCheckoutServiceAuditTest {
+
+  @Mock private InventoryItemRepository inventoryItemRepository;
+  @Mock private UserRepository userRepository;
+  @Mock private LocationRepository locationRepository;
+  @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
+  @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private InventoryItemMapper inventoryItemMapper;
+  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private StockChangeObserver offerRatchet;
+  @Mock private AuditService auditService;
+
+  @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private InventoryEarmarkLookup earmarkTargets;
+  @InjectMocks private InventoryCheckoutService service;
+
+  @Test
+  void updateDelivered_recordsDeliveryToggledAudit() {
+    UUID itemId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+
+    UUID orderId = UUID.randomUUID();
+    User owner = new User();
+    owner.setId(ownerId);
+
+    JobOrder order = new JobOrder();
+    order.setId(orderId);
+    order.setDisplayId(42);
+    when(earmarkTargets.jobOrder(order.getId())).thenReturn(new JobOrderEarmark(order.getId(), 42));
+
+    InventoryItem item = new InventoryItem();
+    item.setId(itemId);
+    item.setVersion(1L);
+    item.setUser(owner);
+    item.setAmount(5.0);
+    InventoryJobOrderAllocation slice =
+        InventoryAllocations.addJobOrder(item, order.getId(), 5.0, false);
+
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, orderId, 1L);
+
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
+    when(inventoryItemMapper.toDto(item))
+        .thenReturn(
+            new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
+                itemId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                java.util.List.of(),
+                0.0,
+                java.util.List.of(),
+                0.0,
+                null,
+                null,
+                1L,
+                null,
+                null));
+
+    service.updateDelivered(itemId, request, ownerId, false);
+
+    assertTrue(slice.getDelivered(), "the order's slice is flipped to delivered");
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED),
+            eq(itemId),
+            any(),
+            eq(ownerId),
+            any());
+  }
+
+  @Test
+  void deleteAllGlobalInventory_recordsWipedAuditWithScopeAndCount() {
+    ScopePredicate scope = new ScopePredicate(true, null, Set.of());
+    when(ownerScopeService.currentScopePredicate()).thenReturn(scope);
+    when(inventoryItemRepository.deleteAllNonPersonal(true, null, Set.of())).thenReturn(42);
+
+    int removed = service.deleteAllGlobalInventory();
+
+    assertEquals(42, removed);
+    InOrder order = inOrder(offerRatchet, inventoryItemRepository);
+    order
+        .verify(offerRatchet)
+        .beforeWipe(scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+    order.verify(inventoryItemRepository).deleteAllNonPersonal(true, null, Set.of());
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_WIPED), isNull(), isNull(), isNull(), details.capture());
+    String rendered = details.getValue().toString();
+    assertTrue(rendered.contains("removed=42"), "audit details carry the removed count");
+    assertTrue(rendered.contains("scope=adminAll"), "audit details carry the wipe scope");
+  }
+
+  @Test
+  void bookOut_gameItemRow_recordsConsumedAuditWithGameItemNameLabelAndDetail() {
+    UUID itemId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+    User owner = new User();
+    owner.setId(ownerId);
+    Location location = new Location();
+    location.setId(UUID.randomUUID());
+    location.setName("ARC-L1");
+    GameItem gameItem = new GameItem();
+    gameItem.setId(UUID.randomUUID());
+    gameItem.setName("Quantum Drive");
+
+    InventoryItem item = new InventoryItem();
+    item.setId(itemId);
+    item.setVersion(1L);
+    item.setUser(owner);
+    item.setLocation(location);
+    item.setGameItem(gameItem);
+    item.setAmount(3.0);
+    item.setPersonal(false);
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+
+    service.bookOutInventoryItem(
+        itemId,
+        new InventoryItemBookOutDto(
+            3.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, null, null),
+        ownerId,
+        false);
+
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_ITEM_CONSUMED),
+            eq(itemId),
+            eq("Quantum Drive @ ARC-L1"),
+            eq(ownerId),
+            details.capture());
+    String rendered = details.getValue().toString();
+    assertTrue(
+        rendered.contains("material=Quantum Drive"),
+        "the catalog-name detail falls back to the game-item name for item rows");
+    assertTrue(rendered.contains("depleted=true"), "the depleted marker is carried");
+  }
+}
