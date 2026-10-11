@@ -307,7 +307,7 @@ construction, no creator-owner fallback and no ownerless-leadership use case).
 
 The active OrgUnit context is surfaced to the user **only** by appending it to the application
 title (`appTitle`, resolved in
-[`LayoutMiscAdvice`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/LayoutMiscAdvice.java)),
+[`LayoutMiscAdvice`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/layout/LayoutMiscAdvice.java)),
 which renders in both the browser `<title>` tag and the sidebar brand logo text. The suffix is:
 
 - the active OrgUnit's **shorthand** (falling back to its name) for an active pin of **either**

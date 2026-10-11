@@ -6,7 +6,7 @@ them.
 ## 4.1 Split the UI from the API, and give the split a single seam
 
 The **backend** serves `/api/v1/...` and never HTML. The **frontend** renders Thymeleaf and holds
-no business logic; it reaches the backend through `service.BackendApiClient` and the `webClient`
+no business logic; it reaches the backend through `kernel.backend.BackendApiClient` and the `webClient`
 bean beneath it (`config.WebClientConfig`): one filter chain with the OAuth2 bearer relay, the
 correlation, org-unit, locale and client-IP relays and the Resilience4j chain (ADR-0032), and on
 top of it the error mapping and the catalogue cache. Three further client beans do what that chain

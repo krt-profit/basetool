@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

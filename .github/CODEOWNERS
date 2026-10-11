@@ -30,6 +30,6 @@
 
 /backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/       @greluc
 /backend/src/main/resources/db/migration/                                  @greluc
-/frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/     @greluc
+/frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/     @greluc
 /keycloak-spi/                                                             @greluc
 /keycloak-theme/                                                           @greluc

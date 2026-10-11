@@ -4,7 +4,7 @@
 - **Date:** 2026-07-22
 - **Deciders:** @greluc
 - **Related:** ADR-0114 (2 s Lettuce command/connect timeout) ·
-  `frontend/.../health/BoundedRedisHealthIndicator.java` · the 2026-07-22 incident
+  `frontend/.../kernel/session/BoundedRedisHealthIndicator.java` · the 2026-07-22 incident
 
 ## Context
 

@@ -28,7 +28,7 @@
             <button type="button" id="operation-edit-open" class="btn btn-ghost" data-testid="operation-edit"
                     data-trigger="open-modal-display" data-modal-id="edit-operation-modal"
                     ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{operation.edit}">Bearbeiten</span></button>
-            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                 <th:block th:replace="~{fragments/components :: overflowMenu(id='operation-menu', items=~{::operation-menu-items})}">
                     <th:block th:ref="operation-menu-items">
                         <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
