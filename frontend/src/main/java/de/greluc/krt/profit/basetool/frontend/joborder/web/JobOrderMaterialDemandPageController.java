@@ -97,9 +97,9 @@ public class JobOrderMaterialDemandPageController {
     model.addAttribute("materialOptions", materialOptions(demand));
     model.addAttribute("qualityOptions", qualityOptions(demand));
     if ("results".equals(fragment)) {
-      return "orders-material-demand :: demandResults";
+      return "joborder/orders-material-demand :: demandResults";
     }
-    return "orders-material-demand";
+    return "joborder/orders-material-demand";
   }
 
   /**

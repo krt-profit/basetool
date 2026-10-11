@@ -196,6 +196,26 @@ export function evaluate({ scripts, manifest, tsconfig, migratedFloor, checkedFl
 }
 
 /**
+ * Checks that every listed script lives in the folder of the domain it is listed under.
+ *
+ * @param {{domains: Record<string, string[]>}} manifest typecheck-ratchet.json
+ * @returns {string[]} one message per script outside its domain's folder
+ */
+export function layoutViolations(manifest) {
+    const violations = [];
+    for (const [domain, files] of Object.entries(manifest.domains)) {
+        for (const file of files) {
+            if (!file.startsWith(`${domain}/`) || file.indexOf('/', domain.length + 1) !== -1) {
+                violations.push(
+                    `${file} is listed under ${domain} but is not in static/js/${domain}/`,
+                );
+            }
+        }
+    }
+    return violations;
+}
+
+/**
  * Reads the real tree below the frontend module.
  *
  * @param {string} root the frontend module directory, with a trailing slash
@@ -222,11 +242,11 @@ export function loadTree(root) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const root = fileURLToPath(new URL('..', import.meta.url));
-    const violations = evaluate({
-        ...loadTree(root),
-        migratedFloor: MIGRATED_FLOOR,
-        checkedFloor: CHECKED_FILES_FLOOR,
-    });
+    const tree = loadTree(root);
+    const violations = [
+        ...evaluate({ ...tree, migratedFloor: MIGRATED_FLOOR, checkedFloor: CHECKED_FILES_FLOOR }),
+        ...layoutViolations(tree.manifest),
+    ];
     for (const violation of violations) {
         console.error(`type-check ratchet: ${violation}`);
     }

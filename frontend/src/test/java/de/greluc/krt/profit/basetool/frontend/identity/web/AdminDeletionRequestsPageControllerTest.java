@@ -227,7 +227,7 @@ class AdminDeletionRequestsPageControllerTest {
 
     String view = controller.page(model);
 
-    assertEquals("admin/deletion-requests", view);
+    assertEquals("identity/admin/deletion-requests", view);
     assertEquals(List.of(), model.getAttribute("requests"));
     assertEquals("admin.deletionRequests.error.load", model.getAttribute("error"));
   }
@@ -255,7 +255,7 @@ class AdminDeletionRequestsPageControllerTest {
 
     String view = controller.rows(model);
 
-    assertEquals("admin/deletion-requests :: rows", view);
+    assertEquals("identity/admin/deletion-requests :: rows", view);
     assertEquals(List.of(), model.getAttribute("requests"));
   }
 

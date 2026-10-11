@@ -105,7 +105,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     mockMvc
         .perform(get("/personal-inventory/blueprints"))
         .andExpect(status().isOk())
-        .andExpect(view().name("personal-inventory-blueprints"))
+        .andExpect(view().name("blueprint/personal-inventory-blueprints"))
         .andExpect(model().attributeExists("blueprints"))
         .andExpect(content().string(containsString("ID_PLACEHOLDER")))
         .andExpect(content().string(containsString("data-source=\"LOG\"")))
@@ -410,7 +410,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     mockMvc
         .perform(get("/personal-inventory/blueprints").param("fragment", "list"))
         .andExpect(status().isOk())
-        .andExpect(view().name("personal-inventory-blueprints :: blueprintList"))
+        .andExpect(view().name("blueprint/personal-inventory-blueprints :: blueprintList"))
         .andExpect(content().string(containsString("id=\"krt-bp-master-rows\"")))
         .andExpect(content().string(containsString("id=\"krt-bp-total-meta\"")))
         .andExpect(

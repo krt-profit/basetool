@@ -77,7 +77,7 @@ class LiveSyncCloseCodeWireParityTest {
    * @throws IOException if the script cannot be read from the classpath
    */
   private static String declaredCode(Pattern pattern, String constantName) throws IOException {
-    Matcher declaration = pattern.matcher(readResource("/static/js/krt-live-sync.js"));
+    Matcher declaration = pattern.matcher(readResource("/static/js/kernel/krt-live-sync.js"));
     assertThat(declaration.find())
         .as("krt-live-sync.js declares %s = <code>", constantName)
         .isTrue();

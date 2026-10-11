@@ -143,7 +143,7 @@ class ProfileControllerTest {
     Model model = new ConcurrentModel();
     String view = controller.profile(model, principal);
 
-    assertEquals("profile", view);
+    assertEquals("identity/profile", view);
     assertEquals("jdoe", model.getAttribute("username"));
     assertEquals("jdoe@example.com", model.getAttribute("email"));
     assertEquals(7, model.getAttribute("rank"));
@@ -189,7 +189,7 @@ class ProfileControllerTest {
     Model model = new ConcurrentModel();
     String view = controller.profile(model, principal);
 
-    assertEquals("profile", view);
+    assertEquals("identity/profile", view);
     assertEquals(3, model.getAttribute("rank"));
     assertEquals("From-Token", model.getAttribute("description"));
     assertEquals("JD", model.getAttribute("displayName"));
@@ -268,7 +268,7 @@ class ProfileControllerTest {
     when(backendApiClient.get(ME, UserDto.class)).thenReturn(user(4, null, null, 1L, null, null));
 
     Model model = new ConcurrentModel();
-    assertEquals("profile", controller.profile(model, principal));
+    assertEquals("identity/profile", controller.profile(model, principal));
     assertNull(model.getAttribute("joinDate"));
     assertNull(model.getAttribute("monthsInSquadron"));
   }
@@ -334,7 +334,7 @@ class ProfileControllerTest {
         controller.updateDescription(
             form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
 
-    assertEquals("profile", view);
+    assertEquals("identity/profile", view);
     verify(backendApiClient, never()).put(any(), any(), any());
     verifyNoInteractions(redirectAttributes);
   }
@@ -533,7 +533,7 @@ class ProfileControllerTest {
         controller.updatePayoutPreference(
             form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
 
-    assertEquals("profile", view);
+    assertEquals("identity/profile", view);
     verify(backendApiClient, never()).put(any(), any(), any());
     verifyNoInteractions(redirectAttributes);
   }

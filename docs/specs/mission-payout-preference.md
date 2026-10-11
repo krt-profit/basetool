@@ -49,7 +49,7 @@ the new participant's `payoutPreference` is **seeded from the user's default**. 
 `ProfileControllerTest`. **Code:** `User.defaultPayoutPreference` (migration `V142`),
 `UserService#updateUserDefaultPayoutPreference`, `UserController` `/api/v1/missions/me/payout-preference`,
 `MissionParticipantService#addParticipant` (reached through `MissionService#addParticipant`),
-`frontend/.../ProfileController` (`POST /profile/payout-preference`) + `templates/profile.html`.
+`frontend/.../ProfileController` (`POST /profile/payout-preference`) + `templates/identity/profile.html`.
 **Issues:** #469.
 
 ## Out of scope

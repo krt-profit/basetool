@@ -64,7 +64,7 @@ class AdminPersonSearchPageControllerTest {
 
     String view = controller.page("Zz", null, model);
 
-    assertEquals("admin/person-search", view);
+    assertEquals("identity/admin/person-search", view);
     assertEquals("admin.personSearch.tooShort", model.getAttribute("error"));
     assertEquals(false, model.getAttribute("searched"));
     verifyNoSearch(client);
@@ -201,7 +201,7 @@ class AdminPersonSearchPageControllerTest {
 
     String view = controller.page("SomeHandle", "results", new ConcurrentModel());
 
-    assertEquals("admin/person-search :: results", view);
+    assertEquals("identity/admin/person-search :: results", view);
   }
 
   @Test
@@ -213,7 +213,7 @@ class AdminPersonSearchPageControllerTest {
 
     String view = controller.page("SomeHandle", "nonsense", new ConcurrentModel());
 
-    assertEquals("admin/person-search", view);
+    assertEquals("identity/admin/person-search", view);
   }
 
   /**

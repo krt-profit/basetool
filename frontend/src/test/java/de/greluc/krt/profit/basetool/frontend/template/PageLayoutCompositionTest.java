@@ -43,11 +43,11 @@ class PageLayoutCompositionTest {
 
   /** The page-level call of a chrome fragment, which only the layout may make. */
   private static final Pattern CHROME_CALL =
-      Pattern.compile("fragments/(?:head|sidebar|header|toast)\\s*::");
+      Pattern.compile("kernel/fragments/(?:head|sidebar|header|toast)\\s*::");
 
   /** The call of the layout fragment. */
   private static final Pattern LAYOUT_CALL =
-      Pattern.compile("<html\\b[^>]*th:replace=\"~\\{fragments/layout\\s*::\\s*page\\(");
+      Pattern.compile("<html\\b[^>]*th:replace=\"~\\{kernel/fragments/layout\\s*::\\s*page\\(");
 
   /** A {@code <head>} element, which marks a template as a page. */
   private static final Pattern HEAD = Pattern.compile("<head\\b");
@@ -62,7 +62,7 @@ class PageLayoutCompositionTest {
     int pages = 0;
     for (Map.Entry<String, String> template : templates.entrySet()) {
       String name = template.getKey();
-      if (name.startsWith("fragments/")) {
+      if (name.contains("fragments/")) {
         continue;
       }
       List<String> problems = problems(template.getValue());
@@ -82,9 +82,9 @@ class PageLayoutCompositionTest {
   @Test
   void aPageThatCopiesTheChromeIsReported() {
     String legacy =
-        "<html xmlns:th=\"http://www.thymeleaf.org\"><head th:replace=\"~{fragments/head ::"
+        "<html xmlns:th=\"http://www.thymeleaf.org\"><head th:replace=\"~{kernel/fragments/head ::"
             + " head(titleContent=~{::title}, additionalLinks=~{})}\"><title>x</title></head><body>"
-            + "<th:block th:replace=\"~{fragments/sidebar :: sidebar}\" /></body></html>";
+            + "<th:block th:replace=\"~{kernel/fragments/sidebar :: sidebar}\" /></body></html>";
 
     assertThat(problems(legacy)).hasSize(2);
   }
@@ -99,7 +99,7 @@ class PageLayoutCompositionTest {
   @Test
   void aPageThroughTheLayoutHasNoProblem() {
     String page =
-        "<html th:replace=\"~{fragments/layout :: page(pageTitle=~{::title},"
+        "<html th:replace=\"~{kernel/fragments/layout :: page(pageTitle=~{::title},"
             + " pageContent=~{::pageContent})}\"><head><title>x</title></head><body>"
             + "<th:block th:fragment=\"pageContent\"></th:block></body></html>";
 
@@ -108,12 +108,12 @@ class PageLayoutCompositionTest {
 
   @Test
   void theLayoutCallsEachChromeFragmentOnce() throws IOException {
-    Path layout = TemplateReferenceScan.TEMPLATE_ROOT.resolve("fragments/layout.html");
+    Path layout = TemplateReferenceScan.TEMPLATE_ROOT.resolve("kernel/fragments/layout.html");
     String source = Files.readString(layout, StandardCharsets.UTF_8);
 
     Map<String, Integer> calls = new TreeMap<>();
     for (String fragment : List.of("head", "sidebar", "header", "toast")) {
-      calls.put(fragment, source.split("fragments/" + fragment + "\\s*::", -1).length - 1);
+      calls.put(fragment, source.split("kernel/fragments/" + fragment + "\\s*::", -1).length - 1);
     }
 
     assertThat(calls).containsEntry("head", 1).containsEntry("sidebar", 1);

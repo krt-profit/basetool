@@ -21,13 +21,13 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -193,9 +193,9 @@ class CascadeLayerOrderTest {
    * @throws URISyntaxException if the classpath root cannot be resolved
    */
   private static List<Path> stylesheets() throws IOException, URISyntaxException {
-    URL anchor = CascadeLayerOrderTest.class.getResource("/static/css/styles.css");
-    assertThat(anchor).as("/static/css/styles.css classpath resource").isNotNull();
-    Path root = Paths.get(anchor.toURI()).getParent();
+    URL anchor = CascadeLayerOrderTest.class.getResource("/static/css/kernel/styles.css");
+    assertThat(anchor).as("/static/css/kernel/styles.css classpath resource").isNotNull();
+    Path root = ClasspathAssets.rootOf(anchor);
     try (Stream<Path> tree = Files.walk(root)) {
       return tree.filter(Files::isRegularFile)
           .filter(p -> p.getFileName().toString().endsWith(".css"))

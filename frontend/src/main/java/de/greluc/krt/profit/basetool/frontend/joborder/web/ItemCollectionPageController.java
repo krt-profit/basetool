@@ -96,8 +96,8 @@ public class ItemCollectionPageController {
     model.addAttribute("collectionProgress", ItemCollectionGroup.total(itemGroups));
     model.addAttribute("locations", locations);
     if ("results".equals(fragment)) {
-      return "item-collection :: collectionResults";
+      return "joborder/item-collection :: collectionResults";
     }
-    return "item-collection";
+    return "joborder/item-collection";
   }
 }

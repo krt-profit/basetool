@@ -77,7 +77,7 @@ public class AdminAnnouncementPageController {
     } catch (Exception e) {
       log.error("Could not fetch admin announcement", e);
     }
-    return "admin/announcement";
+    return "dashboard/admin/announcement";
   }
 
   /**

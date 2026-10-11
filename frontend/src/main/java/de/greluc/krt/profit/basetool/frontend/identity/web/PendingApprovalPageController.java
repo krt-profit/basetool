@@ -95,7 +95,7 @@ public class PendingApprovalPageController {
     }
     model.addAttribute(MODEL_REJECTED, STATE_REJECTED.equals(approvalStatus));
     model.addAttribute(MODEL_NO_ROLE, noRole && !STATE_REJECTED.equals(approvalStatus));
-    return "pending-approval";
+    return "identity/pending-approval";
   }
 
   /**

@@ -96,7 +96,7 @@ class BankInPlaceFragmentMvcTest {
     mockMvc
         .perform(get("/bank/manage").param("tab", "konten").param("fragment", "manageBody"))
         .andExpect(status().isOk())
-        .andExpect(view().name("bank-manage :: manageBody"))
+        .andExpect(view().name("bank/bank-manage :: manageBody"))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-tab-accounts\"")))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-account-row\"")))
         .andExpect(
@@ -114,7 +114,7 @@ class BankInPlaceFragmentMvcTest {
     mockMvc
         .perform(get("/bank/grants").param("fragment", "grantsMatrix"))
         .andExpect(status().isOk())
-        .andExpect(view().name("bank-grants :: grantsMatrix"))
+        .andExpect(view().name("bank/bank-grants :: grantsMatrix"))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-grant-row\"")))
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("bank-grant-create-modal"))));
@@ -158,7 +158,7 @@ class BankInPlaceFragmentMvcTest {
     mockMvc
         .perform(get("/bank/accounts/" + accountId).param("fragment", "accountBody"))
         .andExpect(status().isOk())
-        .andExpect(view().name("bank-account-detail :: accountBody"))
+        .andExpect(view().name("bank/bank-account-detail :: accountBody"))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-balance\"")))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-bookings-panel\"")))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-movement-open\"")))

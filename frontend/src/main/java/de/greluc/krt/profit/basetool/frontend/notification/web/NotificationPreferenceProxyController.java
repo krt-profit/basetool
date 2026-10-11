@@ -58,7 +58,7 @@ public class NotificationPreferenceProxyController {
   @PreAuthorize("isAuthenticated()")
   public String card(Model model) {
     populate(model, notificationClient);
-    return "fragments/profile-notification-prefs :: card";
+    return "notification/fragments/profile-notification-prefs :: card";
   }
 
   /**

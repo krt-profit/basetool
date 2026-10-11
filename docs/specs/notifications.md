@@ -225,7 +225,7 @@ go stale). This is **in-app only** — OS / browser push notifications are out o
   clear-read without a full reload.
 
 **Enforced by:** `MessageBundleConsistencyTest`, frontend lint gate · **Code:**
-`fragments/sidebar.html`, `static/js/notifications.js`, frontend `kernel/layout/LayoutMiscAdvice`
+`kernel/fragments/sidebar.html`, `static/js/notification/notifications.js`, frontend `kernel/layout/LayoutMiscAdvice`
 
 ### REQ-NOTIF-007 — Data-driven recipient rule engine
 
@@ -273,7 +273,7 @@ re-swaps the rule table in place (REQ-FE-001) instead of reloading the page.
 `service/RuleEvaluationService`, `service/NotificationRuleService`,
 `controller/NotificationRuleController`, `db/migration/V156__create_notification_rule.sql`,
 frontend `notification/web/AdminNotificationRulePageController`,
-`templates/admin/notification-rules.html`, `static/js/notification-rules.js`
+`templates/notification/admin/notification-rules.html`, `static/js/notification/notification-rules.js`
 
 ### REQ-NOTIF-008 — UC1: notify on job-order creation
 
@@ -549,7 +549,7 @@ events + clean timeout completion), `DisconnectedClientHandlingTest`,
 `controller/NotificationController#stream`, frontend
 `notification/web/NotificationPageController#stream`, `kernel/backend/BackendSideChannels#notificationStream`,
 `kernel/backend/WebClientConfig#sseWebClient`,
-`exception/GlobalExceptionHandler#handleDisconnectedClient`, `static/js/notifications.js`
+`exception/GlobalExceptionHandler#handleDisconnectedClient`, `static/js/notification/notifications.js`
 
 ### REQ-NOTIF-011 — UC2/UC3: notify on the bank booking-request lifecycle
 
@@ -814,7 +814,7 @@ slice), `NotificationServiceTest` (sort whitelist yields the stable `id` tiebrea
 `MessageBundleConsistencyTest` (`notifications.loadMore` / `notifications.showingLatest` in every
 bundle) · **Code:** `frontend notification/web/NotificationPageController#page` / `#pageItems` /
 `#loadPage`, `notification/model/NotificationPageSliceDto`, `backend service/NotificationService`
-(`SORTABLE_FIELDS` with `id`), `templates/notifications.html`, `static/js/notifications.js`
+(`SORTABLE_FIELDS` with `id`), `templates/notification/notifications.html`, `static/js/notification/notifications.js`
 (`loadMorePage` / `updatePageHint`) · **Issues:** — (ADR-0100 silent-truncation audit follow-up)
 
 ### REQ-NOTIF-022 — The inbox page filters unread/all and links each notification to its subject
@@ -846,8 +846,8 @@ The link passes `safeSameOriginUrl` before it is rendered; following it does not
 the overflow menu. The bell dropdown keeps its rows without links.
 
 **Enforced by:** `NotificationPageRenderMvcTest`, `NotificationPageControllerTest` (`targetOf`,
-`href` on `/page-items`) · `NotificationCenterE2eTest` · **Code:** `notifications.html`,
-`static/js/notifications-page.js`, `static/js/notifications.js` (`buildItem(item, linkable)`),
+`href` on `/page-items`) · `NotificationCenterE2eTest` · **Code:** `notification/notifications.html`,
+`static/js/notification/notifications-page.js`, `static/js/notification/notifications.js` (`buildItem(item, linkable)`),
 `NotificationPageController`, `NotificationViewDto` · **Related:** REQ-NOTIF-019, REQ-UI-027
 
 ### REQ-NOTIF-023 — Reconciling a notice for named members
@@ -1057,8 +1057,8 @@ member's own decision; it changes nothing for anybody else and nothing about wha
 **Code:** `model/NotificationMute`, `model/NotificationType#isMutable`,
 `service/NotificationMuteService`, `controller/NotificationController#preferences`,
 `V271__create_notification_mute.sql`, frontend `NotificationPreferenceWriteController`,
-`NotificationPreferenceProxyController`, `fragments/profile-notification-prefs.html`,
-`static/js/profile-notification-prefs.js` · **Decision:**
+`NotificationPreferenceProxyController`, `notification/fragments/profile-notification-prefs.html`,
+`static/js/identity/profile-notification-prefs.js` · **Decision:**
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 

@@ -121,12 +121,12 @@ class ShipDataPageControllerMvcTest {
     mockMvc
         .perform(get("/ship-data"))
         .andExpect(status().isOk())
-        .andExpect(view().name("ship-data"))
+        .andExpect(view().name("catalogue/ship-data"))
         .andExpect(content().string(containsString("id=\"shipTypeNames-data\"")))
         .andExpect(content().string(containsString("id=\"mfgNames-data\"")))
         .andExpect(content().string(containsString("value=\"Avenger Titan\"")))
         .andExpect(content().string(containsString("value=\"Aegis Dynamics\"")))
-        .andExpect(content().string(containsString("src=\"/js/ship-data.js\"")))
+        .andExpect(content().string(containsString("src=\"/js/catalogue/ship-data.js\"")))
         .andExpect(PageStylesheets.content(containsString(".sd-row--hidden")))
         .andExpect(content().string(containsString("</html>")));
   }

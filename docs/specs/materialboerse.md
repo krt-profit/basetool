@@ -144,7 +144,7 @@ picker's row cap is still reachable; switching kind clears any already-picked ro
 `MaterialboardOfferedAmountFieldE2eTest`, `MaterialboardPickerServerSearchE2eTest` · **Code:**
 `MaterialExchangeService#release/updateOffer`, `MaterialExchangeBoardService#myReleasableItems`
 (50-row picker cap), `InventoryItemRepository#findReleasableForUser`, `MaterialExchangeReleaseRequest`,
-`MaterialExchangeOfferUpdateRequest`, `fragments/materialboerse-modal.html`,
+`MaterialExchangeOfferUpdateRequest`, `materialexchange/fragments/materialboerse-modal.html`,
 `materialboerse-release.js`, `V212` offered-amount column, `V210` partial-unique index,
 `V216` (historical PIECE merge skips offer-backed rows)
 
@@ -241,7 +241,7 @@ facts) and carry **no "Kategorie" field**.
 **Acceptance**
 - [ ] The detail facts show `Qualität` as a bare integer and no category field exists.
 
-**Enforced by:** `MaterialboersePageControllerMvcTest` · **Code:** `materialboerse.html`,
+**Enforced by:** `MaterialboersePageControllerMvcTest` · **Code:** `materialexchange/materialboerse.html`,
 `MaterialExchangeOfferDto`
 
 ### REQ-MARKET-006 — Interessenten anonymity
@@ -337,8 +337,8 @@ fallbacks.*
 - [ ] Master-list rows are native `<button>`s stripped of UA button chrome — no light `buttonface` fill on unselected rows and no beveled/white border around entries (#1184).
 
 **Enforced by:** `MaterialboersePageControllerMvcTest`, `MaterialboersePatternRenderTest`, CI
-Playwright (e2e) · **Code:** `MaterialboersePageController#board`, `materialboerse.html`,
-`fragments/materialboerse-modal.html`, `materialboerse.js`, `materialboerse-release.js`,
+Playwright (e2e) · **Code:** `MaterialboersePageController#board`, `materialexchange/materialboerse.html`,
+`materialexchange/fragments/materialboerse-modal.html`, `materialboerse.js`, `materialboerse-release.js`,
 `materialboerse.css`, `pages/materialboerse.css`
 
 ### REQ-MARKET-010 — Live multi-user board sync
@@ -459,8 +459,8 @@ anbieten" (item field hidden), an item offer only "Menge (Stück)" (amount field
 `MaterialExchangeService#releaseItem`,
 `MaterialExchangeItemReleaseRequest`, `MaterialExchangeOffer` (`kind`/`itemProductKey`/`itemName`/
 `itemQuantity`), `MaterialExchangeOfferRepository#findBoard`,
-`db/migration/V213__add_material_exchange_item_offers.sql`, `materialboerse.html`,
-`fragments/materialboerse-modal.html` (the shared modal), `materialboerse-release.js`,
+`db/migration/V213__add_material_exchange_item_offers.sql`, `materialexchange/materialboerse.html`,
+`materialexchange/fragments/materialboerse-modal.html` (the shared modal), `materialboerse-release.js`,
 `materialboerse.css`
 
 ### REQ-MARKET-014 — Release an item offer from item stock (stock-backed item offer)
@@ -537,8 +537,8 @@ leaf (owner-only; the global item view has no toggle). Its checked state comes f
 `InventoryItemRepository#findReleasableForUser`, `MaterialExchangeBoardService` (effective item
 quantity + releasable picker), `InventoryCheckoutService#ratchetBoardOffersToStock`,
 `InventoryPageController#viewMyGameItemStackEntries` (item-leaf `releasedItemIds`),
-`db/migration/V221__relax_material_exchange_item_offer_stock_link.sql`, `materialboerse.html`,
-`fragments/materialboerse-modal.html`, `fragments/inventory-stack-entries.html`,
+`db/migration/V221__relax_material_exchange_item_offer_stock_link.sql`, `materialexchange/materialboerse.html`,
+`materialexchange/fragments/materialboerse-modal.html`, `inventory/fragments/inventory-stack-entries.html`,
 `inventory-materialboerse.js`,
 `materialboerse-release.js`
 
@@ -647,8 +647,8 @@ member viewing it, with no description body, supplier identity or location cross
 the materialboerse modules is whitelisted (parity test).
 
 **Enforced by:** `MaterialgesuchPageControllerMvcTest`, `MaterialboersePatternRenderTest`,
-`LiveSyncSectionMapParityTest`, `MaterialboardRequestModalE2eTest`, CI Playwright · **Code:** `materialboerse.html`,
-`fragments/materialgesuch-board.html`, `fragments/materialgesuch-modal.html`, `materialboerse.js`,
+`LiveSyncSectionMapParityTest`, `MaterialboardRequestModalE2eTest`, CI Playwright · **Code:** `materialexchange/materialboerse.html`,
+`materialexchange/fragments/materialgesuch-board.html`, `materialexchange/fragments/materialgesuch-modal.html`, `materialboerse.js`,
 `materialgesuch-modal.js`, `LiveSyncTopicClass.MATERIALBOARD`
 
 ### REQ-MARKET-019 — Audited area (requests)

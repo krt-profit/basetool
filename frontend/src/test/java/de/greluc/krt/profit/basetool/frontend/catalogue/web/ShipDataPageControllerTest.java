@@ -58,7 +58,7 @@ class ShipDataPageControllerTest {
 
     String view = controller.listData(model);
 
-    assertEquals("ship-data", view);
+    assertEquals("catalogue/ship-data", view);
   }
 
   @Test

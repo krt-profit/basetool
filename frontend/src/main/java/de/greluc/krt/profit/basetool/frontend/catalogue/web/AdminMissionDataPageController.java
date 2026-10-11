@@ -170,10 +170,10 @@ public class AdminMissionDataPageController {
       model.addAttribute("error", "error.admin.mission.data.load");
     }
     return switch (fragment == null ? "" : fragment) {
-      case "squadrons-results" -> "admin/mission-data :: squadrons-results";
-      case "jobtypes-results" -> "admin/mission-data :: jobtypes-results";
-      case "freqtypes-results" -> "admin/mission-data :: freqtypes-results";
-      default -> "admin/mission-data";
+      case "squadrons-results" -> "catalogue/admin/mission-data :: squadrons-results";
+      case "jobtypes-results" -> "catalogue/admin/mission-data :: jobtypes-results";
+      case "freqtypes-results" -> "catalogue/admin/mission-data :: freqtypes-results";
+      default -> "catalogue/admin/mission-data";
     };
   }
 

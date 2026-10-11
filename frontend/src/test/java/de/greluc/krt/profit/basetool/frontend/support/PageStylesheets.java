@@ -32,14 +32,15 @@ import java.util.regex.Pattern;
 import org.springframework.test.web.servlet.ResultMatcher;
 
 /**
- * Asserts on the page stylesheets ({@code static/css/pages/<page>.css}) a rendered page links. The
- * link is read from the rendered HTML, so a page that links no stylesheet fails outright.
+ * Asserts on the page stylesheets ({@code static/css/pages/<domain>/<page>.css}) a rendered page
+ * links. The link is read from the rendered HTML, so a page that links no stylesheet fails
+ * outright.
  */
 public final class PageStylesheets {
 
   /** A page-stylesheet href, with or without the content hash the resource chain appends. */
   private static final Pattern LINK =
-      Pattern.compile("/css/pages/([A-Za-z0-9._-]+?)(?:-[0-9a-f]{32})?\\.css");
+      Pattern.compile("/css/pages/([A-Za-z0-9._/-]+?)(?:-[0-9a-f]{32})?\\.css");
 
   private PageStylesheets() {}
 

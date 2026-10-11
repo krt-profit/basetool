@@ -218,7 +218,7 @@ public class ProfileController {
           new ProfileRsiHandleForm(rsiHandle, version != null ? version : 0L));
     }
 
-    return "profile";
+    return "identity/profile";
   }
 
   /**

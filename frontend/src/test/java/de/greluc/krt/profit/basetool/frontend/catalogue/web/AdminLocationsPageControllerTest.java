@@ -100,7 +100,7 @@ class AdminLocationsPageControllerTest {
 
     String view = controller.listData(model);
 
-    assertEquals("admin/locations", view);
+    assertEquals("catalogue/admin/locations", view);
     @SuppressWarnings("unchecked")
     List<LocationDto> locations = (List<LocationDto>) model.getAttribute("locations");
     assertEquals(2, locations.size(), "the second backend page must not be dropped");

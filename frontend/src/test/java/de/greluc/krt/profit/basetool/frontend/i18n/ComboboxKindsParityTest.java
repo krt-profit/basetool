@@ -41,9 +41,9 @@ class ComboboxKindsParityTest {
   /** The three registry modules that assign {@code krtComboboxRemoteSources['<marker>'] = …}. */
   private static final List<String> REGISTRY_MODULES =
       List.of(
-          "/static/js/krt-user-search.js",
-          "/static/js/krt-catalog-search.js",
-          "/static/js/krt-bank-account-search.js");
+          "/static/js/kernel/krt-user-search.js",
+          "/static/js/kernel/krt-catalog-search.js",
+          "/static/js/kernel/krt-bank-account-search.js");
 
   /**
    * Matches a remote-source registration: a bracketed single-quoted marker assigned on the shared
@@ -81,7 +81,7 @@ class ComboboxKindsParityTest {
         .isNotEmpty();
 
     Set<String> kinds = new LinkedHashSet<>();
-    Matcher matcher = KINDS_ENTRY.matcher(readResource("/templates/fragments/head.html"));
+    Matcher matcher = KINDS_ENTRY.matcher(readResource("/templates/kernel/fragments/head.html"));
     while (matcher.find()) {
       kinds.add(matcher.group(1));
     }

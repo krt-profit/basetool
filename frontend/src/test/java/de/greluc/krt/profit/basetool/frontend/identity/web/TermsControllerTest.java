@@ -91,7 +91,10 @@ class TermsControllerTest {
 
   @Test
   void shouldReturnTermsView() throws Exception {
-    mockMvc.perform(get("/terms")).andExpect(status().isOk()).andExpect(view().name("terms"));
+    mockMvc
+        .perform(get("/terms"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/terms"));
   }
 
   /**
@@ -107,7 +110,7 @@ class TermsControllerTest {
     mockMvc
         .perform(get("/terms"))
         .andExpect(status().isOk())
-        .andExpect(view().name("terms"))
+        .andExpect(view().name("identity/terms"))
         .andExpect(
             content()
                 .string(
@@ -157,7 +160,7 @@ class TermsControllerTest {
         .containsPattern("class=\"page-eyebrow\"[^>]*>Rechtliches<")
         .contains("<h1>Nutzungsbedingungen</h1>")
         .contains("class=\"card legal-doc\"")
-        .contains("/css/legal")
+        .contains("/css/shell/legal")
         .doesNotContain("hud-box")
         .doesNotContain("krtm-");
   }

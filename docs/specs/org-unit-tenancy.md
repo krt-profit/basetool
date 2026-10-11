@@ -813,7 +813,7 @@ sidebar (`activeSquadronId`) is one of its options and nothing else is selected,
 Otherwise the empty choice reads „-- Bitte wählen --" / „-- Please choose --". *Amended 2026-10-02 by
 the owner: the empty choice read „-- Heimat-Staffel beibehalten --", although an empty pick resolves
 to the only direct membership or the pin, and is refused otherwise.* The rule lives in the shared
-`fragments/owner-picker.html` and so holds on all five surfaces.
+`kernel/fragments/owner-picker.html` and so holds on all five surfaces.
 
 On the **on-behalf book-in** (`/inventory/input?source=admin`) the picker follows the member being
 booked for: it is rendered even with one option (hidden), and choosing a member refills it from
@@ -840,9 +840,9 @@ entry again restores the caller's options.
 **Enforced by:** `OrgUnitStampingServiceOwnerRequiredTest` (both entry points, the status, and the
 pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidden on-behalf picker),
 `InventoryOperationsE2eTest#onBehalfOwnerPickerFollowsTheChosenMember` · **Code:**
-`fragments/owner-picker.html`, `inventory-input.js`, `OrgUnitStampingService#resolveStampedOrgUnit` /
+`kernel/fragments/owner-picker.html`, `inventory-input.js`, `OrgUnitStampingService#resolveStampedOrgUnit` /
 `#resolveSquadronForPickerOutput`, `scope/api/OwnerOrgUnitRequiredException`, `ScopeProblemCode`,
-`krt-fetch.js#ownerOrgUnitRequiredMessage`, `fragments/head.html` ·
+`krt-fetch.js#ownerOrgUnitRequiredMessage`, `kernel/fragments/head.html` ·
 **Related:** REQ-ORG-016, REQ-ORG-017, REQ-API-* (RFC 7807), the i18n rule in the root `CLAUDE.md`
 
 ### REQ-ORG-028 — A scoped aggregate carries `@TenantScoped`, and the scope rules select by it

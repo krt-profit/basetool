@@ -13,8 +13,8 @@ architecture decision (and the rejected alternatives — htmx, cookie-CSRF, app-
 ADR-0012. Phase 0 (#572) builds the foundation + exemplars; per-area conversions are the epic's
 child issues (#573–#582).
 
-The foundation lives in [`krt-fetch.js`](../../frontend/src/main/resources/static/js/krt-fetch.js),
-loaded globally from `fragments/head.html`. It exposes `window.krtFetch` (`write`, `submitForm`,
+The foundation lives in [`krt-fetch.js`](../../frontend/src/main/resources/static/js/kernel/krt-fetch.js),
+loaded globally from `kernel/fragments/head.html`. It exposes `window.krtFetch` (`write`, `submitForm`,
 `swap`, `bindSwap`, `syncVersion`, `handleProblem`, `sectionWrite`, `serialize`, plus the
 re-authentication helpers `maybeReauthenticate` / `reauthRedirect` and the shared
 `ownerOrgUnitRequiredMessage` wording) and `window.krtCsrf` (`headers`, `token`, `headerName`,
@@ -87,7 +87,7 @@ its back/forward cache.
 
 Mutations use `krtFetch.write(...)`; no page may hand-roll a `fetch` write or a CSRF-header read.
 `krtCsrf` is the single source of truth, reading the freshest `meta[name="_csrf"]` /
-`meta[name="_csrf_header"]` tags. Hard-coded header names (e.g. the former `members.html`
+`meta[name="_csrf_header"]` tags. Hard-coded header names (e.g. the former `identity/members.html`
 `X-CSRF-TOKEN`) are forbidden.
 
 **Multipart / `FormData` writes use `krtFetch.submitForm(...)` (S10, #916).** A form-POST write — a
@@ -627,16 +627,16 @@ refinery-import (#591), asset-management (#578), bank (#579), promotion (#580), 
 for an unknown fragment name), and `AdminMissionDataCrudE2eTest` (the three include-inactive filters
 swap with no navigation request). **Issues:** the epic children
 (#572) through (#591), most recently (#580), (#581) and (#582), the last child. **Code:**
-`krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
-`mission-detail.html`,
-`orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`, `datetime-splitter.js`,
-`hangar.html`, `ship-data.html`, `personal-inventory.html`, `personal-inventory-blueprints.html`,
-`personal-inventory*.js`, `bank.js`, `bank-account-detail.html`, `bank-manage.html`,
-`bank-grants.html`, `promotion-admin-topics.html`, `promotion-admin-rank-requirements.html`,
-`promotion-manage.html`, `org-chart.html`, `members.html`, `member-edit.html`, `profile.html`,
-`index.html`, and the #582 admin pages — `announcement.html`, `sync-reports.html`, `locations.html`,
-`materials.html`, `material-aliases.html`, `admin-settings.html`, `uex.html`,
-`fragments/admin-uex.html`, `mission-data.html`, `special-commands.html`,
+`krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `kernel/fragments/pagination.html`,
+`mission/mission-detail.html`,
+`joborder/orders-index.html`, `joborder/orders-detail.html`, `refinery/refinery-orders-create.html`, `datetime-splitter.js`,
+`hangar/hangar.html`, `catalogue/ship-data.html`, `personalinventory/personal-inventory.html`, `blueprint/personal-inventory-blueprints.html`,
+`personal-inventory*.js`, `bank.js`, `bank/bank-account-detail.html`, `bank/bank-manage.html`,
+`bank/bank-grants.html`, `promotion/promotion-admin-topics.html`, `promotion/promotion-admin-rank-requirements.html`,
+`promotion/promotion-manage.html`, `orgchart/org-chart.html`, `identity/members.html`, `identity/member-edit.html`, `identity/profile.html`,
+`dashboard/index.html`, and the #582 admin pages — `announcement.html`, `sync-reports.html`, `locations.html`,
+`catalogue/materials.html`, `material-aliases.html`, `settings/admin-settings.html`, `uex.html`,
+`catalogue/fragments/admin-uex.html`, `mission-data.html`, `special-commands.html`,
 `special-command-detail.html`, `p4k-import.js` — over `JobOrderPageController`,
 `RefineryOrderPageController`, `HangarPageController`, `ShipDataPageController`,
 `PersonalInventoryPageController`, `PersonalInventoryBlueprintsPageController`, `BankPageController`,
@@ -680,8 +680,8 @@ submit helper can surface them inline.
 - [ ] With JavaScript disabled the classic form still `POST→redirect`s (the twin is header-gated).
 
 **Enforced by:** create/refinery navigate-after-AJAX MVC tests (`X-Requested-With` twins return
-`{targetUrl}` / `400`) · **Issues:** #575 · **Code:** `orders-create.html`, `refinery-orders-create.html`,
-`refinery-orders-details.html`, `JobOrderPageController`, `RefineryOrderPageController` (`*Ajax`
+`{targetUrl}` / `400`) · **Issues:** #575 · **Code:** `joborder/orders-create.html`, `refinery/refinery-orders-create.html`,
+`refinery/refinery-orders-details.html`, `JobOrderPageController`, `RefineryOrderPageController` (`*Ajax`
 twins, `propagateBackendError`).
 
 ### REQ-FE-007 — In-place form save with a `{field: message}` validation contract
@@ -726,7 +726,7 @@ to the same instant rather than failing and nulling it. A broken round-trip sile
 **Enforced by:** `MissionCoreEditAjaxControllerTest` (four-version re-read, microsecond zoneless
 schedule-time round-trip, 422 field map, 409 problem+json, fallback routing) +
 `MissionCoreEditInPlaceE2eTest` (in-place save, double-save no-409, inline validation). **Code:**
-`mission-detail.html`, `MissionWriteController` (`updateMissionAjax`, `applyMissionUpdate`,
+`mission/mission-detail.html`, `MissionWriteController` (`updateMissionAjax`, `applyMissionUpdate`,
 `parseToInstant`), `MissionPageController` (`formatInstant`). **Issues:** #589.
 
 ### REQ-FE-008 — A bfcache history-restore renders fresh server state
@@ -742,8 +742,8 @@ deposit on the account-detail page (in-place, correct) → browser back → dash
 old balance until a manual reload.
 
 A single global `pageshow` listener (in
-[`common-handlers.js`](../../frontend/src/main/resources/static/js/common-handlers.js), loaded on
-every page via `fragments/head.html`) calls `window.location.reload()` exactly when
+[`common-handlers.js`](../../frontend/src/main/resources/static/js/kernel/common-handlers.js), loaded on
+every page via `kernel/fragments/head.html`) calls `window.location.reload()` exactly when
 `event.persisted` is true — the precise signal of a bfcache restore. It cannot loop: a fresh load
 fires `pageshow` with `persisted === false`. This is the second sanctioned reload of REQ-FE-001 and is
 deliberate (ADR-0013): a full reload, not a fragment swap, because the restored document is an
@@ -942,7 +942,7 @@ allocation-chip propagation + no-reload assertion, #1307) · **Code:** `LiveSync
 `mission-presence.js` (adapter: `sendChanged` / `krt:mission-changed` / `krt:mission-resync`),
 `krt-live-sync.js` (shared receiver factory), `mission-detail.js` (`krtRefreshMissionSection`
 broadcast + receiver config — its container map derived from the `MISSION_SECTIONS` seam map — with
-flush-time busy re-check + finance-badge `krt:swapped` listener), `mission-detail.html`
+flush-time busy re-check + finance-badge `krt:swapped` listener), `mission/mission-detail.html`
 (`overviewSection` fragment), `MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031,
 ADR-0069, ADR-0094
 
@@ -950,11 +950,11 @@ ADR-0069, ADR-0094
 
 As the member base grows, plain `<select>` dropdowns of users become unusable. **Every field that
 lets a user pick a registered user/member must be a searchable combobox** rendered by
-[`krt-searchable-select.js`](../../frontend/src/main/resources/static/js/krt-searchable-select.js),
+[`krt-searchable-select.js`](../../frontend/src/main/resources/static/js/kernel/krt-searchable-select.js),
 filtering on **both** the user's `username` **and** their display name. The control is opted in with
 the `data-krt-combobox` marker; each `<option>` carries the secondary search term in `data-search`
 (the `username`) so a label that shows only the display name still matches the login handle, and vice
-versa. The enhancer is loaded **globally** from `fragments/head.html` and auto-initialises every
+versa. The enhancer is loaded **globally** from `kernel/fragments/head.html` and auto-initialises every
 `select[data-krt-combobox]` on `DOMContentLoaded` **and** on `krt:swapped` (so pickers inside swapped
 fragments are upgraded); `window.krtEnhanceComboboxes(root)` upgrades pickers a page builds
 dynamically (cloned modal/selector rows). Shared default labels live once in `window.krtComboboxI18n`
@@ -1076,7 +1076,7 @@ in `reconcile`, global `enhanceWithin` on
 `DOMContentLoaded` + `krt:swapped`, `id`/`data-*` passthrough, `setValue` API,
 `window.krtEnhanceComboboxes`), `krt-user-search.js`
 (the `remote-users` / `remote-bank-users` `window.krtComboboxRemoteSources` entries),
-`fragments/head.html` (global load + `window.krtComboboxI18n`), `UserController.searchUsersForBank` /
+`kernel/fragments/head.html` (global load + `window.krtComboboxI18n`), `UserController.searchUsersForBank` /
 `UserProxyController`, and the converted templates/selects · **ADR:** ADR-0053, ADR-0089
 
 ### REQ-FE-012 — A user's own back-to-back writes to one lock scope never self-collide
@@ -1214,7 +1214,7 @@ both.
 
 **Enforced by:** `MissionCoreEditAjaxControllerTest` (dirty-flag-gated PATCH fan-out) + e2e · **Code:**
 `MissionForm` (`dirtyCore` / `dirtySchedule` / `dirtyFlags`), `MissionWriteController`
-(`applyMissionUpdate`), `mission-detail.html` (hidden dirty inputs), `mission-detail.js` (section
+(`applyMissionUpdate`), `mission/mission-detail.html` (hidden dirty inputs), `mission-detail.js` (section
 snapshot + `markDirtySections`) · **Issue:** #1136
 
 ### REQ-FE-015 — Tool-wide live peer sync over topic rooms on one multiplexed WebSocket
@@ -1594,7 +1594,7 @@ not theoretical: `/catalog/location-search` fetched 25 rows against a render cap
 the 53 visible locations** — MIC-L5, Patch City, New Babbage and Orison among them — could not be
 selected at all when booking stock into the Lager; `/inventory/item-search` and the bank-account
 relay fetched *exactly* the render cap, with the same silent effect from the 51st match on.
-`PickerSearchLimitsParityTest` reads the shipped JS and `fragments/head.html` off the classpath and
+`PickerSearchLimitsParityTest` reads the shipped JS and `kernel/fragments/head.html` off the classpath and
 pins both halves against the constants so they cannot drift apart again.
 
 **The user searches follow the same rule** (2026-09-23). `/users/search` and `/users/search-bank`
@@ -1670,7 +1670,7 @@ ARIA ids, no native select left to re-enhance).
 
 **Bespoke pickers with a browse-everything mode.** One picker predates the `krt-searchable-select`
 standard and stays bespoke: the personal-inventory (Mein Inventar) **UEX location typeahead**
-(`static/js/personal-inventory.js` → `/personal-inventory/uex-search` →
+(`static/js/personalinventory/personal-inventory.js` → `/personal-inventory/uex-search` →
 `GET /api/v1/uex/locations/search`). It searches server-side like the converted pickers — typing
 narrows the query and every UEX city / space station stays reachable — **but** it also renders on
 empty-query focus, a "browse everything" mode that returns up to the backend clamp (2000 rows). In
@@ -1734,8 +1734,8 @@ the account analogue of the 5000-scale switch (ADR-0085/ADR-0089), and the fix f
 
 The control opts in **declaratively by the marker value** `data-krt-combobox="remote-bank-accounts"`,
 resolved through the shared registry to the source in
-[`krt-bank-account-search.js`](../../frontend/src/main/resources/static/js/krt-bank-account-search.js)
-(loaded from `fragments/head.html` **before** `krt-searchable-select.js`, exactly like the user
+[`krt-bank-account-search.js`](../../frontend/src/main/resources/static/js/kernel/krt-bank-account-search.js)
+(loaded from `kernel/fragments/head.html` **before** `krt-searchable-select.js`, exactly like the user
 sources). The source queries the frontend proxy `GET /api/proxy/bank/accounts/search` (→ backend
 `GET /api/v1/bank/accounts?status=ACTIVE&size=…&sort=name,asc`, caller-scoped, REQ-BANK-010) and maps
 each row to a `<accountNo> — <name>` option. Four pickers convert: the transfer destination
@@ -1778,9 +1778,9 @@ active/name-sorted + unwraps content), `BankPageControllerTest` / `BankGrantsPag
 account roster preloaded; the grants filter seeds only the selected account) · **Code:**
 `krt-bank-account-search.js` (the `remote-bank-accounts` `krtComboboxRemoteSources` entry +
 `window.krtBankAccountMeta`), `krt-searchable-select.js` (the marker→`remoteSource` lookup, reused),
-`static/js/bank.js` (attribute-delegated source/filter handlers, metadata-map justification),
-`bank/web/BankProxyController#searchAccounts`, `templates/fragments/bank-movement-modal.html`,
-`templates/bank-grants.html`, `fragments/head.html` (script load order) · **ADR:** ADR-0053, ADR-0089,
+`static/js/bank/bank.js` (attribute-delegated source/filter handlers, metadata-map justification),
+`bank/web/BankProxyController#searchAccounts`, `templates/bank/fragments/bank-movement-modal.html`,
+`templates/bank/bank-grants.html`, `kernel/fragments/head.html` (script load order) · **ADR:** ADR-0053, ADR-0089,
 ADR-0106 · **Issues:** —
 
 ### REQ-FE-018 — The browser scripts are type-checked, and the DTO types are generated from the OpenAPI spec
@@ -2148,11 +2148,11 @@ calls `refresh()` after the swap so a collapsed panel never under-reports.
 
 **Enforced by:** `InventoryFilterPanelCollapseE2eTest`, `JobOrderMaterialDemandE2eTest`,
 `InventoryPageControllerMvcTest` (the filters inside the toolbar popover) · **Code:**
-`krt-filter-panel.js`, `fragments/components.html` (`filterPopover`)
+`krt-filter-panel.js`, `kernel/fragments/components.html` (`filterPopover`)
 
 ### REQ-FE-023 — Every script is deferred, and an inline script runs nothing at parse time
 
-Every external `<script>` of the frontend — the shared ones `fragments/head.html` loads and every
+Every external `<script>` of the frontend — the shared ones `kernel/fragments/head.html` loads and every
 page module — carries `defer` (FE-PERF-05, 2026-09-23). Deferred scripts run in **document order**
 after the HTML is parsed and before `DOMContentLoaded`, so the dependency order is unchanged: the
 head's shared scripts before the page modules that use them, `krt-fetch.js` before
@@ -2172,7 +2172,7 @@ script, which runs where it stands, during parsing, before any deferred file:
   `if (window.krtFetch)` guard such scripts carry turns that into a silent no-op — the shape this
   load order regressed in three times. The inline scripts that ran code at parse time moved onto
   `DOMContentLoaded` (the bank detail / holder / manage pagers, the org-unit bank tabs and account
-  detail, the member edit form). `fragments/head.html`'s own inline scripts are exempt: they are the
+  detail, the member edit form). `kernel/fragments/head.html`'s own inline scripts are exempt: they are the
   bootstrap stubs and dictionaries that must exist first.
 
 A second `krtEvents` watchdog sits in the head, beside the stub: if `event-delegation.js` has not
@@ -2196,7 +2196,7 @@ compression instead (`gzip_types` for JavaScript, CSS and JSON, PR #2021).
   script threw and no client-error beacon was sent.
 
 **Enforced by:** `InlineScriptLoadOrderTest` (the first two), `ScriptLoadOrderE2eTest` (the third,
-over `FrontendPageRoutes.CORE_SMOKE`) · **Code:** `fragments/head.html`, `event-delegation.js`,
+over `FrontendPageRoutes.CORE_SMOKE`) · **Code:** `kernel/fragments/head.html`, `event-delegation.js`,
 `krt-client-error.js` · **Related:** REQ-FE-001, REQ-OBS-* (`basetool_client_error_total`), ADR-0069
 (page JavaScript in static modules), ADR-0125
 
@@ -2225,7 +2225,7 @@ A filter, a search or a pager is not unsaved data, and the guard must not treat 
 - [x] An unsaved edit in a data form still opens the dialog when a link is clicked.
 
 **Enforced by:** `UnsavedChangesGuardE2eTest` · **Code:** `unsaved-changes.js`,
-`fragments/unsaved-modal.html`, `admin-terms.js`, `admin/terms.html` · **Related:** REQ-FE-005,
+`kernel/fragments/unsaved-modal.html`, `admin-terms.js`, `identity/admin/terms.html` · **Related:** REQ-FE-005,
 REQ-FE-021
 
 ### REQ-FE-025 — The route table and its gates are pinned, and every handler carries a gate
@@ -2562,7 +2562,7 @@ what it needs; the parameters start with `page` so that they cannot collide with
 **Acceptance**
 
 - [x] 90 page templates were converted in stacked commits against a golden file captured before the
-  first one; the snapshot did not change in any step (2026-10-11). `organisation/unit-detail.html`
+  first one; the snapshot did not change in any step (2026-10-11). `orgunit/organisation/unit-detail.html`
   stays: it has no head, only the roster fragments other pages include.
 - [x] A page that drops its toast, its tail or its links, turns the chrome off or adds a body
   attribute, and a layout that swaps header and sidebar, moves the content after the toast or
@@ -2570,7 +2570,54 @@ what it needs; the parameters start with `page` so that they cannot collide with
 - [x] A page that copies the chrome again, or has a head without the layout call, is reported.
 
 **Enforced by:** `PageChromeSnapshotTest`, `ChromeNeutraliserTest`, `PageLayoutCompositionTest` ·
-**Code:** `templates/fragments/layout.html` · **Related:** REQ-UI-026, REQ-FE-023, REQ-UI-023
+**Code:** `templates/kernel/fragments/layout.html` · **Related:** REQ-UI-026, REQ-FE-023, REQ-UI-023
+
+### REQ-FE-034 — Templates, scripts and stylesheets live in their domain's folder
+
+Since 2026-10-11 (plan §5.9, F5) the frontend's templates and static assets are laid out like its
+Java packages: the folder is the domain, and the domains are the packages of the frontend (REQ-FE-032)
+- `kernel`, `shell` and the 21 domains.
+
+| Kind | Folder | Served as |
+| --- | --- | --- |
+| Template | `templates/<domain>/<path>.html`, keeping the old `admin/`, `fragments/` and `organisation/` sub-folders | view name `<domain>/<path>` |
+| Script | `static/js/<domain>/<name>.js`, the domain being the one `typecheck-ratchet.json` lists it under | `/js/<domain>/<name>.js` |
+| Area stylesheet | `static/css/<domain>/<name>.css`; the design system's `styles.css` is `kernel/styles.css` | `/css/<domain>/<name>.css` |
+| Page stylesheet | `static/css/pages/<domain>/<page>.css`, still one file per template (REQ-UI-023) | `/css/pages/<domain>/<page>.css` |
+
+- **Nothing sits flat.** The one exception are the five templates Spring Boot's error view resolver
+  finds by name (`error.html`, `error/403.html`, `error/404.html`, `error/500.html`,
+  `error/error.html`). `vendor/` below `static/js` is third-party code and is not the domain's.
+- **The shared kernel folder holds what no single domain owns**: the page layout and its chrome
+  fragments, the dialog wrapper, the design-system components, the transport and live-sync scripts and
+  `styles.css`. A fragment used by one domain lives in that domain, whichever page includes it.
+- **A move changes names, not behaviour.** View names in controllers, `th:replace` paths and the
+  `th:src` / `th:href` links were rewritten with the files; the content-hashed asset URLs
+  (`VersionResourceResolver`, one-year `immutable`) work for any sub-folder, so every moved asset is
+  still served at its hash; the nonce, the CSP and the load order are untouched. The route and gate
+  snapshot (REQ-FE-025) and the rendered page chrome (REQ-FE-033) are byte-identical apart from the
+  asset paths they contain.
+- **A stylesheet or script may be linked by a page of another domain**, and some are: `bank.css`
+  (the audit log), `personal-inventory.css` (the blueprint pages), `promotion-admin.css` (the
+  catalogue's price page), `legal.css`, `materialboerse.css` and `organisation-unit-detail.css` each
+  have a second user, and the kernel's chrome loads `notifications.js`. The folder is the owner's;
+  the later boundary test of plan §5.9 names these as its allow-list.
+
+**Acceptance**
+
+- [x] 124 templates, 124 scripts and 88 stylesheets moved with `git mv` (2026-10-11); a flat
+  template, script or stylesheet, a file in a folder that is no domain and a page stylesheet outside
+  `pages/<domain>/` each make the layout test fail.
+- [x] Every `th:src`, `th:href`, `src` and `href` of every template (290 links) names an existing
+  file, every script and stylesheet is linked, and every linked asset resolves to a content-hashed
+  URL and is served; planted missing and orphaned assets are reported.
+- [x] The type-check ratchet (REQ-FE-018) lists each script by its path and fails a script that is
+  listed under another domain than its folder.
+
+**Enforced by:** `AssetLayoutTest`, `AssetReferenceResolutionTest`,
+`StaticResourceHandlerMappingTest#everyAssetATemplateLinksIsServedAtItsContentHashedUrl`,
+`ViewNameResolutionTest`, `:frontend:testTypecheckRatchet` · **Related:** REQ-FE-018, REQ-FE-032,
+REQ-FE-033, REQ-UI-023, REQ-OPS-038
 
 ## Out of scope
 

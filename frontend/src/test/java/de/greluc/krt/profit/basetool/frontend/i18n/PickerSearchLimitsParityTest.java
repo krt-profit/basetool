@@ -40,13 +40,13 @@ import org.junit.jupiter.api.Test;
 class PickerSearchLimitsParityTest {
 
   /** The combobox module carrying the {@code maxResults} default. */
-  private static final String COMBOBOX_MODULE = "/static/js/krt-searchable-select.js";
+  private static final String COMBOBOX_MODULE = "/static/js/kernel/krt-searchable-select.js";
 
   /** The fragment carrying the per-kind {@code krtComboboxI18n.kinds} overrides. */
-  private static final String HEAD_FRAGMENT = "/templates/fragments/head.html";
+  private static final String HEAD_FRAGMENT = "/templates/kernel/fragments/head.html";
 
   /** The mission page script part carrying the user autocompletes' render cap. */
-  private static final String MISSION_MODULE = "/static/js/mission-detail-participants.js";
+  private static final String MISSION_MODULE = "/static/js/mission/mission-detail-participants.js";
 
   /** Matches the {@code USER_SEARCH_RENDER_CAP} declaration in the mission page module. */
   private static final Pattern MISSION_USER_CAP =

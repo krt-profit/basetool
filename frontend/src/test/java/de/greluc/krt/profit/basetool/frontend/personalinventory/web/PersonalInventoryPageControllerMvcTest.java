@@ -91,7 +91,7 @@ class PersonalInventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/personal-inventory"))
         .andExpect(status().isOk())
-        .andExpect(view().name("personal-inventory"))
+        .andExpect(view().name("personalinventory/personal-inventory"))
         .andExpect(model().attributeExists("personalInventoryForm"))
         .andExpect(model().attributeExists("items"));
   }
@@ -107,7 +107,7 @@ class PersonalInventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/personal-inventory").param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("personal-inventory :: results"))
+        .andExpect(view().name("personalinventory/personal-inventory :: results"))
         .andExpect(content().string(containsString("id=\"pi-total-meta\"")))
         .andExpect(content().string(containsString("empty-state")))
         .andExpect(content().string(not(containsString("id=\"pi-results\""))))

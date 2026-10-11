@@ -714,12 +714,15 @@ val testGenApiTypes =
 val testLiveSyncJs =
   tasks.register<NodeTask>("testLiveSyncJs") {
     group = "verification"
-    description = "Regression tests for the live-sync socket script (static/js/krt-live-sync.js)."
+    description =
+      "Regression tests for the live-sync socket script (static/js/kernel/krt-live-sync.js)."
     dependsOn(tasks.named("npmSetup"))
     script.set(layout.projectDirectory.file("scripts/krt-live-sync.test.mjs").asFile)
     ignoreExitValue.set(false)
     inputs.file(layout.projectDirectory.file("scripts/krt-live-sync.test.mjs"))
-    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/krt-live-sync.js"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-live-sync.js")
+    )
     outputs.upToDateWhen { false }
   }
 
@@ -731,7 +734,9 @@ val testPromotionCsvEscape =
     script.set(layout.projectDirectory.file("scripts/promotion-csv-escape.test.mjs").asFile)
     ignoreExitValue.set(false)
     inputs.file(layout.projectDirectory.file("scripts/promotion-csv-escape.test.mjs"))
-    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/promotion-manage.js"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/promotion/promotion-manage.js")
+    )
     outputs.upToDateWhen { false }
   }
 
@@ -743,7 +748,7 @@ val testKrtFetchReadJs =
     script.set(layout.projectDirectory.file("scripts/krt-fetch-read.test.mjs").asFile)
     ignoreExitValue.set(false)
     inputs.file(layout.projectDirectory.file("scripts/krt-fetch-read.test.mjs"))
-    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/krt-fetch.js"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-fetch.js"))
     outputs.upToDateWhen { false }
   }
 
@@ -756,8 +761,8 @@ val testTrustedTypesJs =
     script.set(layout.projectDirectory.file("scripts/trusted-types.test.mjs").asFile)
     ignoreExitValue.set(false)
     inputs.file(layout.projectDirectory.file("scripts/trusted-types.test.mjs"))
-    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/krt-html.js"))
-    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/krt-fetch.js"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-html.js"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-fetch.js"))
     outputs.upToDateWhen { false }
   }
 

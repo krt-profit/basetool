@@ -103,14 +103,15 @@ class ColourTokenCopyTest {
   /**
    * Scans the stylesheets of one resources tree.
    *
-   * @param resources a directory holding {@code static/css/styles.css}
+   * @param resources a directory holding {@code static/css/kernel/styles.css}
    * @return the counts and the offenders
    * @throws IOException if a stylesheet cannot be read
    */
   static @NotNull Scan scan(@NotNull Path resources) throws IOException {
     Path cssRoot = resources.resolve("static/css");
     Map<String, String> tokenByRgb = new TreeMap<>();
-    Matcher token = TOKEN.matcher(CssSources.stripComments(read(cssRoot.resolve("styles.css"))));
+    Matcher token =
+        TOKEN.matcher(CssSources.stripComments(read(cssRoot.resolve("kernel/styles.css"))));
     while (token.find()) {
       tokenByRgb.putIfAbsent(normalise(token.group(2)), token.group(1));
     }

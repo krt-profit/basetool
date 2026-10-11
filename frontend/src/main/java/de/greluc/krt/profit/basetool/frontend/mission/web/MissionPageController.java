@@ -262,9 +262,9 @@ public class MissionPageController {
       model.addAttribute("error", "error.missions.load");
     }
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
-      return "missions :: missionsResults";
+      return "mission/missions :: missionsResults";
     }
-    return "missions";
+    return "mission/missions";
   }
 
   /**
@@ -441,7 +441,7 @@ public class MissionPageController {
     } catch (Exception e) {
       log.error("Error loading mission details", e);
       if (fragment != null) {
-        return "mission-detail :: fragmentError";
+        return "mission/mission-detail :: fragmentError";
       }
       model.addAttribute("error", "error.mission.details.load");
       return "redirect:/missions?error=error.mission.details.load";
@@ -449,18 +449,18 @@ public class MissionPageController {
     model.addAttribute("authUserId", CurrentUser.userIdText(principal));
     if (fragment != null) {
       return switch (fragment.toLowerCase(Locale.ROOT)) {
-        case "crew-board" -> "mission-detail :: crewBoard";
-        case "finance" -> "mission-detail :: financeSection";
-        case "mgmt" -> "mission-detail :: mgmtPanels";
-        case "overview" -> "mission-detail :: overviewSection";
-        case "steps-editor" -> "mission-detail :: stepsEditor";
-        case "objectives-editor" -> "mission-detail :: objectivesEditor";
-        case "frequencies-editor" -> "mission-detail :: frequenciesEditor";
-        case "organisation" -> "mission-detail :: organisationPanel";
-        default -> "mission-detail";
+        case "crew-board" -> "mission/mission-detail :: crewBoard";
+        case "finance" -> "mission/mission-detail :: financeSection";
+        case "mgmt" -> "mission/mission-detail :: mgmtPanels";
+        case "overview" -> "mission/mission-detail :: overviewSection";
+        case "steps-editor" -> "mission/mission-detail :: stepsEditor";
+        case "objectives-editor" -> "mission/mission-detail :: objectivesEditor";
+        case "frequencies-editor" -> "mission/mission-detail :: frequenciesEditor";
+        case "organisation" -> "mission/mission-detail :: organisationPanel";
+        default -> "mission/mission-detail";
       };
     }
-    return "mission-detail";
+    return "mission/mission-detail";
   }
 
   /**
@@ -514,7 +514,7 @@ public class MissionPageController {
     addFormsToModel(model, principal, true);
     addOperationsToModel(model);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
-    return "mission-detail";
+    return "mission/mission-detail";
   }
 
   /**

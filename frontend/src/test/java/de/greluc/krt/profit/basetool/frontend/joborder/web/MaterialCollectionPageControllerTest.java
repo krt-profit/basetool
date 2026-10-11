@@ -85,7 +85,7 @@ class MaterialCollectionPageControllerTest {
 
     String viewName = controller.viewMaterialCollection(jobOrderId, null, model);
 
-    assertEquals("material-collection", viewName);
+    assertEquals("joborder/material-collection", viewName);
     assertEquals(jobOrderId, model.getAttribute("jobOrderId"));
     assertEquals(entries, model.getAttribute("entries"));
     List<?> groups = (List<?>) model.getAttribute("materialGroups");
@@ -116,7 +116,7 @@ class MaterialCollectionPageControllerTest {
 
     String viewName = controller.viewMaterialCollection(jobOrderId, "results", model);
 
-    assertEquals("material-collection :: collectionResults", viewName);
+    assertEquals("joborder/material-collection :: collectionResults", viewName);
     assertEquals(jobOrderId, model.getAttribute("jobOrderId"));
   }
 
@@ -136,7 +136,7 @@ class MaterialCollectionPageControllerTest {
 
     String viewName = controller.viewMaterialCollection(jobOrderId, null, model);
 
-    assertEquals("material-collection", viewName);
+    assertEquals("joborder/material-collection", viewName);
     List<?> entries = (List<?>) model.getAttribute("entries");
     assertNotNull(entries);
     assertTrue(entries.isEmpty());
@@ -158,7 +158,7 @@ class MaterialCollectionPageControllerTest {
 
     String viewName = controller.viewMaterialCollection(jobOrderId, null, model);
 
-    assertEquals("material-collection", viewName);
+    assertEquals("joborder/material-collection", viewName);
     List<?> locations = (List<?>) model.getAttribute("locations");
     assertNotNull(locations);
     assertTrue(locations.isEmpty());

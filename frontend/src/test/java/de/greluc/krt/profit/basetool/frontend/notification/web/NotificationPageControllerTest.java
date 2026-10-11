@@ -101,7 +101,7 @@ class NotificationPageControllerTest {
     Model model = new ExtendedModelMap();
     String view = controller.page(model);
 
-    assertEquals("notifications", view);
+    assertEquals("notification/notifications", view);
     assertEquals(123L, model.getAttribute("notifTotal"));
     assertEquals(Boolean.TRUE, model.getAttribute("notifHasMore"));
     assertEquals(50, ((List<?>) model.getAttribute("notifications")).size());
@@ -136,7 +136,7 @@ class NotificationPageControllerTest {
     Model model = new ExtendedModelMap();
     String view = controller.page(model);
 
-    assertEquals("notifications", view);
+    assertEquals("notification/notifications", view);
     assertTrue(((List<?>) model.getAttribute("notifications")).isEmpty());
     assertEquals(0L, model.getAttribute("notifTotal"));
     assertEquals(Boolean.FALSE, model.getAttribute("notifHasMore"));

@@ -114,11 +114,11 @@ public class AdminExchangeClientsPageController {
     model.addAttribute("undoRuns", runs);
     model.addAttribute("undoRunning", runs.stream().anyMatch(ExchangeBulkUndoRunDto::running));
     if (REGISTRY_FRAGMENT.equals(fragment)) {
-      return "admin/exchange-clients :: " + REGISTRY_FRAGMENT;
+      return "exchange/admin/exchange-clients :: " + REGISTRY_FRAGMENT;
     }
     return UNDO_RUNS_FRAGMENT.equals(fragment)
-        ? "admin/exchange-clients :: " + UNDO_RUNS_FRAGMENT
-        : "admin/exchange-clients";
+        ? "exchange/admin/exchange-clients :: " + UNDO_RUNS_FRAGMENT
+        : "exchange/admin/exchange-clients";
   }
 
   /**

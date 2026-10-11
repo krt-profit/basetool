@@ -128,7 +128,7 @@ class RefineryOrderPaginationMvcTest {
                 .param("page", "1")
                 .with(oauth2Login()))
         .andExpect(status().isOk())
-        .andExpect(view().name("refinery-orders-index"))
+        .andExpect(view().name("refinery/refinery-orders-index"))
         .andExpect(
             content()
                 .string(containsString("/refinery-orders?view=COMPLETED&amp;page=0&amp;size=50")))

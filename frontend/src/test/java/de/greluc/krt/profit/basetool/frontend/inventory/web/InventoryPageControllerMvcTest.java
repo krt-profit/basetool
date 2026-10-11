@@ -115,7 +115,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-index"))
+        .andExpect(view().name("inventory/inventory-index"))
         .andExpect(model().attributeExists("aggregated"))
         .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
         .andExpect(content().string(not(containsString("data-table--stack"))));
@@ -149,7 +149,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/all"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-admin"))
+        .andExpect(view().name("inventory/inventory-admin"))
         .andExpect(model().attributeExists("groupedItems"));
   }
 
@@ -198,8 +198,8 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"umbuchenSubmitBtn\"")))
         .andExpect(content().string(containsString("data-herkunft=\"bookout\"")))
         .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
-        .andExpect(content().string(containsString("/js/inventory-herkunft.js")))
-        .andExpect(content().string(containsString("/js/inventory-common.js")))
+        .andExpect(content().string(containsString("/js/inventory/inventory-herkunft.js")))
+        .andExpect(content().string(containsString("/js/inventory/inventory-common.js")))
         .andExpect(content().string(containsString("terminalLoading")))
         .andExpect(content().string(containsString("terminalNoMaterial")));
   }
@@ -217,8 +217,8 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-herkunft=\"bookout\"")))
         .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
         .andExpect(content().string(containsString("data-herkunft-body")))
-        .andExpect(content().string(containsString("/js/inventory-herkunft.js")))
-        .andExpect(content().string(containsString("/js/inventory-common.js")))
+        .andExpect(content().string(containsString("/js/inventory/inventory-herkunft.js")))
+        .andExpect(content().string(containsString("/js/inventory/inventory-common.js")))
         .andExpect(content().string(containsString("terminalLoading")));
   }
 
@@ -477,7 +477,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-input"))
+        .andExpect(view().name("inventory/inventory-input"))
         .andExpect(
             content()
                 .string(
@@ -507,7 +507,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-input"))
+        .andExpect(view().name("inventory/inventory-input"))
         .andExpect(
             content()
                 .string(
@@ -530,7 +530,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-input"))
+        .andExpect(view().name("inventory/inventory-input"))
         .andExpect(content().string(containsString("name=\"inventoryCatalogMode\"")))
         .andExpect(
             content()
@@ -558,7 +558,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-input"))
+        .andExpect(view().name("inventory/inventory-input"))
         .andExpect(
             content()
                 .string(
@@ -697,7 +697,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/material/" + selectedMaterialId))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-material"))
+        .andExpect(view().name("inventory/inventory-material"))
         .andExpect(
             content()
                 .string(
@@ -746,7 +746,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/material/" + materialId).param("page", "1"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-material"))
+        .andExpect(view().name("inventory/inventory-material"))
         .andExpect(content().string(containsString("Port Olisar")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(containsString("page=2")))
@@ -794,7 +794,7 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-scu-decimal")))
         .andExpect(content().string(containsString("inputmode=\"decimal\"")))
         .andExpect(content().string(containsString("data-scu-allow-zero")))
-        .andExpect(content().string(containsString("/js/scu-decimal-input.js")))
+        .andExpect(content().string(containsString("/js/kernel/scu-decimal-input.js")))
         .andExpect(content().string(containsString("window.krtScuI18n")));
   }
 
@@ -1075,7 +1075,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-input"))
+        .andExpect(view().name("inventory/inventory-input"))
         .andExpect(
             content()
                 .string(
@@ -1124,7 +1124,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-input"))
+        .andExpect(view().name("inventory/inventory-input"))
         .andExpect(content().string(containsString("data-order-needs=")))
         .andExpect(content().string(containsString(orderId.toString())))
         .andExpect(content().string(containsString("&quot;outstandingAmount&quot;:250.0")))
@@ -1625,7 +1625,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-input"))
+        .andExpect(view().name("inventory/inventory-input"))
         .andExpect(model().attribute("missions", empty()))
         .andExpect(model().attribute("materials", hasSize(1)));
   }
@@ -1640,7 +1640,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-input"))
+        .andExpect(view().name("inventory/inventory-input"))
         .andExpect(content().string(containsString("id=\"jobOrderAllocRows\"")))
         .andExpect(content().string(containsString("id=\"missionAllocRows\"")))
         .andExpect(content().string(containsString("data-trigger=\"inv-input-add-order\"")))
@@ -1709,7 +1709,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/my").param("view", "items"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-my"))
+        .andExpect(view().name("inventory/inventory-my"))
         .andExpect(content().string(containsString("Quantum Drive XL-1")))
         .andExpect(content().string(containsString("RSI")))
         .andExpect(content().string(containsString("data-game-item-id=\"" + gameItemId + "\"")))
@@ -1764,7 +1764,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/all").param("view", "items"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-admin"))
+        .andExpect(view().name("inventory/inventory-admin"))
         .andExpect(content().string(containsString("Quantum Drive XL-1")))
         .andExpect(content().string(containsString("data-game-item-id=\"" + gameItemId + "\"")))
         .andExpect(content().string(containsString("data-user-id=\"" + userId + "\"")))
@@ -1797,7 +1797,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory").param("view", "items"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-index"))
+        .andExpect(view().name("inventory/inventory-index"))
         .andExpect(content().string(containsString("Quantum Drive XL-1")))
         .andExpect(content().string(containsString("RSI")))
         .andExpect(
@@ -1848,12 +1848,12 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/game-item/" + gameItemId))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-game-item"))
+        .andExpect(view().name("inventory/inventory-game-item"))
         .andExpect(content().string(containsString("Quantum Drive XL-1")))
         .andExpect(content().string(containsString("Item Owner")))
         .andExpect(content().string(containsString("Port Tressler")))
         .andExpect(content().string(containsString("id=\"inventory-game-item-results\"")))
-        .andExpect(content().string(containsString("/js/inventory-game-item.js")))
+        .andExpect(content().string(containsString("/js/inventory/inventory-game-item.js")))
         .andExpect(content().string(not(containsString("id=\"materialSelect\""))))
         .andExpect(content().string(not(containsString("4.000"))));
   }
@@ -1896,7 +1896,7 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/game-item/" + gameItemId).param("page", "1"))
         .andExpect(status().isOk())
-        .andExpect(view().name("inventory-game-item"))
+        .andExpect(view().name("inventory/inventory-game-item"))
         .andExpect(content().string(containsString("Port Tressler")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(containsString("page=2")))

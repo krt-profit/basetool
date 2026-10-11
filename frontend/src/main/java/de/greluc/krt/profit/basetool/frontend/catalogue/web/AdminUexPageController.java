@@ -152,7 +152,7 @@ public class AdminUexPageController {
       log.error("Error loading UEX admin data", e);
       model.addAttribute("error", "error.admin.uex.load");
     }
-    return "admin/uex";
+    return "catalogue/admin/uex";
   }
 
   /**

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true)}">
+<head>
+    <title th:text="#{material.collection.title} + ' - ' + ${appTitle}">Materialsammelübersicht - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/pages/joborder/material-collection.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='orders.detail.group.order', eyebrowHref=@{/orders/{id}(id=${jobOrderId})},
+        titleText=#{material.collection.title})}"></th:block>
+
+    <div class="card card--flush" id="material-collection-results">
+        <th:block th:fragment="collectionResults">
+        <th:block th:if="${entries == null or entries.isEmpty()}">
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='material.collection.empty', textKey='material.collection.empty.text')}"></th:block>
+        </th:block>
+
+        <th:block th:unless="${entries == null or entries.isEmpty()}">
+        <div class="collection-progress" data-collection-progress="total" role="progressbar"
+             aria-valuemin="0" aria-valuemax="100" th:aria-valuenow="${collectionProgress.percent()}"
+             th:attr="aria-label=#{collection.progress.label}"
+             th:data-progress-template="#{collection.progress.percent('%0')}">
+            <span class="collection-progress__label" th:text="#{collection.progress.percent(${collectionProgress.percent()})}">60 % geliefert</span>
+            <span class="collection-progress__track"><span class="collection-progress__fill" th:attr="data-krtm-width=${collectionProgress.percent()}"></span></span>
+        </div>
+
+        <table class="data-table data-table--stack collection-table" id="material-collection-table">
+            <thead>
+            <tr>
+                <th th:text="#{material.collection.col.owner}">Besitzer</th>
+                <th th:text="#{material.collection.col.location}">Standort</th>
+                <th class="num" th:text="#{material.collection.col.quality}">Qualität</th>
+                <th class="num" th:text="#{material.collection.col.quantity}">Menge</th>
+                <th class="cell-actions" th:text="#{material.collection.col.delivered}">Geliefert</th>
+            </tr>
+            </thead>
+            <tbody th:each="group : ${materialGroups}" class="collection-group" data-collection-group>
+            <tr class="collection-group__head">
+                <th scope="rowgroup" colspan="5">
+                    <span class="split gap-2">
+                        <span class="collection-group__title" th:text="${group.materialName != null ? group.materialName : '-'}">Material</span>
+                        <span class="collection-progress collection-progress--group" data-collection-progress="group" role="progressbar"
+                              aria-valuemin="0" aria-valuemax="100" th:aria-valuenow="${group.progress.percent()}"
+                              th:attr="aria-label=#{collection.progress.label}"
+                              th:data-progress-template="#{collection.progress.amountOf('%0', '%1')}">
+                            <span class="collection-progress__label"
+                                  th:text="#{collection.progress.amountOf(${group.progress.delivered()}, ${group.progress.total()})}">3 von 4 geliefert</span>
+                            <span class="collection-progress__track"><span class="collection-progress__fill" th:attr="data-krtm-width=${group.progress.percent()}"></span></span>
+                        </span>
+                    </span>
+                </th>
+            </tr>
+            <tr th:each="entry : ${group.entries}"
+                th:data-inventory-id="${entry.inventoryEntryId}"
+                th:data-version="${entry.version}"
+                th:data-amount="${entry.quantity}"
+                th:data-allocated="${entry.allocatedQuantity}">
+                <td>
+                    <select class="owner-select krt-select collection-select"
+                            data-role="owner-select" data-krt-combobox="remote-users"
+                            th:data-inventory-id="${entry.inventoryEntryId}"
+                            th:attr="aria-label=#{material.collection.col.owner}">
+                        <option th:if="${entry.ownerId != null}"
+                                th:value="${entry.ownerId}"
+                                th:selected="true"
+                                th:text="${entry.ownerName}"></option>
+                        <option th:if="${entry.ownerId == null}" selected disabled>—</option>
+                    </select>
+                </td>
+                <td class="collection-location" th:attr="data-label=#{material.collection.col.location}">
+                    <select class="location-select krt-select collection-select"
+                            th:data-inventory-id="${entry.inventoryEntryId}"
+                            th:attr="aria-label=#{material.collection.col.location}">
+                        <option th:if="${entry.locationId == null}" selected disabled>—</option>
+                        <option th:each="loc : ${locations}"
+                                th:value="${loc.id}"
+                                th:text="${loc.name}"
+                                th:selected="${loc.id == entry.locationId}"></option>
+                    </select>
+                </td>
+                <td class="num" th:attr="data-label=#{material.collection.col.quality}" th:text="${entry.quality}">500</td>
+                <td class="num" th:attr="data-label=#{material.collection.col.quantity}">
+                    <span class="cell-title" th:text="${entry.allocatedQuantity}">3</span>
+                    <span class="cell-sub" th:if="${entry.quantity > entry.allocatedQuantity}"
+                          th:text="#{material.collection.quantity.ofStock(${entry.quantity})}">von 10 im Bestand</span>
+                </td>
+                <td class="cell-actions" th:attr="data-label=#{material.collection.col.delivered}">
+                    <input type="checkbox"
+                           class="delivered-checkbox"
+                           th:data-inventory-id="${entry.inventoryEntryId}"
+                           th:data-job-order-id="${jobOrderId}"
+                           th:checked="${entry.delivered}"
+                           th:attr="aria-label=#{material.collection.col.delivered}">
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        </th:block>
+        </th:block>
+    </div>
+</main>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    const MSG_OWNER_UPDATED   = /*[[#{material.collection.toast.ownerUpdated}]]*/ 'Besitzer aktualisiert.';
+    const MSG_LOCATION_UPDATED = /*[[#{material.collection.toast.locationUpdated}]]*/ 'Standort aktualisiert.';
+    const MSG_DELIVERED_UPDATED = /*[[#{material.collection.toast.deliveredUpdated}]]*/ 'Lieferstatus aktualisiert.';
+    const MSG_ERROR_GENERIC   = /*[[#{material.collection.toast.error}]]*/ 'Fehler beim Speichern.';
+    window.orderId = /*[[${jobOrderId}]]*/ null;
+</script>
+<script th:src="@{/js/joborder/material-collection.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

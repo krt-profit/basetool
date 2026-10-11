@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageBare=true, pageContent=~{::pageContent})}">
+<head>
+    <title th:text="(${registrationRejected} ? #{pendingApproval.rejected.title} : (${registrationNoRole} ? #{pendingApproval.noRole.title} : #{pendingApproval.title})) + ' - ' + ${appTitle}">Freigabe ausstehend - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/pages/identity/pending-approval.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<header>
+    <nav>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/basetool-logo.svg}" alt="" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div id="pending-approval" class="card pending-approval-card"
+         th:data-status-url="@{/pending-approval/status}" th:data-home-url="@{/}">
+        <div id="pending-approval-waiting" th:if="${!registrationRejected and !registrationNoRole}">
+            <h1 th:text="#{pendingApproval.title}">Freigabe ausstehend</h1>
+            <p th:text="#{pendingApproval.message}">Dein Account wurde erstellt und wartet auf die Freigabe durch einen Administrator. Du kannst das Tool erst nutzen, sobald ein Administrator deinen Zugang freigegeben hat.</p>
+            <p class="pending-approval-emphasis" th:text="#{pendingApproval.patience}">Die Freigabe erfolgt manuell und kann 1 bis 2 Tage dauern. Bitte habe so lange etwas Geduld.</p>
+            <p class="pending-approval-help" th:text="#{pendingApproval.help}">Sobald du freigeschaltet bist, geht es hier automatisch weiter.</p>
+            <p id="pending-approval-approved" class="pending-approval-emphasis" hidden th:text="#{pendingApproval.approved}">Freigabe erteilt. Du wirst weitergeleitet.</p>
+        </div>
+        <div id="pending-approval-no-role" th:if="${registrationNoRole and !registrationRejected}">
+            <h1 th:text="#{pendingApproval.noRole.title}">Keine Rolle vergeben</h1>
+            <p th:text="#{pendingApproval.noRole.message}">Dein Zugang ist freigegeben, aber es ist noch keine Rolle hinterlegt.</p>
+            <p class="pending-approval-emphasis" th:text="#{pendingApproval.noRole.whatNow}">Eine Rolle vergibt die Administration.</p>
+            <p class="pending-approval-help" th:text="#{pendingApproval.noRole.contact}">Wende dich an einen Administrator im DAS-KARTELL-Discord.</p>
+        </div>
+        <div id="pending-approval-rejected" th:hidden="${!registrationRejected}">
+            <h1 th:text="#{pendingApproval.rejected.title}">Registrierung abgelehnt</h1>
+            <p th:text="#{pendingApproval.rejected.message}">Deine Registrierung wurde von einem Administrator abgelehnt. Du kannst das Tool damit nicht nutzen.</p>
+            <p class="pending-approval-emphasis" th:text="#{pendingApproval.rejected.noAutoUnlock}">Es erfolgt keine automatische Freischaltung.</p>
+            <p class="pending-approval-help" th:text="#{pendingApproval.rejected.contact}">Wenn du das für einen Irrtum hältst, wende dich an einen Administrator im DAS-KARTELL-Discord.</p>
+        </div>
+        <form th:action="@{/logout}" method="post" class="pending-approval-logout">
+            <button type="submit" class="btn btn-ghost" th:text="#{nav.logout}">Abmelden</button>
+        </form>
+    </div>
+</main>
+<script th:if="${!registrationRejected and !registrationNoRole}" th:src="@{/js/identity/pending-approval.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

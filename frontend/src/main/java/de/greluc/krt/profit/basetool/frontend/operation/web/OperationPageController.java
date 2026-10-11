@@ -159,10 +159,10 @@ public class OperationPageController {
       model.addAttribute("error", "error.operations.load");
     }
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
-      return "operations-index :: operationsResults";
+      return "operation/operations-index :: operationsResults";
     }
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions());
-    return "operations-index";
+    return "operation/operations-index";
   }
 
   /**
@@ -215,7 +215,7 @@ public class OperationPageController {
       model.addAttribute("error", "error.operation.load");
       return "redirect:/operations";
     }
-    return "operation-detail";
+    return "operation/operation-detail";
   }
 
   /**
@@ -249,21 +249,21 @@ public class OperationPageController {
       return switch (fragment.toLowerCase(Locale.ROOT)) {
         case "overview" -> {
           loadFullModel(id, page, size, authentication, model);
-          yield "operation-detail :: overviewSection";
+          yield "operation/operation-detail :: overviewSection";
         }
         case "payout" -> {
           loadPayoutModel(id, authentication, model);
-          yield "operation-detail :: payoutSection";
+          yield "operation/operation-detail :: payoutSection";
         }
         case "finance" -> {
           loadFinanceModel(id, model);
-          yield "operation-detail :: financeSection";
+          yield "operation/operation-detail :: financeSection";
         }
-        default -> "operation-detail :: fragmentError";
+        default -> "operation/operation-detail :: fragmentError";
       };
     } catch (Exception e) {
       log.error("Error loading operation fragment '{}' for {}", fragment, id, e);
-      return "operation-detail :: fragmentError";
+      return "operation/operation-detail :: fragmentError";
     }
   }
 
@@ -375,7 +375,7 @@ public class OperationPageController {
       log.error("Error loading missions fragment for operation {}", id, e);
       model.addAttribute("missions", List.of());
     }
-    return "operation-detail :: missions";
+    return "operation/operation-detail :: missions";
   }
 
   /**
@@ -414,7 +414,7 @@ public class OperationPageController {
       log.error("Error loading finance detail for operation {} mission {}", id, missionId, e);
       model.addAttribute("financeDetailError", true);
     }
-    return "operation-detail :: financeDetail";
+    return "operation/operation-detail :: financeDetail";
   }
 
   private static boolean hasMissionManagerRole(Authentication authentication) {

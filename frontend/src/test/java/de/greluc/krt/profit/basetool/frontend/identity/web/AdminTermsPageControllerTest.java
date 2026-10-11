@@ -74,7 +74,7 @@ class AdminTermsPageControllerTest {
     mockMvc
         .perform(get("/admin/terms"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/terms"))
+        .andExpect(view().name("identity/admin/terms"))
         .andExpect(model().attribute("termsFilter", "PENDING"));
 
     assertThat(requestedUri()).contains("filter=PENDING");
@@ -90,7 +90,7 @@ class AdminTermsPageControllerTest {
     mockMvc
         .perform(get("/admin/terms").param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/terms :: adminTermsResults"));
+        .andExpect(view().name("identity/admin/terms :: adminTermsResults"));
   }
 
   /**
@@ -102,7 +102,7 @@ class AdminTermsPageControllerTest {
     mockMvc
         .perform(get("/admin/terms").param("fragment", "something-else"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/terms"));
+        .andExpect(view().name("identity/admin/terms"));
   }
 
   /** An explicit filter is honoured and echoed back so the select keeps its selection. */
@@ -152,7 +152,7 @@ class AdminTermsPageControllerTest {
     mockMvc
         .perform(get("/admin/terms"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/terms"))
+        .andExpect(view().name("identity/admin/terms"))
         .andExpect(model().attribute("termsLoadFailed", true));
   }
 

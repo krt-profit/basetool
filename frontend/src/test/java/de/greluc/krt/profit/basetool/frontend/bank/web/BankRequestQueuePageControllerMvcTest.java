@@ -133,7 +133,7 @@ class BankRequestQueuePageControllerMvcTest {
     mockMvc
         .perform(get("/bank/requests"))
         .andExpect(status().isOk())
-        .andExpect(view().name("bank-requests"))
+        .andExpect(view().name("bank/bank-requests"))
         .andExpect(content().string(Matchers.containsString("KB-0001")))
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
         .andExpect(content().string(Matchers.containsString("officerX")))
@@ -150,7 +150,7 @@ class BankRequestQueuePageControllerMvcTest {
     mockMvc
         .perform(get("/bank/requests").param("fragment", "requestQueue"))
         .andExpect(status().isOk())
-        .andExpect(view().name("bank-requests :: requestQueue"));
+        .andExpect(view().name("bank/bank-requests :: requestQueue"));
   }
 
   @Test

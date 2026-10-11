@@ -72,7 +72,7 @@ class MissionPageControllerTest {
 
     String viewName = controller.createMissionForm(model, null, null);
 
-    assertEquals("mission-detail", viewName);
+    assertEquals("mission/mission-detail", viewName);
     assertTrue(model.containsAttribute("isNew"));
     assertTrue((Boolean) model.getAttribute("isNew"));
 
@@ -556,7 +556,7 @@ class MissionPageControllerTest {
 
     String view = controller.missionDetail(id, model, null, null);
 
-    assertEquals("mission-detail", view);
+    assertEquals("mission/mission-detail", view);
     verify(backendApiClient).get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(id));
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_MISSION), anyTypeRef());
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_CREW), anyTypeRef());

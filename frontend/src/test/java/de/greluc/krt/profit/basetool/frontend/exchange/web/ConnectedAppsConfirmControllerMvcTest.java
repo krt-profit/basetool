@@ -101,7 +101,7 @@ class ConnectedAppsConfirmControllerMvcTest {
                 .param("handoff", HANDOFF)
                 .with(user("member").roles("KRT_MEMBER")))
         .andExpect(status().isOk())
-        .andExpect(view().name("connected-apps-confirm"))
+        .andExpect(view().name("exchange/connected-apps-confirm"))
         .andExpect(model().attribute("pendingHandoffId", HANDOFF))
         .andExpect(content().string(containsString("data-handoff-id=\"" + HANDOFF + "\"")));
 

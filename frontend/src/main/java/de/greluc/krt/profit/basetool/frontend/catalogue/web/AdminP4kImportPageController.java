@@ -77,7 +77,7 @@ public class AdminP4kImportPageController {
   @GetMapping
   public String view(@NotNull Model model) {
     model.addAttribute("jobsUrl", "/admin/p4k-import/jobs");
-    return "admin/p4k-import";
+    return "catalogue/admin/p4k-import";
   }
 
   /**

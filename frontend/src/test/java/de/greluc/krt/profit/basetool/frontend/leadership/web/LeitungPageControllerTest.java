@@ -84,7 +84,7 @@ class LeitungPageControllerTest {
 
     String result = controller.leitung(null, null, null, model);
 
-    assertEquals("organisation/leitung", result);
+    assertEquals("leadership/organisation/leitung", result);
     assertSame(view, model.getAttribute("leitung"));
     assertNull(model.getAttribute("allUsers"));
     verify(backend, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
@@ -100,7 +100,7 @@ class LeitungPageControllerTest {
 
     String result = controller.leitung("leitungSections", null, null, model);
 
-    assertEquals("organisation/leitung :: leitungSections", result);
+    assertEquals("leadership/organisation/leitung :: leitungSections", result);
     verify(backend, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 
@@ -204,7 +204,7 @@ class LeitungPageControllerTest {
 
     String result = controller.leitung(null, null, null, model);
 
-    assertEquals("organisation/leitung", result);
+    assertEquals("leadership/organisation/leitung", result);
     assertTrue(assertInstanceOf(Map.class, model.getAttribute("unitContext")).isEmpty());
     assertNull(model.getAttribute("error"));
   }
@@ -286,7 +286,7 @@ class LeitungPageControllerTest {
 
     String result = controller.leitung(null, null, null, model);
 
-    assertEquals("organisation/leitung", result);
+    assertEquals("leadership/organisation/leitung", result);
     assertEquals("leitung.error.load", model.getAttribute("error"));
   }
 

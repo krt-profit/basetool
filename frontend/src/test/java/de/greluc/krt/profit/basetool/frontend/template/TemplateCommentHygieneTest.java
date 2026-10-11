@@ -21,13 +21,13 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -44,7 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <ul>
  *   <li>no plain HTML comment outside {@code script}, {@code style} or {@code textarea};
  *   <li>no parser-level comment whose body contains a premature closing star-slash pair;
- *   <li>no {@code <style>} element; page CSS lives in {@code static/css/pages};
+ *   <li>no {@code <style>} element; page CSS lives in {@code static/css/pages/<domain>};
  *   <li>every {@code /css/pages/…} link names an existing file, and every such file is linked by
  *       exactly one template.
  * </ul>
@@ -112,15 +112,14 @@ class TemplateCommentHygieneTest {
     }
     assertThat(offenders)
         .as(
-            "page CSS lives in static/css/pages/<page>.css, linked where the block would stand"
-                + " (FE-PERF-02)")
+            "page CSS lives in static/css/pages/<domain>/<page>.css, linked where the block would"
+                + " stand (FE-PERF-02)")
         .isEmpty();
   }
 
   @Test
   void everyPageStylesheetIsLinkedExactlyOnceAndExists() throws IOException, URISyntaxException {
-    Path pagesDir =
-        Paths.get(resource("/static/css/styles.css").toURI()).getParent().resolve("pages");
+    Path pagesDir = ClasspathAssets.stylesheets().resolve("pages");
     Set<String> files = pageStylesheets(pagesDir);
     List<String> linked = new ArrayList<>();
     for (Path template : templates()) {
@@ -261,7 +260,7 @@ class TemplateCommentHygieneTest {
    * @throws URISyntaxException if the classpath root cannot be resolved
    */
   private static List<Path> templates() throws IOException, URISyntaxException {
-    Path root = Paths.get(resource("/templates/bank-grants.html").toURI()).getParent();
+    Path root = ClasspathAssets.templates();
     try (Stream<Path> tree = Files.walk(root)) {
       return tree.filter(Files::isRegularFile)
           .filter(p -> p.getFileName().toString().endsWith(".html"))

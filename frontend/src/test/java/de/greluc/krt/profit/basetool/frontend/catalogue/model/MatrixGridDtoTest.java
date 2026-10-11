@@ -29,9 +29,9 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Locks the JSON property names of {@link MatrixGridDto} to what {@code /js/materials-matrix.js}
- * reads, including the {@code @JsonProperty}-kept {@code is} / {@code has} prefixes of the boolean
- * components.
+ * Locks the JSON property names of {@link MatrixGridDto} to what {@code
+ * /js/catalogue/materials-matrix.js} reads, including the {@code @JsonProperty}-kept {@code is} /
+ * {@code has} prefixes of the boolean components.
  */
 class MatrixGridDtoTest {
 

@@ -36,7 +36,8 @@ class OrdersDetailNoUserListTest {
   void ordersDetailTemplateReadsNoUsersModelAttribute() throws IOException {
     String template;
     try (InputStream in =
-        OrdersDetailNoUserListTest.class.getResourceAsStream("/templates/orders-detail.html")) {
+        OrdersDetailNoUserListTest.class.getResourceAsStream(
+            "/templates/joborder/orders-detail.html")) {
       assertThat(in).as("orders-detail.html on the classpath").isNotNull();
       template = new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }

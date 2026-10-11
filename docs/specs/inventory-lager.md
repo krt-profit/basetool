@@ -145,8 +145,8 @@ the tree the user was working in.
 `InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`, `InventoryOperationsE2eTest`
 · **Code:** `InventoryAggregationService#buildGroupedFromStacks`,
 `InventoryItemRepository#findUserStacks` / `#findGlobalStacks`, `InventoryStackAggregate`,
-`InventoryStackDto`, `GroupedInventoryDto`, `inventory-my.html`, `inventory-admin.html`,
-`static/js/inventory-common.js` (tree expand/collapse persistence, shared by `inventory-my.js` and
+`InventoryStackDto`, `GroupedInventoryDto`, `inventory/inventory-my.html`, `inventory/inventory-admin.html`,
+`static/js/inventory/inventory-common.js` (tree expand/collapse persistence, shared by `inventory-my.js` and
 `inventory-admin.js` since FE-SIMP-03) · **Issues:** #466
 
 ### REQ-INV-044 — Actions operate per entry
@@ -234,8 +234,8 @@ identical.
 `InventoryItemController#getMyStackEntries` / `#getAllStackEntries`,
 `InventoryItemRepository#findUserStackEntries` / `#findGlobalStackEntries`,
 `InventoryPageController#viewMyStackEntries` / `#viewAllStackEntries`,
-`fragments/inventory-stack-entries.html`, `static/css/styles.css` (`.tree-row--leaf`, `.btn-icon`),
-`inventory-my.html` / `inventory-admin.html` (note-button DOM sync),
+`inventory/fragments/inventory-stack-entries.html`, `static/css/kernel/styles.css` (`.tree-row--leaf`, `.btn-icon`),
+`inventory/inventory-my.html` / `inventory/inventory-admin.html` (note-button DOM sync),
 `V143__add_inventory_item_stack_key_index.sql` (index rebuilt without the job-order / mission
 columns by `V218__drop_inventory_scalar_associations.sql`) ·
 **Issues:** #466
@@ -281,7 +281,7 @@ there is no equivalent on the squadron-wide `/all` view.
 `InventoryItemControllerTest`, `InventoryPageControllerTest`, `InventoryPageControllerMvcTest` ·
 **Code:** `InventoryItemRepository#findUserStacks`,
 `InventoryItemService#getMyAggregatedInventory`, `InventoryItemController#getMyGroupedInventory`,
-`InventoryPageController#viewMyInventory`, `inventory-my.html` · **Issues:** #466
+`InventoryPageController#viewMyInventory`, `inventory/inventory-my.html` · **Issues:** #466
 
 ### REQ-INV-007 — Personal-marker rebooking (Umbuchung) is an append-only split
 
@@ -354,8 +354,8 @@ There is no "keep home unit" placeholder: the picker always carries a concrete p
 
 **Enforced by:** `InventoryItemServicePersonalRebookTest`, `InventoryItemControllerTest` ·
 **Code:** `InventoryItemService#rebookPersonal`, `InventoryItemController#rebookPersonal`,
-`InventoryItemPersonalRebookDto`, `inventory-my.html`, `inventory-admin.html`,
-`fragments/inventory-stack-entries.html` · **Issues:** #1328
+`InventoryItemPersonalRebookDto`, `inventory/inventory-my.html`, `inventory/inventory-admin.html`,
+`inventory/fragments/inventory-stack-entries.html` · **Issues:** #1328
 
 ### REQ-INV-025 — Book-out validates the CheckoutType; a target-less TRANSFER is rejected
 
@@ -484,8 +484,8 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
 `InventoryItemRepository#findMergeGroupForUpdate`, `InventoryItemService#hasMergeCandidates`,
 `InventoryItemRepository#countMergeCandidates`,
 `MaterialExchangeOfferRepository#existsByInventoryItemId`, `InventoryItemService`,
-`V216__merge_piece_inventory_rows.sql`, `inventory-input.html` / `inventory-input.js`,
-`inventory-my.html` / `inventory-my.js`, `inventory-admin.html` / `inventory-admin.js`
+`V216__merge_piece_inventory_rows.sql`, `inventory/inventory-input.html` / `inventory-input.js`,
+`inventory/inventory-my.html` / `inventory-my.js`, `inventory/inventory-admin.html` / `inventory-admin.js`
 · **Issues:** #1182 · **ADR:** ADR-0097
 
 ### REQ-INV-027 — Inventory associations are to-many quantity splits (Variante C)
@@ -688,9 +688,9 @@ already-allocated order edits its slice instead of posting a duplicate) ·
 `InventoryItemService#createInventoryItem`, `InventoryCheckoutService` (book-out / merge / SELL),
 `JobOrderStockReadService#getMaterialCollection`, `InventoryItemMapper`,
 `V217__add_inventory_allocation_tables.sql`, `V218__drop_inventory_scalar_associations.sql`,
-`fragments/inventory-stack-entries.html`, `inventory-common.js` (the allocation chips both Lager
+`inventory/fragments/inventory-stack-entries.html`, `inventory-common.js` (the allocation chips both Lager
 pages share), `inventory-my.js` / `inventory-admin.js`,
-`inventory-herkunft.js` (deduct-from picker), `inventory-input.html` / `inventory-input.js`,
+`inventory-herkunft.js` (deduct-from picker), `inventory/inventory-input.html` / `inventory-input.js`,
 `InventoryWriteController#toAllocationInputs` (single-target shorthand) ·
 **Issues:** #1182 · **ADR:** ADR-0098
 
@@ -726,7 +726,7 @@ way before the amendment keep their quality 0 until the member corrects them.*
 `InventoryItemControllerTest`, `InventoryPageControllerMvcTest` · **Code:**
 `InventoryItemRepository#getAggregatedInventory`,
 `InventoryAggregationService#getAggregatedInventory`, `AggregatedInventoryDto`,
-`templates/inventory-index.html` · **Issues:** —
+`templates/inventory/inventory-index.html` · **Issues:** —
 
 ### REQ-INV-033 — Per-material and per-game-item drilldowns are paginated server-side (no silent cap)
 
@@ -752,7 +752,7 @@ requirement each frontend page fetched a single `size=1000` slice and silently h
   pager (the item drilldown's title, resolved from the page's first row, likewise re-appears). A
   genuinely empty catalog entry (`totalElements == 0`) is not re-fetched.
 - **In-place pager.** The pager and the page-size picker render **inside** the swapped results
-  fragment (the shared `fragments/pagination.html` component); a page or size click swaps the
+  fragment (the shared `kernel/fragments/pagination.html` component); a page or size click swaps the
   fragment in place with history (REQ-FE-005, `krtFetch.bindSwap`), so the URL always names the
   visible page and a live-sync peer refresh (REQ-FE-010/015) re-fetches exactly that page.
 - **Fragment fetches stay lean.** A `fragment=results` render fetches only the items page — the
@@ -785,8 +785,8 @@ requirement each frontend page fetched a single `size=1000` slice and silently h
 `viewMaterialInventory_FragmentSwap_RendersPagerWithoutCatalogFetch`,
 `viewGameItemInventory_ShouldRenderPaginationControls`) · **Code:**
 `InventoryPageController#viewMaterialInventory` / `#viewGameItemInventory`,
-`templates/inventory-material.html`, `templates/inventory-game-item.html`,
-`static/js/inventory-material.js`, `static/js/inventory-game-item.js`, `fragments/pagination.html`,
+`templates/inventory/inventory-material.html`, `templates/inventory/inventory-game-item.html`,
+`static/js/inventory/inventory-material.js`, `static/js/inventory/inventory-game-item.js`, `kernel/fragments/pagination.html`,
 `InventoryItemController#getInventoryByMaterial` / `#getInventoryByGameItem` (backend paging) ·
 **Issues:** — · **ADR:** ADR-0104
 
@@ -852,7 +852,7 @@ pair) moved into a sticky selection bar that appears only while something is mar
 `InventoryItemController#getMyEntryIds`, `InventoryAggregationService#getMyEntryIds` /
 `#getMyItemEntryIds`, `InventoryItemService#getMyEntryIds`,
 `InventoryItemRepository#findUserEntryIds` / `#findUserItemEntryIds`,
-`InventoryPageController#myEntryIds`, `templates/inventory-my.html`, `static/js/inventory-my.js` ·
+`InventoryPageController#myEntryIds`, `templates/inventory/inventory-my.html`, `static/js/inventory/inventory-my.js` ·
 **Issues:** — · **ADR:** ADR-0104
 
 ### REQ-INV-035 — Refinery output can be stored straight into the personal pool
@@ -905,7 +905,7 @@ already known at storage time.
 `RefineryStorePersonalMarkerTest` · **Code:** `RefineryOrderService#storeRefineryOrder`,
 `RefineryOrderStoreItemDto`, `RefineryOrderWriteController#storeOrder` / `#storeOrderAjax` /
 `#storePersonalWithJobOrder`, `RefineryOrderStoreItemForm`,
-`templates/refinery-orders-details.html`, `static/js/refinery-orders-details.js` · **Issues:** — ·
+`templates/refinery/refinery-orders-details.html`, `static/js/refinery/refinery-orders-details.js` · **Issues:** — ·
 **ADR:** —
 
 ### REQ-INV-036 — "Markierte umbuchen": the bulk bar moves the whole selection, skipping already-at-target rows
@@ -979,8 +979,8 @@ something is marked.*
 `InventoryCheckoutService#bulkRebook`, `InventoryItemService#bulkRebook`,
 `InventoryItemController#bulkRebook`, `InventoryItemRepository#findByIdForRebook`,
 `BulkRebookRequest` / `BulkRebookResultDto` / `BulkRebookMode`,
-`InventoryWriteController#bulkRebook`, `templates/inventory-my.html`,
-`static/js/inventory-my.js` · **Issues:** — · **ADR:** ADR-0124
+`InventoryWriteController#bulkRebook`, `templates/inventory/inventory-my.html`,
+`static/js/inventory/inventory-my.js` · **Issues:** — · **ADR:** ADR-0124
 
 ### REQ-INV-037 — The Lager filters sit in a popover, and the toolbar says when they narrow the view
 
@@ -1057,10 +1057,10 @@ no visibility dimension. Everything else below holds verbatim on both.
 (`viewMyInventory_rendersTheFiltersInsideTheToolbarPopover`,
 `viewAllInventory_rendersTheFiltersInsideTheToolbarPopover`), `InventoryLagerPatternRenderTest`,
 `InventoryMultiSelectLabelE2eTest` (the header summary on both pages),
-`InventoryFilterPanelCollapseE2eTest` · **Code:** `templates/inventory-my.html`,
-`templates/inventory-admin.html` (`fragments/components :: filterPopover`, `:: filterChips`,
-`:: segmented`), `static/js/krt-filter-panel.js` (open/close, badge), `static/js/krt-filter-chips.js`,
-`static/js/inventory-my.js` (`countActiveMyInventoryFilters`), `static/js/inventory-admin.js`
+`InventoryFilterPanelCollapseE2eTest` · **Code:** `templates/inventory/inventory-my.html`,
+`templates/inventory/inventory-admin.html` (`fragments/components :: filterPopover`, `:: filterChips`,
+`:: segmented`), `static/js/kernel/krt-filter-panel.js` (open/close, badge), `static/js/kernel/krt-filter-chips.js`,
+`static/js/inventory/inventory-my.js` (`countActiveMyInventoryFilters`), `static/js/inventory/inventory-admin.js`
 (`countActiveAdminInventoryFilters`) · **Issues:** — · **ADR:** — (extends REQ-UI-017 / ADR-0120;
 mechanism generalised by REQ-FE-021 and REQ-UI-027)
 
@@ -1205,8 +1205,8 @@ re-reads exactly the shape the page was rendered with.
 `inventoryPageOrderSeamMaps_areASubsetOfTheOrdersQueueWhitelist`) · **Code:**
 `JobOrderMaterialRequirementResolver`, `JobOrderQueryService#findAllActiveReference`,
 `JobOrderMaterialNeedDto`, `InventoryPageController#orderNeedsAjax`,
-`templates/inventory-input.html`, `static/js/inventory-input.js` (`relabelOrderOptions` /
-`refreshOrderNeeds`), `templates/fragments/inventory-stack-entries.html`,
+`templates/inventory/inventory-input.html`, `static/js/inventory/inventory-input.js` (`relabelOrderOptions` /
+`refreshOrderNeeds`), `templates/inventory/fragments/inventory-stack-entries.html`,
 `static/js/inventory-{my,admin}.js`, `JobOrderGameItemNeedDto`,
 `InventoryItemRepository#findGameItemStockRowsByJobOrderIds` · **Issues:** #1740, #1742 ·
 **ADR:** — (extends REQ-INV-027 / REQ-ORDERS-034)
@@ -1287,8 +1287,8 @@ from the persisted snapshot.
 `InventoryItemRepository` (`hasLocations` / `locationIds` gate on the stack, entry-id and flat
 queries), `InventoryAggregationService`, `InventoryItemService`, `InventoryItemController`,
 `InventoryPageController` (`resolveLocationFilterOptions`, `fetchGroupedMaterialInventory`),
-`templates/inventory-my.html`, `templates/inventory-admin.html`, `static/js/inventory-my.js`,
-`static/js/inventory-admin.js` · **Issues:** #1879 · **ADR:** — (extends REQ-INV-030 / REQ-INV-034 /
+`templates/inventory/inventory-my.html`, `templates/inventory/inventory-admin.html`, `static/js/inventory/inventory-my.js`,
+`static/js/inventory/inventory-admin.js` · **Issues:** #1879 · **ADR:** — (extends REQ-INV-030 / REQ-INV-034 /
 REQ-INV-037)
 
 ### REQ-INV-041 — "Globales Lager leeren": the admin-only wipe of the shared stock in scope
@@ -1328,7 +1328,7 @@ stock of every org unit, an admin pinned to one org unit wipes only that unit's.
 themselves are not yet pinned by a test · **Code:**
 `InventoryItemController#deleteAllGlobalInventory`, `InventoryCheckoutService#deleteAllGlobalInventory`,
 `InventoryItemRepository#deleteAllNonPersonal`, `InventoryDeleteAllProxyController`,
-`templates/inventory-admin.html`, `static/js/inventory-admin.js` · **Issues:** — · **ADR:** —
+`templates/inventory/inventory-admin.html`, `static/js/inventory/inventory-admin.js` · **Issues:** — · **ADR:** —
 
 ### REQ-INV-052 — A member can change the org unit of their own personal row afterwards
 
@@ -1439,7 +1439,7 @@ Lager row — shared or personal, material or game item — carries a **„gesto
 `InventoryOperationsE2eTest.markingPartOfARowAsStolenSplitsItIntoItsOwnStackInPlace` · **Code:**
 `InventoryStolenMarkService`, `InventoryItemRepository`, `InventoryAggregationService`,
 `InventoryCheckoutService`, `MaterialExchangeBoardService`, `InventoryProperties`,
-`InventoryStolenMarkProxyController`, `fragments/inventory-stolen-mark.html`, `inventory-common.js` ·
+`InventoryStolenMarkProxyController`, `inventory/fragments/inventory-stolen-mark.html`, `inventory-common.js` ·
 **Issues:** #2096
 (epic #2078).
 

@@ -58,7 +58,7 @@ class ImpressumControllerTest {
     mockMvc
         .perform(get("/impressum"))
         .andExpect(status().isOk())
-        .andExpect(view().name("impressum"));
+        .andExpect(view().name("shell/impressum"));
   }
 
   /**
@@ -76,7 +76,7 @@ class ImpressumControllerTest {
         .andExpect(
             content().string(matchesPattern("(?s).*class=\"page-eyebrow\"[^>]*>Rechtliches<.*")))
         .andExpect(content().string(containsString("class=\"card legal-doc\"")))
-        .andExpect(content().string(containsString("/css/legal")))
+        .andExpect(content().string(containsString("/css/shell/legal")))
         .andExpect(content().string(not(containsString("hud-box"))));
   }
 }

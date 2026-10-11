@@ -79,7 +79,7 @@ public class BankGrantsPageController {
         bankClient.grants(byEmployee ? userId : null, byEmployee ? null : accountId);
     model.addAttribute("grants", grants == null ? List.<BankGrantDto>of() : grants);
     if ("grantsMatrix".equals(fragment)) {
-      return "bank-grants :: grantsMatrix";
+      return "bank/bank-grants :: grantsMatrix";
     }
 
     List<BankGrantDto> allGrants = bankClient.grants(null, null);
@@ -103,6 +103,6 @@ public class BankGrantsPageController {
     model.addAttribute("grantees", grantees);
     model.addAttribute("byEmployee", byEmployee);
     model.addAttribute("selectedUserId", userId);
-    return "bank-grants";
+    return "bank/bank-grants";
   }
 }

@@ -116,7 +116,7 @@ public class OrgUnitBankPageController {
           BankAccountOrder.byName(fetchBalances(), OrgUnitBankBalanceDto::accountName);
       model.addAttribute("balances", accounts);
       model.addAttribute("sparks", sparksByAccountId(accounts));
-      return "org-unit-bank :: orgUnitBankAccounts";
+      return "bank/org-unit-bank :: orgUnitBankAccounts";
     }
 
     CompletableFuture<List<OrgUnitBankBalanceDto>> balancesFuture =
@@ -173,9 +173,9 @@ public class OrgUnitBankPageController {
     model.addAttribute("requesterId", CurrentUser.userIdText(principal));
     model.addAttribute("requesterHandle", requesterHandle(principal));
     if ("orgUnitBank".equals(fragment)) {
-      return "org-unit-bank :: orgUnitBank";
+      return "bank/org-unit-bank :: orgUnitBank";
     }
-    return "org-unit-bank";
+    return "bank/org-unit-bank";
   }
 
   /**
@@ -314,7 +314,7 @@ public class OrgUnitBankPageController {
       Model model) {
     if ("orgUnitBankBookings".equals(fragment)) {
       addBookingsModel(id, page, size, from, to, model);
-      return "org-unit-bank-account-detail :: orgUnitBankBookings";
+      return "bank/org-unit-bank-account-detail :: orgUnitBankBookings";
     }
     if ("orgUnitBalanceChart".equals(fragment)) {
       OrgUnitBankAccountDetailDto chartDetail = null;
@@ -324,7 +324,7 @@ public class OrgUnitBankPageController {
         log.warn("Error loading org-unit account {} for balance-chart fragment", id, e);
       }
       addChartModel(id, chartRange, chartDetail, model);
-      return "org-unit-bank-account-detail :: orgUnitBalanceChart";
+      return "bank/org-unit-bank-account-detail :: orgUnitBalanceChart";
     }
 
     OrgUnitBankAccountDetailDto detail = bankClient.orgUnitAccount(id);
@@ -342,12 +342,12 @@ public class OrgUnitBankPageController {
     model.addAttribute("settings", settings);
 
     if ("orgUnitBankSettings".equals(fragment)) {
-      return "org-unit-bank-account-detail :: orgUnitBankSettings";
+      return "bank/org-unit-bank-account-detail :: orgUnitBankSettings";
     }
     addBookingsModel(id, page, size, from, to, model);
     addChartModel(id, chartRange, detail, model);
     addRequestModalModel(id, detail, principal, model);
-    return "org-unit-bank-account-detail";
+    return "bank/org-unit-bank-account-detail";
   }
 
   /**

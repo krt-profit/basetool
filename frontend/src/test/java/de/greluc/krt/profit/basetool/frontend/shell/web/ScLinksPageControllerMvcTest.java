@@ -66,7 +66,7 @@ class ScLinksPageControllerMvcTest {
         mockMvc
             .perform(get("/sc-links").with(oidcLogin()).locale(Locale.GERMAN))
             .andExpect(status().isOk())
-            .andExpect(view().name("sc-links"))
+            .andExpect(view().name("shell/sc-links"))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -77,7 +77,7 @@ class ScLinksPageControllerMvcTest {
         .doesNotContain("hud-box")
         .contains("Offizielles")
         .contains("Handel &amp; Fracht")
-        .contains("/css/pages/sc-links.css");
+        .contains("/css/pages/shell/sc-links.css");
     for (ScLink link : ScLink.values()) {
       assertThat(html)
           .contains("data-testid=\"sc-link-" + link.getKey() + "\"")

@@ -46,10 +46,10 @@ matrix's material/system/loading-dock/auto-load filters keep working in both vie
 - [ ] Both views render the same material card / row (no data difference between views).
 
 **Enforced by:** `MaterialsPageControllerMvcTest` (toggle + both views render; shared
-`fragments/material-card.html` resolves) · **Code:** `materials.html` +
-`static/js/materials.js` (key `materials_group_by_category`), `materials-overview.html` +
-`static/js/materials-matrix.js` (key `materials_matrix_group_by_category`),
-`fragments/material-card.html` · **Issues:** —
+`catalogue/fragments/material-card.html` resolves) · **Code:** `catalogue/materials.html` +
+`static/js/catalogue/materials.js` (key `materials_group_by_category`), `catalogue/materials-overview.html` +
+`static/js/catalogue/materials-matrix.js` (key `materials_matrix_group_by_category`),
+`catalogue/fragments/material-card.html` · **Issues:** —
 
 ## Out of scope
 

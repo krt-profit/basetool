@@ -82,7 +82,7 @@ class HomeControllerMvcTest {
     mockMvc
         .perform(get("/").with(oidcLogin()))
         .andExpect(status().isOk())
-        .andExpect(view().name("index"));
+        .andExpect(view().name("dashboard/index"));
   }
 
   /**
@@ -222,7 +222,7 @@ class HomeControllerMvcTest {
     mockMvc
         .perform(get("/").with(oidcLogin()).param("error", "notification.error.title"))
         .andExpect(status().isOk())
-        .andExpect(view().name("index"))
+        .andExpect(view().name("dashboard/index"))
         .andExpect(content().string(containsString(ERROR_TOAST_ID)));
   }
 
@@ -234,7 +234,7 @@ class HomeControllerMvcTest {
     mockMvc
         .perform(get("/").with(oidcLogin()).param("success", "notification.success.title"))
         .andExpect(status().isOk())
-        .andExpect(view().name("index"))
+        .andExpect(view().name("dashboard/index"))
         .andExpect(content().string(containsString(SUCCESS_TOAST_ID)));
   }
 
@@ -250,7 +250,7 @@ class HomeControllerMvcTest {
     mockMvc
         .perform(get("/").with(oidcLogin()).param("error", "9 invalid value with spaces"))
         .andExpect(status().isOk())
-        .andExpect(view().name("index"))
+        .andExpect(view().name("dashboard/index"))
         .andExpect(content().string(not(containsString(ERROR_TOAST_ID))));
   }
 
@@ -264,7 +264,7 @@ class HomeControllerMvcTest {
     mockMvc
         .perform(get("/").with(oidcLogin()).param("success", ""))
         .andExpect(status().isOk())
-        .andExpect(view().name("index"))
+        .andExpect(view().name("dashboard/index"))
         .andExpect(content().string(not(containsString(SUCCESS_TOAST_ID))));
   }
 
@@ -531,7 +531,7 @@ class HomeControllerMvcTest {
         mockMvc
             .perform(get("/"))
             .andExpect(status().isOk())
-            .andExpect(view().name("landing"))
+            .andExpect(view().name("dashboard/landing"))
             .andReturn();
 
     org.assertj.core.api.Assertions.assertThat(result.getRequest().getSession(false))

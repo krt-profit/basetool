@@ -53,7 +53,7 @@ class AdminBlueprintsPageControllerTest {
 
     String view = controller.listBlueprints("omni", 0, null, model);
 
-    assertEquals("admin/blueprints", view);
+    assertEquals("blueprint/admin/blueprints", view);
     assertEquals(1, ((List<?>) model.getAttribute("blueprints")).size());
     assertEquals("omni", model.getAttribute("search"));
     assertEquals(1, model.getAttribute("totalPages"));
@@ -72,7 +72,7 @@ class AdminBlueprintsPageControllerTest {
 
     String view = controller.listBlueprints("omni", 0, "results", model);
 
-    assertEquals("admin/blueprints :: results", view);
+    assertEquals("blueprint/admin/blueprints :: results", view);
     assertEquals(1, ((List<?>) model.getAttribute("blueprints")).size());
     assertEquals("omni", model.getAttribute("search"));
   }
@@ -88,7 +88,7 @@ class AdminBlueprintsPageControllerTest {
 
     String view = controller.listBlueprints(null, 0, null, model);
 
-    assertEquals("admin/blueprints", view);
+    assertEquals("blueprint/admin/blueprints", view);
     assertEquals("error.admin.blueprints.load", model.getAttribute("error"));
     assertEquals(0, ((List<?>) model.getAttribute("blueprints")).size());
   }

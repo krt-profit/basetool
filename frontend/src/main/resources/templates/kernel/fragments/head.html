@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(titleContent, additionalLinks)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta th:if="${csrfTokenValue != null}" name="_csrf" th:content="${csrfTokenValue}"/>
+    <meta th:if="${csrfHeaderName != null}" name="_csrf_header" th:content="${csrfHeaderName}"/>
+    <link rel="icon" type="image/svg+xml" th:href="@{/logos/basetool-favicon.svg}">
+    <link rel="icon" type="image/png" sizes="32x32" th:href="@{/logos/basetool-favicon-32.png}">
+    <link rel="icon" type="image/png" sizes="16x16" th:href="@{/logos/basetool-favicon-16.png}">
+    <link rel="apple-touch-icon" th:href="@{/logos/basetool-appicon-512.png}">
+    <link rel="manifest" th:href="@{/manifest.webmanifest(locale=${#locale.language})}">
+    <meta name="theme-color" content="#141414">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" th:content="#{pwa.short_name}">
+    <link rel="preload" th:href="@{/fonts/Lato-Regular.woff2}" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" th:href="@{/css/kernel/styles.css}">
+    <script th:src="@{/js/kernel/krt-client-error.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:attr="nonce=${cspNonce}">
+        window.krtEvents = window.krtEvents || (function () {
+            var queue = [];
+            return {
+                _isBootstrapStub: true,
+                _queuedRegistrations: queue,
+                on: function (eventType, actionName, handler) {
+                    queue.push([eventType, actionName, handler]);
+                }
+            };
+        })();
+        window.addEventListener('load', function () {
+            window.setTimeout(function () {
+                var events = window.krtEvents;
+                if (events && events._isBootstrapStub) {
+                    throw new Error('[krtEvents] event-delegation.js never replaced the bootstrap stub; '
+                        + (events._queuedRegistrations || []).length + ' registration(s) are inactive');
+                }
+            }, 5000);
+        });
+    </script>
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.krtScuI18n = {
+            scu: /*[[#{material.scu.validation.positive}]]*/ 'Enter an SCU amount greater than 0.',
+            piece: /*[[#{material.piece.validation.positive}]]*/ 'Enter a whole number greater than 0.'
+        };
+    </script>
+    <script th:src="@{/js/kernel/krt-html.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/safe-url.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/event-delegation.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/common-handlers.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/krt-modal.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/krt-fetch.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/krt-live-sync.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.krtLiveSyncI18n = {
+            updatesAvailable: /*[[#{livesync.updates_available}]]*/ 'Updates available'
+        };
+    </script>
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.krtFetchI18n = {
+            saved: /*[[#{frontend.ajax.saved}]]*/ 'Saved.',
+            saveFailed: /*[[#{frontend.ajax.saveFailed}]]*/ 'Save failed.',
+            conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
+            conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Please reload the page.',
+            conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
+            conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
+            conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?'
+        };
+    </script>
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.krtOwnerPickerI18n = {
+            required: /*[[#{ownerPicker.error.required}]]*/ 'Please choose an org unit for this entry.'
+        };
+    </script>
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.krtComboboxI18n = {
+            placeholder: /*[[#{userSelect.search.placeholder}]]*/ 'Search or select a user…',
+            noResults: /*[[#{userSelect.search.noResults}]]*/ 'No matching users',
+            hint: /*[[#{userSelect.search.hint}]]*/ 'Keep typing to narrow the list…',
+            invalid: /*[[#{userSelect.search.invalid}]]*/ 'Please select an entry from the list.',
+            loading: /*[[#{userSelect.search.loading}]]*/ 'Searching…',
+            kinds: {
+                'remote-users': {
+                    placeholder: /*[[#{userSelect.search.placeholder}]]*/ 'Search or select a user…',
+                    noResults: /*[[#{userSelect.search.noResults}]]*/ 'No matching users'
+                },
+                'remote-bank-users': {
+                    placeholder: /*[[#{userSelect.search.placeholder}]]*/ 'Search or select a user…',
+                    noResults: /*[[#{userSelect.search.noResults}]]*/ 'No matching users'
+                },
+                'remote-materials': {
+                    placeholder: /*[[#{materialSelect.search.placeholder}]]*/ 'Search or select a material…',
+                    noResults: /*[[#{materialSelect.search.noResults}]]*/ 'No matching materials'
+                },
+                'remote-materials-joborder': {
+                    placeholder: /*[[#{materialSelect.search.placeholder}]]*/ 'Search or select a material…',
+                    noResults: /*[[#{materialSelect.search.noResults}]]*/ 'No matching materials'
+                },
+                'remote-materials-raw': {
+                    placeholder: /*[[#{materialSelect.search.placeholder}]]*/ 'Search or select a material…',
+                    noResults: /*[[#{materialSelect.search.noResults}]]*/ 'No matching materials'
+                },
+                'remote-locations': {
+                    placeholder: /*[[#{locationSelect.search.placeholder}]]*/ 'Search or select a location…',
+                    noResults: /*[[#{locationSelect.search.noResults}]]*/ 'No matching locations',
+                    maxResults: 200
+                },
+                'remote-game-items': {
+                    placeholder: /*[[#{orders.create.item.search.placeholder}]]*/ 'Search or select an item…',
+                    noResults: /*[[#{orders.create.item.search.noResults}]]*/ 'No matching items'
+                },
+                'remote-bank-accounts': {
+                    placeholder: /*[[#{bank.account.search.placeholder}]]*/ 'Search or select an account…',
+                    noResults: /*[[#{bank.account.search.noResults}]]*/ 'No matching accounts'
+                }
+            }
+        };
+    </script>
+    <script th:src="@{/js/kernel/krt-user-search.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/krt-catalog-search.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/krt-bank-account-search.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/krt-searchable-select.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/notification/notifications.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/datetime-splitter.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/scu-decimal-input.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/inline-style-apply.js}" defer th:attr="nonce=${cspNonce}"></script>
+
+    <script th:src="@{/js/kernel/krt-filter-panel.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/krt-overflow-menu.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/krt-filter-chips.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/krt-list-count.js}" defer th:attr="nonce=${cspNonce}"></script>
+
+    <title th:replace="${titleContent}"></title>
+    <th:block th:if="${additionalLinks != null}">
+        <th:block th:replace="${additionalLinks}"></th:block>
+    </th:block>
+</head>
+</html>

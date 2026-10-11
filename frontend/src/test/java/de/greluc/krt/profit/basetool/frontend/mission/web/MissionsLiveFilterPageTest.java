@@ -76,7 +76,7 @@ class MissionsLiveFilterPageTest {
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("id=\"missions-filter-submit\""))))
         .andExpect(content().string(containsString("id=\"missions-results\"")))
-        .andExpect(content().string(containsString("/js/missions.js")))
+        .andExpect(content().string(containsString("/js/mission/missions.js")))
         .andExpect(content().string(containsString("missions-loading-indicator")))
         .andExpect(content().string(containsString("id=\"missions-filter-reset\"")));
   }

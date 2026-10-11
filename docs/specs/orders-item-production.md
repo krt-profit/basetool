@@ -380,7 +380,7 @@ per kind, hidden empty tabs, requester tiles), `JobOrderHandoverButtonLayoutTest
 `JobOrderListRenderTest`, `JobOrderPageControllerNoReloadMvcTest` (no-reload section swaps, the
 production-booking relay) and `JobOrderProductionE2eTest` (the full UI booking flow + the
 produce-first hint) ·
-**Code:** `orders-detail.html` (`kpiSection` fragment, `.tab-nav` + `.tab-panes`), `orders-detail.js`
+**Code:** `joborder/orders-detail.html` (`kpiSection` fragment, `.tab-nav` + `.tab-panes`), `orders-detail.js`
 (tab controller, `ORDER_SECTIONS` seam map), `pages/orders-detail.css`,
 `JobOrderPageController#computeKpi` · **Issues:** #1182
 
@@ -452,7 +452,7 @@ MATERIAL-order absence), `LiveSyncSectionMapParityTest`, `JobOrderProductionE2eT
 visible after a booked production with auto-earmark) · **Code:** `JobOrderItemStockController`,
 `JobOrderStockReadService.getItemStockForJobOrder`, `JobOrderItemStockGroupDto` /
 `JobOrderItemStockEntryDto`, `JobOrderPageController.viewOrderDetail` (`itemStockByGameItem`,
-`items` dispatch), `orders-detail.html` (`itemsSection` item expand rows), `orders-detail.js`
+`items` dispatch), `joborder/orders-detail.html` (`itemsSection` item expand rows), `orders-detail.js`
 (`ORDER_SECTIONS['item-stock']` aliased to the items container), `LiveSyncTopicClass.ORDER`,
 `inventory-common.js` (`broadcastOrdersChanged`) · **Issues:** — · **Design:**
 [`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md) §10 PR 4 / §11.2
@@ -510,7 +510,7 @@ redaction passes blank owner/location, keep the rest, null-safe), `JobOrderItemS
 entitled, redactor output otherwise) · **Code:**
 `JobOrderAccessPolicy.canSeeJobOrderInventoryOwners`,
 `JobOrderInventoryOwnerRedactor`, `JobOrderItemStockController` / `MaterialCollectionController` /
-`JobOrderController` (the two pickers), `orders-detail.html` + `material-collection.html` (`—`
+`JobOrderController` (the two pickers), `joborder/orders-detail.html` + `joborder/material-collection.html` (`—`
 fallbacks) · **Issues:** — · **ADR:** [ADR-0107](../adr/0107-job-order-inventory-owner-redaction.md)
 
 ### REQ-ORDERS-030 — Item delivery consumes the order's earmarked item stock (best-effort)
@@ -660,8 +660,8 @@ move re-fetches the page's `collectionResults` fragment in place.
 `ItemCollectionRenderTest` (flattened rows + empty state), `InventoryItemServiceBookOutTest`
 (`transfer_itemRow_fullAmount_carriesJobOrderEarmarkOntoMovedRow`), `LiveSyncSectionMapParityTest`
 (`ITEM_COLLECTION_SECTIONS` subset), `JobOrderProductionE2eTest` (delivered flip on the page
-persists) · **Code:** `ItemCollectionPageController`, `item-collection.html`, `item-collection.js`
-(`ITEM_COLLECTION_SECTIONS`), `orders-detail.html` (item *Übergaben* toolbar link),
+persists) · **Code:** `ItemCollectionPageController`, `joborder/item-collection.html`, `item-collection.js`
+(`ITEM_COLLECTION_SECTIONS`), `joborder/orders-detail.html` (item *Übergaben* toolbar link),
 `InventoryCheckoutService.bookOutTransfer` / `applyTransferInherit` · **Issues:** — · **Design:**
 [`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md)
 
@@ -752,7 +752,7 @@ blueprint change on a line with booked production so this repair works).
 `JobOrderItemServiceTest.toItemDtosFlagsLinesWhoseBlueprintNoLongerProducesTheOrderedItem` ·
 **Code:** `JobOrderIntegrityService`, `JobOrderIntegrityTask`,
 `JobOrderItemRepository#findBlueprintOutputDrift`, `JobOrderItemBlueprintDrift`,
-`JobOrderItemService#isBlueprintStale`, `orders-detail.html`,
+`JobOrderItemService#isBlueprintStale`, `joborder/orders-detail.html`,
 `monitoring/prometheus/alerts/business.yml`, `monitoring/grafana/dashboards/07-basetool-operations.json` ·
 **Decision:** [ADR-0121](../adr/0121-item-order-edit-reconciles-lines-in-place.md)
 

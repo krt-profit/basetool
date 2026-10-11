@@ -48,8 +48,8 @@ class PublicPathsTest {
   @DisplayName("the asset trees, the favicon and sourcemaps are exempt from both gates")
   @ValueSource(
       strings = {
-        "/css/styles.css",
-        "/js/krt-fetch.js",
+        "/css/kernel/styles.css",
+        "/js/kernel/krt-fetch.js",
         "/images/x.png",
         "/logos/basetool-favicon.svg",
         "/fonts/Lato-Regular.woff2",

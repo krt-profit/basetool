@@ -133,7 +133,7 @@ public class BankRequestQueuePageController {
             ? List.<BankHolderDto>of()
             : holders.stream().filter(BankHolderDto::active).toList());
     if ("requestQueue".equals(fragment)) {
-      return "bank-requests :: requestQueue";
+      return "bank/bank-requests :: requestQueue";
     }
     PageResponse<BankAccountDto> activeProbe = bankClient.activeAccountProbe();
     model.addAttribute("canBook", activeProbe != null && activeProbe.totalElements() > 0);
@@ -141,7 +141,7 @@ public class BankRequestQueuePageController {
     model.addAttribute(
         "allOrgUnits", allOrgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : allOrgUnits);
     model.addAttribute("transferFeeRate", fetchTransferFeeRate());
-    return "bank-requests";
+    return "bank/bank-requests";
   }
 
   /**

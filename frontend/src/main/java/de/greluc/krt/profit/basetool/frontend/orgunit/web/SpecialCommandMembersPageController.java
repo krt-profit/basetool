@@ -136,8 +136,8 @@ public class SpecialCommandMembersPageController {
       return "redirect:" + backUrl + "?error=LoadSpecialCommandDetailFailed";
     }
     return "members".equals(fragment)
-        ? "organisation/special-command-detail :: membersResults"
-        : "organisation/special-command-detail";
+        ? "orgunit/organisation/special-command-detail :: membersResults"
+        : "orgunit/organisation/special-command-detail";
   }
 
   /**

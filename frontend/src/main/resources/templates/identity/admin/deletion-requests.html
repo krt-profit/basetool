@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{admin.deletionRequests.title} + ' - ' + ${appTitle}">L&ouml;schantr&auml;ge - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/pages/identity/admin-deletion-requests.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.deletionRequests.title},
+        count=${requests != null ? #lists.size(requests) : null}, countId='deletionRequestsCount', countFor='deletionRequestsHost')}"></th:block>
+
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
+
+    <div class="alert alert-warning dr-note" role="note">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+        <p th:text="#{admin.deletionRequests.deadline}">Ein Antrag ist innerhalb eines Monats zu beantworten. Die Liste ist nach Alter sortiert.</p>
+    </div>
+
+    <div id="deletionRequestsHost" class="card card--flush">
+        <th:block th:fragment="rows">
+        <div class="table-responsive" th:if="${!#lists.isEmpty(requests)}">
+            <table id="deletionRequestsTable" class="data-table data-table--stack"
+                   th:data-list-total="${#lists.size(requests)}">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.deletionRequests.col.member}">Mitglied</th>
+                        <th th:text="#{admin.deletionRequests.col.requestedAt}">Beantragt</th>
+                        <th th:text="#{admin.deletionRequests.col.eraseHistory}">Protokolle</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.deletionRequests.col.actions}">Aktionen</span></th>
+                    </tr>
+                </thead>
+                <tbody id="deletionRequestsBody">
+                    <tr th:each="req : ${requests}" th:id="'dr-row-' + ${req.id}"
+                        th:with="reqHandle=${@handles.display(req.handle)}"
+                        th:attr="data-id=${req.id},data-handle=${reqHandle},data-version=${req.version}">
+                        <td>
+                            <span class="cell-title" th:text="${reqHandle}">Mitglied</span>
+                        </td>
+                        <td class="dr-when" th:attr="data-label=#{admin.deletionRequests.col.requestedAt}"
+                            th:text="${#temporals.format(req.requestedAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
+                        <td th:attr="data-label=#{admin.deletionRequests.col.eraseHistory}">
+                            <span th:if="${req.eraseHistoryRequested}" class="chip chip--warning"
+                                  th:title="#{admin.deletionRequests.eraseHistory.hint}"
+                                  th:text="#{admin.deletionRequests.eraseHistory.yes}">Auch anonymisieren</span>
+                            <span th:unless="${req.eraseHistoryRequested}" class="dr-when" aria-hidden="true">&mdash;</span>
+                        </td>
+                        <td class="cell-actions">
+                            <div class="cluster gap-2 dr-actions">
+                                <button type="button" class="btn btn-ghost btn-xs" data-action="decline"
+                                        th:text="#{admin.deletionRequests.decline}">Ablehnen</button>
+                                <button type="button" class="btn btn-quiet-danger btn-xs" data-action="execute"
+                                        th:text="#{admin.deletionRequests.execute}">Konto l&ouml;schen</button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <th:block th:if="${#lists.isEmpty(requests)}">
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.deletionRequests.empty',
+                textKey='admin.deletionRequests.empty.text', emptyId='deletionRequestsEmpty')}"></th:block>
+        </th:block>
+        </th:block>
+    </div>
+</main>
+</th:block>
+<th:block th:fragment="pageTail">
+<div th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='decline-modal', titleKey='admin.deletionRequests.decline.title', variant=null, body=~{::.decline-form})}">
+    <div class="decline-form">
+        <div class="krt-modal-body">
+            <p class="bank-field-hint" th:text="#{admin.deletionRequests.decline.hint}">Die Begr&uuml;ndung wird dem Mitglied mitgeteilt und gespeichert.</p>
+            <div class="bank-form-row">
+                <label for="decline-note" th:text="#{admin.deletionRequests.decline.note}">Begr&uuml;ndung</label>
+                <textarea id="decline-note" rows="4" data-testid="decline-note"></textarea>
+                <span class="bank-field-error" data-error-for="note"></span>
+            </div>
+            <span class="bank-field-error" data-error-for="_global"></span>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost"
+                    data-trigger="close-modal-display" data-modal-id="decline-modal"
+                    th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn-danger" id="decline-submit"
+                    data-testid="decline-submit"
+                    th:text="#{admin.deletionRequests.decline.submit}">Antrag ablehnen</button>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='execute-modal', titleKey='admin.deletionRequests.execute.title', variant='krt-modal--danger', body=~{::.execute-form})}">
+    <div class="execute-form">
+        <div class="krt-modal-body">
+            <div class="alert alert-warning dr-note" role="alert">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+                <p th:text="#{admin.deletionRequests.execute.warning}">Das Konto und der zugeh&ouml;rige Keycloak-Zugang werden endg&uuml;ltig entfernt. Das l&auml;sst sich nicht zur&uuml;cknehmen.</p>
+            </div>
+            <p class="bank-field-hint" data-execute-member></p>
+            <div class="check-row">
+                <input type="checkbox" id="execute-erase-history" data-testid="execute-erase-history">
+                <div>
+                    <label for="execute-erase-history" th:text="#{admin.deletionRequests.execute.eraseHistory}">Spielernamen in Protokollen und Buchungshistorie anonymisieren</label>
+                    <p class="form-hint" th:text="#{admin.deletionRequests.execute.eraseHistory.hint}">Betrifft beide Audit-Protokolle, die Buchungshistorie, Buchungsantr&auml;ge und die &Uuml;bergabe-Empf&auml;nger. Die Zeilen bleiben bestehen, nur der Name verschwindet.</p>
+                </div>
+            </div>
+            <span class="bank-field-error" data-error-for="_global"></span>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost"
+                    data-trigger="close-modal-display" data-modal-id="execute-modal"
+                    th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn-danger" id="execute-submit"
+                    data-testid="execute-submit"
+                    th:text="#{admin.deletionRequests.execute.submit}">Endg&uuml;ltig l&ouml;schen</button>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    window.krtDeletionRequestsI18n = {
+        declined: /*[[#{admin.deletionRequests.toast.declined}]]*/ 'Request declined.',
+        executed: /*[[#{admin.deletionRequests.toast.executed}]]*/ 'Account deleted.',
+        error: /*[[#{admin.deletionRequests.toast.error}]]*/ 'The decision could not be applied.',
+        noteRequired: /*[[#{admin.deletionRequests.decline.noteRequired}]]*/ 'A reason is required.',
+        confirmMember: /*[[#{admin.deletionRequests.execute.member}]]*/ 'Member: {handle}'
+    };
+</script>
+<script th:src="@{/js/identity/admin-deletion-requests.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

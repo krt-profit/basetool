@@ -5,8 +5,8 @@ import nounsanitized from "eslint-plugin-no-unsanitized";
 const ECMA_VERSION = 2025;
 
 const TRANSPORT_FILES = [
-  "src/main/resources/static/js/krt-fetch.js",
-  "src/main/resources/static/js/krt-client-error.js",
+  "src/main/resources/static/js/kernel/krt-fetch.js",
+  "src/main/resources/static/js/kernel/krt-client-error.js",
 ];
 
 const RAW_FETCH_MESSAGE =
@@ -47,8 +47,8 @@ const TRUSTED_TYPES_MESSAGE =
   "HTML and script sinks are Trusted Types sinks (ADR-0239): write markup with krtHtml.set(el, krtHtml`…`), a server fragment with krtFetch.setTrustedHtml / parseTrustedDocument, and clear with el.replaceChildren().";
 
 const HTML_SINK_FILES = [
-  "src/main/resources/static/js/krt-html.js",
-  "src/main/resources/static/js/krt-fetch.js",
+  "src/main/resources/static/js/kernel/krt-html.js",
+  "src/main/resources/static/js/kernel/krt-fetch.js",
 ];
 
 const TRUSTED_TYPES_SINKS = [

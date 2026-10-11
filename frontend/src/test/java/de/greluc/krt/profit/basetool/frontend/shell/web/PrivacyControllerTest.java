@@ -62,7 +62,10 @@ class PrivacyControllerTest {
 
   @Test
   void shouldReturnPrivacyView() throws Exception {
-    mockMvc.perform(get("/privacy")).andExpect(status().isOk()).andExpect(view().name("privacy"));
+    mockMvc
+        .perform(get("/privacy"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("shell/privacy"));
   }
 
   /**

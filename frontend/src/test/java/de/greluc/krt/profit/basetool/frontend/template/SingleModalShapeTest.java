@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -148,7 +149,7 @@ class SingleModalShapeTest {
         wrapper = html;
         continue;
       }
-      calls += countOccurrences(html, "fragments/modal-wrapper :: modal(");
+      calls += countOccurrences(html, "kernel/fragments/modal-wrapper :: modal(");
       for (String shell : SHELL_CLASSES) {
         if (count(html, shell) > 0) {
           offenders.add(template.getFileName() + " -> a hand-written ." + shell);
@@ -246,7 +247,7 @@ class SingleModalShapeTest {
   private static List<String> dialogBlocks(String html) {
     Pattern call =
         Pattern.compile(
-            "<(th:block|div)\\b[^>]*th:replace=\"~\\{fragments/modal-wrapper :: modal\\(");
+            "<(th:block|div)\\b[^>]*th:replace=\"~\\{kernel/fragments/modal-wrapper :: modal\\(");
     List<String> blocks = new ArrayList<>();
     Matcher start = call.matcher(html);
     while (start.find()) {
@@ -302,7 +303,7 @@ class SingleModalShapeTest {
    * @throws URISyntaxException if the classpath root cannot be resolved
    */
   private static List<Path> templates() throws IOException, URISyntaxException {
-    return filesUnder("/templates/bank-grants.html", ".html");
+    return filesUnder("/templates/bank/bank-grants.html", ".html");
   }
 
   /**
@@ -313,7 +314,7 @@ class SingleModalShapeTest {
    * @throws URISyntaxException if the classpath root cannot be resolved
    */
   private static List<Path> stylesheets() throws IOException, URISyntaxException {
-    return filesUnder("/static/css/styles.css", ".css");
+    return filesUnder("/static/css/kernel/styles.css", ".css");
   }
 
   /**
@@ -330,7 +331,7 @@ class SingleModalShapeTest {
       throws IOException, URISyntaxException {
     URL anchor = SingleModalShapeTest.class.getResource(anchorResource);
     assertThat(anchor).as("%s classpath resource", anchorResource).isNotNull();
-    Path root = Paths.get(anchor.toURI()).getParent();
+    Path root = ClasspathAssets.rootOf(anchor);
     try (Stream<Path> tree = Files.walk(root)) {
       return tree.filter(Files::isRegularFile)
           .filter(p -> p.getFileName().toString().endsWith(extension))

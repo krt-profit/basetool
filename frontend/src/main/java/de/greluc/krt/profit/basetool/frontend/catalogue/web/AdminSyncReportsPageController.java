@@ -238,7 +238,9 @@ public class AdminSyncReportsPageController {
     }
     model.addAttribute("activeTab", activeTab);
     model.addAttribute("basePath", basePath);
-    return "results".equals(fragment) ? "admin/sync-reports :: results" : "admin/sync-reports";
+    return "results".equals(fragment)
+        ? "catalogue/admin/sync-reports :: results"
+        : "catalogue/admin/sync-reports";
   }
 
   /**

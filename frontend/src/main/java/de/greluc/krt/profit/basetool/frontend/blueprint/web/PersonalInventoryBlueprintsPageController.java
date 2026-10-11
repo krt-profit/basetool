@@ -130,10 +130,10 @@ public class PersonalInventoryBlueprintsPageController {
     model.addAttribute("filterQuery", q == null ? "" : q);
     model.addAttribute("blueprints", fetchAllOwned(q));
     if (fragment != null && "list".equalsIgnoreCase(fragment)) {
-      return "personal-inventory-blueprints :: blueprintList";
+      return "blueprint/personal-inventory-blueprints :: blueprintList";
     }
     model.addAttribute("itemCount", countItems());
-    return "personal-inventory-blueprints";
+    return "blueprint/personal-inventory-blueprints";
   }
 
   /**

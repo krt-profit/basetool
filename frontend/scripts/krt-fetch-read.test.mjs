@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const SOURCE = readFileSync(
-    fileURLToPath(new URL('../src/main/resources/static/js/krt-fetch.js', import.meta.url)),
+    fileURLToPath(new URL('../src/main/resources/static/js/kernel/krt-fetch.js', import.meta.url)),
     'utf8',
 );
 

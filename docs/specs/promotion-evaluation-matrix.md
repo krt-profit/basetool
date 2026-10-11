@@ -69,7 +69,7 @@ show is [`promotion-pages.md`](promotion-pages.md) (REQ-PROMO-002, REQ-PROMO-003
 common case, cap-hit banner), `CatalogPagesTest` (the shared walk + `truncated` flag),
 `MessageBundleConsistencyTest` (`promotion.manage.truncated` in every bundle) · **Code:**
 `frontend controller.PromotionPageController#fetchAllEvaluations` / `#fetchMembers` / `#manage`,
-`frontend support.CatalogPages.fetchAll`, `templates/promotion-manage.html` (matrixBody banner) ·
+`frontend support.CatalogPages.fetchAll`, `templates/promotion/promotion-manage.html` (matrixBody banner) ·
 **Issues:** — (ADR-0100 silent-truncation audit follow-up)
 
 ## Out of scope

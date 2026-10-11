@@ -84,7 +84,7 @@ class HangarPaginationMvcTest {
     mockMvc
         .perform(get("/hangar").param("page", "1"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar"))
+        .andExpect(view().name("hangar/hangar"))
         .andExpect(content().string(containsString("/hangar?page=0&amp;size=50")))
         .andExpect(content().string(containsString("/hangar?page=2&amp;size=50")))
         .andExpect(content().string(containsString("page-size-picker")))
@@ -104,7 +104,7 @@ class HangarPaginationMvcTest {
     mockMvc
         .perform(get("/hangar").param("search", "Cutlass").param("page", "1"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar"))
+        .andExpect(view().name("hangar/hangar"))
         .andExpect(
             content().string(containsString("/hangar?search=Cutlass&amp;page=2&amp;size=50")))
         .andExpect(
@@ -156,7 +156,7 @@ class HangarPaginationMvcTest {
     mockMvc
         .perform(get("/hangar").param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar :: hangarResults"))
+        .andExpect(view().name("hangar/hangar :: hangarResults"))
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(not(containsString("id=\"ship-modal\""))));
   }

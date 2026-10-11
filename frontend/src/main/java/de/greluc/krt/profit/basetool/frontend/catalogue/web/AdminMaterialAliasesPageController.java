@@ -80,7 +80,7 @@ public class AdminMaterialAliasesPageController {
       model.addAttribute("error", "error.admin.materialAlias.load");
       model.addAttribute("aliases", List.of());
     }
-    return "admin/material-aliases";
+    return "catalogue/admin/material-aliases";
   }
 
   /**

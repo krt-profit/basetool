@@ -22,7 +22,7 @@ lists (from `/api/v1/refinery-orders/all` or, when the own-orders toggle is on,
 `/api/v1/refinery-orders/my-orders`). It MUST NOT pull a large or unbounded page (the former
 `size=1000`) to filter, search, sort or page in memory — not for a segment, not for the search and
 not for a counter. It renders the shared pagination component — the `.pagination` page-nav plus the
-square `.page-btn` size picker from `fragments/pagination.html` — and adopts the shared page-size
+square `.page-btn` size picker from `kernel/fragments/pagination.html` — and adopts the shared page-size
 contract (REQ-INV-013 / REQ-API-005): **page sizes {10, 50, 100} with a default of 50**; a
 client-supplied `size` outside that set snaps back to the default before the backend call, and a
 negative `page` clamps to 0.
@@ -88,8 +88,8 @@ params), the `onlyMine` toggle and the search `q` — and the pagination control
 `RefineryOrderListViewResolutionTest`, `RefineryOrderDurationTest` (`testViewOrders_*`),
 `RefineryOrderRepositoryListFilterTest`, `RefineryOrderControllerTest` (`ListFilterTests`),
 `RefineryOrderServiceLifecycleTest` · **Code:** `RefineryOrderPageController.viewOrders` /
-`segmentQuery` / `orderPageUri` / `buildPaginationBaseUrl`, `templates/refinery-orders-index.html`,
-`templates/fragments/pagination.html`, `RefineryOrderController` (`/all`, `/my-orders`),
+`segmentQuery` / `orderPageUri` / `buildPaginationBaseUrl`, `templates/refinery/refinery-orders-index.html`,
+`templates/kernel/fragments/pagination.html`, `RefineryOrderController` (`/all`, `/my-orders`),
 `RefineryOrderService.getAllRefineryOrders` / `getMyRefineryOrders`,
 `RefineryOrderRepository.findFilteredScoped` / `findOwnedFiltered` / `LIST_FILTER` · **Issues:** #2
 (performance audit)

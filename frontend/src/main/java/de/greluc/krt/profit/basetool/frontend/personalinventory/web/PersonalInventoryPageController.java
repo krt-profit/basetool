@@ -109,10 +109,10 @@ public class PersonalInventoryPageController {
     }
     populateListing(model, q, page, size, sort);
     if ("results".equals(fragment)) {
-      return "personal-inventory :: results";
+      return "personalinventory/personal-inventory :: results";
     }
     model.addAttribute("blueprintCount", countBlueprints());
-    return "personal-inventory";
+    return "personalinventory/personal-inventory";
   }
 
   /**
@@ -152,7 +152,7 @@ public class PersonalInventoryPageController {
       model.addAttribute("showItemModal", true);
       model.addAttribute("modalAction", "/personal-inventory/add");
       populateListing(model, null, null, null, null);
-      return "personal-inventory";
+      return "personalinventory/personal-inventory";
     }
 
     try {
@@ -196,7 +196,7 @@ public class PersonalInventoryPageController {
       model.addAttribute("showItemModal", true);
       model.addAttribute("modalAction", "/personal-inventory/" + id + "/update");
       populateListing(model, null, null, null, null);
-      return "personal-inventory";
+      return "personalinventory/personal-inventory";
     }
 
     try {

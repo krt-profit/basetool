@@ -17,7 +17,7 @@ expressed as a plain `Sort`, and the text filter had to move server-side to span
 
 This spec pins the listing contract after the rework: one server-side page, the rich ordering and the
 text filter applied by the backend across the user's whole fleet, and the shared pagination component
-from `fragments/pagination.html`.
+from `kernel/fragments/pagination.html`.
 
 Who may see which ships (per-`sub` isolation — `/my-ships` derives the owner from the JWT, never the
 URL) is unchanged; see [`security-and-access.md`](security-and-access.md), `HangarService` and the
@@ -30,7 +30,7 @@ per-ship gates of `HangarAccessPolicy` (`canSeeShip` / `canEditShip`, REQ-ORG-01
 The personal hangar MUST fetch one **server-side page** of the caller's ships from
 `/api/v1/hangar/my-ships` (`page`/`size`/`search`/`fitted`) instead of the former unbounded `size=1000` pull,
 and render the shared pagination component — the `.pagination` page-nav plus the square `.page-btn`
-size picker from `fragments/pagination.html`. It adopts the shared page-size contract
+size picker from `kernel/fragments/pagination.html`. It adopts the shared page-size contract
 (REQ-INV-013 / REQ-API-005): **page sizes {10, 50, 100} with a default of 50**; a client-supplied
 `size` outside that set snaps back to the default before the backend call, and a negative `page`
 clamps to 0.
@@ -93,8 +93,8 @@ without a reload.
 `ShipRepositoryPersonalHangarTest`, `HangarControllerTest`, `HangarPaginationE2eTest` · **Code:**
 `HangarController#getMyShips`, `HangarService#getMyShipsFiltered`,
 `ShipRepository#findByOwnerIdFiltered`, `PaginationUtil#createUnsortedPageRequest`,
-`HangarPageController#viewHangar`, `frontend/src/main/resources/templates/hangar.html`,
-`frontend/src/main/resources/templates/fragments/pagination.html` · **Issues:** #773 (performance
+`HangarPageController#viewHangar`, `frontend/src/main/resources/templates/hangar/hangar.html`,
+`frontend/src/main/resources/templates/kernel/fragments/pagination.html` · **Issues:** #773 (performance
 audit item 10), #772 (orders/refinery pagination).
 
 *Amended 2026-10-03 (website overhaul phase 3):* `/my-ships` takes the optional `fitted` filter, the

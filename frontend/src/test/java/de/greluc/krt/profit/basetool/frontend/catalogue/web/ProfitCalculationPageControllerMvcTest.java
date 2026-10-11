@@ -81,7 +81,7 @@ class ProfitCalculationPageControllerMvcTest {
     mockMvc
         .perform(get("/materials/profit-calculation"))
         .andExpect(status().isOk())
-        .andExpect(view().name("materials-profit-calculation"))
+        .andExpect(view().name("catalogue/materials-profit-calculation"))
         .andExpect(model().attribute("defaultShipId", c2Id))
         .andExpect(model().attributeExists("shipTypes"))
         .andExpect(model().attributeExists("starSystems"));
@@ -105,7 +105,7 @@ class ProfitCalculationPageControllerMvcTest {
     mockMvc
         .perform(get("/materials/profit-calculation"))
         .andExpect(status().isOk())
-        .andExpect(view().name("materials-profit-calculation"))
+        .andExpect(view().name("catalogue/materials-profit-calculation"))
         .andExpect(model().attributeDoesNotExist("defaultShipId"));
   }
 

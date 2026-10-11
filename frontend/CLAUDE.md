@@ -60,7 +60,7 @@ A rendered page carries no developer text and no inline page CSS (`REQ-UI-023`,
   besides Javadoc (ADR-0214); the reasoning goes into the commit message and the PR. A plain
   `<!-- … -->` would also be sent with every response, which `TemplateCommentHygieneTest` fails.
   The only `<!--/*/ … /*/-->` allowed is Thymeleaf's prototype-only markup, which is not a comment.
-- **Page CSS goes into `static/css/pages/<page>.css`**, linked with `<link rel="stylesheet">` where
+- **Page CSS goes into `static/css/pages/<domain>/<page>.css`**, linked with `<link rel="stylesheet">` where
   a `<style>` block would stand (in the `extraLinks` fragment for the head). No `<style>` element in
   a template. It is linted by `:frontend:lintCss` with the standard rule set, like every other
   stylesheet, and formatted by Prettier.
@@ -141,7 +141,7 @@ for the user to see or click — a toast, a confirm, a download link — goes in
 `.krt-modal-close` anywhere else). The page supplies the body:
 
 ```html
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='x-modal', titleKey='x.title',
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='x-modal', titleKey='x.title',
     variant='krt-modal--wide', body=~{::x-modal-body})}">
     <th:block th:ref="x-modal-body">
         <form …><div class="krt-modal-body">…</div><div class="krt-modal-foot">…</div></form>
@@ -163,7 +163,7 @@ The fragment declares no signature; a call names only the parameters it needs:
 | `closeClass` / `closeId` | Class / id on the close control for a page script. |
 
 A condition or iteration goes on a `<th:block>` around the call. In a fragment file, name the body with its template
-(`~{fragments/x :: x-modal-body}`). A new dialog id also needs `DialogA11yE2eTest` to reach it, or an
+(`~{bank/fragments/x :: x-modal-body}`). A new dialog id also needs `DialogA11yE2eTest` to reach it, or an
 `UNREACHED` entry with the reason. Render a dialog under the same condition as its openers and the
 script that drives it: a dialog nothing can open, or whose handlers were never loaded, is dead
 markup (the promotion admin all-squadrons view and the bare admin blueprint page were).
@@ -176,17 +176,17 @@ hands over its parts and **never calls the head, sidebar, header or toast fragme
 
 ```html
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title},
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title},
     pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{x.title} + ' - ' + ${appTitle}">X</title>
     <th:block th:fragment="extraLinks">
-        <link rel="stylesheet" th:href="@{/css/pages/x.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/bank/x.css}">
     </th:block>
 </head>
 <body>
 <th:block th:fragment="pageContent"><main>…</main></th:block>
-<th:block th:fragment="pageTail"><script th:src="@{/js/x.js}" defer th:attr="nonce=${cspNonce}"></script></th:block>
+<th:block th:fragment="pageTail"><script th:src="@{/js/bank/x.js}" defer th:attr="nonce=${cspNonce}"></script></th:block>
 </body>
 </html>
 ```
@@ -196,7 +196,7 @@ none. `pageToast=true` renders the toast between the content and the tail, so th
 go into the tail to keep loading after `toast.js`. `pageBare=true` leaves out sidebar and header (the
 error pages, pending approval, terms acceptance); `pageShowModal=${…}` sets the body's
 `data-show-modal`. A different chrome is a new parameter of the layout, never a copy into a page, and
-changing the layout means rewriting the golden file `templates/page-chrome-snapshot.txt`
+changing the layout means rewriting the golden file `src/test/resources/templates/page-chrome-snapshot.txt`
 (`PageChromeSnapshotTest`, `-PupdateSnapshots`) and saying so in the review. A fragment a controller
 returns (`view :: fragment`) is unaffected.
 
@@ -285,8 +285,9 @@ debt rather than anything TS 7 introduced.
   there is no partial state. Prefer opting in any file you substantially touch. No script carries
   `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`.
 - **The ratchet per domain** (`frontend/typecheck-ratchet.json`, `:frontend:testTypecheckRatchet`):
-  every script of `static/js` (subfolders included, `vendor/` excepted) is listed under exactly one
-  domain, so **a new script must be added to its domain's list** or the build fails. **Every domain
+  every script of `static/js` (subfolders included, `vendor/` excepted) is listed by its path under
+  exactly one domain, and lives in that domain's folder, so **a new script must be added to its
+  domain's list** or the build fails. **Every domain
   is migrated** (`"migrated"` equals the domain list): a new script needs `// @ts-check` from its
   first commit, and a new domain is added to `"domains"`, to `"migrated"` and to `MIGRATED_FLOOR`
   (raise `CHECKED_FILES_FLOOR` too) in `scripts/typecheck-ratchet.mjs`; the list and the floors never
@@ -330,6 +331,30 @@ outside these packages.
 - Bean names are the simple class names or explicit (`moneyFormat`, `relativeDays`, `handles`,
   `markdown`). Templates name one class by its package, `T(…kernel.security.Roles)`;
   `TemplateTypeReferenceTest` fails when it moves without them.
+
+## Template and asset layout (REQ-FE-034, plan §5.9)
+
+The folder is the domain, with the same names as the Java packages. A page template is
+`templates/<domain>/<name>.html` (view name `<domain>/<name>`; the old `admin/` and `fragments/`
+sub-folders stay below the domain), a script `static/js/<domain>/<name>.js` (the domain it is listed
+under in `typecheck-ratchet.json`), an area stylesheet `static/css/<domain>/<name>.css` and a page
+stylesheet `static/css/pages/<domain>/<page>.css`. What no single domain owns lives in `kernel/`:
+the layout and chrome fragments, the dialog wrapper, the components, the transport and live-sync
+scripts, `kernel/styles.css`. The legal pages, the licences page, the app-link help, the SC links
+page and the error pages' stylesheets are the `shell` domain's.
+
+- **Nothing sits flat.** `AssetLayoutTest` fails on a template, script or stylesheet outside a
+  domain folder; only the five error templates Spring Boot resolves by name stay at
+  `templates/error*`. A new domain folder is a new frontend package first.
+- **Every link resolves.** `AssetReferenceResolutionTest` resolves each `th:src` / `th:href` to a
+  file and fails on a script or stylesheet nothing links; the content-hashed URLs work for any
+  sub-folder, so a move needs no change to the asset serving.
+- **A moved file is a `git mv` plus a rewrite of its references** (view names in controllers and
+  tests, `th:replace` paths, asset links, `inputs.file` paths in `build.gradle.kts`, the ESLint
+  per-file settings), never a copy. The served URL changes with the folder; the content hash does not
+  depend on it.
+- A stylesheet another domain's page also links stays in its owner's folder (REQ-FE-034 lists them).
+  A page that needs a domain's script from another domain is a design question, not a copy.
 
 ## Backend calls: resilience & context propagation
 

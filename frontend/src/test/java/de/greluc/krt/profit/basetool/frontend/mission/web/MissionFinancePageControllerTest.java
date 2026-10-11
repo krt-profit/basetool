@@ -92,13 +92,13 @@ class MissionFinancePageControllerTest {
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(true);
       when(missionPageController.missionDetail(eq(MISSION_ID), eq(model), eq(principal), isNull()))
-          .thenReturn("mission-detail");
+          .thenReturn("mission/mission-detail");
 
       String view =
           controller.addFinanceEntry(MISSION_ID, form, br, model, redirectAttributes, principal);
 
       assertEquals(
-          "mission-detail",
+          "mission/mission-detail",
           view,
           "validation error -> direct render via missionDetail, NOT redirect");
       assertEquals("finance-entry-modal", model.getAttribute("openModal"));
@@ -180,13 +180,13 @@ class MissionFinancePageControllerTest {
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(true);
       when(missionPageController.missionDetail(eq(MISSION_ID), eq(model), eq(principal), isNull()))
-          .thenReturn("mission-detail");
+          .thenReturn("mission/mission-detail");
 
       String view =
           controller.updateFinanceEntry(
               MISSION_ID, ENTRY_ID, form, br, model, redirectAttributes, principal);
 
-      assertEquals("mission-detail", view);
+      assertEquals("mission/mission-detail", view);
       assertEquals("edit-finance-entry-modal", model.getAttribute("openModal"));
       assertEquals(
           "/missions/" + MISSION_ID + "/finance-entries/" + ENTRY_ID + "/update",

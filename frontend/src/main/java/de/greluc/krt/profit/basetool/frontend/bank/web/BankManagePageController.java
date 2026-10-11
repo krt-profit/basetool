@@ -111,7 +111,7 @@ public class BankManagePageController {
     }
     model.addAttribute("activeTab", activeTab);
     if ("manageBody".equals(fragment)) {
-      return "bank-manage :: manageBody";
+      return "bank/bank-manage :: manageBody";
     }
 
     if (management) {
@@ -121,7 +121,7 @@ public class BankManagePageController {
     } else {
       model.addAttribute("orgUnits", List.<OrgUnitMembershipOptionDto>of());
     }
-    return "bank-manage";
+    return "bank/bank-manage";
   }
 
   /**

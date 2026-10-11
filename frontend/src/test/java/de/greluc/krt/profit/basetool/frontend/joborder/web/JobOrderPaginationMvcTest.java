@@ -96,7 +96,7 @@ class JobOrderPaginationMvcTest {
     mockMvc
         .perform(get("/orders").param("page", "1"))
         .andExpect(status().isOk())
-        .andExpect(view().name("orders-index"))
+        .andExpect(view().name("joborder/orders-index"))
         .andExpect(
             content()
                 .string(

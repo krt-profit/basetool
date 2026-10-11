@@ -136,7 +136,7 @@ public class PromotionPageController {
     model.addAttribute("groupedRankRequirements", groupedRankRequirements);
     model.addAttribute("rankSteps", rankSteps);
     model.addAttribute("currentUserRank", fetchCurrentUserRank());
-    return "promotion-overview";
+    return "promotion/promotion-overview";
   }
 
   /**
@@ -199,7 +199,7 @@ public class PromotionPageController {
     model.addAttribute("nextProgressPercent", progressPercent(nextEligibility));
     model.addAttribute("requiredLevelByCategory", requiredLevelByCategory);
     model.addAttribute("currentUserRank", currentUserRank);
-    return "promotion-my-evaluations";
+    return "promotion/promotion-my-evaluations";
   }
 
   /**
@@ -294,7 +294,7 @@ public class PromotionPageController {
 
     if ("eligibilityCell".equals(fragment) && userId != null) {
       model.addAttribute("eligList", fetchEligibilityForUser(userId));
-      return "promotion-manage :: eligibilityCell";
+      return "promotion/promotion-manage :: eligibilityCell";
     }
 
     List<PromotionTopicDto> topics = fetchTopics();
@@ -346,9 +346,9 @@ public class PromotionPageController {
     model.addAttribute(
         "matrixTruncated", evaluationsCatalog.truncated() || membersCatalog.truncated());
     if ("matrixBody".equals(fragment)) {
-      return "promotion-manage :: matrixBody";
+      return "promotion/promotion-manage :: matrixBody";
     }
-    return "promotion-manage";
+    return "promotion/promotion-manage";
   }
 
   /**
@@ -387,9 +387,9 @@ public class PromotionPageController {
     model.addAttribute("categoryContentMap", categoryContentMap);
     model.addAttribute("selectedTopicId", selectTopicId(topics, selectedTopic));
     if ("topicsResults".equals(fragment)) {
-      return "promotion-admin-topics :: topicsResults";
+      return "promotion/promotion-admin-topics :: topicsResults";
     }
-    return "promotion-admin-topics";
+    return "promotion/promotion-admin-topics";
   }
 
   /**
@@ -448,9 +448,9 @@ public class PromotionPageController {
     model.addAttribute("categories", fetchAllCategories());
     model.addAttribute("categoriesByTopic", categoriesByTopic);
     if ("ranksResults".equals(fragment)) {
-      return "promotion-admin-rank-requirements :: ranksResults";
+      return "promotion/promotion-admin-rank-requirements :: ranksResults";
     }
-    return "promotion-admin-rank-requirements";
+    return "promotion/promotion-admin-rank-requirements";
   }
 
   /**

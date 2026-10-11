@@ -97,10 +97,10 @@ class AdminLocationsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/locations"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/locations"))
+        .andExpect(view().name("catalogue/admin/locations"))
         .andExpect(content().string(containsString("id=\"locationNames-data\"")))
         .andExpect(content().string(containsString("value=\"ARC-L1\"")))
-        .andExpect(content().string(containsString("src=\"/js/locations.js\"")))
+        .andExpect(content().string(containsString("src=\"/js/catalogue/locations.js\"")))
         .andExpect(content().string(containsString("</html>")));
   }
 

@@ -81,9 +81,9 @@ public class OrgChartPageController {
       model.addAttribute("error", "error.orgChart.load");
     }
     if ("chartBody".equals(fragment)) {
-      return "org-chart :: chartBody";
+      return "orgchart/org-chart :: chartBody";
     }
-    return "org-chart";
+    return "orgchart/org-chart";
   }
 
   /**

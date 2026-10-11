@@ -75,7 +75,7 @@ class WebAppManifestControllerTest {
   private static final Path MAIN_RESOURCES = Path.of("src/main/resources");
 
   /** The stylesheet holding the design system's custom properties (REQ-UI-003). */
-  private static final Path STYLES_CSS = MAIN_RESOURCES.resolve("static/css/styles.css");
+  private static final Path STYLES_CSS = MAIN_RESOURCES.resolve("static/css/kernel/styles.css");
 
   @Autowired private WebApplicationContext context;
 

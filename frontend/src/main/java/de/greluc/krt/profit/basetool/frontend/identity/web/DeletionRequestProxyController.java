@@ -76,7 +76,7 @@ public class DeletionRequestProxyController {
     }
     model.addAttribute("deletionRequest", deletionRequest);
     model.addAttribute("deletionRequestUnavailable", unavailable);
-    return "fragments/profile-deletion-card :: card";
+    return "identity/fragments/profile-deletion-card :: card";
   }
 
   /**

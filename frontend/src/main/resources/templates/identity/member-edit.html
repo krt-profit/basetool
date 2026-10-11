@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
+    <title th:text="#{members.edit.title} + ' - ' + ${appTitle}">Mitglied bearbeiten - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/pages/identity/member-edit.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main th:with="fromProfile=${memberEditForm.source == 'profile'},
+               backHref=${fromProfile ? '/profile' : '/members'},
+               descriptionLength=${memberEditForm.description != null ? memberEditForm.description.length() : 0}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey=${fromProfile ? 'nav.profile' : 'nav.members'},
+        eyebrowHref=@{${backHref}}, titleText=${user.effectiveName})}"></th:block>
+
+    <div class="tab-nav member-edit-tabs" role="tablist" th:aria-label="#{members.edit.title}" data-testid="member-edit-tabs">
+        <button class="tab active" id="member-tab-profile" type="button" role="tab" aria-selected="true"
+                aria-controls="member-panel-profile" data-tab="profile" data-testid="member-tab-profile"
+                th:text="#{members.edit.tab.profile}">Stammdaten</button>
+        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
+                class="tab" id="member-tab-memberships" type="button" role="tab" aria-selected="false" tabindex="-1"
+                aria-controls="member-panel-memberships" data-tab="memberships" data-testid="member-tab-memberships"
+            ><span th:text="#{members.memberships.title}">Mitgliedschaften</span>
+            <span class="tab-count" th:text="${memberMemberships != null ? memberMemberships.size() : 0}">0</span></button>
+        <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
+                class="tab" id="member-tab-export" type="button" role="tab" aria-selected="false" tabindex="-1"
+                aria-controls="member-panel-export" data-tab="export" data-testid="member-tab-export"
+                th:text="#{members.export.title}">Datenauskunft</button>
+    </div>
+
+    <form id="member-edit-form" data-member-edit="true" class="form-layout card"
+          th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
+        <input type="hidden" name="version" th:field="*{version}">
+        <input type="hidden" name="source" th:field="*{source}">
+        <input type="hidden" name="staffelDetailLoaded" th:field="*{staffelDetailLoaded}">
+
+        <div id="member-panel-profile" class="member-edit-panel" role="tabpanel" aria-labelledby="member-tab-profile">
+            <fieldset class="form-section">
+                <legend class="form-section__head" th:text="|1 · #{members.edit.section.profile}|">1 · Profil</legend>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="member-rank" th:text="#{profile.rank}">Rang</label>
+                        <select id="member-rank" name="rank">
+                            <option th:each="i : ${#numbers.sequence(1, 20)}"
+                                    th:value="${i}"
+                                    th:text="${i}"
+                                    th:selected="${i == memberEditForm.rank}">
+                            </option>
+                        </select>
+                        <div th:if="${#fields.hasErrors('rank')}" th:errors="*{rank}" class="field-error"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="member-join-date" th:text="#{member.join_date}">Beitrittsdatum</label>
+                        <input type="date" id="member-join-date" name="joinDate" th:value="*{joinDate}" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="member-display-name" th:text="#{profile.display_name}">Anzeigename</label>
+                        <input type="text" id="member-display-name" name="displayName" th:value="*{displayName}" />
+                        <div class="field-error" data-error-for="displayName"
+                             th:text="${#fields.hasErrors('displayName') ? #fields.errors('displayName')[0] : ''}"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="memberRsiHandle" th:text="#{members.rsiHandle.label}">RSI-Handle</label>
+                        <input type="text" id="memberRsiHandle" readonly
+                               data-testid="member-rsi-handle"
+                               th:value="${memberRsiHandle}"
+                               th:placeholder="#{members.rsiHandle.none}" />
+                        <p class="form-hint" th:text="#{members.rsiHandle.hint}">Vom Mitglied im Profil gepflegt; hier nur lesbar.</p>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+                <legend class="form-section__head"><span th:text="|2 · #{profile.description}|">2 · Beschreibung</span>
+                    <span class="opt" th:text="|· #{form.optional}|">· optional</span></legend>
+                <div class="form-group">
+                    <label for="member-description" class="visually-hidden" th:text="#{profile.description}">Beschreibung</label>
+                    <textarea id="member-description" name="description" rows="5" maxlength="2000"
+                              aria-describedby="member-description-count" data-char-counter="member-description-count"
+                              th:text="*{description}"></textarea>
+                    <p class="char-counter" id="member-description-count" aria-live="polite"
+                       ><span data-char-count th:text="${descriptionLength}">0</span> / 2000</p>
+                    <div class="field-error" data-error-for="description"
+                         th:text="${#fields.hasErrors('description') ? #fields.errors('description')[0] : ''}"></div>
+                </div>
+            </fieldset>
+        </div>
+
+        <div id="member-panel-memberships" class="member-edit-panel" role="tabpanel" aria-labelledby="member-tab-memberships" hidden
+             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+            <fieldset class="form-section" id="staffel-section">
+                <legend class="form-section__head" th:text="|1 · #{members.staffel.title}|">1 · Staffeln</legend>
+
+                <div class="alert alert-warning" role="alert" th:unless="${memberEditForm.staffelDetailLoaded}"
+                     th:text="#{members.staffel.detail_unavailable}">Staffel-Daten konnten nicht geladen werden.</div>
+
+                <th:block th:if="${memberEditForm.staffelDetailLoaded}">
+                <div class="staffel-slot" id="staffel-slot-1">
+                    <div class="form-group">
+                        <label for="staffel1-select" th:text="#{members.staffel.slot1}">Staffel 1</label>
+                        <select id="staffel1-select" class="staffel-select" name="staffel1Id">
+                            <option value=""
+                                    th:selected="${memberEditForm.staffel1Id == null}"
+                                    th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
+                            <option th:each="sq : ${availableSquadrons}"
+                                    th:value="${sq.id()}"
+                                    th:selected="${memberEditForm.staffel1Id != null and memberEditForm.staffel1Id == sq.id()}"
+                                    th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                        </select>
+                    </div>
+                    <div class="staffel-flags" role="group" th:aria-label="#{members.staffel.flags}">
+                        <label class="check-row">
+                            <input type="hidden" name="_staffel1Logistician" value="on" />
+                            <input type="checkbox" name="staffel1Logistician"
+                                   th:checked="${memberEditForm.staffel1Logistician}" />
+                            <span th:text="#{members.is_logistician}">Logistiker</span>
+                        </label>
+                        <label class="check-row">
+                            <input type="hidden" name="_staffel1MissionManager" value="on" />
+                            <input type="checkbox" name="staffel1MissionManager"
+                                   th:checked="${memberEditForm.staffel1MissionManager}" />
+                            <span th:text="#{members.is_mission_manager}">Missions-Manager</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="staffel-slot-2" class="staffel-slot" th:hidden="${memberEditForm.staffel2Id == null}">
+                    <div class="form-group">
+                        <label for="staffel2-select" th:text="#{members.staffel.slot2}">Staffel 2</label>
+                        <select id="staffel2-select" class="staffel-select" name="staffel2Id">
+                            <option value=""
+                                    th:selected="${memberEditForm.staffel2Id == null}"
+                                    th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
+                            <option th:each="sq : ${availableSquadrons}"
+                                    th:value="${sq.id()}"
+                                    th:selected="${memberEditForm.staffel2Id != null and memberEditForm.staffel2Id == sq.id()}"
+                                    th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
+                        </select>
+                    </div>
+                    <div class="staffel-flags" role="group" th:aria-label="#{members.staffel.flags}">
+                        <label class="check-row">
+                            <input type="hidden" name="_staffel2Logistician" value="on" />
+                            <input type="checkbox" name="staffel2Logistician"
+                                   th:checked="${memberEditForm.staffel2Logistician}" />
+                            <span th:text="#{members.is_logistician}">Logistiker</span>
+                        </label>
+                        <label class="check-row">
+                            <input type="hidden" name="_staffel2MissionManager" value="on" />
+                            <input type="checkbox" name="staffel2MissionManager"
+                                   th:checked="${memberEditForm.staffel2MissionManager}" />
+                            <span th:text="#{members.is_mission_manager}">Missions-Manager</span>
+                        </label>
+                    </div>
+                    <button type="button" class="btn btn-quiet-danger btn-xs staffel-remove" id="staffel-remove-2"
+                            th:text="#{members.staffel.remove}">Entfernen</button>
+                </div>
+
+                <button type="button" class="btn btn-ghost staffel-add" id="staffel-add-2"
+                        th:hidden="${memberEditForm.staffel2Id != null}"
+                        ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                    <span th:text="#{members.staffel.add_second}">Zweite Staffel hinzufügen</span></button>
+                </th:block>
+            </fieldset>
+
+            <section class="form-section" aria-labelledby="member-memberships-head">
+                <h2 class="form-section__head" id="member-memberships-head"
+                    th:text="|2 · #{members.edit.section.memberships}|">2 · Alle Mitgliedschaften</h2>
+                <th:block th:if="${memberMemberships == null or memberMemberships.isEmpty()}">
+                    <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='members.memberships.none', textKey='members.memberships.empty.text')}"></th:block>
+                </th:block>
+                <table th:if="${memberMemberships != null and !memberMemberships.isEmpty()}"
+                       class="data-table data-table--stack" data-testid="member-memberships-table">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{members.memberships.col.unit}">Einheit</th>
+                        <th scope="col" th:text="#{members.memberships.col.kind}">Art</th>
+                        <th scope="col" class="cell-actions"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="m : ${memberMemberships}" data-testid="member-membership-row">
+                        <td>
+                            <span class="membership-unit">
+                                <span class="squadron-badge"
+                                      th:classappend="${m.kind() == 'SPECIAL_COMMAND' ? ' squadron-badge-sk' : ''}"
+                                      th:text="${m.orgUnitShorthand() != null ? m.orgUnitShorthand() : m.orgUnitName()}">IRI</span>
+                                <span class="cell-title" th:text="${m.orgUnitName()}">IRIDIUM</span>
+                            </span>
+                        </td>
+                        <td th:attr="data-label=#{members.memberships.col.kind}">
+                            <span class="chip chip--muted"
+                                  th:text="${m.kind() == 'SPECIAL_COMMAND'} ? #{orgUnit.kind.specialCommand.short} : #{orgUnit.kind.squadron.short}">Staffel</span>
+                        </td>
+                        <td class="cell-actions">
+                            <a th:if="${m.kind() == 'SPECIAL_COMMAND'}"
+                               th:href="@{/organisation/special-commands/{id}(id=${m.orgUnitId()})}"
+                               class="btn btn-ghost btn-xs" data-testid="member-membership-manage"
+                               th:text="#{members.memberships.manage}">Verwalten</a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+        </div>
+
+        <div class="form-actions--sticky">
+            <a th:href="@{${backHref}}" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</a>
+            <button type="submit" class="btn btn--cta" data-testid="member-edit-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.edit.save}">Änderungen speichern</span></button>
+        </div>
+    </form>
+
+    <section id="member-panel-export" class="card member-export stack" role="tabpanel" aria-labelledby="member-tab-export" hidden
+             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+        <h2 class="member-export__title" th:text="#{members.export.title}">Datenauskunft</h2>
+        <div class="alert alert-info" th:text="#{members.export.hint}">F&uuml;r eine Auskunftsanfrage eines Mitglieds, das sich nicht anmelden kann. Namen anderer Mitglieder sind entfernt.</div>
+        <div class="cluster">
+            <a th:href="@{/admin/members/{id}/export/pdf(id=${user.id})}" class="btn btn-outline"
+               data-testid="member-export-pdf">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
+                <span th:text="#{members.export.pdf}">Als PDF</span>
+            </a>
+            <a th:href="@{/admin/members/{id}/export/json(id=${user.id})}" class="btn btn-ghost"
+               data-testid="member-export-json">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
+                <span th:text="#{members.export.json}">Als JSON</span>
+            </a>
+        </div>
+    </section>
+</main>
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    window.krtMemberEditI18n = {
+        saved: /*[[#{notification.success.save}]]*/ 'Saved.',
+        error: /*[[#{error.member.update.failed}]]*/ 'Update failed.',
+        conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
+        conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
+        conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
+        conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?',
+        conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
+    };
+</script>
+<script th:src="@{/js/identity/member-edit.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

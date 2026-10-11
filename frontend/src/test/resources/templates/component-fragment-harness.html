@@ -2,16 +2,16 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <div id="harness-button">
-    <th:block th:replace="~{fragments/components :: button(label='DELETE', variant='danger', type='submit', extraClass=null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: button(label='DELETE', variant='danger', type='submit', extraClass=null)}"></th:block>
 </div>
 <div id="harness-alert">
-    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${msgKey}, extraClass='mt-2')}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: alert(type='danger', msgKey=${msgKey}, extraClass='mt-2')}"></th:block>
 </div>
 <div id="harness-alert-null">
-    <th:block th:replace="~{fragments/components :: alert(type='success', msgKey=${missingKey}, extraClass=null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: alert(type='success', msgKey=${missingKey}, extraClass=null)}"></th:block>
 </div>
 <div id="harness-table">
-    <div th:replace="~{fragments/components :: dataTable(head=~{::harnessHead}, body=~{::harnessBody})}">
+    <div th:replace="~{kernel/fragments/components :: dataTable(head=~{::harnessHead}, body=~{::harnessBody})}">
         <th:block th:fragment="harnessHead">
             <th>COL-A</th>
             <th>COL-B</th>

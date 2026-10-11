@@ -1131,7 +1131,7 @@ Every page below the public surface of §1 is behind the frontend's `anyRequest(
 and a `@PreAuthorize` on its handler or its class — every handler carries one except the nine of
 the public surface (REQ-FE-025, `RouteGateSnapshotTest`, whose committed snapshot lists each route's
 gate). The table names the **frontend** gate of each screen and how the
-navigation (`fragments/sidebar.html`) shows it; what the screen then *contains* is decided by the
+navigation (`kernel/fragments/sidebar.html`) shows it; what the screen then *contains* is decided by the
 backend gates of §3. The quick access (`Ctrl`/`⌘` + `K`, REQ-UI-026) reads its pages from that
 rendered menu, so it offers exactly the screens the „Navigation“ column grants and nothing more. Page controllers live under `frontend/.../<domain>/web/`.
 

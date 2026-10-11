@@ -251,7 +251,7 @@ class AdminUexPageControllerTest {
     ConcurrentModel model = new ConcurrentModel();
     String view = controller.listData(model);
 
-    assertEquals("admin/uex", view);
+    assertEquals("catalogue/admin/uex", view);
     assertEquals(newerSync, model.getAttribute("latestUexSync"));
     assertEquals(2L, model.getAttribute("totalTerminals"));
   }

@@ -108,7 +108,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/special-commands"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/special-commands"))
+        .andExpect(view().name("orgunit/admin/special-commands"))
         .andExpect(content().string(containsString("id=\"sc-results\"")));
   }
 
@@ -186,7 +186,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/special-commands").param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/special-commands :: results"))
+        .andExpect(view().name("orgunit/admin/special-commands :: results"))
         .andExpect(content().string(containsString("Fragment SK")))
         .andExpect(content().string(not(containsString("id=\"sc-results\""))))
         .andExpect(content().string(not(containsString("id=\"specialcommand-modal\""))))

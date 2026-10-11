@@ -117,22 +117,26 @@ await test('the builder and its sinks pass in a page script', async () => {
 
 await test('only the two helpers write to an HTML sink or create a policy', async () => {
     const sink = "document.body.innerHTML = '';\nwindow.trustedTypes.createPolicy('x', {});";
-    assert.deepEqual(await rulesFor(sink, 'krt-html.js'), []);
-    assert.deepEqual(await rulesFor(sink, 'krt-fetch.js'), []);
+    assert.deepEqual(await rulesFor(sink, 'kernel/krt-html.js'), []);
+    assert.deepEqual(await rulesFor(sink, 'kernel/krt-fetch.js'), []);
     assert.ok(
-        (await rulesFor('document.body.innerHTML = window.name;', 'krt-html.js')).includes(
+        (await rulesFor('document.body.innerHTML = window.name;', 'kernel/krt-html.js')).includes(
             'no-unsanitized/property',
         ),
     );
     assert.ok(
-        (await rulesFor("document.write('');", 'krt-html.js')).includes('no-restricted-syntax'),
+        (await rulesFor("document.write('');", 'kernel/krt-html.js')).includes(
+            'no-restricted-syntax',
+        ),
     );
 });
 
 await test('the transport may call fetch but still not XMLHttpRequest', async () => {
-    assert.deepEqual(await rulesFor("fetch('/a');", 'krt-fetch.js'), []);
+    assert.deepEqual(await rulesFor("fetch('/a');", 'kernel/krt-fetch.js'), []);
     assert.ok(
-        (await rulesFor('new XMLHttpRequest();', 'krt-fetch.js')).includes('no-restricted-globals'),
+        (await rulesFor('new XMLHttpRequest();', 'kernel/krt-fetch.js')).includes(
+            'no-restricted-globals',
+        ),
     );
 });
 

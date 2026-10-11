@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -47,12 +48,13 @@ class NoMigrationClassTest {
   /**
    * Asserts that the migration stylesheet is gone from the static CSS root.
    *
-   * @throws URISyntaxException if the CSS classpath root cannot be resolved
+   * @throws IOException if the stylesheet tree cannot be walked
    */
   @Test
-  void theMigrationStylesheetIsGone() throws URISyntaxException {
+  void theMigrationStylesheetIsGone() throws IOException {
     assertThat(
-            Files.exists(resource("/static/css/styles.css").resolveSibling("inline-migration.css")))
+            files(ClasspathAssets.stylesheets(), ".css").stream()
+                .anyMatch(sheet -> sheet.getFileName().toString().equals("inline-migration.css")))
         .as("inline-migration.css is retired")
         .isFalse();
   }
@@ -67,9 +69,8 @@ class NoMigrationClassTest {
   void noTemplateOrScriptNamesAMigrationClass() throws IOException, URISyntaxException {
     List<String> offenders = new ArrayList<>();
     List<Path> files = new ArrayList<>();
-    files.addAll(
-        files(resource("/templates/fragments/head.html").getParent().getParent(), ".html"));
-    files.addAll(files(resource("/static/js/krt-modal.js").getParent(), ".js"));
+    files.addAll(files(ClasspathAssets.templates(), ".html"));
+    files.addAll(files(ClasspathAssets.scripts(), ".js"));
     for (Path file : files) {
       Matcher match = MIGRATION_CLASS.matcher(Files.readString(file, StandardCharsets.UTF_8));
       while (match.find()) {

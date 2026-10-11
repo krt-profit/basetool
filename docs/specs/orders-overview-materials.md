@@ -56,7 +56,7 @@ progress column, because its rows carry no collection-progress fields
 **Enforced by:** `JobOrderListRenderTest` (frontend render),
 `JobOrderServiceTest` (UpdateItemJobOrderTests — aggregated stock enrichment) · **Code:**
 `JobOrderStockProjectionService.enrichAggregatedWithClaims`, `JobOrderItemService.aggregateMaterials`,
-`AggregatedMaterialDto.currentStock`, `templates/orders-index.html` · **Issues:** #595
+`AggregatedMaterialDto.currentStock`, `templates/joborder/orders-index.html` · **Issues:** #595
 
 ### REQ-ORDERS-018 — Inventory may only be linked to an order that requires its material
 
@@ -77,7 +77,7 @@ material being linked. An existing (possibly orphaned) link stays visible and re
 allocation chip on the entry, so the stack-entry add picker additionally leaves out the orders the
 entry is already allocated to. This covers all three linking
 pickers: the Lager stack-entry "+ Zuordnen" allocation picker, the Lager book-in
-create form's per-row "Aufträge zuordnen" allocation picker (`inventory-input.html`), and the
+create form's per-row "Aufträge zuordnen" allocation picker (`inventory/inventory-input.html`), and the
 refinery store ("Einlagern") dialog's per-item "Auftrag" picker, which links the refined output
 material to an order that needs it. The picker filter MUST be correct
 for `ITEM` orders too — these carry no `job_order_material` rows, so every picker keys on the
@@ -133,9 +133,9 @@ two gates are parallel, not a replacement.
 `updateInventoryItem` went with `PUT /api/v1/inventory/{id}` in d03a9238b; corrected 2026-09-22),
 `JobOrderItemService.requiredMaterialIds`, `JobOrderReferenceDto.requiredMaterialIds`,
 `JobOrderQueryService.findAllActiveReference`, `JobOrderRepository.findAllActiveWithMaterials`,
-`templates/fragments/inventory-stack-entries.html`,
-`templates/inventory-input.html` / `static/js/inventory-input.js`,
-`RefineryOrderPageController.fetchActiveJobOrders`, `templates/refinery-orders-details.html`
+`templates/inventory/fragments/inventory-stack-entries.html`,
+`templates/inventory/inventory-input.html` / `static/js/inventory/inventory-input.js`,
+`RefineryOrderPageController.fetchActiveJobOrders`, `templates/refinery/refinery-orders-details.html`
 
 ### REQ-ORDERS-019 — Order detail surfaces orphaned linked inventory
 
@@ -161,13 +161,13 @@ detail view.
 (`getOrphanedLinkedInventoryReturnsOnlyLinksWhoseMaterialIsNotRequired`) · **Code:**
 `JobOrderQueryService.getOrphanedLinkedInventory`, `JobOrderController` `GET
 /api/v1/orders/{id}/allocations/orphaned`, `JobOrderPageController.viewOrderDetail`,
-`templates/orders-detail.html`
+`templates/joborder/orders-detail.html`
 
 ### REQ-ORDERS-020 — Order list is paginated server-side
 
 The order-overview list (`GET /orders`) MUST fetch one **server-side page** of orders instead of
 the former unbounded `size=1000` pull, rendering the shared pagination component (the `.pagination`
-page-nav + the square `.page-btn` size picker from `fragments/pagination.html`, REQ-INV-013 /
+page-nav + the square `.page-btn` size picker from `kernel/fragments/pagination.html`, REQ-INV-013 /
 REQ-API-005). The page sizes are **{50, 100, 200} with a default of 100** — a deliberate deviation
 from the shared 10/50/100 / default-50 contract — because the LOGISTICIAN drag-and-drop priority
 reorder operates on the rows of the **current page** (it derives the target priority from adjacent
@@ -190,8 +190,8 @@ live **inside** the `ordersResults` AJAX-swap fragment so a filter change re-ren
 - [ ] A `?size=` outside {50,100,200} falls back to 100; a negative `?page=` clamps to 0.
 
 **Enforced by:** `JobOrderPaginationMvcTest`, `JobOrderPageStatusFilterTest` (fetch URL) · **Code:**
-`JobOrderPageController.viewOrders` / `buildPaginationBaseUrl`, `templates/orders-index.html`,
-`templates/fragments/pagination.html` · **Issues:** #2 (performance audit)
+`JobOrderPageController.viewOrders` / `buildPaginationBaseUrl`, `templates/joborder/orders-index.html`,
+`templates/kernel/fragments/pagination.html` · **Issues:** #2 (performance audit)
 
 ### REQ-ORDERS-022 — Overview surfaces the responsible (processing) org unit
 
@@ -219,7 +219,7 @@ backend change is needed and the order-list endpoint gains no query; the badge r
   distinct.
 
 **Enforced by:** `JobOrderListRenderTest` (frontend render — responsible-badge assertion) ·
-**Code:** `templates/orders-index.html`, `JobOrderDto.responsibleOrgUnit`,
+**Code:** `templates/joborder/orders-index.html`, `JobOrderDto.responsibleOrgUnit`,
 `.order-responsible-label` (`styles.css`), `orders.index.responsible` (i18n) · **Issues:** #1188
 
 ### REQ-ORDERS-027 — Overview: collapsible material sublist + status & squadron filters
@@ -283,7 +283,7 @@ swap.
 threading), `JobOrderPageStatusFilterTest` (status query-param validation + no status cookie),
 `JobOrderControllerTest` (`getAllJobOrders_forwardsSquadronIdFilter`),
 `JobOrderServiceAssigneeAndListTest` / `JobOrderScopeQueryIntegrationTest` (scoped multi-squadron
-query) · **Code:** `templates/orders-index.html`, `static/js/orders-index.js`,
+query) · **Code:** `templates/joborder/orders-index.html`, `static/js/joborder/orders-index.js`,
 `JobOrderPageController.viewOrders` / `fetchActiveSquadrons` / `buildPaginationBaseUrl`,
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
 `JobOrderRepository.findScopedJobOrders`
@@ -319,7 +319,7 @@ explicit `scope` query parameter wins.
 **Enforced by:** `OrdersListPatternRenderTest`, `JobOrderControllerTest`
 (`getAllJobOrders_forwardsToProcessFlag`), `JobOrderServiceAssigneeAndListTest` (`toProcess_*`),
 `JobOrderScopeQueryIntegrationTest` (`processingFilter_*`), `JobOrderToProcessMvcTest` · **Code:**
-`JobOrderPageController.viewOrders`, `orders-index.html`, `static/js/orders-index.js`,
+`JobOrderPageController.viewOrders`, `joborder/orders-index.html`, `static/js/joborder/orders-index.js`,
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
 `JobOrderRepository.findScopedJobOrders` · **Related:** REQ-ORDERS-023, REQ-ORDERS-027, REQ-UI-027
 

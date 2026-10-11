@@ -74,7 +74,7 @@ class ItemCollectionPageControllerTest {
 
     String viewName = controller.viewItemCollection(jobOrderId, null, model);
 
-    assertEquals("item-collection", viewName);
+    assertEquals("joborder/item-collection", viewName);
     assertEquals(jobOrderId, model.getAttribute("jobOrderId"));
     assertEquals(groups, model.getAttribute("itemStock"));
     List<?> itemGroups = (List<?>) model.getAttribute("itemGroups");
@@ -101,7 +101,7 @@ class ItemCollectionPageControllerTest {
 
     String viewName = controller.viewItemCollection(jobOrderId, "results", model);
 
-    assertEquals("item-collection :: collectionResults", viewName);
+    assertEquals("joborder/item-collection :: collectionResults", viewName);
     assertEquals(jobOrderId, model.getAttribute("jobOrderId"));
   }
 
@@ -120,7 +120,7 @@ class ItemCollectionPageControllerTest {
 
     String viewName = controller.viewItemCollection(jobOrderId, null, model);
 
-    assertEquals("item-collection", viewName);
+    assertEquals("joborder/item-collection", viewName);
     List<?> itemStock = (List<?>) model.getAttribute("itemStock");
     assertNotNull(itemStock);
     assertTrue(itemStock.isEmpty());
@@ -141,7 +141,7 @@ class ItemCollectionPageControllerTest {
 
     String viewName = controller.viewItemCollection(jobOrderId, null, model);
 
-    assertEquals("item-collection", viewName);
+    assertEquals("joborder/item-collection", viewName);
     List<?> locations = (List<?>) model.getAttribute("locations");
     assertNotNull(locations);
     assertTrue(locations.isEmpty());

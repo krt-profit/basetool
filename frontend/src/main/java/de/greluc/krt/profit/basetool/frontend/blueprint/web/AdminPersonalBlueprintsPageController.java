@@ -118,7 +118,9 @@ public class AdminPersonalBlueprintsPageController {
     } else {
       model.addAttribute("blueprints", Collections.emptyList());
     }
-    return isFragment ? "admin/personal-blueprints :: results" : "admin/personal-blueprints";
+    return isFragment
+        ? "blueprint/admin/personal-blueprints :: results"
+        : "blueprint/admin/personal-blueprints";
   }
 
   /**

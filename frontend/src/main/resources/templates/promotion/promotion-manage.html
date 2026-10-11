@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{promotion.manage.title} + ' - ' + ${appTitle}">Bewertungsverwaltung - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+    <link rel="stylesheet" th:href="@{/css/pages/promotion/promotion-manage.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main th:with="pmShowMatrix=${!isAllSquadronsMode and members != null and !members.isEmpty()}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.manage.title},
+        count=${pmShowMatrix ? members.size() : null}, countId='pm-count', actions=~{::pm-actions})}">
+        <th:block th:ref="pm-actions">
+            <th:block th:if="${pmShowMatrix}">
+                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='pm-more', items=~{::pm-more-items})}">
+                    <th:block th:ref="pm-more-items">
+                        <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="pm-expand-all"
+                                data-testid="pm-expand-all" th:text="#{promotion.manage.expand.all}">Alle ausklappen</button>
+                        <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="pm-collapse-all"
+                                data-testid="pm-collapse-all" th:text="#{promotion.manage.collapse.all}">Alle einklappen</button>
+                        <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="pm-export-csv"
+                                data-testid="pm-export-csv" th:text="#{promotion.manage.export.csv}">CSV-Export</button>
+                    </th:block>
+                </th:block>
+            </th:block>
+        </th:block>
+    </th:block>
+
+    <div th:if="${isAllSquadronsMode}" class="alert alert-info"
+         th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</div>
+    <th:block th:unless="${isAllSquadronsMode}">
+
+        <div th:if="${!pmShowMatrix}" class="card card--flush">
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='promotion.manage.no.members', textKey='promotion.manage.no.members.text')}"></th:block>
+        </div>
+
+        <th:block th:if="${pmShowMatrix}">
+            <div id="pm-filter-form">
+                <div class="toolbar">
+                    <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('pm-member-search', 'search', null, 'promotion.manage.filter.placeholder')}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='pm-filter-panel', panelName='promotion-manage',
+                        testid='pm-filter-toggle', body=~{::pm-filter-body})}">
+                        <th:block th:ref="pm-filter-body">
+                            <div class="check-row pm-filter-option">
+                                <input type="checkbox" id="pm-filter-eligible" name="eligibleOnly" data-trigger="pm-filter-change" />
+                                <label for="pm-filter-eligible" th:text="#{promotion.manage.filter.eligible.only}">Nur Beförderbare</label>
+                            </div>
+                            <div class="check-row pm-filter-option">
+                                <input type="checkbox" id="pm-filter-no-eval" name="noEvalOnly" data-trigger="pm-filter-change" />
+                                <label for="pm-filter-no-eval" th:text="#{promotion.manage.filter.no.evaluations}">Nur ohne Bewertung</label>
+                            </div>
+                        </th:block>
+                    </th:block>
+                    <span class="toolbar__spacer"></span>
+                    <span id="pm-queue-indicator" class="pm-queue-indicator" hidden
+                          th:attr="aria-label=#{promotion.manage.queue.aria}">
+                        <span class="krt-spinner" aria-hidden="true"></span>
+                        <span>
+                            <span id="pm-queue-count">0</span>
+                            <span th:text="#{promotion.manage.queue.suffix}">Speichervorgänge offen</span>
+                        </span>
+                    </span>
+                </div>
+                <th:block th:replace="~{kernel/fragments/components :: filterChips('pm-filter-form')}"></th:block>
+            </div>
+
+            <div class="pm-bulk-panel" id="pm-bulk-panel" hidden role="region"
+                 th:attr="aria-label=#{promotion.manage.bulk.title}">
+                <span class="pm-bulk-count">
+                    <span id="pm-bulk-count-value">0</span>
+                    <span th:text="#{promotion.manage.bulk.selected}">Mitglieder ausgewählt</span>
+                </span>
+
+                <select id="pm-bulk-category" th:attr="aria-label=#{promotion.manage.bulk.category}">
+                    <option value="" th:text="#{promotion.manage.bulk.category.placeholder}">Kategorie wählen…</option>
+                    <optgroup th:each="topic : ${topics}"
+                              th:label="${topic.name}">
+                        <option th:each="cat : ${categoriesByTopic.get(topic.id.toString())}"
+                                th:value="${cat.id}"
+                                th:text="${cat.name}">Kategorie</option>
+                    </optgroup>
+                </select>
+
+                <select id="pm-bulk-level" th:attr="aria-label=#{promotion.manage.bulk.level}">
+                    <option value="" th:text="#{promotion.manage.bulk.level.placeholder}">Stufe wählen…</option>
+                    <option value="__NONE__" th:text="#{promotion.manage.level.none}">Keine</option>
+                    <option value="LEVEL_A" th:text="#{promotion.manage.level.a}">Stufe A</option>
+                    <option value="LEVEL_B" th:text="#{promotion.manage.level.b}">Stufe B</option>
+                    <option value="LEVEL_C" th:text="#{promotion.manage.level.c}">Stufe C</option>
+                </select>
+
+                <button type="button"
+                        class="btn btn--cta btn-tiny"
+                        data-trigger="pm-bulk-apply"
+                        th:text="#{promotion.manage.bulk.apply}">Anwenden</button>
+                <button type="button"
+                        class="btn btn-ghost btn-tiny"
+                        data-trigger="pm-bulk-clear"
+                        th:text="#{promotion.manage.bulk.clear}">Auswahl aufheben</button>
+            </div>
+
+            <div class="card card--flush pm-matrix-wrapper">
+                <div id="pm-matrix-results">
+                <th:block th:fragment="matrixBody">
+                <th:block th:if="${matrixTruncated}">
+                    <div th:replace="~{kernel/fragments/components :: alert('warning', 'promotion.manage.truncated', 'mb-1')}"></div>
+                </th:block>
+                <table class="pm-matrix">
+                    <thead>
+                        <tr class="pm-row-topic">
+                            <th class="pm-checkbox-cell pm-checkbox-col">
+                                <input type="checkbox" id="pm-select-all"
+                                       data-trigger="pm-select-all"
+                                       th:attr="aria-label=#{promotion.manage.select.all}" />
+                            </th>
+                            <th class="pm-member-cell pm-member-col">
+                                <button type="button"
+                                        class="pm-sort-toggle"
+                                        data-trigger="pm-cycle-sort"
+                                        data-pm-sort-mode="0"
+                                        th:attr="title=#{promotion.manage.sort.tooltip}">
+                                    <span th:text="#{promotion.manage.member}">Mitglied</span>
+                                    <span class="pm-sort-indicator"
+                                          th:text="#{promotion.manage.sort.indicator.none}">↕ Original</span>
+                                </button>
+                            </th>
+                            <th class="pm-eligibility-cell pm-eligibility-col"
+                                th:text="#{promotion.manage.eligibility}">Beförderbar</th>
+                            <th th:each="topic : ${topics}"
+                                class="pm-topic-cell"
+                                th:attr="data-pm-topic-id=${topic.id},data-pm-collapsed='false',colspan=${categoryCountByTopic[topic.id.toString()]}">
+                                <button type="button"
+                                        class="pm-topic-toggle"
+                                        data-trigger="pm-toggle-topic"
+                                        th:attr="data-pm-topic-id=${topic.id},aria-expanded='true',title=${topic.name}">
+                                    <span class="pm-topic-icon" aria-hidden="true"></span>
+                                    <span class="pm-topic-label" th:text="${topic.name}">Themenbereich</span>
+                                </button>
+                            </th>
+                        </tr>
+                        <tr class="pm-row-category">
+                            <th class="pm-checkbox-cell pm-checkbox-col" aria-hidden="true"></th>
+                            <th class="pm-member-cell pm-member-col" aria-hidden="true"></th>
+                            <th class="pm-eligibility-cell pm-eligibility-col" aria-hidden="true"></th>
+                            <th th:each="cat : ${categories}"
+                                class="pm-cat-col"
+                                th:attr="data-pm-topic-id=${cat.topicId},data-pm-category-id=${cat.id},data-pm-topic-name=${cat.topicName},data-pm-category-name=${cat.name}"
+                                th:text="${cat.name}"
+                                th:title="${cat.description}">Kategorie</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="member,memberIter : ${members}"
+                            th:with="lastEval=${lastEvaluatedByUser[member.id.toString()]},
+                                     hasEval=${hasEvaluationsByUser[member.id.toString()] != null and hasEvaluationsByUser[member.id.toString()]},
+                                     eligList=${eligibilityByUser[member.id.toString()]}"
+                            th:attr="data-pm-member-name=${#strings.toLowerCase(member.username)},
+                                     data-pm-username=${member.username},
+                                     data-pm-user-id=${member.id},
+                                     data-pm-rank=${member.rank != null ? member.rank : ''},
+                                     data-pm-original-order=${memberIter.index},
+                                     data-pm-has-evaluations=${hasEval},
+                                     data-pm-eligible=${eligList != null and #lists.size(eligList.?[hasConfiguredRules and eligible]) > 0 ? 'true' : 'false'},
+                                     data-pm-last-evaluated=${lastEval != null ? lastEval.toString() : ''}">
+                            <td class="pm-checkbox-cell pm-checkbox-col">
+                                <input type="checkbox"
+                                       class="pm-row-checkbox"
+                                       data-trigger="pm-row-check"
+                                       th:attr="data-pm-user-id=${member.id},aria-label=${member.username}" />
+                            </td>
+                            <td class="pm-member-cell pm-member-col">
+                                <span class="pm-member-name" th:text="${member.username}">Mitglied</span>
+                                <span th:if="${member.rank != null}"
+                                      class="pm-member-rank"
+                                      th:text="|#{promotion.manage.member.rank}: ${member.rank}|">Rang: 20</span>
+                                <span class="pm-member-last-eval"
+                                      th:attr="data-pm-empty=${lastEval == null ? 'true' : 'false'},
+                                               data-pm-last-evaluated=${lastEval != null ? lastEval.toString() : ''}"
+                                      th:text="#{promotion.manage.last.evaluated.placeholder}">Zuletzt bewertet …</span>
+                            </td>
+                            <td class="pm-eligibility-cell pm-eligibility-col">
+                                <th:block th:fragment="eligibilityCell">
+                                <span th:if="${eligList == null or #lists.isEmpty(eligList)}"
+                                      class="pm-eligibility-none"
+                                      th:text="#{promotion.manage.eligibility.none}">-</span>
+                                <span th:each="elig : ${eligList}"
+                                      th:if="${elig.hasConfiguredRules}"
+                                      th:classappend="${elig.eligible} ? ' is-eligible' : ' not-eligible'"
+                                      class="eligibility-chip"
+                                      th:attr="data-pm-from-rank=${elig.fromRank},data-pm-to-rank=${elig.toRank},data-pm-eligible=${elig.eligible}"
+                                      th:title="${elig.eligible} ? #{promotion.manage.eligibility.eligible} + ' (' + ${elig.fromRank} + ' &rarr; ' + ${elig.toRank} + ')' : #{promotion.manage.eligibility.not.eligible} + ' (' + ${elig.fromRank} + ' &rarr; ' + ${elig.toRank} + ')'">
+                                    <span th:text="${elig.fromRank}">20</span>&rarr;<span th:text="${elig.toRank}">19</span>
+                                </span>
+                                </th:block>
+                            </td>
+                            <td th:each="cat : ${categories}"
+                                class="pm-cat-col"
+                                th:attr="data-pm-topic-id=${cat.topicId},data-pm-category-id=${cat.id}">
+                                <th:block th:with="eval=${evaluationMap[member.id.toString() + '_' + cat.id.toString()]}">
+                                    <select class="level-select"
+                                            data-trigger="pm-save-evaluation"
+                                            th:attr="data-user-id=${member.id},data-category-id=${cat.id},data-version=${eval != null ? eval.version : ''},data-level=${eval != null ? eval.assignedLevel : ''},aria-label=${member.username + ' - ' + cat.name}">
+                                        <option value="" th:text="#{promotion.manage.level.none}"
+                                                th:selected="${eval == null or eval.assignedLevel == null}">Keine</option>
+                                        <option value="LEVEL_A" th:text="#{promotion.manage.level.a}"
+                                                th:selected="${eval != null and eval.assignedLevel == 'LEVEL_A'}">Stufe A</option>
+                                        <option value="LEVEL_B" th:text="#{promotion.manage.level.b}"
+                                                th:selected="${eval != null and eval.assignedLevel == 'LEVEL_B'}">Stufe B</option>
+                                        <option value="LEVEL_C" th:text="#{promotion.manage.level.c}"
+                                                th:selected="${eval != null and eval.assignedLevel == 'LEVEL_C'}">Stufe C</option>
+                                    </select>
+                                </th:block>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div id="pm-empty-state" hidden>
+                    <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='promotion.manage.filter.empty', textKey='promotion.manage.filter.empty.text')}"></th:block>
+                </div>
+                </th:block>
+                </div>
+            </div>
+        </th:block>
+    </th:block>
+</main>
+</th:block>
+<th:block th:fragment="pageTail">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
+    var MSG_SAVED       = /*[[#{promotion.manage.saved}]]*/ 'Saved';
+    var MSG_ERROR       = /*[[#{promotion.manage.error}]]*/ 'Error';
+    var MSG_CONFLICT    = /*[[#{promotion.manage.conflict}]]*/ 'Conflict';
+    var MSG_LAST_EVAL   = /*[[#{promotion.manage.last.evaluated}]]*/ 'Last evaluated';
+    var MSG_BULK_CONFIRM_TITLE = /*[[#{promotion.manage.bulk.confirm.title}]]*/ 'Apply bulk?';
+    var MSG_BULK_CONFIRM_MSG   = /*[[#{promotion.manage.bulk.confirm.message}]]*/ 'Apply level {level} to {count} members in {category}?';
+    var MSG_BULK_NEED_CAT      = /*[[#{promotion.manage.bulk.need.category}]]*/ 'Please pick a category.';
+    var MSG_BULK_NEED_LEVEL    = /*[[#{promotion.manage.bulk.need.level}]]*/ 'Please pick a level.';
+    var MSG_BULK_RESULT        = /*[[#{promotion.manage.bulk.result}]]*/ 'Bulk: {ok} OK, {fail} failed';
+    var MSG_CSV_NAME           = /*[[#{promotion.manage.export.csv.filename}]]*/ 'evaluations';
+    var MSG_CSV_HEADER_MEMBER  = /*[[#{promotion.manage.member}]]*/ 'Member';
+    var MSG_CSV_HEADER_RANK    = /*[[#{promotion.manage.member.rank}]]*/ 'Rank';
+    var MSG_CSV_HEADER_ELIG    = /*[[#{promotion.manage.eligibility}]]*/ 'Eligible';
+    var MSG_CSV_HEADER_LAST    = /*[[#{promotion.manage.last.evaluated}]]*/ 'Last evaluated';
+
+    var SORT_LABELS = [
+        /*[[#{promotion.manage.sort.indicator.none}]]*/ 'Original',
+        /*[[#{promotion.manage.sort.indicator.name.asc}]]*/ 'Name A-Z',
+        /*[[#{promotion.manage.sort.indicator.name.desc}]]*/ 'Name Z-A',
+        /*[[#{promotion.manage.sort.indicator.rank.asc}]]*/ 'Rank low',
+        /*[[#{promotion.manage.sort.indicator.rank.desc}]]*/ 'Rank high'
+    ];
+
+    var STORAGE_KEY_COLLAPSED = 'promotion-manage-collapsed-topics';
+    var STORAGE_KEY_SORT      = 'promotion-manage-sort-mode';
+    var STORAGE_KEY_FILTERS   = 'promotion-manage-filters';
+
+    var MSG_REFRESH_FAILED = /*[[#{promotion.refresh.failed}]]*/ 'Saved, but the view could not be refreshed. Please reload the page.';
+</script>
+<script th:src="@{/js/promotion/promotion-manage.js}" defer th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
+</th:block>
+</body>
+</html>

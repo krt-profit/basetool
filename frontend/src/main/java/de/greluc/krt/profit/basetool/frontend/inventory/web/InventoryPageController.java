@@ -173,9 +173,9 @@ public class InventoryPageController {
     model.addAttribute("aggregated", aggregated);
     model.addAttribute("materials", materials);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
-      return "inventory-index :: inventoryResults";
+      return "inventory/inventory-index :: inventoryResults";
     }
-    return "inventory-index";
+    return "inventory/inventory-index";
   }
 
   /**
@@ -234,12 +234,12 @@ public class InventoryPageController {
     model.addAttribute("pageSizes", DRILLDOWN_PAGE_SIZES);
     model.addAttribute("selectedMaterialId", materialId);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
-      return "inventory-material :: inventoryMaterialResults";
+      return "inventory/inventory-material :: inventoryMaterialResults";
     }
     List<MaterialReferenceDto> materials = fetchMaterials();
     model.addAttribute("materials", materials);
     model.addAttribute("materialName", drilldownMaterialName(materialId, items, materials));
-    return "inventory-material";
+    return "inventory/inventory-material";
   }
 
   /**
@@ -324,9 +324,9 @@ public class InventoryPageController {
             .findFirst()
             .orElse(null));
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
-      return "inventory-game-item :: inventoryGameItemResults";
+      return "inventory/inventory-game-item :: inventoryGameItemResults";
     }
-    return "inventory-game-item";
+    return "inventory/inventory-game-item";
   }
 
   /**
@@ -483,9 +483,9 @@ public class InventoryPageController {
       model.addAttribute("authUserId", currentAuthName());
       model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
       if (fragment) {
-        return "inventory-my :: inventoryTableFragment";
+        return "inventory/inventory-my :: inventoryTableFragment";
       }
-      return "inventory-my";
+      return "inventory/inventory-my";
     }
 
     List<GroupedInventoryDto> groupedItems = new ArrayList<>();
@@ -551,9 +551,9 @@ public class InventoryPageController {
     model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
 
     if (fragment) {
-      return "inventory-my :: inventoryTableFragment";
+      return "inventory/inventory-my :: inventoryTableFragment";
     }
-    return "inventory-my";
+    return "inventory/inventory-my";
   }
 
   /**
@@ -919,9 +919,9 @@ public class InventoryPageController {
       model.addAttribute("authUserId", currentAuthName());
       model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
       if (fragment) {
-        return "inventory-admin :: inventoryTableFragment";
+        return "inventory/inventory-admin :: inventoryTableFragment";
       }
-      return "inventory-admin";
+      return "inventory/inventory-admin";
     }
 
     List<GroupedInventoryDto> groupedItems = new ArrayList<>();
@@ -979,9 +979,9 @@ public class InventoryPageController {
     model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
 
     if (fragment) {
-      return "inventory-admin :: inventoryTableFragment";
+      return "inventory/inventory-admin :: inventoryTableFragment";
     }
-    return "inventory-admin";
+    return "inventory/inventory-admin";
   }
 
   /**
@@ -1019,7 +1019,7 @@ public class InventoryPageController {
         model,
         true);
     addReleasedItemIds(model);
-    return "fragments/inventory-stack-entries :: stackEntriesMy";
+    return "inventory/fragments/inventory-stack-entries :: stackEntriesMy";
   }
 
   /**
@@ -1054,7 +1054,7 @@ public class InventoryPageController {
         model,
         false);
     addReleasedItemIds(model);
-    return "fragments/inventory-stack-entries :: stackEntriesMy";
+    return "inventory/fragments/inventory-stack-entries :: stackEntriesMy";
   }
 
   /**
@@ -1119,7 +1119,7 @@ public class InventoryPageController {
                 materialId, userId, locationId, quality, stolen, owningOrgUnitId, page, size),
         model,
         true);
-    return "fragments/inventory-stack-entries :: stackEntriesAdmin";
+    return "inventory/fragments/inventory-stack-entries :: stackEntriesAdmin";
   }
 
   /**
@@ -1153,7 +1153,7 @@ public class InventoryPageController {
                 gameItemId, userId, locationId, stolen, owningOrgUnitId, page, size),
         model,
         false);
-    return "fragments/inventory-stack-entries :: stackEntriesAdmin";
+    return "inventory/fragments/inventory-stack-entries :: stackEntriesAdmin";
   }
 
   /**
@@ -1238,7 +1238,7 @@ public class InventoryPageController {
     model.addAttribute("jobOrderNeedsJson", writeOrderNeedsJson(orderNeeds(inputJobOrders)));
     model.addAttribute("ownerOptions", ownerFuture.join());
     model.addAttribute("selectedUser", selectedUserFuture.join());
-    return "inventory-input";
+    return "inventory/inventory-input";
   }
 
   /**

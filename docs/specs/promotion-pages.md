@@ -56,8 +56,8 @@ and „achieved / required". The segment „Alle · Offen" hides the met rows cl
 **Enforced by:** `PromotionAreaPagePatternRenderTest` (`overviewRendersRankSteps`,
 `myEvaluationsLeadWithTheProgressBlock`), `PromotionPageControllerTest` (`findNextStep`,
 `progressPercent`) · **Code:** `PromotionPageController#overview` / `#myEvaluations` /
-`findNextStep` / `progressPercent`, `templates/promotion-overview.html`,
-`templates/promotion-my-evaluations.html`, `static/js/promotion-my-evaluations.js`.
+`findNextStep` / `progressPercent`, `templates/promotion/promotion-overview.html`,
+`templates/promotion/promotion-my-evaluations.html`, `static/js/promotion/promotion-my-evaluations.js`.
 
 ### REQ-PROMO-003 — Topics are kept as master-detail, rank requirements as a matrix
 
@@ -90,9 +90,9 @@ step lists its requirements with edit and delete, and deletes the whole step. Th
 `PromotionPageControllerTest` (`selectTopicId`), `PromotionInPlaceFragmentMvcTest`,
 `PromotionTopicCrudE2eTest` · **Code:**
 `PromotionPageController#adminTopics` / `#adminRankRequirements` / `selectTopicId` /
-`matrixCellKey`, `templates/promotion-admin-topics.html`,
-`templates/promotion-admin-rank-requirements.html`, `static/js/promotion-admin-topics.js`,
-`static/js/promotion-admin-rank-requirements.js`.
+`matrixCellKey`, `templates/promotion/promotion-admin-topics.html`,
+`templates/promotion/promotion-admin-rank-requirements.html`, `static/js/promotion/promotion-admin-topics.js`,
+`static/js/promotion/promotion-admin-rank-requirements.js`.
 
 ## Out of scope
 

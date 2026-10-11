@@ -182,7 +182,7 @@ class MemberManagementControllerTest {
 
       String view = controller.listMembers(null, null, null, null, model);
 
-      assertEquals("members", view);
+      assertEquals("identity/members", view);
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
       verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
           .get(uriCaptor.capture(), anyTypeRef());
@@ -263,7 +263,7 @@ class MemberManagementControllerTest {
 
       String view = controller.listMembers(null, null, null, null, model);
 
-      assertEquals("members", view);
+      assertEquals("identity/members", view);
       assertNull(model.getAttribute("users"));
       assertNull(model.getAttribute("usersPage"));
     }
@@ -277,7 +277,7 @@ class MemberManagementControllerTest {
 
       String view = controller.listMembers(null, null, null, null, model);
 
-      assertEquals("members", view, "error path must NOT redirect — direct view render");
+      assertEquals("identity/members", view, "error path must NOT redirect — direct view render");
       assertEquals("error.members.load", model.getAttribute("error"));
     }
 
@@ -289,7 +289,7 @@ class MemberManagementControllerTest {
 
       String view = controller.listMembers(null, null, null, "results", model);
 
-      assertEquals("members :: membersTableFragment", view);
+      assertEquals("identity/members :: membersTableFragment", view);
     }
   }
 
@@ -357,7 +357,7 @@ class MemberManagementControllerTest {
 
       String view = controller.editMember(id, null, model, redirectAttributes);
 
-      assertEquals("member-edit", view);
+      assertEquals("identity/member-edit", view);
       assertNull(model.getAttribute("memberRsiHandle"));
     }
 
@@ -371,7 +371,7 @@ class MemberManagementControllerTest {
 
       String view = controller.editMember(id, null, model, redirectAttributes);
 
-      assertEquals("member-edit", view);
+      assertEquals("identity/member-edit", view);
       assertSame(user, model.getAttribute("user"));
       MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
       assertNotNull(form);
@@ -466,7 +466,7 @@ class MemberManagementControllerTest {
 
       String view = controller.editMember(id, null, model, redirectAttributes);
 
-      assertEquals("member-edit", view);
+      assertEquals("identity/member-edit", view);
       MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
       assertNotNull(form);
       assertEquals(
@@ -536,7 +536,8 @@ class MemberManagementControllerTest {
 
       String view = controller.updateMember(id, form, br, model, redirectAttributes);
 
-      assertEquals("member-edit", view, "validation errors must re-render directly, NOT redirect");
+      assertEquals(
+          "identity/member-edit", view, "validation errors must re-render directly, NOT redirect");
       verify(backendApiClient, never()).put(anyString(), any(), any());
       verify(backendApiClient, never()).put(anyString(), any(), any(), any(Object[].class));
       assertTrue(

@@ -99,7 +99,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/personal-inventory"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/personal-inventory"));
+        .andExpect(view().name("personalinventory/admin/personal-inventory"));
   }
 
   @Test
@@ -116,7 +116,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
         .perform(
             get("/admin/personal-inventory").param("userSub", userSub).param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/personal-inventory :: results"))
+        .andExpect(view().name("personalinventory/admin/personal-inventory :: results"))
         .andExpect(content().string(containsString("data-testid=\"empty-state\"")))
         .andExpect(content().string(containsString("class=\"krt-pi-filter no-track\"")))
         .andExpect(content().string(not(containsString("colspan"))))
@@ -238,7 +238,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
     mockMvc
         .perform(post("/admin/personal-inventory/" + userSub + "/add").with(csrf()))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/personal-inventory"))
+        .andExpect(view().name("personalinventory/admin/personal-inventory"))
         .andExpect(model().attribute("showItemModal", true))
         .andExpect(
             model().attribute("modalAction", "/admin/personal-inventory/" + userSub + "/add"))
@@ -267,7 +267,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
                 .param("name", "Kiste")
                 .param("quantity", "0"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/personal-inventory"))
+        .andExpect(view().name("personalinventory/admin/personal-inventory"))
         .andExpect(model().attribute("showItemModal", true))
         .andExpect(
             model()

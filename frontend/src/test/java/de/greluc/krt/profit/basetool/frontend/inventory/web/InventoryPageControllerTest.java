@@ -103,7 +103,7 @@ class InventoryPageControllerTest {
 
     String view = controller.viewAggregatedInventory(null, null, null, null, model);
 
-    assertEquals("inventory-index", view);
+    assertEquals("inventory/inventory-index", view);
     assertTrue(model.containsAttribute("aggregated"));
     assertTrue(model.containsAttribute("materials"));
   }
@@ -116,7 +116,7 @@ class InventoryPageControllerTest {
 
     String view = controller.viewAggregatedInventory(null, null, null, null, model);
 
-    assertEquals("inventory-index", view);
+    assertEquals("inventory/inventory-index", view);
     assertEquals("error.inventory.aggregate.load", model.getAttribute("error"));
   }
 
@@ -129,7 +129,7 @@ class InventoryPageControllerTest {
 
     String view = controller.viewAggregatedInventory(null, null, null, "results", model);
 
-    assertEquals("inventory-index :: inventoryResults", view);
+    assertEquals("inventory/inventory-index :: inventoryResults", view);
   }
 
   @Test
@@ -142,7 +142,7 @@ class InventoryPageControllerTest {
 
     String view = controller.viewMaterialInventory(materialId, null, null, null, model);
 
-    assertEquals("inventory-material", view);
+    assertEquals("inventory/inventory-material", view);
     assertTrue(model.containsAttribute("items"));
     assertSame(page, model.getAttribute("inventoryMaterialPage"));
     assertEquals(List.of(50, 100, 200), model.getAttribute("pageSizes"));
@@ -209,7 +209,7 @@ class InventoryPageControllerTest {
 
     String view = controller.viewMaterialInventory(materialId, 1, null, "results", model);
 
-    assertEquals("inventory-material :: inventoryMaterialResults", view);
+    assertEquals("inventory/inventory-material :: inventoryMaterialResults", view);
     verify(backendApiClient, never()).getCached(any(), anyTypeRef());
     verify(backendApiClient, times(1)).get(anyString(), anyTypeRef(), any(Object[].class));
   }
@@ -224,7 +224,7 @@ class InventoryPageControllerTest {
 
     String view = controller.viewGameItemInventory(gameItemId, 2, 100, null, model);
 
-    assertEquals("inventory-game-item", view);
+    assertEquals("inventory/inventory-game-item", view);
     assertTrue(model.containsAttribute("items"));
     assertSame(page, model.getAttribute("inventoryGameItemPage"));
     assertEquals(List.of(50, 100, 200), model.getAttribute("pageSizes"));
@@ -243,7 +243,7 @@ class InventoryPageControllerTest {
 
     String view = controller.viewGameItemInventory(gameItemId, null, 1000, "results", model);
 
-    assertEquals("inventory-game-item :: inventoryGameItemResults", view);
+    assertEquals("inventory/inventory-game-item :: inventoryGameItemResults", view);
     verify(backendApiClient)
         .get(eq(GAME_ITEM_DRILLDOWN), anyTypeRef(), eq(gameItemId), eq(0), eq(50));
   }
@@ -333,7 +333,7 @@ class InventoryPageControllerTest {
         controller.viewMyInventory(
             null, null, null, null, null, null, null, false, false, false, false, false, model);
 
-    assertEquals("inventory-my", view);
+    assertEquals("inventory/inventory-my", view);
     assertTrue(model.containsAttribute("items"));
     assertTrue(model.containsAttribute("inventoryForm"));
   }
@@ -363,7 +363,7 @@ class InventoryPageControllerTest {
             false,
             model);
 
-    assertEquals("inventory-my", view);
+    assertEquals("inventory/inventory-my", view);
     assertEquals(List.of(materialId), model.getAttribute("selectedMaterialIds"));
     assertEquals(500, model.getAttribute("selectedMinQuality"));
     assertEquals(List.of(jobOrderId), model.getAttribute("selectedJobOrderIds"));
@@ -392,7 +392,7 @@ class InventoryPageControllerTest {
         controller.viewMyInventory(
             null, null, null, null, null, null, null, true, false, false, false, false, model);
 
-    assertEquals("inventory-my", view);
+    assertEquals("inventory/inventory-my", view);
     assertEquals(true, model.getAttribute("selectedPersonalOnly"));
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
@@ -416,7 +416,7 @@ class InventoryPageControllerTest {
         controller.viewMyInventory(
             null, null, null, null, null, null, null, false, true, false, false, false, model);
 
-    assertEquals("inventory-my", view);
+    assertEquals("inventory/inventory-my", view);
     assertEquals(true, model.getAttribute("selectedNonPersonalOnly"));
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
@@ -443,7 +443,7 @@ class InventoryPageControllerTest {
         controller.viewMyInventory(
             null, null, null, null, null, null, null, false, false, false, false, true, model);
 
-    assertEquals("inventory-my :: inventoryTableFragment", view);
+    assertEquals("inventory/inventory-my :: inventoryTableFragment", view);
   }
 
   @Test
@@ -533,7 +533,7 @@ class InventoryPageControllerTest {
             false,
             model);
 
-    assertEquals("inventory-admin", view);
+    assertEquals("inventory/inventory-admin", view);
     assertTrue(model.containsAttribute("items"));
   }
 
@@ -541,7 +541,7 @@ class InventoryPageControllerTest {
   void viewInputPage_shouldReturnInputPage() {
     Model model = new ConcurrentModel();
     String view = controller.viewInputPage(null, model);
-    assertEquals("inventory-input", view);
+    assertEquals("inventory/inventory-input", view);
   }
 
   @Test
@@ -598,7 +598,7 @@ class InventoryPageControllerTest {
         writeController.addInventoryItem(
             form, bindingResult, new ConcurrentModel(), redirectAttributes);
 
-    assertEquals("inventory-input", view);
+    assertEquals("inventory/inventory-input", view);
   }
 
   @Test
@@ -705,7 +705,7 @@ class InventoryPageControllerTest {
         writeController.bookOutInventoryItem(
             id, form, bindingResult, renderModel, redirectAttributes, referer);
 
-    assertEquals("inventory-admin", view);
+    assertEquals("inventory/inventory-admin", view);
     assertEquals("error.validation.failed", renderModel.getAttribute("errorToast"));
     assertEquals(id, renderModel.getAttribute("showBookOutModal"));
   }
@@ -1098,7 +1098,7 @@ class InventoryPageControllerTest {
             false,
             model);
 
-    assertEquals("inventory-my", view);
+    assertEquals("inventory/inventory-my", view);
     assertEquals(List.of(locationId), model.getAttribute("selectedLocationIds"));
     assertEquals(List.of(location), model.getAttribute("locations"));
     org.mockito.ArgumentCaptor<String> urlCaptor =
@@ -1183,7 +1183,7 @@ class InventoryPageControllerTest {
         controller.viewAllInventory(
             null, null, null, null, null, null, List.of(locationId), false, false, false, model);
 
-    assertEquals("inventory-admin", view);
+    assertEquals("inventory/inventory-admin", view);
     assertEquals(List.of(locationId), model.getAttribute("selectedLocationIds"));
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);

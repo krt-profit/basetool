@@ -122,7 +122,7 @@ class AdminExchangeClientsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/exchange-clients"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/exchange-clients"))
+        .andExpect(view().name("exchange/admin/exchange-clients"))
         .andExpect(
             model().attribute("capabilities", AdminExchangeClientsPageController.CAPABILITIES))
         .andExpect(model().attributeDoesNotExist("error"))
@@ -184,7 +184,7 @@ class AdminExchangeClientsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/exchange-clients").param("fragment", "registry"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/exchange-clients :: registry"))
+        .andExpect(view().name("exchange/admin/exchange-clients :: registry"))
         .andExpect(content().string(containsString("id=\"xc-table\"")))
         .andExpect(content().string(containsString("id=\"xc-switch\"")))
         .andExpect(content().string(not(containsString("id=\"xc-registry-host\""))))
@@ -380,7 +380,7 @@ class AdminExchangeClientsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/exchange-clients").param("fragment", "undoRuns"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/exchange-clients :: undoRuns"))
+        .andExpect(view().name("exchange/admin/exchange-clients :: undoRuns"))
         .andExpect(content().string(containsString("data-xc-running=\"true\"")))
         .andExpect(content().string(containsString("data-run-id=\"" + RUN + "\"")))
         .andExpect(content().string(containsString("27.09.2026 18:00 UTC")))

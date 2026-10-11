@@ -227,9 +227,9 @@ public class RefineryOrderPageController {
     model.addAttribute("searchQuery", query);
     model.addAttribute("onlyMine", mine);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
-      return "refinery-orders-index :: refineryOrdersResults";
+      return "refinery/refinery-orders-index :: refineryOrdersResults";
     }
-    return "refinery-orders-index";
+    return "refinery/refinery-orders-index";
   }
 
   /**
@@ -447,7 +447,7 @@ public class RefineryOrderPageController {
       }
     }
     populateCreateFormModel(model, form, principal);
-    return "refinery-orders-create";
+    return "refinery/refinery-orders-create";
   }
 
   /**
@@ -568,7 +568,7 @@ public class RefineryOrderPageController {
     if (extract == null) {
       model.addAttribute("importErrorKey", "refineryImport.error.invalidFile");
       populateCreateFormModel(model, form, principal);
-      return "refinery-orders-create :: refineryImportFormBody";
+      return "refinery/refinery-orders-create :: refineryImportFormBody";
     }
     try {
       RefineryImportDraftDto draft = refineryClient.importExtract(extract);
@@ -596,7 +596,7 @@ public class RefineryOrderPageController {
       model.addAttribute("importErrorKey", "refineryImport.error.failed");
     }
     populateCreateFormModel(model, form, principal);
-    return "refinery-orders-create :: refineryImportFormBody";
+    return "refinery/refinery-orders-create :: refineryImportFormBody";
   }
 
   /**
@@ -632,7 +632,7 @@ public class RefineryOrderPageController {
       model.addAttribute("importErrorKey", "ingest.handoff.notFound");
     }
     populateCreateFormModel(model, form, principal);
-    return "refinery-orders-create :: refineryImportFormBody";
+    return "refinery/refinery-orders-create :: refineryImportFormBody";
   }
 
   /**
@@ -659,7 +659,7 @@ public class RefineryOrderPageController {
       @AuthenticationPrincipal OidcUser principal) {
     String section = fragment == null ? null : fragment.toLowerCase(Locale.ROOT);
     if (section != null && !FRAGMENT_ORDER.equals(section) && !FRAGMENT_STORE.equals(section)) {
-      return "refinery-orders-details :: fragmentError";
+      return "refinery/refinery-orders-details :: fragmentError";
     }
     boolean isLogistician = isLogistician(principal);
     model.addAttribute("isLogistician", isLogistician);
@@ -783,7 +783,7 @@ public class RefineryOrderPageController {
       } catch (Exception e) {
         log.error("Failed to fetch refinery order details", e);
         if (section != null) {
-          return "refinery-orders-details :: fragmentError";
+          return "refinery/refinery-orders-details :: fragmentError";
         }
         model.addAttribute("errorToast", "error.refineryorder.load");
         return "redirect:/refinery-orders";
@@ -827,12 +827,12 @@ public class RefineryOrderPageController {
     }
     model.addAttribute("materialYieldBonuses", fetchYieldsForLocation(currentLocationId));
     if (FRAGMENT_ORDER.equals(section)) {
-      return "refinery-orders-details :: refineryOrderSection";
+      return "refinery/refinery-orders-details :: refineryOrderSection";
     }
     if (FRAGMENT_STORE.equals(section)) {
-      return "refinery-orders-details :: refineryStoreSection";
+      return "refinery/refinery-orders-details :: refineryStoreSection";
     }
-    return "refinery-orders-details";
+    return "refinery/refinery-orders-details";
   }
 
   /**

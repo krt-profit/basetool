@@ -134,7 +134,7 @@ class PromotionPageControllerTest {
 
     String view = controller.overview(true, model);
 
-    assertEquals("promotion-overview", view);
+    assertEquals("promotion/promotion-overview", view);
     assertTrue(((List<?>) model.getAttribute("topics")).isEmpty());
     assertTrue(((Map<?, ?>) model.getAttribute("topicCategoryMap")).isEmpty());
     assertTrue(((Map<?, ?>) model.getAttribute("categoryContentMap")).isEmpty());
@@ -223,7 +223,7 @@ class PromotionPageControllerTest {
 
     String view = controller.myEvaluations(true, model);
 
-    assertEquals("promotion-my-evaluations", view);
+    assertEquals("promotion/promotion-my-evaluations", view);
     Map<String, MemberEvaluationDto> byCategory =
         (Map<String, MemberEvaluationDto>) model.getAttribute("evaluationByCategoryId");
     assertEquals(1, byCategory.size(), "one evaluation indexed by its categoryId");
@@ -306,7 +306,7 @@ class PromotionPageControllerTest {
 
     String view = controller.manage(true, null, null, model);
 
-    assertEquals("promotion-manage", view);
+    assertEquals("promotion/promotion-manage", view);
     List<PromotionCategoryDto> all = (List<PromotionCategoryDto>) model.getAttribute("categories");
     assertEquals(List.of(c1a, c1b, c2a), all, "flat list follows topic-then-category order");
     Map<String, Integer> counts = (Map<String, Integer>) model.getAttribute("categoryCountByTopic");
@@ -449,7 +449,7 @@ class PromotionPageControllerTest {
 
     String view = controller.adminTopics(true, null, null, model);
 
-    assertEquals("promotion-admin-topics", view);
+    assertEquals("promotion/promotion-admin-topics", view);
     Map<String, List<PromotionCategoryDto>> topicCats =
         (Map<String, List<PromotionCategoryDto>>) model.getAttribute("topicCategoryMap");
     assertEquals(List.of(c), topicCats.get(topicId.toString()));
@@ -480,7 +480,7 @@ class PromotionPageControllerTest {
 
     String view = controller.adminRankRequirements(true, null, model);
 
-    assertEquals("promotion-admin-rank-requirements", view);
+    assertEquals("promotion/promotion-admin-rank-requirements", view);
     Map<String, List<RankRequirementDto>> grouped =
         (Map<String, List<RankRequirementDto>>) model.getAttribute("groupedRequirements");
     assertEquals(1, grouped.size(), "both requirements share the 20→19 step");
@@ -498,7 +498,7 @@ class PromotionPageControllerTest {
 
     String view = controller.overview(true, model);
 
-    assertEquals("promotion-overview", view);
+    assertEquals("promotion/promotion-overview", view);
     assertTrue(((List<?>) model.getAttribute("topics")).isEmpty());
     assertNull(model.getAttribute("currentUserRank"));
   }

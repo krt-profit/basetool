@@ -21,13 +21,13 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -78,7 +78,7 @@ class AccessibleTextTintTest {
     List<String> offenders = new ArrayList<>();
     int stylesheets = 0;
     int exempted = 0;
-    for (Path sheet : filesUnder("/static/css/styles.css", ".css")) {
+    for (Path sheet : filesUnder("/static/css/kernel/styles.css", ".css")) {
       stylesheets++;
       String css =
           Files.readString(sheet, StandardCharsets.UTF_8).replaceAll("(?s)/\\*.*?\\*/", " ");
@@ -98,7 +98,7 @@ class AccessibleTextTintTest {
     assertThat(exempted)
         .as("every DECORATIVE exemption still names a rule that exists")
         .isEqualTo(DECORATIVE.size());
-    for (Path script : filesUnder("/static/js/krt-modal.js", ".js")) {
+    for (Path script : filesUnder("/static/js/kernel/krt-modal.js", ".js")) {
       String js = Files.readString(script, StandardCharsets.UTF_8);
       collect(script, js, JS_TEXT_COLOUR, offenders);
     }
@@ -139,7 +139,7 @@ class AccessibleTextTintTest {
       throws IOException, URISyntaxException {
     URL anchor = AccessibleTextTintTest.class.getResource(anchorResource);
     assertThat(anchor).as("%s classpath resource", anchorResource).isNotNull();
-    Path root = Paths.get(anchor.toURI()).getParent();
+    Path root = ClasspathAssets.rootOf(anchor);
     try (Stream<Path> tree = Files.walk(root)) {
       return tree.filter(Files::isRegularFile)
           .filter(p -> p.getFileName().toString().endsWith(extension))

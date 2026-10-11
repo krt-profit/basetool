@@ -648,7 +648,7 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).param("fragment", "overview").locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(view().name("operation-detail :: overviewSection"))
+        .andExpect(view().name("operation/operation-detail :: overviewSection"))
         .andExpect(content().string(containsString("id=\"operation-head-meta\"")))
         .andExpect(content().string(containsString("data-kpi-participants=\"0\"")))
         .andExpect(content().string(containsString("data-kpi-total-negative=\"false\"")))
@@ -669,7 +669,7 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).param("fragment", "payout").locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(view().name("operation-detail :: payoutSection"))
+        .andExpect(view().name("operation/operation-detail :: payoutSection"))
         .andExpect(content().string(not(containsString("id=\"pane-op-payout\""))));
 
     verify(backendApiClient, never())
@@ -701,7 +701,7 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).param("fragment", "finance").locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(view().name("operation-detail :: financeSection"))
+        .andExpect(view().name("operation/operation-detail :: financeSection"))
         .andExpect(content().string(not(containsString("id=\"pane-op-fin\""))));
 
     verify(backendApiClient, never())
@@ -720,7 +720,7 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).param("fragment", "bogus").locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(view().name("operation-detail :: fragmentError"));
+        .andExpect(view().name("operation/operation-detail :: fragmentError"));
   }
 
   @Test
@@ -733,7 +733,7 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).param("fragment", "payout").locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(view().name("operation-detail :: fragmentError"))
+        .andExpect(view().name("operation/operation-detail :: fragmentError"))
         .andExpect(content().string(containsString("Abschnitt konnte nicht aktualisiert werden")));
   }
 
@@ -772,7 +772,7 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).param("fragment", "bogus").locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        .andExpect(view().name("operation-detail :: fragmentError"))
+        .andExpect(view().name("operation/operation-detail :: fragmentError"))
         .andExpect(content().string(containsString(SECTION_REFRESH_ERROR_DE)))
         .andExpect(content().string(not(containsString("<template"))))
         .andExpect(content().string(not(containsString("id=\"operation-form\""))));

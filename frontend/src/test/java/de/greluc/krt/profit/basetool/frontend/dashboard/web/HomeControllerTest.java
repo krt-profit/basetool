@@ -51,7 +51,7 @@ class HomeControllerTest {
         new org.springframework.mock.web.MockHttpServletRequest();
     String view = controller.home(model, user, request);
 
-    assertEquals("index", view);
+    assertEquals("dashboard/index", view);
     assertEquals("max_muster", model.getAttribute("username"));
   }
 

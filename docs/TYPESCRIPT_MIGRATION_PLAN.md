@@ -152,7 +152,7 @@ the ADR-0069 invariant is finally traded away, so it needs its own ADR and its o
 - **The ordering hazard is the whole risk.** `type="module"` defers execution (as `defer` on 120 of
   the 121 tags already does) and gives each file its own scope, so every parse-time
   DOM lookup and every ordering assumption against `event-delegation.js` / `krt-fetch.js` must be
-  re-verified. The `event-delegation.js` bootstrap stub in `fragments/head.html` exists precisely
+  re-verified. The `event-delegation.js` bootstrap stub in `kernel/fragments/head.html` exists precisely
   because load-order races were a real, repeated defect here.
 - **Exit criteria:** a new ADR superseding the relevant part of ADR-0069; per-page entry bundles;
   full E2E green including the load-order-sensitive mission and orders pages.

@@ -92,7 +92,9 @@ public class AdminTermsPageController {
     model.addAttribute("termsPage", rows);
     model.addAttribute("termsPendingCount", pending);
     model.addAttribute("termsLoadFailed", rows == null);
-    return "results".equals(fragment) ? "admin/terms :: adminTermsResults" : "admin/terms";
+    return "results".equals(fragment)
+        ? "identity/admin/terms :: adminTermsResults"
+        : "identity/admin/terms";
   }
 
   /**

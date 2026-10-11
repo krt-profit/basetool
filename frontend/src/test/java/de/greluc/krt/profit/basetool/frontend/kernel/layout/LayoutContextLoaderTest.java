@@ -227,7 +227,7 @@ class LayoutContextLoaderTest {
      * @return a view name
      */
     public String view(Model model) {
-      return "index";
+      return "dashboard/index";
     }
 
     /**

@@ -78,7 +78,7 @@ class SpecialCommandMembersPageControllerTest {
 
     String view = controller.detail(skId, null, model);
 
-    assertEquals("organisation/special-command-detail", view);
+    assertEquals("orgunit/organisation/special-command-detail", view);
     assertEquals(Boolean.TRUE, model.getAttribute("canToggleLead"));
     assertEquals("/admin/special-commands", model.getAttribute("backUrl"));
   }
@@ -91,7 +91,7 @@ class SpecialCommandMembersPageControllerTest {
 
     String view = controller.detail(skId, "members", model);
 
-    assertEquals("organisation/special-command-detail :: membersResults", view);
+    assertEquals("orgunit/organisation/special-command-detail :: membersResults", view);
     assertEquals(Boolean.FALSE, model.getAttribute("canToggleLead"));
     assertEquals("/organisation/leitung", model.getAttribute("backUrl"));
     List<?> members = assertInstanceOf(List.class, model.getAttribute("members"));

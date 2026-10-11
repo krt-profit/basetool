@@ -86,7 +86,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/personal-blueprints"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/personal-blueprints"))
+        .andExpect(view().name("blueprint/admin/personal-blueprints"))
         .andExpect(content().string(containsString("data-krt-combobox=\"remote-users\"")))
         .andExpect(model().attributeExists("blueprints"))
         .andExpect(model().attribute("adminMode", Boolean.TRUE));
@@ -173,7 +173,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
                 .param("userSub", "00000000-0000-0000-0000-000000000009")
                 .param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/personal-blueprints :: results"))
+        .andExpect(view().name("blueprint/admin/personal-blueprints :: results"))
         .andExpect(content().string(containsString("Arclight Pistol")))
         .andExpect(content().string(not(containsString("id=\"bp-results\""))))
         .andExpect(content().string(not(containsString("id=\"krt-bp-edit-modal\""))))

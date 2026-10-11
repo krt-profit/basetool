@@ -75,7 +75,8 @@ class RefineryImportAjaxControllerTest {
 
   private static final UUID MATERIAL_ID = UUID.randomUUID();
   private static final UUID SUGGESTION_ID = UUID.randomUUID();
-  private static final String FRAGMENT = "refinery-orders-create :: refineryImportFormBody";
+  private static final String FRAGMENT =
+      "refinery/refinery-orders-create :: refineryImportFormBody";
 
   @Autowired private WebApplicationContext context;
 

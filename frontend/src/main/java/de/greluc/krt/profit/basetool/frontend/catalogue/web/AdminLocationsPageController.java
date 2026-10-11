@@ -99,7 +99,7 @@ public class AdminLocationsPageController {
       log.error("Error loading locations data", e);
       model.addAttribute("error", "error.admin.locations.load");
     }
-    return "admin/locations";
+    return "catalogue/admin/locations";
   }
 
   /**

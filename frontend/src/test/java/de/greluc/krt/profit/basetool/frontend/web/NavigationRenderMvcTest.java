@@ -107,7 +107,7 @@ class NavigationRenderMvcTest {
         .contains("id=\"nav-palette\"")
         .contains("data-testid=\"palette-input\"")
         .contains("data-testid=\"mobile-tab-menu\"")
-        .contains("/js/krt-palette.js");
+        .contains("/js/kernel/krt-palette.js");
   }
 
   /**

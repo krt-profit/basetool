@@ -42,7 +42,7 @@ class LiveSyncDenyReasonWireParityTest {
 
   @Test
   void clientRetryableDenyReason_matchesTheServerValue() throws IOException {
-    String js = readResource("/static/js/krt-live-sync.js");
+    String js = readResource("/static/js/kernel/krt-live-sync.js");
     Matcher declaration = CLIENT_DECLARATION.matcher(js);
     assertThat(declaration.find())
         .as("krt-live-sync.js declares DENY_REASON_INDETERMINATE = '<value>'")
@@ -54,7 +54,7 @@ class LiveSyncDenyReasonWireParityTest {
 
   @Test
   void clientTreatsOnlyTheIndeterminateReasonAsRetryable() throws IOException {
-    String js = readResource("/static/js/krt-live-sync.js");
+    String js = readResource("/static/js/kernel/krt-live-sync.js");
     assertThat(js)
         .as(
             "krt-live-sync.js must not branch on the terminal '%s' deny reason",

@@ -812,7 +812,7 @@ public class JobOrderWriteController {
     JobOrderDto order =
         callAssigneeMutation("add assignee", () -> jobOrderClient.addAssignee(id, userId));
     populateAssigneeSectionModel(model, principal, order);
-    return "orders-detail :: assigneesSection";
+    return "joborder/orders-detail :: assigneesSection";
   }
 
   /**
@@ -1233,7 +1233,7 @@ public class JobOrderWriteController {
     JobOrderDto order =
         callAssigneeMutation("remove assignee", () -> jobOrderClient.removeAssignee(id, userId));
     populateAssigneeSectionModel(model, principal, order);
-    return "orders-detail :: assigneesSection";
+    return "joborder/orders-detail :: assigneesSection";
   }
 
   /**
@@ -1259,7 +1259,7 @@ public class JobOrderWriteController {
         callAssigneeMutation(
             "set assignee note", () -> jobOrderClient.setAssigneeNote(id, userId, body));
     populateAssigneeSectionModel(model, principal, order);
-    return "orders-detail :: assigneesSection";
+    return "joborder/orders-detail :: assigneesSection";
   }
 
   /**
@@ -1285,7 +1285,7 @@ public class JobOrderWriteController {
         callAssigneeMutation(
             "delete assignee note", () -> jobOrderClient.deleteAssigneeNote(id, userId, version));
     populateAssigneeSectionModel(model, principal, order);
-    return "orders-detail :: assigneesSection";
+    return "joborder/orders-detail :: assigneesSection";
   }
 
   /**

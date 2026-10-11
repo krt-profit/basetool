@@ -97,8 +97,8 @@ public class MaterialCollectionPageController {
     model.addAttribute("collectionProgress", MaterialCollectionGroup.total(materialGroups));
     model.addAttribute("locations", locations);
     if ("results".equals(fragment)) {
-      return "material-collection :: collectionResults";
+      return "joborder/material-collection :: collectionResults";
     }
-    return "material-collection";
+    return "joborder/material-collection";
   }
 }

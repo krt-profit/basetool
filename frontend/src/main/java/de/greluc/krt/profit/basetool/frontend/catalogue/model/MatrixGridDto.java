@@ -27,7 +27,7 @@ import java.util.Map;
 
 /**
  * Render-ready projection of the materials trade matrix for the client-side virtual-scroll grid
- * ({@code /js/materials-matrix.js}).
+ * ({@code /js/catalogue/materials-matrix.js}).
  *
  * <p>Holds terminal columns, star-system header spans and material rows grouped by category; each
  * row's price map is sparse, containing only terminals that trade the material.

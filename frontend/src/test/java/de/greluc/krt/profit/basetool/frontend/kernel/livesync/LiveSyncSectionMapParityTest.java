@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.livesync;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
@@ -28,7 +29,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -52,7 +52,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void missionSeamMap_matchesTheMissionTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/mission-detail.js", "MISSION_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/mission/mission-detail.js", "MISSION_SECTIONS");
     assertThat(jsKeys)
         .as("MISSION_SECTIONS keys in mission-detail.js vs LiveSyncTopicClass.MISSION whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MISSION.allowedSections());
@@ -61,7 +61,7 @@ class LiveSyncSectionMapParityTest {
   @Test
   void exchangeClientsSeamMap_matchesTheAdminExchangeClientsTopicWhitelist() throws IOException {
     Set<String> jsKeys =
-        seamMapKeys("/static/js/admin-exchange-clients.js", "EXCHANGE_CLIENTS_SECTIONS");
+        seamMapKeys("/static/js/exchange/admin-exchange-clients.js", "EXCHANGE_CLIENTS_SECTIONS");
     assertThat(jsKeys)
         .as(
             "EXCHANGE_CLIENTS_SECTIONS keys in admin-exchange-clients.js vs"
@@ -71,7 +71,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void exchangeClientsPage_broadcastsEveryWriteWithWhitelistedKeys() throws IOException {
-    String js = readResource("/static/js/admin-exchange-clients.js");
+    String js = readResource("/static/js/exchange/admin-exchange-clients.js");
     assertSendChangedKeysWhitelisted(
         js, "'exchange-clients'", LiveSyncTopicClass.EXCHANGE_CLIENTS.allowedSections());
     assertThat(js)
@@ -85,7 +85,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void hangarSeamMap_matchesTheOwnHangarTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/hangar.js", "HANGAR_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/hangar/hangar.js", "HANGAR_SECTIONS");
     assertThat(jsKeys)
         .as("HANGAR_SECTIONS keys in hangar.js vs LiveSyncTopicClass.HANGAR_OWN whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.HANGAR_OWN.allowedSections());
@@ -94,7 +94,8 @@ class LiveSyncSectionMapParityTest {
   @Test
   void blueprintSeamMap_matchesTheOwnBlueprintsTopicWhitelist() throws IOException {
     Set<String> jsKeys =
-        seamMapKeys("/static/js/personal-inventory-blueprints.js", "BLUEPRINT_SECTIONS");
+        seamMapKeys(
+            "/static/js/personalinventory/personal-inventory-blueprints.js", "BLUEPRINT_SECTIONS");
     assertThat(jsKeys)
         .as(
             "BLUEPRINT_SECTIONS keys in personal-inventory-blueprints.js vs"
@@ -104,7 +105,8 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void operationSeamMap_matchesTheOperationTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/operation-detail.js", "OPERATION_SECTIONS");
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/operation/operation-detail.js", "OPERATION_SECTIONS");
     assertThat(jsKeys)
         .as(
             "OPERATION_SECTIONS keys in operation-detail.js vs LiveSyncTopicClass.OPERATION"
@@ -114,8 +116,9 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void ordersQueueSeamMaps_partitionTheOrdersQueueTopicWhitelist() throws IOException {
-    Set<String> queueKeys = seamMapKeys("/static/js/orders-index.js", "ORDERS_SECTIONS");
-    Set<String> demandKeys = seamMapKeys("/static/js/orders-material-demand.js", "DEMAND_SECTIONS");
+    Set<String> queueKeys = seamMapKeys("/static/js/joborder/orders-index.js", "ORDERS_SECTIONS");
+    Set<String> demandKeys =
+        seamMapKeys("/static/js/joborder/orders-material-demand.js", "DEMAND_SECTIONS");
     Set<String> whitelist = LiveSyncTopicClass.ORDERS_QUEUE.allowedSections();
 
     assertThat(queueKeys)
@@ -134,7 +137,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orderDetailCrossPublish_keepsTheDemandOverviewInSync() throws IOException {
-    String js = readResource("/static/js/orders-detail.js");
+    String js = readResource("/static/js/joborder/orders-detail.js");
     assertSendChangedKeysWhitelisted(
         js, "'orders'", LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
     assertThat(js)
@@ -144,7 +147,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryPages_pokeTheDemandOverviewWhenOrderLinkedStockChanges() throws IOException {
-    for (String module : new String[] {"/static/js/inventory-common.js"}) {
+    for (String module : new String[] {"/static/js/inventory/inventory-common.js"}) {
       String js = readResource(module);
       assertSendChangedKeysWhitelisted(
           js, "'orders'", LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
@@ -158,7 +161,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orderDetailSeamMap_matchesTheOrderTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/orders-detail.js", "ORDER_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/joborder/orders-detail.js", "ORDER_SECTIONS");
     assertThat(jsKeys)
         .as("ORDER_SECTIONS keys in orders-detail.js vs LiveSyncTopicClass.ORDER whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORDER.allowedSections());
@@ -167,7 +170,7 @@ class LiveSyncSectionMapParityTest {
   @Test
   void refineryOrderSeamMap_matchesTheRefineryOrderTopicWhitelist() throws IOException {
     Set<String> jsKeys =
-        seamMapKeys("/static/js/refinery-orders-details.js", "REFINERY_ORDER_SECTIONS");
+        seamMapKeys("/static/js/refinery/refinery-orders-details.js", "REFINERY_ORDER_SECTIONS");
     assertThat(jsKeys)
         .as(
             "REFINERY_ORDER_SECTIONS keys in refinery-orders-details.js vs"
@@ -177,7 +180,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void refineryOrderCrossPublishes_onlyEverSendWhitelistedKeys() throws IOException {
-    String js = readResource("/static/js/refinery-orders-details.js");
+    String js = readResource("/static/js/refinery/refinery-orders-details.js");
     assertSendChangedKeysWhitelisted(
         js, "`order:\\$\\{jobOrderId\\}`", LiveSyncTopicClass.ORDER.allowedSections());
     assertThat(js)
@@ -222,7 +225,7 @@ class LiveSyncSectionMapParityTest {
   @Test
   void materialCollectionSeamMap_isASubsetOfTheOrderTopicWhitelist() throws IOException {
     Set<String> jsKeys =
-        seamMapKeys("/static/js/material-collection.js", "MATERIAL_COLLECTION_SECTIONS");
+        seamMapKeys("/static/js/joborder/material-collection.js", "MATERIAL_COLLECTION_SECTIONS");
     assertThat(jsKeys)
         .as(
             "MATERIAL_COLLECTION_SECTIONS keys in material-collection.js vs"
@@ -232,7 +235,8 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void itemCollectionSeamMap_isASubsetOfTheOrderTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/item-collection.js", "ITEM_COLLECTION_SECTIONS");
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/joborder/item-collection.js", "ITEM_COLLECTION_SECTIONS");
     assertThat(jsKeys)
         .as(
             "ITEM_COLLECTION_SECTIONS keys in item-collection.js vs LiveSyncTopicClass.ORDER"
@@ -243,7 +247,7 @@ class LiveSyncSectionMapParityTest {
   @Test
   void inventoryInputOrderSeamMap_isASubsetOfTheOrdersQueueWhitelist() throws IOException {
     Set<String> jsKeys =
-        seamMapKeys("/static/js/inventory-input.js", "INVENTORY_INPUT_ORDER_SECTIONS");
+        seamMapKeys("/static/js/inventory/inventory-input.js", "INVENTORY_INPUT_ORDER_SECTIONS");
     assertThat(jsKeys)
         .as(
             "INVENTORY_INPUT_ORDER_SECTIONS keys in inventory-input.js vs the ORDERS_QUEUE"
@@ -253,17 +257,19 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryPageOrderSeamMaps_areASubsetOfTheOrdersQueueWhitelist() throws IOException {
-    assertThat(seamMapKeys("/static/js/inventory-admin.js", "INVENTORY_ALL_ORDER_SECTIONS"))
+    assertThat(
+            seamMapKeys("/static/js/inventory/inventory-admin.js", "INVENTORY_ALL_ORDER_SECTIONS"))
         .as("INVENTORY_ALL_ORDER_SECTIONS keys in inventory-admin.js vs the ORDERS_QUEUE whitelist")
         .isSubsetOf(LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
-    assertThat(seamMapKeys("/static/js/inventory-my.js", "INVENTORY_MY_ORDER_SECTIONS"))
+    assertThat(seamMapKeys("/static/js/inventory/inventory-my.js", "INVENTORY_MY_ORDER_SECTIONS"))
         .as("INVENTORY_MY_ORDER_SECTIONS keys in inventory-my.js vs the ORDERS_QUEUE whitelist")
         .isSubsetOf(LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
   }
 
   @Test
   void inventoryAllSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/inventory-admin.js", "INVENTORY_ALL_SECTIONS");
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/inventory/inventory-admin.js", "INVENTORY_ALL_SECTIONS");
     assertThat(jsKeys)
         .as(
             "INVENTORY_ALL_SECTIONS keys in inventory-admin.js vs LiveSyncTopicClass.INVENTORY_ALL"
@@ -273,7 +279,8 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryMySeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/inventory-my.js", "INVENTORY_MY_SECTIONS");
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/inventory/inventory-my.js", "INVENTORY_MY_SECTIONS");
     assertThat(jsKeys)
         .as("INVENTORY_MY_SECTIONS keys in inventory-my.js vs LiveSyncTopicClass.INVENTORY_ALL")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
@@ -281,7 +288,8 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void inventoryIndexSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/inventory-index.js", "INVENTORY_INDEX_SECTIONS");
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/inventory/inventory-index.js", "INVENTORY_INDEX_SECTIONS");
     assertThat(jsKeys)
         .as(
             "INVENTORY_INDEX_SECTIONS keys in inventory-index.js vs"
@@ -292,7 +300,7 @@ class LiveSyncSectionMapParityTest {
   @Test
   void inventoryMaterialSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
     Set<String> jsKeys =
-        seamMapKeys("/static/js/inventory-material.js", "INVENTORY_MATERIAL_SECTIONS");
+        seamMapKeys("/static/js/inventory/inventory-material.js", "INVENTORY_MATERIAL_SECTIONS");
     assertThat(jsKeys)
         .as(
             "INVENTORY_MATERIAL_SECTIONS keys in inventory-material.js vs"
@@ -303,7 +311,7 @@ class LiveSyncSectionMapParityTest {
   @Test
   void inventoryGameItemSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
     Set<String> jsKeys =
-        seamMapKeys("/static/js/inventory-game-item.js", "INVENTORY_GAME_ITEM_SECTIONS");
+        seamMapKeys("/static/js/inventory/inventory-game-item.js", "INVENTORY_GAME_ITEM_SECTIONS");
     assertThat(jsKeys)
         .as(
             "INVENTORY_GAME_ITEM_SECTIONS keys in inventory-game-item.js vs"
@@ -313,7 +321,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void missionsListSeamMap_matchesTheMissionsListTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/missions.js", "MISSIONS_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/mission/missions.js", "MISSIONS_SECTIONS");
     assertThat(jsKeys)
         .as("MISSIONS_SECTIONS keys in missions.js vs LiveSyncTopicClass.MISSIONS_LIST whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MISSIONS_LIST.allowedSections());
@@ -321,7 +329,8 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void refinerySeamMap_matchesTheRefineryTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/refinery-orders-index.js", "REFINERY_SECTIONS");
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/refinery/refinery-orders-index.js", "REFINERY_SECTIONS");
     assertThat(jsKeys)
         .as("REFINERY_SECTIONS keys in refinery-orders-index.js vs LiveSyncTopicClass.REFINERY")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.REFINERY.allowedSections());
@@ -329,7 +338,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void membersSeamMap_matchesTheMembersTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/members.js", "MEMBERS_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/identity/members.js", "MEMBERS_SECTIONS");
     assertThat(jsKeys)
         .as("MEMBERS_SECTIONS keys in members.js vs LiveSyncTopicClass.MEMBERS whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MEMBERS.allowedSections());
@@ -338,8 +347,8 @@ class LiveSyncSectionMapParityTest {
   @Test
   void orgStructureSeamMaps_partitionTheOrgStructureTopicWhitelist() throws IOException {
     Set<String> editorKeys =
-        seamMapKeys("/static/js/admin-org-structure.js", "ORG_STRUCTURE_SECTIONS");
-    Set<String> chartKeys = seamMapKeys("/static/js/org-chart.js", "ORG_CHART_SECTIONS");
+        seamMapKeys("/static/js/orgunit/admin-org-structure.js", "ORG_STRUCTURE_SECTIONS");
+    Set<String> chartKeys = seamMapKeys("/static/js/orgchart/org-chart.js", "ORG_CHART_SECTIONS");
     Set<String> whitelist = LiveSyncTopicClass.ORG_STRUCTURE.allowedSections();
 
     assertThat(editorKeys)
@@ -358,8 +367,8 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orgStructureCrossPublishConstants_nameTheOtherPagesSection() throws IOException {
-    String editorJs = readResource("/static/js/admin-org-structure.js");
-    String chartJs = readResource("/static/js/org-chart.js");
+    String editorJs = readResource("/static/js/orgunit/admin-org-structure.js");
+    String chartJs = readResource("/static/js/orgchart/org-chart.js");
     Set<String> whitelist = LiveSyncTopicClass.ORG_STRUCTURE.allowedSections();
 
     assertThat(whitelist)
@@ -388,7 +397,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "BANK_ACCOUNT_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank.js", "BANK_ACCOUNT_SECTIONS");
     assertThat(jsKeys)
         .as("BANK_ACCOUNT_SECTIONS keys in bank.js vs LiveSyncTopicClass.BANK_ACCOUNT whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
@@ -396,7 +405,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orgUnitAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "ORGUNIT_ACCOUNT_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank.js", "ORGUNIT_ACCOUNT_SECTIONS");
     assertThat(jsKeys)
         .as("ORGUNIT_ACCOUNT_SECTIONS keys in bank.js vs LiveSyncTopicClass.BANK_ACCOUNT whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
@@ -404,7 +413,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void bankStaffSeamMap_matchesTheBankStaffTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "BANK_STAFF_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank.js", "BANK_STAFF_SECTIONS");
     assertThat(jsKeys)
         .as("BANK_STAFF_SECTIONS keys in bank.js vs LiveSyncTopicClass.BANK_STAFF whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_STAFF.allowedSections());
@@ -412,7 +421,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orgUnitBankSeamMap_matchesTheOrgUnitBankTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "ORGUNIT_BANK_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank.js", "ORGUNIT_BANK_SECTIONS");
     assertThat(jsKeys)
         .as("ORGUNIT_BANK_SECTIONS keys in bank.js vs LiveSyncTopicClass.ORGUNIT_BANK whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
@@ -443,11 +452,11 @@ class LiveSyncSectionMapParityTest {
     int callsSeen = 0;
     for (String module :
         List.of(
-            "/static/js/materialboerse.js",
-            "/static/js/materialboerse-release.js",
-            "/static/js/materialgesuch-modal.js",
-            "/static/js/inventory-materialboerse.js",
-            "/static/js/inventory-common.js")) {
+            "/static/js/materialexchange/materialboerse.js",
+            "/static/js/materialexchange/materialboerse-release.js",
+            "/static/js/materialexchange/materialgesuch-modal.js",
+            "/static/js/inventory/inventory-materialboerse.js",
+            "/static/js/inventory/inventory-common.js")) {
       Matcher matcher = sendChanged.matcher(readResource(module));
       while (matcher.find()) {
         callsSeen++;
@@ -478,9 +487,9 @@ class LiveSyncSectionMapParityTest {
   void dataLivesyncBroadcastKeys_areAllWithinTheirTopicClassWhitelist()
       throws IOException, URISyntaxException {
     Pattern attribute = Pattern.compile("data-livesync=\"([^\"]*)\"");
-    URL anchor = LiveSyncSectionMapParityTest.class.getResource("/templates/bank-grants.html");
-    assertThat(anchor).as("/templates/bank-grants.html classpath resource").isNotNull();
-    Path templatesRoot = Paths.get(anchor.toURI()).getParent();
+    URL anchor = LiveSyncSectionMapParityTest.class.getResource("/templates/bank/bank-grants.html");
+    assertThat(anchor).as("/templates/bank/bank-grants.html classpath resource").isNotNull();
+    Path templatesRoot = ClasspathAssets.rootOf(anchor);
     int entriesChecked = 0;
     try (Stream<Path> tree = Files.walk(templatesRoot)) {
       List<Path> templates =
@@ -548,7 +557,8 @@ class LiveSyncSectionMapParityTest {
    * Extracts the top-level keys of a JS object literal assigned to {@code variableName} in the
    * given classpath resource.
    *
-   * @param resource the classpath path of the JS module (e.g. {@code /static/js/mission-detail.js})
+   * @param resource the classpath path of the JS module (e.g. {@code
+   *     /static/js/mission/mission-detail.js})
    * @param variableName the seam-map variable (e.g. {@code MISSION_SECTIONS})
    * @return the seam-map section keys
    * @throws IOException if the resource cannot be read

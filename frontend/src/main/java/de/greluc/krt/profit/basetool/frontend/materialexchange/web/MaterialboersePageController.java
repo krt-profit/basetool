@@ -135,10 +135,10 @@ public class MaterialboersePageController {
     if ("detail".equals(fragment)) {
       if (requests) {
         model.addAttribute("selectedRequest", loadRequestDetail(selected));
-        return "fragments/materialgesuch-board :: requestDetail";
+        return "materialexchange/fragments/materialgesuch-board :: requestDetail";
       }
       model.addAttribute("selectedOffer", loadDetail(selected));
-      return "materialboerse :: detail";
+      return "materialexchange/materialboerse :: detail";
     }
 
     boolean mine = scope != null ? "mine".equals(scope) : "mein".equals(tab);
@@ -168,12 +168,12 @@ public class MaterialboersePageController {
       model.addAttribute(
           "selectedRequest", loadRequestDetail(pickSelectedRequestId(reqs, selected)));
       if ("board".equals(fragment)) {
-        return "materialboerse :: board";
+        return "materialexchange/materialboerse :: board";
       }
       if ("list".equals(fragment)) {
-        return "fragments/materialgesuch-board :: requestList";
+        return "materialexchange/fragments/materialgesuch-board :: requestList";
       }
-      return "materialboerse";
+      return "materialexchange/materialboerse";
     }
 
     List<MaterialExchangeOfferDto> offers =
@@ -181,12 +181,12 @@ public class MaterialboersePageController {
     model.addAttribute("offers", offers);
     model.addAttribute("selectedOffer", loadDetail(pickSelectedId(offers, selected)));
     if ("board".equals(fragment)) {
-      return "materialboerse :: board";
+      return "materialexchange/materialboerse :: board";
     }
     if ("list".equals(fragment)) {
-      return "materialboerse :: list";
+      return "materialexchange/materialboerse :: list";
     }
-    return "materialboerse";
+    return "materialexchange/materialboerse";
   }
 
   /**

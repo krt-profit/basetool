@@ -57,6 +57,6 @@ public class ConnectedAppsConfirmController {
     model.addAttribute(
         "pendingHandoffId",
         handoff != null && HANDOFF_ID.matcher(handoff).matches() ? handoff : null);
-    return "connected-apps-confirm";
+    return "exchange/connected-apps-confirm";
   }
 }

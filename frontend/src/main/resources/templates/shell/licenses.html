@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
+    <title th:text="${appTitle} + ' - ' + #{licenses.title}">Profit Basetool - Open-Source-Lizenzen</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/shell/legal.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{licenses.title})}"></th:block>
+    <div class="card legal-doc" data-testid="legal-doc">
+        <p th:text="#{licenses.intro}">Das Profit Basetool enth&auml;lt Open-Source-Komponenten Dritter.</p>
+        <p th:text="#{licenses.choice}">Bietet eine Komponente mehrere Lizenzen zur Wahl an, steht sie unter jeder davon.</p>
+        <p>
+            <span th:text="#{licenses.own}">Das Profit Basetool selbst steht unter der GNU General Public License v3.0.</span>
+            <a href="https://github.com/krt-profit/basetool"
+               target="_blank" rel="noopener noreferrer"
+               th:text="#{licenses.own.source}">Quelltext auf GitHub</a>
+        </p>
+
+        <p th:if="${!ossAvailable}" class="alert alert-warning" th:text="#{licenses.unavailable}">
+            Das Lizenzverzeichnis konnte nicht geladen werden.
+        </p>
+
+        <th:block th:if="${ossAvailable}">
+            <p class="oss-meta"
+               th:text="#{licenses.meta(${ossComponentCount}, ${#lists.size(ossGroups)}, ${appVersion})}">
+                247 Komponenten &middot; 13 Lizenzen &middot; v1.9.2
+            </p>
+
+            <details class="hud-details oss-group" th:each="group : ${ossGroups}">
+                <summary>
+                    <span class="oss-group-head">
+                        <span class="oss-group-name" th:text="${group.license().name()}">Apache License 2.0</span>
+                        <span class="oss-group-meta"
+                              th:text="${group.license().spdxId() != null}
+                                       ? #{licenses.group.meta.spdx(${#lists.size(group.components())}, ${group.license().spdxId()})}
+                                       : #{licenses.group.meta(${#lists.size(group.components())})}">217 &middot; SPDX: Apache-2.0</span>
+                    </span>
+                </summary>
+                <p th:if="${group.license().url() != null}" class="oss-license-link">
+                    <a th:href="${group.license().url()}"
+                       target="_blank" rel="noopener noreferrer"
+                       th:text="#{licenses.group.text}">Lizenztext</a>
+                </p>
+                <ul class="oss-list">
+                    <li class="oss-row" th:each="c : ${group.components()}">
+                        <a th:if="${c.url() != null}" class="oss-name" th:href="${c.url()}"
+                           target="_blank" rel="noopener noreferrer" th:text="${c.name()}">org.example:lib</a>
+                        <span th:if="${c.url() == null}" class="oss-name" th:text="${c.name()}">org.example:lib</span>
+                        <span class="oss-version" th:text="${c.version()}">1.0.0</span>
+                        <span class="oss-modules">
+                            <span class="chip chip--muted" th:each="m : ${c.modules()}"
+                                  th:text="#{${'licenses.module.' + m}}">Backend</span>
+                        </span>
+                    </li>
+                </ul>
+            </details>
+
+            <p class="oss-end" th:text="#{licenses.end(${ossGenerator})}">
+                Ende des Verzeichnisses &middot; erzeugt beim Build &middot; licensee 1.14.1
+            </p>
+        </th:block>
+    </div>
+</main>
+</th:block>
+</body>
+</html>
