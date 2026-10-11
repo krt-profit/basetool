@@ -1,0 +1,46 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.orgchart.model;
+
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Frontend mirror of the Organisationsleitung tier of the org chart (REQ-ORG-026), decoded from
+ * {@code GET /api/v1/org-chart}.
+ *
+ * <p>{@code null} on {@link OrgChartDto} when no active OL exists.
+ *
+ * @param orgUnitId the OL org unit's id (the add-member affordance's target scope).
+ * @param name the OL's display name (the tier caption).
+ * @param shorthand the OL's short tag.
+ * @param grandAdmiral the OL member holding the Grand Admiral post (REQ-ORG-021), or {@code null}
+ *     when vacant; never also listed in {@code members}.
+ * @param members the remaining OL members (OL_MEMBER positions, excluding the Grand Admiral); never
+ *     {@code null}, possibly empty.
+ */
+@DtoMirror
+public record OlChartDto(
+    UUID orgUnitId,
+    String name,
+    String shorthand,
+    OrgChartNodeDto grandAdmiral,
+    List<OrgChartNodeDto> members) {}

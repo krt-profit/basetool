@@ -27,10 +27,15 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
@@ -41,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -67,14 +71,16 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -102,10 +108,11 @@ public class InventoryItemService {
   private final GameItemRepository gameItemRepository;
   private final LocationRepository locationRepository;
   private final JobOrderRepository jobOrderRepository;
-  private final MissionRepository missionRepository;
+  private final EarmarkTargets.Lookup earmarkTargets;
   private final InventoryItemMapper inventoryItemMapper;
   private final OwnerScopeService ownerScopeService;
   private final InventoryAccessPolicy inventoryAccessPolicy;
+  private final StockCommands stockCommands;
   private final JobOrderItemService jobOrderItemService;
   private final AuditRecorder auditRecorder;
   private final InventoryAggregationService inventoryAggregationService;
@@ -446,15 +453,12 @@ public class InventoryItemService {
   public InventoryItemDto createInventoryItem(
       @NotNull InventoryItemCreateDto dto, UUID currentUserId) {
     UUID targetUserId = dto.userId() != null ? dto.userId() : currentUserId;
-    final boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
-    if (onBehalfOfSomeoneElse && !inventoryAccessPolicy.canManageUserInventory(targetUserId)) {
-      throw new AccessDeniedException(
-          "You are not allowed to create inventory items for other users");
-    }
-    if (onBehalfOfSomeoneElse && Boolean.TRUE.equals(dto.personal())) {
-      throw new AccessDeniedException(
-          "You are not allowed to create personal inventory items for other users");
-    }
+    stockCommands.requireBookIn(
+        targetUserId,
+        currentUserId,
+        false,
+        Boolean.TRUE.equals(dto.personal()),
+        BookInRule.lager());
 
     final User user = Entities.require(userRepository.findById(targetUserId), "User not found");
     final Material material =
@@ -527,7 +531,7 @@ public class InventoryItemService {
         assertMaterialRequiredByJobOrder(material, order);
       }
       InventoryAllocations.addJobOrder(
-          item, order, InventoryItem.roundToScuScale(allocation.amount()), false);
+          item, order.getId(), InventoryItem.roundToScuScale(allocation.amount()), false);
     }
     Set<UUID> seenMissions = new HashSet<>();
     for (InventoryAllocationInput allocation : missionAllocations) {
@@ -535,10 +539,10 @@ public class InventoryItemService {
         throw new BadRequestException("A mission may be assigned at most once at check-in");
       }
       requireWholeUnits(wholeUnits, gameItem != null, allocation.amount());
-      Mission missionTarget =
-          Entities.require(missionRepository.findById(allocation.targetId()), "Mission not found");
+      Entities.require(
+          Optional.ofNullable(earmarkTargets.mission(allocation.targetId())), "Mission not found");
       InventoryAllocations.addMission(
-          item, missionTarget, InventoryItem.roundToScuScale(allocation.amount()));
+          item, allocation.targetId(), InventoryItem.roundToScuScale(allocation.amount()));
     }
     if (!InventoryAllocations.fits(item)) {
       throw new OverAllocationException();
@@ -553,8 +557,8 @@ public class InventoryItemService {
         AuditDetails.of("qty", item.getAmount())
             .with("q", item.getQuality())
             .with("personal", item.getPersonal())
-            .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
-            .with("mission", InventoryAuditLabels.missionName(item)));
+            .with("jobOrder", InventoryAuditLabels.jobOrderRef(item, this::jobOrderDisplayIdOf))
+            .with("mission", InventoryAuditLabels.missionName(item, this::missionNameOf)));
     InventoryItem merged =
         inventoryCheckoutService.mergeStockIfRequested(
             saved, Boolean.TRUE.equals(dto.mergeStock()));
@@ -671,7 +675,7 @@ public class InventoryItemService {
         assertFits(sumJobOrderAllocated(item, null) + amount, item.getAmount());
         InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
         slice.setInventoryItem(item);
-        slice.setJobOrder(jobOrder);
+        slice.setJobOrderId(jobOrder.getId());
         slice.setAmount(amount);
         item.getJobOrderAllocations().add(slice);
         recordAllocation(
@@ -683,23 +687,20 @@ public class InventoryItemService {
       }
       case MISSION -> {
         assertMissionDimensionAllowed(item);
-        final Mission mission =
-            Entities.require(missionRepository.findById(dto.targetId()), "Mission not found");
+        final MissionEarmark mission =
+            Entities.require(
+                Optional.ofNullable(earmarkTargets.mission(dto.targetId())), "Mission not found");
         if (findMissionSlice(item, dto.targetId()) != null) {
           throw new BadRequestException("error.inventory.allocation.duplicate.mission");
         }
         assertFits(sumMissionAllocated(item, null) + amount, item.getAmount());
         InventoryMissionAllocation slice = new InventoryMissionAllocation();
         slice.setInventoryItem(item);
-        slice.setMission(mission);
+        slice.setMissionId(dto.targetId());
         slice.setAmount(amount);
         item.getMissionAllocations().add(slice);
         recordAllocation(
-            AuditEventType.INVENTORY_ALLOCATION_ADDED,
-            item,
-            dto.field(),
-            mission.getName(),
-            amount);
+            AuditEventType.INVENTORY_ALLOCATION_ADDED, item, dto.field(), mission.name(), amount);
       }
       case null -> throw new NullPointerException("allocation dimension");
     }
@@ -740,7 +741,7 @@ public class InventoryItemService {
             AuditEventType.INVENTORY_ALLOCATION_CHANGED,
             item,
             dto.field(),
-            "#" + slice.getJobOrder().getDisplayId(),
+            "#" + jobOrderDisplayIdOf(slice.getJobOrderId()),
             amount);
       }
       case MISSION -> {
@@ -755,7 +756,7 @@ public class InventoryItemService {
             AuditEventType.INVENTORY_ALLOCATION_CHANGED,
             item,
             dto.field(),
-            slice.getMission().getName(),
+            Objects.requireNonNull(earmarkTargets.mission(slice.getMissionId())).name(),
             amount);
       }
       case null -> throw new NullPointerException("allocation dimension");
@@ -787,7 +788,8 @@ public class InventoryItemService {
         if (slice == null) {
           throw new NotFoundException("Job-order allocation not found");
         }
-        String ref = slice.getJobOrder() != null ? "#" + slice.getJobOrder().getDisplayId() : "-";
+        JobOrderEarmark target = earmarkTargets.jobOrder(slice.getJobOrderId());
+        String ref = target != null ? "#" + target.displayId() : "-";
         item.getJobOrderAllocations().remove(slice);
         recordAllocation(AuditEventType.INVENTORY_ALLOCATION_REMOVED, item, dto.field(), ref, null);
       }
@@ -796,7 +798,8 @@ public class InventoryItemService {
         if (slice == null) {
           throw new NotFoundException("Mission allocation not found");
         }
-        String ref = slice.getMission() != null ? slice.getMission().getName() : "-";
+        MissionEarmark target = earmarkTargets.mission(slice.getMissionId());
+        String ref = target != null ? target.name() : "-";
         item.getMissionAllocations().remove(slice);
         recordAllocation(AuditEventType.INVENTORY_ALLOCATION_REMOVED, item, dto.field(), ref, null);
       }
@@ -917,10 +920,32 @@ public class InventoryItemService {
    */
   private double sumJobOrderAllocated(@NotNull InventoryItem item, UUID excludeTargetId) {
     return item.getJobOrderAllocations().stream()
-        .filter(a -> a.getJobOrder() != null)
-        .filter(a -> excludeTargetId == null || !excludeTargetId.equals(a.getJobOrder().getId()))
+        .filter(a -> a.getJobOrderId() != null)
+        .filter(a -> excludeTargetId == null || !excludeTargetId.equals(a.getJobOrderId()))
         .mapToDouble(a -> a.getAmount() == null ? 0.0 : a.getAmount())
         .sum();
+  }
+
+  /**
+   * Looks up the running number of a job order the Lager's stock is earmarked to.
+   *
+   * @param jobOrderId the job order
+   * @return its running number, or {@code null} when it is unknown or not assigned
+   */
+  private @Nullable Integer jobOrderDisplayIdOf(UUID jobOrderId) {
+    JobOrderEarmark jobOrder = earmarkTargets.jobOrder(jobOrderId);
+    return jobOrder == null ? null : jobOrder.displayId();
+  }
+
+  /**
+   * Looks up the name of a mission the Lager's stock is earmarked to.
+   *
+   * @param missionId the mission
+   * @return its name, or {@code null} when it is unknown or unnamed
+   */
+  private @Nullable String missionNameOf(UUID missionId) {
+    MissionEarmark mission = earmarkTargets.mission(missionId);
+    return mission == null ? null : mission.name();
   }
 
   /**
@@ -932,8 +957,8 @@ public class InventoryItemService {
    */
   private double sumMissionAllocated(@NotNull InventoryItem item, UUID excludeTargetId) {
     return item.getMissionAllocations().stream()
-        .filter(a -> a.getMission() != null)
-        .filter(a -> excludeTargetId == null || !excludeTargetId.equals(a.getMission().getId()))
+        .filter(a -> a.getMissionId() != null)
+        .filter(a -> excludeTargetId == null || !excludeTargetId.equals(a.getMissionId()))
         .mapToDouble(a -> a.getAmount() == null ? 0.0 : a.getAmount())
         .sum();
   }
@@ -948,7 +973,7 @@ public class InventoryItemService {
   private InventoryJobOrderAllocation findJobOrderSlice(
       @NotNull InventoryItem item, UUID targetId) {
     return item.getJobOrderAllocations().stream()
-        .filter(a -> a.getJobOrder() != null && targetId.equals(a.getJobOrder().getId()))
+        .filter(a -> targetId.equals(a.getJobOrderId()))
         .findFirst()
         .orElse(null);
   }
@@ -962,7 +987,7 @@ public class InventoryItemService {
    */
   private InventoryMissionAllocation findMissionSlice(@NotNull InventoryItem item, UUID targetId) {
     return item.getMissionAllocations().stream()
-        .filter(a -> a.getMission() != null && targetId.equals(a.getMission().getId()))
+        .filter(a -> targetId.equals(a.getMissionId()))
         .findFirst()
         .orElse(null);
   }

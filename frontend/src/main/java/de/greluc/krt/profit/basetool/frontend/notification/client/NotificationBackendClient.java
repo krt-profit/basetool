@@ -19,15 +19,15 @@
 
 package de.greluc.krt.profit.basetool.frontend.notification.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationBulkResultDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationCountResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationPreferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationPreferenceWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationBulkResultDto;
+import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationCountResponse;
+import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationDto;
+import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationPreferenceDto;
+import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationPreferenceWriteRequest;
+import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationRuleDto;
+import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationRuleWriteRequest;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

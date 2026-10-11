@@ -72,10 +72,8 @@ public class InventoryMissionAllocation extends AbstractEntity<UUID> {
   @ToString.Exclude
   private InventoryItem inventoryItem;
 
-  @ManyToOne(optional = false, fetch = FetchType.LAZY)
-  @JoinColumn(name = "mission_id", nullable = false)
-  @ToString.Exclude
-  private Mission mission;
+  @Column(name = "mission_id", nullable = false)
+  private UUID missionId;
 
   @Min(0)
   @Column(nullable = false)

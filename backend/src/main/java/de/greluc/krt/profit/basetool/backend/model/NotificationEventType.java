@@ -388,5 +388,84 @@ public enum NotificationEventType {
    * A member left the organisation (REQ-ORG-030). The default rule notifies the leadership of each
    * unit the member belonged to, and of the parent Bereich when a seat became vacant.
    */
-  ORG_MEMBER_DEPARTED
+  ORG_MEMBER_DEPARTED,
+
+  /**
+   * A ship was assigned to a mission unit by somebody other than its owner (REQ-HANGAR-005). The
+   * default rule notifies the ship's owner.
+   */
+  HANGAR_SHIP_ASSIGNED_TO_UNIT,
+
+  /**
+   * A ship was taken off a mission unit (REQ-HANGAR-005). Creates no notification; clears the
+   * owner's assignment notice for the unit.
+   */
+  HANGAR_SHIP_UNASSIGNED_FROM_UNIT,
+
+  /**
+   * A ship that was assigned to a mission unit of a mission that is not finished was deleted
+   * (REQ-HANGAR-006). The default rule notifies the mission leadership and the unit's responsible
+   * member.
+   */
+  HANGAR_SHIP_DELETED_FROM_MISSION,
+
+  /**
+   * The fitted marks of a member's ships were reset in bulk (REQ-HANGAR-007). The default rule
+   * notifies that member.
+   */
+  HANGAR_FITTED_RESET_FOR_OWNER,
+
+  /**
+   * An admin added, changed or deleted a ship in a member's hangar (REQ-HANGAR-008). The default
+   * rule notifies that member.
+   */
+  HANGAR_CHANGED_BY_ADMIN,
+
+  /**
+   * An admin added, changed, deleted or imported blueprints of a member (REQ-HANGAR-008). The
+   * default rule notifies that member.
+   */
+  BLUEPRINT_CHANGED_BY_ADMIN,
+
+  /**
+   * An admin cleared the removable blueprints of every member (REQ-HANGAR-008). The default rule
+   * notifies each member who lost some.
+   */
+  BLUEPRINT_PURGED_BY_ADMIN,
+
+  /**
+   * An admin suspended a connected application in the registry (REQ-XCH-040). The default rule
+   * notifies the holders of its installations.
+   */
+  EXCHANGE_CLIENT_SUSPENDED,
+
+  /**
+   * An admin activated a suspended connected application again (REQ-XCH-040). The default rule
+   * notifies its holders; the event clears the suspension notices.
+   */
+  EXCHANGE_CLIENT_ACTIVATED,
+
+  /**
+   * An admin raised the minimum client version of a connected application (REQ-XCH-040). The
+   * default rule notifies its holders.
+   */
+  EXCHANGE_CLIENT_UPDATE_REQUIRED,
+
+  /**
+   * An admin removed capabilities from a connected application (REQ-XCH-040). The default rule
+   * notifies its holders.
+   */
+  EXCHANGE_CLIENT_CAPABILITY_REMOVED,
+
+  /**
+   * An admin switched the whole exchange off (REQ-XCH-041). The default rule notifies the holders
+   * of any installation.
+   */
+  EXCHANGE_SWITCHED_OFF,
+
+  /**
+   * An admin switched the exchange on again (REQ-XCH-041). Creates no notification; clears the
+   * switched-off notices.
+   */
+  EXCHANGE_SWITCHED_ON
 }

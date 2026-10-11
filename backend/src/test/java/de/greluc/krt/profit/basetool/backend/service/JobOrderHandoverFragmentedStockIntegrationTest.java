@@ -152,7 +152,7 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
             inv.setMaterial(aslarite);
             inv.setQuality(800);
             inv.setAmount(a);
-            InventoryAllocations.addJobOrder(inv, jobOrder, a, false);
+            InventoryAllocations.addJobOrder(inv, jobOrder.getId(), a, false);
             inv = inventoryItemRepository.save(inv);
             aslariteIds.add(inv.getId());
           }
@@ -169,7 +169,7 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
             inv.setMaterial(ouratite);
             inv.setQuality(900);
             inv.setAmount(a);
-            InventoryAllocations.addJobOrder(inv, jobOrder, a, false);
+            InventoryAllocations.addJobOrder(inv, jobOrder.getId(), a, false);
             inv = inventoryItemRepository.save(inv);
             ouratiteIds.add(inv.getId());
           }

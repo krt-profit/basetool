@@ -286,7 +286,7 @@ class InventoryStolenMarkServiceTest {
     InventoryItem item = row(10.0, QuantityType.SCU);
     JobOrder order = new JobOrder();
     order.setId(UUID.randomUUID());
-    InventoryAllocations.addJobOrder(item, order, 8.0, false);
+    InventoryAllocations.addJobOrder(item, order.getId(), 8.0, false);
     stubRow(item);
     when(inventoryItemRepository.save(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));

@@ -312,7 +312,73 @@ public enum NotificationType {
    * A member of the recipient's unit left the organisation (REQ-ORG-030), rendered with {@code
    * member}, {@code unit}, the {@code reason} word and the {@code vacancy} word.
    */
-  ORG_MEMBER_DEPARTED;
+  ORG_MEMBER_DEPARTED,
+
+  /**
+   * The recipient's ship was assigned to a mission unit (REQ-HANGAR-005), rendered with {@code
+   * shipType}, {@code mission}, {@code unit} and {@code start}.
+   */
+  HANGAR_SHIP_ASSIGNED,
+
+  /**
+   * A deleted ship falls out of a planned mission (REQ-HANGAR-006), rendered with {@code shipType},
+   * {@code mission} and {@code unit}.
+   */
+  HANGAR_SHIP_REMOVED_FROM_UNIT,
+
+  /**
+   * The fitted marks of the recipient's ships were reset (REQ-HANGAR-007), rendered with {@code
+   * count}.
+   */
+  HANGAR_FITTED_RESET,
+
+  /**
+   * An admin changed the recipient's hangar (REQ-HANGAR-008), rendered with {@code actor}, the
+   * {@code change} word and {@code shipType}.
+   */
+  HANGAR_CHANGED_BY_ADMIN,
+
+  /**
+   * An admin changed the recipient's blueprints (REQ-HANGAR-008), rendered with {@code actor}, the
+   * {@code change} word and {@code subject}.
+   */
+  BLUEPRINT_CHANGED_BY_ADMIN,
+
+  /**
+   * An admin cleared the recipient's removable blueprints (REQ-HANGAR-008), rendered with {@code
+   * actor} and {@code count}.
+   */
+  BLUEPRINT_PURGED_BY_ADMIN,
+
+  /**
+   * A connected application of the recipient was suspended (REQ-XCH-040), rendered with {@code
+   * app}.
+   */
+  EXCHANGE_CLIENT_SUSPENDED,
+
+  /**
+   * A connected application of the recipient is active again (REQ-XCH-040), rendered with {@code
+   * app}.
+   */
+  EXCHANGE_CLIENT_ACTIVATED,
+
+  /**
+   * A connected application of the recipient needs an update (REQ-XCH-040), rendered with {@code
+   * app} and {@code version}.
+   */
+  EXCHANGE_CLIENT_UPDATE_REQUIRED,
+
+  /**
+   * A connected application of the recipient lost capabilities (REQ-XCH-040), rendered with {@code
+   * app} and {@code capabilities}.
+   */
+  EXCHANGE_CLIENT_CAPABILITY_REMOVED,
+
+  /**
+   * The exchange was switched off (REQ-XCH-041); connected applications cannot read or write until
+   * it is on again.
+   */
+  EXCHANGE_SWITCHED_OFF;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
@@ -371,7 +437,18 @@ public enum NotificationType {
           BANK_ACCOUNT_DEBITED,
           BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
           ORG_LEADERSHIP_ROLE_MISMATCH,
-          ORG_MEMBER_DEPARTED ->
+          ORG_MEMBER_DEPARTED,
+          HANGAR_SHIP_ASSIGNED,
+          HANGAR_SHIP_REMOVED_FROM_UNIT,
+          HANGAR_FITTED_RESET,
+          HANGAR_CHANGED_BY_ADMIN,
+          BLUEPRINT_CHANGED_BY_ADMIN,
+          BLUEPRINT_PURGED_BY_ADMIN,
+          EXCHANGE_CLIENT_SUSPENDED,
+          EXCHANGE_CLIENT_ACTIVATED,
+          EXCHANGE_CLIENT_UPDATE_REQUIRED,
+          EXCHANGE_CLIENT_CAPABILITY_REMOVED,
+          EXCHANGE_SWITCHED_OFF ->
           true;
     };
   }

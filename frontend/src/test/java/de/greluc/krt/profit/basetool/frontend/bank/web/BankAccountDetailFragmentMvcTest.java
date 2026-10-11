@@ -1,0 +1,151 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.bank.web;
+
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankBalancePointDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankBalanceSeriesDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * MVC render test for the {@code bank-account-detail :: bookings} AJAX fragment (REQ-FE-002): one
+ * booking row and its page-nav render through the real {@code @moneyFormat} bean.
+ */
+@SpringBootTest
+class BankAccountDetailFragmentMvcTest {
+
+  private MockMvc mockMvc;
+
+  @Autowired private WebApplicationContext context;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void accountDetail_fragmentBookings_rendersOnlyBookingsFragment() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    BankBookingDto booking =
+        new BankBookingDto(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "DEPOSIT",
+            new BigDecimal("250000"),
+            "alpha",
+            "Fragment note",
+            "Fragment reason",
+            null,
+            Instant.parse("2026-06-10T18:30:00Z"),
+            null,
+            null,
+            null,
+            null,
+            false,
+            BigDecimal.ZERO,
+            null,
+            null);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(accountId)))
+        .thenReturn(new PageResponse<>(List.of(booking), 0, 20, 25L, 2, List.of()));
+
+    mockMvc
+        .perform(get("/bank/accounts/" + accountId).param("fragment", "bookings"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Fragment note")))
+        .andExpect(content().string(containsString("Fragment reason")))
+        .andExpect(content().string(containsString("class=\"pagination\"")))
+        .andExpect(content().string(containsString("page=1")))
+        .andExpect(content().string(containsString("page-size-picker")))
+        .andExpect(content().string(not(containsString("id=\"bank-bookings-results\""))))
+        .andExpect(content().string(not(containsString("bank-statement-submit"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void accountDetail_fragmentBalanceChart_rendersRangeSelectorAndChart() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    when(backendApiClient.get(
+            contains("/balance-series"), eq(BankBalanceSeriesDto.class), eq(accountId)))
+        .thenReturn(
+            new BankBalanceSeriesDto(
+                List.of(
+                    new BankBalancePointDto(
+                        Instant.parse("2026-06-01T00:00:00Z"), new BigDecimal("100000")),
+                    new BankBalancePointDto(
+                        Instant.parse("2026-06-15T00:00:00Z"), new BigDecimal("300000"))),
+                new BigDecimal("500000")));
+
+    mockMvc
+        .perform(get("/bank/accounts/" + accountId).param("fragment", "balanceChart"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("bank-chart-range-90d")))
+        .andExpect(content().string(containsString("data-testid=\"bank-chart\"")))
+        .andExpect(content().string(containsString("bank-chart-line")))
+        .andExpect(content().string(containsString("bank-chart-target-legend")))
+        .andExpect(content().string(not(containsString("id=\"bank-chart-results\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void accountDetail_fragmentBalanceChart_emptySeries_rendersEmptyState() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    when(backendApiClient.get(
+            contains("/balance-series"), eq(BankBalanceSeriesDto.class), eq(accountId)))
+        .thenReturn(new BankBalanceSeriesDto(List.of(), null));
+
+    mockMvc
+        .perform(get("/bank/accounts/" + accountId).param("fragment", "balanceChart"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("bank-chart-empty")))
+        .andExpect(content().string(not(containsString("data-testid=\"bank-chart\""))));
+  }
+}

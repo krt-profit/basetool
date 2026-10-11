@@ -156,8 +156,8 @@ class InventoryItemServiceBulkCheckoutTest {
     jobOrder.setId(UUID.randomUUID());
     Mission mission = new Mission();
     mission.setId(UUID.randomUUID());
-    InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
-    InventoryAllocations.addMission(item, mission, item.getAmount());
+    InventoryAllocations.addJobOrder(item, jobOrder.getId(), item.getAmount(), false);
+    InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
 
     when(inventoryItemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
 

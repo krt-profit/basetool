@@ -201,7 +201,8 @@ reference DTOs).
   `…frontend.model.` (production enforces it since 2026-09-25; replaced by the exact list on
   2026-10-04, F2); 172 `T(…support.Roles)` references in
   22 templates resolve only at render time; three DTO contract tests are keyed on the `model.dto`
-  package; the authorization gate test checks classes, not handlers.
+  package (four, keyed on the `@DtoMirror` marker since F4, 2026-10-10); the authorization gate
+  test checks classes, not handlers.
 - **Assets.** 100 scripts, 64 stylesheets and 120 templates map onto the domains (19 core + 81 domain
   scripts in 21 domains). The coupling mechanism is the classic shared global scope: 523 top-level
   names in 50 non-IIFE files.
@@ -440,6 +441,7 @@ de.greluc.krt.profit.basetool.frontend
 ├── kernel.web           GlobalExceptionHandler, BackendErrorResponses, RelayParams, binding
 ├── kernel.livesync      websocket relay, presence
 ├── kernel.model         PageResponse, reference DTOs, PayoutPreference, handoff types
+├── kernel.observability logging, tracing and metric infrastructure (added with F4)
 ├── shell                landing, legal pages, manifest, client-error beacon
 └── <domain>.web | .client | .model   controllers and view assemblers; the typed client; mirrors and forms
 ```
@@ -1157,6 +1159,70 @@ as each pair is decoupled.
     (`scope -> inventory` is gone). *Correction:* the read and edit scopes coincide over this
     matrix, as for the refinery, so swapping the edit gate's scope for the read scope is not
     caught; the owner escape and the ownerless rule are.
+  - **5b — done 2026-10-10.** `inventory.api.StockCommands` (`lockLots`, `lockLotRows`, `bookIn`,
+    `bookOutRow`, `markStolen`, all `MANDATORY`), implemented by `InventoryStockCommands`, holds
+    the ADR-0229 lot-lock protocol unchanged (key, prefix, ascending order, row-lock order) and the
+    exchange's Lager writes; `ExchangeStockWriteService` and `ExchangeUndoService` go through it
+    (ADR-0229 *Implementation of the amendment*). `InventoryStockCommandsTest` pins the key
+    derivation, the lock order and the book-in's `INVENTORY_ITEM_CREATED`; the four
+    `ExchangeStockWriteConcurrencyIntegrationTest` cases stay green. `TenancyGuardRules` counts a
+    caller of a published `…Commands` interface whose implementation writes tenant data as a
+    writer, as it does for observers; the connected-apps controller is selected through the undo
+    since, and its two installation handlers are listed as no tenant write. *Correction:* an
+    incremental compile after this change crashed Error Prone (`invalid end position` in
+    `UnnecessaryParentheses`/`ThreadJoinLoop` on a record of `ExchangeStockWriteService`); a full
+    recompile passes, so it is a stale end-position table of the incremental build, not a code
+    fault.
+  - **5c — done 2026-10-10.** The job order and the refinery write no Lager row any more:
+    `StockCommands` gains `takeFromEarmarkedRow` (the material handover and the production
+    consumption: delete a depleted row after its offers are told, else lower the order slice and
+    the mission slices), `consumeEarmarkedItems` (the item handover, oldest row first),
+    `lowered` (the observers' notice after the order is saved, in the old order),
+    `releaseJobOrderEarmarks` / `…MaterialEarmarks` / `…GameItemEarmarks` (the bulk earmark
+    releases, after the loop as before), `bookInFromProduction` and `bookInFromRefinery` (row,
+    earmarks, merge and audit verbatim; the job order and the mission go in by id, so
+    `StockCommands` names no foreign entity and the baseline gains no edge), all `MANDATORY`, and `requireBookIn`, the one book-in rule
+    the Einbuchen, the production and the refinery store share (APPSEC-01). The production still
+    checks before any lookup and the refinery store where it did. *Behaviour unchanged by owner
+    decision:* the refinery store keeps its two differences — a personal book-in for another
+    member passes the owner check alone, an ownerless order needs Logistician+ — as the named
+    `BookInRule.refineryStore()`, pinned by `InventoryStockCommandsTest` and noted in REQ-INV-032 and
+    REQ-SEC-005 until the owner decides. `StockWriteOwnershipTest` makes "only inventory writes
+    Lager rows" a gate (a `save*`/`delete*`/`@Modifying` call on the Lager repository, a row or
+    earmark setter, an earmark mutator), proven able to fail on a planted writer; the GDPR
+    orchestrator is its one listed exception until Phase 4. The job-order and refinery unit tests
+    run against a real `InventoryStockCommands` over their mocks, so they still verify the writes.
+  - **5d-1 — done 2026-10-10.** Write family 7: `inventory.api.StockSoldForTarget`
+    (`soldForMissions`, an `@ObserverSpi`, `MANDATORY`), implemented by
+    `mission.internal.MissionSaleIncome`, books the income of stock sold out of a mission's earmark;
+    the Lager still computes each share and skips a non-positive one, the mission still books
+    nothing for a mission the seller does not take part in and saves after the loop. Baseline
+    **79 → 75**.
+  - **5d-2 — done 2026-10-10.** `InventoryMissionAllocation.mission` becomes `missionId` (the same
+    `mission_id` column and foreign key; no migration), the first of the eight business associations
+    of §5.6 turned into an id. What the Lager shows of the mission (name, planned start) comes from
+    the read SPI `inventory.api.EarmarkTargets.Missions`, implemented by `MissionEarmarkTargets` with
+    one projection query, through `InventoryEarmarkTargetCache` (`EarmarkTargets.Lookup`): a
+    per-transaction memo whose first miss loads every mission the Lager rows of the persistence
+    context are earmarked to, so a page costs one lookup whatever its size. The mapper, the
+    allocation commands and the check-in's existence check (same `Mission not found`) ask it; the
+    DTOs and audit labels are byte-identical. `InventoryEarmarkReadNoNPlusOneTest`, added before
+    the change, keeps six Lager reads at the same statement count for 25 rows as for 3 (proven
+    able to fail: without the context scan the by-material read rises from 9 to 31 statements).
+    Baseline **75 → 67** (`inventory -> mission` is gone).
+  - **5d-3 — done 2026-10-10.** `InventoryJobOrderAllocation.jobOrder` becomes `jobOrderId` (same
+    column and foreign key). The order's running number comes through
+    `EarmarkTargets.JobOrders` (`JobOrderEarmarkTargets`, one projection query) and the same
+    per-transaction memo, which now scans the context for both earmark kinds; the mapper's
+    `JobOrderAllocationDto`, the delivered toggle's and the check-in's audit labels are
+    byte-identical. The job order no longer reaches into a row's earmark collections: the handover
+    asks `InventoryAllocations.jobOrderSlice`, and unlinking a row goes through
+    `StockCommands.releaseJobOrderEarmark`. `StockWriteOwnershipTest` now also refuses a reach into
+    the earmark collections outside the Lager, proven on a planted drain.
+    `InventoryEarmarkReadNoNPlusOneTest` stays green (proven able to fail: without the context
+    scan the by-material read rises from 8 to 30 statements). Baseline **67 → 61**; the remaining
+    `inventory -> joborder` edges are the requirement checks of the allocation and the order-facing
+    stock reads (`JobOrderItemStockGroupDto`, the stock row projections), which move with 5e.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1192,7 +1258,7 @@ domain stays a package.
 | F1 — **done 2026-10-04** | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
 | F3 — **done 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
-| F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
+| F4 — **done 2026-10-10** | Package-by-domain move in one pull request; route/gate snapshot byte-identical. Released only after a release carrying F2 is in production (D-10) |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
 
 *F1 as built (2026-10-04).* `service.BackendErrorMapper` classifies every failed call into one case
@@ -1265,6 +1331,49 @@ import's file part goes out as `application/json` for a `.json` file although th
 `application/octet-stream` — unchanged by the move, now pinned. The next step for the clients is
 F4 (the controllers move next to them) and, per domain with its REST cut, the HTTP interface of
 §5.9.
+
+*F4 as built (2026-10-10).* The layer packages are gone, by script, in one pull request. 546
+domain classes left `controller`, `view`, `model`, `model.dto`, `model.form` and `oss` for
+`frontend.<domain>.web` (controllers, view rows, view helpers such as `BankRunningBalance`) and
+`frontend.<domain>.model` (mirrors, forms, view models); 147 kernel classes left `config`,
+`service`, `websocket`, `support`, `logging`, `exception`, `health`, `metrics`, `validation`, `view`
+and `model` for the kernel packages of §5.9 — `kernel.backend`, `kernel.security`,
+`kernel.session`, `kernel.layout`, `kernel.web`, `kernel.livesync`, `kernel.model` — plus
+`kernel.observability`; 379 tests followed their classes, and a test of several domains' pages
+went to the test-only package `frontend.web`. `shell` took the legal and manifest controllers,
+`ScLink`, the licence report and `AndroidAppLinkProperties`; `AuditDomains` went to `audit.model`
+and `GrafanaLinkProperties` to `exchange.web`, domain code that had sat in the kernel.
+`kernel.model` holds `PageResponse`, `PayoutPreference`, `HandoffKind`, `StagedHandoff`,
+`BackendEnumAsString`, the new marker `DtoMirror` and ten reference DTOs several domains share. The
+route/gate snapshot, `BackendCallExistenceTest`, the URI-template guards, the static paths and every
+bean name are unchanged; the 177 `T(…Roles)` references of 23 templates name
+`kernel.security.Roles`, and `SESSION_BOUND_TYPES` names the 21 session-bound types (all domain
+types) by their new names. The four DTO contract tests went red on the move, keyed on `model.dto`
+as they were, and now select by `@DtoMirror` (`DtoMirrorScan`) with unchanged floors.
+`DomainPackageLayoutTest` keeps every main class in a kernel package of §5.9 or a domain's `web`,
+`model` or `client` package, controllers in `<domain>.web`, marked types in a model package and
+every `*Dto`/`*Request`/`*Response` of a model package marked; `TypedBackendClientTest` admits
+`kernel.backend`, `kernel.layout` and `kernel.security` only (before: all of `config`, `service`
+and `websocket`); `KernelDomainReachTest` freezes the kernel's reaches into domain packages in a
+list that may only shrink — each rule proven against a planted violation (REQ-FE-032).
+BE-SIMP-10's frontend half ran in the same pull request: 410 inline fully qualified names in `main`
+became imports, eight stay (the JetBrains `@NotNull` beside an imported Jakarta one).
+Corrections: §5.9 has no kernel package for logging, tracing and metrics, so `kernel.observability`
+was added beside the seven it draws. The kernel reached into domains in twelve places, not eleven
+(`QualityTierCatalog` reads `catalogue.model.QualityTierDto` since the quality tiers landed); two
+were the active-org-unit session key read from `orgunit.web.MeFrontendController`, which moved into
+`kernel.web.ActiveSquadronContext` (same attribute name). The other ten are frozen rather than
+inverted: §5.1 makes the kernel rank 0 and closed to domain meaning, and the backend handles such
+edges the same way, a shrink-only baseline inverted one by one (the layout's
+`OrgUnitMembershipOptionDto`/`SquadronDto`, the gates' `UserDto`/`RegistrationStatusDto`/`TermsStatusDto`,
+`TermsDocumentDto`, `QualityTierDto`). The contract tests keyed on `model.dto` were four, not three
+(`DtoMirrorConsistencyTest` read the folder). Not every reference DTO moved to the kernel:
+`JobOrderReferenceDto` embeds the order's need lists and stays in `joborder.model`. FQN shortening
+ran after the move in its own commit, not before it as `previous-audits.md` planned, because the
+move script had to rewrite those names anyway. A session written by the release before F4 holds the
+old class names in its flash maps; they resolve to no class, so the value fails at type resolution
+before the allow-list is consulted — dropped on `basetool_session_value_dropped_total`, not refused
+on `basetool_session_type_refused_total` — once per session, never the login (deployment.md).
 
 ### 7.9 REST API track
 

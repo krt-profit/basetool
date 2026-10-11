@@ -4,6 +4,22 @@
 
 ### Added
 
+- **Deploy: veraltete Host-Skripte fallen auf.** Das Release bringt die Hashes der Host-Skripte mit (`host-scripts.sha256`); `deploy.sh` vergleicht sie bei jedem Tick (`basetool_host_scripts_drift`, Alarme `HostScriptDrift` und `HostScriptsCheckStale`) und verweigert ein Release, dessen Apply-Skripte (`deploy.sh`, `lib/`, `render-env-d.py`) auf dem Host andere sind, bevor sich etwas ändert. Notausgang: `--force` oder `IRI_REQUIRE_CURRENT_SCRIPTS=false`. Der Vergleich vor jeder Promotion ist jetzt Pflicht (`docs/deployment.md`).
+
+### Changed
+
+- **Android-App: die neueste veröffentlichte Version wird jetzt als 18 gemeldet.** Die App v0.5.0 (versionCode 18) ist veröffentlicht, das Backend meldete noch 17; Apps mit 17 sehen einen Update-Hinweis, werden aber nicht gesperrt (die Mindestversion bleibt 17).
+
+- **REST-API, Welle 1 (nur Web, keine App-Änderung).** Die Administrations-Endpunkte liegen jetzt je Fachbereich unter `/api/v1/<bereich>/admin/**` (z. B. `/users/admin`, `/catalog/admin`, `/connected-apps/admin`), die Rollen unter `/api/v1/roles`, die Benachrichtigungsregeln unter `/api/v1/notifications/admin/rules`; ein einziges ADMIN-Gate steht vor allen Fachregeln. Das Duplikat `PUT /admin/users/{id}/attributes` und die beiden Ping-Endpunkte entfallen. Teil des gemeinsamen API-Schnitts (REQ-API-023).
+
+## [v1.14.0](https://github.com/krt-profit/basetool/releases/tag/v1.14.0) - 2026-10-10
+
+### Added
+
+- **Benachrichtigungen zu verbundenen Anwendungen.** Wer eine Anwendung verbunden hat, erfährt, wenn sie gesperrt oder wieder aktiv ist, eine neuere Version braucht, eine Fähigkeit verliert oder wenn der Austausch ganz abgeschaltet wird (REQ-XCH-040, -041, Migration V281, #2414).
+
+- **Benachrichtigungen zu Hangar und Blueprints.** Wessen Schiff einem Einsatz zugeteilt wird, erfährt es; fällt ein gelöschtes Schiff aus einem geplanten Einsatz, hören die Einsatzleitung und der Verantwortliche der Einheit davon. Wer Ausgerüstet-Markierungen zurückgesetzt bekommt oder wessen Hangar oder Blueprints ein Admin ändert oder leert, wird benachrichtigt (REQ-HANGAR-005…008, Migration V280, #2414).
+
 - **Benachrichtigungen zur Organisation.** Admins erfahren, wenn nach einer Leitungsänderung die OFFICER-Rolle eines Mitglieds nicht zu seinen Posten passt; die Leitung einer Einheit erfährt, wenn ein Mitglied ausgeschieden ist, und die des übergeordneten Bereichs, wenn dadurch ein Leitungsposten frei wird (REQ-ORG-029, -030, Migration V279, #2414).
 
 - **Benachrichtigungen zur Bank.** Wer einen freigegebenen Antrag bestätigen kann, erfährt, dass er bereit ist; Bankmitarbeiter hören, wenn ihre Berechtigung auf ein Konto erteilt, geändert oder entzogen wird. Auszahlungen, Halterübertragungen und Direktbuchungen von Bankpersonal melden sich bei den Betroffenen (Konto-Verantwortliche), und die Bankleitung erfährt, wenn ein deaktivierter Halter noch Geld hält (REQ-BANK-057…060, Migration V278, #2414).
@@ -11,6 +27,7 @@
 - **Benachrichtigungen zu Materialbörse und Lager.** Wer an einem Angebot Interesse angemeldet oder zugesagt hat, ein Gesuch zu beliefern, erfährt, wenn das Angebot nicht mehr verfügbar oder das Gesuch zurückgezogen ist; wessen Bestand jemand anderes ausbucht oder verkauft, wird benachrichtigt (REQ-MARKET-021, -022, REQ-INV-056, Migration V277, #2414).
 
 - **Benachrichtigungen zur Raffinerie.** Der Besitzer erfährt, wenn ein Raffinerieauftrag fertig ist und abgeholt werden kann, und wenn jemand anderes den Auftrag ändert, storniert oder einlagert, auch auf wessen Lager die Ausbeute gebucht wurde (REQ-REFINERY-023, -024, Migrationen V275/V276, #2414).
+
 - **Keycloak-Härtung als Skript.** `scripts/harden-keycloak-realm.py` setzt die Runbook-Schritte 2 (Passwort
   vergessen), 11 (OTP für Admins, auch über Discord) und 12 (Sitzungsfenster) trocken vorab prüfbar und mit
   Rücknahme um; die Sitzungsfenster stehen jetzt in `scripts/keycloak/session-windows.json`, die der Provisioner
@@ -35,7 +52,16 @@
   Hinweise auslösen, hinter denen keine Nutzeraktion steht (Erinnerungen, abholbereite
   Raffinerieaufträge); er läuft nur auf einer Instanz und meldet sich im Monitoring (Alarm
   `NotificationTimedStale`). Neue Variablen `APP_NOTIFICATIONS_TIMED_ENABLED` und
-  `APP_NOTIFICATIONS_TIMED_INTERVAL` (REQ-NOTIF-026, #2414).
+  `APP_NOTIFICATIONS_TIMED_INTERVAL` (REQ-NOTIF-026, #2414). Der Dienst meldet höchstens 100
+  Hinweise pro Lauf und nur noch Fälle der letzten 14 Tage (Einsatz nie beendet) bzw. 7 Tage
+  (Raffinerieauftrag fertig), sodass Altbestand die Posteingänge nicht flutet; ein Rückstau wird über
+  mehrere Läufe abgearbeitet.
+
+- **Kein stiller Verlust von Benachrichtigungen.** Ein Ereignisschwall über die Warteschlange der
+  Benachrichtigungen hinaus (etwa eine Admin-Massenaktion) wartet jetzt auf Platz statt Hinweise zu
+  verwerfen. Neue Metriken `basetool_notification_created_total` und
+  `basetool_notification_executor_rejected_total` mit den Alarmen `NotificationCreationFlood` und
+  `NotificationExecutorRejected` (REQ-NOTIF-029).
 
 - **Benachrichtigungsregeln erreichen Gruppen.** Der Regel-Editor bietet vier neue Empfängerarten
   (Einsatz-Teilnehmer, Einsatzleitung, Inhaber einer verbundenen Anwendung, Ereignis-Adressaten) und
@@ -75,6 +101,7 @@
   Liste mit Datumsblock, daneben Information und die neuesten Benachrichtigungen. Neuer Auftrag,
   Einbuchen, Mitglied bearbeiten (mit Reitern), Systemeinstellungen, Information und
   Benachrichtigungsregeln haben nummerierte Abschnitte und eine fixierte Aktionsleiste (REQ-UI-027).
+
 - **Rechtliches, Organigramm, Verbundene Anwendungen und Schiffsdaten im neuen Muster.** Diese
   Seiten haben Seitenkopf und Karten statt HUD-Box; die Datenschutzerklärung hat ein
   Inhaltsverzeichnis, das Organigramm ist auf dem Smartphone eine eingerückte Liste, und „Alle
@@ -82,6 +109,7 @@
 
 - **Profil als eine Einstellungsseite.** Abschnitts-Navigation links, eine Speichern-Leiste, die nur
   bei Änderungen erscheint und alle geänderten Abschnitte speichert.
+
 - **Einsatz- und Operationsdetail im neuen Muster.** Der Einsatz hat drei Reiter (Übersicht ·
   Teilnehmer & Einheiten · Finanzen & Auszahlung); statt des Reiters „Verwaltung" öffnet
   „Bearbeiten" einen Bearbeitungsmodus, „Anmelden" ist die Hauptaktion, Löschen liegt im „⋯"-Menü.
@@ -101,19 +129,19 @@
   Admin-Listen haben einen Seitenkopf mit Zähler, eine Werkzeugleiste mit Suche, Segment-Schalter und
   Filter-Popover, entfernbare Filter-Chips und Tabellen, deren Zeile der Link ist und die auf dem
   Smartphone stapeln; Status sind übersetzt, leere Listen zeigen einen Leerzustand (REQ-UI-027).
-  
+
 - **Mein Inventar: Blueprints mit Dialog und Craft-Status.** „Blueprints hinzufügen" öffnet einen
   Dialog, „SC Extractor laden" und „Alle löschen …" liegen im ⋯-Menü; die Seite hat eine Suche,
   „Alle · Craftbar" und „Raffinerie einrechnen". Jede Zeile zeigt Status-Punkt und „3×", das Detail
   eine Kennzahl und die Zutaten mit Bedarf, Vorrat und Qualität (REQ-INV-008/048).
-  
+
 - **Blueprint-Verfügbarkeit: Besitzer als Chips, Suche nach Personen.** Die ersten vier Besitzer
   stehen direkt in der Zeile, „+ n weitere" klappt den Rest auf; die Suche findet auch Besitzer
   innerhalb der eigenen Einheiten (REQ-INV-012/013).
 
 - **Einsätze und Operationen: Zeitraum „Kommend · Vergangen · Alle".** Ersetzt die Checkbox
   „Vergangene anzeigen"; die gespeicherte Auswahl wird übernommen.
-  
+
 - **Beförderung und Einsatzdaten im neuen Muster.** „Themenbereiche verwalten" und „Einsatzdaten
   verwalten" sind Listen mit Detailbereich, deren Auswahl als Link erhalten bleibt; die
   Rangvoraussetzungen stehen als Matrix Rangsprung × Themenbereich. „Beförderungssystem" zeigt den
@@ -122,13 +150,13 @@
 - **Benachrichtigungen: „Ungelesen · Alle" und Links.** Die Seite zeigt zunächst nur Ungelesenes;
   Benachrichtigungen zu Aufträgen, Materialbörse, verbundenen Anwendungen und Admin-Vorgängen
   führen direkt zur Seite (REQ-NOTIF-022).
-  
+
 - **Kartellbank: Kontodetail mit Kennzahlen und Reitern.** Beide Kontodetailseiten zeigen Saldo,
   Ziel, ± 30 Tage und Buchungen als Kacheln, darunter die Reiter „Buchungen" und „Konto-Info" bzw.
   „Ziel & Sichtbarkeit"; die Historie hat „30 Tage · 90 Tage · Zeitraum …" und die Spalte „Saldo
   nach Buchung", einklappbare Bereiche entfallen. Auf der Org-Einheits-Bank heißt der Reiter jetzt
   „Anträge an unsere Konten", und „Laufende Anträge" zeigt den Freigabeweg.
-  
+
 - **Buchungsanträge: Status als Segment.** „Ausstehend · Bestätigt · Abgelehnt · Alle" ersetzt die
   Status-Checkboxen, „n warten auf dich" zählt die entscheidbaren Anträge; wartet ein Antrag auf
   eine Freigabe, steht „wartet auf …" in der Zeile. Die KRT-Freigaben sind eine Stufen-Leiste.
@@ -232,17 +260,27 @@
 
 ### Changed
 
-- **REST-API, Welle 1 (nur Web, keine App-Änderung).** Die Administrations-Endpunkte liegen jetzt je Fachbereich unter `/api/v1/<bereich>/admin/**` (z. B. `/users/admin`, `/catalog/admin`, `/connected-apps/admin`), die Rollen unter `/api/v1/roles`, die Benachrichtigungsregeln unter `/api/v1/notifications/admin/rules`; ein einziges ADMIN-Gate steht vor allen Fachregeln. Das Duplikat `PUT /admin/users/{id}/attributes` und die beiden Ping-Endpunkte entfallen. Teil des gemeinsamen API-Schnitts (REQ-API-023).
+- **Nicht rückgängig zu machen: die Migrationen V261–V265.** `V262`–`V264` setzen `quality_tier_id` auf
+  `NOT NULL` (Auftragsmaterial, Auftrags-Artikelmaterial, Materialanspruch), `V264` löscht den alten
+  Unique-Index von `material_claim`, `V265` begrenzt jede Qualität per `CHECK` auf 0–1000 und bricht den
+  Backend-Start bei einem Wert außerhalb ab. Ein reiner Code-Rollback auf v1.13.7 ist danach nicht möglich
+  (Schreibzugriffe auf Aufträge schlagen fehl); der Rückweg ist die Wiederherstellung des Backups, das
+  unmittelbar vor der Beförderung gezogen wurde (`docs/RELEASE_1.14.0_PRODUCTION_RUNBOOK.md`).
 
 - **UEX und SC Wiki werden nur über externe Adressen angesprochen.** Der Abruf lehnt Namen ab, die auf
   interne, Loopback- oder Link-Local-Adressen auflösen, folgt keiner Weiterleitung und läuft höchstens
   vier (UEX) bzw. zwei (SC Wiki) Aufrufe gleichzeitig. Eine auf einen internen Host zeigende
   `app.uex`- oder `app.scwiki`-URL funktioniert damit nicht mehr (REQ-SEC-081).
-
+- **Frontend-Code nach Fachbereichen gepackt (Betrieb).** Controller, DTOs und Formulare liegen in
+  `frontend.<bereich>.web` / `.model`, der Kern in `frontend.kernel.*`; die Logger-Kategorien aller
+  Frontend-Klassen ändern sich. Nur nach
+  einem Release mit der exakten Session-Liste (F2) ausrollen: eine noch offene Weiterleitung verliert
+  beim Deploy einmalig ihre Flash-Werte, die Anmeldung bleibt (REQ-FE-032, `deployment.md`).
 - **Auswahlfelder nach abgelaufener Sitzung führen zur Anmeldung.** Ist die Sitzung abgelaufen, zeigt
   eine Mitglieder-, Material- oder Kontosuche nicht mehr stumm „keine Treffer", sondern leitet zur
   Anmeldung weiter; dasselbe gilt für alle anderen nachgeladenen Listen und Downloads. Alle Lesezugriffe
   laufen über `krtFetch.get` / `getJson` (REQ-FE-031).
+
 - **Unterstützte Browser: Chrome 122, Firefox 131, Safari/iOS 18.4 oder neuer** („Baseline 2025",
   ADR-0239). Typprüfung und ESLint prüfen die Skripte jetzt auf ES2025 (REQ-FE-018).
 
@@ -261,7 +299,7 @@
   letzten `krtm-*`-Klassen sind Design-System-Bausteine oder Seitenregeln; Bank-Administration hat
   Seitenkopf und Hinweis-Boxen. Tote CSS-Regeln, Skripte und 205 Sprachschlüssel sind weg; das
   Bank-Kontodetail ist auf großen Bildschirmen so breit wie die übrigen Seiten (REQ-UI-027).
-  
+
 - **Kartellbank: „Bestätigen" nur, wo du bestätigen darfst.** Die Antragswarteschlange zeigt die
   Bestätigen-Aktion nur noch bei Anträgen, für die dir die passende Konto-Berechtigung zusteht; sonst
   steht dort „wartet auf berechtigte Bankmitarbeiter". Die Queue-API liefert dafür pro Antrag
@@ -269,26 +307,26 @@
 
 - **Blueprints: Fehlmenge wieder sichtbar.** Ist der Vorrat einer Zutat zu knapp, steht unter dem
   Vorrat wieder „fehlt n“ (REQ-INV-048).
-  
+
 - **Auftragsdetail: Reiter „Hersteller“.** Der Reiter, der zeigt, wer ein Item craften kann, hieß
   „Herstellung“ wie das Buchen der Herstellung im Reiter „Items“; er heißt jetzt „Hersteller“
   (REQ-ORDERS-026).
 
 - **Build: Configuration-Cache auch für lokale Builds.** `gradle.properties` schaltet ihn ein;
   `--no-configuration-cache` schaltet ihn für einen Lauf ab (BLD-PERF-04).
-  
+
 - **CI: Cache-Janitor behält je Gradle-Job nur den neuesten Cache** und warnt, wenn der Actions-Cache
   nach dem Aufräumen über 8 GiB liegt (CI-01).
-  
+
 - **Tests: PostgreSQL-Testcontainer per Digest.** Die Backend-Tests starten genau das Produktions-Image
   (`TestImages.POSTGRES`, gegen Compose und Quadlet-Unit geprüft; TST-18).
-  
+
 - **CI: Dependabot-Digest-Bumps von Redis und PostgreSQL ziehen `TestImages` mit.** Der Compose-Follow-up
   setzt die Digest-Konstanten auf den Compose-Pin, statt `TestImagesTest` rot zu lassen (REQ-OPS-035,
   ADR-0215).
-  
+
 - **Doku: Verlängerung der OWASP-Suppressions beschrieben** (CONTRIBUTING, SEC-16).
-  
+
 - **Modularisierung: die Entscheidungen sind festgehalten.** ADR-0231 bis ADR-0239 (Modulschnitt,
   Zusammenspiel der Module, Prüfwerkzeuge, harter API-Schnitt mit erzwungenem App-Update, Fehlermodell,
   Zugriffsregeln je Fachbereich, NullAway, `switch` ohne `default`, Browser-Baseline 2025), dazu
@@ -363,10 +401,6 @@
   `api/contract-tiers.txt`); die Change-Set-`Op`s von Blueprint und Schiff sind erstmals richtig
   dokumentiert, und der Generator prüft das Dokument vor dem Schreiben (REQ-API-018).
 
-- **Fehlercodes: ein Register statt verstreuter Strings.** Alle 49 Problem-Codes des Backends stehen in
-  `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
-  `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
-
 - **Fehlercodes: ein Register statt verstreuter Strings.** Alle 50 Problem-Codes des Backends stehen in
   `CoreProblemCode` und in `problem-codes.txt`; `openapi.json` dokumentiert `code` mit seinen Werten,
   `correlationId`, `fieldErrors` und 429 auf allen `/api/**`-Operationen (REQ-API-019).
@@ -375,7 +409,12 @@
   Die Freigabe ist eine aus dem Vertrag generierte nginx-Map statt Pfad- und Präfixregeln; alles andere
   beantwortet die Edge mit 404 (auch die bisherigen 405). `GET /api/v1/me/layout`, `POST /api/v1/job-types`
   und Pfade unter `/api/v1/me/` und `/api/v1/terms/`, die die App nicht aufruft, sind dort nicht mehr
-  erreichbar; die App selbst ändert sich nicht (REQ-API-021, REQ-OPS-042).
+  erreichbar; die App selbst ändert sich nicht (REQ-API-021, REQ-OPS-042). `HEAD` wird auf dem
+  öffentlichen API-Host nicht mehr durchgelassen.
+
+- **Mehr API-Antworten sind `private, no-store`.** Jede `/api`-Familie, die nicht ausdrücklich als
+  teilbar eingestuft ist, gilt als persönlich; darunter jetzt `/orders` (außer dem Artikelkatalog) und
+  `/exchange` (außer dem Katalog). Diese GETs tragen kein ETag und kein `304` mehr (REQ-SEC-031).
 
 ### Fixed
 
@@ -433,6 +472,7 @@
 
 - **Datenauskunft: Qualität der Eintragungen.** Der Export zeigt die Qualitätsstufe einer
   Material-Eintragung wieder an; seit dem Stufen-Katalog blieb sie bei neuen Eintragungen leer.
+
 - **Sandbox: Seed läuft wieder.** Die Beispielaufträge des Exchange-Sandbox-Seeds nennen ihre
   Qualitätsstufe; seit V262/V263 brach der Seed an der fehlenden Stufe ab.
 
@@ -505,6 +545,7 @@
 - **Frontend-Lint-Werkzeug: `source-map-js` 1.2.2.** Behebt GHSA-68fv-2mgg-jv7q (Denial of Service über
   indizierte Source-Map-Abschnitte) in der Abhängigkeit von Stylelint/PostCSS; läuft nur im Build,
   nicht in der App.
+
 - **Frontend: Trusted Types im Report-Modus.** Jede Seite sendet zusätzlich den Header
   `Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; trusted-types krt-html
   krt-fragment`; ein ungeschützter DOM-Schreibzugriff wird als `csp_violation` gemeldet, nichts wird
@@ -526,29 +567,29 @@
   CVE-2026-13720 und CVE-2026-81841 (je mittlere Schwere: Alert-Regeln fremder Ordner lesbar,
   Provisioning-Metadaten durch Editoren setzbar, pausierter öffentlicher Dashboard-Link blieb
   gültig). Digest in Compose und Quadlet aktualisiert; wirkt nach dem nächsten Deploy.
-  
+
 - **Basis-Images auf den aktuellen Stand der Tags gehoben (nur Digests, keine neuen Versionen).**
   
   Temurin JRE/JDK 25.0.4.1+1 (sicherheitsbedingter Sonderrelease), `nginx-unprivileged:1.31.6-alpine`
   mit neuen Alpine-Schichten und der BuildKit-Builder `buildx-stable-1`. Die Log-Signaturen von
   `JvmNativeThreadExhaustion` und `JvmStartupCacheRejected` wurden auf dem neuen JRE erneut geprüft.
-  
+
 - **Ingest prüft den Hostnamen des Backends standardmäßig.** Der Jar-Default von
   `app.ingest.verify-backend-hostname` ist jetzt `true`; nur das `dev`-Profil schaltet ihn ab.
   Compose und Quadlet setzten bereits `true` (ING-SEC-04).
-  
+
 - **Host: `deploy` darf nur noch die podman-Unterbefehle der Deploy-Skripte als `iri` ausführen**
   statt `podman *`; repo-lint prüft die Liste gegen die Skripte. Wirkt erst nach einem Ansible-Lauf
   auf dem Host (OPS-SEC-08).
-  
+
 - **CI: Werkzeuge per Hash gepinnt.** PyYAML, ansible-core/ansible-lint aus `--require-hashes`-Dateien,
   markdownlint-cli2 aus einem Lockfile, Ansible-Collections exakt versioniert (CI-SEC-12).
-  
+
 - **CI: Release-App-Schlüssel in der Umgebung `release`.** `release-prepare`, `refresh-versions` und
   `release-publish` lesen ihn dort; `release-publish` läuft dafür auf dem Push nach `main` und erkennt
   den Release-Merge selbst. Der Owner legt die Umgebung einmalig an und löscht danach das
   Repository-Secret (CI-SEC-16, ADR-0201).
-  
+
 - **Backend: Prüfregeln für Mandantentrennung und Massenzuweisung.** Org-Einheiten-gebundene Aggregate
   tragen `@TenantScoped`; ein Test verlangt für jeden Controller, der solche Daten schreibt, den
   Scope-Gate, und für Request-Bodies `@Valid`, keine Antwort-DTOs und keine servergeführten Felder

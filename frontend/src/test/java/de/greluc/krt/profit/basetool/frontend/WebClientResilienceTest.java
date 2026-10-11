@@ -207,8 +207,8 @@ class WebClientResilienceTest {
 
   /**
    * Verifies that the time limiter in {@link
-   * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter} also times out
-   * state-changing HTTP verbs.
+   * de.greluc.krt.profit.basetool.frontend.kernel.backend.WebClientConfig#resilienceFilter} also
+   * times out state-changing HTTP verbs.
    */
   @ParameterizedTest
   @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
@@ -260,7 +260,7 @@ class WebClientResilienceTest {
 
   /**
    * Verifies that {@link
-   * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter} sends a
+   * de.greluc.krt.profit.basetool.frontend.kernel.backend.WebClientConfig#resilienceFilter} sends a
    * state-changing request that receives a 5xx exactly once, since retries apply only to idempotent
    * verbs.
    */

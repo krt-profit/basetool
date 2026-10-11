@@ -25,9 +25,11 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeNotices;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
@@ -40,6 +42,8 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -66,6 +70,11 @@ public class ExchangeRegistryService {
 
   /** The Basetool's own client ids, which the registry refuses. */
   private final FirstPartyClientIds firstPartyClientIds;
+
+  /** Publishes the notices to the holders of a changed client's installations (REQ-XCH-040). */
+  private final ApplicationEventPublisher eventPublisher;
+
+  private final AuthHelperService authHelperService;
 
   /**
    * Registers {@code basetool_exchange_registry_changes_total} for every action at zero, so the
@@ -191,6 +200,7 @@ public class ExchangeRegistryService {
     ExchangeClient client = getClient(id);
     OptimisticLock.check(client.getVersion(), request.version(), ExchangeClient.class, id);
     final ExchangeRegistrySnapshot before = mirrorSync.load();
+    final String oldMinClientVersion = client.getMinClientVersion();
     Set<ExchangeCapability> oldCapabilities = EnumSet.noneOf(ExchangeCapability.class);
     oldCapabilities.addAll(client.getCapabilities());
     Set<ExchangeCapability> newCapabilities = EnumSet.copyOf(request.capabilities());
@@ -214,6 +224,7 @@ public class ExchangeRegistryService {
     added.removeAll(oldCapabilities);
     Set<ExchangeCapability> removed = EnumSet.copyOf(oldCapabilities);
     removed.removeAll(newCapabilities);
+    announceUpdate(saved, oldMinClientVersion, removed);
     auditRecorder.record(
         AuditEventType.EXCHANGE_CLIENT_UPDATED,
         saved.getId(),
@@ -279,9 +290,65 @@ public class ExchangeRegistryService {
         null,
         null,
         AuditDetails.of("enabled", enabled));
+    UUID actor = authHelperService.currentUserId().orElse(null);
+    eventPublisher.publishEvent(
+        enabled ? ExchangeNotices.switchedOn(actor) : ExchangeNotices.switchedOff(actor));
     countAfterCommit(
         enabled ? ExchangeRegistryAction.SWITCH_ON : ExchangeRegistryAction.SWITCH_OFF);
     return saved;
+  }
+
+  /**
+   * Tells the holders of a client's installations that it needs an update or lost capabilities
+   * (REQ-XCH-040).
+   *
+   * @param client the saved client
+   * @param oldMinClientVersion the version floor before the change, or {@code null}
+   * @param removed the capabilities the change removed
+   */
+  private void announceUpdate(
+      @NotNull ExchangeClient client,
+      @Nullable String oldMinClientVersion,
+      @NotNull Set<ExchangeCapability> removed) {
+    UUID actor = authHelperService.currentUserId().orElse(null);
+    String floor = client.getMinClientVersion();
+    if (floor != null && isRaised(oldMinClientVersion, floor)) {
+      eventPublisher.publishEvent(
+          ExchangeNotices.updateRequired(client.getId(), client.getDisplayName(), floor, actor));
+    }
+    if (!removed.isEmpty()) {
+      eventPublisher.publishEvent(
+          ExchangeNotices.capabilityRemoved(
+              client.getId(), client.getDisplayName(), scopes(removed), actor));
+    }
+  }
+
+  /**
+   * Whether a version floor went up: any floor over none, a numerically greater dotted version, and
+   * a different floor that cannot be compared.
+   *
+   * @param before the floor before the change, or {@code null}
+   * @param after the floor after the change
+   * @return {@code true} when members must update
+   */
+  static boolean isRaised(@Nullable String before, @NotNull String after) {
+    if (before == null) {
+      return true;
+    }
+    String[] a = before.split("[.]");
+    String[] b = after.split("[.]");
+    for (int i = 0; i < Math.max(a.length, b.length); i++) {
+      try {
+        long x = i < a.length ? Long.parseLong(a[i].strip()) : 0;
+        long y = i < b.length ? Long.parseLong(b[i].strip()) : 0;
+        if (x != y) {
+          return y > x;
+        }
+      } catch (NumberFormatException _) {
+        return !before.equals(after);
+      }
+    }
+    return false;
   }
 
   /**
@@ -314,6 +381,11 @@ public class ExchangeRegistryService {
         saved.getClientId(),
         null,
         null);
+    UUID actor = authHelperService.currentUserId().orElse(null);
+    eventPublisher.publishEvent(
+        suspended
+            ? ExchangeNotices.clientSuspended(saved.getId(), saved.getDisplayName(), actor)
+            : ExchangeNotices.clientActivated(saved.getId(), saved.getDisplayName(), actor));
     countAfterCommit(
         suspended ? ExchangeRegistryAction.SUSPENDED : ExchangeRegistryAction.ACTIVATED);
     return saved;

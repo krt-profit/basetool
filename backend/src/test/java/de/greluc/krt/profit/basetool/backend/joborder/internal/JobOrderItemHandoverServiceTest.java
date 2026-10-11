@@ -51,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepo
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
@@ -97,6 +98,11 @@ class JobOrderItemHandoverServiceTest {
 
   @BeforeEach
   void setUp() {
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        service,
+        "stockCommands",
+        new InventoryStockCommands(
+            inventoryItemRepository, null, null, null, auditService, null, offerRatchet));
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     gameItemId = UUID.randomUUID();
@@ -157,7 +163,7 @@ class JobOrderItemHandoverServiceTest {
     row.setGameItem(gameItem);
     row.setLocation(location);
     row.setAmount(amount);
-    InventoryAllocations.addJobOrder(row, order, earmark, false);
+    InventoryAllocations.addJobOrder(row, order.getId(), earmark, false);
     return row;
   }
 
@@ -343,7 +349,7 @@ class JobOrderItemHandoverServiceTest {
     UUID siblingOrderId = UUID.randomUUID();
     JobOrder siblingOrder = JobOrder.builder().id(siblingOrderId).type(JobOrderType.ITEM).build();
     InventoryItem row = itemRow(5.0, 3.0);
-    InventoryAllocations.addJobOrder(row, siblingOrder, 2.0, false);
+    InventoryAllocations.addJobOrder(row, siblingOrder.getId(), 2.0, false);
     when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
             orderId, gameItemId))
         .thenReturn(List.of(row));
