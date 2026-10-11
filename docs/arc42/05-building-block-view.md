@@ -308,6 +308,12 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
   `IngestEndpointSurfaceTest`, which pins the gateway's routed surface to the exchange route table
   and fails on any mapping under `/v1`; and `ContextShape`, the bean count each application's
   `ContextShapeTest` ratchets (REQ-OPS-038).
+- **`build-logic`** — an included build, not a module of the product and never shipped: the
+  `basetool.*` precompiled convention plugins (toolchain, annotation wiring, test and compile
+  conventions, Checkstyle, Spotless, JaCoCo, PIT, SpotBugs, CycloneDX, Licensee, Spring Boot and
+  dependency management, Error Prone) that every module applies by id, the typed `basetool { }`
+  extension and the reader of each module's `build-settings.properties` (REQ-OPS-046, ADR-0248). It is
+  the place a Gradle module extracted later (plan §5.8) gets its conventions from.
 
 ### Inside `ingest`
 

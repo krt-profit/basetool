@@ -1,3 +1,5 @@
+pluginManagement { includeBuild("build-logic") }
+
 plugins { id("de.fayard.refreshVersions") version "0.60.6" apply false }
 
 if (providers.gradleProperty("refreshVersions").isPresent) {

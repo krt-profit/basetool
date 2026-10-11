@@ -3,6 +3,7 @@ WORKDIR /app
 COPY --chmod=755 gradlew .
 COPY gradle/ gradle/
 COPY build.gradle.kts settings.gradle.kts gradle.properties lombok.config ./
+COPY build-logic/ build-logic/
 COPY backend/build.gradle.kts backend/build-settings.properties backend/
 COPY frontend/build.gradle.kts frontend/build-settings.properties frontend/
 COPY ingest/build.gradle.kts ingest/build-settings.properties ingest/

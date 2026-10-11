@@ -1,28 +1,11 @@
-import net.ltgt.gradle.errorprone.CheckSeverity
-import net.ltgt.gradle.errorprone.errorprone
-
-buildscript {
-  dependencies {
-    constraints {
-      classpath(libs.commons.lang3)
-      classpath(libs.jackson3.databind)
-    }
-  }
-}
-
 plugins {
-  java
-  checkstyle
-  id("jacoco")
   id("idea")
-  alias(libs.plugins.spring.boot)
-  alias(libs.plugins.spring.dependency.management)
-  alias(libs.plugins.cyclonedx.bom)
-  alias(libs.plugins.licensee)
-  alias(libs.plugins.spotbugs.base)
-  alias(libs.plugins.pitest)
-  alias(libs.plugins.errorprone)
-  id("com.diffplug.spotless")
+  id("basetool.spring-app-conventions")
+  id("basetool.quality-conventions")
+  id("basetool.mutation-conventions")
+  id("basetool.supply-chain-conventions")
+  id("basetool.javadoc-conventions")
+  id("basetool.errorprone-conventions")
 }
 
 description = "backend"
@@ -54,9 +37,6 @@ dependencies {
   implementation(libs.semver4j.core)
   implementation(libs.logstash.logback.encoder)
   implementation(project(":logging-support"))
-
-  errorprone(libs.errorprone.core)
-  errorprone(libs.nullaway)
 
   implementation(libs.mapstruct.core)
   annotationProcessor(libs.mapstruct.processor)
@@ -102,65 +82,43 @@ tasks.named<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   excludeFilter.set(rootProject.file("config/spotbugs/exclude.xml"))
 }
 
-val nullAwayPackages =
-  listOf(
-      "admin",
-      "audit",
-      "bank",
-      "catalogue",
-      "exchange",
-      "hangar",
-      "identity",
-      "inventory",
-      "joborder",
-      "livesync",
-      "materialexchange",
-      "mission",
-      "notification",
-      "orgunit",
-      "personalinventory",
-      "platform",
-      "privacy",
-      "refinery",
-      "scope",
-    )
-    .map { "de.greluc.krt.profit.basetool.backend.$it.api" }
-    .plus(
-      listOf(
-          "blueprint",
-          "hangar",
-          "inventory",
-          "joborder",
-          "materialexchange",
-          "mission",
-          "refinery",
-        )
-        .map {
-          "de.greluc.krt.profit.basetool.backend.$it"
-        }
-    )
-    .joinToString(",")
-
-tasks.named<JavaCompile>("compileJava") {
-  options.errorprone {
-    disableWarningsInGeneratedCode.set(true)
-    check("NullAway", CheckSeverity.ERROR)
-    disable("StringConcatToTextBlock")
-    option("NullAway:AnnotatedPackages", nullAwayPackages)
-    option("NullAway:TreatGeneratedAsUnannotated", "true")
-  }
-}
-
-tasks
-  .withType<JavaCompile>()
-  .matching { it.name != "compileJava" }
-  .configureEach {
-    options.errorprone.enabled.set(false)
-  }
-
-tasks.javadoc {
-  options { (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet") }
-  destinationDir = project.file("docs/javadoc")
+basetool {
+  nullAwayPackages.addAll(
+    listOf(
+        "admin",
+        "audit",
+        "bank",
+        "catalogue",
+        "exchange",
+        "hangar",
+        "identity",
+        "inventory",
+        "joborder",
+        "livesync",
+        "materialexchange",
+        "mission",
+        "notification",
+        "orgunit",
+        "personalinventory",
+        "platform",
+        "privacy",
+        "refinery",
+        "scope",
+      )
+      .map { "de.greluc.krt.profit.basetool.backend.$it.api" }
+  )
+  nullAwayPackages.addAll(
+    listOf(
+        "blueprint",
+        "hangar",
+        "inventory",
+        "joborder",
+        "materialexchange",
+        "mission",
+        "refinery",
+      )
+      .map { "de.greluc.krt.profit.basetool.backend.$it" }
+  )
 }
 
 val contractBaseline = layout.buildDirectory.file("contract-baseline/openapi.json")

@@ -9,6 +9,7 @@ on:
     paths:
       - 'build.gradle.kts'
       - '**/build.gradle.kts'
+      - 'build-logic/**'
       - 'settings.gradle.kts'
       - 'gradle/libs.versions.toml'
       - 'gradle/wrapper/gradle-wrapper.properties'
@@ -19,6 +20,7 @@ on:
     paths:
       - 'build.gradle.kts'
       - '**/build.gradle.kts'
+      - 'build-logic/**'
       - 'settings.gradle.kts'
       - 'gradle/libs.versions.toml'
       - 'gradle/wrapper/gradle-wrapper.properties'

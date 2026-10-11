@@ -470,7 +470,8 @@ def selftest() -> int:
     real_own, real_shared = input_sets(real)
     for m in MODULES:
         check(f"the real Dockerfile yields {m}/src/main as {m}'s own input", f"{m}/src/main" in real_own[m])
-    for must in ("gradle", "logging-support/src/main", "build.gradle.kts", "backend/build.gradle.kts"):
+    for must in ("gradle", "build-logic", "logging-support/src/main", "build.gradle.kts",
+                 "backend/build.gradle.kts"):
         check(f"the real Dockerfile yields shared input {must}", must in real_shared)
     real_sources = copy_sources(real)
     for path in MODULE_OWN:

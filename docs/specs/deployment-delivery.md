@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md), [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md)
 
 # Deployment delivery & promotion
 
@@ -1328,7 +1328,7 @@ all three on six runners. The `plan` job's main path applies only to a `push` on
      (today `<module>/src/main`) and `frontend/oss-bundled-components.json` (copied for every module,
      read only by the frontend's `generateOssLicenses`);
    - everything else is **shared** and rebuilds all three: the Gradle wrapper and `gradle/` (version
-     catalog, `verification-metadata.xml`), the root build scripts and `gradle.properties`, **all six
+     catalog, `verification-metadata.xml`), the root build scripts, `build-logic/` and `gradle.properties`, **all six
      module build scripts** (Gradle configures every project for every build, and the frontend jar
      embeds the Licensee reports of the backend, ingest and keycloak-spi classpaths),
      `logging-support/src/main`, the Dockerfile itself (base-image digests), the root `.dockerignore`,
@@ -1763,8 +1763,8 @@ declares it as `implementation(project(...))`. `logging-support` is the only suc
 
 Applying the plugin is each module's own decision; **what the BOM contains is not**. Since
 2026-09-23 (audit item BLD-SIMP-06) the output path, schema version, serial number, licence text,
-build-system reference and the `^runtimeClasspath$` restriction are set once, in the root
-`build.gradle.kts` (`subprojects { plugins.withId("org.cyclonedx.bom") }`), for every module that
+build-system reference and the `^runtimeClasspath$` restriction are set once, in the
+`basetool.sbom-conventions` plugin of `build-logic` (REQ-OPS-046), for every module that
 applies it — four copies of the same block had been maintained by hand until then. Verified at the
 move: the component lists of all four BOMs were identical before and after.
 
@@ -1777,7 +1777,7 @@ restores — and the BOM kept its old component list. Reproduced on `:ingest` in
 (dependency removed, the BOM still listed it; added back, the BOM still did not) until
 `--rerun-tasks`. Two measures close it:
 
-- both SBOM tasks are **untracked** (`doNotTrackState` in the root `build.gradle.kts`), so they
+- both SBOM tasks are **untracked** (`doNotTrackState` in `basetool.sbom-conventions`), so they
   execute on every invocation and never read or write the build cache; `release-prepare.yml`
   additionally passes `--no-build-cache`, so a release stays fresh even if the build script
   regresses;
@@ -1832,7 +1832,7 @@ Recorded here rather than left to look like an oversight.
   `--no-build-cache` flag is removed.
 
 **Enforced by:** `.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml`
-(`sbom-coverage`) · `verifyCyclonedxBom` (root `build.gradle.kts`) · `.github/workflows/ci.yml` ·
+(`sbom-coverage`) · `verifyCyclonedxBom` (`build-logic`, `basetool.sbom-conventions`) · `.github/workflows/ci.yml` ·
 `.github/workflows/release-prepare.yml` · `.github/workflows/release-publish.yml`
 · **Related:** REQ-OPS-023 (their provenance), REQ-OPS-024 (what is scanned), REQ-OPS-029 (the
 release notes that have to name this same set)
@@ -2482,8 +2482,8 @@ record.
 
 ### REQ-OPS-037 — Every module declares its own quality settings; none is defaulted
 
-The root `build.gradle.kts` applies the shared conventions to every module, but the values that
-differ per module are **declared by the module itself** in `<module>/build-settings.properties`,
+The `build-logic` convention plugins (REQ-OPS-046) apply the shared conventions to every module, but
+the values that differ per module are **declared by the module itself** in `<module>/build-settings.properties`,
 never derived from the module's name with a fallback. A module carved out of `backend` must not
 quietly be held to weaker floors than the code it came from (plan G-20).
 
@@ -2522,7 +2522,7 @@ Values at introduction, identical to the name-keyed maps they replace:
   `./gradlew help` with a message naming the module and key.
 - [x] `./gradlew help --configuration-cache` reuses its entry on the second run.
 
-**Enforced by:** root `build.gradle.kts` (`ModuleBuildSettings`, `moduleBuildSettings()`) ·
+**Enforced by:** `build-logic` (`ModuleBuildSettings`, `Project.moduleBuildSettings()`) ·
 `*/build-settings.properties` · `scripts/check-pit-result.sh` (`pitest.yml`) · **Related:**
 REQ-OPS-038
 
@@ -2570,7 +2570,7 @@ what it guards:
 
 ### REQ-OPS-039 — The build sets the test profile once; no test repeats it
 
-Every Gradle `Test` task sets `spring.profiles.active=test` (root `build.gradle.kts`). An
+Every Gradle `Test` task sets `spring.profiles.active=test` (`basetool.java-conventions` in `build-logic`). An
 `@ActiveProfiles("test")` on a test class therefore changes nothing about the profile — but it is
 part of the key under which Spring's test-context cache stores an application context, so two test
 classes that differ only by that annotation boot two identical contexts, and with the cache's limit of
@@ -2608,8 +2608,8 @@ properties, not by the profile; sharing them is REQ-OPS-041.
 - [x] The full backend, frontend and ingest suites are green after the removal.
 
 **Enforced by:** `*/…/architecture/TestProfileConventionTest` ·
-`test-support/…/profile/TestProfileScan` · root `build.gradle.kts` (`systemProperty
-("spring.profiles.active", "test")`)
+`test-support/…/profile/TestProfileScan` · `build-logic` (`basetool.java-conventions`,
+`systemProperty("spring.profiles.active", "test")`)
 
 ### REQ-OPS-040 — The provider JAR is checked against the Keycloak that loads it
 
@@ -2878,6 +2878,58 @@ after the apps, and the promotion failed.
 [ADR-0247](../adr/0247-a-release-carries-the-hashes-of-the-host-scripts-and-the-host-checks-them.md) ·
 **Runbook:** `docs/deployment.md` → *Before a promotion: the host scripts* · **Related:** REQ-OPS-001,
 REQ-OPS-007, REQ-OPS-036, REQ-OBS-014
+
+### REQ-OPS-046 — The shared build conventions are precompiled plugins of an included build
+
+Every build convention the modules share lives in `build-logic/`, an included build
+(`pluginManagement { includeBuild("build-logic") }`), as precompiled script plugins applied by id
+from the module scripts. The root `build.gradle.kts` carries no `subprojects {}` or `allprojects {}`
+configuration of the modules (its `allprojects {}` sets the group and version only), so Gradle's
+isolated projects have nothing to reject and a module added later inherits no default (ADR-0248).
+
+- **One plugin per concern**, each applying what it needs: `basetool.java-conventions` (toolchain 25,
+  Lombok and JetBrains annotations on `compileOnly`/`annotationProcessor` of `main` and `test`,
+  `mockitoAgent`, the SEC-17 jar guard, the `Test` and `JavaCompile` conventions, the `basetool { }`
+  extension), `basetool.checkstyle-conventions`, `basetool.spotless-conventions`,
+  `basetool.coverage-conventions` (JaCoCo), `basetool.spotbugs-conventions` (with FindSecBugs),
+  `basetool.quality-conventions` (those four), `basetool.mutation-conventions` (PIT),
+  `basetool.sbom-conventions`, `basetool.licensee-conventions`, `basetool.supply-chain-conventions`
+  (those two), `basetool.dependency-management-conventions`, `basetool.spring-library-conventions`,
+  `basetool.spring-app-conventions`, `basetool.errorprone-conventions` (Error Prone with NullAway),
+  `basetool.javadoc-conventions` and, on the root project only, `basetool.repository-format-conventions`
+  (Spotless for the non-Java files).
+- **A module states what it is** by the plugins in its `plugins {}` block; nothing is applied to it
+  from outside. The aggregates exist so that the full set cannot be applied by halves.
+- **Typed settings.** What differs per module is declared by the module: in
+  `build-settings.properties` (REQ-OPS-037) and in the `basetool { }` extension
+  (`javaRelease`, `nullAwayPackages`). The licence policy (`OssLicensePolicy`) is a class of the
+  included build; no module reads another project's `extra`.
+- **The version catalog is imported** by `build-logic/settings.gradle.kts` from
+  `gradle/libs.versions.toml`; the plugin versions are the catalog's `[plugins]` entries, put on the
+  included build's classpath through their markers, and the security floors for their transitive
+  jars (`plexus-utils`, `commons-lang3`, Jackson) are constraints there.
+- **Dependency verification covers the included build** with the one root
+  `gradle/verification-metadata.xml` (REQ-OPS-034); the image builds copy `build-logic/`, which makes
+  it a shared image input, and `build-logic/**` is a path filter of the dependency-check and
+  sandbox-image workflows.
+- **No behaviour change by the move.** The task graph (`build -m`, `tasks --all`), every task's
+  type, dependencies and inputs, the compiler arguments including Error Prone's, the test JVM
+  arguments, the resolved classpaths and the SBOM component lists are identical before and after.
+
+**Acceptance**
+
+- [x] A dump of every project's tasks, configurations, compiler arguments, test arguments and tool
+  settings (an init script, not committed) differs before and after only by the `basetool`
+  extension and the removed `ossLicense*` extras of the root.
+- [x] `./gradlew help --configuration-cache` and `./gradlew build -m --configuration-cache` reuse
+  their entry on the second run.
+- [x] A cold Gradle user home resolves the whole build under the strict verification metadata.
+- [x] `check_sbom_coverage.py` finds the SBOM convention and each module's application of it.
+
+**Enforced by:** `build-logic/` · `settings.gradle.kts` · `.github/scripts/check_sbom_coverage.py`
+(`sbom-coverage`) · `.github/scripts/image_reuse_plan.py` (`--selftest`) · **Decision:**
+[ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md) ·
+**Related:** REQ-OPS-034, REQ-OPS-037, REQ-OPS-038
 
 ## Open questions
 
