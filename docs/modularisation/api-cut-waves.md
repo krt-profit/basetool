@@ -13,8 +13,8 @@
 | Documented operations / paths | 572 / 440 | **567 / 434** (`openapi.json`) |
 | Tiers | — | **T0 4, T1 244, T2 319** (`x-contract-tier`) |
 | Operations the cut touches | 161 (74 app-frozen) | **188 (77 app-called)**: 184 path moves and deletions plus 4 operations that change a shape (§ 5); the 4 quality-tier admin operations of ADR-0241, the 14 exchange-administration operations (D-12), the 2 sync-report operations and the 2 kommando-group writes (Q-8) are inside the 184 |
-| Machinery | planned | **built**: G-01 … G-08 and G-23 guards, the generated edge map (REQ-API-021), the ledger `declared-breaks.txt` (empty), `retired-operations.txt` (empty, answers `410 APP_UPDATE_REQUIRED`), the release-bound floor (REQ-API-020; `application.yml` 17 / 17), the app call lists (`app-calls/18.txt` = app v0.5.0, `unreleased.txt` = 245 calls) |
-| App | v0.3.1 | **v0.5.0 (versionCode 18)** published 2026-10-03, with the policy re-read on resume (basetool-android#209, merged); the next build is **19** |
+| Machinery | planned | **built**: G-01 … G-08 and G-23 guards, the generated edge map (REQ-API-021), the ledger `declared-breaks.txt`, `retired-operations.txt` (answers `410 APP_UPDATE_REQUIRED`), the release-bound floor (REQ-API-020; `application.yml` **19 / 19** since the finalising pull request, 17 / 18 before), the app call list `app-calls/19.txt` (the app's own list, 244 calls; the stand-in `unreleased.txt` is gone) |
+| App | v0.3.1 | **v0.5.0 (versionCode 18)** published 2026-10-03, with the policy re-read on resume (basetool-android#209, merged); the next build is **19** (v0.6.0 on the app's `claude/api-cut`, not yet published) |
 | Backend layout | layer packages | controllers live in `<module>/web` for 13 modules (e.g. `mission/web/MissionController`, `bank/web/…`); the rest still in `controller` |
 | Frontend | one `BackendApiClient` | **typed clients per domain** (`<domain>/client/*BackendClient`): the path strings of a domain are in one class, plus a few page controllers that still hold literals |
 
@@ -71,7 +71,7 @@ gate list of every wave.
 
 Every table below is generated from the map (`example` rows stand for a family; the operation
 count is exact). Tier and app column count operations: T1 = in the frozen set, app = called by
-app v0.5.0 (`app-calls/18.txt`). The order is the appendix order, risk and app impact first.
+app v0.5.0 (`api-cut-app-calls-baseline.txt`). The order is the appendix order, risk and app impact first.
 
 | Wave | Content | Operations | T1 | App-called | App release |
 | --- | --- | ---: | ---: | ---: | --- |
@@ -297,9 +297,10 @@ catalogue data). **App-called (3):** `JobOrderRepository`, `MaterialCollectionRe
 
 `/material-requests/**` to `/material-exchange/requests/**` (both roots are `no-store`, REQ-SEC-031 as
 amended 2026-10-03: the board rows carry viewer-specific flags); `/announcement` to `/announcements/current` (the read
-keeps its `204` semantics, REQ-API-009); `POST /hangar/import/fleetview` is deleted (the app
-already uses `POST /hangar/import/ships`; the operation's announced sunset no longer matters under
-the hard cut) and with it the last deprecated operation: `@ApiDeprecation`, `DeprecationInterceptor`
+keeps its `204` semantics, REQ-API-009); `POST /hangar/import/fleetview` is deleted (the web import
+stays on `POST /hangar/import/ships`; the app had its own Fleetview import screen that called the
+removed operation and app 19 drops that screen, owner decision of 2026-10-11; the operation's
+announced sunset no longer matters under the hard cut) and with it the last deprecated operation: `@ApiDeprecation`, `DeprecationInterceptor`
 and their tests go. **App-called (9):** `MaterialBoardRepository` 7, `AnnouncementRepository` 1,
 `HangarRepository` 1.
 
@@ -314,7 +315,7 @@ and are part of the same forced update; they are listed because the map is a lis
 | --- | --- | --- | --- | --- |
 | S-1 | 3 | `GET /missions` absorbs the search: filters and `q` replace the parameter `query` | `MissionRepository` | ledger line with the field |
 | S-2 | 4 | `PATCH /bank/accounts/{id}/balance-target` becomes `PUT` with its org-unit twin's request shape | none (the 2026-10-03 call list does not contain it) | in the cut (Q-5); done in wave 4: only the verb changes, the two request records were already field-for-field identical (`target`, `version`) |
-| S-3 | 6 | the app's `GET /settings/{key}` for the two job-order age thresholds becomes `GET /orders/settings`; `GET /refinery-orders/settings` for the rounding mode | `JobOrderRepository` | in the cut (Q-5); done in wave 6: the typed reads are `JobOrderSettingsController` and `RefinerySettingsController` over `SystemSettings`, the web reads them instead of the key store, `GET /settings/{key}` leaves the frozen set (ledger line, no retirement because the admin page still reads and writes through it); only the job-order read is T1, the rounding mode is not called by the app |
+| S-3 | 6 | the app's `GET /settings/{key}` for the two job-order age thresholds becomes `GET /orders/settings`; `GET /refinery-orders/settings` for the rounding mode | `JobOrderRepository` | in the cut (Q-5); done in wave 6: the typed reads are `JobOrderSettingsController` and `RefinerySettingsController` over `SystemSettings`, the web reads them instead of the key store, `GET /settings/{key}` leaves the frozen set (ledger line, no retirement because the admin page still reads and writes through it); only the job-order read is T1, the rounding mode is not called by the app. Finalising pull request (owner decision 2026-10-11, REQ-SEC-083): app 19 reads only `GET /orders/settings` (verified in the app's `claude/api-cut`), the admin page is the only other reader, so `GET /settings` and `GET /settings/{key}` are now `hasRole('ADMIN')`; the matrix lines change `pre=` only, and no ledger, retirement or edge line is involved because the operation was not in the frozen set any more |
 | S-4 | 6 | `POST`/`PUT /refinery-orders` bind request records without `id`, `owner`, `profit`, `owningSquadron`; `status` limited on create; the owner override moves to the per-target path | `RefineryRepository` | in the cut (Q-5); done in wave 6: `RefineryOrderCreateRequest` (no `status`, `version` or owner: the service already forced `OPEN`) and `RefineryOrderUpdateRequest` (keeps `status` and `version`, which the web edit form sets), the per-target `POST`/`PUT` bind them too, `RefineryOrderDto` is only a response now; two field-level ledger lines |
 | S-5 | 3 | finance gate reads the mission from the path | none | none |
 | S-6 | 5 | one game-item reference for the catalogue read instead of two (`id`, `name`, `manufacturer`, `kind`); the embedded `GameItemReferenceDto` of the order DTOs stays | `JobOrderRepository` | done in wave 5 for the endpoint |
@@ -329,8 +330,8 @@ frozen external behaviour changes with it.
 
 1. **One release.** The six waves ship as one backend/frontend release and one app release,
    versionCode **19**. The release's own `application.yml` carries the floor: both
-   `minimum-version-code` and `latest-version-code` become 19 (today 17 / 17 although 18 is
-   published). The host `.env` stays an emergency override only.
+   `minimum-version-code` and `latest-version-code` become 19 (17 / 18 before; raised once, in the
+   finalising pull request, D-24). The host `.env` stays an emergency override only.
 2. **Ledger.** One line `<VERB> <old path> - 19` for each of the 75 T1 operations that move or are
    deleted (the 74 app-called ones and `GET /users/me/memberships`, T1 but not called by 0.5.0),
    plus lines with the field for the shape changes S-1 to S-4. `declared-breaks.txt` is filled
@@ -345,7 +346,9 @@ frozen external behaviour changes with it.
    floor restores the old API with it.)
 5. **Order of events.** App 19 is built from the app's integration branch against the backend
    integration branch's `openapi.json`; its call list `19.txt` is generated by the app and copied
-   in; `AppCallListTest` then proves every call of 19 exists and no call of 19 is in the ledger.
+   in as `app-calls/19.txt` (done: 244 calls, the stand-in `unreleased.txt` deleted);
+   `ExternalContractTest` and `CommittedAppCallListTest` then prove every call of 19 exists at its
+   new path and none is in the ledger or on the retired list.
    Only then is the draft PR marked ready.
 6. **Rehearsal.** Before the production promotion the whole sequence is rehearsed on the testing
    host (old app → 410 wall → new app works); that is an owner-executed step (§ 7, Q-9).
@@ -367,7 +370,7 @@ Open, with the owner (the Android repository is not touched until Q-3 to Q-5 are
 | --- | --- | --- |
 | Q-2 | Release name and floor: app 19 (proposal 0.6.0), floor and latest 19; `latest-version-code` is 17 although 18 is published. | yes to 19 |
 | Q-3 | App branch `claude/api-cut` in `basetool-android`, one PR per repository class, nothing on its `main` until the backend is ready; who may merge there? | same rule as here |
-| Q-4 | `POST /hangar/import/fleetview` is called by the app today (T1); the new app drops it and keeps the ship import. | confirm |
+| Q-4 | `POST /hangar/import/fleetview` is called by the app today (T1); the new app drops its Fleetview import screen. The app never called the ship import `POST /hangar/import/ships`; only the web uses it. | confirmed 2026-10-11: the app import is removed, the web import stays |
 | Q-5 | Shape changes that touch the app (S-2, S-3, S-4): in this cut or later? | in this cut |
 | Q-9 | Rehearsal of the forced update on the testing host (owner-executed). | rehearse first |
 
@@ -382,7 +385,7 @@ against its backend wave. Counts are app-called operations.
 | 2 | `MissionRepository`, `MissionTimelineRepository` | 3 | 29 | `/slim` removal is mechanical; `query` → `q`; finance entries nested, the mission id goes into the path |
 | 3 | `BankRepository` (+ balance-target in `BankStaffRepository`) | 4 | 24 (+1) | mechanical prefix |
 | 4 | `JobOrderRepository`, `MaterialCollectionRepository`, `InventoryRepository` (game items), settings read | 5, 6 | 3 (+1) | DTO union for game items |
-| 5 | `MaterialBoardRepository`, `AnnouncementRepository` (current), `HangarRepository` (drop fleetview) | 6 | 9 | |
+| 5 | `MaterialBoardRepository`, `AnnouncementRepository` (current), `HangarRepository` (drop the app's Fleetview import screen) | 6 | 9 | |
 | 6 | `RefineryRepository` | 6 | 1 | request record, `status` no longer echoed |
 | 7 | vendored `openapi.json`, the generated call list `19.txt`, the version-policy test, release notes | all | | the list is produced by the app's own generator |
 

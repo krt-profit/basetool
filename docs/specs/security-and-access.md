@@ -20,7 +20,7 @@ read/write is isolated to the calling user unless the caller is privileged.
 > ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-083** (corrected 2026-10-03: REQ-SEC-073…080 went to the
+> allocated. The next free id is **REQ-SEC-084** (corrected 2026-10-03: REQ-SEC-073…080 went to the
 > Phase 0 guard packages of the modularisation plan) — re-check `origin/main` and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
@@ -5735,6 +5735,29 @@ dry run by default, with a rollback file, never deleting.
 **Code:** `scripts/harden-keycloak-realm.py`, `scripts/keycloak/session-windows.json`,
 `scripts/keycloak/hardening_probe.py` · **Related:** REQ-SEC-052, REQ-SEC-053, ADR-0159, ADR-0202,
 [`OWNER_STEPS_2026-10.md`](../OWNER_STEPS_2026-10.md)
+
+---
+
+### REQ-SEC-083 — The generic settings key store is read by ADMIN only
+
+`GET /api/v1/settings` and `GET /api/v1/settings/{key}` expose the raw `system_setting` rows with
+their optimistic-lock versions. They carry `hasRole('ADMIN')`, like the write `PUT
+/api/v1/settings/{key}` (owner decision of 2026-10-11, wave 6 of the API cut). The reads were
+member-readable only because the Android app took the two job-order age thresholds from them;
+app 19 reads the typed `GET /api/v1/orders/settings` instead, the web reads the typed
+`GET /api/v1/orders/settings` and `GET /api/v1/refinery-orders/settings`, and the admin page is the
+one reader left of the store (`SettingsBackendClient`). The two typed reads stay
+`isAuthenticated()`. An app below build 19 meets the update wall (REQ-API-020) before it could
+see a `403`.
+
+**Acceptance**
+
+- [x] A signed-in caller holding `KRT_MEMBER`, `LOGISTICIAN`, `MISSION_MANAGER`, `OFFICER` or
+  `BANK_EMPLOYEE` and not `ADMIN` is refused `403` on both reads; an admin is served.
+- [x] The authorization matrix records `pre=hasRole('ADMIN')` for both reads.
+
+**Enforced by:** `SystemSettingControllerSecurityTest`, `AuthorizationMatrixTest` ·
+**Code:** `SystemSettingController` · **Related:** REQ-SEC-052, REQ-API-009, REQ-API-023
 
 ---
 

@@ -387,7 +387,8 @@ Invariants that must hold:
   `ageRedDays`, one cached entry `SETTINGS_JOB_ORDER`) holds two global, slow-changing settings read
   through `getCached` on the orders list and detail renders (`JobOrderPageController`). The typed read
   replaced the two reads of `GET /api/v1/settings/{key}` in wave 6 of the API cut; that key store stays
-  the admin page's read and write path (`SettingsBackendClient`), with the optimistic-lock versions. Their sole writer is `AdminSettingsPageController`, which
+  the admin page's read and write path (`SettingsBackendClient`), with the optimistic-lock versions;
+  both of its reads are ADMIN-only (REQ-SEC-083). Their sole writer is `AdminSettingsPageController`, which
   calls the coarse `clearStaticDataCache()` on every save — on **both** the classic redirect handler and the
   AJAX twin, in a `finally` around the per-setting PUTs so even a **partial save** (an early setting PUT
   lands, a later one throws) still drops the cache rather than stranding the persisted threshold until

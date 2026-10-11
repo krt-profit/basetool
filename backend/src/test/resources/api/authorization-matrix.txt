@@ -488,8 +488,8 @@ PUT /api/v1/refining-methods/{id} | RefiningMethodController#updateRefiningMetho
 GET /api/v1/roles | AdminController#getAllRoles | pre=hasRole('ADMIN') | url=/api/v1/roles -> hasAnyAuthority(ROLE_ADMIN)
 PUT /api/v1/roles/{name}/description | AdminController#updateRoleDescription | pre=hasRole('ADMIN') | url=/api/v1/roles/** -> hasAnyAuthority(ROLE_ADMIN)
 PUT /api/v1/roles/{name}/permissions | AdminController#updatePermissions | pre=hasRole('ADMIN') | url=/api/v1/roles/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/settings | SystemSettingController#getAllSettings | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/settings/{key} | SystemSettingController#getSetting | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/settings | SystemSettingController#getAllSettings | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/settings/{key} | SystemSettingController#getSetting | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PUT /api/v1/settings/{key} | SystemSettingController#updateSetting | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/ship-types | ShipTypeController#getAllShipTypes | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/ship-types/{id} | ShipTypeController#getShipType | pre=isAuthenticated() | url=anyRequest -> authenticated

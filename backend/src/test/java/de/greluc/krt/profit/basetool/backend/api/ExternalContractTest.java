@@ -2086,7 +2086,7 @@ class ExternalContractTest {
   private static final String APP_CALLS = "backend/src/test/resources/api/app-calls";
 
   /** How many calls the newest committed app call list names at least. */
-  private static final int NEWEST_CALL_LIST_FLOOR = 243;
+  private static final int NEWEST_CALL_LIST_FLOOR = 244;
 
   /** How many operations the frozen set holds at least. */
   private static final int FROZEN_OPERATIONS_FLOOR = 246;

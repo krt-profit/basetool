@@ -153,7 +153,7 @@ class EdgeAdmissionTest {
         AppCallList.load(repositoryRoot().resolve("backend/src/test/resources/api/app-calls"));
     List<String> calls = new ArrayList<>();
     releases.forEach(release -> release.calls().forEach(call -> calls.add(call.key())));
-    assertThat(new LinkedHashSet<>(calls)).hasSizeGreaterThanOrEqualTo(243);
+    assertThat(new LinkedHashSet<>(calls)).hasSizeGreaterThanOrEqualTo(244);
 
     List<Pattern> entries = committedEntries();
     List<String> refused =
