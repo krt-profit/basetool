@@ -1051,8 +1051,8 @@ public class MissionController {
   }
 
   /**
-   * Adds a participant with the same rules as {@link #addParticipantPublic} and returns only the
-   * updated participant list.
+   * Adds a participant, an explicit user or a guest name, and returns only the updated participant
+   * list.
    *
    * @param id mission id
    * @param request add-participant payload (userId XOR guestName + meta)
