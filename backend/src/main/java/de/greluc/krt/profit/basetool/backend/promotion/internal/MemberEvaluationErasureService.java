@@ -19,7 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
-import de.greluc.krt.profit.basetool.backend.service.MemberEvaluationErasure;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -27,22 +28,35 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Deletes a departing member's grades for the GDPR user deletion; never opens a transaction. */
+/** Deletes a departing member's grades for the account deletion. */
 @Component
 @RequiredArgsConstructor
-public class MemberEvaluationErasureService implements MemberEvaluationErasure {
+@Transactional(propagation = Propagation.MANDATORY)
+public class MemberEvaluationErasureService implements UserErasureParticipant {
+
+  static final int POSITION = 70;
 
   private final MemberEvaluationRepository memberEvaluationRepository;
 
+  @Override
+  public @NotNull Phase phase() {
+    return Phase.DELETE;
+  }
+
+  @Override
+  public int position() {
+    return POSITION;
+  }
+
   /**
-   * Deletes every grade of the member through one bulk delete; requires the caller's transaction.
+   * Deletes every grade of the member through one bulk delete.
    *
    * @param userId the departing member's {@code app_user.id}
-   * @return the number of grades removed
+   * @param fallbackAdminId unused
+   * @return the number of grades removed, reported as {@link Erased#EVALUATIONS}
    */
   @Override
-  @Transactional(propagation = Propagation.MANDATORY)
-  public int deleteAllEvaluationsOf(@NotNull UUID userId) {
-    return memberEvaluationRepository.deleteAllByUserId(userId);
+  public @NotNull Map<Erased, Integer> erase(@NotNull UUID userId, @NotNull UUID fallbackAdminId) {
+    return Map.of(Erased.EVALUATIONS, memberEvaluationRepository.deleteAllByUserId(userId));
   }
 }

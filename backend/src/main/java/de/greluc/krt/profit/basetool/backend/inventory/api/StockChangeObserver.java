@@ -67,12 +67,4 @@ public interface StockChangeObserver {
    */
   int beforeWipe(
       boolean adminAllScope, @Nullable UUID activeOrgUnitId, @NotNull Set<UUID> memberOrgUnitIds);
-
-  /**
-   * The Lager rows of an account are about to be purged with the account.
-   *
-   * @param userId the account being erased
-   * @return the number of offers the purge will remove
-   */
-  int beforeUserPurge(@NotNull UUID userId);
 }

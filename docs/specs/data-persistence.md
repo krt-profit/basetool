@@ -483,6 +483,23 @@ Foreign keys that declare their own `ON DELETE CASCADE` / `SET NULL` are handled
 code. The reassignment target is a surviving admin (never the user being deleted; resolved from
 `findAllAdmins`, falling back to the current admin caller).
 
+**The deletion is an orchestrator over participants** (plan §7.6). `UserDeletionService` checks the
+preconditions, resolves the fallback admin, runs every `platform.api.UserErasureParticipant`
+inside its one transaction — by phase (`DELETE`, then `REASSIGN`, then `UNLINK`), then by
+position within the phase — clears the member's approval trail, writes the deletion's audit rows
+from the counts the participants return and removes the account row. Each module that holds
+member data owns its participant: `MaterialExchangeOfferErasure`, `InventoryUserErasure`,
+`HangarUserErasure`, `PersonalInventoryErasureService`, `PersonalBlueprintUserErasure`,
+`NotificationUserErasure` and `MemberEvaluationErasureService` purge;
+`MissionOwnerReassignment` and `RefineryOwnerReassignment` hand shared aggregates to the
+fallback admin; `MissionMemberUnlink` and `JobOrderMemberUnlink` clear back-references. Every
+participant is `MANDATORY` (an `@ObserverSpi`, REQ-AUDIT-007). The order of statements is part of
+the contract: the Materialbörse audits the offers on the member's Lager rows before those rows
+go, and two participants of a phase never share a position. The audit rows
+(`INVENTORY_PURGED_ON_USER_DELETION`, `PERSONAL_DATA_PURGED_ON_USER_DELETION`,
+`REFINERY_ORDERS_REASSIGNED`, `USER_DELETED`) stay with the orchestrator, unchanged in type,
+details and order (REQ-AUDIT-001).
+
 Concrete handling, in order:
 
 - **Purged** (the account's own data): `inventory_item.user_id` and `ship.owner_id` — the departing
@@ -615,9 +632,15 @@ material-claim unlink are invoked, and that both run before `userRepository.dele
 material claim and asserts no `23503`, the mission + its companion are reassigned to the same admin,
 and the claim survives with a null stamp. The same class additionally deletes a user who still holds
 an org-unit membership and asserts the flush raises no `TransientPropertyValueException` and that the
-DB cascade removed the membership row.
+DB cascade removed the membership row. `UserDeletionEndStateTest` (real Postgres) deletes a member
+who owns rows in every store next to a second member whose rows must stay, and pins the end state
+of every table and the audit rows with their order and exact details; `UserErasureOrderTest` pins
+the participants' run order and the uniqueness of the positions; `UserDeletionServiceTest` runs
+fake participants through the orchestrator (phase and position order, summed counts, audit
+details, refusals run none); each participant has a unit test.
 
 **Enforced by:** `UserDeletionService.deleteUser` (explicit ordered reassignment),
+the `UserErasureParticipant` implementations (`platform.api`),
 `MissionOwnershipRepository.updateOwner`, `MaterialClaimRepository.unlinkClaimedByUser`,
 `db/migration/V63` (companion table without auto-cascade on `owner_id`),
 `OrgUnitMembershipRepository.findOrgUnitIdsByUserId` (projection-only snapshot seam),
@@ -1121,8 +1144,8 @@ them without a foreign key). Each such column has a disposition in all three reg
 listed with its reason:
 
 - **Erasure** (REQ-DATA-008, `UserDeletionService`): its foreign key cascades or nulls on delete;
-  or the deletion resolves it before the account row goes, listed as a step the service is checked
-  to call (11 columns: reassigned, nulled or purged); or it outlives the account by design
+  or the deletion resolves it before the account row goes, listed as a step the orchestrator or one
+  of its participants is checked to call (11 columns: reassigned, nulled or purged); or it outlives the account by design
   (`audit_event.target_user_id`, `bank_audit_event.target_user_id`, REQ-AUDIT-001; and
   `p4k_import_job.created_by`, the enqueuing admin's id on an import job, pruned to seven days
   after every import run).
@@ -1144,13 +1167,15 @@ listed with its reason:
 
 - [x] A new member-referencing column without a disposition fails in each registry; a listed
   column that no longer exists fails; a column listed as not exported that a section exports fails.
-- [x] Every listed deletion step is a call `UserDeletionService` makes.
+- [x] Every listed deletion step is a call `UserDeletionService` or an `UserErasureParticipant`
+  makes.
 - [x] Proven able to fail: a table with a non-cascading foreign key to `app_user` and an
   unregistered `*_by` column, created in a rolled-back transaction, is reported by all three
   registries; a deletion step the service never calls is reported. Selection floor: 56 columns.
 
 **Enforced by:** `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest`,
-`UserIdentityColumnForeignKeyTest` · **Code:** `UserDeletionService`, `DataExportSections`,
+`UserIdentityColumnForeignKeyTest` · **Code:** `UserDeletionService`, the `UserErasureParticipant`
+implementations, `DataExportSections`,
 `UserAccountMergeService`
 
 ### REQ-DATA-022 — a cached instance is never edited; caches move to read models

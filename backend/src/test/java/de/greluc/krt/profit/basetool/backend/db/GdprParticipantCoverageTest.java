@@ -22,8 +22,11 @@ package de.greluc.krt.profit.basetool.backend.db;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
@@ -57,8 +60,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Holds the three GDPR registries against every column that references a member (REQ-DATA-021): the
- * erasure of {@link UserDeletionService}, the Art. 15 export of {@link DataExportSections} and the
- * account merge of {@link UserAccountMergeService}.
+ * erasure of {@link UserDeletionService} and its {@link UserErasureParticipant}s, the Art. 15
+ * export of {@link DataExportSections} and the account merge of {@link UserAccountMergeService}.
  *
  * <p>A column references a member when it carries a foreign key to {@code app_user}, or when it is
  * a {@code uuid} named {@code user_id}, {@code owner_id}, {@code *_user_id}, {@code *_by}, {@code
@@ -81,20 +84,27 @@ class GdprParticipantCoverageTest {
       Pattern.compile(
           "\\bwhere\\s+(?:([a-z_][a-z0-9_]*)\\.)?([a-z_][a-z0-9_]*)\\s*=\\s*:userid\\b");
 
+  private static final JavaClasses PRODUCTION =
+      new ClassFileImporter()
+          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+          .importPackages("de.greluc.krt.profit.basetool.backend");
+
   private static final Pattern FIRST_FROM = Pattern.compile("\\bfrom\\s+([a-z_][a-z0-9_]*)");
 
   /**
    * One step of the deletion that resolves a reference the database refuses to drop on its own.
    *
    * @param type the class whose member the deletion calls
-   * @param member the method {@link UserDeletionService} calls
+   * @param member the method {@link UserDeletionService} or one of the {@link
+   *     UserErasureParticipant}s calls
    * @param effect what the step does to the column
    */
   record DeletionStep(@NotNull Class<?> type, @NotNull String member, @NotNull String effect) {}
 
   /**
    * The member references whose foreign key neither cascades nor nulls, each with the step of
-   * {@link UserDeletionService} that resolves it before the account row goes.
+   * {@link UserDeletionService} or of an {@link UserErasureParticipant} that resolves it before the
+   * account row goes.
    */
   static final Map<String, DeletionStep> ERASED_BY_THE_DELETION_SERVICE =
       Map.ofEntries(
@@ -226,8 +236,9 @@ class GdprParticipantCoverageTest {
             Member references the account deletion cannot resolve. A foreign key without ON \
             DELETE CASCADE or SET NULL makes UserDeletionService fail; a column without a foreign \
             key outlives the account unseen. Give the key an ON DELETE clause, resolve it in \
-            UserDeletionService and list the step in ERASED_BY_THE_DELETION_SERVICE, or list a \
-            column that must outlive the account in RETAINED_AFTER_ERASURE with its reason.\
+            UserDeletionService or an UserErasureParticipant of the owning module and list the \
+            step in ERASED_BY_THE_DELETION_SERVICE, or list a column that must outlive the account \
+            in RETAINED_AFTER_ERASURE with its reason.\
             """)
         .isEmpty();
     assertThat(staleKeys(ERASED_BY_THE_DELETION_SERVICE.keySet(), references.keySet()))
@@ -239,10 +250,10 @@ class GdprParticipantCoverageTest {
   }
 
   @Test
-  @DisplayName("every listed deletion step is a call UserDeletionService really makes")
+  @DisplayName("every listed deletion step is a call the deletion or a participant really makes")
   void everyDeletionStepIsCalledByTheDeletionService() {
     assertThat(missingDeletionCalls(ERASED_BY_THE_DELETION_SERVICE))
-        .as("deletion steps UserDeletionService does not call")
+        .as("deletion steps neither UserDeletionService nor an erasure participant calls")
         .isEmpty();
   }
 
@@ -320,6 +331,16 @@ class GdprParticipantCoverageTest {
     assertThat(missingDeletionCalls(planted)).containsExactly("g11_planted.member_id");
   }
 
+  @Test
+  @DisplayName("proof: a step only a participant performs is found")
+  void aStepOnlyAParticipantPerformsIsFound() {
+    Map<String, DeletionStep> steps =
+        Map.of(
+            "ship.owner_id",
+            new DeletionStep(ShipRepository.class, "deleteByOwnerId", "rows purged"));
+    assertThat(missingDeletionCalls(steps)).isEmpty();
+  }
+
   /**
    * Returns every member-referencing column with its foreign key's {@code ON DELETE} action, or
    * {@code null} when it has no foreign key.
@@ -378,10 +399,14 @@ class GdprParticipantCoverageTest {
   }
 
   private static Set<String> missingDeletionCalls(Map<String, DeletionStep> steps) {
-    JavaClass service = new ClassFileImporter().importClass(UserDeletionService.class);
     Set<String> calls = new TreeSet<>();
-    for (JavaMethodCall call : service.getMethodCallsFromSelf()) {
-      calls.add(call.getTargetOwner().getName() + "#" + call.getName());
+    for (JavaClass type : PRODUCTION) {
+      if (type.isEquivalentTo(UserDeletionService.class)
+          || (!type.isInterface() && type.isAssignableTo(UserErasureParticipant.class))) {
+        for (JavaMethodCall call : type.getMethodCallsFromSelf()) {
+          calls.add(call.getTargetOwner().getName() + "#" + call.getName());
+        }
+      }
     }
     Set<String> missing = new TreeSet<>();
     steps.forEach(

@@ -74,6 +74,17 @@ or personal data; events belong to their publishers' `api.events` packages.
 - Event records that carry names, e-mail addresses or free text today are reduced to ids when they
   move to their publishers.
 
+## Implementation
+
+- **2026-10-11, GDPR participants, slice a (erasure).** `UserErasureParticipant` is owned by
+  `platform.api`, not by identity as the plan first wrote: `notification` and `audit` (rank 1)
+  are participants and may not depend on identity (rank 3). It is an `@ObserverSpi`; its
+  phases run in the order `DELETE`, `REASSIGN`, `UNLINK`, which is the order the deletion has
+  always issued its statements in. Eleven implementations in ten modules replace the
+  orchestrator's direct repository calls, `MemberEvaluationErasure`, `PersonalInventoryErasure`
+  and `StockChangeObserver.beforeUserPurge`; the deletion audit rows stay in
+  `UserDeletionService`. See plan §7.6.
+
 ## Alternatives considered
 
 - **Events for every cross-module reaction** — breaks atomicity and audit completeness for the

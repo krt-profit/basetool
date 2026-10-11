@@ -24,26 +24,18 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
-import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Erased;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -62,10 +54,10 @@ import org.springframework.web.client.RestClientException;
  * Hard-deletes an {@code app_user} row with every foreign-key reference to it, in the order the
  * database constraints demand.
  *
- * <p>Runs only for an ex-member already removed from Keycloak: purges the account-owned data,
- * reassigns shared aggregates to a fallback admin, unlinks nullable back-references and audits bank
- * responsible-holder changes. The calling admin is resolved through {@link
- * UserService#getCurrentUser()}.
+ * <p>Runs only for an ex-member already removed from Keycloak. Every module's part is a {@link
+ * UserErasureParticipant} the orchestrator runs in phase order; the orchestrator itself clears the
+ * approval trail, audits the deletion and bank responsible-holder changes. The calling admin is
+ * resolved through {@link UserService#getCurrentUser()}.
  */
 @Service
 @RequiredArgsConstructor
@@ -102,29 +94,14 @@ public class UserDeletionService {
 
   private final ClientDirectory clientDirectory;
   private final UserRepository userRepository;
-  private final InventoryItemRepository inventoryItemRepository;
-  private final StockChangeObserver stockChangeObserver;
-  private final ShipRepository shipRepository;
-  private final RefineryOrderRepository refineryOrderRepository;
-  private final MissionRepository missionRepository;
-  private final MissionOwnershipRepository missionOwnershipRepository;
-  private final JobOrderRepository jobOrderRepository;
-  private final MissionParticipantRepository missionParticipantRepository;
-  private final MaterialClaimRepository materialClaimRepository;
   private final UserApprovalEventRepository userApprovalEventRepository;
   private final AuditRecorder auditRecorder;
 
   /**
-   * The five stores keyed by a plain {@code app_user.id} column. Their foreign keys cascade on
-   * delete (REQ-DATA-008), but {@link #deleteUser(UUID)} deletes them explicitly to count the rows
-   * for the audit event.
+   * Every module's part of the deletion, run by phase and position inside {@link
+   * #deleteUser(UUID)}'s transaction.
    */
-  private final PersonalInventoryErasure personalInventoryErasure;
-
-  private final PersonalBlueprintRepository personalBlueprintRepository;
-  private final NotificationRepository notificationRepository;
-  private final NotificationRuleRepository notificationRuleRepository;
-  private final MemberEvaluationErasure memberEvaluationErasure;
+  private final List<UserErasureParticipant> erasureParticipants;
 
   /**
    * The authoritative answer to "is this account really gone from Keycloak?". Consulted by {@link
@@ -160,12 +137,14 @@ public class UserDeletionService {
    * <p>The account's rows are handled as follows:
    *
    * <ul>
-   *   <li><b>Purged</b>: warehouse rows, hangar, "Mein Inventar", personal blueprints,
-   *       notifications, notification-rule selectors and promotion evaluations.
-   *   <li><b>Reassigned to the fallback admin</b>: refinery orders, missions and their {@code
-   *       mission_ownership} companion.
-   *   <li><b>Unlinked</b>: mission managers, job-order assignees, mission participants and {@code
-   *       material_claim.claimed_by_user_id}.
+   *   <li><b>Purged</b> ({@code DELETE} phase): warehouse rows and the offers on them, hangar,
+   *       "Mein Inventar", personal blueprints, notifications, notification-rule selectors and
+   *       promotion evaluations.
+   *   <li><b>Reassigned to the fallback admin</b> ({@code REASSIGN}): missions with their {@code
+   *       mission_ownership} companion, and refinery orders.
+   *   <li><b>Unlinked</b> ({@code UNLINK}): mission managers and participants, job-order assignees
+   *       and {@code material_claim.claimed_by_user_id}.
+   *   <li><b>Cleared here</b>: the member's approval events and the approval back-pointers.
    *   <li><b>Left to the database</b>: every reference whose FK declares {@code ON DELETE SET NULL}
    *       or {@code CASCADE}.
    * </ul>
@@ -235,17 +214,20 @@ public class UserDeletionService {
                             () ->
                                 new IllegalStateException("No admin user found to reassign data")));
 
-    stockChangeObserver.beforeUserPurge(userId);
-    int inventoryDeleted = inventoryItemRepository.deleteByUserId(userId);
-    int shipsDeleted = shipRepository.deleteByOwnerId(userId);
-
-    int personalInventoryDeleted = personalInventoryErasure.deleteAllItemsOf(userId);
-    int blueprintsDeleted = personalBlueprintRepository.deleteAllByOwnerUserId(userId);
-    int notificationsDeleted = notificationRepository.deleteAllForRecipient(userId);
-    int ruleSelectorsDeleted = notificationRuleRepository.deleteSelectorsByUserId(userId);
-    int evaluationsDeleted = memberEvaluationErasure.deleteAllEvaluationsOf(userId);
-
-    missionRepository.updateOwner(user, admin);
+    Map<Erased, Integer> erased = new EnumMap<>(Erased.class);
+    for (UserErasureParticipant participant : inRunOrder()) {
+      participant
+          .erase(userId, admin.getId())
+          .forEach((kind, rows) -> erased.merge(kind, rows, Integer::sum));
+    }
+    int inventoryDeleted = erased.getOrDefault(Erased.INVENTORY_ROWS, 0);
+    int shipsDeleted = erased.getOrDefault(Erased.SHIPS, 0);
+    int personalInventoryDeleted = erased.getOrDefault(Erased.PERSONAL_INVENTORY, 0);
+    int blueprintsDeleted = erased.getOrDefault(Erased.BLUEPRINTS, 0);
+    int notificationsDeleted = erased.getOrDefault(Erased.NOTIFICATIONS, 0);
+    int ruleSelectorsDeleted = erased.getOrDefault(Erased.RULE_SELECTORS, 0);
+    int evaluationsDeleted = erased.getOrDefault(Erased.EVALUATIONS, 0);
+    int refineryReassigned = erased.getOrDefault(Erased.REFINERY_ORDERS_REASSIGNED, 0);
 
     if (inventoryDeleted > 0 || shipsDeleted > 0) {
       auditRecorder.record(
@@ -275,7 +257,6 @@ public class UserDeletionService {
               .with("ruleSelectors", ruleSelectorsDeleted)
               .with("evaluations", evaluationsDeleted));
     }
-    int refineryReassigned = refineryOrderRepository.updateOwner(user, admin);
     if (refineryReassigned > 0) {
       auditRecorder.record(
           AuditEventType.REFINERY_ORDERS_REASSIGNED,
@@ -287,12 +268,6 @@ public class UserDeletionService {
               .with("fromUser", userId)
               .with("toAdmin", admin.getId()));
     }
-    missionOwnershipRepository.updateOwner(user, admin);
-
-    missionRepository.removeManager(userId);
-    jobOrderRepository.removeAssignee(userId);
-    missionParticipantRepository.unlinkUser(userId);
-    materialClaimRepository.unlinkClaimedByUser(userId);
 
     userApprovalEventRepository.deleteByUserId(userId);
     userApprovalEventRepository.clearDecidedBy(userId);
@@ -331,6 +306,19 @@ public class UserDeletionService {
         ruleSelectorsDeleted,
         evaluationsDeleted,
         admin.getId());
+  }
+
+  /**
+   * Returns the participants in the order they run: by phase, then by position within the phase.
+   *
+   * @return the participants, earliest first
+   */
+  public List<UserErasureParticipant> inRunOrder() {
+    return erasureParticipants.stream()
+        .sorted(
+            Comparator.comparing(UserErasureParticipant::phase)
+                .thenComparingInt(UserErasureParticipant::position))
+        .toList();
   }
 
   /**

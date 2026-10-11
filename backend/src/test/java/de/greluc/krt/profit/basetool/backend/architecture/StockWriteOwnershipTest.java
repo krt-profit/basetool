@@ -33,8 +33,6 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.service.AllocationReductions;
-import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.junit.jupiter.api.DisplayName;
@@ -60,13 +58,6 @@ class StockWriteOwnershipTest {
   private static final JavaClasses FIXTURES =
       new ClassFileImporter().importPackagesOf(StockWriteFixtures.class);
 
-  /** Writers outside the inventory module, each with the reason. */
-  private static final Map<String, String> FOREIGN_WRITERS =
-      Map.of(
-          UserDeletionService.class.getName(),
-          "the GDPR orchestrator purges the member's Lager rows; it becomes an erasure participant"
-              + " of the inventory module in Phase 4 (plan §7.6)");
-
   private static final Set<String> ROW_TYPES =
       Set.of(
           InventoryItem.class.getName(),
@@ -86,10 +77,11 @@ class StockWriteOwnershipTest {
     assertThat(foreignWriters(PRODUCTION))
         .as(
             """
-            Classes outside the inventory module that write Lager rows, against FOREIGN_WRITERS. \
-            Ask inventory.api.StockCommands instead.\
+            Classes outside the inventory module that write Lager rows. Ask \
+            inventory.api.StockCommands instead; the account deletion reaches the Lager through the \
+            inventory module's own UserErasureParticipant.\
             """)
-        .isEqualTo(new TreeSet<>(FOREIGN_WRITERS.keySet()));
+        .isEmpty();
   }
 
   @Test

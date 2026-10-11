@@ -19,7 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -27,22 +28,36 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Deletes a departing owner's "Mein Inventar" rows for the GDPR user deletion. */
+/** Deletes a departing owner's "Mein Inventar" rows for the account deletion. */
 @Component
 @RequiredArgsConstructor
-public class PersonalInventoryErasureService implements PersonalInventoryErasure {
+@Transactional(propagation = Propagation.MANDATORY)
+public class PersonalInventoryErasureService implements UserErasureParticipant {
+
+  static final int POSITION = 40;
 
   private final PersonalInventoryItemRepository personalInventoryItemRepository;
 
+  @Override
+  public @NotNull Phase phase() {
+    return Phase.DELETE;
+  }
+
+  @Override
+  public int position() {
+    return POSITION;
+  }
+
   /**
-   * Deletes every row of the owner through one bulk delete; requires the caller's transaction.
+   * Deletes every row of the owner through one bulk delete.
    *
-   * @param ownerUserId the departing owner's {@code app_user.id}
-   * @return the number of deleted rows
+   * @param userId the departing owner's {@code app_user.id}
+   * @param fallbackAdminId unused
+   * @return the number of rows removed, reported as {@link Erased#PERSONAL_INVENTORY}
    */
   @Override
-  @Transactional(propagation = Propagation.MANDATORY)
-  public int deleteAllItemsOf(@NotNull UUID ownerUserId) {
-    return personalInventoryItemRepository.deleteByOwnerUserId(ownerUserId);
+  public @NotNull Map<Erased, Integer> erase(@NotNull UUID userId, @NotNull UUID fallbackAdminId) {
+    return Map.of(
+        Erased.PERSONAL_INVENTORY, personalInventoryItemRepository.deleteByOwnerUserId(userId));
   }
 }
