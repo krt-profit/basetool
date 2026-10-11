@@ -49,8 +49,8 @@ public interface OrgUnitMembershipRepository
    * Counts the org-unit memberships of the given user. Used by {@code OrgUnitMembershipService} to
    * detect the two inventory-relevant boundary transitions — gaining the first membership
    * (membershipless → member) and losing the last (member → membershipless) — so {@link
-   * de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitReconciler} can re-stamp the
-   * user's inventory accordingly.
+   * de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrgUnitReconciler} can
+   * re-stamp the user's inventory accordingly.
    *
    * @param userId the user whose memberships to count; never {@code null}.
    * @return the number of org-unit membership rows of this user (0 when membershipless).

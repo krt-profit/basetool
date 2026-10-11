@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchReque
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.FirstMembershipObserver;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
@@ -89,7 +90,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private SquadronRepository squadronRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private KommandoGroupRepository kommandoGroupRepository;
-  @Mock private InventoryOrgUnitReconciler inventoryReconciler;
+  @Mock private FirstMembershipObserver firstMembershipObserver;
   @Mock private AuditService auditService;
   @Mock private MembershipChangeObserver membershipChangeObserver;
   @Mock private OrgUnitSeatNotifier seatNotifier;
@@ -192,7 +193,7 @@ class OrgUnitMembershipServiceTest {
 
     membershipService.addMember(scId, userId);
 
-    verify(inventoryReconciler).onUserGainedFirstOrgUnit(userId, sc);
+    verify(firstMembershipObserver).onUserGainedFirstOrgUnit(userId, sc);
   }
 
   @Test
@@ -206,7 +207,7 @@ class OrgUnitMembershipServiceTest {
 
     membershipService.addMember(scId, userId);
 
-    verify(inventoryReconciler, never()).onUserGainedFirstOrgUnit(any(), any());
+    verify(firstMembershipObserver, never()).onUserGainedFirstOrgUnit(any(), any());
   }
 
   @Test
@@ -239,7 +240,7 @@ class OrgUnitMembershipServiceTest {
 
     membershipService.removeMember(scId, userId);
 
-    verify(inventoryReconciler).onUserLostLastOrgUnit(userId);
+    verify(firstMembershipObserver).onUserLostLastOrgUnit(userId);
   }
 
   @Test
@@ -250,7 +251,7 @@ class OrgUnitMembershipServiceTest {
 
     membershipService.removeMember(scId, userId);
 
-    verify(inventoryReconciler, never()).onUserLostLastOrgUnit(any());
+    verify(firstMembershipObserver, never()).onUserLostLastOrgUnit(any());
   }
 
   @Test
@@ -398,7 +399,7 @@ class OrgUnitMembershipServiceTest {
     verify(membershipRepository).save(any(OrgUnitMembership.class));
     verify(auditService)
         .record(eq(AuditEventType.MEMBERSHIP_GRANTED), eq(squadronA), any(), eq(userId), any());
-    verify(inventoryReconciler).onUserGainedFirstOrgUnit(userId, sqA);
+    verify(firstMembershipObserver).onUserGainedFirstOrgUnit(userId, sqA);
   }
 
   @Test
@@ -424,8 +425,8 @@ class OrgUnitMembershipServiceTest {
             new MembershipDeltaRequest.StaffelChange(squadronZeta, false, false),
             new MembershipDeltaRequest.StaffelChange(squadronAlpha, false, false)));
 
-    verify(inventoryReconciler).onUserGainedFirstOrgUnit(userId, sqAlpha);
-    verify(inventoryReconciler, never()).onUserGainedFirstOrgUnit(userId, sqZeta);
+    verify(firstMembershipObserver).onUserGainedFirstOrgUnit(userId, sqAlpha);
+    verify(firstMembershipObserver, never()).onUserGainedFirstOrgUnit(userId, sqZeta);
   }
 
   @Test
@@ -487,7 +488,7 @@ class OrgUnitMembershipServiceTest {
     verify(auditService)
         .record(eq(AuditEventType.MEMBERSHIP_REVOKED), eq(squadronA), any(), eq(userId), any());
     verify(membershipChangeObserver).onSquadronRankCleared(squadronA, userId);
-    verify(inventoryReconciler).onUserLostLastOrgUnit(userId);
+    verify(firstMembershipObserver).onUserLostLastOrgUnit(userId);
   }
 
   @Test

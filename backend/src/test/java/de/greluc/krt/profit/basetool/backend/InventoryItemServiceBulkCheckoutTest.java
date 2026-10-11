@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -43,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantReposi
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;

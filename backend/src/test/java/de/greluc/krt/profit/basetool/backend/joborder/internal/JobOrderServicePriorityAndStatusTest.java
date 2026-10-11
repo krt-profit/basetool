@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
@@ -49,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.QualityTierService;

@@ -79,7 +79,7 @@ class JobOrderMapperTest {
     ReflectionTestUtils.setField(
         mapper,
         "stockAccess",
-        new de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess() {
+        new de.greluc.krt.profit.basetool.backend.mapper.StockViewerAccess() {
           @Override
           public boolean mayEditInventoryItem(
               java.util.UUID inventoryItemId, java.util.UUID ownerId) {

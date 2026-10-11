@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -51,7 +52,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepo
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;

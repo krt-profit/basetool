@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -326,7 +326,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark(
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark(
       o.id, o.displayId) FROM JobOrder o WHERE o.id IN :ids
       """)
   List<JobOrderEarmark> findEarmarks(@Param("ids") Collection<UUID> ids);

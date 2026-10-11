@@ -21,11 +21,7 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
-import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
@@ -35,6 +31,8 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
+import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,8 +108,8 @@ class InventoryItemMapperTest {
     item.setVersion(7L);
     InventoryAllocations.addJobOrder(item, jobOrder.getId(), item.getAmount(), true);
     InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
-    EarmarkTargets.Lookup targets =
-        new EarmarkTargets.Lookup() {
+    InventoryEarmarkLookup targets =
+        new InventoryEarmarkLookup() {
           @Override
           public MissionEarmark mission(UUID id) {
             return id.equals(missionId)

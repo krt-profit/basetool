@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -32,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LinkedStockAttributionDto;
+import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver.MaterialRequirement;
 import de.greluc.krt.profit.basetool.backend.service.QualityBucketAllocator.Allocation;

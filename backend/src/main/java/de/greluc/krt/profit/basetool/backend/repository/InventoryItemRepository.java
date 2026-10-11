@@ -19,14 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
-import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
+import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderGameItemStockRow;
+import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
@@ -176,7 +176,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
   /**
    * Loads every non-personal inventory row owned by the given user, for {@link
-   * de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitReconciler}.
+   * de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrgUnitReconciler}.
    *
    * @param userId the owner whose shared inventory to load; never {@code null}.
    * @return the user's non-personal inventory rows; never {@code null}, possibly empty.
@@ -871,7 +871,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow(a.jobOrderId, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow(a.jobOrderId, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
       FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
       AND a.inventoryItem.material IS NOT NULL
       """)
@@ -885,12 +885,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * @param jobOrderIds the orders whose earmarked item stock to project; an empty collection yields
    *     an empty list.
    * @return one {@link
-   *     de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow} per game-item
-   *     job-order allocation, never {@code null}.
+   *     de.greluc.krt.profit.basetool.backend.model.projection.JobOrderGameItemStockRow} per
+   *     game-item job-order allocation, never {@code null}.
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow(a.jobOrderId, a.inventoryItem.gameItem.id, a.amount)
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.JobOrderGameItemStockRow(a.jobOrderId, a.inventoryItem.gameItem.id, a.amount)
       FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
       AND a.inventoryItem.gameItem IS NOT NULL
       """)
