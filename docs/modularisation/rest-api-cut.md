@@ -440,10 +440,10 @@ guards** none beyond the wave checklist. **Effort** S.
 | Current | Target | Operations | App-frozen |
 | --- | --- | ---: | ---: |
 | `/hangar/users/{userId}/ships/**`, four operations with `hasRole('ADMIN')` | `/hangar/admin/users/{userId}/ships/**` | 4 | 0 |
-| `POST /hangar/import/fleetview`, deprecated | deleted; the new app uses `POST /hangar/import/ships` | 1 | 1 |
+| `POST /hangar/import/fleetview`, deprecated | deleted; the web import stays on `POST /hangar/import/ships` (the app never called it; app 19 drops its own Fleetview import screen) | 1 | 1 |
 | **Moved or deleted** | | **5** | **1** |
 
-**Consequences.** **App:** `HangarRepository` drops the fleetview import. The operation's announced
+**Consequences.** **App:** `HangarRepository` and the Fleetview import screen go. The operation's announced
 sunset date no longer matters: under the hard cut it leaves in this wave through a ledger line.
 **Edge:** allow-list line 170 goes; probe lines 247 (the fleetview import) and 249 (the 404 probe of
 `/hangar/users/…`) change. **Web:** `hangar` 15 literals in 4 classes. **Backend:** the
