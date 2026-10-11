@@ -6,6 +6,10 @@
 
 - **Deploy: veraltete Host-Skripte fallen auf.** Das Release bringt die Hashes der Host-Skripte mit (`host-scripts.sha256`); `deploy.sh` vergleicht sie bei jedem Tick (`basetool_host_scripts_drift`, Alarme `HostScriptDrift` und `HostScriptsCheckStale`) und verweigert ein Release, dessen Apply-Skripte (`deploy.sh`, `lib/`, `render-env-d.py`) auf dem Host andere sind, bevor sich etwas ändert. Notausgang: `--force` oder `IRI_REQUIRE_CURRENT_SCRIPTS=false`. Der Vergleich vor jeder Promotion ist jetzt Pflicht (`docs/deployment.md`).
 
+### Fixed
+
+- **Einsatz: Mit-Manager hinzufügen zeigte einen Fehler, obwohl es klappte.** Das Frontend las die Antwortliste des Backends als Text und warf einen Dekodierungsfehler (HTTP 500 im Browser), obwohl der Manager bereits eingetragen war; die Antwort wird jetzt verworfen.
+
 ### Changed
 
 - **Android-App: die neueste veröffentlichte Version wird jetzt als 18 gemeldet.** Die App v0.5.0 (versionCode 18) ist veröffentlicht, das Backend meldete noch 17; Apps mit 17 sehen einen Update-Hinweis, werden aber nicht gesperrt (die Mindestversion bleibt 17).

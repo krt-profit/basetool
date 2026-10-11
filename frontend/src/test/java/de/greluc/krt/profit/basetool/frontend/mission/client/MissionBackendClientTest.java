@@ -292,9 +292,11 @@ class MissionBackendClientTest {
 
   @Test
   void sectionAndOwnershipWrites() {
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < 7; i++) {
       backend.answerEmpty();
     }
+    backend.answerJson("[{\"id\":\"" + OTHER + "\",\"label\":\"Manager\"}]");
+    backend.answerEmpty();
     backend.answerJson("{\"id\":\"" + ID + "\"}");
     CreateMissionRequest create =
         new CreateMissionRequest(
