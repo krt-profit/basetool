@@ -447,7 +447,7 @@ class ExternalContractTest {
               Set.of("id", "status", "version"),
               Set.of("status", "version")),
           new ContractOperation(
-              "/api/v1/org-units/bank/balances",
+              "/api/v1/bank/org-units/balances",
               "get",
               Set.of(
                   "accountId",
@@ -461,31 +461,31 @@ class ExternalContractTest {
                   "approvalLimit",
                   "approvalExempt")),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}",
+              "/api/v1/bank/org-units/accounts/{id}",
               "get",
               Set.of(
                   "detail", "account", "delta30d", "bookingCount", "name", "accountNo", "balance")),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/settings", "get", BANK_ACCOUNT_SETTINGS),
+              "/api/v1/bank/org-units/accounts/{id}/settings", "get", BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/balance-target",
+              "/api/v1/bank/org-units/accounts/{id}/balance-target",
               "put",
               BANK_ACCOUNT_SETTINGS,
               Set.of("version")),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
+              "/api/v1/bank/org-units/accounts/{id}/visibility/role/{roleCode}",
               "post",
               BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
+              "/api/v1/bank/org-units/accounts/{id}/visibility/role/{roleCode}",
               "delete",
               BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled}",
+              "/api/v1/bank/org-units/accounts/{id}/visibility/all-members/{enabled}",
               "put",
               BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
-                  "/api/v1/org-units/bank/accounts/{id}/transactions",
+                  "/api/v1/bank/org-units/accounts/{id}/transactions",
                   "get",
                   Set.of(
                       "content",
@@ -504,7 +504,7 @@ class ExternalContractTest {
                       "counterpartyHandle"))
               .addressedBy(Set.of("page:integer", "size:integer")),
           new ContractOperation(
-              "/api/v1/org-units/bank/requests",
+              "/api/v1/bank/org-units/requests",
               "get",
               Set.of(
                   "id",
@@ -526,7 +526,7 @@ class ExternalContractTest {
                   "createdAt",
                   "version")),
           new ContractOperation(
-              "/api/v1/org-units/bank/requests/foreign",
+              "/api/v1/bank/org-units/requests/foreign",
               "get",
               Set.of(
                   "id",
@@ -545,28 +545,28 @@ class ExternalContractTest {
                   "createdAt",
                   "version")),
           new ContractOperation(
-              "/api/v1/org-units/bank/transfer-targets", "get", Set.of("id", "name", "accountNo")),
+              "/api/v1/bank/org-units/transfer-targets", "get", Set.of("id", "name", "accountNo")),
           new ContractOperation(
-              "/api/v1/org-units/bank/requests",
+              "/api/v1/bank/org-units/requests",
               "post",
               Set.of("id", "status", "requiresOwnerApproval", "requiredApprover", "version"),
               Set.of("sourceAccountId", "type", "amount")),
           new ContractOperation(
-              "/api/v1/org-units/bank/requests/{id}",
+              "/api/v1/bank/org-units/requests/{id}",
               "put",
               Set.of("id", "amount", "note", "targetAccountId", "version"),
               Set.of("amount")),
           new ContractOperation(
-              "/api/v1/org-units/bank/requests/{id}/cancel",
+              "/api/v1/bank/org-units/requests/{id}/cancel",
               "post",
               Set.of("id", "status", "version"),
               Set.of("version")),
           new ContractOperation(
-              "/api/v1/org-units/bank/requests/{id}/owner-approval",
+              "/api/v1/bank/org-units/requests/{id}/owner-approval",
               "post",
               Set.of("id", "ownerApprovalGranted", "ownerApprovalGrantedByHandle", "version")),
           new ContractOperation(
-              "/api/v1/org-units/bank/requests/{id}/owner-approval",
+              "/api/v1/bank/org-units/requests/{id}/owner-approval",
               "delete",
               Set.of("id", "ownerApprovalGranted", "version")),
           new ContractOperation(
@@ -1433,39 +1433,39 @@ class ExternalContractTest {
                   "sourceHolderId")),
           new ContractOperation("/api/v1/bank/transfer-fee-rate", "get", Set.of("rate")),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
+              "/api/v1/bank/org-units/accounts/{id}/approval-limit/all-members",
               "put",
               BANK_ACCOUNT_SETTINGS,
               Set.of("limit")),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
+              "/api/v1/bank/org-units/accounts/{id}/approval-limit/all-members",
               "delete",
               BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members",
+              "/api/v1/bank/org-units/accounts/{id}/approval-limit/area-members",
               "put",
               BANK_ACCOUNT_SETTINGS,
               Set.of("limit")),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members",
+              "/api/v1/bank/org-units/accounts/{id}/approval-limit/area-members",
               "delete",
               BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
+              "/api/v1/bank/org-units/accounts/{id}/approval-limit/role/{roleCode}",
               "put",
               BANK_ACCOUNT_SETTINGS,
               Set.of("limit")),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
+              "/api/v1/bank/org-units/accounts/{id}/approval-limit/role/{roleCode}",
               "delete",
               BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
+              "/api/v1/bank/org-units/accounts/{id}/approval-limit/user/{userId}",
               "put",
               BANK_ACCOUNT_SETTINGS,
               Set.of("limit")),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
+              "/api/v1/bank/org-units/accounts/{id}/approval-limit/user/{userId}",
               "delete",
               BANK_ACCOUNT_SETTINGS),
           new ContractOperation(

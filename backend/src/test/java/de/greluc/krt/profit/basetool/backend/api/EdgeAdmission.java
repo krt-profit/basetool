@@ -116,6 +116,8 @@ final class EdgeAdmission {
    */
   private static final Map<String, Shape> NAMED_SHAPES =
       Map.of(
+          "enabled",
+          BOOLEAN_SHAPE,
           "roleCode",
           new Shape("[A-Za-z0-9_-]{1,64}", List.of("LOGISTICIAN")),
           "type",
@@ -178,7 +180,7 @@ final class EdgeAdmission {
           refused("GET", "/api/v1/settings/job_order.age_green_days"),
           refused(
               "PUT",
-              "/api/v1/org-units/bank/accounts/" + SAMPLE_UUID + "/visibility/all-members/maybe"),
+              "/api/v1/bank/org-units/accounts/" + SAMPLE_UUID + "/visibility/all-members/maybe"),
           refused("GET", "/api/v2/ping"),
           refused("GET", "/actuator/health"));
 

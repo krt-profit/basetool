@@ -39,7 +39,7 @@ class NoStoreApiScopesTest {
       strings = {
         "/api/v1/bank",
         "/api/v1/bank/accounts",
-        "/api/v1/org-units/bank/transactions",
+        "/api/v1/bank/org-units/transactions",
         "/api/v1/users",
         "/api/v1/users/me",
         "/api/v1/me/capabilities",
@@ -114,7 +114,7 @@ class NoStoreApiScopesTest {
     "/api/v1/orders/requested, NO_STORE",
     "/api/v1/exchange/catalog/locations, REVALIDATE",
     "/api/v1/exchange/me/installation, NO_STORE",
-    "/api/v1/org-units/bank/balances, NO_STORE",
+    "/api/v1/bank/org-units/balances, NO_STORE",
     "/api/v1/blueprints/admin/defaults, NO_STORE",
     "/api/v1/blueprints/00000000-0000-4000-8000-000000000000, REVALIDATE",
     "/api/v1/org-units/active, REVALIDATE",
@@ -175,7 +175,7 @@ class NoStoreApiScopesTest {
         .as(
             "the number of no-store families. Raise it here when you add one, and add the path to"
                 + " sensitiveFamiliesMatch in the same change")
-        .isEqualTo(32);
+        .isEqualTo(31);
     assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(28);
   }
 }

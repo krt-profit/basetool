@@ -15,7 +15,7 @@ GET /api/v1/bank/accounts/{id} | BankAccountController#getAccount | pre=@bankSec
 PATCH /api/v1/bank/accounts/{id} | BankAccountController#renameAccount | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 PATCH /api/v1/bank/accounts/{id}/approval-tiers | BankAccountController#setCartelApprovalTiers | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 GET /api/v1/bank/accounts/{id}/balance-series | BankAccountController#getBalanceSeries | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
-PATCH /api/v1/bank/accounts/{id}/balance-target | BankAccountController#setBalanceTarget | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
+PUT /api/v1/bank/accounts/{id}/balance-target | BankAccountController#setBalanceTarget | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
 POST /api/v1/bank/accounts/{id}/close | BankAccountController#closeAccount | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 POST /api/v1/bank/accounts/{id}/reopen | BankAccountController#reopenAccount | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 GET /api/v1/bank/accounts/{id}/statement | BankAccountController#downloadStatement | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
@@ -40,6 +40,35 @@ PATCH /api/v1/bank/holders/{id} | BankHolderController#updateHolder | pre=hasRol
 GET /api/v1/bank/holders/{id}/transactions | BankHolderController#getHolderBookings | pre=@bankSecurityService.canSeeHolder(#id, authentication) | url=anyRequest -> authenticated
 GET /api/v1/bank/members/search | UserController#searchUsersForBank | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
 GET /api/v1/bank/members/search/references | UserController#searchUserReferencesForBank | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/accounts/{id} | OrgUnitBankController#getAccountDetail | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/bank/org-units/accounts/{id}/approval-limit/all-members | OrgUnitBankController#clearAllMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/bank/org-units/accounts/{id}/approval-limit/all-members | OrgUnitBankController#setAllMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/bank/org-units/accounts/{id}/approval-limit/area-members | OrgUnitBankController#clearAreaMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/bank/org-units/accounts/{id}/approval-limit/area-members | OrgUnitBankController#setAreaMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/bank/org-units/accounts/{id}/approval-limit/role/{roleCode} | OrgUnitBankController#clearRoleApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/bank/org-units/accounts/{id}/approval-limit/role/{roleCode} | OrgUnitBankController#setRoleApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/bank/org-units/accounts/{id}/approval-limit/user/{userId} | OrgUnitBankController#clearUserApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/bank/org-units/accounts/{id}/approval-limit/user/{userId} | OrgUnitBankController#setUserApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/accounts/{id}/balance-series | OrgUnitBankController#getBalanceSeries | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/bank/org-units/accounts/{id}/balance-target | OrgUnitBankController#setBalanceTarget | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/accounts/{id}/settings | OrgUnitBankController#getAccountSettings | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/accounts/{id}/statement | OrgUnitBankController#downloadStatement | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/accounts/{id}/transactions | OrgUnitBankController#getAccountBookings | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/bank/org-units/accounts/{id}/visibility/all-members/{enabled} | OrgUnitBankController#setAllMembersVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/bank/org-units/accounts/{id}/visibility/area-members/{enabled} | OrgUnitBankController#setAreaMembersVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/bank/org-units/accounts/{id}/visibility/role/{roleCode} | OrgUnitBankController#removeRoleVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/bank/org-units/accounts/{id}/visibility/role/{roleCode} | OrgUnitBankController#addRoleVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/bank/org-units/accounts/{id}/visibility/user/{userId} | OrgUnitBankController#removeUserVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/bank/org-units/accounts/{id}/visibility/user/{userId} | OrgUnitBankController#addUserVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/balances | OrgUnitBankController#listOverseenBalances | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/requests | OrgUnitBankController#listOwnBookingRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/bank/org-units/requests | OrgUnitBankController#createBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/requests/foreign | OrgUnitBankController#listForeignRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/bank/org-units/requests/{id} | OrgUnitBankController#updateOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/bank/org-units/requests/{id}/cancel | OrgUnitBankController#cancelOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/bank/org-units/requests/{id}/owner-approval | OrgUnitBankController#revokeOwnerApproval | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/bank/org-units/requests/{id}/owner-approval | OrgUnitBankController#grantOwnerApproval | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/transfer-targets | OrgUnitBankController#listTransferTargets | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/bank/requests | BankRequestController#getQueue | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
 POST /api/v1/bank/requests/{id}/confirm | BankRequestController#confirm | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
 POST /api/v1/bank/requests/{id}/reject | BankRequestController#reject | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
@@ -346,35 +375,6 @@ DELETE /api/v1/org-chart/positions/{id}/leader | OrgChartController#vacateComman
 GET /api/v1/org-units | OrgHierarchyController#listOrgUnits | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/org-units/active | OrgUnitController#listActiveOrgUnits | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/org-units/active-all-kinds | OrgUnitController#listActiveOrgUnitsAllKinds | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/org-units/bank/accounts/{id} | OrgUnitBankController#getAccountDetail | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/org-units/bank/accounts/{id}/approval-limit/all-members | OrgUnitBankController#clearAllMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/org-units/bank/accounts/{id}/approval-limit/all-members | OrgUnitBankController#setAllMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/org-units/bank/accounts/{id}/approval-limit/area-members | OrgUnitBankController#clearAreaMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/org-units/bank/accounts/{id}/approval-limit/area-members | OrgUnitBankController#setAreaMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode} | OrgUnitBankController#clearRoleApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode} | OrgUnitBankController#setRoleApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId} | OrgUnitBankController#clearUserApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId} | OrgUnitBankController#setUserApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/org-units/bank/accounts/{id}/balance-series | OrgUnitBankController#getBalanceSeries | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/org-units/bank/accounts/{id}/balance-target | OrgUnitBankController#setBalanceTarget | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/org-units/bank/accounts/{id}/settings | OrgUnitBankController#getAccountSettings | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/org-units/bank/accounts/{id}/statement | OrgUnitBankController#downloadStatement | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/org-units/bank/accounts/{id}/transactions | OrgUnitBankController#getAccountBookings | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled} | OrgUnitBankController#setAllMembersVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/org-units/bank/accounts/{id}/visibility/area-members/{enabled} | OrgUnitBankController#setAreaMembersVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode} | OrgUnitBankController#removeRoleVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode} | OrgUnitBankController#addRoleVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/org-units/bank/accounts/{id}/visibility/user/{userId} | OrgUnitBankController#removeUserVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/org-units/bank/accounts/{id}/visibility/user/{userId} | OrgUnitBankController#addUserVisibility | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/org-units/bank/balances | OrgUnitBankController#listOverseenBalances | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/org-units/bank/requests | OrgUnitBankController#listOwnBookingRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/org-units/bank/requests | OrgUnitBankController#createBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/org-units/bank/requests/foreign | OrgUnitBankController#listForeignRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/org-units/bank/requests/{id} | OrgUnitBankController#updateOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/org-units/bank/requests/{id}/cancel | OrgUnitBankController#cancelOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
-DELETE /api/v1/org-units/bank/requests/{id}/owner-approval | OrgUnitBankController#revokeOwnerApproval | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/org-units/bank/requests/{id}/owner-approval | OrgUnitBankController#grantOwnerApproval | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/org-units/bank/transfer-targets | OrgUnitBankController#listTransferTargets | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/org-units/bereiche | OrgHierarchyController#listBereiche | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/org-units/bereiche | OrgHierarchyController#createBereich | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/org-units/bereiche/{id}/members | OrgHierarchyController#addBereichLeader | pre=hasRole('ADMIN') or (@orgRoleManagementSecurityService.canAppointBereichRole(#id, #request.role(), authentication) and @orgRoleManagementSecurityService.targetsAnotherUser(#request.userId(), authentication)) | url=anyRequest -> authenticated

@@ -73,7 +73,7 @@ class StreamAwareShallowEtagHeaderFilterTest {
         "/api/v1/notifications",
         "/api/v1/notifications/unread-count",
         "/api/v1/bank/accounts",
-        "/api/v1/org-units/bank/transactions",
+        "/api/v1/bank/org-units/transactions",
         "/api/v1/users/me",
         "/api/v1/me/capabilities",
         "/api/v1/hangar/ships",
@@ -122,7 +122,7 @@ class StreamAwareShallowEtagHeaderFilterTest {
       strings = {
         "/api/v1/notifications",
         "/api/v1/bank/accounts",
-        "/api/v1/org-units/bank/transactions",
+        "/api/v1/bank/org-units/transactions",
         "/api/v1/users/me",
         "/api/v1/me/capabilities",
         "/api/v1/missions/{missionId}/finance-entries",

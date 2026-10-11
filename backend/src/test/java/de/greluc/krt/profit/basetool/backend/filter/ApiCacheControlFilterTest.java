@@ -98,8 +98,8 @@ class ApiCacheControlFilterTest {
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "/api/v1/org-units/bank/balances",
-        "/api/v1/org-units/bank/accounts/42/transactions",
+        "/api/v1/bank/org-units/balances",
+        "/api/v1/bank/org-units/accounts/42/transactions",
         "/api/v1/missions/{missionId}/finance-entries",
         "/api/v1/missions/42/finance-entries",
         "/api/v1/missions/42/finance-entries/summary",

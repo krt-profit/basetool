@@ -387,6 +387,16 @@ class ArchitectureRuleFailureTest {
             SanctionedBridge.class),
         BANK,
         "RogueBridge");
+    assertReports(
+        ArchitectureTest.orgUnitBankControllersAreOnTheOrgUnitSideRule(
+            ArchitectureTest.ORG_UNIT_BANK_CONTROLLERS, ArchitectureTest.ORG_UNIT_BANK_SIDE),
+        BANK,
+        "FixtureOrgUnitBankController");
+    assertReports(
+        ArchitectureTest.orgUnitBankControllersRelayOnlyToTheSeamRule(
+            ArchitectureTest.ORG_UNIT_BANK_CONTROLLERS, ArchitectureTest.bankDomain(fixturesRoot)),
+        BANK,
+        "FixtureStaffService");
     ArchRule insertOnly =
         ArchitectureTest.bankLedgerRepositoriesMustStayInsertOnlyRule(
             ArchitectureTest.ledgerMethods(Set.of(FixtureLedgerRepository.class), Set.of()),
@@ -400,6 +410,17 @@ class ArchitectureRuleFailureTest {
                 (JavaClass c) -> c.getSimpleName().contains("Bank"))),
         importPackageOf(FixtureBankThing.class),
         "FixtureBankThing");
+  }
+
+  @Test
+  void theOrgUnitBankSelectionFollowsTheMappingPrefix() {
+    assertThat(
+            BANK.stream()
+                .filter(c -> ArchitectureTest.ORG_UNIT_BANK_CONTROLLERS.test(c))
+                .map(JavaClass::getSimpleName))
+        .containsExactly("FixtureOrgUnitBankController");
+    assertThat(ArchitectureTest.countClasses(BANK, ArchitectureTest.ORG_UNIT_BANK_CONTROLLERS))
+        .isEqualTo(1);
   }
 
   @Test

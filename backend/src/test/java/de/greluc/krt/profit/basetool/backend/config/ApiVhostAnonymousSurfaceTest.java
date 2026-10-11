@@ -133,9 +133,9 @@ class ApiVhostAnonymousSurfaceTest {
         "/api/v1/inventory/all/grouped",
         "/api/v1/orders",
         "/api/v1/orders/00000000-0000-4000-8000-00000000cafe",
-        "/api/v1/org-units/bank/balances",
-        "/api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe",
-        "/api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/transactions"
+        "/api/v1/bank/org-units/balances",
+        "/api/v1/bank/org-units/accounts/00000000-0000-4000-8000-00000000cafe",
+        "/api/v1/bank/org-units/accounts/00000000-0000-4000-8000-00000000cafe/transactions"
       })
   @WithAnonymousUser
   void shouldRefuseAnonymousRemainingPhaseTwoReadsWithUnauthorized(String path) throws Exception {
@@ -561,7 +561,7 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousAccountSettingsWithUnauthorized() throws Exception {
-    String account = "/api/v1/org-units/bank/accounts/" + ABSENT_OPERATION;
+    String account = "/api/v1/bank/org-units/accounts/" + ABSENT_OPERATION;
     mockMvc.perform(get(account + "/settings")).andExpect(status().isUnauthorized());
     mockMvc
         .perform(
@@ -1057,7 +1057,7 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousApprovalLimitWritesWithUnauthorized() throws Exception {
-    String stem = "/api/v1/org-units/bank/accounts/" + ABSENT_OPERATION + "/approval-limit/";
+    String stem = "/api/v1/bank/org-units/accounts/" + ABSENT_OPERATION + "/approval-limit/";
     for (String leaf :
         new String[] {
           "all-members", "area-members", "role/KOMMANDOLEITER", "user/" + ABSENT_OPERATION
