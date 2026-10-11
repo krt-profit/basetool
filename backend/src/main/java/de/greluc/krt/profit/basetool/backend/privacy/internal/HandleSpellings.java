@@ -29,8 +29,8 @@ import org.jetbrains.annotations.NotNull;
  * Every name a member is stored under, shared by the Art. 15 export's handle scrubbing
  * (REQ-SEC-058) and the Art. 17 erasure of text-only handle snapshots (REQ-SEC-062).
  *
- * <p>{@code HandleSpellingCoverageTest} holds this list against {@link PersonSearchTargets}, so a
- * new {@code app_user} name column must be declared here as a spelling or in {@link
+ * <p>{@code HandleSpellingCoverageTest} holds this list against the columns the person search
+ * declares, so a new {@code app_user} name column must be declared here as a spelling or in {@link
  * #NOT_A_SPELLING}.
  */
 public final class HandleSpellings {
@@ -40,7 +40,7 @@ public final class HandleSpellings {
    * #of(User)} yields them.
    *
    * <p>Physical column names, because the two registries this is held against are written in
-   * physical names: {@link PersonSearchTargets} searches columns, not properties.
+   * physical names: the person search declares columns, not properties.
    */
   public static final List<String> COLUMNS =
       List.of("username", "display_name", "discord_guild_nickname", "rsi_handle");

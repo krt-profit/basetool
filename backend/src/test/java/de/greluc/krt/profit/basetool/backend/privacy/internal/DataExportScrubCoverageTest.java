@@ -29,12 +29,12 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies the export's scrub declarations against {@link PersonSearchTargets} (REQ-SEC-058,
+ * Verifies the export's scrub declarations against the person-mention sources (REQ-SEC-058,
  * REQ-SEC-060, ADR-0185).
  *
- * <p>Every person-name column, including {@link PersonSearchTargets#EXEMPT_BUT_MAY_HOLD_A_NAME},
- * must be scrubbed or exempted with a reason by the section that selects it, and every declaration
- * must name an existing column of its own section. The sections are the union of what the modules'
+ * <p>Every person-name column, including the exemptions that may still hold a name, must be
+ * scrubbed or exempted with a reason by the section that selects it, and every declaration must
+ * name an existing column of its own section. The sections are the union of what the modules'
  * participants declare, and the SQL is parsed, not executed.
  */
 class DataExportScrubCoverageTest {
@@ -62,7 +62,7 @@ class DataExportScrubCoverageTest {
 
     assertThat(unaccounted)
         .as(
-            "Every export column that PersonSearchTargets registers as a place a person is named"
+            "Every export column that a PersonMentionSource registers as a place a person is named"
                 + " must be scrubbed by its section (scrubbing(...)) or, with a reason, kept"
                 + " (keeping(...)). Add it to whichever is true -- leaving it absent is the state"
                 + " that ships a third party's name in somebody's Art. 15 export.")
@@ -72,11 +72,11 @@ class DataExportScrubCoverageTest {
   /** Verifies that the name-bearing exemptions remain a subset of the search's exempt columns. */
   @Test
   void theNameBearingExemptionsAreRealExemptions() {
-    assertThat(PersonSearchTargets.EXEMPT_COLUMNS)
+    assertThat(MentionSourceDeclarations.exemptColumns())
         .as(
             "EXEMPT_BUT_MAY_HOLD_A_NAME names the exemptions that can still contain somebody's"
                 + " name, so every entry must be an exemption")
-        .containsAll(PersonSearchTargets.EXEMPT_BUT_MAY_HOLD_A_NAME);
+        .containsAll(MentionSourceDeclarations.exemptButMayHoldNames());
   }
 
   @Test
@@ -176,12 +176,13 @@ class DataExportScrubCoverageTest {
    */
   private static boolean namesAPerson(Set<String> tables, String column) {
     boolean searched =
-        PersonSearchTargets.TARGETS.stream()
+        MentionSourceDeclarations.targets().stream()
             .anyMatch(t -> tables.contains(t.table()) && t.column().equals(column));
     return searched
         || tables.stream()
             .anyMatch(
                 table ->
-                    PersonSearchTargets.EXEMPT_BUT_MAY_HOLD_A_NAME.contains(table + "." + column));
+                    MentionSourceDeclarations.exemptButMayHoldNames()
+                        .contains(table + "." + column));
   }
 }

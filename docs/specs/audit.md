@@ -290,7 +290,7 @@ snapshotted, exactly as the bank trail snapshots holder handles).
 > `AuditDetails` builder: the last parameter is a bare `CharSequence`, and two bank call sites
 > concatenate a handle straight into it (`BankHolderService` records `HOLDER_REGISTERED` with the
 > holder's handle **as** the payload; `BankLedgerService` writes `"+<amount> aUEC @<handle>"` on
-> every booking). `PersonSearchTargets` had exempted both `details` columns from the person search
+> every booking). The person-search registry had exempted both `details` columns from the person search
 > **on the strength of this rule**, which made the exemption false. Both columns are searched now
 > (REQ-SEC-060) and a granted erasure rewrites them in place (REQ-SEC-062). The rule stands as a
 > rule; it is simply not a guarantee, and the two registries no longer assume it is.
@@ -302,7 +302,7 @@ snapshotted, exactly as the bank trail snapshots holder handles).
 > (`orders.create.handle` — "Handle des Ansprechpartners"), often an outsider with no account.
 > `ACCOUNT_DELETION_REQUEST_EXECUTED` likewise snapshots the member's own effective name. The
 > snapshot itself is correct and stays — the trail has to survive the aggregate — but the column is
-> a person-name surface in `PersonSearchTargets` (REQ-SEC-060) and the Art. 15 export deliberately
+> a person-name surface in the person-mention sources (REQ-SEC-060) and the Art. 15 export deliberately
 > does **not** select it (REQ-SEC-058). The wrong wording here is what left the export unguarded,
 > so it is corrected rather than quietly dropped.
 >

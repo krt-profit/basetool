@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.platform.api.HandleAnonymisationParticipant;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage.Disposition;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.MentionSourceDeclarations;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.service.HandleAnonymisationService;
@@ -114,7 +114,7 @@ class HandleAnonymisationCoverageTest {
   @DisplayName("every column a participant rewrites is one the person search reaches")
   void everyRewrittenColumnIsSearchable() {
     Set<String> searchable =
-        PersonSearchTargets.TARGETS.stream()
+        MentionSourceDeclarations.targets().stream()
             .map(target -> target.table() + "." + target.column())
             .collect(Collectors.toSet());
 

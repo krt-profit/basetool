@@ -188,7 +188,7 @@ class TableOwnershipTest {
           "de.greluc.krt.profit.basetool.backend.service.DataExportService",
           "Runs the Art. 15 export sections that every module declares.",
           "de.greluc.krt.profit.basetool.backend.service.PersonSearchService",
-          "Runs the person search over the PersonSearchTargets registry across every module.",
+          "Runs the person search over the columns every module declares.",
           "de.greluc.krt.profit.basetool.backend.platform.api.OwnedRowsMover",
           "Re-points the member-referencing columns the modules declare during an account merge.",
           "de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSourceTransactionManager",

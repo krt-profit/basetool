@@ -1513,11 +1513,12 @@ and the audit, job-order and handover repositories `HandleAnonymisationService` 
 2026-10-11**; (c)
 `PersonalDataExportSection`, one per module for the sections of `DataExportSections` — **done
 2026-10-11**; (d)
-`PersonMentionSource`, for the targets of `PersonSearchTargets`; (e) `UserReassignmentParticipant`,
+`PersonMentionSource`, for the targets of `PersonSearchTargets` — **done 2026-10-11**; (e)
+`UserReassignmentParticipant`,
 for the `FOLLOWS_THE_MEMBER` / `STAYS_WITH_THE_ACT` lists of `UserAccountMergeService` — **done
 2026-10-11**. Each rewrites its live-schema coverage test to compare the union of the registered
-participants with `information_schema` (the erasure's and the merge's are done), so an unclaimed
-member column still fails the build.
+participants with `information_schema` (the erasure's, the merge's and the other three are done), so
+an unclaimed member column still fails the build.
 
 **P4 slice a — done 2026-10-11 (the erasure participants).** `UserDeletionService` no longer names a
 foreign repository: it runs the registered `UserErasureParticipant`s and writes the deletion's audit
@@ -1663,6 +1664,46 @@ floor of `ArchitectureTest` fell from 63 to 62 with the class. (5) The character
 asserted that the external contact is absent from the whole document, which is wrong for the
 member's own prose; it now separates a name in a column no section selects (must be absent) from
 one in the member's own text (stays).
+**P4 slice d — done 2026-10-11 (the person-mention sources).** `PersonSearchService` no longer reads a
+central registry: it builds its one statement from the columns the modules declare, and
+`PersonSearchTargets` is gone.
+1. *Characterise*: `PersonMentionCatalogueTest` (the 79 searched columns with area, id column and
+   link kind, and the exempt columns, name-bearing exemptions and exempt tables, against a
+   committed catalogue) and `PersonSearchEndStateTest` (real Postgres: one row in every table that
+   holds a searched column, filled generically from the schema with the synthetic name in each
+   searched column; the 79 hits compared with a committed list of area, table, column, link kind
+   and snippet), both added before the change in their own commit and green on the unchanged code.
+   Proven able to fail: dropping the `rsi_handle` target and changing the link kind of the bank
+   holder's handle turn both red.
+2. *SPI*: `platform.api.PersonMentionSource` with `targets()` (`Target`: area, table, column, id
+   column, `LinkKind`) and three default sets, `exemptColumns()`, `exemptButMayHoldNames()` and
+   `exemptTables()`. A pure declaration, so not an `@ObserverSpi`. Twenty-one implementations: one
+   per module that owns a text column (admin, audit, bank, blueprint, catalogue, dashboard,
+   exchange, hangar, identity, inventory, joborder, materialexchange, mission, notification,
+   operation, orgchart, orgunit, personalinventory, promotion, refinery) and
+   `platform.api.SchemaHistoryMentionSource` for Flyway's schema history. The inventory's and the
+   blueprint's sit in `service`, assigned by their names.
+3. *Registry*: `privacy.internal.PersonMentionRegistry` collects the beans, orders the targets by
+   area, table and column and refuses a column declared twice. The link kinds that were string
+   constants are the enum `LinkKind`; the hit still carries its name.
+4. *Gates*: the tests read the union of the sources, found by scanning
+   (`MentionSourceDeclarations`): `PersonSearchCoverageTest` (every text column searched or
+   exempt, now also: no stale exemption and no column both searched and exempt),
+   `HandleErasureCoverageTest`, `HandleSpellingCoverageTest`, `HandleAnonymisationCoverageTest` and
+   `DataExportScrubCoverageTest`; the new `PersonMentionOwnershipTest` holds every source to the
+   module that owns the tables it names.
+The search results are unchanged. Baseline **36 → 36**: the declarations are text and name no class.
+**Corrections:** (1) There are 79 targets, not the 80 the evidence counted. (2) The old javadoc
+promised the results in registry order, "the member record first, the audit trails last"; the
+statement has always ended in `ORDER BY area, src_table, src_column, row_id`, so the order of the
+registry never reached a result, and the registry now sorts by area, table and column. (3) The new
+stale-exemption check found four entries for things that no longer exist, an exempt column
+(`kommando_group.sort_key`) and three exempt tables (`blueprint_component`, `uex_commodity`,
+`uex_vehicle`); they are dropped, which changes no search, and the catalogue lost the same four
+lines. (4) The schema history is the one table no module owns; its exemption sits in
+`platform.api` because an implementation in `platform.internal` would close an `api` ⇄ `internal`
+cycle of the platform. (5) `exemptButMayHoldNames`, not `...AName`: Checkstyle reads the
+abbreviation. (6) The leaf-helper floor of `ArchitectureTest` fell from 62 to 61 with the class.
 
 **P4 slice e — done 2026-10-11 (the account-merge participants).** `UserAccountMergeService` no
 longer holds the two lists of member columns or any SQL: it asks the registered

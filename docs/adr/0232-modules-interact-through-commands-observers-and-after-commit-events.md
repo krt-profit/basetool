@@ -97,6 +97,12 @@ or personal data; events belong to their publishers' `api.events` packages.
   `DataExportSections`; the reading order is a global `position` on each section, because a
   module's sections are not contiguous in it. `privacy.internal.PersonalDataExportRegistry`
   orders them and refuses a duplicate key or position. See plan §7.6.
+- **2026-10-11, GDPR participants, slice d (person mentions).** `PersonMentionSource` is owned
+  by `platform.api` and is a plain declaration SPI like the export's: `targets()` and three
+  default exemption sets. Twenty-one implementations, one per module that owns a text column
+  (and the platform's for Flyway's schema history), replace `PersonSearchTargets`;
+  `privacy.internal.PersonMentionRegistry` orders the union and refuses a column declared
+  twice. See plan §7.6.
 
 - **2026-10-11, GDPR participants, slice e (account merge).** `UserReassignmentParticipant` is
   owned by `platform.api` for the same reason. It is an `@ObserverSpi`; eighteen implementations in

@@ -152,7 +152,6 @@ import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsP
 import de.greluc.krt.profit.basetool.backend.platform.internal.RequestBodyLimitProperties;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
@@ -363,7 +362,6 @@ class ArchitectureTest {
           OrgUnitLabels.class,
           PartialRoleScopeProperties.class,
           Permissions.class,
-          PersonSearchTargets.class,
           ProblemResponseFactory.class,
           Quality.class,
           QuantityTypeRounding.class,
@@ -1075,7 +1073,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 62);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 61);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);
