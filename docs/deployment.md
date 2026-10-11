@@ -878,6 +878,10 @@ the backend image.
   [`EXCHANGE_GO_LIVE_RUNBOOK.md`](EXCHANGE_GO_LIVE_RUNBOOK.md) set on 2026-09-28. If production
   answers anything else, the promotion would change the floor: correct the literal in a pull request
   first, or accept the change deliberately.
+- **Before promoting the release that carries the API cut** (REQ-API-020, D-24): the release
+  commits **19 / 19**, so production answers 17 / 17 until it is promoted and every app below 19 meets
+  the update wall afterwards. Publish app 19 first; the floor, the retired answers and the new paths
+  arrive in one deploy, and a rollback takes all three back.
 
 ---
 
