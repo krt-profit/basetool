@@ -314,7 +314,7 @@ class SubjectRateLimitingFilterTest {
       "/api/v1/users/admin/u/export/pdf",
       "/api/v1/audit/BANK/export.json",
       "/api/v1/bank/admin/audit/export",
-      "/api/v1/org-units/bank/accounts/a/statement",
+      "/api/v1/bank/org-units/accounts/a/statement",
       "/api/v1/bank/export/three-month-report",
       "/api/v1/orders/o/item-handovers/h/report",
       "/api/v1/orders/o/handovers/h/report",

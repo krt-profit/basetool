@@ -336,7 +336,7 @@ class LiveSyncSubscriptionAuthorizerTest {
     assertThat(primary.getPath()).isEqualTo("/api/v1/bank/accounts/" + bank.resourceId());
     RecordedRequest fallback = server.takeRequest(2, TimeUnit.SECONDS);
     assertThat(fallback.getPath())
-        .isEqualTo("/api/v1/org-units/bank/accounts/" + bank.resourceId());
+        .isEqualTo("/api/v1/bank/org-units/accounts/" + bank.resourceId());
   }
 
   @Test

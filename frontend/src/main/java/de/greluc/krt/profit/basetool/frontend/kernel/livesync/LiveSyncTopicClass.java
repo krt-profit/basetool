@@ -132,7 +132,7 @@ public enum LiveSyncTopicClass {
       "bank_account",
       "/api/v1/bank/accounts/{id}",
       null,
-      "/api/v1/org-units/bank/accounts/{id}",
+      "/api/v1/bank/org-units/accounts/{id}",
       null),
 
   /**

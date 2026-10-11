@@ -55,7 +55,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * AJAX proxy for the org-unit bank actions ({@code /api/proxy/org-units/bank/**}), forwarding to
- * the matching {@code /api/v1/org-units/bank/**} backend endpoints and streaming the redacted
+ * the matching {@code /api/v1/bank/org-units/**} backend endpoints and streaming the redacted
  * statement PDF. It requires authentication; authorization is decided by the backend.
  */
 @RestController

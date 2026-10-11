@@ -65,15 +65,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Org-unit-facing slice of the bank at {@code /api/v1/org-units/bank}, outside the {@code
- * BANK_EMPLOYEE}-gated {@code /api/v1/bank/**} space, for the officers and leads who oversee an org
- * unit (REQ-BANK-021, REQ-BANK-022).
+ * Org-unit-facing slice of the bank at {@code /api/v1/bank/org-units}, decided in the access
+ * service and not by a bank role, for the officers and leads who oversee an org unit (REQ-BANK-021,
+ * REQ-BANK-022).
  *
  * <p>Only relays to {@link OrgUnitBankAccessService}, which scopes every call to the caller's
  * oversight; a caller who oversees nothing gets an empty result.
  */
 @RestController
-@RequestMapping("/api/v1/org-units/bank")
+@RequestMapping("/api/v1/bank/org-units")
 @RequiredArgsConstructor
 @Tag(
     name = "org-unit-bank-controller",

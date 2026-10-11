@@ -75,7 +75,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Typed backend client of the bank domain: the staff surfaces under {@code /api/v1/bank}, the
- * org-unit bank view under {@code /api/v1/org-units/bank}, their PDF exports and the admin wipe
+ * org-unit bank view under {@code /api/v1/bank/org-units}, their PDF exports and the admin wipe
  * reset (REQ-BANK-*), over {@link BackendApiClient} (plan §5.9, ADR-0032).
  *
  * <p>Every write sends the backend's own request record and decodes its answer into the mirrored
@@ -463,7 +463,7 @@ public class BankBackendClient {
   @Nullable
   public BankAccountDto setBalanceTarget(
       @NotNull UUID id, @NotNull SetBankBalanceTargetRequest request) {
-    return backendApiClient.patch(
+    return backendApiClient.put(
         "/api/v1/bank/accounts/{id}/balance-target", request, BankAccountDto.class, id);
   }
 
@@ -618,7 +618,7 @@ public class BankBackendClient {
    */
   @Nullable
   public List<OrgUnitBankBalanceDto> orgUnitBalances() {
-    return backendApiClient.get("/api/v1/org-units/bank/balances", BALANCE_LIST);
+    return backendApiClient.get("/api/v1/bank/org-units/balances", BALANCE_LIST);
   }
 
   /**
@@ -628,7 +628,7 @@ public class BankBackendClient {
    */
   @Nullable
   public List<BankBookingRequestDto> ownOrgUnitRequests() {
-    return backendApiClient.get("/api/v1/org-units/bank/requests", BOOKING_REQUEST_LIST);
+    return backendApiClient.get("/api/v1/bank/org-units/requests", BOOKING_REQUEST_LIST);
   }
 
   /**
@@ -638,7 +638,7 @@ public class BankBackendClient {
    */
   @Nullable
   public List<BankBookingRequestDto> foreignOrgUnitRequests() {
-    return backendApiClient.get("/api/v1/org-units/bank/requests/foreign", BOOKING_REQUEST_LIST);
+    return backendApiClient.get("/api/v1/bank/org-units/requests/foreign", BOOKING_REQUEST_LIST);
   }
 
   /**
@@ -648,7 +648,7 @@ public class BankBackendClient {
    */
   @Nullable
   public List<BankAccountRefDto> orgUnitTransferTargets() {
-    return backendApiClient.get("/api/v1/org-units/bank/transfer-targets", ACCOUNT_REF_LIST);
+    return backendApiClient.get("/api/v1/bank/org-units/transfer-targets", ACCOUNT_REF_LIST);
   }
 
   /**
@@ -660,7 +660,7 @@ public class BankBackendClient {
   @Nullable
   public OrgUnitBankAccountDetailDto orgUnitAccount(@NotNull UUID id) {
     return backendApiClient.get(
-        "/api/v1/org-units/bank/accounts/{id}", OrgUnitBankAccountDetailDto.class, id);
+        "/api/v1/bank/org-units/accounts/{id}", OrgUnitBankAccountDetailDto.class, id);
   }
 
   /**
@@ -672,7 +672,7 @@ public class BankBackendClient {
   @Nullable
   public OrgUnitBankAccountSettingsDto orgUnitAccountSettings(@NotNull UUID id) {
     return backendApiClient.get(
-        "/api/v1/org-units/bank/accounts/{id}/settings", OrgUnitBankAccountSettingsDto.class, id);
+        "/api/v1/bank/org-units/accounts/{id}/settings", OrgUnitBankAccountSettingsDto.class, id);
   }
 
   /**
@@ -689,7 +689,7 @@ public class BankBackendClient {
   public PageResponse<BankBookingDto> orgUnitAccountBookings(
       @NotNull UUID id, int page, int size, @NotNull Instant from, @NotNull Instant to) {
     String uri =
-        UriComponentsBuilder.fromPath("/api/v1/org-units/bank/accounts/{id}/transactions")
+        UriComponentsBuilder.fromPath("/api/v1/bank/org-units/accounts/{id}/transactions")
             .queryParam("page", page)
             .queryParam("size", size)
             .queryParam("from", from)
@@ -712,7 +712,7 @@ public class BankBackendClient {
   public BankBalanceSeriesDto orgUnitBalanceSeries(
       @NotNull UUID id, @NotNull Instant from, @NotNull Instant to) {
     String uri =
-        UriComponentsBuilder.fromPath("/api/v1/org-units/bank/accounts/{id}/balance-series")
+        UriComponentsBuilder.fromPath("/api/v1/bank/org-units/accounts/{id}/balance-series")
             .queryParam("from", from)
             .queryParam("to", to)
             .encode()
@@ -730,7 +730,7 @@ public class BankBackendClient {
   @Nullable
   public BankBookingRequestDto createOrgUnitRequest(@NotNull CreateBankBookingRequest request) {
     return backendApiClient.post(
-        "/api/v1/org-units/bank/requests", request, BankBookingRequestDto.class);
+        "/api/v1/bank/org-units/requests", request, BankBookingRequestDto.class);
   }
 
   /**
@@ -744,7 +744,7 @@ public class BankBackendClient {
   public BankBookingRequestDto cancelOrgUnitRequest(
       @NotNull UUID id, @NotNull CancelBankBookingRequest request) {
     return backendApiClient.post(
-        "/api/v1/org-units/bank/requests/{id}/cancel", request, BankBookingRequestDto.class, id);
+        "/api/v1/bank/org-units/requests/{id}/cancel", request, BankBookingRequestDto.class, id);
   }
 
   /**
@@ -758,7 +758,7 @@ public class BankBackendClient {
   public BankBookingRequestDto updateOrgUnitRequest(
       @NotNull UUID id, @NotNull UpdateBankBookingRequest request) {
     return backendApiClient.put(
-        "/api/v1/org-units/bank/requests/{id}", request, BankBookingRequestDto.class, id);
+        "/api/v1/bank/org-units/requests/{id}", request, BankBookingRequestDto.class, id);
   }
 
   /**
@@ -772,7 +772,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto setOrgUnitBalanceTarget(
       @NotNull UUID id, @NotNull OrgUnitBalanceTargetRequest request) {
     return backendApiClient.put(
-        "/api/v1/org-units/bank/accounts/{id}/balance-target",
+        "/api/v1/bank/org-units/accounts/{id}/balance-target",
         request,
         OrgUnitBankAccountSettingsDto.class,
         id);
@@ -790,7 +790,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto addRoleVisibility(
       @NotNull UUID id, @NotNull String roleCode, @NotNull Map<String, Object> body) {
     return backendApiClient.post(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
+        "/api/v1/bank/org-units/accounts/{id}/visibility/role/{roleCode}",
         body,
         OrgUnitBankAccountSettingsDto.class,
         id,
@@ -808,7 +808,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto removeRoleVisibility(
       @NotNull UUID id, @NotNull String roleCode) {
     return backendApiClient.delete(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
+        "/api/v1/bank/org-units/accounts/{id}/visibility/role/{roleCode}",
         OrgUnitBankAccountSettingsDto.class,
         id,
         roleCode);
@@ -826,7 +826,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto setAllMembersVisibility(
       @NotNull UUID id, boolean enabled, @NotNull Map<String, Object> body) {
     return backendApiClient.put(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled}",
+        "/api/v1/bank/org-units/accounts/{id}/visibility/all-members/{enabled}",
         body,
         OrgUnitBankAccountSettingsDto.class,
         id,
@@ -845,7 +845,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto setAreaMembersVisibility(
       @NotNull UUID id, boolean enabled, @NotNull Map<String, Object> body) {
     return backendApiClient.put(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/area-members/{enabled}",
+        "/api/v1/bank/org-units/accounts/{id}/visibility/area-members/{enabled}",
         body,
         OrgUnitBankAccountSettingsDto.class,
         id,
@@ -864,7 +864,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto addUserVisibility(
       @NotNull UUID id, @NotNull UUID userId, @NotNull Map<String, Object> body) {
     return backendApiClient.post(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/user/{userId}",
+        "/api/v1/bank/org-units/accounts/{id}/visibility/user/{userId}",
         body,
         OrgUnitBankAccountSettingsDto.class,
         id,
@@ -882,7 +882,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto removeUserVisibility(
       @NotNull UUID id, @NotNull UUID userId) {
     return backendApiClient.delete(
-        "/api/v1/org-units/bank/accounts/{id}/visibility/user/{userId}",
+        "/api/v1/bank/org-units/accounts/{id}/visibility/user/{userId}",
         OrgUnitBankAccountSettingsDto.class,
         id,
         userId);
@@ -900,7 +900,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto setRoleApprovalLimit(
       @NotNull UUID id, @NotNull String roleCode, @NotNull SetBankApprovalLimitRequest request) {
     return backendApiClient.put(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
+        "/api/v1/bank/org-units/accounts/{id}/approval-limit/role/{roleCode}",
         request,
         OrgUnitBankAccountSettingsDto.class,
         id,
@@ -918,7 +918,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto clearRoleApprovalLimit(
       @NotNull UUID id, @NotNull String roleCode) {
     return backendApiClient.delete(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
+        "/api/v1/bank/org-units/accounts/{id}/approval-limit/role/{roleCode}",
         OrgUnitBankAccountSettingsDto.class,
         id,
         roleCode);
@@ -935,7 +935,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto setAllMembersApprovalLimit(
       @NotNull UUID id, @NotNull SetBankApprovalLimitRequest request) {
     return backendApiClient.put(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
+        "/api/v1/bank/org-units/accounts/{id}/approval-limit/all-members",
         request,
         OrgUnitBankAccountSettingsDto.class,
         id);
@@ -950,7 +950,7 @@ public class BankBackendClient {
   @Nullable
   public OrgUnitBankAccountSettingsDto clearAllMembersApprovalLimit(@NotNull UUID id) {
     return backendApiClient.delete(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
+        "/api/v1/bank/org-units/accounts/{id}/approval-limit/all-members",
         OrgUnitBankAccountSettingsDto.class,
         id);
   }
@@ -966,7 +966,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto setAreaMembersApprovalLimit(
       @NotNull UUID id, @NotNull SetBankApprovalLimitRequest request) {
     return backendApiClient.put(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members",
+        "/api/v1/bank/org-units/accounts/{id}/approval-limit/area-members",
         request,
         OrgUnitBankAccountSettingsDto.class,
         id);
@@ -981,7 +981,7 @@ public class BankBackendClient {
   @Nullable
   public OrgUnitBankAccountSettingsDto clearAreaMembersApprovalLimit(@NotNull UUID id) {
     return backendApiClient.delete(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members",
+        "/api/v1/bank/org-units/accounts/{id}/approval-limit/area-members",
         OrgUnitBankAccountSettingsDto.class,
         id);
   }
@@ -998,7 +998,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto setUserApprovalLimit(
       @NotNull UUID id, @NotNull UUID userId, @NotNull SetBankApprovalLimitRequest request) {
     return backendApiClient.put(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
+        "/api/v1/bank/org-units/accounts/{id}/approval-limit/user/{userId}",
         request,
         OrgUnitBankAccountSettingsDto.class,
         id,
@@ -1016,7 +1016,7 @@ public class BankBackendClient {
   public OrgUnitBankAccountSettingsDto clearUserApprovalLimit(
       @NotNull UUID id, @NotNull UUID userId) {
     return backendApiClient.delete(
-        "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
+        "/api/v1/bank/org-units/accounts/{id}/approval-limit/user/{userId}",
         OrgUnitBankAccountSettingsDto.class,
         id,
         userId);
@@ -1033,7 +1033,7 @@ public class BankBackendClient {
   public BankBookingRequestDto grantOwnerApproval(
       @NotNull UUID id, @NotNull Map<String, Object> body) {
     return backendApiClient.post(
-        "/api/v1/org-units/bank/requests/{id}/owner-approval",
+        "/api/v1/bank/org-units/requests/{id}/owner-approval",
         body,
         BankBookingRequestDto.class,
         id);
@@ -1048,7 +1048,7 @@ public class BankBackendClient {
   @Nullable
   public BankBookingRequestDto revokeOwnerApproval(@NotNull UUID id) {
     return backendApiClient.delete(
-        "/api/v1/org-units/bank/requests/{id}/owner-approval", BankBookingRequestDto.class, id);
+        "/api/v1/bank/org-units/requests/{id}/owner-approval", BankBookingRequestDto.class, id);
   }
 
   /**
@@ -1063,7 +1063,7 @@ public class BankBackendClient {
   public byte @Nullable [] orgUnitAccountStatement(
       @NotNull UUID id, @NotNull Instant from, @NotNull Instant to, @Nullable String userTimeZone) {
     String uri =
-        UriComponentsBuilder.fromPath("/api/v1/org-units/bank/accounts/{id}/statement")
+        UriComponentsBuilder.fromPath("/api/v1/bank/org-units/accounts/{id}/statement")
             .queryParam("from", from)
             .queryParam("to", to)
             .encode()

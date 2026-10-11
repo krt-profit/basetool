@@ -849,8 +849,8 @@ softening the independence from REQ-BANK-008: `BankSecurityService` and the
 ledger stay 100 % OrgUnit-blind. The entire OrgUnit logic lives in exactly
 one seam deliberately **not** named with `Bank`, `OrgUnitBankAccessService`
 (ADR-0020), which is the only one allowed to connect `OwnerScopeService` and the bank
-(ArchUnit-pinned). This surface lies **outside** the bank URL/role space
-under `/api/v1/org-units/bank/**` and needs **no** bank role. „Off./Lead" =
+(ArchUnit-pinned). This surface lies at `/api/v1/bank/org-units/**`, beside the
+bank-employee one, and needs **no** bank role. „Off./Lead" =
 officer of one's own Staffel or lead of one's own Spezialkommando (oversight scope
 `currentOversightScope()`); a plain member still sees nothing.
 
@@ -862,8 +862,8 @@ officer of one's own Staffel or lead of one's own Spezialkommando (oversight sco
 
 | Function (gate)                                                                                                                | Member | Off./Lead | Bank Empl. | Bank Mgmt. | Admin |
 |:-------------------------------------------------------------------------------------------------------------------------------|:------:|:---------:|:----------:|:----------:|:-----:|
-| View **only the balance** of one's own OrgUnit account (`GET /api/v1/org-units/bank/balances`, oversight scope)                |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
-| Create a deposit/withdrawal **request** / view one's own requests / withdraw one's own request (`/org-units/bank/requests/**`) |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
+| View **only the balance** of one's own OrgUnit account (`GET /api/v1/bank/org-units/balances`, oversight scope)                |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
+| Create a deposit/withdrawal **request** / view one's own requests / withdraw one's own request (`/bank/org-units/requests/**`) |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
 | **Confirm** a request (books it, records holders) / **reject** it (`/api/v1/bank/requests/**`, `BANK_EMPLOYEE` + account flag) |   ❌    |     ❌     | ✅ per flag |     ✅      |   ✅   |
 
 \* Bank Empl./Bank Management reach the officer endpoints only as far as the oversight
@@ -916,9 +916,9 @@ decides per account what is visible.
 
 | Function (gate)                                                                                                |  Member (if granted)  | Responsible | Bank Empl. (access) | Admin |
 |:---------------------------------------------------------------------------------------------------------------|:---------------------:|:-----------:|:-------------------:|:-----:|
-| View balance + read-only detail + account statement (`/api/v1/org-units/bank/accounts/{id}`, holders redacted) | ✅ (as far as visible) |      ✅      |    ✅ (bank page)    |   ✅   |
-| Configure visibility (`/api/v1/org-units/bank/accounts/{id}/visibility/**`)                                    |           ❌           |      ✅      |         ❌ †         |   ✅   |
-| Set/remove balance target (`…/balance-target` org-unit or `/api/v1/bank/accounts/{id}/balance-target`)         |           ❌           |      ✅      |     ✅ (access)      |   ✅   |
+| View balance + read-only detail + account statement (`/api/v1/bank/org-units/accounts/{id}`, holders redacted) | ✅ (as far as visible) |      ✅      |    ✅ (bank page)    |   ✅   |
+| Configure visibility (`/api/v1/bank/org-units/accounts/{id}/visibility/**`)                                    |           ❌           |      ✅      |         ❌ †         |   ✅   |
+| Set/remove balance target (`PUT …/balance-target`, org-unit or `/api/v1/bank/accounts/{id}/balance-target`)         |           ❌           |      ✅      |     ✅ (access)      |   ✅   |
 
 † Configuring **Sonderkonto** visibility is restricted to **OL members or Bank Management**
 (REQ-BANK-035/-037, `canConfigureVisibility`) — **not** a plain Bank Empl. (the column
