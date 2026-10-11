@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
     <title th:text="${specialCommand != null ? specialCommand.name() + ' - ' + appTitle : appTitle}">Spezialkommando - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
         <meta name="_csrf" th:content="${_csrf.token}"/>
@@ -10,10 +10,7 @@
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <main th:with="backHref=${canToggleLead or specialCommand == null} ? ${backUrl} : ${backUrl + '?unit=' + specialCommand.id()}">
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey=${canToggleLead ? 'admin.specialcommands.title' : 'leitung.title'}, eyebrowHref=@{${backHref}},
         titleText=${specialCommand != null ? specialCommand.name() : ''}, actions=~{::sk-actions})}">
@@ -61,9 +58,8 @@
         </form>
     </th:block>
 </th:block>
-
-<th:block th:replace="~{fragments/toast :: toast}"/>
-
+</th:block>
+<th:block th:fragment="pageTail">
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var MEMBER_MSG = {
         saved: /*[[#{notification.success.save}]]*/ 'Gespeichert.',
@@ -84,5 +80,6 @@
     };
 </script>
 <script th:src="@{/js/special-command-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>
