@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonMentionRegistry;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,7 +47,8 @@ class PersonSearchServiceAuditTest {
 
   @Test
   void recordSearch_recordsTheLengthAndNeverTheTerm() {
-    PersonSearchService service = new PersonSearchService(auditService);
+    PersonSearchService service =
+        new PersonSearchService(auditService, new PersonMentionRegistry(List.of()));
 
     service.recordSearch(
         TERM, new PersonSearchService.PersonSearchResult(List.of(hit(), hit()), true, List.of()));
@@ -63,7 +65,8 @@ class PersonSearchServiceAuditTest {
 
   @Test
   void recordSearch_measuresTheTrimmedTerm() {
-    PersonSearchService service = new PersonSearchService(auditService);
+    PersonSearchService service =
+        new PersonSearchService(auditService, new PersonMentionRegistry(List.of()));
 
     service.recordSearch(
         "  " + TERM + "  ",

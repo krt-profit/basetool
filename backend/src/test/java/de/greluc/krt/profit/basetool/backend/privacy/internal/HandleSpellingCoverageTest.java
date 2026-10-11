@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.privacy.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource.Target;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -39,9 +40,9 @@ class HandleSpellingCoverageTest {
 
   /** The {@code app_user} text columns the person search matches names against. */
   private static Set<String> searchedColumns() {
-    return PersonSearchTargets.TARGETS.stream()
+    return MentionSourceDeclarations.targets().stream()
         .filter(t -> TABLE.equals(t.table()))
-        .map(PersonSearchTargets.Target::column)
+        .map(Target::column)
         .collect(Collectors.toSet());
   }
 
@@ -51,7 +52,7 @@ class HandleSpellingCoverageTest {
         .as(
             "A name a member is stored under must be findable by the Personensuche, because that is"
                 + " the only route to the text-only snapshots after the account is gone. Add the"
-                + " column to PersonSearchTargets.TARGETS.")
+                + " column to the PersonMentionSource of its module.")
         .containsAll(HandleSpellings.COLUMNS);
   }
 

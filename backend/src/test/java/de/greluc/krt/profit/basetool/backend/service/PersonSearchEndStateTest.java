@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets.Target;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource.Target;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.MentionSourceDeclarations;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -118,7 +118,8 @@ class PersonSearchEndStateTest {
   void theNameIsFoundInEveryRegisteredColumnAndOnlyThere() throws IOException {
     jdbc.execute("SET LOCAL session_replication_role = replica");
     Map<String, List<Target>> byTable = new LinkedHashMap<>();
-    for (Target target : PersonSearchTargets.TARGETS) {
+    List<Target> declared = MentionSourceDeclarations.targets();
+    for (Target target : declared) {
       byTable.computeIfAbsent(target.table(), table -> new ArrayList<>()).add(target);
     }
 
@@ -145,9 +146,7 @@ class PersonSearchEndStateTest {
 
     assertThat(result.truncated()).isFalse();
     assertThat(result.cappedColumns()).isEmpty();
-    assertThat(result.hits())
-        .as("one hit per registered column")
-        .hasSameSizeAs(PersonSearchTargets.TARGETS);
+    assertThat(result.hits()).as("one hit per registered column").hasSameSizeAs(declared);
     assertThat(lines).containsExactlyElementsOf(golden());
   }
 

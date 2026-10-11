@@ -162,7 +162,6 @@ exempt-column|job_order_handover_item.location_name
 exempt-column|job_type.archetype
 exempt-column|job_type.description
 exempt-column|job_type.name
-exempt-column|kommando_group.sort_key
 exempt-column|material_category.name
 exempt-column|material_exchange_offer.item_name
 exempt-column|material_exchange_offer.item_product_key
@@ -236,7 +235,6 @@ exempt-name-holder|p4k_import_job.error_message
 exempt-name-holder|p4k_import_job.result_json
 exempt-name-holder|p4k_import_job.source_filename
 exempt-table|blueprint
-exempt-table|blueprint_component
 exempt-table|city
 exempt-table|faction
 exempt-table|flyway_schema_history
@@ -256,5 +254,3 @@ exempt-table|space_station
 exempt-table|star_system
 exempt-table|terminal
 exempt-table|uex_category
-exempt-table|uex_commodity
-exempt-table|uex_vehicle

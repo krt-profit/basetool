@@ -27,7 +27,7 @@ import org.jetbrains.annotations.NotNull;
  * Registers what happens to each place a person is named when that person's Art. 17 erasure is
  * granted (REQ-SEC-062).
  *
- * <p>{@code HandleErasureCoverageTest} requires every {@link PersonSearchTargets} column to have a
+ * <p>{@code HandleErasureCoverageTest} requires every column the person search declares to have a
  * disposition here, and cross-checks {@link Disposition#ANONYMISED} against {@code
  * HandleAnonymisationService.ANONYMISED_COLUMNS}. Prose columns are {@link
  * Disposition#REVIEWED_BY_HAND}.
@@ -77,7 +77,7 @@ public final class HandleErasureCoverage {
     return Map.entry(column, new Coverage(Disposition.REVIEWED_BY_HAND, reason));
   }
 
-  /** Keyed {@code table.column}, exactly as {@link PersonSearchTargets} spells it. */
+  /** Keyed {@code table.column}, exactly as the person-mention sources spell it. */
   public static final Map<String, Coverage> COVERAGE =
       Map.ofEntries(
           anonymised(

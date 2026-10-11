@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Requires every column {@link PersonSearchTargets} registers as naming a person to carry a
+ * Requires every column the person-mention sources register as naming a person to carry a
  * disposition in {@link HandleErasureCoverage}, keeping the Art. 17 erasure's column set closed
  * (REQ-SEC-062, ADR-0183).
  */
@@ -39,7 +39,7 @@ class HandleErasureCoverageTest {
 
   /** Every registered person-name column, as {@code table.column}. */
   private static Set<String> registeredColumns() {
-    return PersonSearchTargets.TARGETS.stream()
+    return MentionSourceDeclarations.targets().stream()
         .map(t -> t.table() + "." + t.column())
         .collect(Collectors.toSet());
   }

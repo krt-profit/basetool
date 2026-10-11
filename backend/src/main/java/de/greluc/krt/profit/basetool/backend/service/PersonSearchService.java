@@ -24,8 +24,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets.Target;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource.Target;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonMentionRegistry;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
@@ -85,6 +85,7 @@ public class PersonSearchService {
   private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[a-z_][a-z0-9_]{0,62}$");
 
   private final AuditRecorder auditRecorder;
+  private final PersonMentionRegistry mentionRegistry;
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -117,7 +118,7 @@ public class PersonSearchService {
     Query query = entityManager.createNativeQuery(buildSql());
     query.setParameter("term", LikePatterns.contains(trimmed));
     query.setParameter("term_plain", trimmed);
-    query.setMaxResults(TOTAL_LIMIT + 1 + PersonSearchTargets.TARGETS.size());
+    query.setMaxResults(TOTAL_LIMIT + 1 + mentionRegistry.targets().size());
 
     List<?> rows = query.getResultList();
     boolean truncated = rows.size() > TOTAL_LIMIT;
@@ -145,7 +146,7 @@ public class PersonSearchService {
     log.info(
         "Person search returned {} hit(s) across {} column(s){}{}",
         hits.size(),
-        PersonSearchTargets.TARGETS.size(),
+        mentionRegistry.targets().size(),
         truncated ? " (truncated)" : "",
         capped.isEmpty() ? "" : " (" + capped.size() + " column(s) capped)");
     return new PersonSearchResult(hits, truncated, List.copyOf(capped));
@@ -176,9 +177,10 @@ public class PersonSearchService {
    * @return the SQL, with {@code :term} left to be bound
    */
   private @NotNull String buildSql() {
-    StringBuilder sql = new StringBuilder(PersonSearchTargets.TARGETS.size() * 220);
+    List<Target> targets = mentionRegistry.targets();
+    StringBuilder sql = new StringBuilder(targets.size() * 220);
     boolean first = true;
-    for (Target t : PersonSearchTargets.TARGETS) {
+    for (Target t : targets) {
       requireSafeIdentifier(t.table());
       requireSafeIdentifier(t.column());
       requireSafeIdentifier(t.idColumn());
@@ -205,7 +207,7 @@ public class PersonSearchService {
           .append("), ")
           .append(SNIPPET_LENGTH)
           .append(") AS snippet, ")
-          .append(t.linkKind() == null ? "CAST(NULL AS text)" : quote(t.linkKind()))
+          .append(t.linkKind() == null ? "CAST(NULL AS text)" : quote(t.linkKind().name()))
           .append(" AS link_kind")
           .append(" FROM ")
           .append(t.table())
@@ -231,7 +233,8 @@ public class PersonSearchService {
   private static void requireSafeIdentifier(@NotNull String identifier) {
     if (!SAFE_IDENTIFIER.matcher(identifier).matches()) {
       throw new IllegalStateException(
-          "PersonSearchTargets contains an identifier that is not a plain SQL name: " + identifier);
+          "A person-mention source declares an identifier that is not a plain SQL name: "
+              + identifier);
     }
   }
 

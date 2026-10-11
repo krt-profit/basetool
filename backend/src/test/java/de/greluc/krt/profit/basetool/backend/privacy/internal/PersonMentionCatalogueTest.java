@@ -108,7 +108,7 @@ class PersonMentionCatalogueTest {
   private static List<String> declaredLines() {
     List<String> lines = new ArrayList<>();
     new TreeSet<>(
-            PersonSearchTargets.TARGETS.stream()
+            MentionSourceDeclarations.targets().stream()
                 .map(
                     t ->
                         "target|"
@@ -123,9 +123,9 @@ class PersonMentionCatalogueTest {
                             + t.linkKind())
                 .toList())
         .forEach(lines::add);
-    add(lines, "exempt-column|", PersonSearchTargets.EXEMPT_COLUMNS);
-    add(lines, "exempt-name-holder|", PersonSearchTargets.EXEMPT_BUT_MAY_HOLD_A_NAME);
-    add(lines, "exempt-table|", PersonSearchTargets.EXEMPT_TABLES);
+    add(lines, "exempt-column|", MentionSourceDeclarations.exemptColumns());
+    add(lines, "exempt-name-holder|", MentionSourceDeclarations.exemptButMayHoldAName());
+    add(lines, "exempt-table|", MentionSourceDeclarations.exemptTables());
     return lines;
   }
 
