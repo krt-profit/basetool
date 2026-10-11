@@ -1072,7 +1072,8 @@ integrity, not coupling. A **trigger** or a **native statement** (a repository's
 `@Query(nativeQuery = true)` or `@NativeQuery`, an entity's `@Formula`) names another module's table
 only through a reviewed crossing listed with its reason in `TableOwnershipTest`, and SQL that no
 repository declares runs only in the four listed classes: the three GDPR registries'
-executors (`DataExportService`, `PersonSearchService`, `UserAccountMergeService`) and
+executors (`DataExportService`, `PersonSearchService` and the merge's `OwnedRowsMover`, which runs
+the tables the modules' `UserReassignmentParticipant`s declare) and
 `ChangeSourceTransactionManager`.
 
 Every table and column a trigger function names — `NEW.x`, `OLD.x`, `alias.x`, an `INSERT` column
@@ -1160,9 +1161,10 @@ listed with its reason:
   `mission_unit.responsible_user_id`, `org_unit.grand_admiral_user_id`, `user_roles.user_id`)
   each have one since 2026-10-03 (REQ-SEC-058), and the not-exported list no longer admits a
   column that holds data about the member.
-- **Merge** (REQ-SEC-046, `UserAccountMergeService`): it follows the member or stays with the act;
-  only `p4k_import_job.created_by` is listed as not merged. `UserAccountMergeCoverageTest` holds
-  the foreign-key columns as before; this requirement adds the ones without a key.
+- **Merge** (REQ-SEC-046, `UserAccountMergeService`): it follows the member or stays with the act,
+  as the union of the modules' `UserReassignmentParticipant` declarations; only
+  `p4k_import_job.created_by` is listed as not merged. `UserAccountMergeCoverageTest` holds the
+  foreign-key columns as before; this requirement adds the ones without a key.
 
 **Acceptance**
 
@@ -1181,7 +1183,7 @@ listed with its reason:
 **Enforced by:** `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest`,
 `UserIdentityColumnForeignKeyTest` · **Code:** `UserDeletionService`, the `UserErasureParticipant`
 implementations, the `PersonalDataExportSection`
-implementations, `UserAccountMergeService`
+implementations, `UserAccountMergeService`, the `UserReassignmentParticipant` implementations
 
 ### REQ-DATA-022 — a cached instance is never edited; caches move to read models
 
