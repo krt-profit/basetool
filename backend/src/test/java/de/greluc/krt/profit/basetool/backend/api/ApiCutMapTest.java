@@ -138,6 +138,10 @@ class ApiCutMapTest {
     assertThatThrownBy(() -> waveNumber("x", "x GET /a /b T2 -"))
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining("x GET /a /b T2 -");
+    assertThatThrownBy(() -> waveNumber("100", "100 GET /a /b T2 -"))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("100 GET /a /b T2 -");
+    assertThat(waveNumber("3", "3 GET /a /b T2 -")).isEqualTo(3);
   }
 
   /**
@@ -311,11 +315,17 @@ class ApiCutMapTest {
    * @throws AssertionError if the field is not an integer in range
    */
   private static int waveNumber(String text, String line) {
-    if (!text.matches("\\d{1,2}")) {
-      throw new AssertionError(
-          "api-cut-map.txt: `" + text + "` is not a wave number in '" + line + "'");
+    String message = "api-cut-map.txt: `" + text + "` is not a wave number in '" + line + "'";
+    int wave;
+    try {
+      wave = Integer.parseInt(text);
+    } catch (NumberFormatException e) {
+      throw new AssertionError(message, e);
     }
-    return Integer.parseInt(text);
+    if (wave < 0 || wave > 99) {
+      throw new AssertionError(message);
+    }
+    return wave;
   }
 
   /**
