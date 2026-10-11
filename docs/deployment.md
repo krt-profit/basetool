@@ -71,7 +71,11 @@ disaster recovery: [`backup.md`](backup.md). The monitoring plane:
   `docker-compose.monitoring.yml`, `docker/maintenance`, `docker/edge`, `docker/acme`,
   `keycloak-theme`, `monitoring` and **`quadlet/`** — the unit files and their `env.d` templates.
   It is promoted in lock-step with the app images and the `basetool-keycloak-spi` JAR bundle
-  (ADR-0055), so a promoted unit change reaches the host by the next tick.
+  (ADR-0055), so a promoted unit change reaches the host by the next tick. It also carries
+  `host-scripts.sha256`, the hashes of the host scripts the role installs, which the host compares
+  with its own copies (REQ-OPS-045, ADR-0247); `release-images.yml` generates it from the commit, and
+  a local `docker build -f docker/config/Dockerfile .` needs
+  `scripts/host-scripts-manifest.sh generate > docker/config/host-scripts.sha256` first.
 - **The three app images are one Dockerfile (ADR-0209).** `docker/app/Dockerfile`, built with
   `--build-arg MODULE=backend|frontend|ingest` from the repository root. Each image carries a Java
   AOT cache its build verified; a host that starts one with a different
@@ -548,7 +552,79 @@ rest.
 
 Nothing is deployed yet: `:stable` still names the previous release.
 
+### Before a promotion: the host scripts
+
+> [!danger] Mandatory, and a mismatch blocks the promotion
+> The scripts under `/var/iri/code/scripts` reach a host **only** through the Ansible role, never the
+> config bundle, so "released" does not mean "installed". On 2026-10-10 the v1.14.0 promotion took
+> production down for about four minutes because `deploy.sh` and `backup.sh` on the host still started
+> the edge after `ingest` and `frontend`; the fix had been released and never installed. The check
+> below would have shown exactly those two of 14 files. It is a step of **every** promotion to
+> production and to testing, not only of releases that touch a script (ADR-0247, REQ-OPS-045).
+
+All read-only on the host. Hash on the host with `sha256sum`, and hash the tag with a byte-exact tool
+locally (Git-Bash or WSL). **Never pipe file bytes through PowerShell**: it re-encodes them and adds
+carriage returns, and the hashes then differ for a file that is identical. Only the hex text crosses
+PowerShell here, and the comparison strips the carriage returns.
+
+1. Hash every file under the scripts directory on the host (PowerShell; `<host>` is production or testing):
+
+   ```powershell
+   ssh root@<host> "cd /var/iri/code/scripts && find . -type f | cut -c3- | sort | xargs sha256sum" | Set-Content -Encoding ascii host.sha256
+   ```
+
+2. Hash the release tag locally, from a checkout that has the tag (`git fetch --tags origin`):
+
+   ```bash
+   scripts/host-scripts-manifest.sh generate --rev v1.15.0 > expected.sha256
+   ```
+
+   That prints one `sha256sum` line per file the role installs, read with `git show <tag>:scripts/<file>`.
+   For a tag from before `scripts/host-scripts.list` existed, loop over the files that step 1 printed:
+   `git show v1.14.0:scripts/<file> | sha256sum`.
+
+3. Compare:
+
+   ```bash
+   tr -d '\r' < host.sha256 | sort -k2 > host.sorted
+   sort -k2 expected.sha256 > expected.sorted
+   diff expected.sorted host.sorted
+   ```
+
+   No output is a match. A line starting `<` is a file the tag has and the host lacks or holds with other
+   bytes: **that blocks the promotion**. A line starting `>` for a name that is not in the list is a
+   leftover on the host (read it, it does not block); a `>` for a listed name is the other half of a
+   `<`.
+
+4. **On any `<` line, do not promote.** Run the role from a checkout **of that tag** (not `main`; the
+   hashes must be the tag's), as an owner-approved production write:
+
+   ```bash
+   ansible-playbook site.yml --limit production --tags deploy,scripts --check --diff
+   ansible-playbook site.yml --limit production --tags deploy,scripts
+   ```
+
+   then repeat steps 1 to 3 until `diff` prints nothing. `--tags observability` and `--tags updates`
+   install the collectors and are only needed when their files differ.
+
+Once a host runs a `deploy.sh` that has the check, the host does this itself: every tick logs
+`host scripts: all N match the manifest of the deployed release` (or one `WARN` per file), writes
+`basetool_host_scripts_drift`, and refuses a release whose apply path differs (see
+[What happens on the host](#what-happens-on-the-host)). The manual check stays mandatory: it is the only
+protection for a host that has not got the check yet, and it is how the first install is verified.
+
+> [!note] The first install of the check comes through the role
+> A `deploy.sh` without the check cannot police itself. Until the role has been run from a tag that
+> contains it, the manual comparison above is the whole protection, and `HostScriptsCheckStale` fires
+> on the absent metric once the release's alert rules are live. The refusal never blocks its own fix:
+> the fix is the role, not `deploy.sh`, and the refusal records no backoff, so the first tick after the
+> role run applies the release. A host that missed the first manifest (an older `deploy.sh` applied that
+> bundle) gets it with `deploy.sh --reapply` after the role run.
+
 ### Promoting to production
+
+> [!important] First: [the host scripts comparison](#before-a-promotion-the-host-scripts)
+> It is mandatory, and a mismatch blocks the promotion.
 
 > [!note] A release whose PRs need more than this path gets its own runbook
 > When a release carries host steps, ordering constraints or switches beyond the promotion below,
@@ -596,7 +672,9 @@ Within about five minutes the timer fires `deploy.sh`, which:
 1. logs in to GHCR (as `iri` for the pull, as `deploy` for `skopeo`/`cosign`), resolves `:stable`
    for all five artifacts and compares the five-field marker
    `backend|frontend|ingest|config|keycloak-spi` with `/var/lib/iri/last-deployed.digests`;
-2. on a match, **verifies the running stack** (REQ-OPS-013): each app service has a container that
+2. on a match, **compares the host's scripts with the deployed release's manifest** (one
+   `host scripts:` line per differing or missing file, `basetool_host_scripts_drift`; a warning, never
+   a failure at target) and **verifies the running stack** (REQ-OPS-013): each app service has a container that
    is running and healthy (or still starting) from the target digest. A converged stack is a no-op
    — plus the edge and monitoring reconciles below. A structural divergence (missing container,
    wrong image) is logged as `drift: …` and re-applied — a missing container is **started**, and
@@ -614,8 +692,12 @@ Within about five minutes the timer fires `deploy.sh`, which:
 3. otherwise **cosign-verifies every digest** (REQ-OPS-015) — a failure aborts before anything is
    pulled or staged; then, if the provider-JAR digest moved, **extracts the JAR** into
    `/var/lib/iri/keycloak-spi-stage.jar`, before anything on the host changes;
-4. if the config digest moved: extracts the bundle, asserts it carries no secret, applies the
-   stateful-infra gate (below), **checks that `deploy` owns and can write every directory it is
+4. if the config digest moved: extracts the bundle, asserts it carries no secret, **compares the
+   bundle's `host-scripts.sha256` with the host's scripts and refuses the release, changing nothing and
+   recording no backoff, when `deploy.sh`, `lib/common.sh`, `lib/container-runtime.sh` or
+   `render-env-d.py` differ** (`HOST SCRIPTS:` in the log, `DeployFailed`; the fix is the role from the
+   release's tag, then the next tick applies it; `--force` or `IRI_REQUIRE_CURRENT_SCRIPTS=false`
+   bypass it), applies the stateful-infra gate (below), **checks that `deploy` owns and can write every directory it is
    about to mirror into** (and the compose directory, the unit directory and `env.d/`), snapshots
    the live tree to `config-previous/`, mirrors the new tree into `/var/iri/code`, **renders
    `env.d/`**, installs changed units and stops-then-removes units the release no longer names;
@@ -1413,8 +1495,8 @@ aardvark-dns, containers-common, passt) is updated by hand, testing host first:
 > a host that has been up more than five minutes, because its `OnBootSec` has passed.) Reaches a host
 > only through the role: `--tags scripts`.
 
-Confirm by content, never by mtime:
-`sha256sum /var/iri/code/scripts/deploy.sh` against `git show origin/main:scripts/deploy.sh | sha256sum`.
+Confirm by content, never by mtime, and before every promotion:
+[Before a promotion: the host scripts](#before-a-promotion-the-host-scripts).
 
 ---
 
@@ -2222,6 +2304,8 @@ goes.
 | `drift: […] unhealthy on the target image — not part of this re-apply` and `stack-health heartbeat NOT stamped` | the deploy log | a tick found a missing container **and** an unhealthy one; the re-apply brought the missing one back and deliberately left the unhealthy one to the next tick's targeted heal (ADR-0083). Nothing to do unless the next tick's heal fails |
 | `health check failed … on a re-apply of the deployed release — not rolling back` (or a `FATAL … step '…' failed` after `re-applying`), then `recorded re-apply failure #N`; `DeployHealthRestartFailing` fires, `DeployRolledBack` does not | the `drift:` and `health gate: did not come up, in start order: […]` lines, `${UPOD} logs --since 10m <first unit named>`, `${UCTL} status <that unit>.service` | the running stack drifted from the deployed release (a missing container, a wrong image) and putting that same release back did not bring it up. Nothing was rolled back and the anchors still name the release before it — correct, since the target *is* the deployed release (ADR-0083, amended 2026-09-25). Treat it as a runtime fault: read the unit's log, fix the cause, then `cd / && sudo -u deploy /var/iri/code/scripts/deploy.sh --reapply` to re-apply it now (or `--force`, which skips the backoff the same way). The automatic retry backs off 300 s, doubling, capped at 1 h — the heal's durations, from `reapply-failed.digests` (since 2026-09-26; 600 s doubling to 6 h from `failed.digests` before). If the deployed release itself is at fault, roll back by promotion (`promote.yml -f version=…`) |
 | `FATAL: --reapply: no deployed release on this host`, `… cannot be combined with --tag`, or `… the host disagrees about what is deployed` | the command's output | `--reapply` was refused before anything was contacted or changed, and nothing was recorded. No marker: the host has never finished a deploy — run a normal one. `--tag`: drop one of the two. Disagreement: `current-digest-pin.yml` and `last-deployed.digests` name different app digests — find out which is running (`${UPOD} ps`, the drop-ins), then deploy that release with `--tag` |
+| `HOST SCRIPTS: [deploy.sh …] on this host are not the ones this release was built with`; `DeployFailed` fires | the deploy log, `{app="ops-deploy"} \|~ "host scripts:"` | the host's `deploy.sh`, `lib/` or `render-env-d.py` is older (or newer) than the release's — nothing was changed and no backoff recorded; run the role from the release's tag ([Before a promotion](#before-a-promotion-the-host-scripts)), and the next tick applies it |
+| `host scripts: WARN … differs`; `HostScriptDrift` or `HostScriptsCheckStale` fires | the same log, `basetool_host_scripts_drift` | a script the role installs is not the deployed release's, or the host's `deploy.sh` has no such check — run the role from the release's tag |
 | `CARVE-OUT: postgres/Keycloak image pin changed` | the deploy log, `config-blocked.marker` | a gated upgrade — see [Stateful-infra upgrades](#stateful-infra-upgrades) |
 | `health gate: did not come up, in start order: […]` with `provider JAR: yes` in the `this release changed:` line; `DeployRolledBack` fires | the `health gate:` lines of the deploy log, `${UPOD} logs --since 10m <first unit named>`, `${UCTL} status keycloak.service backend.service frontend.service ingest.service` | one release moved the JAR (and possibly images), and the whole of it — pin, config, units, JAR — was rolled back together (ADR-0213); the target backs off. `KEYCLOAK did not come up … the JAR is the likely cause` narrows it to the JAR; `keycloak is up on the new provider JAR; the first unit that did not come up is …` cannot tell a bad image from a bad JAR — read that unit's log. If it then says `rollback ALSO failed — did not come up: […]`, something outside the release is wrong — `${UCTL} start backend.service ingest.service frontend.service` waits for them without restarting anything. *(Before 2026-09-25 the JAR had its own post-gate step, logging `keycloak did not become healthy with the new provider JAR` and `DeployFailed`.)* See [Keycloak provider JAR](#keycloak-provider-jar) |
 | `FATAL: deploy aborted before the health gate — step 'extract the keycloak-spi provider JAR' failed`; `DeployFailed` fires | the deploy log; `skopeo inspect docker://ghcr.io/<owner>/basetool-keycloak-spi:stable` as `deploy` | the promoted provider-JAR image could not be read or carries no `/providers/keycloak-spi.jar`; nothing on the host was changed and the target backs off. Until 2026-09-25 this failed after the gate and recorded nothing |

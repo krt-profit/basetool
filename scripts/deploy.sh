@@ -41,6 +41,14 @@ MIXED_RELEASE_GRACE="${IRI_MIXED_RELEASE_GRACE:-900}"
 COSIGN_SEARCH_PATH="${IRI_COSIGN_SEARCH_PATH:-/usr/local/bin:/usr/bin:/opt/cosign/bin}"
 VERIFY_LAST_ERROR=""
 
+HOST_SCRIPTS_DIR="${IRI_HOST_SCRIPTS_DIR:-${IRI_SCRIPT_DIR}}"
+REQUIRE_CURRENT_SCRIPTS="${IRI_REQUIRE_CURRENT_SCRIPTS:-true}"
+HOST_SCRIPTS_MANIFEST_NAME="host-scripts.sha256"
+APPLY_PATH_SCRIPTS=(deploy.sh lib/common.sh lib/container-runtime.sh render-env-d.py)
+HS_DIFFERS=()
+HS_MISSING=()
+HS_CHECKED=0
+
 TARGET_TAG=stable
 TAG_GIVEN=false
 CHECK_ONLY=false
@@ -129,6 +137,11 @@ Environment overrides (all optional, sensible defaults shown):
                                   org.opencontainers.image.revision; false = break-glass)
   IRI_MIXED_RELEASE_GRACE=900   (seconds a mixed target set is waited out as a
                                   promotion in progress before it fails the deploy)
+  IRI_REQUIRE_CURRENT_SCRIPTS=true   (refuse a release whose config bundle lists a
+                                  deploy.sh, lib/ or render-env-d.py hash the host's
+                                  copy does not have; false = break-glass, --force
+                                  also bypasses it)
+  IRI_HOST_SCRIPTS_DIR=<dir of this script>   (the host scripts that are hashed)
   DOCKER_CONFIG=/var/lib/iri/.docker   (the registry credential cosign reads
                                         and skopeo shares via
                                         REGISTRY_AUTH_FILE; under STATE_DIR
@@ -223,6 +236,8 @@ snapshot_config_tree() {
     && cp -a "${COMPOSE_DIR}/monitoring" "${dst}/monitoring"
   [[ -d "${COMPOSE_DIR}/quadlet" ]] \
     && cp -a "${COMPOSE_DIR}/quadlet" "${dst}/quadlet"
+  [[ -f "${COMPOSE_DIR}/${HOST_SCRIPTS_MANIFEST_NAME}" ]] \
+    && cp -a "${COMPOSE_DIR}/${HOST_SCRIPTS_MANIFEST_NAME}" "${dst}/${HOST_SCRIPTS_MANIFEST_NAME}"
   return 0
 }
 
@@ -258,6 +273,134 @@ apply_config_tree() {
   if [[ -d "${src}/quadlet" ]]; then
     mirror_dir "${src}/quadlet" "${dst}/quadlet"
   fi
+  if [[ -f "${src}/${HOST_SCRIPTS_MANIFEST_NAME}" ]]; then
+    install -m 0644 "${src}/${HOST_SCRIPTS_MANIFEST_NAME}" "${dst}/.${HOST_SCRIPTS_MANIFEST_NAME}.tmp"
+    mv -f "${dst}/.${HOST_SCRIPTS_MANIFEST_NAME}.tmp" "${dst}/${HOST_SCRIPTS_MANIFEST_NAME}"
+  else
+    rm -f "${dst}/${HOST_SCRIPTS_MANIFEST_NAME}"
+  fi
+}
+
+host_scripts_compare() {
+  local manifest="$1" line rel want actual
+  local re='^([0-9a-f]{64})  ([A-Za-z0-9._][A-Za-z0-9._/-]*)$'
+  HS_DIFFERS=()
+  HS_MISSING=()
+  HS_CHECKED=0
+  [[ -s "${manifest}" ]] || return 2
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    [[ -n "${line}" ]] || continue
+    if ! [[ "${line}" =~ ${re} ]] || [[ "${line}" == *..* ]]; then
+      return 2
+    fi
+    want="${BASH_REMATCH[1]}"
+    rel="${BASH_REMATCH[2]}"
+    HS_CHECKED=$(( HS_CHECKED + 1 ))
+    if [[ ! -r "${HOST_SCRIPTS_DIR}/${rel}" ]]; then
+      HS_MISSING+=("${rel}")
+      continue
+    fi
+    actual="$(sha256sum < "${HOST_SCRIPTS_DIR}/${rel}")"
+    [[ "${actual%% *}" == "${want}" ]] || HS_DIFFERS+=("${rel}")
+  done < "${manifest}"
+  (( HS_CHECKED > 0 )) || return 2
+  return 0
+}
+
+host_scripts_apply_path_drift() {
+  local rel path out=""
+  for rel in "${HS_DIFFERS[@]}" "${HS_MISSING[@]}"; do
+    for path in "${APPLY_PATH_SCRIPTS[@]}"; do
+      if [[ "${rel}" == "${path}" ]]; then
+        out="${out}${out:+ }${rel}"
+      fi
+    done
+  done
+  printf '%s' "${out}"
+}
+
+write_host_scripts_metric() {
+  local rel
+  {
+    if (( ${#HS_DIFFERS[@]} + ${#HS_MISSING[@]} > 0 )); then
+      echo "# HELP basetool_host_scripts_drift 1 for each host script whose sha256 differs from (kind=differs) or is absent against (kind=missing) the manifest of the release it is compared with."
+      echo "# TYPE basetool_host_scripts_drift gauge"
+      for rel in "${HS_DIFFERS[@]}"; do
+        echo "basetool_host_scripts_drift{file=\"${rel}\",kind=\"differs\"} 1"
+      done
+      for rel in "${HS_MISSING[@]}"; do
+        echo "basetool_host_scripts_drift{file=\"${rel}\",kind=\"missing\"} 1"
+      done
+    fi
+    echo "# HELP basetool_host_scripts_check_timestamp_seconds Unix time deploy.sh last compared the host scripts with a release manifest."
+    echo "# TYPE basetool_host_scripts_check_timestamp_seconds gauge"
+    echo "basetool_host_scripts_check_timestamp_seconds $(date +%s)"
+  } | write_textfile host-scripts.prom || true
+}
+
+report_host_scripts() {
+  local label="$1" rel
+  write_host_scripts_metric
+  if (( ${#HS_DIFFERS[@]} + ${#HS_MISSING[@]} == 0 )); then
+    log "host scripts: all ${HS_CHECKED} match the manifest of the ${label}"
+    return 0
+  fi
+  for rel in "${HS_DIFFERS[@]}"; do
+    log "host scripts: WARN ${rel} differs from the manifest of the ${label}"
+  done
+  for rel in "${HS_MISSING[@]}"; do
+    log "host scripts: WARN ${rel} is missing, the manifest of the ${label} lists it"
+  done
+  log "host scripts: WARN install the scripts of that release with the role (ansible-playbook site.yml --tags deploy,scripts, run from its tag; docs/deployment.md, Before a promotion: the host scripts)"
+}
+
+forget_host_scripts_metric() {
+  rm -f "${TEXTFILE_DIR}/host-scripts.prom" 2>/dev/null || true
+}
+
+check_host_scripts_applied() {
+  local manifest="${COMPOSE_DIR}/${HOST_SCRIPTS_MANIFEST_NAME}" rc=0
+  if [[ ! -f "${manifest}" ]]; then
+    forget_host_scripts_metric
+    log "host scripts: the deployed release carries no ${HOST_SCRIPTS_MANIFEST_NAME}, so the host's scripts are not compared (the first release that ships one starts the check)"
+    return 0
+  fi
+  host_scripts_compare "${manifest}" || rc=$?
+  if (( rc != 0 )); then
+    forget_host_scripts_metric
+    log "host scripts: WARN ${manifest} is empty or malformed, so the host's scripts are not compared"
+    return 0
+  fi
+  report_host_scripts "deployed release"
+}
+
+assert_host_scripts_current_or_die() {
+  local manifest="$1" rc=0 apply
+  if [[ ! -f "${manifest}" ]]; then
+    log "host scripts: the config bundle carries no ${HOST_SCRIPTS_MANIFEST_NAME}, so nothing is compared (a bundle built before the check existed)"
+    return 0
+  fi
+  host_scripts_compare "${manifest}" || rc=$?
+  if (( rc != 0 )); then
+    forget_host_scripts_metric
+    log "host scripts: WARN the bundle's ${HOST_SCRIPTS_MANIFEST_NAME} is empty or malformed, so nothing is compared"
+    return 0
+  fi
+  report_host_scripts "release being applied"
+  apply="$(host_scripts_apply_path_drift)"
+  [[ -n "${apply}" ]] || return 0
+  if [[ "${FORCE}" == "true" ]]; then
+    log "host scripts: WARN [${apply}] are not this release's, which apply it; --force given, applying anyway"
+    return 0
+  fi
+  if [[ "${REQUIRE_CURRENT_SCRIPTS}" != "true" ]]; then
+    log "WARNING: host-scripts gate DISABLED (IRI_REQUIRE_CURRENT_SCRIPTS=false), applying with [${apply}] that are not this release's"
+    return 0
+  fi
+  PRE_GATE_GUARD=false
+  rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
+  write_deploy_metric failure
+  fail "HOST SCRIPTS: [${apply}] on this host are not the ones this release was built with, and they are what applies it. Nothing was changed. Install that release's scripts first: run the role from its tag with --tags deploy,scripts (docs/deployment.md, Before a promotion: the host scripts); the next tick then applies the release. Break-glass: deploy.sh --force, or IRI_REQUIRE_CURRENT_SCRIPTS=false"
 }
 
 install_quadlet_units() {
@@ -1059,6 +1202,10 @@ if [[ "${CONFIG_CHANGED}" != "true" ]]; then
   fi
 fi
 
+if [[ "${CONFIG_CHANGED}" != "true" ]]; then
+  check_host_scripts_applied
+fi
+
 running_stack_drift() {
   local entry svc image digest cids cid state img_id repo_digests img_ok
   local -a units=()
@@ -1332,6 +1479,7 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   DEPLOY_STEP="check the staged config bundle"
   require_file "${CONFIG_STAGE_DIR}/docker-compose.yml"
   assert_no_secrets "${CONFIG_STAGE_DIR}"
+  assert_host_scripts_current_or_die "${CONFIG_STAGE_DIR}/${HOST_SCRIPTS_MANIFEST_NAME}"
 
   OLD_INFRA="$(infra_image_pins "${COMPOSE_DIR}")"
   NEW_INFRA="$(infra_image_pins "${CONFIG_STAGE_DIR}")"
