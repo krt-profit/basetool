@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **Nicht rückgängig zu machen: die Migration V282.** Sie löscht die abgelösten Qualitätsspalten `job_order_material.min_quality`, `job_order_item_material.quality_requirement` und `material_claim.quality_requirement` samt zugehöriger Indizes und Prüfregeln. Ein reiner Code-Rollback auf ein Release vor v1.14.0 ist danach nicht möglich; der Rückweg ist die Wiederherstellung des Backups, das unmittelbar vor der Promotion gezogen wird.
+
 - **Android-App: Mindest- und neueste Version sind jetzt 19.** Mit dem gemeinsamen API-Schnitt erscheint die App v0.6.0 (versionCode 19); wer eine ältere App nutzt, wird mit dem Release zum Update aufgefordert und kann die App erst nach dem Update wieder benutzen (REQ-API-020).
 
 - **REST-API, Welle 1 (nur Web, keine App-Änderung).** Die Administrations-Endpunkte liegen jetzt je Fachbereich unter `/api/v1/<bereich>/admin/**` (z. B. `/users/admin`, `/catalog/admin`, `/connected-apps/admin`), die Rollen unter `/api/v1/roles`, die Benachrichtigungsregeln unter `/api/v1/notifications/admin/rules`; ein einziges ADMIN-Gate steht vor allen Fachregeln. Das Duplikat `PUT /admin/users/{id}/attributes` und die beiden Ping-Endpunkte entfallen. Teil des gemeinsamen API-Schnitts (REQ-API-023).
