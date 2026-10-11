@@ -36,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFinanceRe
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderLine;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceGroupAggregate;
-import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;

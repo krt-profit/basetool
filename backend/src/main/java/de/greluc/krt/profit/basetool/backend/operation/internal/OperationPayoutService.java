@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -36,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.operation.api.events.OperationNotic
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFigures;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFinanceReader;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.math.BigDecimal;
@@ -54,6 +52,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -447,6 +446,7 @@ public class OperationPayoutService {
    * @param participantKey a participant key
    * @return the member's id, or {@code null} for a guest or a deleted account
    */
+  @Nullable
   private static UUID memberOf(@NotNull String participantKey) {
     try {
       return UUID.fromString(participantKey);

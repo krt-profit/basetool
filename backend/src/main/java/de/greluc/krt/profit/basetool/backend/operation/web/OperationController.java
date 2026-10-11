@@ -20,19 +20,19 @@
 package de.greluc.krt.profit.basetool.backend.operation.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.mapper.OperationMapper;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.operation.internal.MissionFinanceSummaryDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationCreateDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceService;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceSummaryDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationMapper;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutService;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutStatusUpdateDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutSummaryDto;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -416,7 +416,7 @@ public class OperationController {
     @ApiResponse(responseCode = "403", description = "Caller lacks the MISSION_MANAGER role.")
   })
   public OperationDto createOperation(@Valid @RequestBody OperationCreateDto createDto) {
-    de.greluc.krt.profit.basetool.backend.model.Operation operation =
+    de.greluc.krt.profit.basetool.backend.operation.internal.Operation operation =
         operationMapper.toEntity(createDto);
     return operationMapper.toDto(
         operationService.createOperation(operation, createDto.owningOrgUnitId()));

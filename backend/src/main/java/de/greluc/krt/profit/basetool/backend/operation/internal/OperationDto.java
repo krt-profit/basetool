@@ -17,9 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
+import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import java.time.Instant;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -43,13 +43,13 @@ import org.jetbrains.annotations.Nullable;
 public record OperationDto(
     UUID id,
     String name,
-    String description,
+    @Nullable String description,
     OperationStatus status,
-    SquadronReferenceDto owningSquadron,
+    @Nullable SquadronReferenceDto owningSquadron,
     Long version,
     Instant createdAt,
     Instant updatedAt,
-    Boolean payoutPreliminary) {
+    @Nullable Boolean payoutPreliminary) {
 
   /**
    * Returns a copy of this DTO with {@code payoutPreliminary} replaced.

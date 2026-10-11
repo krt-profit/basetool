@@ -133,6 +133,7 @@ val nullAwayPackages =
           "joborder",
           "materialexchange",
           "mission",
+          "operation",
           "refinery",
         )
         .map {

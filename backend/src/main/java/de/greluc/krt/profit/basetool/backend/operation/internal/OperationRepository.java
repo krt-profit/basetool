@@ -17,17 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.repository;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.Operation;
-import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -57,6 +55,7 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * @return the earliest {@code createdAt} in that status, or {@code null} when none exists
    */
   @Query("SELECT MIN(o.createdAt) FROM Operation o WHERE o.status = :status")
+  @Nullable
   Instant findOldestCreatedAtByStatus(@Param("status") OperationStatus status);
 
   /**
@@ -100,13 +99,13 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    *     participant escape
    */
   @EntityGraph(attributePaths = {"owningOrgUnit"})
-  @Query("SELECT o FROM Operation o WHERE " + ScopeSpecifications.OPERATION_SCOPE_PREDICATE)
+  @Query("SELECT o FROM Operation o WHERE " + OperationAccessPolicy.OPERATION_SCOPE_PREDICATE)
   Page<Operation> findAllScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
-      @Param("viewerUserId") UUID viewerUserId,
+      @Param("viewerUserId") @Nullable UUID viewerUserId,
       Pageable pageable);
 
   /**
@@ -131,20 +130,20 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto(o.id,
-      o.name) FROM Operation o WHERE (
+      SELECT new de.greluc.krt.profit.basetool.backend.operation.internal.OperationReferenceDto(
+      o.id, o.name) FROM Operation o WHERE (
         o.status IN ('PLANNED', 'ACTIVE')
         OR (o.status IN ('COMPLETED', 'CANCELED') AND o.createdAt >= :cutoff)
       ) AND
       """
-          + ScopeSpecifications.OPERATION_SCOPE_PREDICATE
+          + OperationAccessPolicy.OPERATION_SCOPE_PREDICATE
           + " ORDER BY o.name ASC")
   List<OperationReferenceDto> findAllReferenceScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
-      @Param("viewerUserId") UUID viewerUserId,
+      @Param("viewerUserId") @Nullable UUID viewerUserId,
       @Param("cutoff") Instant cutoff);
 
   /**
@@ -173,7 +172,7 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
   @EntityGraph(attributePaths = {"owningOrgUnit"})
   @Query(
       "SELECT o FROM Operation o WHERE "
-          + ScopeSpecifications.OPERATION_SCOPE_PREDICATE
+          + OperationAccessPolicy.OPERATION_SCOPE_PREDICATE
           + " AND (CAST(:query AS string) IS NULL OR o.name ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%') ESCAPE '\\' OR CAST(o.description AS string) ILIKE CONCAT('%',"
           + " CAST(:query AS string), '%') ESCAPE '\\') AND (CAST(o.status AS string) IN (:status))"
@@ -181,15 +180,15 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
           + " Mission m WHERE m.operationId = o.id) >= :start) AND (CAST(:end AS timestamp) IS NULL"
           + " OR (SELECT MAX(m.plannedEndTime) FROM Mission m WHERE m.operationId = o.id) <= :end)")
   Page<Operation> searchOperations(
-      @Param("query") String query,
-      @Param("start") Instant start,
-      @Param("end") Instant end,
+      @Param("query") @Nullable String query,
+      @Param("start") @Nullable Instant start,
+      @Param("end") @Nullable Instant end,
       @Param("status") List<String> status,
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
-      @Param("viewerUserId") UUID viewerUserId,
+      @Param("viewerUserId") @Nullable UUID viewerUserId,
       Pageable pageable);
 
   /**

@@ -17,21 +17,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mapper;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.model.Operation;
-import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
+import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import tools.jackson.databind.json.JsonMapper;
 
 class OperationMapperTest {
 
@@ -69,7 +68,7 @@ class OperationMapperTest {
   }
 
   @Test
-  void toDtoFromSummary_shouldBuildTheDtoToDtoBuildsFromTheEntity() {
+  void theEmbeddedOperationOfAMissionIsTheOperationDtoOnTheWire() {
     UUID id = UUID.randomUUID();
     Squadron owner = new Squadron();
     owner.setId(UUID.randomUUID());
@@ -97,21 +96,10 @@ class OperationMapperTest {
             entity.getCreatedAt(),
             entity.getUpdatedAt());
 
-    assertEquals(mapper.toDto(entity), mapper.toDtoFromSummary(summary));
-  }
-
-  @Test
-  void toDtoFromSummary_shouldLeaveTheOwnerOutForAnOwnerlessOperation() {
-    MissionOperationSummary summary =
-        new MissionOperationSummary(
-            UUID.randomUUID(), "Op", null, "PLANNED", null, null, null, 0L, null, null);
-
-    OperationDto dto = mapper.toDtoFromSummary(summary);
-
-    assertNull(dto.owningSquadron());
-    assertEquals(OperationStatus.PLANNED, dto.status());
-    assertNull(dto.payoutPreliminary());
-    assertNull(mapper.toDtoFromSummary(null));
+    JsonMapper json = JsonMapper.builder().build();
+    assertEquals(
+        json.writeValueAsString(mapper.toDto(entity)),
+        json.writeValueAsString(MissionOperationDto.of(summary)));
   }
 
   @Test

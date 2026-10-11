@@ -17,9 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
+import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -40,6 +43,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /** Operation JPA entity. */
 @TenantScoped("owningOrgUnit")
@@ -60,6 +64,7 @@ public class Operation extends AbstractEntity<UUID> {
   private String name;
 
   @Column(columnDefinition = "TEXT")
+  @Nullable
   private String description;
 
   @Enumerated(EnumType.STRING)
@@ -84,5 +89,6 @@ public class Operation extends AbstractEntity<UUID> {
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id")
+  @Nullable
   private OrgUnit owningOrgUnit;
 }
