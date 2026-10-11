@@ -46,7 +46,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatu
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
@@ -92,9 +92,9 @@ public class JobOrderBackendClient {
       LIST_OF_BLUEPRINT_REFERENCE =
           new ParameterizedTypeReference<List<BlueprintReferenceDto>>() {};
 
-  private static final ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>
+  private static final ParameterizedTypeReference<PageResponse<InventoryGameItemReferenceDto>>
       PAGE_OF_GAME_ITEM_REFERENCE =
-          new ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>() {};
+          new ParameterizedTypeReference<PageResponse<InventoryGameItemReferenceDto>>() {};
 
   private static final ParameterizedTypeReference<List<MaterialDto>> LIST_OF_MATERIAL =
       new ParameterizedTypeReference<List<MaterialDto>>() {};
@@ -228,7 +228,7 @@ public class JobOrderBackendClient {
   @Nullable
   public List<InventoryItemDto> orphanedInventory(@NotNull UUID id) {
     return backendApiClient.get(
-        "/api/v1/orders/{id}/inventory/orphaned", LIST_OF_INVENTORY_ITEM, id);
+        "/api/v1/orders/{id}/allocations/orphaned", LIST_OF_INVENTORY_ITEM, id);
   }
 
   /**
@@ -240,9 +240,7 @@ public class JobOrderBackendClient {
   @Nullable
   public List<BlueprintReferenceDto> itemBlueprints(@NotNull UUID gameItemId) {
     return backendApiClient.get(
-        "/api/v1/orders/item-catalog/{gameItemId}/blueprints",
-        LIST_OF_BLUEPRINT_REFERENCE,
-        gameItemId);
+        "/api/v1/game-items/{gameItemId}/blueprints", LIST_OF_BLUEPRINT_REFERENCE, gameItemId);
   }
 
   /**
@@ -255,7 +253,7 @@ public class JobOrderBackendClient {
   @Nullable
   public ItemDerivationDto itemDerivation(@NotNull UUID blueprintId, int amount) {
     return backendApiClient.get(
-        "/api/v1/orders/item-catalog/blueprints/{blueprintId}/derivation?amount={amount}",
+        "/api/v1/blueprints/{blueprintId}/derivation?amount={amount}",
         ItemDerivationDto.class,
         blueprintId,
         amount);
@@ -269,9 +267,10 @@ public class JobOrderBackendClient {
    * @return the page, or {@code null} when the backend sent no body
    */
   @Nullable
-  public PageResponse<GameItemReferenceDto> searchOrderableItems(@NotNull String search, int size) {
+  public PageResponse<InventoryGameItemReferenceDto> searchOrderableItems(
+      @NotNull String search, int size) {
     return backendApiClient.get(
-        "/api/v1/orders/item-catalog?search={q}&size={size}&sort=name,asc",
+        "/api/v1/game-items?q={q}&orderable=true&size={size}&sort=name,asc",
         PAGE_OF_GAME_ITEM_REFERENCE,
         search,
         size);
@@ -283,7 +282,7 @@ public class JobOrderBackendClient {
    * @return the probe page, or {@code null} when the backend sent no body
    */
   @Nullable
-  public PageResponse<GameItemReferenceDto> orderableItemProbe() {
+  public PageResponse<InventoryGameItemReferenceDto> orderableItemProbe() {
     return backendApiClient.getCached(CachedCatalog.ITEM_CATALOG, PAGE_OF_GAME_ITEM_REFERENCE);
   }
 
@@ -650,7 +649,7 @@ public class JobOrderBackendClient {
    */
   public void unlinkInventoryItem(@NotNull UUID id, @NotNull UUID inventoryItemId) {
     backendApiClient.delete(
-        "/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink", Void.class, id, inventoryItemId);
+        "/api/v1/orders/{id}/allocations/{inventoryItemId}", Void.class, id, inventoryItemId);
   }
 
   /**

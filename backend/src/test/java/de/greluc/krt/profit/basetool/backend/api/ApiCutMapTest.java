@@ -142,11 +142,20 @@ class ApiCutMapTest {
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining("100 GET /a /b T2 -");
     assertThat(waveNumber("3", "3 GET /a /b T2 -")).isEqualTo(3);
+    List<Entry> fold =
+        List.of(
+            new Entry(5, "GET", "/api/v1/a", "/api/v1/c", "T2", false),
+            new Entry(5, "GET", "/api/v1/b", "/api/v1/c", "T1", true),
+            new Entry(5, "GET", "/api/v1/d", "/api/v1/e", "T2", false));
+    assertThat(tierAfterMove(fold, fold.get(0))).isEqualTo("T1");
+    assertThat(tierAfterMove(fold, fold.get(1))).isEqualTo("T1");
+    assertThat(tierAfterMove(fold, fold.get(2))).isEqualTo("T2");
   }
 
   /**
    * An operation still at its old path has the tier and the app call the map says; one that moved
-   * stands at its new path with the tier it had.
+   * stands at its new path with the tier it had, a fold with the strictest tier of the operations
+   * folded into it.
    */
   @Test
   @DisplayName("the map agrees with the document on tier and the app's calls")
@@ -154,7 +163,8 @@ class ApiCutMapTest {
     JsonNode paths = CommittedOpenApi.published().path("paths");
     Set<String> appCalls = appCalls();
     List<String> disagreements = new ArrayList<>();
-    for (Entry entry : map()) {
+    List<Entry> entries = map();
+    for (Entry entry : entries) {
       JsonNode operation = paths.path(entry.oldPath()).path(entry.verb().toLowerCase());
       if (!operation.isMissingNode()) {
         if (!entry.tier().equals(operation.path("x-contract-tier").asString(""))) {
@@ -170,7 +180,7 @@ class ApiCutMapTest {
       }
       JsonNode moved = paths.path(entry.newPath()).path(entry.verb().toLowerCase());
       if (moved.isMissingNode()
-          || !entry.tier().equals(moved.path("x-contract-tier").asString(""))) {
+          || !tierAfterMove(entries, entry).equals(moved.path("x-contract-tier").asString(""))) {
         disagreements.add(entry.verb() + " " + entry.newPath() + " is not the moved operation");
       }
     }
@@ -205,6 +215,27 @@ class ApiCutMapTest {
     map().forEach(e -> mapped.add(e.oldKey()));
 
     assertThat(escapes(documentedOperations(), mapped)).isEmpty();
+  }
+
+  /**
+   * The tier the target of a move carries: the entry's own tier, or the strictest tier of every
+   * entry folded into the same target, so a frozen operation absorbing a web-only twin stays
+   * frozen.
+   *
+   * @param entries the map
+   * @param entry the moved entry
+   * @return {@code T1} when any entry with the same target is {@code T1}, else the entry's tier
+   */
+  private static String tierAfterMove(List<Entry> entries, Entry entry) {
+    for (Entry other : entries) {
+      if (!other.deleted()
+          && other.verb().equals(entry.verb())
+          && other.newPath().equals(entry.newPath())
+          && "T1".equals(other.tier())) {
+        return "T1";
+      }
+    }
+    return entry.tier();
   }
 
   /**

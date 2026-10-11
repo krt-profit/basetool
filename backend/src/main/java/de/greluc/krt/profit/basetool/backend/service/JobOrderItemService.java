@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
@@ -62,8 +61,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -412,20 +409,6 @@ public class JobOrderItemService {
                 (BlueprintReferenceDto b) -> b.outputName() != null ? b.outputName() : "",
                 String.CASE_INSENSITIVE_ORDER))
         .toList();
-  }
-
-  /**
-   * Page of orderable items (blueprint outputs with at least one resolvable material) for the
-   * create UI's item picker. An optional name filter narrows the list.
-   *
-   * @param search case-insensitive name substring, or {@code null}/blank for no filter
-   * @param pageable page request (whitelisted sort)
-   * @return a page of orderable item references
-   */
-  @NotNull
-  public Page<GameItemReferenceDto> findOrderableItems(String search, @NotNull Pageable pageable) {
-    String q = search != null && !search.isBlank() ? LikePatterns.escape(search.strip()) : "";
-    return blueprintRepository.findOrderableItems(q, pageable).map(this::gameItemRef);
   }
 
   /**

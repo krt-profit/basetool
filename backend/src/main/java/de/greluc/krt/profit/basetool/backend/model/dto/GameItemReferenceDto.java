@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * Slim reference to a {@code GameItem} for item-order payloads and the orderable-item picker.
+ * Slim reference to a {@code GameItem} embedded in item-order payloads.
  *
  * @param id the game item's primary key
  * @param name the item's display name

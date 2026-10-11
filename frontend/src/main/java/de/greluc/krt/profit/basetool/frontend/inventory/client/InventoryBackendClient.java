@@ -231,7 +231,7 @@ public class InventoryBackendClient {
   @Nullable
   public PageResponse<InventoryGameItemReferenceDto> itemCatalog(int pageSize, @NotNull String q) {
     String uri =
-        UriComponentsBuilder.fromPath("/api/v1/inventory/item-catalog")
+        UriComponentsBuilder.fromPath("/api/v1/game-items")
             .queryParam("size", pageSize)
             .queryParam("sort", "name,asc")
             .toUriString();

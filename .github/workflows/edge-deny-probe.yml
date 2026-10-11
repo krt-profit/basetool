@@ -155,6 +155,8 @@ jobs:
           POST /api/v1/finance-entries 410
           PUT /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 410
           DELETE /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 410
+          GET /api/v1/game-items 401
+          GET /api/v1/game-items/00000000-0000-4000-8000-00000000cafe/blueprints 401
           POST /api/v1/hangar/import/fleetview 401
           GET /api/v1/hangar/my-ships 401
           POST /api/v1/hangar/ships 401
@@ -302,13 +304,14 @@ jobs:
           PUT /api/v1/operations/00000000-0000-4000-8000-00000000cafe/payouts/paid-out 401
           GET /api/v1/orders 401
           POST /api/v1/orders 401
-          GET /api/v1/orders/item-catalog 401
-          GET /api/v1/orders/item-catalog/00000000-0000-4000-8000-00000000cafe/blueprints 401
+          GET /api/v1/orders/item-catalog 410
+          GET /api/v1/orders/item-catalog/00000000-0000-4000-8000-00000000cafe/blueprints 410
           POST /api/v1/orders/items 401
           GET /api/v1/orders/lookup 401
           GET /api/v1/orders/material-demand 401
           GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe 401
           PUT /api/v1/orders/00000000-0000-4000-8000-00000000cafe 401
+          DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/allocations/00000000-0000-4000-8000-00000000cafe 401
           POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe 401
           DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe 401
           PUT /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe/note 401
@@ -324,7 +327,7 @@ jobs:
           GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/claims 401
           POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe/claims 401
           DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/claims/00000000-0000-4000-8000-00000000cafe 401
-          DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/inventory/00000000-0000-4000-8000-00000000cafe/unlink 401
+          DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/inventory/00000000-0000-4000-8000-00000000cafe/unlink 410
           GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/item-stock 401
           GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/material-collection 401
           DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/materials/00000000-0000-4000-8000-00000000cafe 401
@@ -451,6 +454,8 @@ jobs:
           POST /api/v1/blueprints/products/search 404
           GET /api/v1/finance-entries 404
           GET /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 404
+          POST /api/v1/game-items 404
+          POST /api/v1/game-items/00000000-0000-4000-8000-00000000cafe/blueprints 404
           GET /api/v1/hangar/import/fleetview 404
           POST /api/v1/hangar/my-ships 404
           GET /api/v1/hangar/ships 404
@@ -579,6 +584,7 @@ jobs:
           POST /api/v1/orders/lookup 404
           POST /api/v1/orders/material-demand 404
           POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/allocations/00000000-0000-4000-8000-00000000cafe 404
           GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe 404
           GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe/note 404
           GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/handovers 404

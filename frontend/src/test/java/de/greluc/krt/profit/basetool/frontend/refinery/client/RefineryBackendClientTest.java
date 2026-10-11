@@ -93,7 +93,7 @@ class RefineryBackendClientTest {
     client.importExtract(extract);
 
     backend.expect("GET", "/api/v1/refinery-orders/" + ID);
-    backend.expect("GET", "/api/v1/refinery-orders/locations/" + LOCATION + "/yields");
+    backend.expect("GET", "/api/v1/locations/" + LOCATION + "/refinery-yields");
     backend.expect(
         "POST", "/api/v1/refinery-orders/import-extract", "{\"refinery\":\"ARC-L1\",\"goods\":[]}");
   }

@@ -250,7 +250,7 @@ class JobOrderPageControllerNoReloadMvcTest {
 
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink"),
+            eq("/api/v1/orders/{id}/allocations/{inventoryItemId}"),
             eq(Void.class),
             eq(orderId),
             eq(invId));
@@ -264,7 +264,7 @@ class JobOrderPageControllerNoReloadMvcTest {
     doThrow(new BackendServiceException("conflict", null, 409))
         .when(backendApiClient)
         .delete(
-            eq("/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink"),
+            eq("/api/v1/orders/{id}/allocations/{inventoryItemId}"),
             eq(Void.class),
             eq(orderId),
             eq(invId));

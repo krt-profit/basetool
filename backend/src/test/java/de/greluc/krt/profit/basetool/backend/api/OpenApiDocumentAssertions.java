@@ -63,7 +63,7 @@ public final class OpenApiDocumentAssertions {
           Map.entry("exchange", 21),
           Map.entry("hangar", 15),
           Map.entry("identity", 57),
-          Map.entry("inventory", 28),
+          Map.entry("inventory", 27),
           Map.entry("joborder", 39),
           Map.entry("leadership", 1),
           Map.entry("livesync", 2),

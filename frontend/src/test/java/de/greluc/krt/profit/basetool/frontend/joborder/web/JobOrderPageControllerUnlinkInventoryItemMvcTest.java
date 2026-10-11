@@ -73,7 +73,7 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
     UUID inventoryItemId = UUID.randomUUID();
 
     when(backendApiClient.delete(
-            eq("/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink"),
+            eq("/api/v1/orders/{id}/allocations/{inventoryItemId}"),
             eq(Void.class),
             eq(orderId),
             eq(inventoryItemId)))
@@ -88,7 +88,7 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
 
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink"),
+            eq("/api/v1/orders/{id}/allocations/{inventoryItemId}"),
             eq(Void.class),
             eq(orderId),
             eq(inventoryItemId));
@@ -115,7 +115,7 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
     doThrow(new BackendServiceException("Internal Server Error", null, 500))
         .when(backendApiClient)
         .delete(
-            eq("/api/v1/orders/{id}/inventory/{inventoryItemId}/unlink"),
+            eq("/api/v1/orders/{id}/allocations/{inventoryItemId}"),
             eq(Void.class),
             eq(orderId),
             eq(inventoryItemId));

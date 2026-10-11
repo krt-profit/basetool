@@ -95,7 +95,7 @@ class NoStoreApiScopesTest {
         "/api/v1/job-types",
         "/api/v1/org-units/active",
         "/api/v1/special-commands",
-        "/api/v1/orders/item-catalog",
+        "/api/v1/game-items",
         "/api/v1/exchange/catalog/locations",
         "/api/v1/terms/document",
         "/actuator/health",
@@ -110,7 +110,8 @@ class NoStoreApiScopesTest {
   @CsvSource({
     "/api/v1/terms/document, REVALIDATE",
     "/api/v1/terms/status, NO_STORE",
-    "/api/v1/orders/item-catalog/00000000-0000-4000-8000-000000000000/blueprints, REVALIDATE",
+    "/api/v1/game-items/00000000-0000-4000-8000-000000000000/blueprints, REVALIDATE",
+    "/api/v1/locations/00000000-0000-4000-8000-000000000000/refinery-yields, REVALIDATE",
     "/api/v1/orders/requested, NO_STORE",
     "/api/v1/exchange/catalog/locations, REVALIDATE",
     "/api/v1/exchange/me/installation, NO_STORE",
@@ -176,6 +177,6 @@ class NoStoreApiScopesTest {
             "the number of no-store families. Raise it here when you add one, and add the path to"
                 + " sensitiveFamiliesMatch in the same change")
         .isEqualTo(31);
-    assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(28);
+    assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(29);
   }
 }

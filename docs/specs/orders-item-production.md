@@ -462,7 +462,7 @@ visible after a booked production with auto-earmark) · **Code:** `JobOrderItemS
 The four per-order reads that expose the **owner identity and location** of the stock linked to a
 job order — the inline item stock (`GET /orders/{id}/item-stock`, REQ-ORDERS-028), the material
 collection (`GET /orders/{id}/material-collection`), and the two inventory pickers
-(`GET /orders/{id}/materials/{matId}/inventory`, `GET /orders/{id}/inventory/orphaned`) — MUST blank
+(`GET /orders/{id}/materials/{matId}/inventory`, `GET /orders/{id}/allocations/orphaned`) — MUST blank
 the per-entry owner and location for a caller who can see the order but is **not entitled to its
 responsible (processing) side**. Concretely: on a Spezialkommando-responsible (SK-public) order,
 `canSeeJobOrder` admits every profit-eligible member — including members of the merely **requesting**

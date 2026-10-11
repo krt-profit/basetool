@@ -839,11 +839,10 @@ class ExternalContractTest {
               "/api/v1/bank/holders/{id}",
               "get",
               Set.of("id", "handle", "active", "totalHeld", "version")),
+          new ContractOperation("/api/v1/game-items", "get", Set.of("content", "id", "name"))
+              .addressedBy(Set.of("q:string", "orderable:boolean", "page:integer", "size:integer")),
           new ContractOperation(
-                  "/api/v1/orders/item-catalog", "get", Set.of("content", "id", "name"))
-              .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
-          new ContractOperation(
-              "/api/v1/orders/item-catalog/{gameItemId}/blueprints",
+              "/api/v1/game-items/{gameItemId}/blueprints",
               "get",
               Set.of("id", "outputName", "scwikiKey")),
           new ContractOperation(
@@ -1404,7 +1403,7 @@ class ExternalContractTest {
                   "allocatedQuantity",
                   "delivered")),
           new ContractOperation(
-              "/api/v1/orders/{jobOrderId}/inventory/{inventoryItemId}/unlink", "delete", Set.of()),
+              "/api/v1/orders/{id}/allocations/{inventoryItemId}", "delete", Set.of()),
           new ContractOperation(
               "/api/v1/orders/{jobOrderId}/materials/{materialId}", "delete", Set.of()),
           new ContractOperation(

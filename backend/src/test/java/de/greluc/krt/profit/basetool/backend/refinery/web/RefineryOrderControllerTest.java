@@ -370,20 +370,6 @@ class RefineryOrderControllerTest {
 
       assertSame(out, result);
     }
-
-    @Test
-    void getYieldsForLocation_delegatesToService_andReturnsTheMap() {
-      UUID locationId = UUID.randomUUID();
-      UUID matA = UUID.randomUUID();
-      UUID matB = UUID.randomUUID();
-      java.util.Map<UUID, Integer> expected = java.util.Map.of(matA, 5, matB, -3);
-      when(service.getYieldBonusByMaterialForLocationId(locationId)).thenReturn(expected);
-
-      java.util.Map<UUID, Integer> result = controller.getYieldsForLocation(locationId);
-
-      assertSame(expected, result);
-      verify(service).getYieldBonusByMaterialForLocationId(locationId);
-    }
   }
 
   @Nested

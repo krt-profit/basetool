@@ -39,7 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
@@ -630,7 +630,7 @@ public class JobOrderPageController {
 
   /**
    * JSON proxy for the create form's blueprint picker: returns the blueprints that produce the
-   * given orderable item. Relays to the backend item-catalog endpoint.
+   * given orderable item. Relays to the backend game-items endpoint.
    *
    * @param gameItemId the orderable item
    * @return the blueprint references producing it
@@ -678,9 +678,9 @@ public class JobOrderPageController {
    */
   @GetMapping("/item-search")
   @ResponseBody
-  public List<GameItemReferenceDto> itemSearch(@RequestParam(required = false) String q) {
+  public List<InventoryGameItemReferenceDto> itemSearch(@RequestParam(required = false) String q) {
     try {
-      PageResponse<GameItemReferenceDto> page =
+      PageResponse<InventoryGameItemReferenceDto> page =
           jobOrderClient.searchOrderableItems(q == null ? "" : q, PickerSearch.PAGE_SIZE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
@@ -764,7 +764,7 @@ public class JobOrderPageController {
    */
   private boolean hasOrderableItems() {
     try {
-      PageResponse<GameItemReferenceDto> page = jobOrderClient.orderableItemProbe();
+      PageResponse<InventoryGameItemReferenceDto> page = jobOrderClient.orderableItemProbe();
       return page == null || page.content() == null || !page.content().isEmpty();
     } catch (Exception e) {
       log.error("Failed to probe orderable items", e);

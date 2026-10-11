@@ -55,7 +55,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryAggregationService;
-import de.greluc.krt.profit.basetool.backend.service.InventoryItemCatalogService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryStolenMarkService;
@@ -95,7 +94,6 @@ class InventoryItemControllerTest {
 
   @Mock private InventoryItemService inventoryItemService;
   @Mock private InventoryAggregationService inventoryAggregationService;
-  @Mock private InventoryItemCatalogService inventoryItemCatalogService;
   @Mock private UserService userService;
   @Mock private AuthHelperService authHelperService;
   @Mock private InventoryOrgUnitChangeService inventoryOrgUnitChangeService;
@@ -1045,28 +1043,6 @@ class InventoryItemControllerTest {
     assertThat(result.content()).containsExactly(dto);
     verify(inventoryAggregationService).getInventoryByGameItem(eq(gameItemId), any(Pageable.class));
     verifyNoInteractions(inventoryItemService);
-  }
-
-  @Test
-  void getItemCatalog_wrapsCatalogServicePageIntoPageResponse() {
-    InventoryGameItemReferenceDto ref =
-        new InventoryGameItemReferenceDto(UUID.randomUUID(), "Quantum Drive", "RSI", "GENERIC");
-    Page<InventoryGameItemReferenceDto> page =
-        new PageImpl<>(List.of(ref), PageRequest.of(0, 20), 1);
-    when(inventoryItemCatalogService.findBookableItems(eq("drive"), any(Pageable.class)))
-        .thenReturn(page);
-
-    PageResponse<InventoryGameItemReferenceDto> result =
-        controller.getItemCatalog("drive", 0, 20, "name,asc");
-
-    assertThat(result.content()).containsExactly(ref);
-    assertThat(result.totalElements()).isEqualTo(1L);
-    ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-    verify(inventoryItemCatalogService).findBookableItems(eq("drive"), pageable.capture());
-    org.springframework.data.domain.Sort sort = pageable.getValue().getSort();
-    assertThat(sort.getOrderFor("name")).isNotNull();
-    assertThat(sort.getOrderFor("id")).isNotNull();
-    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
   @Test

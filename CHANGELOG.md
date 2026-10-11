@@ -18,6 +18,8 @@
 
 - **REST-API, Welle 4 (Kartellbank).** Die Bank-Endpunkte für Offiziere, Leiter und Mitglieder wandern von `/api/v1/org-units/bank/…` nach `/api/v1/bank/org-units/…`; das Kontostandsziel der Bankmitarbeiter wird mit `PUT` statt `PATCH` gesetzt (`/api/v1/bank/accounts/{id}/balance-target`, gleicher Inhalt). Die alten App-Pfade antworten `410 APP_UPDATE_REQUIRED`; die App erscheint mit dem gemeinsamen API-Schnitt neu (versionCode 19).
 
+- **REST-API, Welle 5 (Aufträge und Spielgegenstände).** Die beiden Gegenstandskataloge (`/orders/item-catalog` und `/inventory/item-catalog`) sind ein Katalog: `GET /api/v1/game-items` mit `q`, `orderable=true` für die bestellbaren Gegenstände und einer gemeinsamen Antwort (`id`, `name`, `manufacturer`, `kind`); er wird nur noch revalidiert statt als `no-store` ausgeliefert, die Rollen der beiden Vorgänger gelten unverändert. Blueprint-Liste und Materialableitung liegen unter `/game-items/{id}/blueprints` und `/blueprints/{id}/derivation`, die Lagerzuordnungen eines Auftrags unter `/orders/{id}/allocations[/{inventoryItemId}|/orphaned]`, die Raffinerie-Ausbeuten unter `/locations/{locationId}/refinery-yields`. Die alten App-Pfade antworten `410 APP_UPDATE_REQUIRED`; die App erscheint mit dem gemeinsamen API-Schnitt neu (versionCode 19).
+
 ## [v1.14.0](https://github.com/krt-profit/basetool/releases/tag/v1.14.0) - 2026-10-10
 
 ### Added

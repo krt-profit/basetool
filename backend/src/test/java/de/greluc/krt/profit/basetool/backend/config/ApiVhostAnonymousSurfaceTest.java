@@ -1137,7 +1137,7 @@ class ApiVhostAnonymousSurfaceTest {
     String order = "/api/v1/orders/" + ABSENT_OPERATION;
     mockMvc.perform(get(order + "/material-collection")).andExpect(status().isUnauthorized());
     mockMvc
-        .perform(delete(order + "/inventory/" + ABSENT_OPERATION + "/unlink").with(csrf()))
+        .perform(delete(order + "/allocations/" + ABSENT_OPERATION).with(csrf()))
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(delete(order + "/materials/" + ABSENT_OPERATION).with(csrf()))

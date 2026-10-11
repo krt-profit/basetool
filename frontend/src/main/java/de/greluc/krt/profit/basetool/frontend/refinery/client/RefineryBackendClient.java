@@ -198,7 +198,7 @@ public class RefineryBackendClient {
   @Nullable
   public Map<String, Integer> yields(@NotNull UUID locationId) {
     return backendApiClient.get(
-        "/api/v1/refinery-orders/locations/{id}/yields", STRING_INTEGER_MAP, locationId);
+        "/api/v1/locations/{id}/refinery-yields", STRING_INTEGER_MAP, locationId);
   }
 
   /**

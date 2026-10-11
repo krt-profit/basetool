@@ -91,7 +91,9 @@ public enum CachedCatalog {
    * so {@code size=1} is the point, not a truncation (exempt from REQ-ADMIN-003).
    */
   ITEM_CATALOG(
-      "/api/v1/orders/item-catalog?size=1&sort=name,asc", CacheDomain.ITEM_CATALOG, Fetch.SINGLE),
+      "/api/v1/game-items?orderable=true&size=1&sort=name,asc",
+      CacheDomain.ITEM_CATALOG,
+      Fetch.SINGLE),
   /** The whole quality-tier catalogue, inactive tiers included (REQ-ORDERS-036). */
   QUALITY_TIERS(
       "/api/v1/quality-tiers?includeInactive=true", CacheDomain.QUALITY_TIER, Fetch.SINGLE),

@@ -45,10 +45,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderSta
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
@@ -57,7 +54,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
@@ -116,7 +112,6 @@ public class JobOrderController {
   private final JobOrderQueryService jobOrderQueryService;
   private final JobOrderMaterialDemandService jobOrderMaterialDemandService;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
-  private final JobOrderItemService jobOrderItemService;
   private final JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
   private final JobOrderItemHandoverService jobOrderItemHandoverService;
   private final JobOrderItemProductionService jobOrderItemProductionService;
@@ -384,74 +379,6 @@ public class JobOrderController {
   @PreAuthorize("isAuthenticated()")
   public JobOrderDto createItemJobOrder(@RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return jobOrderService.createItemJobOrder(dto);
-  }
-
-  /**
-   * Paged picker of orderable items (blueprint outputs with at least one resolvable material) for
-   * the item-order create form.
-   *
-   * @param search optional case-insensitive item-name filter
-   * @param page zero-based page index
-   * @param size page size
-   * @param sort sort spec (only {@code name} is whitelisted)
-   * @return paged orderable item references
-   */
-  @GetMapping("/item-catalog")
-  @Operation(
-      summary = "List orderable items",
-      description =
-          "Returns a paginated list of items that can be ordered (blueprint outputs with at least"
-              + " one resolvable material).")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public PageResponse<GameItemReferenceDto> getOrderableItems(
-      @RequestParam(required = false) String search,
-      @RequestParam(required = false, defaultValue = "0") int page,
-      @RequestParam(required = false, defaultValue = "20") int size,
-      @RequestParam(required = false, defaultValue = "name,asc") String sort) {
-    Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("name"), "name");
-    Page<GameItemReferenceDto> p = jobOrderItemService.findOrderableItems(search, pageable);
-    return PageResponse.of(p);
-  }
-
-  /**
-   * Lists the blueprints that produce a given orderable item, for the create form's blueprint
-   * picker.
-   *
-   * @param gameItemId the orderable item
-   * @return blueprint references producing that item
-   */
-  @GetMapping("/item-catalog/{gameItemId}/blueprints")
-  @Operation(
-      summary = "List blueprints for an orderable item",
-      description = "Returns the blueprints that produce the given item.")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public List<BlueprintReferenceDto> getBlueprintsForItem(@PathVariable UUID gameItemId) {
-    return jobOrderItemService.blueprintsForItem(gameItemId);
-  }
-
-  /**
-   * Previews the material derivation for a chosen blueprint at a given amount: resolved materials
-   * (with default quality), adoptable sub-assembly suggestions, and unresolved-ingredient names for
-   * the create-form warning banner.
-   *
-   * @param blueprintId the chosen blueprint
-   * @param amount the whole-unit amount to scale by (defaults to 1)
-   * @return the derivation preview
-   */
-  @GetMapping("/item-catalog/blueprints/{blueprintId}/derivation")
-  @Operation(
-      summary = "Preview blueprint material derivation",
-      description =
-          "Returns the materials, sub-assembly suggestions and unresolved ingredients derived from"
-              + " a blueprint at the given amount.")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public ItemDerivationDto getBlueprintDerivation(
-      @PathVariable UUID blueprintId,
-      @RequestParam(required = false, defaultValue = "1") int amount) {
-    return jobOrderItemService.deriveForPreview(blueprintId, amount);
   }
 
   /**
@@ -729,7 +656,7 @@ public class JobOrderController {
    * @return orphaned inventory-item DTOs (empty when every linked item matches a requirement),
    *     owner/location redacted for requesting-side viewers
    */
-  @GetMapping("/{id}/inventory/orphaned")
+  @GetMapping("/{id}/allocations/orphaned")
   @Operation(
       summary = "Get orphaned linked inventory for a job order",
       description =
@@ -1024,10 +951,10 @@ public class JobOrderController {
    * Removes a single inventory item from the order — sets {@code jobOrderId=null} via Hibernate
    * dirty-checking (no bulk update, so the surrounding aggregate stays managed).
    *
-   * @param jobOrderId job-order id
+   * @param id job-order id
    * @param inventoryItemId inventory-item id
    */
-  @DeleteMapping("/{jobOrderId}/inventory/{inventoryItemId}/unlink")
+  @DeleteMapping("/{id}/allocations/{inventoryItemId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(
       summary = "Unlink a single inventory item from a job order",
@@ -1046,10 +973,9 @@ public class JobOrderController {
           + Roles.OFFICER
           + "', '"
           + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
-  public void unlinkInventoryItem(
-      @PathVariable UUID jobOrderId, @PathVariable UUID inventoryItemId) {
-    jobOrderService.unlinkInventoryItem(jobOrderId, inventoryItemId);
+          + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  public void unlinkInventoryItem(@PathVariable UUID id, @PathVariable UUID inventoryItemId) {
+    jobOrderService.unlinkInventoryItem(id, inventoryItemId);
   }
 
   /**
