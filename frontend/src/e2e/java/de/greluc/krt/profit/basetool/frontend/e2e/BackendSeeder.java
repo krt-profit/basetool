@@ -1507,10 +1507,7 @@ public final class BackendSeeder {
       int amount) {
     JsonArray blueprints =
         JsonParser.parseString(
-                getBody(
-                    username,
-                    password,
-                    "/api/v1/orders/item-catalog/" + gameItemId + "/blueprints"))
+                getBody(username, password, "/api/v1/game-items/" + gameItemId + "/blueprints"))
             .getAsJsonArray();
     if (blueprints.isEmpty()) {
       throw new IllegalStateException(

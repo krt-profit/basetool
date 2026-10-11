@@ -128,11 +128,10 @@ class JobOrderBackendClientTest {
     backend.expect("GET", "/api/v1/orders/" + ORDER);
     backend.expect("GET", "/api/v1/orders/" + ORDER + "/item-blueprint-owners");
     backend.expect("GET", "/api/v1/orders/" + ORDER + "/item-stock");
-    backend.expect("GET", "/api/v1/orders/" + ORDER + "/inventory/orphaned");
-    backend.expect("GET", "/api/v1/orders/item-catalog/" + OTHER + "/blueprints");
-    backend.expect(
-        "GET", "/api/v1/orders/item-catalog/blueprints/" + OTHER + "/derivation?amount=3");
-    backend.expect("GET", "/api/v1/orders/item-catalog?search=cirrus&size=20&sort=name,asc");
+    backend.expect("GET", "/api/v1/orders/" + ORDER + "/allocations/orphaned");
+    backend.expect("GET", "/api/v1/game-items/" + OTHER + "/blueprints");
+    backend.expect("GET", "/api/v1/blueprints/" + OTHER + "/derivation?amount=3");
+    backend.expect("GET", "/api/v1/game-items?q=cirrus&orderable=true&size=20&sort=name,asc");
     backend.expect("GET", "/api/v1/orders/" + ORDER + "/materials/" + MATERIAL + "/inventory");
     backend.expect("GET", "/api/v1/orders/" + ORDER + "/materials/" + MATERIAL + "/attribution");
     backend.expect("GET", "/api/v1/users/me");
@@ -163,7 +162,7 @@ class JobOrderBackendClientTest {
     backend.expect("GET", "/api/v1/settings/job_order.age_yellow_days");
     backend.expect("GET", "/api/v1/settings/job_order.age_red_days");
     backend.expect("GET", "/api/v1/materials/job-order");
-    backend.expect("GET", "/api/v1/orders/item-catalog?size=1&sort=name,asc");
+    backend.expect("GET", "/api/v1/game-items?orderable=true&size=1&sort=name,asc");
     backend.expect("GET", "/api/v1/squadrons?size=1000&sort=name,asc&page=0");
     backend.expect("GET", "/api/v1/org-units/active");
     backend.expect("GET", "/api/v1/org-units/active-all-kinds");
@@ -328,7 +327,7 @@ class JobOrderBackendClientTest {
         "{\"amount\":3,\"version\":2,\"consumption\":[],\"skippedMaterialIds\":[],"
             + "\"bookIn\":null}");
     backend.expect("DELETE", "/api/v1/orders/" + ORDER + "/materials/" + MATERIAL, null);
-    backend.expect("DELETE", "/api/v1/orders/" + ORDER + "/inventory/" + OTHER + "/unlink", null);
+    backend.expect("DELETE", "/api/v1/orders/" + ORDER + "/allocations/" + OTHER, null);
   }
 
   @Test

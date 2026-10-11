@@ -1181,7 +1181,7 @@ public class JobOrderWriteController {
           "successToast", "orders.detail.inventory.unlink.success");
     } catch (BackendServiceException bse) {
       BackendErrorLogging.warn(
-          log, "DELETE /api/v1/orders/{id}/inventory/{inventoryItemId}/unlink", id, bse);
+          log, "DELETE /api/v1/orders/{id}/allocations/{inventoryItemId}", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.inventory.unlink.error");
     } catch (Exception e) {
       log.error("Failed to unlink inventory item {} from jobOrder={}", inventoryItemId, id, e);

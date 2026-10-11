@@ -94,7 +94,7 @@ class InventoryBackendClientTest {
     backend.expect("GET", "/api/v1/inventory/aggregated?catalog=ITEM");
     backend.expect("GET", "/api/v1/inventory/material/" + MATERIAL + "?page=0&size=50");
     backend.expect("GET", "/api/v1/inventory/game-item/" + GAME_ITEM + "?page=3&size=100");
-    backend.expect("GET", "/api/v1/inventory/item-catalog?size=26&sort=name,asc&q=Gold%20Erz");
+    backend.expect("GET", "/api/v1/game-items?size=26&sort=name,asc&q=Gold%20Erz");
   }
 
   @Test

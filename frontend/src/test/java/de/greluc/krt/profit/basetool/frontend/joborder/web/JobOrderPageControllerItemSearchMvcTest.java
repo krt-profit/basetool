@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.List;
 import java.util.UUID;
@@ -70,9 +70,14 @@ class JobOrderPageControllerItemSearchMvcTest {
   @WithMockUser
   void itemSearch_mapsBackendPageToReferenceList() throws Exception {
     UUID id = UUID.randomUUID();
-    PageResponse<GameItemReferenceDto> page =
+    PageResponse<InventoryGameItemReferenceDto> page =
         new PageResponse<>(
-            List.of(new GameItemReferenceDto(id, "P8-SC SMG", "WEAPON")), 0, 25, 1L, 1, List.of());
+            List.of(new InventoryGameItemReferenceDto(id, "P8-SC SMG", null, "WEAPON")),
+            0,
+            25,
+            1L,
+            1,
+            List.of());
     doReturn(page).when(backendApiClient).get(any(), anyTypeRef(), any(Object[].class));
 
     mockMvc
