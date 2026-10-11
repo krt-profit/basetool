@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
     <title th:text="#{refineryorder.detail.title} + ' - ' + ${appTitle}">Raffinerieauftrag Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/refinery-order-form.css}">
@@ -9,10 +9,7 @@
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <main class="refinery-order">
     <div class="page-head" data-testid="page-head"
          th:with="headState=${orderState != null ? orderState.name() : null},
@@ -390,8 +387,8 @@
         <select data-krt-combobox="remote-users" required></select>
     </template>
 </main>
-
-<th:block th:replace="~{fragments/toast :: toast}" />
+</th:block>
+<th:block th:fragment="pageTail">
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const ROUNDING_MODE = /*[[${roundingMode}]]*/ 'UP';
 
@@ -434,5 +431,6 @@
     };
 </script>
 <script th:src="@{/js/refinery-orders-details.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>

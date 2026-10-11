@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
     <title th:text="#{promotion.admin.ranks.title} + ' - ' + ${appTitle}">Rangvoraussetzungen verwalten - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
     <link rel="stylesheet" th:href="@{/css/promotion-admin.css}">
@@ -8,10 +8,7 @@
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <main>
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.admin.ranks.title},
         count=${isAllSquadronsMode ? null : #lists.size(requirements)}, countId='ar-count', countFor='ar-results',
@@ -305,5 +302,6 @@
     var MSG_REFRESH_FAILED = /*[[#{promotion.refresh.failed}]]*/ 'Saved, but the view could not be refreshed. Please reload the page.';
 </script>
 <script th:src="@{/js/promotion-admin-rank-requirements.js}" defer th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
+</th:block>
 </body>
 </html>
