@@ -219,6 +219,7 @@ The platform modules reach the domains only through SPIs they own and the domain
 | `platform.api.ClientDirectory` | whether a client id is a configured ingest gateway or a registered exchange client, for the bounded client label | exchange (`ExchangeClientDirectory`) |
 | `catalogue.api.LocationUsage` | whether any row of a module still references a location, so the catalogue refuses to delete it; the first usage by position that says yes names the refusal | hangar (`ShipLocationUsage`), refinery (`RefineryLocationUsage`) |
 | `platform.api.UserErasureParticipant` | a module's part of the account deletion: its rows removed, reassigned to the fallback admin or unlinked, by phase (`DELETE`, `REASSIGN`, `UNLINK`) and position, inside the deletion's one transaction; the counts it returns feed the deletion's audit rows | materialexchange, inventory, hangar, personalinventory, blueprint, notification, promotion (`DELETE`); mission, refinery (`REASSIGN`); mission, joborder (`UNLINK`) |
+| `platform.api.HandleAnonymisationParticipant` | a module's part of the granted Art. 17 handle anonymisation: the handle snapshots of its tables replaced by the sentinel, by position, inside the anonymisation's one transaction; the counts it returns feed the marker rows, and a participant records its own marker | audit (`AuditHandleAnonymisation`), bank (`BankHandleAnonymisation`), joborder (`JobOrderHandleAnonymisation`) |
 
 ## 5.3 Level 2 — inside `frontend`
 
