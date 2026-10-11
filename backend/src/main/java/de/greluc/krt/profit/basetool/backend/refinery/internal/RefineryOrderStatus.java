@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 /** Enumeration of Refinery Order Status values. */
 public enum RefineryOrderStatus {

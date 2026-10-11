@@ -1,5 +1,3 @@
-catalogue -> hangar: LocationService -> ShipRepository
-catalogue -> refinery: LocationService -> RefineryOrderRepository
 identity -> inventory: MeController -> InventoryProperties
 identity -> joborder: UserDtoRedaction -> JobOrderAssigneeDto
 identity -> orgunit: MeController -> OrgUnitMembershipOptionDto

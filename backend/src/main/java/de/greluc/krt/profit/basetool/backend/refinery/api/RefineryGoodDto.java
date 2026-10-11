@@ -17,12 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.refinery.api;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Refinery good of a refinery order.
@@ -31,10 +33,10 @@ import java.util.UUID;
  * malus (negative) for {@code inputMaterial}, or {@code null} when unknown. Ignored on write.
  */
 public record RefineryGoodDto(
-    UUID id,
-    @NotNull MaterialDto inputMaterial,
+    @Nullable UUID id,
+    @Nullable @NotNull MaterialDto inputMaterial,
     @NotNull @Min(1) Integer inputQuantity,
-    MaterialDto outputMaterial,
+    @Nullable MaterialDto outputMaterial,
     @NotNull @Min(1) Integer outputQuantity,
     @QualityValue Integer quality,
-    Integer yieldBonusPercent) {}
+    @Nullable Integer yieldBonusPercent) {}

@@ -28,6 +28,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryGood;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.backend.repository.*;
@@ -287,7 +290,7 @@ class RefineryOrderTest {
         .andExpect(status().isOk());
 
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.CANCELED,
+        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.CANCELED,
         refineryOrderRepository.findById(saved.getId()).get().getStatus());
   }
 
@@ -382,7 +385,7 @@ class RefineryOrderTest {
         .andExpect(status().isOk());
 
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.CANCELED,
+        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.CANCELED,
         refineryOrderRepository.findById(order.getId()).get().getStatus());
   }
 
@@ -570,7 +573,7 @@ class RefineryOrderTest {
 
     RefineryOrder stored = refineryOrderRepository.findById(order.getId()).orElseThrow();
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.COMPLETED,
+        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.COMPLETED,
         stored.getStatus());
 
     java.util.List<InventoryItem> items =

@@ -17,23 +17,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mapper;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.backend.mapper.LocationMapperImpl;
+import de.greluc.krt.profit.basetool.backend.mapper.MaterialCategoryMapperImpl;
+import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapperImpl;
+import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapperImpl;
+import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
-import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryGoodDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;

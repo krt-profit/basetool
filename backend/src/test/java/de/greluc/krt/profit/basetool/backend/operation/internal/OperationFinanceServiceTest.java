@@ -28,16 +28,18 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.RefineryOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.model.dto.*;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFigures;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFinanceReader;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderLine;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceGroupAggregate;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryMissionProfitAggregate;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -54,11 +56,9 @@ class OperationFinanceServiceTest {
 
   @Mock private MissionFinanceEntryRepository financeEntryRepository;
 
-  @Mock private RefineryOrderRepository refineryOrderRepository;
-
   @Mock private MissionMapper missionMapper;
 
-  @Mock private RefineryOrderMapper refineryOrderMapper;
+  @Mock private RefineryOrderFinanceReader refineryOrderFinanceReader;
 
   @InjectMocks private OperationFinanceService operationFinanceService;
 
@@ -91,9 +91,7 @@ class OperationFinanceServiceTest {
             .type(FinanceType.EXPENSE)
             .build();
 
-    RefineryOrder ro1 = new RefineryOrder();
-    ro1.setMissionId(msn1.getId());
-    ro1.setExpenses(50.0);
+    RefineryOrderLine ro1 = orderLine(msn1.getId(), null, 50.0);
 
     MissionFinanceEntry e3 =
         MissionFinanceEntry.builder()
@@ -104,7 +102,7 @@ class OperationFinanceServiceTest {
 
     when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
     when(financeEntryRepository.findAllByMissionIdIn(any())).thenReturn(List.of(e1, e2, e3));
-    when(refineryOrderRepository.findByMissionIdIn(any())).thenReturn(List.of(ro1));
+    when(refineryOrderFinanceReader.linesOfMissions(any())).thenReturn(List.of(ro1));
 
     OperationFinanceDto result = operationFinanceService.getOperationFinances(operationId);
 
@@ -137,24 +135,13 @@ class OperationFinanceServiceTest {
     msn.setName("Profit Mission");
     operation.setMissions(Set.of(msn));
 
-    RefineryOrder profitOrder = new RefineryOrder();
-    profitOrder.setMissionId(msn.getId());
-    profitOrder.setExpenses(100.0);
-    profitOrder.setOreSales(450.0);
-
-    RefineryOrder lossOrder = new RefineryOrder();
-    lossOrder.setMissionId(msn.getId());
-    lossOrder.setExpenses(200.0);
-    lossOrder.setOreSales(50.0);
-
-    RefineryOrder legacyOrder = new RefineryOrder();
-    legacyOrder.setMissionId(msn.getId());
-    legacyOrder.setExpenses(25.0);
-    legacyOrder.setOreSales(null);
+    RefineryOrderLine profitOrder = orderLine(msn.getId(), 450.0, 100.0);
+    RefineryOrderLine lossOrder = orderLine(msn.getId(), 50.0, 200.0);
+    RefineryOrderLine legacyOrder = orderLine(msn.getId(), null, 25.0);
 
     when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
     when(financeEntryRepository.findAllByMissionIdIn(any())).thenReturn(List.of());
-    when(refineryOrderRepository.findByMissionIdIn(any()))
+    when(refineryOrderFinanceReader.linesOfMissions(any()))
         .thenReturn(List.of(profitOrder, lossOrder, legacyOrder));
 
     OperationFinanceDto result = operationFinanceService.getOperationFinances(operationId);
@@ -182,8 +169,8 @@ class OperationFinanceServiceTest {
                 new MissionFinanceGroupAggregate(
                     alpha.getId(), BigDecimal.valueOf(500), BigDecimal.valueOf(100)),
                 new MissionFinanceGroupAggregate(bravo.getId(), null, BigDecimal.valueOf(200))));
-    when(refineryOrderRepository.aggregateProfitByMissionIds(any()))
-        .thenReturn(List.of(new RefineryMissionProfitAggregate(alpha.getId(), 350.0)));
+    when(refineryOrderFinanceReader.profitByMission(any()))
+        .thenReturn(Map.of(alpha.getId(), 350.0));
 
     OperationFinanceSummaryDto result =
         operationFinanceService.getOperationFinanceSummary(operationId);
@@ -211,7 +198,7 @@ class OperationFinanceServiceTest {
 
     when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
     when(financeEntryRepository.findAllByMissionId(msn.getId())).thenReturn(List.of());
-    when(refineryOrderRepository.findByMissionId(msn.getId())).thenReturn(List.of());
+    when(refineryOrderFinanceReader.linesOfMission(msn.getId())).thenReturn(List.of());
 
     MissionFinanceSummaryDto result =
         operationFinanceService.getMissionFinanceDetail(operationId, msn.getId());
@@ -238,5 +225,14 @@ class OperationFinanceServiceTest {
     assertThrows(
         NotFoundException.class,
         () -> operationFinanceService.getMissionFinanceDetail(operationId, foreignMissionId));
+  }
+
+  private static RefineryOrderLine orderLine(UUID missionId, Double oreSales, Double expenses) {
+    RefineryOrderDto dto =
+        new RefineryOrderDto(
+            null, null, null, null, null, null, expenses, null, oreSales, null, null, null,
+            List.of(), null, null, null);
+    return new RefineryOrderLine(
+        RefineryOrderFigures.of(missionId, null, oreSales, expenses, null), dto);
   }
 }

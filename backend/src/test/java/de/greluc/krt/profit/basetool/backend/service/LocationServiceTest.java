@@ -23,20 +23,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationUsage;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -48,11 +47,16 @@ class LocationServiceTest {
 
   @Mock private LocationRepository locationRepository;
 
-  @Mock private ShipRepository shipRepository;
+  @Mock private LocationUsage shipUsage;
 
-  @Mock private RefineryOrderRepository refineryOrderRepository;
+  @Mock private LocationUsage orderUsage;
 
-  @InjectMocks private LocationService locationService;
+  private LocationService locationService;
+
+  @BeforeEach
+  void setUp() {
+    locationService = new LocationService(locationRepository, List.of(orderUsage, shipUsage));
+  }
 
   @Test
   void createLocation_ShouldSaveDirectly() {
@@ -84,18 +88,54 @@ class LocationServiceTest {
   @Test
   void deleteLocation_WhenInUseByShips_ShouldThrowException() {
     UUID locId = UUID.randomUUID();
-    when(shipRepository.existsByLocationId(locId)).thenReturn(true);
+    when(shipUsage.position()).thenReturn(10);
+    when(orderUsage.position()).thenReturn(20);
+    when(shipUsage.users()).thenReturn("ships");
+    when(shipUsage.isUsed(locId)).thenReturn(true);
 
-    assertThrows(EntityInUseException.class, () -> locationService.deleteLocation(locId));
+    EntityInUseException thrown =
+        assertThrows(EntityInUseException.class, () -> locationService.deleteLocation(locId));
+
+    assertEquals(
+        "Cannot delete location: It is currently used by one or more ships.", thrown.getMessage());
+    verify(orderUsage, never()).isUsed(any(UUID.class));
+    verify(locationRepository, never()).delete(any(Location.class));
   }
 
   @Test
   void deleteLocation_WhenInUseByRefineryOrders_ShouldThrowException() {
     UUID locId = UUID.randomUUID();
-    when(shipRepository.existsByLocationId(locId)).thenReturn(false);
-    when(refineryOrderRepository.existsByLocationId(locId)).thenReturn(true);
+    when(shipUsage.position()).thenReturn(10);
+    when(orderUsage.position()).thenReturn(20);
+    when(shipUsage.isUsed(locId)).thenReturn(false);
+    when(orderUsage.users()).thenReturn("refinery orders");
+    when(orderUsage.isUsed(locId)).thenReturn(true);
 
-    assertThrows(EntityInUseException.class, () -> locationService.deleteLocation(locId));
+    EntityInUseException thrown =
+        assertThrows(EntityInUseException.class, () -> locationService.deleteLocation(locId));
+
+    assertEquals(
+        "Cannot delete location: It is currently used by one or more refinery orders.",
+        thrown.getMessage());
+    verify(locationRepository, never()).delete(any(Location.class));
+  }
+
+  @Test
+  void deleteLocation_WhenUnused_DeletesTheLocationAfterAskingEveryUsage() {
+    UUID locId = UUID.randomUUID();
+    Location location = new Location();
+    location.setId(locId);
+    when(shipUsage.position()).thenReturn(10);
+    when(orderUsage.position()).thenReturn(20);
+    when(shipUsage.isUsed(locId)).thenReturn(false);
+    when(orderUsage.isUsed(locId)).thenReturn(false);
+    when(locationRepository.findById(locId)).thenReturn(Optional.of(location));
+
+    locationService.deleteLocation(locId);
+
+    verify(shipUsage).isUsed(locId);
+    verify(orderUsage).isUsed(locId);
+    verify(locationRepository).delete(location);
   }
 
   @Test
