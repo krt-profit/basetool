@@ -62,7 +62,9 @@ class NoStoreApiScopesTest {
         "/api/v1/live-sync/stream",
         "/api/v1/material-exchange/offers",
         "/api/v1/material-exchange/releasable-items",
-        "/api/v1/material-requests",
+        "/api/v1/material-exchange/requests",
+        "/api/v1/material-exchange/requests/counts",
+        "/api/v1/announcements/current/admin",
         "/api/v1/notifications/admin/rules",
         "/api/v1/roles",
         "/api/v1/org-units/me/active",
@@ -113,6 +115,12 @@ class NoStoreApiScopesTest {
     "/api/v1/game-items/00000000-0000-4000-8000-000000000000/blueprints, REVALIDATE",
     "/api/v1/locations/00000000-0000-4000-8000-000000000000/refinery-yields, REVALIDATE",
     "/api/v1/orders/requested, NO_STORE",
+    "/api/v1/orders/settings, REVALIDATE",
+    "/api/v1/refinery-orders/settings, REVALIDATE",
+    "/api/v1/refinery-orders/all, NO_STORE",
+    "/api/v1/announcements/current, REVALIDATE",
+    "/api/v1/announcements/current/admin, NO_STORE",
+    "/api/v1/material-exchange/requests/counts, NO_STORE",
     "/api/v1/exchange/catalog/locations, REVALIDATE",
     "/api/v1/exchange/me/installation, NO_STORE",
     "/api/v1/bank/org-units/balances, NO_STORE",
@@ -177,6 +185,6 @@ class NoStoreApiScopesTest {
             "the number of no-store families. Raise it here when you add one, and add the path to"
                 + " sensitiveFamiliesMatch in the same change")
         .isEqualTo(31);
-    assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(29);
+    assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(31);
   }
 }

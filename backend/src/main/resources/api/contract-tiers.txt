@@ -16,7 +16,7 @@ T0 POST /api/v1/exchange/me/stock/changes
 T0 POST /api/v1/live-sync/changed
 T0 GET /api/v1/live-sync/stream
 T0 GET /api/v1/notifications/stream
-T1 GET /api/v1/announcement
+T1 GET /api/v1/announcements/current
 T1 GET /api/v1/bank/accounts
 T1 POST /api/v1/bank/accounts
 T1 GET /api/v1/bank/accounts/{id}
@@ -46,7 +46,6 @@ T1 GET /api/v1/bank/transfer-fee-rate
 T1 POST /api/v1/bank/transfers
 T1 POST /api/v1/bank/withdrawals
 T1 GET /api/v1/blueprints/products/search
-T1 POST /api/v1/hangar/import/fleetview
 T1 GET /api/v1/hangar/my-ships
 T1 DELETE /api/v1/hangar/ships
 T1 POST /api/v1/hangar/ships
@@ -88,13 +87,13 @@ T1 POST /api/v1/material-exchange/offers/{id}/interest
 T1 PUT /api/v1/material-exchange/offers/{id}/remark
 T1 GET /api/v1/material-exchange/releasable-items
 T1 GET /api/v1/material-exchange/released-item-ids
-T1 GET /api/v1/material-requests
-T1 POST /api/v1/material-requests
-T1 POST /api/v1/material-requests/item
-T1 PUT /api/v1/material-requests/{id}
-T1 POST /api/v1/material-requests/{id}/deactivate
-T1 DELETE /api/v1/material-requests/{id}/interest
-T1 POST /api/v1/material-requests/{id}/interest
+T1 GET /api/v1/material-exchange/requests
+T1 POST /api/v1/material-exchange/requests
+T1 POST /api/v1/material-exchange/requests/item
+T1 PUT /api/v1/material-exchange/requests/{id}
+T1 POST /api/v1/material-exchange/requests/{id}/deactivate
+T1 DELETE /api/v1/material-exchange/requests/{id}/interest
+T1 POST /api/v1/material-exchange/requests/{id}/interest
 T1 GET /api/v1/materials/matrix
 T1 GET /api/v1/materials/prices-overview
 T1 GET /api/v1/materials/profit-calculation
@@ -166,6 +165,7 @@ T1 GET /api/v1/game-items
 T1 GET /api/v1/game-items/{gameItemId}/blueprints
 T1 POST /api/v1/orders/items
 T1 GET /api/v1/orders/lookup
+T1 GET /api/v1/orders/settings
 T1 GET /api/v1/orders/material-demand
 T1 GET /api/v1/orders/{id}
 T1 PUT /api/v1/orders/{id}
@@ -240,7 +240,6 @@ T1 GET /api/v1/refinery-orders/{id}
 T1 PUT /api/v1/refinery-orders/{id}
 T1 POST /api/v1/refinery-orders/{id}/store
 T1 GET /api/v1/refining-methods
-T1 GET /api/v1/settings/{key}
 T1 GET /api/v1/ship-types
 T1 GET /api/v1/terminals
 T1 POST /api/v1/terms/acceptance

@@ -221,6 +221,5 @@ layer config platform infrastructure layer package
 layer filter platform infrastructure layer package
 layer logging platform infrastructure layer package
 layer metrics platform infrastructure layer package
-layer interceptor platform infrastructure layer package
 layer annotation platform infrastructure layer package
 layer web platform infrastructure layer package

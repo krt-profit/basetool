@@ -27,11 +27,14 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryGoodDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderUpdateRequest;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Map;
@@ -202,10 +205,8 @@ class RefineryOrderMapperTest {
   @Test
   void toEntity_linksTheMissionAsAnIdOnlyStub() {
     UUID missionId = UUID.randomUUID();
-    RefineryOrderDto dto =
-        new RefineryOrderDto(
-            null,
-            null,
+    RefineryOrderCreateRequest request =
+        new RefineryOrderCreateRequest(
             null,
             new MissionReferenceDto(missionId, "Op Sunfire", "PLANNED", Instant.now()),
             null,
@@ -214,17 +215,44 @@ class RefineryOrderMapperTest {
             null,
             null,
             null,
-            null,
-            null,
             java.util.List.of(),
-            null,
-            null,
             null);
 
-    RefineryOrder entity = mapper.toEntity(dto);
+    RefineryOrder entity = mapper.toEntity(request);
 
     assertEquals(missionId, entity.getMission().getId());
     assertNull(entity.getMission().getName());
+  }
+
+  @Test
+  void toEntity_fromACreateRequest_leavesTheServerManagedFieldsUnset() {
+    RefineryOrderCreateRequest request =
+        new RefineryOrderCreateRequest(
+            null, null, null, 30L, 1.0, 2.0, 3.0, null, java.util.List.of(), UUID.randomUUID());
+
+    RefineryOrder entity = mapper.toEntity(request);
+
+    assertNull(entity.getId());
+    assertNull(entity.getVersion());
+    assertNull(entity.getOwner());
+    assertNull(entity.getOwningOrgUnit());
+    assertEquals(30L, entity.getDurationMinutes());
+    assertEquals(3.0, entity.getOreSales());
+  }
+
+  @Test
+  void toEntity_fromAnUpdateRequest_carriesStatusAndVersionButNoIdentity() {
+    RefineryOrderUpdateRequest request =
+        new RefineryOrderUpdateRequest(
+            null, null, null, 30L, 1.0, 2.0, 3.0, null, "IN_PROGRESS", java.util.List.of(), 7L);
+
+    RefineryOrder entity = mapper.toEntity(request);
+
+    assertNull(entity.getId());
+    assertNull(entity.getOwner());
+    assertNull(entity.getOwningOrgUnit());
+    assertEquals(RefineryOrderStatus.IN_PROGRESS, entity.getStatus());
+    assertEquals(7L, entity.getVersion());
   }
 
   @Test
@@ -236,7 +264,8 @@ class RefineryOrderMapperTest {
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto((RefineryOrder) null));
     assertNull(mapper.toListDto(null));
-    assertNull(mapper.toEntity((RefineryOrderDto) null));
+    assertNull(mapper.toEntity((RefineryOrderCreateRequest) null));
+    assertNull(mapper.toEntity((RefineryOrderUpdateRequest) null));
   }
 
   @Test

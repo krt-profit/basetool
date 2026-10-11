@@ -53,6 +53,7 @@ public final class NoStoreApiScopes {
   private static final List<String> NO_STORE_FAMILIES =
       List.of(
           "/api/v1/announcements/**",
+          "/api/v1/announcements/current/admin",
           "/api/v1/audit/**",
           "/api/v1/bank/**",
           "/api/v1/blueprints/admin/**",
@@ -64,7 +65,6 @@ public final class NoStoreApiScopes {
           "/api/v1/inventory/**",
           "/api/v1/live-sync/**",
           "/api/v1/material-exchange/**",
-          "/api/v1/material-requests/**",
           "/api/v1/me/**",
           "/api/v1/missions/*/finance-entries/**",
           "/api/v1/missions/me/**",
@@ -87,7 +87,7 @@ public final class NoStoreApiScopes {
   /** The families whose GET bodies are shared or reference data and only need revalidation. */
   private static final List<String> REVALIDATE_FAMILIES =
       List.of(
-          "/api/v1/announcement/**",
+          "/api/v1/announcements/current/**",
           "/api/v1/app/**",
           "/api/v1/blueprints/**",
           "/api/v1/cities/**",
@@ -102,10 +102,12 @@ public final class NoStoreApiScopes {
           "/api/v1/material-external-aliases/**",
           "/api/v1/materials/**",
           "/api/v1/missions/**",
+          "/api/v1/orders/settings",
           "/api/v1/org-units/**",
           "/api/v1/outposts/**",
           "/api/v1/pois/**",
           "/api/v1/quality-tiers/**",
+          "/api/v1/refinery-orders/settings",
           "/api/v1/refining-methods/**",
           "/api/v1/settings/**",
           "/api/v1/ship-types/**",

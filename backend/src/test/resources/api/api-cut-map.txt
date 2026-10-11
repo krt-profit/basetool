@@ -182,3 +182,4 @@
 6 POST /api/v1/material-requests/{id}/deactivate /api/v1/material-exchange/requests/{id}/deactivate T1 app
 6 DELETE /api/v1/material-requests/{id}/interest /api/v1/material-exchange/requests/{id}/interest T1 app
 6 POST /api/v1/material-requests/{id}/interest /api/v1/material-exchange/requests/{id}/interest T1 app
+6 POST /api/v1/material-exchange/items/{inventoryItemId}/deactivate /api/v1/material-exchange/offers/deactivate T2 -

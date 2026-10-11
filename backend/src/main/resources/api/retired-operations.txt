@@ -1,6 +1,15 @@
+GET /api/v1/announcement
 POST /api/v1/finance-entries
 DELETE /api/v1/finance-entries/{entryId}
 PUT /api/v1/finance-entries/{entryId}
+POST /api/v1/hangar/import/fleetview
+GET /api/v1/material-requests
+POST /api/v1/material-requests
+POST /api/v1/material-requests/item
+PUT /api/v1/material-requests/{id}
+POST /api/v1/material-requests/{id}/deactivate
+DELETE /api/v1/material-requests/{id}/interest
+POST /api/v1/material-requests/{id}/interest
 GET /api/v1/me/active-org-unit
 GET /api/v1/me/org-units
 GET /api/v1/missions/search

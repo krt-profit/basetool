@@ -550,7 +550,7 @@ class DualUseRequestBodyProofTest {
   }
 
   @Test
-  void refineryOrderDtoCreateIgnoresForgedIdOwnerStaffelAndStatus() throws Exception {
+  void refineryOrderCreateRequestIgnoresForgedIdOwnerStaffelAndStatus() throws Exception {
     joinIridium(member);
     Location station = refineryStation();
     List<Map<String, Object>> goods = goods();
@@ -595,7 +595,7 @@ class DualUseRequestBodyProofTest {
   }
 
   @Test
-  void refineryOrderDtoUpdateKeepsOwnerStaffelAndPathIdentity() throws Exception {
+  void refineryOrderUpdateRequestKeepsOwnerStaffelAndPathIdentity() throws Exception {
     joinIridium(member);
     Location station = refineryStation();
     List<Map<String, Object>> goods = goods();

@@ -341,24 +341,6 @@ class HangarControllerTest {
   }
 
   @Test
-  @SuppressWarnings("removal")
-  void importFleetview_deprecatedPath_routesToSameService() {
-    Jwt jwt = jwt("alice-sub");
-    UUID ownerId = UUID.randomUUID();
-    MultipartFile file =
-        new MockMultipartFile("file", "fleetview.json", "application/json", "[]".getBytes());
-    FleetviewImportResponseDto response =
-        new FleetviewImportResponseDto(2, 1, 0, List.of("oldship"), List.of());
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(hangarImportService.importShips(ownerId, file)).thenReturn(response);
-
-    FleetviewImportResponseDto result = controller.importFleetview(jwt, file);
-
-    assertThat(result).isSameAs(response);
-    verify(hangarImportService).importShips(ownerId, file);
-  }
-
-  @Test
   void resetAllFittedStatus_delegatesToService() {
     controller.resetAllFittedStatus();
 

@@ -121,11 +121,7 @@ final class EdgeAdmission {
           "roleCode",
           new Shape("[A-Za-z0-9_-]{1,64}", List.of("LOGISTICIAN")),
           "type",
-          new Shape("[A-Z][A-Z0-9_]{1,63}", List.of("JOB_ORDER_CREATED")),
-          "key",
-          new Shape(
-              "(job_order\\.age_yellow_days|job_order\\.age_red_days)",
-              List.of("job_order.age_yellow_days", "job_order.age_red_days")));
+          new Shape("[A-Z][A-Z0-9_]{1,63}", List.of("JOB_ORDER_CREATED")));
 
   /** A literal path segment: no character a regular expression would read as syntax but a dot. */
   private static final Pattern LITERAL_SEGMENT = Pattern.compile("[A-Za-z0-9_~.-]+");
@@ -177,7 +173,7 @@ final class EdgeAdmission {
           refused("POST", "/api/v1/bank/admin/wipe-reset"),
           refused("PATCH", "/api/v1/bank/accounts/" + SAMPLE_UUID + "/approval-tiers"),
           refused("POST", "/api/v1/inventory/all"),
-          refused("GET", "/api/v1/settings/job_order.age_green_days"),
+          refused("GET", "/api/v1/settings/job_order.age_yellow_days"),
           refused(
               "PUT",
               "/api/v1/bank/org-units/accounts/" + SAMPLE_UUID + "/visibility/all-members/maybe"),

@@ -41,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
  * isAuthenticated()} gate is the floor for every endpoint (REQ-SEC-052).
  */
 @RestController
-@RequestMapping("/api/v1/announcement")
+@RequestMapping("/api/v1/announcements/current")
 @RequiredArgsConstructor
 @Transactional
 @PreAuthorize("isAuthenticated()")
