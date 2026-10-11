@@ -157,12 +157,14 @@ public class MaterialExchangeBoardService {
             : interestRepository.findOfferIdsInterestedByViewer(viewerId, offerIds);
     Map<UUID, List<OrgUnitReferenceDto>> badges =
         ownerOrgUnitBadges(ownerIdsOf(offers.getContent()));
+    Map<UUID, InventoryItem> rows = rowsOf(offers.getContent());
 
     Page<MaterialExchangeOfferDto> dtos =
         offers.map(
             offer ->
                 toDto(
                     offer,
+                    rows.get(offer.getInventoryItemId()),
                     viewerId,
                     badges.getOrDefault(ownerIdOf(offer), List.of()),
                     counts.getOrDefault(offer.getId(), 0L).intValue(),
@@ -310,13 +312,14 @@ public class MaterialExchangeBoardService {
         ownerId == null
             ? List.of()
             : ownerOrgUnitBadges(Set.of(ownerId)).getOrDefault(ownerId, List.of());
-    return toDto(offer, viewerId, badges, count, viewerInterested, names);
+    return toDto(offer, rowOf(offer), viewerId, badges, count, viewerInterested, names);
   }
 
   /**
    * Assembles the offer DTO from the entity and the viewer-relative facts.
    *
    * @param offer the offer.
+   * @param item the offer's Lager row with its material, or {@code null} for an offer without one.
    * @param viewerId the requesting member, or {@code null}.
    * @param ownerOrgUnits the Anbieter's affiliation badges (Staffel(n) then SK(s)), never {@code
    *     null}.
@@ -328,6 +331,7 @@ public class MaterialExchangeBoardService {
   @NotNull
   private MaterialExchangeOfferDto toDto(
       MaterialExchangeOffer offer,
+      @Nullable InventoryItem item,
       @Nullable UUID viewerId,
       List<OrgUnitReferenceDto> ownerOrgUnits,
       int interestCount,
@@ -343,16 +347,15 @@ public class MaterialExchangeBoardService {
     Double availableAmount = null;
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
       itemName = offer.getItemName();
-      itemQuantity = effectiveItemQuantity(offer);
-      availableAmount =
-          mine && offer.getInventoryItem() != null ? offer.getInventoryItem().getAmount() : null;
+      itemQuantity = effectiveItemQuantity(offer, item);
+      availableAmount = mine && item != null ? item.getAmount() : null;
     } else {
-      InventoryItem item = offer.getInventoryItem();
-      Material mat = item.getMaterial();
+      InventoryItem row = Objects.requireNonNull(item);
+      Material mat = row.getMaterial();
       material = new MaterialReferenceDto(mat.getId(), mat.getName(), mat.getQuantityType());
-      quality = item.getQuality();
-      amount = effectiveOfferedAmount(offer);
-      availableAmount = mine ? item.getAmount() : null;
+      quality = row.getQuality();
+      amount = effectiveOfferedAmount(offer, row);
+      availableAmount = mine ? row.getAmount() : null;
     }
     return new MaterialExchangeOfferDto(
         offer.getId(),
@@ -373,8 +376,7 @@ public class MaterialExchangeBoardService {
         viewerInterested,
         offer.getStatus(),
         offer.getVersion(),
-        offer.getInventoryItem() != null
-            && Boolean.TRUE.equals(offer.getInventoryItem().getStolen()));
+        item != null && Boolean.TRUE.equals(item.getStolen()));
   }
 
   /**
@@ -503,15 +505,51 @@ public class MaterialExchangeBoardService {
   }
 
   /**
+   * Loads the Lager rows of a page of offers with their material in one read.
+   *
+   * @param offers the offers
+   * @return each offer's row by id
+   */
+  private Map<UUID, InventoryItem> rowsOf(Collection<MaterialExchangeOffer> offers) {
+    List<UUID> ids =
+        offers.stream()
+            .map(MaterialExchangeOffer::getInventoryItemId)
+            .filter(Objects::nonNull)
+            .toList();
+    Map<UUID, InventoryItem> rows = new HashMap<>();
+    if (!ids.isEmpty()) {
+      for (InventoryItem row : inventoryItemRepository.findWithMaterialByIdIn(ids)) {
+        rows.put(row.getId(), row);
+      }
+    }
+    return rows;
+  }
+
+  /**
+   * Loads one offer's Lager row with its material.
+   *
+   * @param offer the offer
+   * @return the row, or {@code null} for an offer without one
+   */
+  @Nullable
+  InventoryItem rowOf(MaterialExchangeOffer offer) {
+    return offer.getInventoryItemId() == null
+        ? null
+        : inventoryItemRepository.findById(offer.getInventoryItemId()).orElse(null);
+  }
+
+  /**
    * Returns the offered amount clamped to the item's current stock, matching the board query's
    * {@code LEAST(offeredAmount, item.amount)}; never negative.
    *
-   * @param offer the offer, with its item loaded
+   * @param offer the offer
+   * @param item the offer's Lager row
    * @return the clamped offered quantity in SCU
    */
-  private static double effectiveOfferedAmount(@NotNull MaterialExchangeOffer offer) {
+  private static double effectiveOfferedAmount(
+      @NotNull MaterialExchangeOffer offer, @NotNull InventoryItem item) {
     Double offered = offer.getOfferedAmount();
-    Double stock = offer.getInventoryItem().getAmount();
+    Double stock = item.getAmount();
     double offeredValue = offered == null ? 0.0 : offered;
     double stockValue = stock == null ? 0.0 : stock;
     return Math.max(0.0, Math.min(offeredValue, stockValue));
@@ -522,15 +560,16 @@ public class MaterialExchangeBoardService {
    * backing row's stock for a stock-backed offer; never negative.
    *
    * @param offer the item offer
+   * @param item the offer's Lager row, or {@code null} for an offer without one
    * @return the clamped whole-unit quantity, or {@code null} if the offer states none
    */
   @Nullable
-  private static Integer effectiveItemQuantity(@NotNull MaterialExchangeOffer offer) {
+  private static Integer effectiveItemQuantity(
+      @NotNull MaterialExchangeOffer offer, @Nullable InventoryItem item) {
     Integer quantity = offer.getItemQuantity();
     if (quantity == null) {
       return null;
     }
-    InventoryItem item = offer.getInventoryItem();
     if (item == null || item.getAmount() == null) {
       return quantity;
     }

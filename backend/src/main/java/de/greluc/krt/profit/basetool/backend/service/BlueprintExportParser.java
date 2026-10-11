@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ParsedEntry;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintExportEntryDto;
@@ -187,15 +188,4 @@ public final class BlueprintExportParser {
   private static @Nullable Instant toInstant(@Nullable Double epochSeconds) {
     return epochSeconds == null ? null : Instant.ofEpochMilli(Math.round(epochSeconds * 1000.0));
   }
-
-  /**
-   * A de-duplicated export entry: external product name, structural tag and earliest acquisition
-   * instant.
-   *
-   * @param externalName the trimmed external product name
-   * @param tag the scmdb.net structural blueprint key (REQ-INV-019), or {@code null}
-   * @param suggestedAcquiredAt the earliest acquisition instant, or {@code null}
-   */
-  public record ParsedEntry(
-      @NotNull String externalName, @Nullable String tag, @Nullable Instant suggestedAcquiredAt) {}
 }

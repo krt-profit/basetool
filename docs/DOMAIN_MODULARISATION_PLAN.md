@@ -201,7 +201,8 @@ reference DTOs).
   `…frontend.model.` (production enforces it since 2026-09-25; replaced by the exact list on
   2026-10-04, F2); 172 `T(…support.Roles)` references in
   22 templates resolve only at render time; three DTO contract tests are keyed on the `model.dto`
-  package; the authorization gate test checks classes, not handlers.
+  package (four, keyed on the `@DtoMirror` marker since F4, 2026-10-10); the authorization gate
+  test checks classes, not handlers.
 - **Assets.** 100 scripts, 64 stylesheets and 120 templates map onto the domains (19 core + 81 domain
   scripts in 21 domains). The coupling mechanism is the classic shared global scope: 523 top-level
   names in 50 non-IIFE files.
@@ -440,6 +441,7 @@ de.greluc.krt.profit.basetool.frontend
 ├── kernel.web           GlobalExceptionHandler, BackendErrorResponses, RelayParams, binding
 ├── kernel.livesync      websocket relay, presence
 ├── kernel.model         PageResponse, reference DTOs, PayoutPreference, handoff types
+├── kernel.observability logging, tracing and metric infrastructure (added with F4)
 ├── shell                landing, legal pages, manifest, client-error beacon
 └── <domain>.web | .client | .model   controllers and view assemblers; the typed client; mirrors and forms
 ```
@@ -923,7 +925,7 @@ their "must stay green" period here (D-01).
      `BlueprintUploadPreviewServiceTest` was added for the one exchange path a lower module used.
   2. *Inversions* (5 baseline edges, **108 → 103**; the `blueprint -> exchange` and
      `scope -> exchange` pairs are gone): the blueprint upload preview hands the envelope to the
-     blueprint-owned SPI `service.BlueprintEnvelopeReader` (implemented by
+     blueprint-owned SPI `service.BlueprintEnvelopeReader` (since P3-7a in `blueprint.api`; implemented by
      `ExchangeBlueprintEnvelopeReader`, same binding, validation and draft resolution in the
      caller's transaction); `PersonalBlueprintService`, `CustomJwtGrantedAuthoritiesConverter` and
      `UserDeletionService` ask `platform.api.ClientDirectory` (`displayNames`, `isGatewayClient`,
@@ -1017,7 +1019,9 @@ as each pair is decoupled.
   `MaterialExchangeOffer.inventoryItem` stays an association for now: converting it rewrites the
   fetch plan of eight queries and two entity graphs, and nothing needs the id until `InventoryItem`
   leaves `model` with the inventory move (P3-5), where it belongs. **Tracked for P3-5:** convert
-  `MaterialExchangeOffer.inventoryItem` to the item id when `InventoryItem` moves. (3)
+  `MaterialExchangeOffer.inventoryItem` to the item id when `InventoryItem` moves — done in
+  P3-5d-4 (2026-10-10), ahead of the move. *Correction:* it was eight board queries, one entity
+  graph and two Lager queries (the releasable-row reads' `NOT EXISTS`), not two entity graphs. (3)
   `ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE` is public, because the offer board's JPQL
   splices it from another package.
 - `refinery` — **done 2026-10-10.**
@@ -1138,7 +1142,8 @@ as each pair is decoupled.
   with the APPSEC-01 book-in check once, before any lookup; **5d** the earmarks
   (`InventoryJobOrderAllocation.jobOrder`, `InventoryMissionAllocation.mission`) and
   `MaterialExchangeOffer.inventoryItem` as ids, and `StockSoldForTarget` for the sale entries
-  (write family 7), which also settles P3-13 by inversion instead of a rank swap; **5e** the move,
+  (write family 7), which also settles P3-13 by inversion instead of a rank swap; **5e** the move
+  (deferred to Phase 4, see 5e below),
   NullAway and the idioms.
   - **5a — done 2026-10-10.** `InventoryModuleContractTest` pins that create, note update,
     personal rebook and book-out each record their audit event in the command's transaction, and
@@ -1171,6 +1176,184 @@ as each pair is decoupled.
     `UnnecessaryParentheses`/`ThreadJoinLoop` on a record of `ExchangeStockWriteService`); a full
     recompile passes, so it is a stale end-position table of the incremental build, not a code
     fault.
+  - **5c — done 2026-10-10.** The job order and the refinery write no Lager row any more:
+    `StockCommands` gains `takeFromEarmarkedRow` (the material handover and the production
+    consumption: delete a depleted row after its offers are told, else lower the order slice and
+    the mission slices), `consumeEarmarkedItems` (the item handover, oldest row first),
+    `lowered` (the observers' notice after the order is saved, in the old order),
+    `releaseJobOrderEarmarks` / `…MaterialEarmarks` / `…GameItemEarmarks` (the bulk earmark
+    releases, after the loop as before), `bookInFromProduction` and `bookInFromRefinery` (row,
+    earmarks, merge and audit verbatim; the job order and the mission go in by id, so
+    `StockCommands` names no foreign entity and the baseline gains no edge), all `MANDATORY`, and `requireBookIn`, the one book-in rule
+    the Einbuchen, the production and the refinery store share (APPSEC-01). The production still
+    checks before any lookup and the refinery store where it did. *Behaviour unchanged by owner
+    decision:* the refinery store keeps its two differences — a personal book-in for another
+    member passes the owner check alone, an ownerless order needs Logistician+ — as the named
+    `BookInRule.refineryStore()`, pinned by `InventoryStockCommandsTest` and noted in REQ-INV-032 and
+    REQ-SEC-005 until the owner decides. `StockWriteOwnershipTest` makes "only inventory writes
+    Lager rows" a gate (a `save*`/`delete*`/`@Modifying` call on the Lager repository, a row or
+    earmark setter, an earmark mutator), proven able to fail on a planted writer; the GDPR
+    orchestrator is its one listed exception until Phase 4. The job-order and refinery unit tests
+    run against a real `InventoryStockCommands` over their mocks, so they still verify the writes.
+  - **5d-1 — done 2026-10-10.** Write family 7: `inventory.api.StockSoldForTarget`
+    (`soldForMissions`, an `@ObserverSpi`, `MANDATORY`), implemented by
+    `mission.internal.MissionSaleIncome`, books the income of stock sold out of a mission's earmark;
+    the Lager still computes each share and skips a non-positive one, the mission still books
+    nothing for a mission the seller does not take part in and saves after the loop. Baseline
+    **79 → 75**.
+  - **5d-2 — done 2026-10-10.** `InventoryMissionAllocation.mission` becomes `missionId` (the same
+    `mission_id` column and foreign key; no migration), the first of the eight business associations
+    of §5.6 turned into an id. What the Lager shows of the mission (name, planned start) comes from
+    the read SPI `inventory.api.EarmarkTargets.Missions`, implemented by `MissionEarmarkTargets` with
+    one projection query, through `InventoryEarmarkTargetCache` (`EarmarkTargets.Lookup`): a
+    per-transaction memo whose first miss loads every mission the Lager rows of the persistence
+    context are earmarked to, so a page costs one lookup whatever its size. The mapper, the
+    allocation commands and the check-in's existence check (same `Mission not found`) ask it; the
+    DTOs and audit labels are byte-identical. `InventoryEarmarkReadNoNPlusOneTest`, added before
+    the change, keeps six Lager reads at the same statement count for 25 rows as for 3 (proven
+    able to fail: without the context scan the by-material read rises from 9 to 31 statements).
+    Baseline **75 → 67** (`inventory -> mission` is gone).
+  - **5d-3 — done 2026-10-10.** `InventoryJobOrderAllocation.jobOrder` becomes `jobOrderId` (same
+    column and foreign key). The order's running number comes through
+    `EarmarkTargets.JobOrders` (`JobOrderEarmarkTargets`, one projection query) and the same
+    per-transaction memo, which now scans the context for both earmark kinds; the mapper's
+    `JobOrderAllocationDto`, the delivered toggle's and the check-in's audit labels are
+    byte-identical. The job order no longer reaches into a row's earmark collections: the handover
+    asks `InventoryAllocations.jobOrderSlice`, and unlinking a row goes through
+    `StockCommands.releaseJobOrderEarmark`. `StockWriteOwnershipTest` now also refuses a reach into
+    the earmark collections outside the Lager, proven on a planted drain.
+    `InventoryEarmarkReadNoNPlusOneTest` stays green (proven able to fail: without the context
+    scan the by-material read rises from 8 to 30 statements). Baseline **67 → 61**; the remaining
+    `inventory -> joborder` edges are the requirement checks of the allocation and the order-facing
+    stock reads (`JobOrderItemStockGroupDto`, the stock row projections), which move with 5e.
+  - **5d-4 — done 2026-10-10.** `MaterialExchangeOffer.inventoryItem` becomes `inventoryItemId`
+    (the same `inventory_item_id` column, foreign key and `ON DELETE CASCADE`; no migration). The
+    board's JPQL joins the row as an entity join (`LEFT JOIN InventoryItem ii ON ii.id =
+    o.inventoryItemId`), so its filters, sort and clamp stay in SQL; the detail's entity graph
+    drops the row. The board then loads the page's rows with their material in one read
+    (`InventoryItemRepository.findWithMaterialByIdIn`) and hands each row to the DTO mapping; the
+    detail, the update's clamp and the audit label load the one row by id. The DTOs and the audit
+    labels and details are byte-identical. `MaterialExchangeBoardNoNPlusOneTest`, added before
+    the change, keeps the "mein" board at the same count for 25 offers as for 3 (5 statements)
+    and the detail within the bound (proven able to fail: loading the rows per offer gives 10
+    against 54). The Materialbörse no longer holds an association into the Lager; its remaining
+    use of `InventoryItem` is the type, which stays in `model` like every entity. Baseline
+    unchanged.
+  - **5e — done 2026-10-10, without the move.** The last eleven `inventory -> joborder` edges
+    go: the two order-facing Lager reads (the material collection and the item stock of an
+    order, REQ-ORDERS-028) move into `joborder.internal.JobOrderStockReadService`, which reads
+    each row's slice through `InventoryAllocations.jobOrderSlice`; the Lager's link checks
+    (REQ-ORDERS-018, REQ-INV-031) ask `EarmarkTargets.JobOrders` for what an order requires
+    (`requiredMaterialIds`, `requiredGameItemIds`); the two earmarked-stock projections
+    (`JobOrderMaterialStockRow`, `JobOrderGameItemStockRow`) move to `inventory.api`. No
+    behaviour changes: the 404s, the messages and the DTOs are the same. Baseline **61 → 50**.
+    The tenancy guard's controller selection drops from 25 to 23 (floor 24 → 23): the
+    material-collection and item-stock controllers were selected only because they held
+    `InventoryItemService`, and they have GET handlers only. The model layer's join-column
+    selection floor drops to 354 with the two projections. NullAway takes in the whole
+    `inventory` package tree. The §8.1 idioms have no site left in the inventory code: its
+    concatenated `@Query` strings splice the scope constant or split a token, and its one
+    `isPresent()` is a plain boolean.
+    *Correction — the move waits for Phase 4:* moving any inventory implementation class into
+    `inventory.internal` closes a package cycle (probed: moving `StockViewerAccessService`
+    alone gives 15 cycles, among them `admin -> mapper -> inventory -> service -> admin`). Layer
+    classes consume `inventory.api`, while the inventory implementation needs the layers
+    (`OwnerScopeService`, `AuthHelperService`, the mappers, the repositories). The layer
+    consumers are: `UserDeletionService` (privacy, Phase 4), `BlueprintCraftabilityService`
+    (P3-7), `MeController` (identity, Phase 4), `OrgUnitMembershipService` and
+    `OrgUnitMembershipRepository` (`InventoryOrgUnitReconciler`, Phase 4),
+    `JobOrderStockProjectionService` and `JobOrderMapper` (joborder),
+    `JobOrderRepository.findEarmarks` and `MissionRepository.findEarmarks`, and the Lager's
+    own `InventoryItemMapper`, `InventoryItemRepository` and services. Mission and job order
+    could move because no layer class used their packages. **Tracked for Phase 4:** move the
+    inventory into `inventory.web` / `inventory.internal` once those consumers have left the
+    layer packages (P4-1, §7.6), then NullAway covers it without a further change.
+
+- `hangar` — **done 2026-10-10** (P3-6).
+  1. *Characterise*: `HangarModuleContractTest` pins that creating, updating and deleting a ship
+     record `HANGAR_SHIP_CREATED`, `HANGAR_SHIP_UPDATED` and `HANGAR_SHIP_DELETED` in the
+     command's transaction, and that a member of another org unit is refused on both per-ship
+     write entry points (PUT and DELETE `/api/v1/hangar/ships/{id}`) with nothing recorded.
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `HangarAccessPolicy` (bean
+     `hangarAccessPolicy`) holds `canSeeShip` and `canEditShip` on the kernel's `permitsOwnedRow`.
+     The differential verdict test compared the policy, the live scope hub and a restatement over
+     9 callers × 7 ships × 2 gates = 126 verdicts before the old methods went (proven able to fail:
+     dropping the owner from the edit gate) and keeps comparing against the restatement. The two
+     write gates switched; the authorization matrix changed on exactly two lines;
+     `AccessGateService` lost `ShipRepository`. Baseline **50 → 48** (`scope -> hangar` is gone).
+  3. *Command API*: `hangar.api.ShipCommands` (`addShipForClient`, `updateShip`, `deleteShip`,
+     all `MANDATORY`), implemented by `HangarShipCommands` over `HangarService`; the exchange's
+     ship write and undo call it instead of `HangarService`. Each command keeps its audit event.
+  4. *Move*: `HangarController` into `hangar.web`; `HangarService`, `HangarImportService`,
+     `FleetExportParser`, the policy and the ten hangar-only DTOs (home location, the import
+     formats and response, the squadron overview) into `hangar.internal`. NullAway takes in the
+     whole module: three findings, the two optional components of the squadron overview DTOs now
+     `@Nullable` and one map lookup that cannot miss wrapped in `Objects.requireNonNull`. The §8.1
+     idioms have no site in the hangar code (its concatenated queries splice a constant; its one
+     `Math.max` has a single bound). The model layer's join-column selection floor drops 354 → 344
+     with the ten DTOs.
+  **Corrections:** (1) `Ship`, `ShipRepository`, `ShipMapper`, `ShipDto`, `ShipRequestDto` and
+  `ShipTypeMatcher` stay in the layer packages: the exchange, the mission, the catalogue's
+  location service and the GDPR services use them. (2) The squadron-overview DTOs carried no
+  nullness; the overview has always sent `details` as `null` without the owner details and
+  `locationName` as `null` for a ship without a location, which the annotations now state. No
+  N+1 test was added: the move changes no query or fetch plan.
+
+- `blueprint` — **in two parts** (P3-7a, P3-7b), each releasable on its own.
+  - **P3-7a — done 2026-10-10.**
+    1. *Characterise*: `BlueprintModuleContractTest` pins that adding, updating and removing a
+       personal blueprint record `BLUEPRINT_ADDED`, `BLUEPRINT_UPDATED` and `BLUEPRINT_REMOVED` in
+       the command's transaction. It also pins that another member reaches none of the owner's
+       blueprints (404, nothing recorded) and that a plain member is refused on both overview
+       reads.
+    2. *Access policy* (§5.4): `BlueprintAccessPolicy` (bean `blueprintAccessPolicy`) gates the
+       org-unit blueprint overview. Two matrix lines changed, in expression text only.
+       `BlueprintAccessPolicyDifferentialTest` compares the policy, the live hub and a restatement
+       for 14 callers (admin, officer without a seat, member of none, and each of the eleven
+       membership roles). It is proven able to fail.
+    3. *Inversions* (baseline **48 → 45**):
+       - `blueprint -> inventory` is gone. The craftability asks its own read SPI
+         `blueprint.api.CraftableStockSource`, which inventory implements in
+         `InventoryCraftableStock`. Stock and pending refinery yield now share one record,
+         `blueprint.api.CraftabilitySlice`, which replaces `CraftabilityYieldSource.YieldSlice`;
+         `InventoryItemService#getOwnedStockSlices` is gone.
+       - `identity -> blueprint` is gone. Creating a member account calls
+         `identity.api.MemberCreatedObserver` (`@ObserverSpi`, `MANDATORY`), which
+         `DefaultBlueprintGrantOnCreation` implements by granting the default blueprints, as
+         before, in the creating transaction.
+       - `blueprint` is a declared module with an `api` package. `CraftabilityYieldSource` and
+         `BlueprintEnvelopeReader` moved there from `service`, and every higher-ranked module
+         allows `blueprint::api`.
+    **Corrections:**
+    (1) §5.3 lists the default-blueprint grant as an after-commit event. It stays a same-transaction
+    observer instead, because the grant records `BLUEPRINT_DEFAULTS_GRANTED` with the request's
+    actor, and listeners never write audit rows. A failed grant still rolls the account creation
+    back, exactly as before. The provisioning task still heals a missed grant.
+    (2) The overview gate's predicate stays in the scope kernel (`RequestScopeResolver`). Identity's
+    `/me` capability view reads it too, and an `identity -> blueprint` edge would break the ranks.
+    The policy builds on it, and the differential test keeps both live copies in step.
+  - **P3-7b — done 2026-10-10, without the move.** The exchange, the Materialbörse and the job
+    order reach no blueprint implementation class any more. They go through five published
+    interfaces:
+    - `BlueprintProducts`, the product resolution: by key, by game item, all products, and the
+      `scwiki_key` index;
+    - `BlueprintImports`, the import preview and name resolution;
+    - `BlueprintFamilies`, the variant families;
+    - `DefaultBlueprintKeys`;
+    - `PersonalBlueprintCommands` (`add`, `delete`, all `MANDATORY`), implemented by
+      `PersonalBlueprintCommandService` over `PersonalBlueprintService`.
+
+    Their records `ResolvedProduct`, `NameResolution` and `ParsedEntry` moved out of the services
+    into `blueprint.api`. `ResolvedProduct.outputItemId` is now marked `@Nullable`, which it always
+    was. The existing services implement the interfaces, so no behaviour changes. NullAway takes in
+    the whole `blueprint` tree, which today is its `api` package. The §8.1 idioms were not swept,
+    because the implementation does not move.
+
+    *Correction — the move waits for P4-1:* `CraftableStockSource` is implemented in the layer
+    package `service` (`InventoryCraftableStock`), because the inventory has not moved. So `service`
+    depends on `blueprint.api`. Any blueprint implementation class in `blueprint.internal` needs
+    `service` (the scope hub, the audit recorder), which closes a `service <-> blueprint` package
+    cycle, as it did for the inventory. **Tracked as P4-2 (§7.6).**
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1191,6 +1374,17 @@ Carried into this phase from Phase 2: `service.MemberEvaluationErasure` (promoti
 `personalinventory.api.PersonalInventoryErasure` are the interim erasure commands `UserDeletionService`
 calls; both are replaced by `UserErasureParticipant` implementations here, and
 `MemberEvaluationErasure` leaves the `service` package with that step (P2-3); `service.BankHandleSnapshots` (bank) goes the same way (P2-5).
+**P4-1 — move the inventory into `inventory.web` / `inventory.internal`** (carried from P3-5e,
+§7.5). It waits until the layer classes that consume `inventory.api` have left the layer packages:
+the GDPR orchestrator (`UserDeletionService`), identity's `MeController`, the org-unit membership
+service and repository (`InventoryOrgUnitReconciler`), the blueprint's craftability read (P3-7), the
+job order's `JobOrderStockProjectionService` and `JobOrderMapper`, and the earmark finders of
+`JobOrderRepository` and `MissionRepository`. The Lager's own controller, services, mapper and
+repository then move together; NullAway already covers the `inventory` tree.
+**P4-2 — move the blueprint into `blueprint.web` / `blueprint.internal`** (carried from
+P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
+The five published interfaces already cover every foreign caller, so the move touches no
+other module; the §8.1 idioms go with it.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
@@ -1206,7 +1400,7 @@ domain stays a package.
 | F1 — **done 2026-10-04** | Kernel extraction: `BackendErrorMapper` (a sealed outcome type with a pattern switch), template overloads for write verbs, the eleven bypassing controllers moved onto the kernel, the `WebClient` confinement rule at zero |
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
 | F3 — **done 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
-| F4 | Package-by-domain move in one pull request; route/gate snapshot byte-identical |
+| F4 — **done 2026-10-10** | Package-by-domain move in one pull request; route/gate snapshot byte-identical. Released only after a release carrying F2 is in production (D-10) |
 | F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
 
 *F1 as built (2026-10-04).* `service.BackendErrorMapper` classifies every failed call into one case
@@ -1280,6 +1474,49 @@ import's file part goes out as `application/json` for a `.json` file although th
 F4 (the controllers move next to them) and, per domain with its REST cut, the HTTP interface of
 §5.9.
 
+*F4 as built (2026-10-10).* The layer packages are gone, by script, in one pull request. 546
+domain classes left `controller`, `view`, `model`, `model.dto`, `model.form` and `oss` for
+`frontend.<domain>.web` (controllers, view rows, view helpers such as `BankRunningBalance`) and
+`frontend.<domain>.model` (mirrors, forms, view models); 147 kernel classes left `config`,
+`service`, `websocket`, `support`, `logging`, `exception`, `health`, `metrics`, `validation`, `view`
+and `model` for the kernel packages of §5.9 — `kernel.backend`, `kernel.security`,
+`kernel.session`, `kernel.layout`, `kernel.web`, `kernel.livesync`, `kernel.model` — plus
+`kernel.observability`; 379 tests followed their classes, and a test of several domains' pages
+went to the test-only package `frontend.web`. `shell` took the legal and manifest controllers,
+`ScLink`, the licence report and `AndroidAppLinkProperties`; `AuditDomains` went to `audit.model`
+and `GrafanaLinkProperties` to `exchange.web`, domain code that had sat in the kernel.
+`kernel.model` holds `PageResponse`, `PayoutPreference`, `HandoffKind`, `StagedHandoff`,
+`BackendEnumAsString`, the new marker `DtoMirror` and ten reference DTOs several domains share. The
+route/gate snapshot, `BackendCallExistenceTest`, the URI-template guards, the static paths and every
+bean name are unchanged; the 177 `T(…Roles)` references of 23 templates name
+`kernel.security.Roles`, and `SESSION_BOUND_TYPES` names the 21 session-bound types (all domain
+types) by their new names. The four DTO contract tests went red on the move, keyed on `model.dto`
+as they were, and now select by `@DtoMirror` (`DtoMirrorScan`) with unchanged floors.
+`DomainPackageLayoutTest` keeps every main class in a kernel package of §5.9 or a domain's `web`,
+`model` or `client` package, controllers in `<domain>.web`, marked types in a model package and
+every `*Dto`/`*Request`/`*Response` of a model package marked; `TypedBackendClientTest` admits
+`kernel.backend`, `kernel.layout` and `kernel.security` only (before: all of `config`, `service`
+and `websocket`); `KernelDomainReachTest` freezes the kernel's reaches into domain packages in a
+list that may only shrink — each rule proven against a planted violation (REQ-FE-032).
+BE-SIMP-10's frontend half ran in the same pull request: 410 inline fully qualified names in `main`
+became imports, eight stay (the JetBrains `@NotNull` beside an imported Jakarta one).
+Corrections: §5.9 has no kernel package for logging, tracing and metrics, so `kernel.observability`
+was added beside the seven it draws. The kernel reached into domains in twelve places, not eleven
+(`QualityTierCatalog` reads `catalogue.model.QualityTierDto` since the quality tiers landed); two
+were the active-org-unit session key read from `orgunit.web.MeFrontendController`, which moved into
+`kernel.web.ActiveSquadronContext` (same attribute name). The other ten are frozen rather than
+inverted: §5.1 makes the kernel rank 0 and closed to domain meaning, and the backend handles such
+edges the same way, a shrink-only baseline inverted one by one (the layout's
+`OrgUnitMembershipOptionDto`/`SquadronDto`, the gates' `UserDto`/`RegistrationStatusDto`/`TermsStatusDto`,
+`TermsDocumentDto`, `QualityTierDto`). The contract tests keyed on `model.dto` were four, not three
+(`DtoMirrorConsistencyTest` read the folder). Not every reference DTO moved to the kernel:
+`JobOrderReferenceDto` embeds the order's need lists and stays in `joborder.model`. FQN shortening
+ran after the move in its own commit, not before it as `previous-audits.md` planned, because the
+move script had to rewrite those names anyway. A session written by the release before F4 holds the
+old class names in its flash maps; they resolve to no class, so the value fails at type resolution
+before the allow-list is consulted — dropped on `basetool_session_value_dropped_total`, not refused
+on `basetool_session_type_refused_total` — once per session, never the login (deployment.md).
+
 ### 7.9 REST API track
 
 **Delivery decided 2026-10-04 (D-24):** the waves below are built and merged one by one, but ship
@@ -1321,7 +1558,7 @@ features only, no preview flags) stands; every proposal below uses final feature
 | **Do not adopt** Markdown documentation comments (`///`, JEP 467): Checkstyle 14.3.0 does not treat them as Javadoc; gatherers: no loop here is clearer as one | — | — | — | — |
 | **ADR-0223 corrections** — **done 2026-10-10** (the corrections were recorded in the ADR on 2026-10-02; the missing gate is `scripts/check-final-java-only.py`, REQ-OPS-043): JDK 26 does add a final library feature (JEP 517, HTTP/3 for the HTTP client); JEP 510 (KDF) is final in 25; Checkstyle already enforces the module-import and compact-source bans in `main` (not in `test`/`e2e`); there are 42 `super(…)` calls, not 34; a `--enable-preview` gate is still missing | The decision record stays authoritative | — | Review | S |
 
-**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move, `mission` with its own). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
+**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move, `mission` with its own, the `inventory` tree with P3-5e and `hangar` with P3-6). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
 annotations by simple name; Spring Framework builds itself with the same pair. Starting with the new
 module API packages, it would turn the annotations into a checked contract and close arc42 §11.4
 ("derived nullity annotations have no gate"). Cost: a compile-time dependency, about ten javac

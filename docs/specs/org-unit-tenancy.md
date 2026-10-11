@@ -307,7 +307,7 @@ construction, no creator-owner fallback and no ownerless-leadership use case).
 
 The active OrgUnit context is surfaced to the user **only** by appending it to the application
 title (`appTitle`, resolved in
-[`LayoutMiscAdvice`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/LayoutMiscAdvice.java)),
+[`LayoutMiscAdvice`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/layout/LayoutMiscAdvice.java)),
 which renders in both the browser `<title>` tag and the sidebar brand logo text. The suffix is:
 
 - the active OrgUnit's **shorthand** (falling back to its name) for an active pin of **either**
@@ -336,9 +336,10 @@ product owner called out:
 - the owner **has no org unit at all** yet the row is **still stamped to one** (the demote to
   `NULL` has not happened / does not apply).
 
-Enforced in
-[`OwnerScopeService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)
-(`canSee/canEditInventoryItem`, `canSee/canEditShip`, `canSee/canEditRefineryOrder`): a shared
+Enforced in the scope kernel's `permitsOwnedRow`
+([`OwnerScopeService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)),
+which the module access policies call (`canSee/canEditInventoryItem`, `canSee/canEditShip`,
+`canSee/canEditRefineryOrder`; corrected 2026-10-10, the gates had moved out of the scope hub): a shared
 `isCurrentUserOwner(owner)` check runs **before** the strict `owning_org_unit_id` scope check (and
 before the ownerless-row branch), so the `@PreAuthorize` gate can never deny a write the service
 layer would accept. The service layers already authorise the owner with no org-unit narrowing —
@@ -358,9 +359,9 @@ shared pools. A **non-owner** stays bound by the strict `owning_org_unit_id` sco
 
 **Enforced by:** `OwnerScopeServiceTest` (`PersonalAggregateOwnerRetainsAccessTests`),
 `InventoryTenancyE2eTest` (`ownerRetainsEditAfterLeavingOwningOrgUnit`) · **Code:**
-`InventoryAccessPolicy#canSeeInventoryItem` / `#canEditInventoryItem`, `OwnerScopeService#canSeeShip` /
+`InventoryAccessPolicy#canSeeInventoryItem` / `#canEditInventoryItem`, `HangarAccessPolicy#canSeeShip` /
 `#canEditShip`, `RefineryAccessPolicy#canSeeRefineryOrder` / `#canEditRefineryOrder` (corrected
-2026-10-10: the refinery gates left the scope hub with the refinery module).
+2026-10-10: the refinery, inventory and ship gates left the scope hub with their modules).
 
 ### REQ-ORG-014 — Three-tier org hierarchy (Organisationsleitung > Bereich > Staffel/SK)
 

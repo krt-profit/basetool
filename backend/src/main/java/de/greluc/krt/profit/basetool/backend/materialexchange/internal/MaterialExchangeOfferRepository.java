@@ -65,8 +65,8 @@ public interface MaterialExchangeOfferRepository
       value =
           """
           SELECT o FROM MaterialExchangeOffer o
-          LEFT JOIN FETCH o.inventoryItem ii
-          LEFT JOIN FETCH ii.material m
+          LEFT JOIN InventoryItem ii ON ii.id = o.inventoryItemId
+          LEFT JOIN ii.material m
           LEFT JOIN FETCH o.owner ow
           LEFT JOIN FETCH o.owningOrgUnit
           WHERE o.status = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus.ACTIVE
@@ -91,7 +91,7 @@ public interface MaterialExchangeOfferRepository
       countQuery =
           """
           SELECT COUNT(o) FROM MaterialExchangeOffer o
-          LEFT JOIN o.inventoryItem ii
+          LEFT JOIN InventoryItem ii ON ii.id = o.inventoryItemId
           LEFT JOIN ii.material m
           LEFT JOIN o.owner ow
           WHERE o.status = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus.ACTIVE
@@ -124,8 +124,7 @@ public interface MaterialExchangeOfferRepository
    * @param id the offer id.
    * @return the offer with its item / material / owner / org unit initialised, or empty.
    */
-  @EntityGraph(
-      attributePaths = {"inventoryItem", "inventoryItem.material", "owner", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "owningOrgUnit"})
   Optional<MaterialExchangeOffer> findWithDetailById(UUID id);
 
   /**
@@ -152,8 +151,8 @@ public interface MaterialExchangeOfferRepository
    */
   @Query(
       """
-      SELECT o.inventoryItem.id FROM MaterialExchangeOffer o
-      WHERE o.status = :status AND o.inventoryItem.id IN :inventoryItemIds
+      SELECT o.inventoryItemId FROM MaterialExchangeOffer o
+      WHERE o.status = :status AND o.inventoryItemId IN :inventoryItemIds
       """)
   Set<UUID> findInventoryItemIdsWithStatus(
       @Param("status") MaterialExchangeOfferStatus status,
@@ -182,7 +181,7 @@ public interface MaterialExchangeOfferRepository
   @Query(
       """
       UPDATE MaterialExchangeOffer o SET o.offeredAmount = :stock
-      WHERE o.inventoryItem.id = :itemId
+      WHERE o.inventoryItemId = :itemId
         AND o.status = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus.ACTIVE
         AND o.offeredAmount IS NOT NULL
         AND o.offeredAmount > :stock
@@ -204,7 +203,7 @@ public interface MaterialExchangeOfferRepository
   @Query(
       """
       UPDATE MaterialExchangeOffer o SET o.itemQuantity = :stock
-      WHERE o.inventoryItem.id = :itemId
+      WHERE o.inventoryItemId = :itemId
         AND o.kind = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferKind.ITEM
         AND o.status = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus.ACTIVE
         AND o.itemQuantity IS NOT NULL
@@ -241,7 +240,8 @@ public interface MaterialExchangeOfferRepository
       SELECT o.id AS id, o.kind AS kind, o.offeredAmount AS offeredAmount,
              o.itemQuantity AS itemQuantity, o.itemName AS itemName, o.owner.id AS ownerId,
              m.name AS materialName
-      FROM MaterialExchangeOffer o JOIN o.inventoryItem i LEFT JOIN i.material m
+      FROM MaterialExchangeOffer o JOIN InventoryItem i ON i.id = o.inventoryItemId
+      LEFT JOIN i.material m
       WHERE i.id IN :inventoryItemIds
         AND o.status = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus.ACTIVE
       """)
@@ -262,7 +262,8 @@ public interface MaterialExchangeOfferRepository
       SELECT o.id AS id, o.kind AS kind, o.offeredAmount AS offeredAmount,
              o.itemQuantity AS itemQuantity, o.itemName AS itemName, o.owner.id AS ownerId,
              m.name AS materialName
-      FROM MaterialExchangeOffer o JOIN o.inventoryItem i LEFT JOIN i.material m
+      FROM MaterialExchangeOffer o JOIN InventoryItem i ON i.id = o.inventoryItemId
+      LEFT JOIN i.material m
       WHERE i.personal = false
         AND o.status = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus.ACTIVE
         AND
@@ -284,7 +285,8 @@ public interface MaterialExchangeOfferRepository
       SELECT o.id AS id, o.kind AS kind, o.offeredAmount AS offeredAmount,
              o.itemQuantity AS itemQuantity, o.itemName AS itemName, o.owner.id AS ownerId,
              m.name AS materialName
-      FROM MaterialExchangeOffer o JOIN o.inventoryItem i LEFT JOIN i.material m
+      FROM MaterialExchangeOffer o JOIN InventoryItem i ON i.id = o.inventoryItemId
+      LEFT JOIN i.material m
       WHERE i.user.id = :userId
         AND o.status = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus.ACTIVE
       """)

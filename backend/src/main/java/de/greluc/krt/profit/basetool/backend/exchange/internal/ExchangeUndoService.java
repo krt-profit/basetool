@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCommands;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
@@ -34,8 +36,6 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.service.HangarService;
-import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
@@ -86,13 +86,13 @@ public class ExchangeUndoService {
   private final ExchangeChangeRepository changeRepository;
   private final ExchangeClientRepository clientRepository;
   private final PersonalBlueprintRepository blueprintRepository;
-  private final PersonalBlueprintService blueprintService;
+  private final PersonalBlueprintCommands blueprintService;
   private final ExchangeStockWriteService stockWriteService;
   private final StockCommands stockCommands;
   private final ShipRepository shipRepository;
   private final ShipTypeRepository shipTypeRepository;
   private final LocationRepository locationRepository;
-  private final HangarService hangarService;
+  private final ShipCommands shipCommands;
   private final ExchangeShipLinkRepository linkRepository;
   private final AuditRecorder auditRecorder;
   private final ExchangeLiveSync liveSync;
@@ -335,7 +335,7 @@ public class ExchangeUndoService {
     }
     if (before == null) {
       if (ship.isPresent()) {
-        hangarService.deleteShip(member, shipId);
+        shipCommands.deleteShip(member, shipId);
       }
       return true;
     }
@@ -357,9 +357,9 @@ public class ExchangeUndoService {
             ship.map(Ship::getVersion).orElse(null),
             null);
     if (ship.isPresent()) {
-      hangarService.updateShip(member, shipId, dto);
+      shipCommands.updateShip(member, shipId, dto);
     } else {
-      hangarService.addShipForClient(member, dto);
+      shipCommands.addShipForClient(member, dto);
     }
     return true;
   }

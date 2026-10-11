@@ -173,7 +173,7 @@ class MaterialExchangeStockLinksDataTest {
     offerRepository.save(
         MaterialExchangeOffer.builder()
             .kind(MaterialExchangeOfferKind.MATERIAL)
-            .inventoryItem(item)
+            .inventoryItemId(item.getId())
             .owner(item.getUser())
             .owningOrgUnit(item.getOwningOrgUnit())
             .offeredAmount(offered)

@@ -1173,7 +1173,7 @@ the list may only shrink.
 
 Every material quality and every quality floor the system stores lies in **0 to 1000 inclusive**:
 `inventory_item.quality`, `refinery_good.quality`, `job_order_handover_item.quality`,
-`blueprint_ingredient.min_quality`, `job_order_material.min_quality`, the `quality_min` /
+`blueprint_ingredient.min_quality`, the `quality_min` /
 `quality_max` bounds of `blueprint_requirement_modifier` and `blueprint_modifier_segment`,
 `material_exchange_request.min_quality` and `quality_tier.min_quality`. The bound holds in three
 places, so no path can slip past it:

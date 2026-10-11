@@ -1,0 +1,466 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.kernel.backend;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.web.reactive.function.client.WebClient;
+
+/**
+ * Success-path coverage for every public method and overload of {@link BackendApiClient} (cached
+ * and uncached, {@code Class<T>} and {@code ParameterizedTypeReference<T>}, every verb with and
+ * without body), driven by a shared {@link MockWebServer}.
+ */
+class BackendApiClientHappyPathTest {
+
+  private MockWebServer server;
+  private WebClient webClient;
+  private WebClient termsDocumentClient;
+  private BackendApiClient client;
+
+  @BeforeEach
+  void setUp() throws Exception {
+    server = new MockWebServer();
+    server.start();
+    webClient =
+        WebClient.builder()
+            .baseUrl(server.url("/").toString())
+            .defaultHeader("X-Auth", "authenticated")
+            .build();
+    termsDocumentClient =
+        WebClient.builder()
+            .baseUrl(server.url("/").toString())
+            .defaultHeader("X-Auth", "public")
+            .build();
+    client =
+        new BackendApiClient(
+            webClient,
+            termsDocumentClient,
+            new SimpleMeterRegistry(),
+            new org.springframework.cache.support.NoOpCacheManager());
+  }
+
+  @AfterEach
+  void tearDown() throws Exception {
+    server.shutdown();
+  }
+
+  @Test
+  void get_withClassResponseType_parsesBody() {
+    server.enqueue(jsonOk("hello"));
+
+    String result = client.get("/api/v1/greeting", String.class);
+
+    assertEquals("hello", result);
+  }
+
+  @Test
+  void get_withClassResponseType_usesAuthenticatedClient_byDefault() throws Exception {
+    server.enqueue(jsonOk("ok"));
+
+    client.get("/api/v1/x", String.class);
+
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals(
+        "authenticated",
+        req.getHeader("X-Auth"),
+        "Default get(uri, Class) must use the authenticated WebClient");
+  }
+
+  @Test
+  void get_withParameterizedType_parsesList() {
+    server.enqueue(jsonOk("[\"a\",\"b\",\"c\"]"));
+
+    List<String> result = client.get("/api/v1/list", new ParameterizedTypeReference<>() {});
+
+    assertEquals(List.of("a", "b", "c"), result);
+  }
+
+  @Test
+  void get_withARepeatedPlaceholder_fillsEachOccurrenceWithTheNextValue() throws Exception {
+    server.enqueue(jsonOk("{}"));
+    server.enqueue(jsonOk("{}"));
+
+    client.get(
+        "/api/v1/materials/{id}/terminals?starSystemNames={s}&starSystemNames={s}",
+        String.class,
+        "0b5e0b5e-0000-4000-8000-000000000001",
+        "Stanton",
+        "Pyro & Nyx");
+    client.get(
+        "/api/v1/missions/search?status={status}&status={status}&size={size}",
+        new ParameterizedTypeReference<String>() {},
+        "PLANNED",
+        "ACTIVE",
+        20);
+
+    assertEquals(
+        "/api/v1/materials/0b5e0b5e-0000-4000-8000-000000000001/terminals"
+            + "?starSystemNames=Stanton&starSystemNames=Pyro%20%26%20Nyx",
+        server.takeRequest(1, TimeUnit.SECONDS).getPath());
+    assertEquals(
+        "/api/v1/missions/search?status=PLANNED&status=ACTIVE&size=20",
+        server.takeRequest(1, TimeUnit.SECONDS).getPath());
+  }
+
+  @Test
+  void get_withUriVariables_percentEncodesSpacesAndQuotes_notFormEncoding() throws Exception {
+    server.enqueue(jsonOk("[]"));
+
+    client.get(
+        "/api/v1/personal-blueprints/overview/owners?productKey={productKey}",
+        new ParameterizedTypeReference<List<String>>() {},
+        "killshot \"dominion camo\" rifle");
+
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals(
+        "/api/v1/personal-blueprints/overview/owners?productKey=killshot%20%22dominion%20camo%22%20rifle",
+        req.getPath());
+    assertEquals(
+        "authenticated",
+        req.getHeader("X-Auth"),
+        "URI-variable GET must use the authenticated WebClient");
+  }
+
+  /**
+   * Every verb goes out on the authenticated client (REQ-SEC-052).
+   *
+   * @throws Exception if a request could not be read back from the stub server
+   */
+  @Test
+  void everyVerbUsesTheAuthenticatedClient() throws Exception {
+    server.enqueue(jsonOk("\"x\""));
+    server.enqueue(jsonOk("\"x\""));
+    server.enqueue(jsonOk("\"x\""));
+    server.enqueue(jsonOk("\"x\""));
+    server.enqueue(jsonOk("\"x\""));
+    server.enqueue(jsonOk("[]"));
+
+    client.get("/api/v1/things", String.class);
+    client.post("/api/v1/things", "body", String.class);
+    client.put("/api/v1/things/1", "body", String.class);
+    client.patch("/api/v1/things/1", "body", String.class);
+    client.delete("/api/v1/things/1", String.class);
+    client.get("/api/v1/list", new ParameterizedTypeReference<List<String>>() {});
+
+    for (int i = 0; i < 6; i++) {
+      RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+      assertNotNull(req);
+      assertEquals(
+          "authenticated",
+          req.getHeader("X-Auth"),
+          "no verb may reach the backend without the caller's token: " + req.getPath());
+    }
+  }
+
+  /**
+   * The one exception, and the reason it is a named method rather than a flag: the Nutzungs-
+   * bedingungen have to be readable before anyone has accepted them, so the consent gate has
+   * something to point at. It is one of the four public backend paths REQ-SEC-052 enumerates.
+   *
+   * @throws Exception if the request could not be read back from the stub server
+   */
+  @Test
+  void getTermsDocumentAnonymously_isTheOnlyCallOnTheAnonymousClient() throws Exception {
+    server.enqueue(jsonOk("{\"version\":\"1\",\"markdown\":\"text\"}"));
+
+    client.getTermsDocumentAnonymously();
+
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals("public", req.getHeader("X-Auth"));
+    assertEquals("/api/v1/terms/document", req.getPath());
+  }
+
+  @Test
+  void getCached_withClassResponseType_parsesBody() {
+    server.enqueue(jsonOk("cached"));
+
+    String result = client.getCached(CachedCatalog.ORG_UNITS_ACTIVE, String.class);
+
+    assertEquals("cached", result);
+  }
+
+  @Test
+  void getCached_withParameterizedType_parsesBody() {
+    server.enqueue(jsonOk("[1,2,3]"));
+
+    List<Integer> result =
+        client.getCached(CachedCatalog.ORG_UNITS_ACTIVE, new ParameterizedTypeReference<>() {});
+
+    assertEquals(List.of(1, 2, 3), result);
+  }
+
+  @Test
+  void getCached_pageWalkedCatalog_mergesAllPagesInOrder() throws Exception {
+    server.enqueue(jsonOk(pageJson(List.of("a", "b"), 0, 2, 3, 2)));
+    server.enqueue(jsonOk(pageJson(List.of("c"), 1, 2, 3, 2)));
+
+    PageResponse<String> result =
+        client.getCached(
+            CachedCatalog.SQUADRONS, new ParameterizedTypeReference<PageResponse<String>>() {});
+
+    assertEquals(List.of("a", "b", "c"), result.content());
+    assertEquals(3L, result.totalElements(), "the merged envelope keeps the backend total");
+    assertEquals(2, server.getRequestCount());
+    RecordedRequest first = server.takeRequest(1, TimeUnit.SECONDS);
+    RecordedRequest second = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("/api/v1/squadrons?size=1000&sort=name,asc&page=0", first.getPath());
+    assertEquals("/api/v1/squadrons?size=1000&sort=name,asc&page=1", second.getPath());
+  }
+
+  @Test
+  void getCached_pageWalkedCatalog_singlePage_makesExactlyOneRequest() {
+    server.enqueue(jsonOk(pageJson(List.of("only"), 0, 1000, 1, 1)));
+
+    PageResponse<String> result =
+        client.getCached(
+            CachedCatalog.SQUADRONS, new ParameterizedTypeReference<PageResponse<String>>() {});
+
+    assertEquals(List.of("only"), result.content());
+    assertEquals(1, server.getRequestCount(), "a one-chunk catalogue must cost one request");
+  }
+
+  @Test
+  void getCached_pageWalkedCatalog_classOverload_isRejectedWithoutAnyRequest() {
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> client.getCached(CachedCatalog.SQUADRONS, String.class));
+
+    assertTrue(ex.getMessage().contains("SQUADRONS"));
+    assertEquals(0, server.getRequestCount(), "the guard must reject before any backend call");
+  }
+
+  @Test
+  void getCached_pageWalkedCatalog_capHit_stopsAndLogsWarning() {
+    for (int i = 0; i < CatalogPages.MAX_CATALOG_PAGES; i++) {
+      server.enqueue(jsonOk(pageJson(List.of("row" + i), i, 1, 1000, 1000)));
+    }
+    ch.qos.logback.classic.Logger logger =
+        (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(BackendApiClient.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      PageResponse<String> result =
+          client.getCached(
+              CachedCatalog.SQUADRONS, new ParameterizedTypeReference<PageResponse<String>>() {});
+
+      assertEquals(CatalogPages.MAX_CATALOG_PAGES, result.content().size());
+      assertEquals(1000L, result.totalElements(), "the total must stay the backend's truth");
+      assertEquals(CatalogPages.MAX_CATALOG_PAGES, server.getRequestCount());
+      assertTrue(
+          appender.list.stream()
+              .anyMatch(
+                  event ->
+                      event.getLevel() == Level.WARN
+                          && event.getFormattedMessage().contains("safety cap")),
+          "hitting the cap must be loud in the log");
+    } finally {
+      logger.detachAppender(appender);
+    }
+  }
+
+  /**
+   * Builds the JSON of one backend {@code PageResponse} chunk for the page-walk tests.
+   *
+   * @param content the page's rows (JSON-encoded as plain strings)
+   * @param page the zero-based page index the backend reports
+   * @param size the page size the backend reports
+   * @param totalElements the total row count the backend reports
+   * @param totalPages the total page count the backend reports (drives the walk's continuation)
+   * @return the serialised page JSON
+   */
+  private static String pageJson(
+      List<String> content, int page, int size, long totalElements, int totalPages) {
+    String rows =
+        content.stream()
+            .map(s -> "\"" + s + "\"")
+            .collect(java.util.stream.Collectors.joining(","));
+    return "{\"content\":["
+        + rows
+        + "],\"page\":"
+        + page
+        + ",\"size\":"
+        + size
+        + ",\"totalElements\":"
+        + totalElements
+        + ",\"totalPages\":"
+        + totalPages
+        + ",\"sort\":[]}";
+  }
+
+  @Test
+  void clearStaticDataCache_doesNotThrow() {
+    assertDoesNotThrow(() -> client.clearStaticDataCache());
+  }
+
+  @Test
+  void post_withBody_sendsBodyAndParsesResponse() throws Exception {
+    server.enqueue(jsonOk("{\"echo\":\"ok\"}"));
+
+    String result = client.post("/api/v1/things", "{\"name\":\"x\"}", String.class);
+
+    assertEquals("{\"echo\":\"ok\"}", result);
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("POST", req.getMethod());
+    assertEquals("/api/v1/things", req.getPath());
+    assertTrue(req.getBody().readUtf8().contains("\"name\""));
+  }
+
+  @Test
+  void post_withNullBody_sendsEmptyBody() throws Exception {
+    server.enqueue(jsonOk("ok"));
+
+    String result = client.post("/api/v1/trigger", null, String.class);
+
+    assertEquals("ok", result);
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("POST", req.getMethod());
+    assertEquals(0L, req.getBodySize(), "null body must not be serialised");
+  }
+
+  @Test
+  void put_withBody_sendsBodyAndParsesResponse() throws Exception {
+    server.enqueue(jsonOk("replaced"));
+
+    String result = client.put("/api/v1/things/1", "{\"a\":1}", String.class);
+
+    assertEquals("replaced", result);
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("PUT", req.getMethod());
+    assertEquals("/api/v1/things/1", req.getPath());
+  }
+
+  @Test
+  void put_withNullBody_sendsEmptyBody() throws Exception {
+    server.enqueue(jsonOk("ok"));
+
+    String result = client.put("/api/v1/things/1", null, String.class);
+
+    assertEquals("ok", result);
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals(0L, req.getBodySize());
+  }
+
+  @Test
+  void patch_withBody_sendsBodyAndParsesResponse() throws Exception {
+    server.enqueue(jsonOk("patched"));
+
+    String result = client.patch("/api/v1/things/1", "{\"a\":1}", String.class);
+
+    assertEquals("patched", result);
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("PATCH", req.getMethod());
+  }
+
+  @Test
+  void patch_withNullBody_sendsEmptyBody() throws Exception {
+    server.enqueue(jsonOk("ok"));
+
+    String result = client.patch("/api/v1/things/1", null, String.class);
+
+    assertEquals("ok", result);
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals(0L, req.getBodySize());
+  }
+
+  @Test
+  void delete_returnsParsedResponse() throws Exception {
+    server.enqueue(jsonOk("deleted"));
+
+    String result = client.delete("/api/v1/things/1", String.class);
+
+    assertEquals("deleted", result);
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("DELETE", req.getMethod());
+    assertEquals("/api/v1/things/1", req.getPath());
+  }
+
+  @Test
+  void delete_void_returnsNull() throws Exception {
+    server.enqueue(new MockResponse().setResponseCode(204));
+
+    Void result = client.delete("/api/v1/things/1", Void.class);
+
+    assertNull(result);
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("DELETE", req.getMethod());
+  }
+
+  /**
+   * Every write verb has a URI-template twin that expands its variables in order and encodes each
+   * value, so a relayed value carrying URI syntax stays one path segment (REQ-SEC-051).
+   *
+   * @throws Exception if a request could not be read back from the stub server
+   */
+  @Test
+  void everyWriteVerbExpandsAndEncodesUriTemplateVariables() throws Exception {
+    for (int i = 0; i < 5; i++) {
+      server.enqueue(jsonOk("\"x\""));
+    }
+    String hostile = "a/b?c=d&e#f";
+
+    client.post("/api/v1/things/{id}/items/{item}", "body", String.class, hostile, 7);
+    client.put("/api/v1/things/{id}?v={v}", null, String.class, hostile, 3L);
+    client.patch("/api/v1/things/{id}", "body", String.class, hostile);
+    client.delete("/api/v1/things/{id}", String.class, hostile);
+    client.delete("/api/v1/things/{id}/slice", "body", String.class, hostile);
+
+    String encoded = "a%2Fb%3Fc%3Dd%26e%23f";
+    List<String> expected =
+        List.of(
+            "POST /api/v1/things/" + encoded + "/items/7",
+            "PUT /api/v1/things/" + encoded + "?v=3",
+            "PATCH /api/v1/things/" + encoded,
+            "DELETE /api/v1/things/" + encoded,
+            "DELETE /api/v1/things/" + encoded + "/slice");
+    for (String line : expected) {
+      RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+      assertNotNull(req);
+      assertEquals(line, req.getMethod() + " " + req.getPath());
+      assertEquals("authenticated", req.getHeader("X-Auth"));
+    }
+  }
+
+  private static MockResponse jsonOk(String body) {
+    return new MockResponse()
+        .setResponseCode(200)
+        .setHeader("Content-Type", "application/json")
+        .setBody(body);
+  }
+}

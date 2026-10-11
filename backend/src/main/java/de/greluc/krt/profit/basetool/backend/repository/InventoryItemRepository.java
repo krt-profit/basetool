@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
@@ -149,7 +149,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Query(
       """
       SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryMissionAllocation ma
-      WHERE ma.inventoryItem = i AND ma.mission.id = :missionId)
+      WHERE ma.inventoryItem = i AND ma.missionId = :missionId)
       """)
   List<InventoryItem> findByMissionId(@Param("missionId") UUID missionId);
 
@@ -166,7 +166,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @EntityGraph(attributePaths = {"material", "location", "user"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryMissionAllocation ma"
-          + " WHERE ma.inventoryItem = i AND ma.mission.id = :missionId) AND "
+          + " WHERE ma.inventoryItem = i AND ma.missionId = :missionId) AND "
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
   List<InventoryItem> findByMissionIdScoped(
       @Param("missionId") UUID missionId,
@@ -256,9 +256,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
           + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1"
-          + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id"
+          + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrderId"
           + " IN :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM"
-          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN"
+          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.missionId IN"
           + " :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)")
   Page<InventoryItem> findGlobalByFilters(
       @Param("hasMaterials") boolean hasMaterials,
@@ -286,9 +286,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       (:hasMaterials = false OR
       i.material.id IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality)
       AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
-      WHERE ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds)) AND (:hasMissions =
+      WHERE ja.inventoryItem = i AND ja.jobOrderId IN :jobOrderIds)) AND (:hasMissions =
       false OR EXISTS (SELECT 1 FROM InventoryMissionAllocation ma WHERE ma.inventoryItem =
-      i AND ma.mission.id IN :missionIds))
+      i AND ma.missionId IN :missionIds))
       AND (:hasLocations = false OR i.location.id IN :locationIds)
       """)
   Page<InventoryItem> findUserByFilters(
@@ -329,7 +329,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds) AND (:hasJobOrders ="
           + " false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja WHERE"
-          + " ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds)) AND (:hasLocations = false"
+          + " ja.inventoryItem = i AND ja.jobOrderId IN :jobOrderIds)) AND (:hasLocations = false"
           + " OR i.location.id IN :locationIds)")
   Page<InventoryItem> findGlobalItemsByFilters(
       @Param("hasGameItems") boolean hasGameItems,
@@ -363,9 +363,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
           + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1"
-          + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id"
+          + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrderId"
           + " IN :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM"
-          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN"
+          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.missionId IN"
           + " :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)"
           + " AND (:stolenOnly = false OR i.stolen = true) AND (:nonStolenOnly = false OR"
           + " i.stolen = false)"
@@ -408,9 +408,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       AND (:nonStolenOnly = false OR i.stolen = false)
       AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS NULL
       OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM
-      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id IN
+      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrderId IN
       :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM
-      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN
+      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.missionId IN
       :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)
       GROUP BY m, i.user, i.location, i.quality, i.personal, i.stolen, oou
       """)
@@ -461,7 +461,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds) AND (:hasJobOrders ="
           + " false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja WHERE"
-          + " ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds))"
+          + " ja.inventoryItem = i AND ja.jobOrderId IN :jobOrderIds))"
           + " AND (:hasLocations = false OR i.location.id IN :locationIds)"
           + " AND (:stolenOnly = false OR i.stolen = true) AND (:nonStolenOnly = false OR"
           + " i.stolen = false)"
@@ -511,7 +511,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       AND (:nonStolenOnly = false OR i.stolen = false)
       AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds)
       AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
-      WHERE ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds))
+      WHERE ja.inventoryItem = i AND ja.jobOrderId IN :jobOrderIds))
       AND (:hasLocations = false OR i.location.id IN :locationIds)
       GROUP BY gi, i.user, i.location, i.personal, i.stolen, oou
       """)
@@ -561,9 +561,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       AND (:nonStolenOnly = false OR i.stolen = false)
       AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS NULL
       OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM
-      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id IN
+      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrderId IN
       :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM
-      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN
+      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.missionId IN
       :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)
       ORDER BY i.createdAt ASC
       """)
@@ -612,7 +612,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       AND (:nonStolenOnly = false OR i.stolen = false)
       AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds)
       AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
-      WHERE ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds))
+      WHERE ja.inventoryItem = i AND ja.jobOrderId IN :jobOrderIds))
       AND (:hasLocations = false OR i.location.id IN :locationIds)
       ORDER BY i.createdAt ASC
       """)
@@ -801,7 +801,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Query(
       """
       SELECT i FROM InventoryItem i WHERE i.material.id = :materialId AND EXISTS (SELECT 1 FROM
-      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id = :jobOrderId)
+      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrderId = :jobOrderId)
       """)
   List<InventoryItem> findByJobOrderIdAndMaterialId(
       @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
@@ -818,7 +818,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       """
       SELECT i FROM InventoryItem i WHERE i.material IS NOT NULL AND EXISTS
       (SELECT 1 FROM InventoryJobOrderAllocation ja
-      WHERE ja.inventoryItem = i AND ja.jobOrder.id = :jobOrderId) ORDER BY i.user.username
+      WHERE ja.inventoryItem = i AND ja.jobOrderId = :jobOrderId) ORDER BY i.user.username
       ASC, i.location.name ASC, i.material.name ASC, i.quality DESC, i.amount DESC
       """)
   List<InventoryItem> findByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
@@ -836,7 +836,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       """
       SELECT i FROM InventoryItem i WHERE i.gameItem IS NOT NULL AND EXISTS
       (SELECT 1 FROM InventoryJobOrderAllocation ja
-      WHERE ja.inventoryItem = i AND ja.jobOrder.id = :jobOrderId) ORDER BY i.user.username
+      WHERE ja.inventoryItem = i AND ja.jobOrderId = :jobOrderId) ORDER BY i.user.username
       ASC, i.location.name ASC, i.gameItem.name ASC, i.amount DESC
       """)
   List<InventoryItem> findGameItemRowsByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
@@ -854,7 +854,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       """
       SELECT i FROM InventoryItem i WHERE i.gameItem.id = :gameItemId AND EXISTS
       (SELECT 1 FROM InventoryJobOrderAllocation ja
-      WHERE ja.inventoryItem = i AND ja.jobOrder.id = :jobOrderId)
+      WHERE ja.inventoryItem = i AND ja.jobOrderId = :jobOrderId)
       ORDER BY i.createdAt ASC, i.id ASC
       """)
   List<InventoryItem> findGameItemRowsByJobOrderAndGameItemForUpdate(
@@ -871,8 +871,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow(a.jobOrder.id, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
-      FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id IN :jobOrderIds
+      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow(a.jobOrderId, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
+      FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
       AND a.inventoryItem.material IS NOT NULL
       """)
   List<JobOrderMaterialStockRow> findMaterialStockRowsByJobOrderIds(
@@ -884,13 +884,14 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    *
    * @param jobOrderIds the orders whose earmarked item stock to project; an empty collection yields
    *     an empty list.
-   * @return one {@link de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow}
-   *     per game-item job-order allocation, never {@code null}.
+   * @return one {@link
+   *     de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow} per game-item
+   *     job-order allocation, never {@code null}.
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow(a.jobOrder.id, a.inventoryItem.gameItem.id, a.amount)
-      FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id IN :jobOrderIds
+      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow(a.jobOrderId, a.inventoryItem.gameItem.id, a.amount)
+      FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
       AND a.inventoryItem.gameItem IS NOT NULL
       """)
   List<JobOrderGameItemStockRow> findGameItemStockRowsByJobOrderIds(
@@ -903,7 +904,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * @param jobOrderId the order whose allocations to drop.
    */
   @Modifying
-  @Query("DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id = :jobOrderId")
+  @Query("DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrderId = :jobOrderId")
   void deleteJobOrderAllocationsByJobOrder(@Param("jobOrderId") UUID jobOrderId);
 
   /**
@@ -916,7 +917,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
       """
-      DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id = :jobOrderId AND
+      DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrderId = :jobOrderId AND
       a.inventoryItem.id IN (SELECT i.id FROM InventoryItem i WHERE i.material.id = :materialId)
       """)
   void deleteJobOrderAllocationsByJobOrderAndMaterial(
@@ -932,7 +933,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
       """
-      DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id = :jobOrderId AND
+      DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrderId = :jobOrderId AND
       a.inventoryItem.id IN (SELECT i.id FROM InventoryItem i WHERE i.gameItem.id = :gameItemId)
       """)
   void deleteJobOrderAllocationsByJobOrderAndGameItem(
@@ -995,7 +996,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       i.personal = :personal AND i.stolen = :stolen AND
       ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
       :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
-      o.inventoryItem = i) ORDER BY i.createdAt ASC, i.id ASC
+      o.inventoryItemId = i.id) ORDER BY i.createdAt ASC, i.id ASC
       """)
   List<InventoryItem> findMergeGroupForUpdate(
       @Param("userId") UUID userId,
@@ -1056,7 +1057,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       i.personal = :personal AND i.stolen = :stolen AND
       ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
       :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
-      o.inventoryItem = i)
+      o.inventoryItemId = i.id)
       """)
   long countMergeCandidates(
       @Param("userId") UUID userId,
@@ -1359,4 +1360,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
      */
     double getAmount();
   }
+
+  /**
+   * Loads the given Lager rows with their material in one read, for a page of Materialbörse offers.
+   *
+   * @param ids the rows
+   * @return the existing rows
+   */
+  @EntityGraph(attributePaths = {"material"})
+  List<InventoryItem> findWithMaterialByIdIn(Collection<UUID> ids);
 }

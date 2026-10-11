@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderStockReadService;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
-import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -49,7 +49,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class JobOrderItemStockController {
 
-  private final InventoryItemService inventoryItemService;
+  private final JobOrderStockReadService jobOrderStockReadService;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
@@ -80,7 +80,7 @@ public class JobOrderItemStockController {
   @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   public List<JobOrderItemStockGroupDto> getItemStock(@PathVariable @NotNull UUID jobOrderId) {
     List<JobOrderItemStockGroupDto> groups =
-        inventoryItemService.getItemStockForJobOrder(jobOrderId);
+        jobOrderStockReadService.getItemStockForJobOrder(jobOrderId);
     return jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)
         ? groups
         : inventoryOwnerRedactor.redactItemStockGroups(groups);

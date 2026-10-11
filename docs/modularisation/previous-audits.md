@@ -446,7 +446,10 @@ Every finding that is not DONE or not CONFIRMED, grouped by the priority of the 
   names; 19 deliberate ones remain, mostly clashes between the Jakarta and JetBrains `@NotNull`).
   The frontend half never ran: 482 inline fully qualified names in 42 files today (the audit counted
   420). They are shortened per frontend package right before it moves into its domain package, as a
-  separate commit, so the move diff stays reviewable.
+  separate commit, so the move diff stays reviewable. **Done 2026-10-10** with F4, as its own commit
+  after the move rather than before it, since the move script rewrote those names anyway: 410 names
+  in 33 `main` files became imports; eight stay, each a JetBrains `@NotNull` beside an imported
+  Jakarta one.
 - **BE-PERF-15** (Backend · DONE · ADJUSTED · P2 → P3). The N+1 loops are gone (#2004), but the fix
   added `OrgRoleManagementSecurityService`'s caller-membership memo beside the one
   `RequestScopeResolver` already kept. Both fold into one org-unit-owned query (with BE-SIMP-09);

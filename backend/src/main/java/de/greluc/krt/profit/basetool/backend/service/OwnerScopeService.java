@@ -423,26 +423,4 @@ public class OwnerScopeService {
   public boolean canActOnTargetUser(@NotNull UUID targetUserId, boolean edit) {
     return accessGateService.canActOnTargetUser(targetUserId, edit);
   }
-
-  /**
-   * Delegates to {@link AccessGateService#canSeeShip(UUID)}: whether the caller may read ship
-   * {@code shipId} (owner escape → ownerless → strict scope).
-   *
-   * @param shipId ship to inspect; never {@code null}.
-   * @return {@code true} iff the caller may read the ship.
-   */
-  public boolean canSeeShip(@NotNull UUID shipId) {
-    return accessGateService.canSeeShip(shipId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canEditShip(UUID)}: whether the caller may edit ship
-   * {@code shipId} (owner escape → ownerless → strict scope).
-   *
-   * @param shipId ship to inspect; never {@code null}.
-   * @return {@code true} iff the caller may edit the ship.
-   */
-  public boolean canEditShip(@NotNull UUID shipId) {
-    return accessGateService.canEditShip(shipId);
-  }
 }

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
@@ -40,7 +41,6 @@ import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -138,6 +139,7 @@ class JobOrderServiceTest {
             jobOrderRepository,
             materialRepository,
             inventoryItemRepository,
+            new InventoryStockCommands(inventoryItemRepository, null, null, null, null, null, null),
             null,
             orgUnitRepository,
             jobOrderOrgUnitResolver,
@@ -1209,7 +1211,7 @@ class JobOrderServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     item.setId(inventoryItemId);
     item.setAmount(10.0);
-    InventoryAllocations.addJobOrder(item, jobOrder, 10.0, false);
+    InventoryAllocations.addJobOrder(item, jobOrder.getId(), 10.0, false);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
@@ -1217,8 +1219,7 @@ class JobOrderServiceTest {
     jobOrderService.unlinkInventoryItem(orderId, inventoryItemId);
 
     assertTrue(
-        item.getJobOrderAllocations().stream()
-            .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(orderId)),
+        item.getJobOrderAllocations().stream().noneMatch(a -> orderId.equals(a.getJobOrderId())),
         "the order's allocation slice should be removed after unlinking");
     verify(jobOrderRepository).findById(orderId);
     verify(inventoryItemRepository).findById(inventoryItemId);
@@ -1259,7 +1260,7 @@ class JobOrderServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     item.setId(inventoryItemId);
     item.setAmount(10.0);
-    InventoryAllocations.addJobOrder(item, otherOrder, 10.0, false);
+    InventoryAllocations.addJobOrder(item, otherOrder.getId(), 10.0, false);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));

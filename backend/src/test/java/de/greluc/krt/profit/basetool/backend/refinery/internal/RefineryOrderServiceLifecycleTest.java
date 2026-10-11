@@ -36,6 +36,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftabilitySlice;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.City;
@@ -65,7 +66,6 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.CraftabilityYieldSource;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -1220,7 +1220,7 @@ class RefineryOrderServiceLifecycleTest {
               OWNER_ID, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)))
           .thenReturn(List.of(order1, order2));
 
-      List<CraftabilityYieldSource.YieldSlice> slices = service.pendingYieldSlices(OWNER_ID);
+      List<CraftabilitySlice> slices = service.pendingYieldSlices(OWNER_ID);
 
       assertEquals(2, slices.size(), "one slice per (material, quality) pair");
       assertEquals(
@@ -1256,10 +1256,10 @@ class RefineryOrderServiceLifecycleTest {
               OWNER_ID, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)))
           .thenReturn(List.of(order, nullGoodsOrder));
 
-      List<CraftabilityYieldSource.YieldSlice> slices = service.pendingYieldSlices(OWNER_ID);
+      List<CraftabilitySlice> slices = service.pendingYieldSlices(OWNER_ID);
 
       assertEquals(1, slices.size(), "only the fully-populated positive-SCU good yields a slice");
-      CraftabilityYieldSource.YieldSlice only = slices.get(0);
+      CraftabilitySlice only = slices.get(0);
       assertEquals(scuMaterialId, only.materialId());
       assertEquals(Integer.valueOf(100), only.quality());
       assertEquals(3.0d, only.totalScu(), 1e-9);
@@ -1280,9 +1280,8 @@ class RefineryOrderServiceLifecycleTest {
       return g;
     }
 
-    private Double totalScuFor(
-        List<CraftabilityYieldSource.YieldSlice> slices, UUID materialId, int quality) {
-      for (CraftabilityYieldSource.YieldSlice slice : slices) {
+    private Double totalScuFor(List<CraftabilitySlice> slices, UUID materialId, int quality) {
+      for (CraftabilitySlice slice : slices) {
         if (materialId.equals(slice.materialId())
             && Integer.valueOf(quality).equals(slice.quality())) {
           return slice.totalScu();

@@ -1284,6 +1284,24 @@ run, and from `iri-host-updates-metrics.service` at boot. Added 2026-09-22 with 
 answer — is **left out** rather than written as `0`, so `absent()` and a stale reading stay visible;
 the boot run carries the last run's values over and re-reads only the reboot flag.
 
+##### `basetool_host_scripts_*` — whether the host runs the scripts its release was built with
+
+Written by `deploy.sh` itself into the same textfile directory (`host-scripts.prom`), on every tick
+that stages no config bundle (against the deployed release's `host-scripts.sha256`) and on a staging
+tick (against the incoming one). Added 2026-10-11 with REQ-OPS-045, after the v1.14.0 promotion was
+applied by a stale `deploy.sh`.
+
+| series | type | source | why |
+|---|---|---|---|
+| `basetool_host_scripts_drift{file,kind}` | gauge | `sha256sum` of the host's copy against the manifest | `1` per script that differs (`kind="differs"`) or is absent (`kind="missing"`); `HostScriptDrift` |
+| `basetool_host_scripts_check_timestamp_seconds` | gauge | the tick itself | when a tick last compared; `HostScriptsCheckStale` |
+
+**Labels:** `file` is a path from `scripts/host-scripts.list` (14 entries, fixed by the repository, not a
+request or user value) and `kind` has two values, so the set is bounded by REQ-OBS-006. A drift series
+exists **only while it holds**: in sync there is none, which is why the timestamp is the liveness signal
+and `absent()` on it is the alarm for a host whose `deploy.sh` predates the check. A deployed release
+with no manifest, or a malformed one, removes the file rather than writing zeros.
+
 > [!important] `basetool_scheduled_job_enabled` exists so `absent()` can tell "off" from "wedged"
 > Added 2026-09-17. The last-success gauge is registered **lazily, on a job's first
 > success**, so `absent(last_success)` means "has never succeeded" — which covers two very
@@ -1565,6 +1583,12 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   job; `NotificationTimedStale` (> 15 min, warning) fires when it stops succeeding, and a panel
   on `07-basetool-operations.json` charts the notices raised per hour by kind. Added with issue
   #2414.
+- `basetool_notification_created_total{notification_type}` counter (`NotificationCreationService`,
+  bounded by the notification types) counts the inbox rows written; `NotificationCreationFlood` (> 2000
+  in 15 min, warning) fires on a runaway producer (REQ-NOTIF-029).
+- `basetool_notification_executor_rejected_total` counter (untagged, `BackpressureRejectedExecutionHandler`)
+  counts the after-commit notification callbacks the executor refused after its 30 s wait; each is a
+  lost notice and `NotificationExecutorRejected` (any in 10 min, warning) fires (REQ-NOTIF-029).
 - `basetool_notification_retention_deleted_total{kind}` counter (`read` / `unread`,
   `NotificationRetentionTask`) splits the inbox sweep's two windows, which its `items` total
   conflated. The halves are isolated from each other in the task, so one can be stuck while the
@@ -2813,6 +2837,15 @@ therefore alerts on:
   tick wrote; none could see ticks that stopped happening. `DeployHeartbeatStale` (warning) fires
   when `basetool_deploy_last_stack_healthy_timestamp` — stamped by every tick that finds the stack at
   target and healthy — is over an hour old, or absent.
+- **The scripts that apply a release** (since 2026-10-11). The promotion of v1.14.0 was applied by a
+  `deploy.sh` older than the release, and nothing said so. `deploy.sh` now compares the host's scripts
+  with the `host-scripts.sha256` of the release (deployed, or incoming on a staging tick) and writes
+  `basetool_host_scripts_drift{file,kind}` and `basetool_host_scripts_check_timestamp_seconds`.
+  `HostScriptDrift` (warning, 1h) names the file; `HostScriptsCheckStale` (warning, 1h) fires when no
+  tick has compared for 12 hours **or the metric is absent** — which is exactly how a host whose
+  `deploy.sh` has no such check looks, so the alert covers the host that cannot report on itself.
+  A release whose apply-path scripts differ is refused outright (REQ-OPS-045), which stamps
+  `DeployFailed`.
 - **The stateful services themselves** (since 2026-09-22). An exporter that cannot reach its target
   stays up and scraped, so `TargetDown` never saw a down database. `PostgresDown` (`pg_up == 0`) and
   `RedisDown` (`redis_up == 0`), both critical after 2 minutes, close that; the nightly quiesce stops
@@ -3093,7 +3126,7 @@ series (`job` / `instance` / `reason` / `name` / `path` / `health_type` / `compo
 or free-text values.
 
 **Enforced by:** `AlertedMeterPresenceTest` (dead-alert guard: a meter an alert rule names must be
-registered) · `frontend/.../config/Resilience4jMetricsConfig` (publishes the three meters Boot 4
+registered) · `frontend/.../kernel/backend/Resilience4jMetricsConfig` (publishes the three meters Boot 4
 silently stopped publishing) · `ingest/.../observability/Resilience4jMetricsConfig` (the gateway's breaker
 and bulkhead meters, which had no series at all until then; `Resilience4jMetricsConfigTest`) · `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
 groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/infrastructure.yml`
@@ -3155,7 +3188,7 @@ the backend genuinely uses Spring Data web paging and keeps the auto-config.
 (`@SpringBootApplication(exclude = … DataWebAutoConfiguration.class)`) ·
 `frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/FrontendApplicationTests.java`
 (asserts the resolver is absent from the live chain) ·
-`frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/OrgUnitContextAdvice.java`
+`frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/layout/OrgUnitContextAdvice.java`
 (the single-fetch `@ModelAttribute` cross-injection the exclusion protects).
 
 ### REQ-OBS-016 — Log levels are changeable at runtime

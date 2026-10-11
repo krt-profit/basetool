@@ -13,7 +13,7 @@
     <span class="oc-node-name" th:text="${nm}">Name</span>
     <span class="oc-node-flag" th:if="${freeText}" th:text="${noAcc}"
           th:title="#{orgChart.noAccount.hint}">Kein Account</span>
-    <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${editable and node.userId() == null}">
+    <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${editable and node.userId() == null}">
         <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
                 th:data-position-id="${node.positionId()}"
                 th:data-version="${node.version()}"
@@ -66,7 +66,7 @@
                 </button>
             </div>
             <button th:if="${b.leadership().lead() == null}" type="button" class="oc-add"
-                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-add"
+                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" data-trigger="oc-add"
                     data-position-type="BEREICHSLEITER" th:data-org-unit-id="${b.orgUnitId()}"
                     th:data-rank-label="#{orgChart.rank.BEREICHSLEITER}"
                     th:text="#{orgChart.add.bereichLead}">Bereichsleiter zuweisen</button>
@@ -88,12 +88,12 @@
                         </div>
                     </li>
                 </ul>
-                <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                         data-trigger="oc-add" data-position-type="BEREICHSKOORDINATOR"
                         th:data-org-unit-id="${b.orgUnitId()}"
                         th:data-rank-label="#{orgChart.rank.BEREICHSKOORDINATOR}"
                         th:text="#{orgChart.add.bereichCoordinator}">Bereichskoordinator hinzufügen</button>
-                <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                         data-trigger="oc-add" data-position-type="BEREICHSOPERATOR"
                         th:data-org-unit-id="${b.orgUnitId()}"
                         th:data-rank-label="#{orgChart.rank.BEREICHSOPERATOR}"
@@ -127,7 +127,7 @@
                 <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
             </div>
             <button th:if="${sq.lead() == null}" type="button" class="oc-add"
-                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-add"
+                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" data-trigger="oc-add"
                     data-position-type="SQUADRON_LEAD" th:data-org-unit-id="${sq.orgUnitId()}"
                     th:data-rank-label="#{orgChart.rank.SQUADRON_LEAD}"
                     th:text="#{orgChart.add.squadronLead}">Staffelleiter zuweisen</button>
@@ -146,7 +146,7 @@
                             <span class="oc-command-name oc-command-name--unnamed"
                                   th:if="${cmd.name() == null}"
                                   th:text="#{orgChart.command.unnamed}">Ohne Namen</span>
-                            <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                            <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                                  th:if="${cmd.kommandoGroupId() == null}">
                                 <button type="button" class="oc-icon-btn" data-trigger="oc-rename"
                                         th:data-position-id="${cmd.positionId()}"
@@ -182,7 +182,7 @@
                                 <span class="oc-node-name" th:text="${cmdNm}">Name</span>
                                 <span class="oc-node-flag" th:if="${cmdFreeText}" th:text="${cmdNoAcc}"
                                       th:title="#{orgChart.noAccount.hint}">Kein Account</span>
-                                <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                                <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
                                      th:if="${cmd.leaderUserId() == null}">
                                     <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
                                             th:data-position-id="${cmd.positionId()}"
@@ -216,7 +216,7 @@
                         </div>
                         <button th:if="${cmd.kommandoGroupId() == null and cmd.leaderUserId() == null and cmd.leaderDisplayName() == null}"
                                 type="button" class="oc-add"
-                                sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-reassign"
+                                sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" data-trigger="oc-reassign"
                                 th:data-position-id="${cmd.positionId()}"
                                 th:data-version="${cmd.version()}" data-user-id=""
                                 th:data-rank-label="#{orgChart.rank.COMMAND_LEAD}"
@@ -233,7 +233,7 @@
 
                         <button th:if="${cmd.kommandoGroupId() == null and cmd.deputy() == null}"
                                 type="button" class="oc-add"
-                                sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-add"
+                                sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" data-trigger="oc-add"
                                 data-position-type="DEPUTY_COMMAND_LEAD"
                                 th:data-org-unit-id="${sq.orgUnitId()}"
                                 th:data-parent-id="${cmd.positionId()}"
@@ -241,7 +241,7 @@
                                 th:text="#{orgChart.add.deputy}">Stv. zuweisen</button>
                         <button th:if="${cmd.kommandoGroupId() == null and sq.canAddEnsign()}"
                                 type="button" class="oc-add"
-                                sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-add"
+                                sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" data-trigger="oc-add"
                                 data-position-type="ENSIGN" th:data-org-unit-id="${sq.orgUnitId()}"
                                 th:data-parent-id="${cmd.positionId()}"
                                 th:data-rank-label="#{orgChart.rank.ENSIGN}"
@@ -257,13 +257,13 @@
             </ul>
 
             <button th:if="${sq.canAddCommand()}" type="button" class="oc-add"
-                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-add"
+                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" data-trigger="oc-add"
                     data-position-type="COMMAND_LEAD" data-needs-name="true"
                     data-user-optional="true" th:data-org-unit-id="${sq.orgUnitId()}"
                     th:data-rank-label="#{orgChart.command.tag}"
                     th:text="#{orgChart.add.command}">Kommandogruppe hinzufügen</button>
             <button th:if="${sq.canAddEnsign()}" type="button" class="oc-add"
-                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-add"
+                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" data-trigger="oc-add"
                     data-position-type="ENSIGN" th:data-org-unit-id="${sq.orgUnitId()}"
                     th:data-rank-label="#{orgChart.rank.ENSIGN}"
                     th:text="#{orgChart.add.ensignDirect}">Ensign (direkt) hinzufügen</button>
@@ -285,7 +285,7 @@
                 </li>
             </ul>
             <button th:if="${sk.canAddCommander()}" type="button" class="oc-add"
-                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-add" data-position-type="SK_COMMANDER"
+                    sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" data-trigger="oc-add" data-position-type="SK_COMMANDER"
                     th:data-org-unit-id="${sk.orgUnitId()}"
                     th:data-rank-label="#{orgChart.rank.SK_COMMANDER}"
                     th:text="#{orgChart.add.skCommander}">SK-Leiter hinzufügen</button>

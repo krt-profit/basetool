@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.DefaultBlueprintKeys;
 import de.greluc.krt.profit.basetool.backend.repository.DefaultBlueprintRepository;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -39,7 +40,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @RequiredArgsConstructor
-public class DefaultBlueprintKeyService {
+public class DefaultBlueprintKeyService implements DefaultBlueprintKeys {
 
   private final DefaultBlueprintRepository repository;
   private final AtomicReference<Set<String>> cache = new AtomicReference<>();
@@ -51,6 +52,7 @@ public class DefaultBlueprintKeyService {
    * @param productKey normalized product key, may be {@code null}
    * @return {@code true} if the key is a default product key
    */
+  @Override
   public boolean isDefault(@Nullable String productKey) {
     return productKey != null && current().contains(productKey);
   }

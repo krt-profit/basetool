@@ -29,7 +29,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
@@ -78,6 +80,7 @@ class InventoryCheckoutServiceAuditTest {
   @Mock private AuditService auditService;
 
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private EarmarkTargets.Lookup earmarkTargets;
   @InjectMocks private InventoryCheckoutService service;
 
   @Test
@@ -92,13 +95,15 @@ class InventoryCheckoutServiceAuditTest {
     JobOrder order = new JobOrder();
     order.setId(orderId);
     order.setDisplayId(42);
+    when(earmarkTargets.jobOrder(order.getId())).thenReturn(new JobOrderEarmark(order.getId(), 42));
 
     InventoryItem item = new InventoryItem();
     item.setId(itemId);
     item.setVersion(1L);
     item.setUser(owner);
     item.setAmount(5.0);
-    InventoryJobOrderAllocation slice = InventoryAllocations.addJobOrder(item, order, 5.0, false);
+    InventoryJobOrderAllocation slice =
+        InventoryAllocations.addJobOrder(item, order.getId(), 5.0, false);
 
     UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, orderId, 1L);
 

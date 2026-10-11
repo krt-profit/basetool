@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolv
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -252,7 +251,7 @@ class InventoryAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
       AccessGateService accessGateService =
-          new AccessGateService(resolver, authHelper, mock(ShipRepository.class), memberships);
+          new AccessGateService(resolver, authHelper, memberships);
       OwnerScopeService ownerScopeService =
           new OwnerScopeService(
               resolver,

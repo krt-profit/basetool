@@ -78,11 +78,11 @@ class TemplateTypeReferenceTest {
   void aMovedClassOrAMissingMemberIsReported() {
     String html =
         """
-        <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"></a>
+        <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"></a>
         <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.Roles).ADMIN)"></a>
-        <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).NOPE)"></a>
-        <a th:text="${T(de.greluc.krt.profit.basetool.frontend.support.Roles).authority('X')}"></a>
-        <a th:text="${T(de.greluc.krt.profit.basetool.frontend.support.Roles).nope('X')}"></a>
+        <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).NOPE)"></a>
+        <a th:text="${T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).authority('X')}"></a>
+        <a th:text="${T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).nope('X')}"></a>
         """;
 
     List<TypeReference> references = TemplateReferenceScan.typeReferences("fixture.html", html);

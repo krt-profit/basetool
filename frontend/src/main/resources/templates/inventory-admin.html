@@ -16,9 +16,9 @@
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
         titleText=#{inventory.overview.global}, count=null, actions=~{::lager-all-actions})}">
         <th:block th:ref="lager-all-actions">
-            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:href="@{/inventory/input(source='admin')}"
+            <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN)" th:href="@{/inventory/input(source='admin')}"
                class="btn btn--cta" data-testid="page-head-primary" th:text="#{inventory.input.new}">Einbuchen</a>
-            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                 <th:block th:replace="~{fragments/components :: overflowMenu(id='lager-all-more', items=~{::lager-all-more-items})}">
                     <th:block th:ref="lager-all-more-items">
                         <button type="button" id="delete-all-global-inventory-btn" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
@@ -547,7 +547,7 @@
     </th:block>
 </th:block>
 
-<th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+<th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-all-global-inventory-modal', titleKey='inventory.deleteAll.modal.title', variant='krt-modal--wide krt-modal--danger', body=~{::delete-all-global-inventory-modal-body})}">
     <th:block th:ref="delete-all-global-inventory-modal-body">
         <div class="krt-modal-body">

@@ -31,12 +31,13 @@ import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.Hand
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransaction;
-import de.greluc.krt.profit.basetool.backend.controller.HangarController;
 import de.greluc.krt.profit.basetool.backend.controller.InventoryItemController;
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandController;
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandMembershipController;
 import de.greluc.krt.profit.basetool.backend.controller.UserController;
 import de.greluc.krt.profit.basetool.backend.exchange.web.ConnectedAppsController;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.hangar.web.HangarController;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
@@ -109,6 +110,7 @@ class TenancyGuardTest {
           JobOrderAccessPolicy.class,
           MissionAccessPolicy.class,
           InventoryAccessPolicy.class,
+          HangarAccessPolicy.class,
           MissionSecurityService.class,
           SpecialCommandSecurityService.class,
           OrgRoleManagementSecurityService.class);
@@ -241,7 +243,7 @@ class TenancyGuardTest {
 
   private static final int REFERENCE_FLOOR = 22;
 
-  private static final int CONTROLLER_FLOOR = 24;
+  private static final int CONTROLLER_FLOOR = 23;
 
   private static final int HANDLER_FLOOR = 126;
 

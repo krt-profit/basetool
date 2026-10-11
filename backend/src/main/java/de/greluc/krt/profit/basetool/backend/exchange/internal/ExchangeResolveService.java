@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImports;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.NameResolution;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
@@ -40,11 +44,7 @@ import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository.Excha
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService.NameResolution;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintNameNormalizer;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.service.MaterialNameCanonicalizer;
 import de.greluc.krt.profit.basetool.backend.service.ShipTypeMatcher;
 import io.micrometer.core.instrument.Counter;
@@ -93,8 +93,8 @@ public class ExchangeResolveService {
   /** The longest display name the published item reference carries. */
   private static final int MAX_NAME = 200;
 
-  private final BlueprintProductService blueprintProductService;
-  private final BlueprintImportService blueprintImportService;
+  private final BlueprintProducts blueprintProductService;
+  private final BlueprintImports blueprintImportService;
   private final BlueprintNameNormalizer normalizer;
   private final FuzzyNameMatcher fuzzyMatcher;
   private final BlueprintRepository blueprintRepository;
