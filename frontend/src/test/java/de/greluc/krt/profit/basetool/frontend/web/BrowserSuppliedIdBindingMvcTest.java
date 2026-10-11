@@ -136,7 +136,7 @@ class BrowserSuppliedIdBindingMvcTest {
           .andExpect(status().isBadRequest());
     }
 
-    assertNoBackendCallMentions("org-units/bank");
+    assertNoBackendCallMentions("bank/org-units");
   }
 
   @Test

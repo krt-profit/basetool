@@ -273,7 +273,7 @@ class BankAccountDetailPatternRenderTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void orgUnitDetailRendersTheSharedPatternWithTheRequestAction() throws Exception {
-    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
+    String detailUri = "/api/v1/bank/org-units/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(ACCOUNT_ID)))
         .thenReturn(
@@ -288,7 +288,7 @@ class BankAccountDetailPatternRenderTest {
                 false));
     when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef(), eq(ACCOUNT_ID)))
         .thenReturn(bookings());
-    when(backendApiClient.get(eq("/api/v1/org-units/bank/transfer-targets"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/bank/org-units/transfer-targets"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new BankAccountRefDto(ACCOUNT_ID, "KB-0042", "IRI Betriebskonto", "ORG_UNIT"),
@@ -347,13 +347,13 @@ class BankAccountDetailPatternRenderTest {
         BankRequestStepsTest.request(
             UUID.randomUUID(), "PENDING", true, "BANK_MANAGEMENT", false, "2026-10-02T10:00:00Z");
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/org-units/bank/balances"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/bank/org-units/balances"), anyTypeRef()))
         .thenReturn(List.of(balance));
-    when(backendApiClient.get(eq("/api/v1/org-units/bank/requests"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/bank/org-units/requests"), anyTypeRef()))
         .thenReturn(List.of(overLimit));
-    when(backendApiClient.get(eq("/api/v1/org-units/bank/requests/foreign"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/bank/org-units/requests/foreign"), anyTypeRef()))
         .thenReturn(List.of(overLimit));
-    when(backendApiClient.get(eq("/api/v1/org-units/bank/transfer-targets"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/bank/org-units/transfer-targets"), anyTypeRef()))
         .thenReturn(
             List.of(new BankAccountRefDto(ACCOUNT_ID, "KB-0042", "IRI Betriebskonto", "ORG_UNIT")));
 

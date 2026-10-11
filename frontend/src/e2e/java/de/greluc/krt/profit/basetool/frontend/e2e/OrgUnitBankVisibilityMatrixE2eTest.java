@@ -65,7 +65,7 @@ class OrgUnitBankVisibilityMatrixE2eTest {
   private static final String NONVIEWER_USER = "test-none";
   private static final String NONVIEWER_PASSWORD = "test-none-pw";
 
-  private static final String BALANCES = "/api/v1/org-units/bank/balances";
+  private static final String BALANCES = "/api/v1/bank/org-units/balances";
 
   private static Playwright playwright;
   private static Browser browser;
@@ -131,12 +131,12 @@ class OrgUnitBankVisibilityMatrixE2eTest {
     assertEquals(
         200,
         seeder.attemptGetStatus(
-            BEREICH_USER, BEREICH_PASSWORD, "/api/v1/org-units/bank/accounts/" + specialAccountId),
+            BEREICH_USER, BEREICH_PASSWORD, "/api/v1/bank/org-units/accounts/" + specialAccountId),
         "a Bereichsleiter may open the Sonderkonto drill-in");
     assertEquals(
         403,
         seeder.attemptGetStatus(
-            OFFICER_USER, OFFICER_PASSWORD, "/api/v1/org-units/bank/accounts/" + specialAccountId),
+            OFFICER_USER, OFFICER_PASSWORD, "/api/v1/bank/org-units/accounts/" + specialAccountId),
         "an OFFICER without a Bereich/OL seat is denied the Sonderkonto drill-in");
   }
 
@@ -153,14 +153,14 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         seeder.attemptGetStatus(
             NONVIEWER_USER,
             NONVIEWER_PASSWORD,
-            "/api/v1/org-units/bank/accounts/" + specialAccountId),
+            "/api/v1/bank/org-units/accounts/" + specialAccountId),
         "a non-viewer is denied the Sonderkonto drill-in");
     assertEquals(
         403,
         seeder.attemptGetStatus(
             NONVIEWER_USER,
             NONVIEWER_PASSWORD,
-            "/api/v1/org-units/bank/accounts/" + orgUnitAccountId),
+            "/api/v1/bank/org-units/accounts/" + orgUnitAccountId),
         "a non-viewer is denied the Staffel-account drill-in");
   }
 
@@ -174,7 +174,7 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         seeder.postForStatus(
             ADMIN_USER,
             ADMIN_PASSWORD,
-            "/api/v1/org-units/bank/accounts/"
+            "/api/v1/bank/org-units/accounts/"
                 + orgUnitAccountId
                 + "/visibility/user/"
                 + memberUserId,
@@ -189,7 +189,7 @@ class OrgUnitBankVisibilityMatrixE2eTest {
   void globalRoleAndAllMembersGrantsOnSpecial() {
     String special =
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Bank Vis Grant SK", "SPECIAL");
-    String detail = "/api/v1/org-units/bank/accounts/" + special;
+    String detail = "/api/v1/bank/org-units/accounts/" + special;
 
     assertEquals(
         200,
@@ -220,7 +220,7 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         seeder.putForStatus(
             ADMIN_USER,
             ADMIN_PASSWORD,
-            "/api/v1/org-units/bank/accounts/" + orgUnitAccountId + "/balance-target",
+            "/api/v1/bank/org-units/accounts/" + orgUnitAccountId + "/balance-target",
             "{\"target\":10000000,\"version\":" + version + "}"),
         "admin may set a balance target (override)");
     assertEquals(
@@ -228,7 +228,7 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         seeder.putForStatus(
             MEMBER_USER,
             MEMBER_PASSWORD,
-            "/api/v1/org-units/bank/accounts/" + orgUnitAccountId + "/balance-target",
+            "/api/v1/bank/org-units/accounts/" + orgUnitAccountId + "/balance-target",
             "{\"target\":1,\"version\":0}"),
         "a plain member may not set a balance target");
 
@@ -239,7 +239,7 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         seeder.postForStatus(
             BEREICH_USER,
             BEREICH_PASSWORD,
-            "/api/v1/org-units/bank/accounts/" + special + "/visibility/role/OFFICER",
+            "/api/v1/bank/org-units/accounts/" + special + "/visibility/role/OFFICER",
             "{}"),
         "a Bereichsleiter may not configure a Sonderkonto's visibility");
     assertEquals(
@@ -247,7 +247,7 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         seeder.postForStatus(
             MGMT_USER,
             MGMT_PASSWORD,
-            "/api/v1/org-units/bank/accounts/" + special + "/visibility/role/OFFICER",
+            "/api/v1/bank/org-units/accounts/" + special + "/visibility/role/OFFICER",
             "{}"),
         "bank management may configure a Sonderkonto's visibility");
   }

@@ -985,7 +985,7 @@ public final class BackendSeeder {
 
   /**
    * Raises a {@code PENDING} deposit booking request via {@code POST
-   * /api/v1/org-units/bank/requests} and returns its id (REQ-BANK-042).
+   * /api/v1/bank/org-units/requests} and returns its id (REQ-BANK-042).
    *
    * @param username the requester's Keycloak username
    * @param password the password
@@ -1002,7 +1002,7 @@ public final class BackendSeeder {
             + amount
             + ",\"note\":\"e2e live-sync\"}";
     return JsonParser.parseString(
-            postBody(username, password, "/api/v1/org-units/bank/requests", body))
+            postBody(username, password, "/api/v1/bank/org-units/requests", body))
         .getAsJsonObject()
         .get("id")
         .getAsString();
@@ -1131,7 +1131,7 @@ public final class BackendSeeder {
 
   /**
    * Finds the caller's own {@code PENDING} booking request on the given account with the given
-   * amount, from {@code GET /api/v1/org-units/bank/requests}.
+   * amount, from {@code GET /api/v1/bank/org-units/requests}.
    *
    * @param username the requesting officer/lead's Keycloak username
    * @param password the password
@@ -1154,7 +1154,7 @@ public final class BackendSeeder {
 
   /**
    * Reads the status of one of the caller's own booking requests from {@code GET
-   * /api/v1/org-units/bank/requests}.
+   * /api/v1/bank/org-units/requests}.
    *
    * @param username the requesting officer/lead's Keycloak username
    * @param password the password
@@ -1179,7 +1179,7 @@ public final class BackendSeeder {
    * @return the caller's requests
    */
   private JsonArray ownBookingRequests(String username, String password) {
-    return JsonParser.parseString(getBody(username, password, "/api/v1/org-units/bank/requests"))
+    return JsonParser.parseString(getBody(username, password, "/api/v1/bank/org-units/requests"))
         .getAsJsonArray();
   }
 

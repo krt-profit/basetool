@@ -75,10 +75,10 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class OrgUnitBankPageControllerMvcTest {
 
-  private static final String BALANCES_URI = "/api/v1/org-units/bank/balances";
-  private static final String REQUESTS_URI = "/api/v1/org-units/bank/requests";
-  private static final String FOREIGN_REQUESTS_URI = "/api/v1/org-units/bank/requests/foreign";
-  private static final String TRANSFER_TARGETS_URI = "/api/v1/org-units/bank/transfer-targets";
+  private static final String BALANCES_URI = "/api/v1/bank/org-units/balances";
+  private static final String REQUESTS_URI = "/api/v1/bank/org-units/requests";
+  private static final String FOREIGN_REQUESTS_URI = "/api/v1/bank/org-units/requests/foreign";
+  private static final String TRANSFER_TARGETS_URI = "/api/v1/bank/org-units/transfer-targets";
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
@@ -472,7 +472,7 @@ class OrgUnitBankPageControllerMvcTest {
     PageResponse<BankBookingDto> bookings =
         new PageResponse<>(List.of(booking), 0, 20, 1L, 1, List.of());
 
-    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
+    String detailUri = "/api/v1/bank/org-units/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
@@ -545,7 +545,7 @@ class OrgUnitBankPageControllerMvcTest {
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
         new OrgUnitBankAccountDetailDto(inner, true, false, false, true, false, null, false);
-    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
+    String detailUri = "/api/v1/bank/org-units/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
@@ -610,7 +610,7 @@ class OrgUnitBankPageControllerMvcTest {
     OrgUnitBankAccountDetailDto detail =
         new OrgUnitBankAccountDetailDto(
             inner, true, false, false, true, false, new BigDecimal("1000000"), false);
-    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
+    String detailUri = "/api/v1/bank/org-units/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);
