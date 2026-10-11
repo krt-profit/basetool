@@ -117,7 +117,7 @@ class PlatformMirrorParityTest {
     for (Path file :
         List.of(
             root.resolve(BACKEND_MAIN + "config/ManagementPortSecurityConfig.java"),
-            root.resolve(FRONTEND_MAIN + "config/ManagementPortSecurityConfig.java"),
+            root.resolve(FRONTEND_MAIN + "kernel/security/ManagementPortSecurityConfig.java"),
             root.resolve(INGEST_MAIN + "assembly/ManagementPortSecurityConfig.java"))) {
       String code = code(file);
       assertThat(code)
@@ -134,7 +134,8 @@ class PlatformMirrorParityTest {
     assertThat(code(root.resolve(BACKEND_MAIN + "config/ManagementPortSecurityConfig.java")))
         .contains("\"/actuator/health\"", "\"/actuator/prometheus\"")
         .doesNotContain("\"/actuator/**\"");
-    assertThat(code(root.resolve(FRONTEND_MAIN + "config/ManagementPortSecurityConfig.java")))
+    assertThat(
+            code(root.resolve(FRONTEND_MAIN + "kernel/security/ManagementPortSecurityConfig.java")))
         .contains("securityMatcher(\"/actuator/**\")");
     assertThat(code(root.resolve(INGEST_MAIN + "assembly/ManagementPortSecurityConfig.java")))
         .contains("securityMatcher(\"/actuator/**\")");

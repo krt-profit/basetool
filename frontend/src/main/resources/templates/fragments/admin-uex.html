@@ -6,7 +6,7 @@
         <td th:text="${term.name}">Name</td>
         <td th:text="${term.nickname}">Nickname</td>
         <td>
-            <div class="flex-gap-xs" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+            <div class="flex-gap-xs" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                 <form method="post" th:action="@{/admin/uex-data/terminals/{id}/loading-dock(id=${term.id})}" class="m-0">
                     <input type="hidden" name="action" value="uex">
                     <button type="submit" class="btn" th:classappend="${!term.hasLoadingDockOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
@@ -34,7 +34,7 @@
             </div>
         </td>
         <td>
-            <div class="flex-gap-xs" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+            <div class="flex-gap-xs" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                 <form method="post" th:action="@{/admin/uex-data/terminals/{id}/auto-load(id=${term.id})}" class="m-0">
                     <input type="hidden" name="action" value="uex">
                     <button type="submit" class="btn" th:classappend="${!term.isAutoLoadOverridden} ? 'btn-active' : 'btn-secondary'" th:text="#{admin.uex.flag.btn.uex}">UEX</button>
@@ -62,7 +62,7 @@
             </div>
         </td>
         <td>
-            <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/uex-data/terminals/{id}/toggle-visibility(id=${term.id})}" class="m-0">
+            <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" method="post" th:action="@{/admin/uex-data/terminals/{id}/toggle-visibility(id=${term.id})}" class="m-0">
                 <input type="hidden" name="hidden" th:value="${!term.hidden}">
                 <button type="submit" class="btn" th:classappend="${term.hidden} ? '' : 'btn-secondary'"
                         th:data-label-show="#{btn.show}" th:data-label-hide="#{btn.hide}"

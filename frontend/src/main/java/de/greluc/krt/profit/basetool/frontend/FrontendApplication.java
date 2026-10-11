@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend;
 
+import io.github.resilience4j.springboot3.verifier.autoconfigure.SpringBoot3VerifierAutoConfiguration;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.boot.data.autoconfigure.web.DataWebAutoConfiguration;
 
 /**
  * Spring Boot entry point for the frontend module.
@@ -31,11 +33,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  * {@code @ModelAttribute} parameters (REQ-OBS-015).
  */
 @SpringBootApplication(
-    exclude = {
-      io.github.resilience4j.springboot3.verifier.autoconfigure.SpringBoot3VerifierAutoConfiguration
-          .class,
-      org.springframework.boot.data.autoconfigure.web.DataWebAutoConfiguration.class
-    })
+    exclude = {SpringBoot3VerifierAutoConfiguration.class, DataWebAutoConfiguration.class})
 @ConfigurationPropertiesScan
 public class FrontendApplication {
   static void main(String[] args) {

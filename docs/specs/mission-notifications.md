@@ -56,7 +56,9 @@ member; removal clears that member's add, reminder and check-in notices, an add 
 `MissionNotificationPublisher#statusChanged` publishes `MISSION_NEVER_ENDED` the moment a mission becomes
 `COMPLETED` without an `actualEndTime`; `MissionNeverEndedNoticeProducer` does the same for `ACTIVE` and
 `COMPLETED` missions whose planned end is more than `app.missions.notices.overdue-after` (default `PT6H`)
-past without one. The default rule notifies the mission's owner and co-managers (`MISSION_LEADERSHIP`);
+past without one, **but no more than `app.missions.notices.overdue-window` (default `P14D`) beyond that
+point**: an older mission is history, is never announced and needs no marker. At most the tick's remaining
+event budget of missions is handled per run, oldest first (REQ-NOTIF-026). The default rule notifies the mission's owner and co-managers (`MISSION_LEADERSHIP`);
 `never_ended_notified_at` makes it fire once. Recording the end publishes `MISSION_END_RECORDED`, which
 clears the notice and the open check-in notices; moving the planned end re-arms the marker.
 

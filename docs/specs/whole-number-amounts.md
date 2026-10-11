@@ -69,9 +69,9 @@ amount.
 `MissionPageControllerMvcTest#missionDetail_WithFinanceEntry_ShouldRenderEditButtonWithoutTemplateError`,
 `MissionFinanceEntryE2eTest` (e2e create→view: add a finance entry, reopen the detail page, assert
 200 + the rendered `data-amount`). **Code:** `backend/.../model/dto/MissionFinanceEntry{Create,Update}Dto`
-(`@WholeNumber`, `@DecimalMin`, `@DecimalMax`), `frontend/.../model/form/MissionFinanceEntryForm`
-(`@WholeNumber`), `backend/.../validation/WholeNumber` + `frontend/.../validation/WholeNumber`,
-`frontend/.../view/MoneyFormat`, `templates/mission-detail.html`, `templates/operation-detail.html`.
+(`@WholeNumber`, `@DecimalMin`, `@DecimalMax`), `frontend/.../mission/model/MissionFinanceEntryForm`
+(`@WholeNumber`), `backend/.../validation/WholeNumber` + `frontend/.../kernel/web/WholeNumber`,
+`frontend/.../kernel/web/MoneyFormat`, `templates/mission-detail.html`, `templates/operation-detail.html`.
 **Issues:** PR #465.
 
 ### REQ-ORDERS-001 — Item-order piece counts: positive whole numbers
@@ -131,7 +131,7 @@ non-material whole-number rule shared with the order counts above.
 **Code:** `backend/.../model/dto/PersonalInventoryItem{Create,Update}Request`,
 `backend/.../model/PersonalInventoryItem` (`quantity` is `Integer`),
 `static/js/personal-inventory.js`, `templates/personal-inventory.html`,
-`templates/admin/personal-inventory.html`, `frontend/.../model/form/PersonalInventoryForm`.
+`templates/admin/personal-inventory.html`, `frontend/.../personalinventory/model/PersonalInventoryForm`.
 **Issues:** PR #465.
 
 ## Out of scope

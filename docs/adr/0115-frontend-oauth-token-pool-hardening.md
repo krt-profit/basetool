@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-20
 - **Deciders:** @greluc
-- **Related:** `frontend/.../config/WebClientConfig.java` (`oauthTokenPool` + the two token-response clients) · `frontend/.../config/SecurityConfig.java` (`oauth2Login().tokenEndpoint()`) · REQ-SEC-012 (refresh-token rotation / reuse detection) · ADR-0019 (single-flight authorized-client manager) · ADR-0078 (WebClient pool scale-hardening) · the 2026-07-20 reactive-degradation incident
+- **Related:** `frontend/.../kernel/backend/WebClientConfig.java` (`oauthTokenPool` + the two token-response clients) · `frontend/.../kernel/security/SecurityConfig.java` (`oauth2Login().tokenEndpoint()`) · REQ-SEC-012 (refresh-token rotation / reuse detection) · ADR-0019 (single-flight authorized-client manager) · ADR-0078 (WebClient pool scale-hardening) · the 2026-07-20 reactive-degradation incident
 
 ## Context
 

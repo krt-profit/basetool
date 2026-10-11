@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.architecture.fixture;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import lombok.RequiredArgsConstructor;
 
 /**

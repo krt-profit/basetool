@@ -1,0 +1,71 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.kernel.livesync;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Verifies that the subscribe-deny {@code reason} written from {@link
+ * MetricNames#SUBSCRIBE_DENY_INDETERMINATE} matches the literal {@code krt-live-sync.js} compares
+ * against to decide on its reconnect retry.
+ */
+class LiveSyncDenyReasonWireParityTest {
+
+  /** The client's declaration of the retryable deny reason, e.g. {@code = 'indeterminate';}. */
+  private static final Pattern CLIENT_DECLARATION =
+      Pattern.compile("DENY_REASON_INDETERMINATE\\s*=\\s*'([\\w-]+)'");
+
+  @Test
+  void clientRetryableDenyReason_matchesTheServerValue() throws IOException {
+    String js = readResource("/static/js/krt-live-sync.js");
+    Matcher declaration = CLIENT_DECLARATION.matcher(js);
+    assertThat(declaration.find())
+        .as("krt-live-sync.js declares DENY_REASON_INDETERMINATE = '<value>'")
+        .isTrue();
+    assertThat(declaration.group(1))
+        .as("the client's retryable deny reason vs MetricNames.SUBSCRIBE_DENY_INDETERMINATE")
+        .isEqualTo(MetricNames.SUBSCRIBE_DENY_INDETERMINATE);
+  }
+
+  @Test
+  void clientTreatsOnlyTheIndeterminateReasonAsRetryable() throws IOException {
+    String js = readResource("/static/js/krt-live-sync.js");
+    assertThat(js)
+        .as(
+            "krt-live-sync.js must not branch on the terminal '%s' deny reason",
+            MetricNames.SUBSCRIBE_DENY_AUTHZ)
+        .doesNotContain("'" + MetricNames.SUBSCRIBE_DENY_AUTHZ + "'");
+  }
+
+  private static String readResource(String resource) throws IOException {
+    try (InputStream in = LiveSyncDenyReasonWireParityTest.class.getResourceAsStream(resource)) {
+      assertThat(in).as("classpath resource %s", resource).isNotNull();
+      return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+    }
+  }
+}
