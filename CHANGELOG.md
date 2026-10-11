@@ -16,6 +16,8 @@
 
 - **REST-API, Welle 3 (Einsätze).** Die Einsatz-Endpunkte verlieren das Suffix `/slim`; die Einsatzsuche ist jetzt `GET /api/v1/missions?q=…` (der Parameter `query` heißt `q`). Finanzbuchungen werden unter `/api/v1/missions/{missionId}/finance-entries` angelegt, geändert und gelöscht, Lagerbestand und Raffinerieaufträge eines Einsatzes über `?missionId=` gelesen. `PUT /missions/{id}` und `POST /missions/{id}/participants/add` entfallen. Die alten App-Pfade antworten `410 APP_UPDATE_REQUIRED`; die App erscheint mit dem gemeinsamen API-Schnitt neu (versionCode 19).
 
+- **REST-API, Welle 4 (Kartellbank).** Die Bank-Endpunkte für Offiziere, Leiter und Mitglieder wandern von `/api/v1/org-units/bank/…` nach `/api/v1/bank/org-units/…`; das Kontostandsziel der Bankmitarbeiter wird mit `PUT` statt `PATCH` gesetzt (`/api/v1/bank/accounts/{id}/balance-target`, gleicher Inhalt). Die alten App-Pfade antworten `410 APP_UPDATE_REQUIRED`; die App erscheint mit dem gemeinsamen API-Schnitt neu (versionCode 19).
+
 ## [v1.14.0](https://github.com/krt-profit/basetool/releases/tag/v1.14.0) - 2026-10-10
 
 ### Added

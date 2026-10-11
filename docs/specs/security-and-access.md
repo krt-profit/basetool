@@ -2048,7 +2048,7 @@ family decides, so a sub-family can differ from its parent.
 
 | `no-store` | What makes it sensitive |
 | --- | --- |
-| `/api/v1/bank/**`, `/api/v1/org-units/bank/**` | bank ledgers, balances and holder handles |
+| `/api/v1/bank/**` (the org-unit slice `/api/v1/bank/org-units/**` included) | bank ledgers, balances and holder handles |
 | `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
 | `/api/v1/notifications/**` | one member's feed, including the SSE stream, and the recipient rules, whose selector can name an individual member |
 | `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
@@ -2074,12 +2074,13 @@ Revalidatable: `announcement`, `app`, `blueprints`, `cities`, `frequency-types`,
 catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**`,
 `/api/v1/orders/item-catalog/**` and `/api/v1/terms/document`.
 
-**Both bank spellings, because they are different surfaces.** `/api/v1/bank/**` is the
-bank-employee one; the member-facing account a shipped client actually reads lives under
-`/api/v1/org-units/bank/**`, and its transaction rows carry a `holderHandle`. Listing only the
-former — as this requirement originally did — left the member bank ledger, along with the mission
-finance reads, the personal holdings and the refinery profit figures, on the storable directive:
-exactly the families the public API vhost added, and exactly the data the rule exists for.
+**One bank family, two audiences.** `/api/v1/bank/**` covers the bank-employee surface and the
+member-facing account a shipped client actually reads at `/api/v1/bank/org-units/**` (it lay at
+`/api/v1/org-units/bank/**`, a family of its own, until wave 4 of the API cut), and its transaction
+rows carry a `holderHandle`. Listing only the employee half — as this requirement originally did —
+left the member bank ledger, along with the mission finance reads, the personal holdings and the
+refinery profit figures, on the storable directive: exactly the families the public API vhost
+added, and exactly the data the rule exists for.
 
 **A missing family is actively downgraded, not merely un-opted-in.** `ApiCacheControlFilter` runs at
 `HIGHEST_PRECEDENCE + 20`, ahead of the Spring Security chain, and sets `Cache-Control` before

@@ -273,7 +273,8 @@ the grant table.
 > isolated in one deliberately non-`Bank*`-named seam, `OrgUnitBankAccessService` (ADR-0020),
 > which is the **only** class permitted to bridge `OwnerScopeService` and the bank
 > (pinned by `ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`). The officer/lead
-> surface lives outside the bank URL/role space (`/api/v1/org-units/bank/**`).
+> surface lives beside the bank-employee one at `/api/v1/bank/org-units/**` (moved there from
+> `/api/v1/org-units/bank/**` in wave 4 of the API cut) and is decided in that seam, not by a bank role.
 >
 > **Amendment (epic #692, REQ-BANK-027):** the same seam — still the only org-unit bridge — extends this
 > narrow capability **up the hierarchy**: a Bereichsleitung over its `AREA` account, the OL over the
@@ -680,7 +681,8 @@ in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
 
 ### REQ-BANK-018 — API & persistence conventions
 
-Bank endpoints live under `/api/v1/bank/**` and follow
+Bank endpoints live under `/api/v1/bank/**` (the org-unit-facing slice at
+`/api/v1/bank/org-units/**`, REQ-BANK-021) and follow
 `docs/specs/api-conventions.md` (DTO-only boundaries, MapStruct, `@Valid`, RFC 7807,
 `PageResponse` with whitelisted sort fields, UTC storage, SpringDoc/`openapi.json`
 upkeep) and `docs/specs/data-persistence.md` (Flyway-only schema, no N+1). Mutable rows
@@ -764,7 +766,7 @@ scope (ADR-0020): an officer oversees their own Staffel, an SK lead the Spezialk
 they lead, an admin all org units (or the one pinned). The view is **balance-only**: no
 transaction history, no holder distribution, no audit — those stay a bank-staff surface
 (REQ-BANK-010). It is exposed **outside** the bank role space, under
-`/api/v1/org-units/bank/balances` (authenticated; the scope decides the result), so an
+`/api/v1/bank/org-units/balances` (authenticated; the scope decides the result), so an
 officer/lead needs **no** bank role and reaching it never grants any other bank surface.
 This is the sole, owner-approved relaxation of REQ-BANK-008's "members see nothing" rule,
 and it is mediated entirely by a non-`Bank*` seam so `BankSecurityService` stays
@@ -860,7 +862,7 @@ chooses **no holder** (that is recorded at confirmation). A requester sees the s
 their **own** requests only (per-user isolation) and may **cancel** an own request while it
 is still `PENDING` (`BOOKING_REQUEST_CANCELLED`) or **correct** it while it is still pending
 *and* unapproved (REQ-BANK-056). The requester endpoints live under
-`/api/v1/org-units/bank/requests/**`, scope-checked by the same seam (create requires the
+`/api/v1/bank/org-units/requests/**`, scope-checked by the same seam (create requires the
 caller to oversee the org unit; cancel requires owning the request). A request cannot be
 raised against a `CLOSED` account.
 
@@ -1577,6 +1579,10 @@ admin on any account); for a Sonderkonto the target is bank-staff-only for non-a
 it echoes the account's `@Version` (the
 target shares the row's optimistic lock with rename/close — both infrequent) and is audited
 (`BALANCE_TARGET_SET` / `BALANCE_TARGET_CLEARED`). The target enforces nothing; it is a display goal.
+
+The bank-staff write is `PUT /api/v1/bank/accounts/{id}/balance-target` (full replacement of the
+target, `{target, version}` as the org-unit twin `PUT /api/v1/bank/org-units/accounts/{id}/balance-target`;
+it was a `PATCH` before wave 4 of the API cut). Both echo the version and write the same audit events.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (holder-only set, version check), `BankAccountServiceTest` (bank-staff set/clear + audit) · **Code:** `bank/internal/BankAccount#balanceTarget`, `bank/internal/OrgUnitBankAccessService#setBalanceTarget`, `bank/internal/BankAccountService#setBalanceTarget`, `bank/web/OrgUnitBankController` / `BankAccountController`, `db/migration/V189` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
@@ -2813,7 +2819,7 @@ granted for the amount and reason **as they stood**; allowing an edit afterwards
 small approved request into an arbitrarily large pre-approved one. The UI withholds the edit button
 in that state rather than offering a dead end.
 
-The endpoint is `PUT /api/v1/org-units/bank/requests/{id}` with **PUT semantics** (an omitted field
+The endpoint is `PUT /api/v1/bank/org-units/requests/{id}` with **PUT semantics** (an omitted field
 clears it), guarded under the row lock by: ownership (a foreign id is **404**, never 403 — the same
 per-user isolation `cancelOwn` uses, so the endpoint cannot probe which ids exist), still-`PENDING`
 (`BANK_REQUEST_NOT_PENDING`), not-yet-approved, and the echoed `@Version` (409). REQ-BANK-045 still

@@ -261,6 +261,8 @@ moved reads stay no-store; the `/api/v1/org-units/bank/` entry goes. The 29 mapp
 (`bankClassesMustNotConsultOrgUnitScope`, `orgUnitAwareBankSeamIsContainedToOneClass`) are keyed on
 names and must still select the moved classes (G-01).
 
+**Status (2026-10-11):** done on branch `claude/api-cut-w4`, on top of wave 3. The 29 mappings moved by the class mapping of `OrgUnitBankController` alone (`/api/v1/bank/org-units`); no URL rule covered the old prefix, none was added, and the seam class and both seam rules are untouched (the rules select by class literal and package, so the move cannot empty them; `ArchitectureTest.theOrgUnitBankPrefixIsServedBySeamControllersOnly` adds the path-keyed pin with a floor and a planted failure). The `/api/v1/org-units/bank/` entry left `NoStoreApiScopes` (no-store families 32 to 31; the moved reads fall under `/api/v1/bank/**`). `OrgUnitBankPathCutTest` proves the controller serves exactly the map's new paths, nothing is left under the old prefix, the new paths demand authentication, and the old ones answer `410 APP_UPDATE_REQUIRED` (24 frozen) or `404` (5 never frozen: balance-series, statement, area-members visibility, user visibility grant and revoke). S-2 is in: see section 5. Ledger and retirement: 24 lines.
+
 ### 4.5 Wave 5: job orders and game items
 
 | Example old path | Example new path | Ops | T1 | App-called |
@@ -306,7 +308,7 @@ and are part of the same forced update; they are listed because the map is a lis
 | # | Wave | Item | App | Decision |
 | --- | --- | --- | --- | --- |
 | S-1 | 3 | `GET /missions` absorbs the search: filters and `q` replace the parameter `query` | `MissionRepository` | ledger line with the field |
-| S-2 | 4 | `PATCH /bank/accounts/{id}/balance-target` becomes `PUT` with its org-unit twin's request shape | `BankStaffRepository` | owner (Q-5) |
+| S-2 | 4 | `PATCH /bank/accounts/{id}/balance-target` becomes `PUT` with its org-unit twin's request shape | none (the 2026-10-03 call list does not contain it) | in the cut (Q-5); done in wave 4: only the verb changes, the two request records were already field-for-field identical (`target`, `version`) |
 | S-3 | 6 | the app's `GET /settings/{key}` for the two job-order age thresholds becomes `GET /orders/settings`; `GET /refinery-orders/settings` for the rounding mode | `JobOrderRepository` | owner (Q-5) |
 | S-4 | 6 | `POST`/`PUT /refinery-orders` bind request records without `id`, `owner`, `profit`, `owningSquadron`; `status` limited on create; the owner override moves to the per-target path | `RefineryRepository` | owner (Q-5) |
 | S-5 | 3 | finance gate reads the mission from the path | none | none |
