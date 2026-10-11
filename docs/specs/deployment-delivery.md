@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md)
 
 # Deployment delivery & promotion
 
@@ -1933,6 +1933,8 @@ to the shared group and restores the defect exactly.
   checker self-tests against a known-drifted workflow first, so it cannot pass vacuously.
 - [ ] The `build-stack` job, which builds the E2E images once per run for all matrix cells (since
   2026-09-22), carries the same gate expression, so a run whose gate is false builds nothing.
+- [ ] `e2e.yml` carries no `merge_group` trigger: its gate admits any event that is not a pull
+  request, so a merge group would start the whole suite (REQ-OPS-044).
 
 **Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`,
 `jobs.build-stack.if`) · `.github/scripts/check_e2e_gate_mirror.py` ·
@@ -2774,6 +2776,106 @@ features only. No tracked file outside Markdown and the audit archive names `--e
 
 **Enforced by:** `scripts/check-final-java-only.py` (`repo-lint.yml`, `final-java-only`) ·
 **Related:** ADR-0223, REQ-OPS-038
+
+### REQ-OPS-044 — Pull requests merge through a merge queue, and every required check reports in it
+
+`main` is advanced only through a GitHub merge queue (a `merge_queue` rule in the `main` ruleset:
+merge commit, one pull request per group). The strict up-to-date policy is off; the queue builds `main`
+plus the pull request before the merge instead.
+
+- **Every required status check reports on the merge group.** A required check either runs on the
+  `merge_group` event (checks whose verdict depends on the combined tree) or is answered by a job of
+  the same name in `merge-group-shims.yml` (checks decided on the pull request head: DCO,
+  gitleaks). A required context nothing reports on a merge group wedges the queue and is a defect.
+- **CodeQL runs for real in every merge group, and uploads nothing.** `codeql.yml` triggers on
+  `merge_group`, analyses `java-kotlin` and `javascript-typescript` and calls `analyze` with
+  `upload: never` and `upload-database: false`, so no SARIF upload races the queue's deletion of the
+  temporary branch. The group's verdict is that the analysis completes on the combined tree;
+  findings are judged on the pull request head and on `main`.
+- **A merge group reads its base from `github.event.merge_group`**, never from `github.base_ref` or
+  `github.event.pull_request`, which are empty there.
+- **No merge group starts the E2E suite.** `e2e.yml` has no `merge_group` trigger.
+- **One pull request per group**, so the push to `main` carries the single merge commit the release and
+  image workflows inspect.
+- **The repository stays public**; the queue exists only for public repositories of an
+  organization. The emergency path when `gh pr merge --admin` does not merge past the queue is the
+  owner editing the ruleset, never an agent.
+
+**Acceptance**
+
+- [ ] Every context in the `main` ruleset's `required_status_checks` is the `name:` of a job in a
+  workflow that triggers on `merge_group`.
+- [ ] A queued docs-only pull request reaches `main` with all 11 contexts reported on its
+  `gh-readonly-queue/main/...` ref and a GitHub-verified merge commit.
+- [ ] A merge group's `Analyze (java-kotlin)` and `Analyze (javascript-typescript)` pass without
+  creating a code scanning analysis on the `gh-readonly-queue/...` ref.
+- [ ] After a queued merge, `gh pr view <n> --json mergeCommit` equals the new `main` tip.
+- [ ] Two queued pull requests that each add the same Flyway version fail the second group, not
+  `main`.
+
+**Enforced by:** the ruleset `main`, `.github/workflows/merge-group-shims.yml`,
+`.github/workflows/codeql.yml` (matrix and `upload`), the `merge_group` triggers of `ci.yml`,
+`repo-lint.yml`, `wrapper-validation.yml` and `flyway-migrations.yml` · **Decision:**
+[ADR-0246](../adr/0246-pull-requests-merge-through-a-merge-queue-not-the-strict-up-to-date-policy.md) ·
+**Related:** REQ-OPS-027
+
+### REQ-OPS-045 — The host scripts that apply a release are the ones it was built with, and a drift is visible
+
+The operational scripts reach a host only through the Ansible role, never the config bundle
+(REQ-OPS-001, ADR-0188). A host can therefore run older scripts than the release it applies, and
+until 2026-10-10 nothing said so: v1.14.0 was applied by a `deploy.sh` that still started the edge
+after the apps, and the promotion failed.
+
+- **The release carries the hashes.** `scripts/host-scripts.list` names every file the role installs
+  under `/var/iri/code/scripts`. The config image ships `/config/host-scripts.sha256`
+  (`<sha256>  <path>` per file, `sha256sum -c` format), generated from the commit by
+  `scripts/host-scripts-manifest.sh generate` in the `build-config` job, and the job fails when the
+  file is missing or empty. A repo self-test keeps the list equal to what the role installs.
+- **The host compares on every tick.** `deploy.sh` keeps the deployed release's manifest as
+  `/var/iri/code/host-scripts.sha256` (delivered and rolled back with the config tree) and hashes the
+  listed files in its own directory against it on every tick that stages no bundle (a staging tick
+  compares the incoming manifest instead). It logs one
+  `host scripts:` line per differing or missing file and writes `host-scripts.prom`:
+  `basetool_host_scripts_drift{file,kind}` (`differs` | `missing`, one series per drifting file, none
+  when in sync) and `basetool_host_scripts_check_timestamp_seconds`. A release without a manifest, or a
+  malformed one, is logged and the file is removed; it is never a failure.
+- **Alerts.** `HostScriptDrift` (warning, 1 h) names the file and its kind; `HostScriptsCheckStale`
+  (warning, 12 h or absent) says no tick has compared. A host whose `deploy.sh` predates the check
+  writes nothing, so its absent metric is the alert.
+- **The host refuses what its apply path cannot apply.** On a config-changing tick, after the bundle is
+  staged and before anything on the host changes, `deploy.sh` compares the incoming manifest. When
+  `deploy.sh`, `lib/common.sh`, `lib/container-runtime.sh` or `render-env-d.py` differ or are missing it
+  exits 1 with a `HOST SCRIPTS:` FATAL that names them and the role command, stamps a failed deploy, and
+  records no backoff and no marker, so the first tick after the role run applies the release. Other
+  stale scripts only warn. `--force` and `IRI_REQUIRE_CURRENT_SCRIPTS=false` bypass it, loudly.
+- **The comparison before a promotion is mandatory** (`docs/deployment.md` → *Before a promotion: the
+  host scripts*): every file under `/var/iri/code/scripts` against the tag, byte-exact, and a mismatch
+  blocks the promotion until `--tags deploy,scripts` has been run from that tag (an owner-approved
+  production write).
+- **Bootstrap.** A host whose `deploy.sh` lacks this check cannot guard itself; its first install comes
+  through the role, and the mandatory step is the protection until then (ADR-0247).
+
+**Acceptance**
+
+- [x] `deploy.test.sh`: a tick at target reports a match, warns and exports a differing and a missing
+  file, and logs and clears the metric for a release without a manifest or with a malformed one.
+- [x] `deploy.test.sh`: a stale apply-path script refuses the release before any change, records no
+  backoff, and the next tick applies it once fixed; `--force` and the break-glass apply; a stale
+  non-apply script warns and applies; the manifest is applied with the config tree and put back by a
+  rollback.
+- [x] `host-scripts-manifest.test.sh`: the list equals what the role installs, the apply path is a
+  subset of it and covers what `deploy.sh` sources, `generate` is byte-exact from a revision and
+  `sha256sum -c` accepts it, the config image and the release workflow ship it.
+- [x] `monitoring/prometheus/tests/host_scripts_drift_test.yml` covers both alerts, including the absent
+  metric.
+
+**Enforced by:** `scripts/deploy.sh` (`check_host_scripts_applied`, `assert_host_scripts_current_or_die`) ·
+`scripts/host-scripts-manifest.sh` · `scripts/host-scripts.list` · `docker/config/Dockerfile` ·
+`.github/workflows/release-images.yml` · `monitoring/prometheus/alerts/ops-automation.yml` ·
+`scripts/deploy.test.sh`, `scripts/host-scripts-manifest.test.sh` · **Decision:**
+[ADR-0247](../adr/0247-a-release-carries-the-hashes-of-the-host-scripts-and-the-host-checks-them.md) ·
+**Runbook:** `docs/deployment.md` → *Before a promotion: the host scripts* · **Related:** REQ-OPS-001,
+REQ-OPS-007, REQ-OPS-036, REQ-OBS-014
 
 ## Open questions
 

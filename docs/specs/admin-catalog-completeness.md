@@ -124,7 +124,7 @@ a deliberately-bounded probe documented on the constant.
 **Enforced by:** `FrontendCacheSplitTest` (per-constant fetch-mode + URI pins, `&page=`
 appendability), `BackendApiClientHappyPathTest` (merge order, single-request common case,
 `Class`-overload guard, cap-hit WARN), `CatalogPagesTest` · **Code:**
-`frontend service.CachedCatalog` (`Fetch` mode), `BackendApiClient.getCached` /
+`frontend kernel.backend.CachedCatalog` (`Fetch` mode), `BackendApiClient.getCached` /
 `fetchCompleteCatalog` · **Issues:** —
 
 ## Out of scope

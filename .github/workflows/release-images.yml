@@ -649,6 +649,9 @@ jobs:
             org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/docs/deployment.md
             org.opencontainers.image.licenses=GPL-3.0-only
 
+      - name: Generate the host script manifest
+        run: scripts/host-scripts-manifest.sh generate > docker/config/host-scripts.sha256
+
       - name: Build & push config bundle (multi-arch)
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
@@ -690,7 +693,7 @@ jobs:
             test -d "/tmp/config-bundle/${d}" \
               || { echo "::error::config bundle is missing directory: ${d}" >&2; missing=1; }
           done
-          for f in docker/edge/nginx.conf docker/edge/include/maintenance.conf docker/acme/publish-loop.sh; do
+          for f in docker/edge/nginx.conf docker/edge/include/maintenance.conf docker/acme/publish-loop.sh host-scripts.sha256; do
             test -s "/tmp/config-bundle/${f}" \
               || { echo "::error::config bundle is missing or has an empty: ${f}" >&2; missing=1; }
           done

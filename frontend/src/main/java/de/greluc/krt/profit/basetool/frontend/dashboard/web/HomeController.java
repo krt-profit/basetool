@@ -1,0 +1,201 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.dashboard.web;
+
+import de.greluc.krt.profit.basetool.frontend.dashboard.client.DashboardBackendClient;
+import de.greluc.krt.profit.basetool.frontend.dashboard.model.AnnouncementDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+/**
+ * Controller for {@code /}: the landing page for anonymous visitors and the dashboard (upcoming
+ * missions, announcement, once-per-session welcome toast) for members.
+ */
+@Controller
+@UsesLayoutModel
+@RequiredArgsConstructor
+@Slf4j
+public class HomeController {
+
+  @Value("${app.ui.notification-duration:5000}")
+  private long notificationDuration;
+
+  /** Reads the dashboard's backend data. */
+  private final DashboardBackendClient dashboardClient;
+
+  /**
+   * Renders {@code /}. For an anonymous visitor it returns the landing page without any backend
+   * call, model attribute or session (REQ-SEC-052); for a member it renders the dashboard.
+   *
+   * @param model Thymeleaf model populated with mission, announcement, username and toast flags
+   * @param principal authenticated OIDC user, or {@code null} for an anonymous visitor
+   * @param request the current request; the session is taken from it only for a member
+   * @return {@code landing} for an anonymous visitor, {@code index} for a member
+   */
+  @NotNull
+  @GetMapping("/")
+  public String home(
+      Model model, @AuthenticationPrincipal OidcUser principal, HttpServletRequest request) {
+    if (principal == null) {
+      return "landing";
+    }
+    try {
+      Instant now = Instant.now();
+      Instant horizon = now.plus(7, ChronoUnit.DAYS);
+      PageResponse<MissionListDto> upcomingPage = dashboardClient.upcomingMissions(now, horizon);
+      List<MissionListDto> upcomingMissions =
+          (upcomingPage != null && upcomingPage.content() != null)
+              ? upcomingPage.content()
+              : List.of();
+      model.addAttribute("upcomingMissions", upcomingMissions);
+    } catch (BackendServiceException e) {
+      log.debug("Could not fetch upcoming missions", e);
+      model.addAttribute("upcomingMissions", List.of());
+      model.addAttribute("error", "error.mission.fetch");
+    } catch (Exception e) {
+      log.error("Could not fetch upcoming missions", e);
+      model.addAttribute("upcomingMissions", List.of());
+      model.addAttribute("error", "error.mission.fetch");
+    }
+
+    model.addAttribute("myOrgUnitIds", Set.of());
+
+    model.addAttribute("username", principal.getPreferredUsername());
+
+    HttpSession session = request.getSession(true);
+    if (session.getAttribute("welcomeMessageShown") == null) {
+      model.addAttribute("showLoginNotification", true);
+      model.addAttribute("notificationDuration", notificationDuration);
+      session.setAttribute("welcomeMessageShown", true);
+    }
+
+    try {
+      UserDto currentUser = dashboardClient.currentUser();
+      model.addAttribute("currentUser", currentUser);
+
+      Set<UUID> myOrgUnitIds = new HashSet<>();
+      if (currentUser.squadrons() != null) {
+        for (SquadronReferenceDto su : currentUser.squadrons()) {
+          if (su != null && su.id() != null) {
+            myOrgUnitIds.add(su.id());
+          }
+        }
+      }
+      if (currentUser.squadron() != null && currentUser.squadron().id() != null) {
+        myOrgUnitIds.add(currentUser.squadron().id());
+      }
+      try {
+        List<UUID> directOrgUnitIds = dashboardClient.myOrgUnitIds();
+        if (directOrgUnitIds != null) {
+          for (UUID id : directOrgUnitIds) {
+            if (id != null) {
+              myOrgUnitIds.add(id);
+            }
+          }
+        }
+      } catch (Exception ex) {
+        log.warn("Could not fetch own org-unit memberships for the home highlight", ex);
+      }
+      model.addAttribute("myOrgUnitIds", myOrgUnitIds);
+
+      AnnouncementDto announcement = dashboardClient.announcement();
+      model.addAttribute("announcement", announcement);
+
+      boolean unread = false;
+      if (announcement != null && announcement.id() != null) {
+        if (currentUser.lastReadAnnouncementId() == null
+            || !currentUser.lastReadAnnouncementId().equals(announcement.id())) {
+          unread = true;
+        }
+      }
+      model.addAttribute("unreadAnnouncement", unread);
+    } catch (BackendServiceException e) {
+      log.debug("Could not load home user/announcement context", e);
+    } catch (Exception e) {
+      log.warn("Unexpected failure building home context", e);
+    }
+    return "index";
+  }
+
+  /**
+   * Marks the given announcement as read for the current user; backend failures are logged and
+   * swallowed.
+   *
+   * @param id announcement id to mark as read
+   * @return redirect back to {@code /}
+   */
+  @NotNull
+  @PostMapping("/announcement/read")
+  @PreAuthorize("isAuthenticated()")
+  public String markAnnouncementAsRead(@RequestParam UUID id) {
+    try {
+      dashboardClient.markAnnouncementRead(id);
+    } catch (Exception e) {
+      log.error("Failed to mark announcement as read", e);
+    }
+    return "redirect:/";
+  }
+
+  /**
+   * AJAX variant of {@link #markAnnouncementAsRead}, selected by {@code X-Requested-With:
+   * XMLHttpRequest}, so the page removes the control in place (REQ-FE-005).
+   *
+   * @param id announcement id to mark as read
+   * @return {@code 200} on success, {@code 502} on a backend failure
+   */
+  @PostMapping(value = "/announcement/read", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<Void> markAnnouncementAsReadAjax(@RequestParam UUID id) {
+    try {
+      dashboardClient.markAnnouncementRead(id);
+      return ResponseEntity.ok().build();
+    } catch (Exception e) {
+      log.error("Failed to mark announcement as read", e);
+      return ResponseEntity.status(502).build();
+    }
+  }
+}

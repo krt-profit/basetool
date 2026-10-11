@@ -32,10 +32,11 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 | Q11 | A metric is renamed and a dashboard or alert rule silently breaks. | The monitoring-moves-with-the-change rule; the dashboard and rule gates |
 | Q12 | A backend call hangs and the page blanks instead of degrading. | Resilience4j Timeout/CircuitBreaker with logged transitions; `REQ-FE-*` |
 | Q13 | A read's statement count starts growing with its row count, or a new foreign key ships without an index. | Hibernate `Statistics` statement-count tests (`BankReadNoNPlusOneTest`, `UserMappingNoNPlusOneTest`); `fail_on_pagination_over_collection_fetch`; `ForeignKeyIndexCoverageTest` over the live catalogue (`REQ-DATA-003`, `REQ-DATA-017`) |
+| Q14 | A release is applied by older host scripts than it was built with (the 2026-10-10 v1.14.0 outage). | The bundle's `host-scripts.sha256` against the host every tick (`HostScriptDrift`, `HostScriptsCheckStale`); `deploy.sh` refuses a release whose apply-path scripts differ; the mandatory pre-promotion comparison (`REQ-OPS-045`) |
 
 ## 10.3 What operationalises them
 
-- **213 alert rules** in six rule files — `apps`, `business`, `containers-runtime`,
+- **223 alert rules** in six rule files — `apps`, `business`, `containers-runtime`,
   `infrastructure`, `meta`, `ops-automation` — with `promtool` unit tests beside them, plus 14
   LogQL alerts in the Loki ruler. The `meta`
   rules are the ones that matter most and are easiest to forget: they alert on the *monitoring

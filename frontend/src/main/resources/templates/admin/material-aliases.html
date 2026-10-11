@@ -21,7 +21,7 @@
         <div class="card-head">
             <h2 id="alias-edit-title" class="card-title" th:text="#{admin.materialAlias.section.edit}">Alias bearbeiten</h2>
         </div>
-        <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}(id=${aliasToEdit.id})}" class="form-grid" data-alias-update th:data-alias-id="${aliasToEdit.id}">
+        <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}(id=${aliasToEdit.id})}" class="form-grid" data-alias-update th:data-alias-id="${aliasToEdit.id}">
             <input type="hidden" name="version" th:value="${aliasToEdit.version}">
             <div class="form-group">
                 <label for="editSourceSystem" th:text="#{admin.materialAlias.sourceSystem}">Quelle</label>
@@ -93,7 +93,7 @@
                             <td data-alias-field="externalCode" th:attr="data-label=#{admin.materialAlias.externalCode}" th:text="${a.externalCode}">-</td>
                             <td th:attr="data-label=#{admin.materialAlias.createdBy}" th:text="${a.createdBy}">system</td>
                             <td class="cell-actions">
-                                <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}/delete(id=${a.id})}" class="m-0" data-alias-delete>
+                                <form sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" method="post" th:action="@{/admin/material-aliases/{id}/delete(id=${a.id})}" class="m-0" data-alias-delete>
                                     <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{admin.materialAlias.action.delete}" th:aria-label="#{admin.materialAlias.action.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 </form>
                             </td>
@@ -107,7 +107,7 @@
         </div>
     </div>
 
-    <section class="card" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" aria-labelledby="alias-create-title">
+    <section class="card" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" aria-labelledby="alias-create-title">
         <div class="card-head">
             <h2 id="alias-create-title" class="card-title" th:text="#{admin.materialAlias.section.add}">Neuen Alias anlegen</h2>
         </div>

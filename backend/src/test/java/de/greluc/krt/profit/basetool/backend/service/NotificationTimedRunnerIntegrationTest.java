@@ -22,10 +22,12 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
+import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationTimedProperties;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,7 +56,7 @@ class NotificationTimedRunnerIntegrationTest {
       }
 
       @Override
-      public int produce(Instant now) {
+      public int produce(Instant now, int limit) {
         calls.incrementAndGet();
         return 1;
       }
@@ -70,6 +72,7 @@ class NotificationTimedRunnerIntegrationTest {
             List.of(counting(calls)),
             notificationRepository,
             new SimpleMeterRegistry(),
+            new NotificationTimedProperties(true, Duration.ofMinutes(1), 100),
             transactionManager);
 
     try (Connection otherInstance = dataSource.getConnection()) {

@@ -1,0 +1,219 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.bank.web;
+
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDetailDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankCapabilitiesDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankGrantDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankHolderDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+import org.hamcrest.Matchers;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Renders the three Bank in-place swap fragments (REQ-FE-005) and pins their boundaries: the
+ * manage/grants fragments exclude their creation modals, the {@code accountBody} fragment includes
+ * the booking modals.
+ */
+@SpringBootTest
+class BankInPlaceFragmentMvcTest {
+
+  @Autowired private WebApplicationContext context;
+  private MockMvc mockMvc;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  @Test
+  @WithMockUser(roles = {"BANK_MANAGEMENT"})
+  void manage_fragmentManageBody_rendersPanelWithoutTheCreationModals() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef(), eq(0), eq(25)))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(account(UUID.randomUUID(), "KB-0001", "ACTIVE", "0")),
+                0,
+                25,
+                1,
+                1,
+                Collections.emptyList()));
+
+    mockMvc
+        .perform(get("/bank/manage").param("tab", "konten").param("fragment", "manageBody"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("bank-manage :: manageBody"))
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-tab-accounts\"")))
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-account-row\"")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("bank-create-account-modal"))));
+  }
+
+  @Test
+  @WithMockUser(roles = {"BANK_MANAGEMENT"})
+  void grants_fragmentGrantsMatrix_rendersMatrixWithoutTheCreateModal() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenReturn(List.of(grant(userId, "alpha", accountId)));
+
+    mockMvc
+        .perform(get("/bank/grants").param("fragment", "grantsMatrix"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("bank-grants :: grantsMatrix"))
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-grant-row\"")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("bank-grant-create-modal"))));
+  }
+
+  @Test
+  @WithMockUser(roles = {"BANK_EMPLOYEE"})
+  void accountDetail_fragmentAccountBody_rendersBodyIncludingTheBookingModals() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    UUID holderId = UUID.randomUUID();
+    BankAccountDto self = account(accountId, "KB-0001", "ACTIVE", "1000");
+    BankAccountDetailDto detail =
+        new BankAccountDetailDto(
+            self,
+            new BigDecimal("10"),
+            1,
+            new BankCapabilitiesDto(true, true, true, false),
+            new de.greluc.krt.profit.basetool.frontend.bank.model.BankApprovalLimitsDto(
+                false,
+                false,
+                false,
+                false,
+                java.util.List.of(),
+                java.util.Map.of(),
+                null,
+                null,
+                java.util.List.of()));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(
+            eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId)))
+        .thenReturn(detail);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef(), eq(accountId)))
+        .thenReturn(
+            new PageResponse<BankBookingDto>(List.of(), 0, 20, 0, 0, Collections.emptyList()));
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new BankHolderDto(
+                    holderId, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L)));
+
+    mockMvc
+        .perform(get("/bank/accounts/" + accountId).param("fragment", "accountBody"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("bank-account-detail :: accountBody"))
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-balance\"")))
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-bookings-panel\"")))
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-movement-open\"")))
+        .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-movement-type\"")))
+        .andExpect(content().string(Matchers.containsString("field-hint-marker")))
+        .andExpect(
+            content()
+                .string(Matchers.containsString("data-testid=\"bank-movement-fee-inclusive\"")))
+        .andExpect(content().string(Matchers.containsString("data-fee-inclusive-row")))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.not(
+                        Matchers.containsString("name=\"feeInclusive\" value=\"true\" checked"))))
+        .andExpect(
+            content().string(Matchers.containsString("data-role=\"bank-cp-external-toggle\"")))
+        .andExpect(content().string(Matchers.containsString("name=\"counterpartyExternalName\"")))
+        .andExpect(content().string(Matchers.containsString("data-bank-all-orgunits")))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.stringContainsInOrder(
+                        List.of(
+                            "data-counterparty-user",
+                            "data-role=\"bank-cp-external-toggle\"",
+                            "data-counterparty-orgunit"))))
+        .andExpect(
+            content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-users\"")))
+        .andExpect(
+            content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-accounts\"")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("id=\"bank-deposit-modal\""))));
+    verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
+  }
+
+  private static BankAccountDto account(UUID id, String no, String status, String balance) {
+    return new BankAccountDto(
+        id,
+        no,
+        "Konto " + no,
+        "ORG_UNIT",
+        status,
+        null,
+        null,
+        new BigDecimal(balance),
+        null,
+        null,
+        null,
+        0L,
+        Instant.parse("2026-01-15T10:00:00Z"));
+  }
+
+  private static BankGrantDto grant(UUID userId, String handle, UUID accountId) {
+    return new BankGrantDto(
+        userId, handle, accountId, "KB-0001", "Staffel IRIDIUM", true, false, false, true, 0L);
+  }
+}

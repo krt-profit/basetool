@@ -15,7 +15,7 @@
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-approval-request-filed=#{bank.movement.approvalRequestFiled},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey=${dashboard == null ? 'nav.section.bank' : (dashboard.management() ? 'bank.dashboard.subtitle.management(' + #lists.size(dashboard.accounts()) + ')' : 'bank.dashboard.subtitle.employee(' + #lists.size(dashboard.accounts()) + ')')}, titleText=#{bank.dashboard.title}, actions=~{::bank-dashboard-actions})}">
         <th:block th:ref="bank-dashboard-actions">
-            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
+            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).BANK_MANAGEMENT)">
                 <button type="button" class="btn btn-ghost bank-download-btn"
                         data-download-url="/api/proxy/bank/export/three-month-report"
                         data-filename="bank-3-monats-report.pdf"
