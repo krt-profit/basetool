@@ -25,9 +25,6 @@ import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
@@ -35,25 +32,18 @@ import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryStackDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -80,7 +70,6 @@ public class InventoryAggregationService {
   private final UserRepository userRepository;
   private final MaterialRepository materialRepository;
   private final GameItemRepository gameItemRepository;
-  private final JobOrderRepository jobOrderRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final MaterialMapper materialMapper;
   private final OwnerScopeService ownerScopeService;
@@ -949,125 +938,6 @@ public class InventoryAggregationService {
             scope.memberOrgUnitIds(),
             pageable)
         .map(inventoryItemMapper::toDto);
-  }
-
-  /**
-   * Returns all inventory items linked to the given job order, sorted server-side by owner name,
-   * location, material name, quality (desc), quantity (desc).
-   *
-   * @param jobOrderId the UUID of the job order
-   * @return sorted list of {@link MaterialCollectionEntryDto}
-   * @throws NotFoundException when the job order is unknown
-   */
-  public List<MaterialCollectionEntryDto> getMaterialCollection(UUID jobOrderId) {
-    Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
-    return inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
-        .map(
-            item -> {
-              String ownerName =
-                  item.getUser().getDisplayName() != null
-                      ? item.getUser().getDisplayName()
-                      : item.getUser().getUsername();
-              Optional<InventoryJobOrderAllocation> slice =
-                  item.getJobOrderAllocations().stream()
-                      .filter(a -> jobOrderId.equals(a.getJobOrderId()))
-                      .findFirst();
-              boolean delivered =
-                  slice.map(a -> Boolean.TRUE.equals(a.getDelivered())).orElse(false);
-              Double allocatedQuantity = slice.map(a -> a.getAmount()).orElse(item.getAmount());
-              return new MaterialCollectionEntryDto(
-                  item.getId(),
-                  item.getVersion() != null ? item.getVersion() : 0L,
-                  ownerName,
-                  item.getUser().getId(),
-                  item.getLocation().getName(),
-                  item.getLocation().getId(),
-                  item.getMaterial().getName(),
-                  item.getQuality() != null ? item.getQuality().doubleValue() : null,
-                  item.getAmount(),
-                  allocatedQuantity,
-                  delivered);
-            })
-        .toList();
-  }
-
-  /**
-   * Returns the game-item stock earmarked to the given job order, grouped per game item and sorted
-   * by name (REQ-ORDERS-028). Each group carries the ordered and manufactured amounts of the
-   * order's matching item lines, {@code 0} when the order no longer requests that item.
-   *
-   * @param jobOrderId the UUID of the job order
-   * @return name-sorted list of {@link JobOrderItemStockGroupDto}; empty when no game-item stock is
-   *     earmarked to the order
-   * @throws NotFoundException when the job order is unknown
-   */
-  @NotNull
-  public List<JobOrderItemStockGroupDto> getItemStockForJobOrder(UUID jobOrderId) {
-    JobOrder jobOrder =
-        Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
-
-    Map<UUID, int[]> lineTotals = new HashMap<>();
-    for (JobOrderItem line : jobOrder.getItems()) {
-      if (line.getGameItem() == null) {
-        continue;
-      }
-      int[] totals = lineTotals.computeIfAbsent(line.getGameItem().getId(), _ -> new int[2]);
-      totals[0] += line.getAmount() != null ? line.getAmount() : 0;
-      totals[1] += line.getManufacturedAmount() != null ? line.getManufacturedAmount() : 0;
-    }
-
-    Map<UUID, List<InventoryItem>> byGameItem = new LinkedHashMap<>();
-    for (InventoryItem row :
-        inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId)) {
-      byGameItem.computeIfAbsent(row.getGameItem().getId(), _ -> new ArrayList<>()).add(row);
-    }
-
-    List<JobOrderItemStockGroupDto> groups = new ArrayList<>();
-    byGameItem.forEach(
-        (gameItemId, rows) -> {
-          GameItem gameItem = rows.getFirst().getGameItem();
-          List<JobOrderItemStockEntryDto> entries = new ArrayList<>();
-          long allocatedTotal = 0L;
-          for (InventoryItem row : rows) {
-            String ownerName =
-                row.getUser().getDisplayName() != null
-                    ? row.getUser().getDisplayName()
-                    : row.getUser().getUsername();
-            Optional<InventoryJobOrderAllocation> slice =
-                row.getJobOrderAllocations().stream()
-                    .filter(a -> jobOrderId.equals(a.getJobOrderId()))
-                    .findFirst();
-            long allocatedQuantity =
-                Math.round(
-                    slice.map(InventoryJobOrderAllocation::getAmount).orElse(row.getAmount()));
-            allocatedTotal += allocatedQuantity;
-            entries.add(
-                new JobOrderItemStockEntryDto(
-                    row.getId(),
-                    row.getVersion() != null ? row.getVersion() : 0L,
-                    ownerName,
-                    row.getUser().getId(),
-                    row.getLocation().getName(),
-                    row.getLocation().getId(),
-                    Math.round(row.getAmount()),
-                    allocatedQuantity,
-                    slice.map(a -> Boolean.TRUE.equals(a.getDelivered())).orElse(false)));
-          }
-          int[] totals = lineTotals.getOrDefault(gameItemId, new int[2]);
-          groups.add(
-              new JobOrderItemStockGroupDto(
-                  inventoryItemMapper.gameItemToReferenceDto(gameItem),
-                  totals[0],
-                  totals[1],
-                  allocatedTotal,
-                  entries));
-        });
-    groups.sort(
-        Comparator.<JobOrderItemStockGroupDto, String>comparing(
-                g -> g.gameItem() != null && g.gameItem().name() != null ? g.gameItem().name() : "",
-                String.CASE_INSENSITIVE_ORDER)
-            .thenComparing(g -> g.gameItem() != null ? String.valueOf(g.gameItem().id()) : ""));
-    return groups;
   }
 
   /**

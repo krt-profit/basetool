@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -57,6 +58,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -64,6 +66,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Mockito unit tests for the per-allocation write methods of {@link InventoryItemService}
@@ -90,6 +93,13 @@ class InventoryItemServiceAllocationTest {
   @Mock private InventoryCheckoutService inventoryCheckoutService;
 
   @InjectMocks private InventoryItemService service;
+
+  /** Wires the job-order requirement lookup over the mocked order repository and item service. */
+  @BeforeEach
+  void wireJobOrders() {
+    ReflectionTestUtils.setField(
+        service, "jobOrders", new JobOrderEarmarkTargets(jobOrderRepository, jobOrderItemService));
+  }
 
   private final UUID itemId = UUID.randomUUID();
   private final UUID materialId = UUID.randomUUID();

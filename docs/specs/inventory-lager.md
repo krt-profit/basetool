@@ -686,7 +686,7 @@ already-allocated order edits its slice instead of posting a duplicate) ·
 **Code:** `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
 `inventory/api/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
 `InventoryItemService#createInventoryItem`, `InventoryCheckoutService` (book-out / merge / SELL),
-`InventoryAggregationService#getMaterialCollection`, `InventoryItemMapper`,
+`JobOrderStockReadService#getMaterialCollection`, `InventoryItemMapper`,
 `V217__add_inventory_allocation_tables.sql`, `V218__drop_inventory_scalar_associations.sql`,
 `fragments/inventory-stack-entries.html`, `inventory-common.js` (the allocation chips both Lager
 pages share), `inventory-my.js` / `inventory-admin.js`,

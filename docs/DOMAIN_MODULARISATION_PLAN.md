@@ -1142,7 +1142,8 @@ as each pair is decoupled.
   with the APPSEC-01 book-in check once, before any lookup; **5d** the earmarks
   (`InventoryJobOrderAllocation.jobOrder`, `InventoryMissionAllocation.mission`) and
   `MaterialExchangeOffer.inventoryItem` as ids, and `StockSoldForTarget` for the sale entries
-  (write family 7), which also settles P3-13 by inversion instead of a rank swap; **5e** the move,
+  (write family 7), which also settles P3-13 by inversion instead of a rank swap; **5e** the move
+  (deferred to Phase 4, see 5e below),
   NullAway and the idioms.
   - **5a — done 2026-10-10.** `InventoryModuleContractTest` pins that create, note update,
     personal rebook and book-out each record their audit event in the command's transaction, and
@@ -1236,7 +1237,37 @@ as each pair is decoupled.
     the change, keeps the "mein" board at the same count for 25 offers as for 3 (5 statements)
     and the detail within the bound (proven able to fail: loading the rows per offer gives 10
     against 54). The Materialbörse no longer holds an association into the Lager; its remaining
-    use of `InventoryItem` is the type, which leaves `model` with 5e. Baseline unchanged.
+    use of `InventoryItem` is the type, which stays in `model` like every entity. Baseline
+    unchanged.
+  - **5e — done 2026-10-10, without the move.** The last eleven `inventory -> joborder` edges
+    go: the two order-facing Lager reads (the material collection and the item stock of an
+    order, REQ-ORDERS-028) move into `joborder.internal.JobOrderStockReadService`, which reads
+    each row's slice through `InventoryAllocations.jobOrderSlice`; the Lager's link checks
+    (REQ-ORDERS-018, REQ-INV-031) ask `EarmarkTargets.JobOrders` for what an order requires
+    (`requiredMaterialIds`, `requiredGameItemIds`); the two earmarked-stock projections
+    (`JobOrderMaterialStockRow`, `JobOrderGameItemStockRow`) move to `inventory.api`. No
+    behaviour changes: the 404s, the messages and the DTOs are the same. Baseline **61 → 50**.
+    The tenancy guard's controller selection drops from 25 to 23 (floor 24 → 23): the
+    material-collection and item-stock controllers were selected only because they held
+    `InventoryItemService`, and they have GET handlers only. The model layer's join-column
+    selection floor drops to 354 with the two projections. NullAway takes in the whole
+    `inventory` package tree. The §8.1 idioms have no site left in the inventory code: its
+    concatenated `@Query` strings splice the scope constant or split a token, and its one
+    `isPresent()` is a plain boolean.
+    *Correction — the move waits for Phase 4:* moving any inventory implementation class into
+    `inventory.internal` closes a package cycle (probed: moving `StockViewerAccessService`
+    alone gives 15 cycles, among them `admin -> mapper -> inventory -> service -> admin`). Layer
+    classes consume `inventory.api`, while the inventory implementation needs the layers
+    (`OwnerScopeService`, `AuthHelperService`, the mappers, the repositories). The layer
+    consumers are: `UserDeletionService` (privacy, Phase 4), `BlueprintCraftabilityService`
+    (P3-7), `MeController` (identity, Phase 4), `OrgUnitMembershipService` and
+    `OrgUnitMembershipRepository` (`InventoryOrgUnitReconciler`, Phase 4),
+    `JobOrderStockProjectionService` and `JobOrderMapper` (joborder),
+    `JobOrderRepository.findEarmarks` and `MissionRepository.findEarmarks`, and the Lager's
+    own `InventoryItemMapper`, `InventoryItemRepository` and services. Mission and job order
+    could move because no layer class used their packages. **Tracked for Phase 4:** move the
+    inventory into `inventory.web` / `inventory.internal` once those consumers have left the
+    layer packages (P4-1, §7.6), then NullAway covers it without a further change.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1257,6 +1288,13 @@ Carried into this phase from Phase 2: `service.MemberEvaluationErasure` (promoti
 `personalinventory.api.PersonalInventoryErasure` are the interim erasure commands `UserDeletionService`
 calls; both are replaced by `UserErasureParticipant` implementations here, and
 `MemberEvaluationErasure` leaves the `service` package with that step (P2-3); `service.BankHandleSnapshots` (bank) goes the same way (P2-5).
+**P4-1 — move the inventory into `inventory.web` / `inventory.internal`** (carried from P3-5e,
+§7.5). It waits until the layer classes that consume `inventory.api` have left the layer packages:
+the GDPR orchestrator (`UserDeletionService`), identity's `MeController`, the org-unit membership
+service and repository (`InventoryOrgUnitReconciler`), the blueprint's craftability read (P3-7), the
+job order's `JobOrderStockProjectionService` and `JobOrderMapper`, and the earmark finders of
+`JobOrderRepository` and `MissionRepository`. The Lager's own controller, services, mapper and
+repository then move together; NullAway already covers the `inventory` tree.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
@@ -1430,7 +1468,7 @@ features only, no preview flags) stands; every proposal below uses final feature
 | **Do not adopt** Markdown documentation comments (`///`, JEP 467): Checkstyle 14.3.0 does not treat them as Javadoc; gatherers: no loop here is clearer as one | — | — | — | — |
 | **ADR-0223 corrections** — **done 2026-10-10** (the corrections were recorded in the ADR on 2026-10-02; the missing gate is `scripts/check-final-java-only.py`, REQ-OPS-043): JDK 26 does add a final library feature (JEP 517, HTTP/3 for the HTTP client); JEP 510 (KDF) is final in 25; Checkstyle already enforces the module-import and compact-source bans in `main` (not in `test`/`e2e`); there are 42 `super(…)` calls, not 34; a `--enable-preview` gate is still missing | The decision record stays authoritative | — | Review | S |
 
-**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move, `mission` with its own). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
+**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move, `mission` with its own, and the `inventory` tree with P3-5e). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
 annotations by simple name; Spring Framework builds itself with the same pair. Starting with the new
 module API packages, it would turn the annotations into a checked contract and close arc42 §11.4
 ("derived nullity annotations have no gate"). Cost: a compile-time dependency, about ten javac

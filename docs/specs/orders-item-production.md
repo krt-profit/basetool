@@ -445,12 +445,12 @@ with no earmarked item stock renders no stock block (no empty-state message).
 - [ ] The `item-stock` key is present at the seam map **and** the relay whitelist
   (`LiveSyncSectionMapParityTest` stays green).
 
-**Enforced by:** `JobOrderItemStockControllerTest` + `InventoryItemServiceTest`
+**Enforced by:** `JobOrderItemStockControllerTest` + `JobOrderStockReadServiceTest`
 (`getItemStockForJobOrder` grouping / slice / delivered / orphan context / 404),
 `JobOrderItemDetailRenderTest` (inline stock in the item expand + read-only + `items` fragment swap +
 MATERIAL-order absence), `LiveSyncSectionMapParityTest`, `JobOrderProductionE2eTest` (inline stock
 visible after a booked production with auto-earmark) · **Code:** `JobOrderItemStockController`,
-`InventoryAggregationService.getItemStockForJobOrder`, `JobOrderItemStockGroupDto` /
+`JobOrderStockReadService.getItemStockForJobOrder`, `JobOrderItemStockGroupDto` /
 `JobOrderItemStockEntryDto`, `JobOrderPageController.viewOrderDetail` (`itemStockByGameItem`,
 `items` dispatch), `orders-detail.html` (`itemsSection` item expand rows), `orders-detail.js`
 (`ORDER_SECTIONS['item-stock']` aliased to the items container), `LiveSyncTopicClass.ORDER`,
