@@ -104,6 +104,14 @@ or personal data; events belong to their publishers' `api.events` packages.
   `privacy.internal.PersonMentionRegistry` orders the union and refuses a column declared
   twice. See plan §7.6.
 
+- **2026-10-11, GDPR participants, slice e (account merge).** `UserReassignmentParticipant` is
+  owned by `platform.api` for the same reason. It is an `@ObserverSpi`; eighteen implementations in
+  seventeen modules replace the two lists of `UserAccountMergeService`: each declares the columns
+  that follow the member, with their unique-key remainder, and those that stay with the act. The
+  statements of the merge run in one engine, `platform.api.OwnedRowsMover`, and the bank refuses
+  two ledgers through the SPI's `assertMergeable`. The `USER_MERGED` audit row stays in the
+  orchestrator. See plan §7.6.
+
 ## Alternatives considered
 
 - **Events for every cross-module reaction** — breaks atomicity and audit completeness for the

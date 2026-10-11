@@ -3303,11 +3303,21 @@ would not repair an identity, it would falsify history.
 | Notifications, rule selectors, promotion evaluations                                                | The exchange's client revocations, change sequence and write journal (REQ-XCH-008, REQ-XCH-013, REQ-XCH-022)          |
 | Connected-application installations and their ship links (REQ-XCH-007, REQ-XCH-017)                 | The admin bulk-undo runs (who requested them) and their per-member skips (REQ-XCH-034)                                |
 
+**The merge is an orchestrator over participants** (plan §7.6, `platform.api`). Each module that
+holds member columns declares them in its `UserReassignmentParticipant` — the columns that follow
+the member, with the remainder of the unique constraint as the conflict key, and the columns that
+stay with the act. `UserAccountMergeService` asks every participant to refuse the merge first (the
+bank does, on two ledgers), runs them by position, moves the declared tables through the
+`OwnedRowsMover` and writes the `USER_MERGED` row from the rows each reported, in participant order.
+Eighteen participants in seventeen modules take part; `UserReassignmentOrderTest` pins their order,
+columns and conflict keys.
+
 **The classification is exhaustive by construction.** `UserAccountMergeCoverageTest` reads every
 foreign key into `app_user` out of the live schema, adds the two deliberately FK-less audit target
-columns, and fails the build unless each appears in exactly one of the two lists — and unless every
-listed column still exists. A new user-referencing column cannot be forgotten here; it can only be
-classified, by someone who had to decide which side it belongs on.
+columns, and fails the build unless each appears in exactly one of the two classifications — the
+union of the participants' declarations — and unless every declared column still exists. A new
+user-referencing column cannot be forgotten here; it can only be classified, by someone who had to
+decide which side it belongs on.
 
 **Conflicts are deduplicated where they are duplicates and refused where they are not.** Fifteen
 moved tables carry a unique constraint over the user column, so one member may legitimately hold a
@@ -3332,8 +3342,12 @@ user-deletion flow's job and carries its own fail-closed Keycloak probe (REQ-DAT
   longer exists.
 - [x] One `USER_MERGED` audit event names both ids and the per-table counts, never the callsign.
 
-**Enforced by:** `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest` ·
-**Code:** `UserAccountMergeService`, `DiscordRegistrationAdminController#merge` ·
+**Enforced by:** `UserAccountMergeEndStateTest` (real Postgres: the 29 followed columns, the
+duplicates dropped, a bystander's rows, the rows that stay, the `USER_MERGED` details and their
+order), `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest`, `UserReassignmentOrderTest` ·
+**Code:** `UserAccountMergeService`, `platform/api/UserReassignmentParticipant`,
+`platform/api/OwnedRowsMover`, the `*UserReassignment` participants,
+`DiscordRegistrationAdminController#merge` ·
 **Related:** REQ-SEC-045, ADR-0142 point 5, REQ-DATA-008, REQ-AUDIT-001
 
 ### REQ-SEC-047 — A client is told its authorisation, never left to derive it
