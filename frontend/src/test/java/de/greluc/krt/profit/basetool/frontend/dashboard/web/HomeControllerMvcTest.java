@@ -461,8 +461,8 @@ class HomeControllerMvcTest {
   /**
    * REQ-MISSION-012: the own-unit highlight covers every org-unit kind, not just Staffeln. A viewer
    * with no Staffel but a direct Spezialkommando membership (sourced from {@code
-   * /api/v1/users/me/org-unit-ids}) still gets the "Meine Einheit" chip on a mission owned by that
-   * SK. The same path covers a direct Bereich / Organisationsleitung membership.
+   * /api/v1/org-units/me/ids}) still gets the "Meine Einheit" chip on a mission owned by that SK.
+   * The same path covers a direct Bereich / Organisationsleitung membership.
    */
   @Test
   void home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersSpecialCommand()
@@ -489,7 +489,7 @@ class HomeControllerMvcTest {
             null,
             null);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(me);
-    when(backendApiClient.get(eq("/api/v1/users/me/org-unit-ids"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/org-units/me/ids"), anyTypeRef()))
         .thenReturn(List.of(specialCommandId));
 
     MissionListDto skMission =

@@ -141,7 +141,7 @@ class LeitungPagePatternRenderTest {
             List.of(new LeitungMemberDto(PILOT, "Pilot", "MEMBER", null, 3L, false)),
             List.of(),
             null);
-    when(backendApiClient.get("/api/v1/leitung/view", LeitungViewDto.class))
+    when(backendApiClient.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
         .thenReturn(
             new LeitungViewDto(
                 true, List.of(ol), List.of(bereich), List.of(squadron), List.of(sk)));
@@ -289,7 +289,7 @@ class LeitungPagePatternRenderTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void rendersTheEmptyState() throws Exception {
-    when(backendApiClient.get("/api/v1/leitung/view", LeitungViewDto.class))
+    when(backendApiClient.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
         .thenReturn(new LeitungViewDto(false, List.of(), List.of(), List.of(), List.of()));
 
     String html = render(get("/organisation/leitung"));

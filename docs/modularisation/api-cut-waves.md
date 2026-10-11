@@ -12,14 +12,14 @@
 | --- | --- | --- |
 | Documented operations / paths | 572 / 440 | **567 / 434** (`openapi.json`) |
 | Tiers | — | **T0 4, T1 244, T2 319** (`x-contract-tier`) |
-| Operations the cut touches | 161 (74 app-frozen) | **188 (77 app-called)**: 182 path moves and deletions plus 6 operations that change a shape (§ 5), among them the 2 kommando-group writes of wave 2 (Q-8); the 4 quality-tier admin operations of ADR-0241, the 14 exchange-administration operations (D-12) and the 2 sync-report operations are inside the 182 |
+| Operations the cut touches | 161 (74 app-frozen) | **188 (77 app-called)**: 184 path moves and deletions plus 4 operations that change a shape (§ 5); the 4 quality-tier admin operations of ADR-0241, the 14 exchange-administration operations (D-12), the 2 sync-report operations and the 2 kommando-group writes (Q-8) are inside the 184 |
 | Machinery | planned | **built**: G-01 … G-08 and G-23 guards, the generated edge map (REQ-API-021), the ledger `declared-breaks.txt` (empty), `retired-operations.txt` (empty, answers `410 APP_UPDATE_REQUIRED`), the release-bound floor (REQ-API-020; `application.yml` 17 / 17), the app call lists (`app-calls/18.txt` = app v0.5.0, `unreleased.txt` = 245 calls) |
 | App | v0.3.1 | **v0.5.0 (versionCode 18)** published 2026-10-03, with the policy re-read on resume (basetool-android#209, merged); the next build is **19** |
 | Backend layout | layer packages | controllers live in `<module>/web` for 13 modules (e.g. `mission/web/MissionController`, `bank/web/…`); the rest still in `controller` |
 | Frontend | one `BackendApiClient` | **typed clients per domain** (`<domain>/client/*BackendClient`): the path strings of a domain are in one class, plus a few page controllers that still hold literals |
 
 The machine-readable map is [`api-cut-map.txt`](../../backend/src/test/resources/api/api-cut-map.txt):
-`<wave> <VERB> <old path> <new path|-> <tier> <app|->`, one line per operation, 182 lines for the
+`<wave> <VERB> <old path> <new path|-> <tier> <app|->`, one line per operation, 184 lines for the
 path moves and deletions (the shape changes are in § 5). `ApiCutMapTest` (built with wave 1)
 holds the committed document to it: every line is in exactly one of its two states, and a wave that
 has landed has no old path left.
@@ -76,19 +76,18 @@ app v0.5.0 (`app-calls/18.txt`). The order is the appendix order, risk and app i
 | Wave | Content | Operations | T1 | App-called | App release |
 | --- | --- | ---: | ---: | ---: | --- |
 | 1 | web-only: admin sub-trees, exchange administration (D-12), quality tiers (ADR-0241), sync reports, notification rules, hangar admin, three deletions | 68 | 0 | 0 | none |
-| 2 | identity and org units: member-scoped moves out of `/users` and `/me`, the hierarchy fold, the Leitung view | 28 | 10 | 9 | 19 |
+| 2 | identity and org units: member-scoped moves out of `/users` and `/me`, the hierarchy fold, the Leitung view, the kommando-group writes under their squadron | 30 | 10 | 9 | 19 |
 | 3 | mission: nested finance ledger, `/slim` dropped, search folded, two dead writes deleted, mission views as filters | 36 | 29 | 29 | 19 |
 | 4 | bank: `/org-units/bank/**` to `/bank/org-units/**` | 29 | 24 | 24 | 19 |
 | 5 | job orders and game items | 7 | 3 | 3 | 19 |
 | 6 | the small rest: Materialbörse, announcement, fleetview import deleted | 14 | 9 | 9 | 19 |
-| | **Path moves and deletions** | **182** | **75** | **74** | |
+| | **Path moves and deletions** | **184** | **75** | **74** | |
 
 Reconciliation with the inventory (wave 1: 50 + 14 exchange + 4 quality tier = 68; waves 2 to 6:
-30/9, 36/29, 30/24, 7/3, 17/12): the inventory's 188 operations are the 182 map lines plus six
-operations that change a shape and not a path (§ 5): the two kommando-group writes (wave 2,
-web-only, Q-8), the balance-target write (wave 4) and the typed settings read and the two
-refinery writes (wave 6). Its 77 app-called operations are the 74 above plus the balance-target
-write, the settings read and the refinery create. Wave 6 differs by one app-called operation from
+30/9, 36/29, 30/24, 7/3, 17/12): the inventory's 188 operations are the 184 map lines plus four
+operations that change a shape and not a path (§ 5): the balance-target write (wave 4) and the typed
+settings read and the two refinery writes (wave 6). Its 77 app-called operations are the 74 above plus
+the balance-target write, the settings read and the refinery create. Wave 6 differs by one app-called operation from
 the inventory's 12 (map 9 plus settings and refinery create = 11); the wave 6 pull request settles
 it against the call list.
 

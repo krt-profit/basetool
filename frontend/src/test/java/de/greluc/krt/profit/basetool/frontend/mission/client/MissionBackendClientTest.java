@@ -184,7 +184,7 @@ class MissionBackendClientTest {
     backend.expect("GET", M + "/finance-entries?size=200");
     backend.expect("GET", "/api/v1/refinery-orders/mission/" + ID);
     backend.expect("GET", "/api/v1/inventory/mission/" + ID);
-    backend.expect("GET", "/api/v1/users/me/pickable-org-units");
+    backend.expect("GET", "/api/v1/org-units/me/pickable");
     backend.expect("GET", M + "/participants/unassigned");
     backend.expect("GET", "/api/v1/settings/refinery.rounding.mode");
   }

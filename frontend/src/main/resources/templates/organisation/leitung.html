@@ -309,7 +309,7 @@
                                     </thead>
                                     <tbody>
                                         <tr th:each="g : ${u.groups()}" class="leitung-group"
-                                            th:data-group-id="${g.id()}" th:data-group-version="${g.version()}" th:data-group-sort="${g.sortIndex()}">
+                                            th:data-group-id="${g.id()}" th:data-unit-id="${u.id()}" th:data-group-version="${g.version()}" th:data-group-sort="${g.sortIndex()}">
                                             <td>
                                                 <input th:if="${u.canManageRoster()}" type="text" class="leitung-group-name" maxlength="100"
                                                        th:value="${g.name()}" th:data-original="${g.name()}" th:aria-label="#{leitung.groups.name}"/>

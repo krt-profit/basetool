@@ -246,7 +246,7 @@ it preserves the surrounding guarantees:
   single unit applies — no owner is marked.
 
 The flag is self-service: the user reads / sets it through `GET` / `PUT
-/api/v1/users/me/blueprint-sharing` (JWT-scoped, optimistic-locked), saved in place on the
+/api/v1/blueprints/me/sharing` (JWT-scoped, optimistic-locked), saved in place on the
 profile page (REQ-FE-001) next to the payout preference. The two aggregations union the opted-in
 users' `owner_user_id`s into their org-unit member set before counting; an owner who is both a member
 and a global sharer is counted once.

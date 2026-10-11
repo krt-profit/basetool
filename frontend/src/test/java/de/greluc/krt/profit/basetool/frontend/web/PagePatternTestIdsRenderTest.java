@@ -208,7 +208,8 @@ class PagePatternTestIdsRenderTest {
             Boolean.FALSE);
     when(backendApiClient.get(eq("/api/v1/users?sort=username,asc"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(member), 0, 20, 1L, 1, List.of("username,asc")));
-    when(backendApiClient.get(eq("/api/v1/users/{id}/memberships"), anyTypeRef(), eq(MEMBER_ID)))
+    when(backendApiClient.get(
+            eq("/api/v1/org-units/members/{id}/memberships"), anyTypeRef(), eq(MEMBER_ID)))
         .thenReturn(List.of());
 
     String html = render("/members", "ADMIN");

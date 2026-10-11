@@ -79,7 +79,7 @@ class DashboardBackendClientTest {
     assertThat(client.myOrgUnitIds()).containsExactly(ID);
 
     backend.expect("GET", "/api/v1/users/me");
-    backend.expect("GET", "/api/v1/users/me/org-unit-ids");
+    backend.expect("GET", "/api/v1/org-units/me/ids");
   }
 
   @Test
@@ -104,7 +104,7 @@ class DashboardBackendClientTest {
 
     backend.expect("GET", "/api/v1/announcement");
     backend.expect("GET", "/api/v1/announcement");
-    backend.expect("PUT", "/api/v1/users/me/read-announcement/" + ID, null);
+    backend.expect("PUT", "/api/v1/announcements/" + ID + "/read", null);
     backend.expect("GET", "/api/v1/announcement/admin");
     backend.expect("PUT", "/api/v1/announcement", "{\"content\":\"Neu\",\"version\":null}");
     backend.expect("DELETE", "/api/v1/announcement", null);

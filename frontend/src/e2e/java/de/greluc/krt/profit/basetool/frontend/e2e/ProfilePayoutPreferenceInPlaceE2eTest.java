@@ -165,15 +165,15 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
 
   /**
    * Reads the test user's currently persisted default payout preference straight from the backend
-   * ({@code GET /api/v1/users/me/payout-preference}, which returns {@code defaultPayoutPreference}
-   * plus the user-row version), so the persistence assertion does not race the client's in-place
-   * writeback.
+   * ({@code GET /api/v1/missions/me/payout-preference}, which returns {@code
+   * defaultPayoutPreference} plus the user-row version), so the persistence assertion does not race
+   * the client's in-place writeback.
    *
    * @return the persisted {@code defaultPayoutPreference} enum name (e.g. {@code PAYOUT})
    */
   private static String persistedPayoutPreference() {
     String body =
-        new BackendSeeder().getBody(USERNAME, PASSWORD, "/api/v1/users/me/payout-preference");
+        new BackendSeeder().getBody(USERNAME, PASSWORD, "/api/v1/missions/me/payout-preference");
     return JsonParser.parseString(body)
         .getAsJsonObject()
         .get("defaultPayoutPreference")

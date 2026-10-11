@@ -79,7 +79,7 @@ class LeitungPageControllerTest {
     LeitungPageController controller =
         new LeitungPageController(new LeadershipBackendClient(backend));
     LeitungViewDto view = emptyView();
-    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(view);
+    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class)).thenReturn(view);
     Model model = new ConcurrentModel();
 
     String result = controller.leitung(null, null, null, model);
@@ -95,7 +95,7 @@ class LeitungPageControllerTest {
     BackendApiClient backend = mock(BackendApiClient.class);
     LeitungPageController controller =
         new LeitungPageController(new LeadershipBackendClient(backend));
-    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(emptyView());
+    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class)).thenReturn(emptyView());
     Model model = new ConcurrentModel();
 
     String result = controller.leitung("leitungSections", null, null, model);
@@ -131,7 +131,7 @@ class LeitungPageControllerTest {
         new LeitungPageController(new LeadershipBackendClient(backend));
     UUID squadron = UUID.randomUUID();
     UUID sk = UUID.randomUUID();
-    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class))
+    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
         .thenReturn(
             new LeitungViewDto(
                 false,
@@ -159,7 +159,7 @@ class LeitungPageControllerTest {
     UUID bereich = UUID.randomUUID();
     UUID squadron = UUID.randomUUID();
     UUID sk = UUID.randomUUID();
-    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(emptyView());
+    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class)).thenReturn(emptyView());
     when(backend.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
@@ -197,7 +197,7 @@ class LeitungPageControllerTest {
     BackendApiClient backend = mock(BackendApiClient.class);
     LeitungPageController controller =
         new LeitungPageController(new LeadershipBackendClient(backend));
-    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(emptyView());
+    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class)).thenReturn(emptyView());
     when(backend.get("/api/v1/org-chart", OrgChartDto.class))
         .thenThrow(new BackendServiceException("down", null, 503));
     Model model = new ConcurrentModel();
@@ -218,7 +218,7 @@ class LeitungPageControllerTest {
     UUID leadOnly = UUID.randomUUID();
     UUID pilot = UUID.randomUUID();
     UUID lead = UUID.randomUUID();
-    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class))
+    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
         .thenReturn(
             new LeitungViewDto(
                 false,
@@ -280,7 +280,7 @@ class LeitungPageControllerTest {
     BackendApiClient backend = mock(BackendApiClient.class);
     LeitungPageController controller =
         new LeitungPageController(new LeadershipBackendClient(backend));
-    when(backend.get("/api/v1/leitung/view", LeitungViewDto.class))
+    when(backend.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
         .thenThrow(new BackendServiceException("boom", null, 503));
     Model model = new ConcurrentModel();
 
@@ -390,7 +390,7 @@ class LeitungPageControllerTest {
         new LeitungPageController(new LeadershipBackendClient(backend));
     UUID bereichId = UUID.randomUUID();
     when(backend.post(
-            eq("/api/v1/org-hierarchy/bereiche/{bereichId}/members"),
+            eq("/api/v1/org-units/bereiche/{bereichId}/members"),
             any(),
             eq(BereichMemberResponse.class),
             eq(bereichId)))
@@ -440,7 +440,7 @@ class LeitungPageControllerTest {
     assertEquals(200, response.getStatusCode().value());
     verify(backend)
         .delete(
-            "/api/v1/org-hierarchy/organisationsleitung/{olId}/members/{userId}",
+            "/api/v1/org-units/organisationsleitung/{olId}/members/{userId}",
             Void.class,
             olId,
             userId);

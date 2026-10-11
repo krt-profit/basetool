@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The member's default payout preference as {@code PUT /api/v1/users/me/payout-preference} takes
+ * The member's default payout preference as {@code PUT /api/v1/missions/me/payout-preference} takes
  * it.
  *
  * @param preference the {@code PayoutPreference} name

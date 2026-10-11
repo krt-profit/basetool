@@ -88,11 +88,13 @@ public class KommandoGroupController {
   /**
    * Renames and/or reorders a Kommandogruppe (admin, or the Staffelleiter of the group's squadron).
    *
+   * @param squadronId the Staffel the group must belong to; a group of another Staffel is not
+   *     found.
    * @param groupId the group to update; never {@code null}.
    * @param request the update payload (name + sort index + version); never {@code null}.
    * @return the persisted group with the bumped version.
    */
-  @PutMapping("/api/v1/kommando-groups/{groupId}")
+  @PutMapping("/api/v1/squadrons/{squadronId}/kommando-groups/{groupId}")
   @PreAuthorize(
       "hasRole('"
           + Roles.ADMIN
@@ -100,7 +102,10 @@ public class KommandoGroupController {
           + " authentication)")
   @Operation(summary = "Rename / reorder a Kommandogruppe (admin or the squadron's Staffelleiter)")
   public KommandoGroupDto update(
-      @PathVariable @NotNull UUID groupId, @RequestBody @Valid UpdateKommandoGroupRequest request) {
+      @PathVariable @NotNull UUID squadronId,
+      @PathVariable @NotNull UUID groupId,
+      @RequestBody @Valid UpdateKommandoGroupRequest request) {
+    kommandoGroupService.requireGroupOf(squadronId, groupId);
     return kommandoGroupService.updateGroup(groupId, request);
   }
 
@@ -108,16 +113,19 @@ public class KommandoGroupController {
    * Deletes a Kommandogruppe (admin, or the Staffelleiter of the group's squadron). Rejected while
    * the group still has assigned members.
    *
+   * @param squadronId the Staffel the group must belong to; a group of another Staffel is not
+   *     found.
    * @param groupId the group to delete; never {@code null}.
    */
-  @DeleteMapping("/api/v1/kommando-groups/{groupId}")
+  @DeleteMapping("/api/v1/squadrons/{squadronId}/kommando-groups/{groupId}")
   @PreAuthorize(
       "hasRole('"
           + Roles.ADMIN
           + "') or @orgRoleManagementSecurityService.canManageKommandoGroup(#groupId,"
           + " authentication)")
   @Operation(summary = "Delete a Kommandogruppe (admin or the squadron's Staffelleiter)")
-  public void delete(@PathVariable @NotNull UUID groupId) {
+  public void delete(@PathVariable @NotNull UUID squadronId, @PathVariable @NotNull UUID groupId) {
+    kommandoGroupService.requireGroupOf(squadronId, groupId);
     kommandoGroupService.deleteGroup(groupId);
   }
 }

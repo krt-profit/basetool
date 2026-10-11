@@ -42,7 +42,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Pins BE-PERF-06: the slim picker searches {@code /api/v1/users/search/references} and {@code
- * /api/v1/users/search-bank/references} carry exactly the role gates of their full-DTO twins
+ * /api/v1/bank/members/search/references} carry exactly the role gates of their full-DTO twins
  * ({@code /search}, {@code /search-bank}) and return only the reference projection — no e-mail, no
  * roles, no membership flags, so nothing a peer view would have to redact.
  */
@@ -66,10 +66,10 @@ class UserReferenceSearchTest {
     "/api/v1/users/search/references, ROLE_BANK_EMPLOYEE, 403",
     "/api/v1/users/search/references, ROLE_KRT_MEMBER, 200",
     "/api/v1/users/search/references, ROLE_OFFICER, 200",
-    "/api/v1/users/search-bank/references, ROLE_NO_ROLE, 403",
-    "/api/v1/users/search-bank/references, ROLE_BANK_EMPLOYEE, 200",
-    "/api/v1/users/search-bank/references, ROLE_KRT_MEMBER, 200",
-    "/api/v1/users/search-bank/references, ROLE_OFFICER, 200",
+    "/api/v1/bank/members/search/references, ROLE_NO_ROLE, 403",
+    "/api/v1/bank/members/search/references, ROLE_BANK_EMPLOYEE, 200",
+    "/api/v1/bank/members/search/references, ROLE_KRT_MEMBER, 200",
+    "/api/v1/bank/members/search/references, ROLE_OFFICER, 200",
   })
   void gatesMatchTheFullDtoTwins(String path, String role, int expected) throws Exception {
     mockMvc
@@ -84,7 +84,7 @@ class UserReferenceSearchTest {
         .perform(get("/api/v1/users/search/references").param("query", "x"))
         .andExpect(status().isUnauthorized());
     mockMvc
-        .perform(get("/api/v1/users/search-bank/references").param("query", "x"))
+        .perform(get("/api/v1/bank/members/search/references").param("query", "x"))
         .andExpect(status().isUnauthorized());
   }
 

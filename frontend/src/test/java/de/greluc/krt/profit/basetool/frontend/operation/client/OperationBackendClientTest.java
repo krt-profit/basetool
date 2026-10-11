@@ -117,7 +117,7 @@ class OperationBackendClientTest {
     assertThat(client.payouts(ID)).isNotNull();
     assertThat(client.missionFinance(ID, MISSION)).isNotNull();
 
-    backend.expect("GET", "/api/v1/users/me/pickable-org-units");
+    backend.expect("GET", "/api/v1/org-units/me/pickable");
     backend.expect("GET", O);
     backend.expect(
         "GET",

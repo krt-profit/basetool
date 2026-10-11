@@ -371,8 +371,7 @@ public class MissionBackendClient {
    */
   @Nullable
   public List<OrgUnitMembershipOptionDto> pickableOrgUnits() {
-    return backendApiClient.get(
-        "/api/v1/users/me/pickable-org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+    return backendApiClient.get("/api/v1/org-units/me/pickable", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
   }
 
   /**

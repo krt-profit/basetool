@@ -393,14 +393,6 @@ public class SecurityConfig {
                     .hasRole(Roles.ADMIN)
                     .requestMatchers("/api/v1/users/search", "/api/v1/users/search/references")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
-                    .requestMatchers(
-                        "/api/v1/users/search-bank", "/api/v1/users/search-bank/references")
-                    .hasAnyRole(
-                        Roles.ADMIN,
-                        Roles.OFFICER,
-                        Roles.KRT_MEMBER,
-                        Roles.BANK_MANAGEMENT,
-                        Roles.BANK_EMPLOYEE)
                     .requestMatchers("/api/v1/users/lookup")
                     .hasAnyRole(
                         Roles.ADMIN,
@@ -416,8 +408,6 @@ public class SecurityConfig {
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
                     .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
                     .hasRole(Roles.ADMIN)
-                    .requestMatchers(HttpMethod.GET, "/api/v1/users/*/memberships")
-                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE)
                     .requestMatchers("/api/v1/users/**")
                     .hasRole(Roles.ADMIN)
                     .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships")

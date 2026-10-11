@@ -243,7 +243,7 @@ MDC alias was removed in the rename-soak cleanup release.)
 The frontend sends `X-Active-Org-Unit-Id` on every outbound call; the backend reads it to scope
 staffel-scoped queries (an admin pin directly, a non-admin pin only when it matches a membership).
 The selection lives in the Redis-backed Spring Session under `iridium.activeOrgUnitId`, set via
-`POST /me/active-org-unit` and read back via `GET /api/v1/me/active-org-unit`. (The pre-R5.e
+`POST /me/active-org-unit` and read back via `GET /api/v1/org-units/me/active`. (The pre-R5.e
 `X-Active-Squadron-Id` header, the `iridium.activeSquadronId` session key, and the
 `/active-squadron` endpoints were removed in the rename-soak cleanup release.)
 
@@ -385,9 +385,9 @@ so the system is byte-identical to today's flat behaviour while the hierarchy is
 - [x] With every `parent_org_unit_id` NULL and no leadership flags set, `OwnerScopeService` scope output
   is byte-identical to pre-change (snapshot test).
 - [x] An ADMIN-only management UI (`/admin/org-structure`) creates Bereiche and the Organisationsleitung
-  and sets the parent edges (Staffel/SK → Bereich, Bereich → OL) over the existing `/api/v1/org-hierarchy`
+  and sets the parent edges (Staffel/SK → Bereich, Bereich → OL) over the existing `/api/v1/org-units`
   API, reading the whole structure — each unit's current parent and optimistic-lock version — from a
-  single `GET /api/v1/org-hierarchy/org-units`. Leadership seating stays on the org chart (REQ-ORG-026).
+  single `GET /api/v1/org-units`. Leadership seating stays on the org chart (REQ-ORG-026).
 
 **Enforced by:** `OrgHierarchyMigrationTest` (V164: the two new kinds, the `parent_org_unit_id` column +
 its kind-pairing parent trigger, the OL-has-no-parent CHECK, `ddl-auto=validate` at boot), and
@@ -523,7 +523,7 @@ extended:
   officers; the only widening is the caller ≠ target create-on-behalf paths (book-out/transfer, store).
 - [ ] The ownerless `NULL` path behaves exactly as REQ-ORG-009.
 - [x] The create-form pickers surface the Bereich/OL tiers in the UI: the Mission/Operation/Refinery/
-  Inventory **owning** picker (cascade-scoped via `/api/v1/users/me/pickable-org-units`, Phase 5) and
+  Inventory **owning** picker (cascade-scoped via `/api/v1/org-units/me/pickable`, Phase 5) and
   the Job Order **requesting** (Auftraggeber) picker (every active unit via
   `/api/v1/org-units/active-all-kinds`; since ADR-0149 the order form has no anonymous caller, so
   the Staffel/SK-only `/api/v1/org-units/active` catalogue is its degradation path rather than a
@@ -554,7 +554,7 @@ read/edit lock); existing picker-resolver + per-aggregate stamping/visibility te
    SK's `parent_org_unit_id` wherever it is needed (e.g. the org chart), so there is no separate
    membership row to keep in sync and no stale seat on demotion or SK re-parenting. (An admin may
    still grant such a user an *explicit, flagged* Bereichsleitung role via
-   `POST /api/v1/org-hierarchy/bereiche/{id}/members` — that is an additive, reach-bearing grant,
+   `POST /api/v1/org-units/bereiche/{id}/members` — that is an additive, reach-bearing grant,
    independent of the derived organisational seat.)
 3. **Bereichsleitung members** (`is_bereichsleiter`/`koordinator`/`operator`) belong to **no Staffel**.
 4. **OL members** (`is_ol_member`) belong to **no Staffel**, but **may** belong to a Bereich.
@@ -568,7 +568,7 @@ must not be able to violate them. `membership.kind` and the trigger-synced flags
 
 An admin assigns the (up to two) Staffeln on the **member-edit page**: two fixed Staffel slots, each
 with its own Logistician / Mission-Manager flags, are folded into the `staffeln` list of the single
-membership-delta `PATCH /api/v1/users/{id}/memberships` and **reconciled** against the user's current
+membership-delta `PATCH /api/v1/org-units/members/{id}/memberships` and **reconciled** against the user's current
 Staffel memberships by `OrgUnitMembershipService.reconcileStaffelMemberships` — squadrons are added /
 removed and per-squadron flags patched in one transaction (removals are deleted before any insert so
 the ≤2 counting trigger never miscounts a re-point). The legacy per-flag query-param toggle endpoints
@@ -579,7 +579,7 @@ When a reconcile grants a previously membership-less user their first Staffel(n)
 ownerless-personal inventory adopts the **name-sorted primary** of the newly added Staffeln — not
 whichever the client listed first — matching the same primary every other surface derives. The
 admin member-edit form only sends the `staffeln` set when the authoritative per-Staffel detail
-(`GET /api/v1/users/{id}/memberships/detail`, which carries each Staffel's own flags) loaded on the
+(`GET /api/v1/org-units/members/{id}/memberships/detail`, which carries each Staffel's own flags) loaded on the
 edit-form GET; if that fetch failed the two slots render blank with a notice and the save **skips**
 the Staffel reconcile entirely, so a transient detail outage can never be misread as "remove every
 Staffel" and silently strip the member's memberships.
@@ -611,7 +611,7 @@ dropped to one:
   honours an active pin: a two-Staffel user with no explicit picker output but a pin onto one of their
   own org units is stamped to the pinned unit; with no pin it still 400s "owningOrgUnitId is required"
   so the create form forces an explicit choice (the owner picker lists **both** Staffeln, sourced from
-  `/api/v1/users/{id}/memberships` / `/me/pickable-org-units`). A single-stamp is never silent. The
+  `/api/v1/org-units/members/{id}/memberships` / `/me/pickable-org-units`). A single-stamp is never silent. The
   same "pin, else choose" applies to promotion topic / rank-requirement create, which additionally
   reject a two-Staffel officer who has not pinned (`hasAmbiguousStaffelContext`).
 - The single-Staffel `PATCH /api/v1/users/{id}/squadron` admin endpoint (and its destructive

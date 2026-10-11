@@ -63,7 +63,7 @@ class ApiCutMapTest {
               + "|orders/[^/]+/inventory/.*|missions/[^/]+/participants/add"
               + "|users/me/(payout-preference|blueprint-sharing|read-announcement/.*"
               + "|memberships|pickable-org-units|org-unit-ids)"
-              + "|orders/item-catalog.*|inventory/item-catalog)$");
+              + "|orders/item-catalog.*|inventory/item-catalog|kommando-groups/.*)$");
 
   /** The verbs the document and the map use. */
   private static final Set<String> VERBS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE");
@@ -97,7 +97,7 @@ class ApiCutMapTest {
   void theMapParses() throws IOException {
     List<Entry> entries = map();
 
-    assertThat(entries).hasSizeGreaterThanOrEqualTo(182);
+    assertThat(entries).hasSizeGreaterThanOrEqualTo(184);
     assertThat(entries).allSatisfy(e -> assertThat(e.wave()).isBetween(1, 6));
     assertThat(entries).allSatisfy(e -> assertThat(VERBS).contains(e.verb()));
     assertThat(entries).allSatisfy(e -> assertThat(e.tier()).isIn("T1", "T2"));
@@ -272,7 +272,7 @@ class ApiCutMapTest {
    */
   private static Set<String> appCalls() throws IOException {
     Set<String> calls = new HashSet<>();
-    for (String line : lines("/api/app-calls/18.txt")) {
+    for (String line : lines("/api/api-cut-app-calls-baseline.txt")) {
       String[] f = line.split(" ");
       calls.add(f[0] + " " + f[1]);
     }

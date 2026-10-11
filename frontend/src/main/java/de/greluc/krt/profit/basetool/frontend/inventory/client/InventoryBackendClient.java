@@ -555,7 +555,9 @@ public class InventoryBackendClient {
   @Nullable
   public List<OrgUnitMembershipOptionDto> memberships(@NotNull UUID userId) {
     return backendApiClient.get(
-        "/api/v1/users/{id}/memberships?allKinds=true", ORG_UNIT_MEMBERSHIP_OPTION_LIST, userId);
+        "/api/v1/org-units/members/{id}/memberships?allKinds=true",
+        ORG_UNIT_MEMBERSHIP_OPTION_LIST,
+        userId);
   }
 
   /**
@@ -565,8 +567,7 @@ public class InventoryBackendClient {
    */
   @Nullable
   public List<OrgUnitMembershipOptionDto> pickableOrgUnits() {
-    return backendApiClient.get(
-        "/api/v1/users/me/pickable-org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+    return backendApiClient.get("/api/v1/org-units/me/pickable", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
   }
 
   /**

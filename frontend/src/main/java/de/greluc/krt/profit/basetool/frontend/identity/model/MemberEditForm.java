@@ -30,8 +30,8 @@ import org.springframework.format.annotation.DateTimeFormat;
  *
  * <p>A member may belong to up to two Staffeln (REQ-ORG-017), modelled as two fixed slots ({@code
  * staffel1*} / {@code staffel2*}) with per-squadron flags (REQ-SEC-005). The controller folds the
- * non-empty slots into one {@code PATCH /api/v1/users/{id}/memberships}; clearing both removes
- * every Staffel membership.
+ * non-empty slots into one {@code PATCH /api/v1/org-units/members/{id}/memberships}; clearing both
+ * removes every Staffel membership.
  *
  * @param rank pay-grade rank (1-20)
  * @param description profile description

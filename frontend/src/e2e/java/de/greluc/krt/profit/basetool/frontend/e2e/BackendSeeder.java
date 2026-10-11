@@ -1808,8 +1808,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Creates a {@code BEREICH} OrgUnit via {@code POST /api/v1/org-hierarchy/bereiche} and returns
-   * its id (REQ-ORG-014).
+   * Creates a {@code BEREICH} OrgUnit via {@code POST /api/v1/org-units/bereiche} and returns its
+   * id (REQ-ORG-014).
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -1822,14 +1822,13 @@ public final class BackendSeeder {
     return seedEntity(
         adminUser,
         adminPassword,
-        "/api/v1/org-hierarchy/bereiche",
+        "/api/v1/org-units/bereiche",
         "{\"name\":\"" + name + "\",\"shorthand\":\"" + shorthand + "\"}");
   }
 
   /**
-   * Grants a user a Bereichsleitung role via {@code POST
-   * /api/v1/org-hierarchy/bereiche/{id}/members} (REQ-ORG-017). The user must hold no Staffel
-   * membership.
+   * Grants a user a Bereichsleitung role via {@code POST /api/v1/org-units/bereiche/{id}/members}
+   * (REQ-ORG-017). The user must hold no Staffel membership.
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -1843,7 +1842,7 @@ public final class BackendSeeder {
     postBody(
         adminUser,
         adminPassword,
-        "/api/v1/org-hierarchy/bereiche/" + bereichId + "/members",
+        "/api/v1/org-units/bereiche/" + bereichId + "/members",
         "{\"userId\":\"" + userId + "\",\"role\":\"" + role + "\"}");
   }
 
@@ -2265,8 +2264,8 @@ public final class BackendSeeder {
 
   /**
    * Assigns {@code targetUserId} to a Staffel with the given role flags via {@code PATCH
-   * /api/v1/users/{id}/memberships} (REQ-ORG-017). The sent Staffel set is authoritative;
-   * idempotent.
+   * /api/v1/org-units/members/{id}/memberships} (REQ-ORG-017). The sent Staffel set is
+   * authoritative; idempotent.
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -2292,7 +2291,7 @@ public final class BackendSeeder {
               + ",\"isMissionManager\":"
               + isMissionManager
               + "}]}";
-      int status = patch(token, "/api/v1/users/" + targetUserId + "/memberships", body);
+      int status = patch(token, "/api/v1/org-units/members/" + targetUserId + "/memberships", body);
       if (status < 200 || status >= 300) {
         throw new IllegalStateException(
             "Staffel membership assignment PATCH failed: HTTP " + status);
@@ -2471,8 +2470,8 @@ public final class BackendSeeder {
 
   /**
    * Assigns the IRIDIUM Staffel to the user via the membership-delta reconcile ({@code PATCH
-   * /api/v1/users/{id}/memberships}) and returns the HTTP status. The reconcile is declarative and
-   * carries no user-row version, so there is no optimistic-lock 409 to react to.
+   * /api/v1/org-units/members/{id}/memberships}) and returns the HTTP status. The reconcile is
+   * declarative and carries no user-row version, so there is no optimistic-lock 409 to react to.
    *
    * @param token bearer token
    * @param userId the app_user id to assign
@@ -2483,7 +2482,8 @@ public final class BackendSeeder {
     String body = "{\"staffeln\":[{\"squadronId\":\"" + IRIDIUM_SQUADRON_ID + "\"}]}";
     HttpRequest request =
         HttpRequest.newBuilder(
-                URI.create(BACKEND_BASE_URL + "/api/v1/users/" + userId + "/memberships"))
+                URI.create(
+                    BACKEND_BASE_URL + "/api/v1/org-units/members/" + userId + "/memberships"))
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .method("PATCH", HttpRequest.BodyPublishers.ofString(body))

@@ -267,7 +267,7 @@ class ExternalContractTest {
               "/api/v1/terms/status", "get", Set.of("accepted", "currentVersion")),
           new ContractOperation(
               "/api/v1/terms/acceptance", "post", Set.of("accepted", "currentVersion")),
-          new ContractOperation("/api/v1/me/active-org-unit", "get", Set.of("orgUnitId")),
+          new ContractOperation("/api/v1/org-units/me/active", "get", Set.of("orgUnitId")),
           new ContractOperation(
               "/api/v1/me/capabilities",
               "get",
@@ -284,7 +284,7 @@ class ExternalContractTest {
               "get",
               Set.of("version", "title", "intro", "sections", "lastUpdated")),
           new ContractOperation(
-              "/api/v1/users/me/memberships",
+              "/api/v1/org-units/me/memberships",
               "get",
               Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "kind")),
           new ContractOperation(
@@ -846,7 +846,7 @@ class ExternalContractTest {
               "get",
               Set.of("id", "outputName", "scwikiKey")),
           new ContractOperation(
-                  "/api/v1/users/search-bank",
+                  "/api/v1/bank/members/search",
                   "get",
                   Set.of(
                       "content", "totalElements", "id", "effectiveName", "displayName", "username"))
@@ -857,7 +857,7 @@ class ExternalContractTest {
               "get",
               Set.of("content", "id", "name", "ratingYield", "ratingCost", "ratingSpeed")),
           new ContractOperation(
-              "/api/v1/me/org-units",
+              "/api/v1/org-units/me/switchable",
               "get",
               Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "isProfitEligible", "kind")),
           new ContractOperation(
@@ -865,7 +865,7 @@ class ExternalContractTest {
               "get",
               Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "isProfitEligible", "kind")),
           new ContractOperation(
-                  "/api/v1/users/{id}/memberships",
+                  "/api/v1/org-units/members/{id}/memberships",
                   "get",
                   Set.of(
                       "orgUnitId", "orgUnitName", "orgUnitShorthand", "isProfitEligible", "kind"))
@@ -1468,20 +1468,18 @@ class ExternalContractTest {
               "delete",
               BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
-              "/api/v1/users/me/payout-preference",
+              "/api/v1/missions/me/payout-preference",
               "get",
               Set.of("defaultPayoutPreference", "version")),
           new ContractOperation(
-              "/api/v1/users/me/payout-preference",
+              "/api/v1/missions/me/payout-preference",
               "put",
               Set.of("defaultPayoutPreference", "version"),
               Set.of("preference", "version")),
           new ContractOperation(
-              "/api/v1/users/me/blueprint-sharing",
-              "get",
-              Set.of("shareBlueprintsGlobally", "version")),
+              "/api/v1/blueprints/me/sharing", "get", Set.of("shareBlueprintsGlobally", "version")),
           new ContractOperation(
-              "/api/v1/users/me/blueprint-sharing",
+              "/api/v1/blueprints/me/sharing",
               "put",
               Set.of("shareBlueprintsGlobally", "version"),
               Set.of("shareBlueprintsGlobally", "version")),
@@ -1493,9 +1491,7 @@ class ExternalContractTest {
               Set.of("rsiHandle", "version"),
               Set.of("version")),
           new ContractOperation(
-              "/api/v1/users/me/read-announcement/{announcementId}",
-              "put",
-              Set.of("lastReadAnnouncementId")),
+              "/api/v1/announcements/{id}/read", "put", Set.of("lastReadAnnouncementId")),
           new ContractOperation(
               "/api/v1/orders/{id}", "put", JOB_ORDER_DETAIL, Set.of("materials")),
           new ContractOperation(
@@ -1862,7 +1858,7 @@ class ExternalContractTest {
    */
   private static final Set<String> ADDRESSED_BY_NO_QUERY_PARAMETER =
       Set.of(
-          "get /api/v1/users/me/memberships",
+          "get /api/v1/org-units/me/memberships",
           "get /api/v1/refining-methods",
           "post /api/v1/personal-blueprints/import/preview",
           "post /api/v1/personal-blueprints/import/apply",

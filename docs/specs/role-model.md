@@ -167,7 +167,7 @@ branch). Only an admin sets, changes or clears their own rank; a Bereichsleiter 
 themselves Staffelleiter, a Staffelleiter cannot demote themselves to Kommandoleiter. (Since
 2026-09-27.)
 
-**What the view shows.** `GET /api/v1/leitung/view` lists the units the caller **leads and those
+**What the view shows.** `GET /api/v1/org-chart/leadership` lists the units the caller **leads and those
 below them**, independent of what they may change: a squadron rank or `SK_LEAD` shows its own unit,
 an area rank its Bereich with the Bereich's direct children (`OrgUnitCascadeService`), an
 `OL_MEMBER` seat every unit including the OL, an admin everything; a plain `MEMBER` seat shows

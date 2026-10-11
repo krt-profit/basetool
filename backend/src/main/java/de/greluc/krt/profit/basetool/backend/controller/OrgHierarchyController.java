@@ -59,7 +59,7 @@ import org.springframework.web.bind.annotation.RestController;
  * the Organisationsleitung and wiring the {@code parent_org_unit_id} edges between tiers.
  */
 @RestController
-@RequestMapping("/api/v1/org-hierarchy")
+@RequestMapping("/api/v1/org-units")
 @RequiredArgsConstructor
 @Transactional
 public class OrgHierarchyController {
@@ -147,7 +147,7 @@ public class OrgHierarchyController {
    *
    * @return the org-unit node DTOs.
    */
-  @GetMapping("/org-units")
+  @GetMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "List all org units",
@@ -167,7 +167,7 @@ public class OrgHierarchyController {
    * @return the child's id, kind, new parent id and bumped version.
    */
   @NotNull
-  @PatchMapping("/org-units/{id}/parent")
+  @PatchMapping("/{id}/parent")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Set an org unit's parent",

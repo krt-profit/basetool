@@ -1,0 +1,10 @@
+GET /api/v1/me/active-org-unit
+GET /api/v1/me/org-units
+GET /api/v1/users/me/blueprint-sharing
+PUT /api/v1/users/me/blueprint-sharing
+GET /api/v1/users/me/memberships
+GET /api/v1/users/me/payout-preference
+PUT /api/v1/users/me/payout-preference
+PUT /api/v1/users/me/read-announcement/{announcementId}
+GET /api/v1/users/search-bank
+GET /api/v1/users/{id}/memberships

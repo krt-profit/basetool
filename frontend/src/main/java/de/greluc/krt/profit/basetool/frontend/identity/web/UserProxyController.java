@@ -63,7 +63,7 @@ public class UserProxyController {
 
   /**
    * Bank-audience twin of {@link #searchUsers}, forwarding to {@code
-   * /api/v1/users/search-bank/references}, which also admits bank staff (ADR-0089).
+   * /api/v1/bank/members/search/references}, which also admits bank staff (ADR-0089).
    *
    * @param query free-text query to forward to the backend, or {@code null}/blank to match all
    * @return matching user references, never {@code null}

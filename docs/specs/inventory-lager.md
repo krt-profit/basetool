@@ -296,7 +296,7 @@ the source row's current flag, never from the client:
   to more than one org unit; a sole membership auto-stamps; a membershipless owner yields an
   ownerless shared row the reconciler promotes later, REQ-INV-004). The owner's picker lists their
   direct memberships across **all four org-unit kinds** (Staffel + SK + Bereich + OL) via
-  `GET /api/v1/users/{id}/memberships?allKinds=true`, mirroring the bank counterparty picker
+  `GET /api/v1/org-units/members/{id}/memberships?allKinds=true`, mirroring the bank counterparty picker
   (REQ-BANK-044); the resolver already accepts a Bereich/OL pool (REQ-ORG-016), so a Bereich/OL-member
   owner can book into their Bereich/OL pool, not only their Staffel/SK. The browser reaches that
   endpoint through the frontend's `/users/{id}/memberships` proxy (`UserProxyController`, which

@@ -51,7 +51,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * Admin page for defining the org hierarchy (REQ-ORG-014): creating Bereiche and the
- * Organisationsleitung and setting parent edges, via the backend {@code /api/v1/org-hierarchy} API.
+ * Organisationsleitung and setting parent edges, via the backend {@code /api/v1/org-units} API.
  *
  * <p>Writes are in-place AJAX relays that re-render the affected section through {@link #page} and
  * broadcast on the {@code org-structure} live-sync room (REQ-FE-010); backend conflicts are relayed

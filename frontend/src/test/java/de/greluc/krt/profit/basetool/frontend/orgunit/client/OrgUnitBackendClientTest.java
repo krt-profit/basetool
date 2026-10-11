@@ -103,20 +103,20 @@ class OrgUnitBackendClientTest {
         .isEqualTo(new BereichDto(UNIT, "Profit", "PRF", null, true, OL, "PROFIT", 0L));
     assertThat(ol).isEqualTo(new OrganisationsleitungDto(OL, "Leitung", "OL", null, true, 0L));
     assertThat(parent).isEqualTo(new OrgUnitParentResponse(UNIT, "BEREICH", OL, 2L));
-    backend.expect("GET", "/api/v1/org-hierarchy/org-units");
+    backend.expect("GET", "/api/v1/org-units");
     backend.expect(
         "POST",
-        "/api/v1/org-hierarchy/bereiche",
+        "/api/v1/org-units/bereiche",
         "{\"name\":\"Profit\",\"shorthand\":\"PRF\",\"description\":null,\"parentOrgUnitId\":\""
             + OL
             + "\",\"department\":\"PROFIT\"}");
     backend.expect(
         "POST",
-        "/api/v1/org-hierarchy/organisationsleitung",
+        "/api/v1/org-units/organisationsleitung",
         "{\"name\":\"Leitung\",\"shorthand\":\"OL\",\"description\":null}");
     backend.expect(
         "PATCH",
-        "/api/v1/org-hierarchy/org-units/" + UNIT + "/parent",
+        "/api/v1/org-units/" + UNIT + "/parent",
         "{\"parentOrgUnitId\":\"" + OL + "\",\"version\":1}");
   }
 

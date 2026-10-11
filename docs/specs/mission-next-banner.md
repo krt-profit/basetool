@@ -129,7 +129,7 @@ next-mission banner; the first row is the soonest upcoming mission.
   (`home.upcoming.my_unit`, the square `.chip--primary`). "Directly assigned" spans **every org-unit
   kind** — Staffel, Spezialkommando, Bereich (when the viewer is a direct member) and
   Organisationsleitung (when a direct member) — **not** only Staffeln. The set comes from the
-  kind-agnostic `GET /api/v1/users/me/org-unit-ids` self-endpoint (the caller's direct
+  kind-agnostic `GET /api/v1/org-units/me/ids` self-endpoint (the caller's direct
   `org_unit_membership` rows mapped to their org-unit ids), unioned with the Staffel ids already on
   the `/me` `UserDto` as a fallback; the mission's `owningSquadron.id` is matched against that set.
   The **leadership cascade** of the `/next` lookup (REQ-MISSION-008) is intentionally **not** applied
@@ -194,7 +194,7 @@ Amended 2026-10-04: the „Angemeldet" chip of the redesign's hand-off is built 
 `findDirectMembershipOrgUnitIds_noMemberships_returnsEmpty`),
 `UserControllerTest` (`getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService`).
 **Code:** `frontend/.../HomeController#home` (the next-7-days `/api/v1/missions/search` call + the
-`/api/v1/users/me/org-unit-ids` own-unit lookup), `templates/index.html` (the `upcomingMissions`
+`/api/v1/org-units/me/ids` own-unit lookup), `templates/index.html` (the `upcomingMissions`
 row list `.home-missions` + the `myOrgUnitIds` chip gate + the `signedUp` chip), `static/css/pages/index.css`; backend `UserController#getMyOrgUnitIds` +
 `MissionController#toListRows` + `MissionService#signedUpMissionIds` +
 `OrgUnitMembershipService#findDirectMembershipOrgUnitIds`. The mission grid reuses the existing
