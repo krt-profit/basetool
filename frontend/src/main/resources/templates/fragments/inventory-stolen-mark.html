@@ -3,7 +3,7 @@
 <body>
 
 <th:block th:fragment="stolenMarkModal(prefix)">
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='stolenMarkModal', titleKey='inventory.stolen.mark.title', titleId='stolenMarkTitle', variant='krt-modal--wide', closeTrigger=${prefix + '-close-stolen'}, body=~{fragments/inventory-stolen-mark :: stolenMarkBody(${prefix})})}"></th:block>
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='stolenMarkModal', titleKey='inventory.stolen.mark.title', titleId='stolenMarkTitle', variant='krt-modal--wide', closeTrigger=${prefix + '-close-stolen'}, body=~{fragments/inventory-stolen-mark :: stolenMarkBody(${prefix})})}"></th:block>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var stolenMarkI18n = {
         markTitle: /*[[#{inventory.stolen.mark.title}]]*/ 'Als gestohlen markieren',
@@ -30,7 +30,7 @@
         <div class="form-group mb-1">
             <label for="stolenMarkAmount" class="form-label">
                 <span th:text="#{inventory.stolen.amount}">Menge</span>
-                <th:block th:replace="~{fragments/scu-hint :: scuHint('stolen-mark-scu-hint', true)}"></th:block>
+                <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('stolen-mark-scu-hint', true)}"></th:block>
             </label>
             <div class="flex-gap-sm">
                 <input type="text" inputmode="decimal" data-scu-decimal id="stolenMarkAmount" step="0.001" min="0" required class="w-full" data-testid="stolen-mark-amount">

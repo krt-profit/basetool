@@ -47,6 +47,6 @@ public class ScLinksPageController {
   @GetMapping("/sc-links")
   public String showLinks(@NotNull Model model) {
     model.addAttribute("scLinkCategories", List.of(ScLinkCategory.values()));
-    return "sc-links";
+    return "shell/sc-links";
   }
 }

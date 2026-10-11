@@ -75,7 +75,7 @@ class SecurityConfigStaticAssetPermitAllTest {
         "/sm/abcdef123456.map",
         "/favicon.ico",
         "/robots.txt",
-        "/css/styles.css",
+        "/css/kernel/styles.css",
         "/css/does-not-exist.css.map",
         "/error/foo",
         "/manifest.webmanifest"

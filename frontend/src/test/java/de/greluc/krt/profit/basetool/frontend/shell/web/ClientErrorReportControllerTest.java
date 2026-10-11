@@ -58,7 +58,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 class ClientErrorReportControllerTest {
 
   /** The shipped beacon module, read off the test classpath to pin the client/server kind set. */
-  private static final String BEACON_MODULE = "/static/js/krt-client-error.js";
+  private static final String BEACON_MODULE = "/static/js/kernel/krt-client-error.js";
 
   /** Captures the beacon's {@code payload} object literal, which has no nested braces. */
   private static final Pattern BEACON_PAYLOAD = Pattern.compile("const payload = \\{([^}]*)\\}");

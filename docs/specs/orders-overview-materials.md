@@ -167,7 +167,7 @@ detail view.
 
 The order-overview list (`GET /orders`) MUST fetch one **server-side page** of orders instead of
 the former unbounded `size=1000` pull, rendering the shared pagination component (the `.pagination`
-page-nav + the square `.page-btn` size picker from `fragments/pagination.html`, REQ-INV-013 /
+page-nav + the square `.page-btn` size picker from `kernel/fragments/pagination.html`, REQ-INV-013 /
 REQ-API-005). The page sizes are **{50, 100, 200} with a default of 100** — a deliberate deviation
 from the shared 10/50/100 / default-50 contract — because the LOGISTICIAN drag-and-drop priority
 reorder operates on the rows of the **current page** (it derives the target priority from adjacent
@@ -191,7 +191,7 @@ live **inside** the `ordersResults` AJAX-swap fragment so a filter change re-ren
 
 **Enforced by:** `JobOrderPaginationMvcTest`, `JobOrderPageStatusFilterTest` (fetch URL) · **Code:**
 `JobOrderPageController.viewOrders` / `buildPaginationBaseUrl`, `templates/orders-index.html`,
-`templates/fragments/pagination.html` · **Issues:** #2 (performance audit)
+`templates/kernel/fragments/pagination.html` · **Issues:** #2 (performance audit)
 
 ### REQ-ORDERS-022 — Overview surfaces the responsible (processing) org unit
 

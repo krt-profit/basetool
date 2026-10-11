@@ -165,8 +165,8 @@ class StaticResourceHandlerMappingTest {
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "/css/styles.css",
-        "/js/krt-html.js",
+        "/css/kernel/styles.css",
+        "/js/kernel/krt-html.js",
         "/fonts/Lato-Regular.woff2",
         "/images/made-by-the-community.png",
         "/images/pattern.svg",
@@ -204,8 +204,8 @@ class StaticResourceHandlerMappingTest {
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "/css/styles.css",
-        "/js/krt-html.js",
+        "/css/kernel/styles.css",
+        "/js/kernel/krt-html.js",
         "/fonts/Lato-Regular.woff2",
         "/images/made-by-the-community.png",
         "/images/pattern.svg",

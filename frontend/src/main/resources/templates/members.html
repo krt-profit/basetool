@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{members.title} + ' - ' + ${appTitle}">Mitgliederverwaltung - Profit Basetool</title>
 </head>
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{members.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{members.title},
         count=${usersPage != null ? usersPage.totalElements() : null}, countId='members-count', countFor='members-results', actions=~{::members-actions})}">
         <th:block th:ref="members-actions">
             <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-                <th:block th:replace="~{fragments/components :: overflowMenu(id='members-more', items=~{::members-more-items})}">
+                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='members-more', items=~{::members-more-items})}">
                     <th:block th:ref="members-more-items">
                         <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="members-sync"
                                 data-testid="members-sync" th:title="#{members.sync.title}" th:text="#{members.sync.button}">Jetzt synchronisieren</button>
@@ -22,7 +22,7 @@
 
     <form id="members-filter-form" method="get" th:action="@{/members}" class="no-track" role="search">
         <div class="toolbar">
-            <th:block th:replace="~{fragments/components :: toolbarSearch('member-search', 'search', ${search}, 'members.search.placeholder')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('member-search', 'search', ${search}, 'members.search.placeholder')}"></th:block>
         </div>
     </form>
 
@@ -106,15 +106,15 @@
         </div>
 
         <th:block th:if="${error == null and (users == null or users.isEmpty())}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='members.empty', textKey='members.empty.text')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='members.empty', textKey='members.empty.text')}"></th:block>
         </th:block>
 
-        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${usersPage}, baseUrl='/members')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${usersPage}, baseUrl='/members')}"></th:block>
         </th:block>
     </div>
 
     <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-        <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='consolidate-modal', titleKey='members.consolidate.modal.title', variant='krt-modal--wide', body=~{::consolidate-modal-body})}">
+        <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='consolidate-modal', titleKey='members.consolidate.modal.title', variant='krt-modal--wide', body=~{::consolidate-modal-body})}">
             <th:block th:ref="consolidate-modal-body">
                 <div class="krt-modal-body">
                     <label for="consolidate-target" th:text="#{members.consolidate.modal.targetLabel}">Konto, das bleibt</label>
@@ -132,7 +132,7 @@
         </th:block>
     </th:block>
 </main>
-<script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/kernel/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const MSG_DELETE_TITLE = /*[[#{members.delete.title}]]*/ "";
     const MSG_DELETE_CONFIRM = /*[[#{members.delete_confirm}]]*/ "";

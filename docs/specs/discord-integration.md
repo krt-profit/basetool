@@ -161,7 +161,7 @@ second time for the nickname. All Discord calls of the provider JAR share one `H
 - [x] The gate makes exactly one Discord call per first login; the precheck's nickname comes from
   that call's member object (`DiscordGuildRoleGateAuthenticatorTest`).
 
-**Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `DiscordGuildRoleGateAuthenticatorTest` (exactly one Discord call per first login) · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `fragments/sidebar.html`, `fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
+**Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `DiscordGuildRoleGateAuthenticatorTest` (exactly one Discord call per first login) · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `kernel/fragments/sidebar.html`, `kernel/fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
 
 ### REQ-SEC-071 — A Discord login that returns to the wrong browser ends on a page with a way back
 

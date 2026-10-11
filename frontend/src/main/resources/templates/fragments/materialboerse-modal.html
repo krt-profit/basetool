@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="de">
 <body>
 <th:block th:fragment="releaseModal">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='mb-modal', titleKey='materialboerse.modal.release.title', variant='krt-modal--wide', titleId='mb-modal-title', closeTrigger='', closeClass='mb-modal-close', body=~{fragments/materialboerse-modal :: mb-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='mb-modal', titleKey='materialboerse.modal.release.title', variant='krt-modal--wide', titleId='mb-modal-title', closeTrigger='', closeClass='mb-modal-close', body=~{fragments/materialboerse-modal :: mb-modal-body})}">
         <th:block th:ref="mb-modal-body">
             <div class="krt-modal-body">
                 <div class="mb-modal-picker" data-mb-picker hidden>

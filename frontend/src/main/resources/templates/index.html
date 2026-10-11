@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="${appTitle}">Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -53,7 +53,7 @@
                 </li>
             </ul>
             <th:block th:if="${#lists.isEmpty(upcomingMissions)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='home.upcoming.empty', textKey='home.upcoming.empty.text', actionHref='/missions', actionKey='home.upcoming.all')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='home.upcoming.empty', textKey='home.upcoming.empty.text', actionHref='/missions', actionKey='home.upcoming.all')}"></th:block>
             </th:block>
         </section>
 
@@ -96,7 +96,7 @@
         </div>
     </div>
 
-    <th:block th:replace="~{fragments/fankit :: band}" />
+    <th:block th:replace="~{shell/fragments/fankit :: band}" />
 
 </main>
 <script th:src="@{/js/index.js}" defer th:attr="nonce=${cspNonce}"></script>

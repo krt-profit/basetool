@@ -61,7 +61,7 @@ class OssLicensesControllerTest {
     mockMvc
         .perform(get("/licenses"))
         .andExpect(status().isOk())
-        .andExpect(view().name("licenses"))
+        .andExpect(view().name("shell/licenses"))
         .andExpect(model().attribute("ossAvailable", true));
   }
 

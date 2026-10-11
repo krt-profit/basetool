@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{operations.title} + ' - ' + ${appTitle}">Operations - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.mission_planning', titleText=#{operations.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.mission_planning', titleText=#{operations.title},
         count=${operationsPage != null ? operationsPage.totalElements() : null}, countId='operations-count', countFor='operations-results', actions=~{::operations-actions})}">
         <th:block th:ref="operations-actions">
             <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)"
@@ -18,16 +18,16 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/components :: alert(type='success', msgKey=${successMessage}, extraClass=null)}"></th:block>
-    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${errorMessage}, extraClass=null)}"></th:block>
-    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass=null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: alert(type='success', msgKey=${successMessage}, extraClass=null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: alert(type='danger', msgKey=${errorMessage}, extraClass=null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: alert(type='danger', msgKey=${error}, extraClass=null)}"></th:block>
 
     <form id="operations-filter-form" method="get" th:action="@{/operations}" class="no-track">
         <div class="toolbar">
-            <th:block th:replace="~{fragments/components :: toolbarSearch('operation-search', 'search', ${search}, 'operation.search.placeholder')}"></th:block>
-            <th:block th:replace="~{fragments/components :: segmented(name='period', labelKey='mission.period.label', selected=${period},
+            <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('operation-search', 'search', ${search}, 'operation.search.placeholder')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='period', labelKey='mission.period.label', selected=${period},
                 options=${ {{value: 'UPCOMING', labelKey: 'mission.period.upcoming'}, {value: 'PAST', labelKey: 'mission.period.past'}, {value: 'ALL', labelKey: 'filter.all'}} })}"></th:block>
-            <th:block th:replace="~{fragments/components :: filterPopover(panelId='operations-filter-panel', panelName='operations',
+            <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='operations-filter-panel', panelName='operations',
                 testid='operations-filter-toggle', body=~{::operations-filter-body})}">
                 <th:block th:ref="operations-filter-body">
                     <div class="datetime-split-group" data-datetime-filter-role="start">
@@ -51,7 +51,7 @@
             </th:block>
             <span id="operations-loading-indicator" hidden><span class="krt-loading-indicator"></span></span>
         </div>
-        <th:block th:replace="~{fragments/components :: filterChips('operations-filter-form')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: filterChips('operations-filter-form')}"></th:block>
     </form>
 
     <div id="operations-results" class="card card--flush">
@@ -102,14 +102,14 @@
         </div>
 
         <th:block th:if="${operations == null or operations.isEmpty()}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='operation.empty', textKey='operation.empty.text')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='operation.empty', textKey='operation.empty.text')}"></th:block>
         </th:block>
 
-        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${operationsPage}, baseUrl='/operations')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${operationsPage}, baseUrl='/operations')}"></th:block>
         </th:block>
     </div>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='create-operation-modal', titleKey='operation.create', variant='krt-modal--wide', body=~{::create-operation-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='create-operation-modal', titleKey='operation.create', variant='krt-modal--wide', body=~{::create-operation-modal-body})}">
         <th:block th:ref="create-operation-modal-body">
             <form id="create-operation-form" th:action="@{/operations/create}" method="post">
                 <div class="krt-modal-body">
@@ -130,7 +130,7 @@
                         <option value="CANCELED" th:text="#{operation.status.canceled}">CANCELED</option>
                     </select>
                 </div>
-                <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=false)}"></th:block>
+                <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=false)}"></th:block>
                 </div>
                 <div class="krt-modal-foot">
                     <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="create-operation-modal" th:text="#{general.cancel}">Cancel</button>
@@ -140,7 +140,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-operation-modal', titleKey='general.confirm', variant='krt-modal--danger', body=~{::delete-operation-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='delete-operation-modal', titleKey='general.confirm', variant='krt-modal--danger', body=~{::delete-operation-modal-body})}">
         <th:block th:ref="delete-operation-modal-body">
             <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
                 <div class="krt-modal-body">

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{admin.audit.title} + ' - ' + ${appTitle}">Audit-Logs - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -10,10 +10,10 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.audit.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.audit.title},
         count=${events != null ? events.totalElements() : null}, countId='audit-count', countFor='audit-results', actions=~{::audit-actions})}">
         <th:block th:ref="audit-actions">
-            <th:block th:replace="~{fragments/components :: overflowMenu(id='audit-more-menu', items=~{::audit-more-items})}">
+            <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='audit-more-menu', items=~{::audit-more-items})}">
                 <th:block th:ref="audit-more-items">
                     <button type="button" class="overflow-menu__item" role="menuitem" data-trigger="open-modal-display"
                             data-modal-id="audit-export-modal" data-testid="audit-export-open">
@@ -54,7 +54,7 @@
                             th:text="#{${eventKeyPrefix + et}}">Ereignis</option>
                 </select>
             </div>
-            <th:block th:replace="~{fragments/components :: filterPopover(panelId='audit-filter-panel', panelName='audit',
+            <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='audit-filter-panel', panelName='audit',
                 testid='audit-filter-toggle', body=~{::audit-filter-body})}">
                 <th:block th:ref="audit-filter-body">
                     <div class="datetime-split-group" data-datetime-filter-role="start">
@@ -94,7 +94,7 @@
                 </th:block>
             </th:block>
         </div>
-        <th:block th:replace="~{fragments/components :: filterChips('audit-filter-form')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: filterChips('audit-filter-form')}"></th:block>
     </form>
 
     <div id="audit-results" class="card card--flush" data-testid="audit-panel">
@@ -127,14 +127,14 @@
             </table>
         </div>
         <th:block th:if="${error == null and (events == null or #lists.isEmpty(events.content()))}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.audit.empty.title', textKey='admin.audit.empty',
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.audit.empty.title', textKey='admin.audit.empty',
                 emptyId='audit-empty')}"></th:block>
         </th:block>
-        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${events}, baseUrl=${paginationBaseUrl})}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${events}, baseUrl=${paginationBaseUrl})}"></th:block>
         </th:block>
     </div>
 
-    <div th:replace="~{fragments/modal-wrapper :: modal(modalId='audit-export-modal', titleKey='admin.audit.export.title', variant=null, body=~{::.audit-download-form})}">
+    <div th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='audit-export-modal', titleKey='admin.audit.export.title', variant=null, body=~{::.audit-download-form})}">
         <form class="audit-download-form no-track"
                   th:attr="data-endpoint=${exportEndpoint},data-filename='audit-' + ${activeDomain} + '.pdf',data-period-required=#{admin.audit.export.periodRequired},data-download-error=#{admin.audit.export.error}">
                 <div class="krt-modal-body">
@@ -176,7 +176,7 @@
             </form>
     </div>
 
-    <div th:replace="~{fragments/modal-wrapper :: modal(modalId='audit-purge-modal', titleKey='admin.audit.purge.title', variant='krt-modal--danger', body=~{::.audit-purge-form})}">
+    <div th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='audit-purge-modal', titleKey='admin.audit.purge.title', variant='krt-modal--danger', body=~{::.audit-purge-form})}">
             <form class="audit-purge-form no-track"
                   th:attr="data-endpoint=${purgeEndpoint},data-period-required=#{admin.audit.purge.beforeRequired},data-delete-error=#{admin.audit.purge.error},data-success-template=#{admin.audit.purge.success}">
                 <div class="krt-modal-body">

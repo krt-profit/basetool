@@ -34,8 +34,8 @@ const source = (name) =>
         'utf8',
     );
 
-const KRT_HTML = source('krt-html.js');
-const KRT_FETCH = source('krt-fetch.js');
+const KRT_HTML = source('kernel/krt-html.js');
+const KRT_FETCH = source('kernel/krt-fetch.js');
 
 let failures = 0;
 

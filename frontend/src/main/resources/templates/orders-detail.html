@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{orders.detail.title} + ' - ' + ${appTitle}">Auftrag Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -31,7 +31,7 @@
                th:if="${isItemOrder and (order.itemHandovers == null or order.itemHandovers.isEmpty())}"
                th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit.items}">Items bearbeiten</span></a>
             <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-                <th:block th:replace="~{fragments/components :: overflowMenu(id='order-menu', items=~{::order-menu-items})}">
+                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='order-menu', items=~{::order-menu-items})}">
                     <th:block th:ref="order-menu-items">
                         <form id="delete-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
                             <button type="submit" class="overflow-menu__item overflow-menu__item--danger" role="menuitem" data-testid="order-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{orders.detail.delete}">Auftrag löschen</span></button>
@@ -179,7 +179,7 @@
         <section th:if="${order.type != 'ITEM'}" id="pane-materials" class="tab-pane" role="tabpanel" aria-labelledby="tab-materials">
         <div id="order-materials-results"><th:block th:fragment="materialsSection">
         <span hidden data-od-tab-count="materials" th:text="${order.materials != null ? order.materials.size() : 0}">0</span>
-        <th:block th:if="${order.materials == null or order.materials.isEmpty()}"><th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.detail.materials.empty.title', textKey='orders.detail.materials.empty.text')}"></th:block></th:block>
+        <th:block th:if="${order.materials == null or order.materials.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.materials.empty.title', textKey='orders.detail.materials.empty.text')}"></th:block></th:block>
         <div class="table-responsive" th:unless="${order.materials == null or order.materials.isEmpty()}">
         <table class="data-table data-table--stack od-table"
                th:with="showClaims=${order.materials != null and !order.materials.isEmpty() and order.materials[0].openAmount != null}">
@@ -272,7 +272,7 @@
         <section th:if="${order.type == 'ITEM'}" id="pane-items" class="tab-pane" role="tabpanel" aria-labelledby="tab-items">
         <div id="order-items-results"><th:block th:fragment="itemsSection">
         <span hidden data-od-tab-count="items" th:text="${order.items != null ? order.items.size() : 0}">0</span>
-        <th:block th:if="${order.items == null or order.items.isEmpty()}"><th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.detail.items.empty.title', textKey='orders.detail.items.empty.text')}"></th:block></th:block>
+        <th:block th:if="${order.items == null or order.items.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.items.empty.title', textKey='orders.detail.items.empty.text')}"></th:block></th:block>
         <div class="table-responsive" th:unless="${order.items == null or order.items.isEmpty()}">
         <table class="data-table data-table--stack od-table od-items-table">
             <thead>
@@ -400,7 +400,7 @@
         <section th:if="${order.type == 'ITEM' and !requesterView}" id="pane-aggregated" class="tab-pane" role="tabpanel" aria-labelledby="tab-aggregated">
         <div id="order-aggregated-results" th:unless="${requesterView}"><th:block th:fragment="aggregatedSection">
         <span hidden data-od-tab-count="aggregated" th:text="${order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0}">0</span>
-        <th:block th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}"><th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.detail.materials.empty.title', textKey='orders.detail.aggregated.empty')}"></th:block></th:block>
+        <th:block th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.materials.empty.title', textKey='orders.detail.aggregated.empty')}"></th:block></th:block>
         <div class="table-responsive" th:unless="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">
         <table class="data-table data-table--stack od-table"
                th:with="showClaims=${order.aggregatedMaterials != null and !order.aggregatedMaterials.isEmpty() and order.aggregatedMaterials[0].openAmount != null}">
@@ -537,7 +537,7 @@
                 </div>
             </div>
 
-            <th:block th:if="${order.assignees == null or order.assignees.isEmpty()}"><th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.detail.assignees.empty.title', textKey='orders.detail.assignees.empty')}"></th:block></th:block>
+            <th:block th:if="${order.assignees == null or order.assignees.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.assignees.empty.title', textKey='orders.detail.assignees.empty')}"></th:block></th:block>
             <ul class="od-assignee-list" th:unless="${order.assignees == null or order.assignees.isEmpty()}">
                 <li class="od-assignee" th:each="assignee : ${order.assignees}"
                     th:with="canEdit=${(currentUserId != null and assignee.user != null and currentUserId.equals(assignee.user.id)) or #authorization.expression('hasRole(''LOGISTICIAN'')')}">
@@ -612,7 +612,7 @@
               >
             </div>
 
-            <th:block th:if="${itemBlueprintOwners.owners.isEmpty()}"><th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.detail.blueprintOwners.empty.title', textKey='orders.detail.blueprintOwners.empty')}"></th:block></th:block>
+            <th:block th:if="${itemBlueprintOwners.owners.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.blueprintOwners.empty.title', textKey='orders.detail.blueprintOwners.empty')}"></th:block></th:block>
             <ul class="bp-owner-list" th:unless="${itemBlueprintOwners.owners.isEmpty()}">
               <li class="bp-owner" th:each="owner : ${itemBlueprintOwners.owners}">
                 <div class="bp-owner__head">
@@ -671,7 +671,7 @@
             <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
         </div>
 
-        <th:block th:if="${order.handovers == null or order.handovers.isEmpty()}"><th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.detail.handovers.empty.title', textKey='orders.detail.handovers.empty.text')}"></th:block></th:block>
+        <th:block th:if="${order.handovers == null or order.handovers.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.handovers.empty.title', textKey='orders.detail.handovers.empty.text')}"></th:block></th:block>
         <div th:unless="${order.handovers == null or order.handovers.isEmpty()}" class="table-responsive">
             <table class="data-table data-table--stack od-table">
                 <thead>
@@ -727,7 +727,7 @@
         <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${!hasOutstandingItemLines and !isFullyDelivered}" class="alert alert-info od-pane-alert" data-testid="item-handover-none-manufactured" th:text="#{orders.detail.itemHandover.produceFirst}">Es sind keine hergestellten Items zur Übergabe vorhanden. Erfasse zuerst die Herstellung im Reiter „Items".</p>
         <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${!hasOutstandingItemLines and isFullyDelivered}" class="alert alert-info od-pane-alert" data-testid="item-handover-all-delivered" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
 
-        <th:block th:if="${order.itemHandovers == null or order.itemHandovers.isEmpty()}"><th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.detail.handovers.empty.title', textKey='orders.detail.handovers.empty.text')}"></th:block></th:block>
+        <th:block th:if="${order.itemHandovers == null or order.itemHandovers.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.handovers.empty.title', textKey='orders.detail.handovers.empty.text')}"></th:block></th:block>
         <div th:unless="${order.itemHandovers == null or order.itemHandovers.isEmpty()}" class="table-responsive">
             <table class="data-table data-table--stack od-table">
                 <thead>
@@ -771,7 +771,7 @@
 </main>
 
 <th:block th:if="${isLogistician or requesterView}">
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='edit-modal', titleKey='orders.detail.edit', variant='krt-modal--xwide', body=~{::edit-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='edit-modal', titleKey='orders.detail.edit', variant='krt-modal--xwide', body=~{::edit-modal-body})}">
     <th:block th:ref="edit-modal-body">
         <form id="edit-order-form" th:data-order-id="${order.id}" th:data-requester-view="${requesterView}" th:action="${requesterView} ? @{/orders/{id}/requested-update(id=${order.id})} : @{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
         <div class="krt-modal-body">
@@ -840,7 +840,7 @@
                         <label class="form-label-sm">
                             <span th:text="#{orders.material.amount}">Menge (SCU)</span>
                             <span data-role="amount-unit"></span>
-                            <th:block th:replace="~{fragments/scu-hint :: scuHint(null, true)}"></th:block>
+                            <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint(null, true)}"></th:block>
                         </label>
                         <input class="w-full" type="text" inputmode="decimal" data-scu-decimal step="0.001" data-role="material-amount" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required>
                     </div>
@@ -868,7 +868,7 @@
                         <label class="form-label-sm">
                             <span th:text="#{orders.material.amount}">Menge (SCU)</span>
                             <span data-role="amount-unit"></span>
-                            <th:block th:replace="~{fragments/scu-hint :: scuHint(null, true)}"></th:block>
+                            <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint(null, true)}"></th:block>
                         </label>
                         <input class="w-full" type="text" inputmode="decimal" data-scu-decimal step="0.001" data-role="material-amount" name="materials[0].amount" min="0.001" required>
                     </div>
@@ -889,7 +889,7 @@
 </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='status-warning-modal', titleKey='orders.status.warning.title', body=~{::status-warning-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='status-warning-modal', titleKey='orders.status.warning.title', body=~{::status-warning-modal-body})}">
     <th:block th:ref="status-warning-modal-body">
         <div class="krt-modal-body">
         <p class="od-modal-text" th:text="#{orders.status.warning.body}">Wenn Sie den Status auf Abgeschlossen oder Abgelehnt setzen, werden alle verknüpften Lagereinträge vom Auftrag getrennt. Diese Aktion kann nicht rückgängig gemacht werden.</p>
@@ -901,7 +901,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='material-delete-confirm-modal', titleKey='orders.detail.material.removeConfirmTitle', variant='krt-modal--danger', body=~{::material-delete-confirm-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='material-delete-confirm-modal', titleKey='orders.detail.material.removeConfirmTitle', variant='krt-modal--danger', body=~{::material-delete-confirm-modal-body})}">
     <th:block th:ref="material-delete-confirm-modal-body">
         <div class="krt-modal-body">
         <p class="mb-2" th:text="#{orders.detail.material.removeConfirmText}">Möchtest du dieses Material wirklich aus dem Auftrag entfernen?</p>
@@ -914,7 +914,7 @@
 </th:block>
 
 <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='claim-modal', titleKey='orders.claim.modal.title.add', titleId='claim-modal-title', body=~{::claim-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='claim-modal', titleKey='orders.claim.modal.title.add', titleId='claim-modal-title', body=~{::claim-modal-body})}">
     <th:block th:ref="claim-modal-body">
         <div class="krt-modal-body">
         <p id="claim-modal-bucket" class="text-muted od-modal-lead"></p>
@@ -933,7 +933,7 @@
         <div class="form-group mb-2">
             <label for="claim-amount" class="form-label">
                 <span th:text="#{orders.claim.amount}">Menge</span>
-                <th:block th:replace="~{fragments/scu-hint :: scuHint('claim-scu-hint', true)}"></th:block>
+                <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('claim-scu-hint', true)}"></th:block>
             </label>
             <input class="w-full" type="text" inputmode="decimal" data-scu-decimal id="claim-amount" step="0.001" min="0.001">
             <small id="claim-open-hint" class="text-muted"></small>
@@ -948,7 +948,7 @@
 </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='assignee-note-modal', titleKey='orders.detail.assignees.note.modalTitle', variant='krt-modal--wide', body=~{::assignee-note-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='assignee-note-modal', titleKey='orders.detail.assignees.note.modalTitle', variant='krt-modal--wide', body=~{::assignee-note-modal-body})}">
     <th:block th:ref="assignee-note-modal-body">
         <div class="krt-modal-body">
         <p id="assignee-note-for" class="text-muted od-modal-lead"></p>
@@ -969,7 +969,7 @@
 </th:block>
 <th:block th:fragment="pageTail">
 <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='handover-modal', titleKey='orders.detail.handover.record', variant='krt-modal--wide', body=~{::handover-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='handover-modal', titleKey='orders.detail.handover.record', variant='krt-modal--wide', body=~{::handover-modal-body})}">
     <th:block th:ref="handover-modal-body">
         <form data-testid="order-handover-form" id="handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
             <div class="krt-modal-body">
@@ -1017,7 +1017,7 @@
 </th:block>
 
 <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}">
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='item-handover-modal', titleKey='orders.detail.handover.record', variant='krt-modal--wide', body=~{::item-handover-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='item-handover-modal', titleKey='orders.detail.handover.record', variant='krt-modal--wide', body=~{::item-handover-modal-body})}">
     <th:block th:ref="item-handover-modal-body">
         <form data-testid="item-handover-form" id="item-handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
             <div class="krt-modal-body">
@@ -1071,7 +1071,7 @@
 </th:block>
 
 <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:if="${order.type == 'ITEM' and isLogistician}">
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='production-modal', titleKey='orders.detail.production.record', variant='krt-modal--xwide', titleId='production-modal-title', body=~{::production-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='production-modal', titleKey='orders.detail.production.record', variant='krt-modal--xwide', titleId='production-modal-title', body=~{::production-modal-body})}">
     <th:block th:ref="production-modal-body">
         <div class="krt-modal-body">
         <div class="krt-form" id="production-form" th:data-order-id="${order.id}" th:data-acting-user-id="${actingUser != null ? actingUser.id : ''}" th:data-acting-user-name="${actingUser != null ? (actingUser.effectiveName != null ? actingUser.effectiveName : actingUser.username) : ''}" th:data-responsible-org-unit-id="${order.responsibleOrgUnit != null ? order.responsibleOrgUnit.id() : ''}">

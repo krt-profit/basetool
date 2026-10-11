@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{nav.materials.overview} + ' - ' + ${appTitle}">Preis-Übersicht - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -124,7 +124,7 @@
     <div id="matrixError" class="alert alert-danger" role="alert" hidden th:text="#{error.materials.matrix.load}">Fehler</div>
 
     <div id="matrixEmpty" class="card card--flush" hidden>
-        <th:block th:replace="~{fragments/components :: emptyState(titleKey='materials.matrix.noResults', textKey='materials.matrix.noResults.text')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='materials.matrix.noResults', textKey='materials.matrix.noResults.text')}"></th:block>
     </div>
 
     <div class="card card--flush mtx-card" id="tableContainer" hidden>

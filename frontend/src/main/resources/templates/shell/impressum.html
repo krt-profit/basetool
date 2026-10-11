@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="${appTitle} + ' - ' + #{impressum.title}">Profit Basetool - Impressum</title>
     <th:block th:fragment="extraLinks">
-        <link rel="stylesheet" th:href="@{/css/legal.css}">
+        <link rel="stylesheet" th:href="@{/css/shell/legal.css}">
     </th:block>
 </head>
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{impressum.title})}"></th:block>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{impressum.title})}"></th:block>
     <div class="card legal-doc" data-testid="legal-doc">
         <p th:text="#{impressum.p1}">Angaben gem\u00e4\u00df \u00a7 5 DDG</p>
 
@@ -51,7 +51,7 @@
             <span th:text="#{impressum.credits_prefix}">Erstellt mit</span> <a href="https://impressum-generator.de" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_generator}">Impressum-Generator.de</a><span th:text="#{impressum.credits_middle}">, dem Tool f\u00fcr Impressum und</span> <a href="https://impressum-generator.de/datenschutz-generator" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_privacy}">Datenschutz-Erkl\u00e4rung</a><span th:text="#{impressum.credits_suffix}">. Nach einer Vorlage der</span> <a href="https://www.kanzlei-hasselbach.de/" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_lawyer}">Kanzlei Hasselbach</a><span th:text="#{impressum.credits_end}">.</span>
         </p>
     </div>
-    <th:block th:replace="~{fragments/fankit :: band}" />
+    <th:block th:replace="~{shell/fragments/fankit :: band}" />
 </main>
 </th:block>
 </body>

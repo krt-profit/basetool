@@ -2740,7 +2740,7 @@ replaces rather than appends breaks every installed copy for the length of the r
 **Code:** `frontend/…/shell/web/AssetLinksController.java`,
 `frontend/…/shell/web/AppLinkController.java`,
 `frontend/…/shell/web/AndroidAppLinkProperties.java`, `SecurityConfig` (anonymous matchers),
-`frontend/…/templates/app-link-help.html`.
+`frontend/…/templates/shell/app-link-help.html`.
 **Test:** `AssetLinksControllerTest` — asserts the three response conditions through the real
 security chain, and that the digests are an array. `AppLinkControllerTest` — the fallback's redirect,
 its dropped query and the page behind it. `AnonymousSurfaceSweepMvcTest` — that both stay anonymous.

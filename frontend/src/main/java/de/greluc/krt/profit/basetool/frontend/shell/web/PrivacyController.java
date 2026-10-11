@@ -40,6 +40,6 @@ public class PrivacyController {
   @NotNull
   @GetMapping("/privacy")
   public String showPrivacy() {
-    return "privacy";
+    return "shell/privacy";
   }
 }

@@ -225,7 +225,7 @@ go stale). This is **in-app only** — OS / browser push notifications are out o
   clear-read without a full reload.
 
 **Enforced by:** `MessageBundleConsistencyTest`, frontend lint gate · **Code:**
-`fragments/sidebar.html`, `static/js/notifications.js`, frontend `kernel/layout/LayoutMiscAdvice`
+`kernel/fragments/sidebar.html`, `static/js/notifications.js`, frontend `kernel/layout/LayoutMiscAdvice`
 
 ### REQ-NOTIF-007 — Data-driven recipient rule engine
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{admin.defaultBlueprints.title}">Admin: Standard-Blueprints</title>
     <th:block th:fragment="extraLinks">
@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.admin.defaultBlueprints},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.admin.defaultBlueprints},
         count=${defaults != null ? #lists.size(defaults) : null}, countId='krt-dbp-count', countFor='krt-dbp-list-host')}"></th:block>
 
     <section class="card krt-personal-inventory dbp-section" aria-labelledby="krt-dbp-add-heading">
@@ -73,14 +73,14 @@
                 </table>
             </div>
             <th:block th:if="${#lists.isEmpty(defaults)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.defaultBlueprints.empty', textKey='admin.defaultBlueprints.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.defaultBlueprints.empty', textKey='admin.defaultBlueprints.empty.text')}"></th:block>
             </th:block>
             </th:block>
         </div>
     </section>
 </main>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-dbp-delete-modal', titleKey='admin.defaultBlueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='dbp-close-delete', body=~{::krt-dbp-delete-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='krt-dbp-delete-modal', titleKey='admin.defaultBlueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='dbp-close-delete', body=~{::krt-dbp-delete-modal-body})}">
     <th:block th:ref="krt-dbp-delete-modal-body">
         <div class="krt-modal-body">
             <p id="krt-dbp-delete-message" class="m-0" th:text="#{admin.defaultBlueprints.modal.remove.body}">Wirklich entfernen?</p>

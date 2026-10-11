@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{connectedApps.confirmMass.title} + ' - ' + ${appTitle}">Gro&szlig;e &Auml;nderung best&auml;tigen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -12,7 +12,7 @@
     <span id="cac-i18n" hidden
           th:attr="data-error=#{notification.error.title},data-summary=#{connectedApps.confirmMass.summary},data-done=#{connectedApps.confirmMass.done},data-discarded=#{connectedApps.confirmMass.discarded},data-refused=#{connectedApps.confirmMass.refused},data-resource-blueprints=#{connectedApps.confirmMass.resource.blueprints},data-resource-stock=#{connectedApps.confirmMass.resource.stock},data-resource-ships=#{connectedApps.confirmMass.resource.ships}"></span>
 
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='connectedApps.title', eyebrowHref=@{/connected-apps}, titleText=#{connectedApps.confirmMass.title})}"></th:block>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='connectedApps.title', eyebrowHref=@{/connected-apps}, titleText=#{connectedApps.confirmMass.title})}"></th:block>
 
     <div class="form-layout card cac-card" id="cac-box" data-testid="cac-box" th:attr="data-handoff-id=${pendingHandoffId}" aria-live="polite">
         <p class="cac-context" th:text="#{connectedApps.confirmMass.subtitle}">Eine verbundene Anwendung wollte auf einmal viele Eintr&auml;ge entfernen.</p>

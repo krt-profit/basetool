@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="movementModal(modalId, refreshTarget, accountId, accountSelectable, justificationRequired, canDeposit, canWithdraw, canTransfer)">
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId=${modalId}, titleKey='bank.modal.movement.title', variant='krt-modal--wide', body=~{fragments/bank-movement-modal :: bank-movement-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId=${modalId}, titleKey='bank.modal.movement.title', variant='krt-modal--wide', body=~{fragments/bank-movement-modal :: bank-movement-modal-body})}">
     <th:block th:ref="bank-movement-modal-body">
         <form class="bank-ajax-form no-track" data-method="POST"
               data-livesync="bank:@account/account,bookings,chart bank:@destination/account,bookings,chart bank/grid orgunit-bank/orgUnitBank"
@@ -26,7 +26,7 @@
                         <span data-role="bank-movement-account-label"
                               th:attr="data-label-deposit=#{bank.field.targetAccount},data-label-withdrawal=#{bank.movement.field.sourceAccount},data-label-transfer=#{bank.movement.field.sourceAccount}"
                               th:text="#{bank.movement.field.sourceAccount}">Quellkonto</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.movement.field.sourceAccount.hint')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.movement.field.sourceAccount.hint')}"></th:block>
                     </label>
                     <select id="bank-mv-source-account" data-role="bank-movement-source" required
                             data-krt-combobox="remote-bank-accounts"
@@ -53,7 +53,7 @@
                 <div class="bank-form-row">
                     <label for="bank-mv-amount">
                         <span th:text="#{bank.field.amount}">Betrag (aUEC)</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.amount.hint')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.field.amount.hint')}"></th:block>
                     </label>
                     <input type="number" id="bank-mv-amount" name="amount" min="1" step="1" required
                            data-testid="bank-movement-amount" th:placeholder="#{bank.field.amount.placeholder}">
@@ -74,7 +74,7 @@
                         <input type="checkbox" name="feeInclusive" value="true" disabled
                                data-testid="bank-movement-fee-inclusive">
                         <span th:text="#{bank.field.feeInclusive}">Geb&uuml;hr im Betrag enthalten</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.feeInclusive.hint')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.field.feeInclusive.hint')}"></th:block>
                     </label>
                 </div>
 
@@ -89,7 +89,7 @@
                     <div class="bank-form-row" data-split-row hidden>
                         <label for="bank-mv-split-percent">
                             <span th:text="#{bank.split.percent}">Prozentsatz (%)</span>
-                            <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.split.hint')}"></th:block>
+                            <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.split.hint')}"></th:block>
                         </label>
                         <input type="number" id="bank-mv-split-percent" name="splitPercent"
                                min="1" max="100" step="1" disabled
@@ -119,7 +119,7 @@
                 <div class="bank-form-row" data-movement-types="WITHDRAWAL" hidden>
                     <label for="bank-mv-withdraw-holder">
                         <span th:text="#{bank.field.holder.payer}">Von Halter</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.holder.payer.hint')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.field.holder.payer.hint')}"></th:block>
                     </label>
                     <select id="bank-mv-withdraw-holder" name="holderId" required disabled data-krt-combobox
                             data-testid="bank-movement-withdraw-holder">
@@ -132,7 +132,7 @@
                 <div class="bank-form-row" data-movement-types="TRANSFER" hidden>
                     <label for="bank-mv-source-holder">
                         <span th:text="#{bank.field.holder.source}">Von Halter</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.holder.payer.hint')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.field.holder.payer.hint')}"></th:block>
                     </label>
                     <select id="bank-mv-source-holder" name="sourceHolderId" required disabled data-krt-combobox
                             data-testid="bank-movement-source-holder">
@@ -145,7 +145,7 @@
                 <div class="bank-form-row" data-movement-types="TRANSFER" hidden>
                     <label for="bank-mv-dest-holder">
                         <span th:text="#{bank.field.holder.target}">An Halter (Zielkonto)</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.holder.target.hint')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.field.holder.target.hint')}"></th:block>
                     </label>
                     <select id="bank-mv-dest-holder" name="destinationHolderId" required disabled data-krt-combobox
                             data-testid="bank-movement-dest-holder">
@@ -168,7 +168,7 @@
                 <div class="bank-form-row" data-movement-types="WITHDRAWAL TRANSFER" hidden>
                     <label for="bank-mv-justification">
                         <span th:text="#{bank.field.justification}">Begr&uuml;ndung</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.justification.hint')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.field.justification.hint')}"></th:block>
                     </label>
                     <input type="text" id="bank-mv-justification" name="justification" maxlength="500" disabled
                            data-testid="bank-movement-justification" th:placeholder="#{bank.field.justification.placeholder}">
@@ -185,7 +185,7 @@
                 <div class="bank-form-row">
                     <label for="bank-mv-staff-note">
                         <span th:text="#{bank.field.staffNote}">Notiz Bankmitarbeiter</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.staffNote.hint')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.field.staffNote.hint')}"></th:block>
                     </label>
                     <input type="text" id="bank-mv-staff-note" name="staffNote" maxlength="500"
                            data-testid="bank-movement-staff-note">

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{admin.personalInventory.blueprints.title}">Admin: Blueprints</title>
     <th:block th:fragment="extraLinks">
@@ -11,7 +11,7 @@
 <th:block th:fragment="pageContent">
 <main>
     <th:block th:with="hasUser=${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.personalInventory.blueprints.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.personalInventory.blueprints.title},
         count=${hasUser ? #lists.size(blueprints) : null}, countId='bp-count', countFor='bp-results', actions=~{::bp-actions})}">
         <th:block th:ref="bp-actions">
             <th:block th:if="${hasUser}">
@@ -20,7 +20,7 @@
                         data-trigger="bp-import-pick"
                         th:text="#{personalInventory.blueprints.import.button}">JSON importieren</button>
             </th:block>
-            <th:block th:replace="~{fragments/components :: overflowMenu(id='bp-admin-menu', items=~{::bp-menu-items})}">
+            <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='bp-admin-menu', items=~{::bp-menu-items})}">
                 <th:block th:ref="bp-menu-items">
                     <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
                             data-trigger="open-modal-display" data-modal-id="bp-purge-modal" data-testid="bp-purge-open"
@@ -42,10 +42,10 @@
     </form>
 
     <div th:if="${!hasUser}" class="card card--flush">
-        <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.personalInventory.userSelect.emptyTitle', textKey='admin.personalInventory.userSelect.empty')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.personalInventory.userSelect.emptyTitle', textKey='admin.personalInventory.userSelect.empty')}"></th:block>
     </div>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bp-purge-modal', titleKey='admin.personalInventory.blueprints.purge.modal.title', variant='krt-modal--danger', body=~{::bp-purge-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bp-purge-modal', titleKey='admin.personalInventory.blueprints.purge.modal.title', variant='krt-modal--danger', body=~{::bp-purge-modal-body})}">
         <th:block th:ref="bp-purge-modal-body">
             <form method="post" th:action="@{/admin/personal-blueprints/delete-all-users}" class="no-track" data-bp-purge
                   th:data-purge-success="#{admin.personalInventory.blueprints.purge.toast.count}"
@@ -103,7 +103,7 @@
         <form th:action="@{/admin/personal-blueprints}" method="get" class="krt-pi-filter no-track">
             <input type="hidden" name="userSub" th:value="${selectedUserSub}">
             <div class="toolbar">
-                <th:block th:replace="~{fragments/components :: toolbarSearch('krt-bp-q', 'q', ${filterQuery}, 'personalInventory.filter.search')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('krt-bp-q', 'q', ${filterQuery}, 'personalInventory.filter.search')}"></th:block>
             </div>
         </form>
 
@@ -151,7 +151,7 @@
                 </table>
             </div>
             <th:block th:if="${#lists.isEmpty(blueprints)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.personalInventory.blueprints.empty.title', textKey='admin.personalInventory.blueprints.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.personalInventory.blueprints.empty.title', textKey='admin.personalInventory.blueprints.empty.text')}"></th:block>
             </th:block>
         </th:block>
         </div>
@@ -160,7 +160,7 @@
 </main>
 
 <th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-edit-modal', titleKey='personalInventory.blueprints.modal.editNote.title', variant='krt-modal--wide', titleId='krt-bp-edit-title', closeTrigger='bp-close-edit', body=~{::krt-bp-edit-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='krt-bp-edit-modal', titleKey='personalInventory.blueprints.modal.editNote.title', variant='krt-modal--wide', titleId='krt-bp-edit-title', closeTrigger='bp-close-edit', body=~{::krt-bp-edit-modal-body})}">
     <th:block th:ref="krt-bp-edit-modal-body">
         <form id="krt-bp-edit-form" method="post">
             <div class="krt-modal-body">
@@ -181,7 +181,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-delete-modal', titleKey='personalInventory.blueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='bp-close-delete', body=~{::krt-bp-delete-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='krt-bp-delete-modal', titleKey='personalInventory.blueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='bp-close-delete', body=~{::krt-bp-delete-modal-body})}">
     <th:block th:ref="krt-bp-delete-modal-body">
         <div class="krt-modal-body">
             <p id="krt-bp-delete-message" th:text="#{personalInventory.blueprints.modal.remove.body}">Wirklich entfernen?</p>
@@ -196,7 +196,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-import-modal', titleKey='personalInventory.blueprints.import.title', variant='krt-bp-import-frame', body=~{::krt-bp-import-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='krt-bp-import-modal', titleKey='personalInventory.blueprints.import.title', variant='krt-bp-import-frame', body=~{::krt-bp-import-modal-body})}">
     <th:block th:ref="krt-bp-import-modal-body">
         <div class="krt-modal-body">
             <p class="krt-bp-import-summary" id="krt-bp-import-summary"></p>

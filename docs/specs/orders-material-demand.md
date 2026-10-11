@@ -194,7 +194,7 @@ count, hide-covered, the material filter and its search, and the sort cycle) ·
 `MaterialDemandOrderShareDto`, `JobOrderMaterialDemandPageController`,
 `templates/orders-material-demand.html`, `templates/fragments/material-amount.html`,
 `static/js/orders-material-demand.js`,
-`fragments/sidebar.html`, `LiveSyncTopicClass.ORDERS_QUEUE` · **Issues:** #1522
+`kernel/fragments/sidebar.html`, `LiveSyncTopicClass.ORDERS_QUEUE` · **Issues:** #1522
 
 ## Out of scope
 

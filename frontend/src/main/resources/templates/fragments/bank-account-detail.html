@@ -104,7 +104,7 @@
 <form th:fragment="historyFilter(idPrefix, testIdPrefix, resultsId, fragmentName)"
       class="bank-history-filter no-track" method="get" th:action="@{${historyBaseUrl}}" data-bank-history-filter
       th:attr="data-results=${'#' + resultsId},data-fragment=${fragmentName}">
-    <th:block th:replace="~{fragments/components :: segmented(name='historyPeriod', labelKey='bank.chart.range.label',
+    <th:block th:replace="~{kernel/fragments/components :: segmented(name='historyPeriod', labelKey='bank.chart.range.label',
         selected=${historyPreset},
         options=${ {{value: '30d', labelKey: 'bank.chart.range.30d'},
                     {value: '90d', labelKey: 'bank.chart.range.90d'},
@@ -127,7 +127,7 @@
 <th:block th:fragment="bookingsTable(staff, rowTestId, testIdPrefix, emptyTestId)">
     <th:block th:if="${bookings == null or #lists.isEmpty(bookings.content())}">
         <div class="bank-bookings-empty" th:attr="data-testid=${emptyTestId}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.detail.history.emptyTitle',
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='bank.detail.history.emptyTitle',
                 textKey='bank.detail.history.empty')}"></th:block>
         </div>
     </th:block>
@@ -203,8 +203,8 @@
         </table>
     </div>
     <div class="pagination-controls bank-bookings-foot" th:if="${bookings != null and bookings.totalElements() > 0}">
-        <nav th:replace="~{fragments/pagination :: pageSizePicker(${bookings}, ${paginationBaseUrl}, ${pageSizes})}"></nav>
-        <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+        <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(${bookings}, ${paginationBaseUrl}, ${pageSizes})}"></nav>
+        <nav th:replace="~{kernel/fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
     </div>
 </th:block>
 

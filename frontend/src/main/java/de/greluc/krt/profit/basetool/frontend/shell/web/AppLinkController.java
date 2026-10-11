@@ -65,6 +65,6 @@ public class AppLinkController {
   @NotNull
   @GetMapping(HELP_PATH)
   public String linkHelp() {
-    return "app-link-help";
+    return "shell/app-link-help";
   }
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{bank.requests.title} + ' - ' + ${appTitle}">Antr&auml;ge - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-approval-request-filed=#{bank.movement.approvalRequestFiled},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', titleText=#{bank.requests.title}, actions=~{::bank-requests-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', titleText=#{bank.requests.title}, actions=~{::bank-requests-actions})}">
         <th:block th:ref="bank-requests-actions">
             <button type="button" class="btn btn-outline" th:if="${canBook}"
                     data-trigger="open-modal-display" data-modal-id="bank-movement-modal"
@@ -23,7 +23,7 @@
 
     <form id="bank-requests-filter-form" method="get" th:action="@{/bank/requests}" class="no-track">
         <div class="toolbar">
-            <th:block th:replace="~{fragments/components :: segmented(name='status', labelKey='bank.requests.filter.aria', selected=${selectedStatus}, options=${statusOptions})}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='status', labelKey='bank.requests.filter.aria', selected=${selectedStatus}, options=${statusOptions})}"></th:block>
             <span class="toolbar__spacer"></span>
             <span class="toolbar__count" data-bank-waiting-count data-testid="bank-requests-waiting"
                   th:attr="data-template=#{bank.request.waitingForYou('{0}')}"
@@ -113,7 +113,7 @@
                             <span class="bank-req-waiting" data-testid="bank-request-waiting" th:unless="${approvalOpen}"
                                   data-waiting-for="authorized-staff" th:title="#{bank.request.authorizedStaff.hint}"
                                   th:with="staffLabel=#{bank.request.authorizedStaff}" th:text="#{bank.request.waitingFor(${staffLabel})}">wartet auf berechtigte Bankmitarbeiter</span>
-                            <th:block th:replace="~{fragments/components :: overflowMenu(id=${'bank-req-more-' + r.id()}, items=~{::bank-req-more-items})}">
+                            <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'bank-req-more-' + r.id()}, items=~{::bank-req-more-items})}">
                                 <th:block th:ref="bank-req-more-items">
                                     <button type="button" class="overflow-menu__item" role="menuitem" th:if="${mayConfirm}"
                                             data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
@@ -159,12 +159,12 @@
             </tbody>
         </table>
         <th:block th:if="${requests == null or #lists.isEmpty(requests.content())}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.requests.empty.title', textKey='bank.requests.empty', emptyId='bank-requests-empty')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='bank.requests.empty.title', textKey='bank.requests.empty', emptyId='bank-requests-empty')}"></th:block>
         </th:block>
         </th:block>
     </div>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-confirm-request-modal', titleKey='bank.request.confirm.modal.title', body=~{::bank-confirm-request-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-confirm-request-modal', titleKey='bank.request.confirm.modal.title', body=~{::bank-confirm-request-modal-body})}">
         <th:block th:ref="bank-confirm-request-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
                   data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank bank:@account/account,bookings,chart bank:@destination/account,bookings,chart"
@@ -226,7 +226,7 @@
                     <div class="bank-form-row">
                         <label for="bank-confirm-staff-note">
                             <span th:text="#{bank.field.staffNote}">Notiz Bankmitarbeiter</span>
-                            <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.staffNote.hint')}"></th:block>
+                            <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.field.staffNote.hint')}"></th:block>
                         </label>
                         <input type="text" id="bank-confirm-staff-note" name="staffNote" maxlength="500"
                                data-testid="bank-confirm-staff-note">
@@ -244,7 +244,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-reject-request-modal', titleKey='bank.request.reject.modal.title', variant='krt-modal--danger', body=~{::bank-reject-request-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-reject-request-modal', titleKey='bank.request.reject.modal.title', variant='krt-modal--danger', body=~{::bank-reject-request-modal-body})}">
         <th:block th:ref="bank-reject-request-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
                   data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank"

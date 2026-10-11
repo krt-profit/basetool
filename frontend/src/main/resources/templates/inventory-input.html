@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{inventory.input.title} + ' - Profit Basetool'">Lagereintrag einbuchen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -11,7 +11,7 @@
 <main th:with="inputSource=${inventoryForm.source},
                backHref=${inputSource == 'admin' ? '/inventory/all' : (inputSource == 'aggregated' ? '/inventory' : '/inventory/my')},
                backKey=${inputSource == 'admin' ? 'inventory.overview.global' : (inputSource == 'aggregated' ? 'nav.inventory' : 'inventory.overview.my')}">
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey=${backKey}, eyebrowHref=@{${backHref}},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey=${backKey}, eyebrowHref=@{${backHref}},
         titleText=#{inventory.input.title})}"></th:block>
 
     <form id="inventory-input-form" class="form-layout card" th:action="@{/inventory/input}" method="post" th:object="${inventoryForm}">
@@ -26,7 +26,7 @@
 
         <fieldset class="form-section">
             <legend class="form-section__head" th:text="|1 · #{inventory.input.section.stock}|">1 · Bestand</legend>
-            <th:block th:replace="~{fragments/components :: segmented(name='inventoryCatalogMode', labelKey='inventory.form.item.modeLabel',
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='inventoryCatalogMode', labelKey='inventory.form.item.modeLabel',
                 variant='segmented--block segmented--lg',
                 selected=${inventoryForm.gameItemId != null ? 'item' : 'material'},
                 options=${ {{value: 'material', labelKey: 'inventory.form.item.mode.material'}, {value: 'item', labelKey: 'inventory.form.item.mode.item'}} })}"></th:block>
@@ -64,7 +64,7 @@
             <legend class="form-section__head" th:text="|2 · #{inventory.input.section.amount}|">2 · Menge &amp; Lagerort</legend>
             <div class="form-grid">
                 <div class="form-group">
-                    <label for="amount"><span th:text="#{inventory.form.amount}">Menge</span> <span id="amount-unit"></span><th:block th:replace="~{fragments/scu-hint :: scuHint('amount-scu-hint', true)}"></th:block></label>
+                    <label for="amount"><span th:text="#{inventory.form.amount}">Menge</span> <span id="amount-unit"></span><th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('amount-scu-hint', true)}"></th:block></label>
                     <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required>
                 </div>
                 <div class="form-group">
@@ -105,7 +105,7 @@
                 </div>
 
                 <th:block th:with="ownerPickerAlwaysRender=*{isGlobal}">
-                    <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                 </th:block>
             </div>
 

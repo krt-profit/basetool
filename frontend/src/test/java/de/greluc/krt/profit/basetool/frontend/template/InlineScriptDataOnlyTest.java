@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.template;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -55,7 +56,7 @@ class InlineScriptDataOnlyTest {
    */
   static final Map<String, String> EXCEPTIONS =
       Map.of(
-          "fragments/head.html|window.krtEvents = window.krtEvents ||",
+          "kernel/fragments/head.html|window.krtEvents = window.krtEvents ||",
           "The krtEvents stub reports, five seconds after load, that event-delegation.js never"
               + " replaced it; it detects a failed deferred script and so must not be one.");
 
@@ -424,8 +425,6 @@ class InlineScriptDataOnlyTest {
   }
 
   private static Path templatesRoot() throws URISyntaxException {
-    return Paths.get(
-            InlineScriptDataOnlyTest.class.getResource("/templates/bank-grants.html").toURI())
-        .getParent();
+    return ClasspathAssets.templates();
   }
 }

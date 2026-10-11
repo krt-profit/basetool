@@ -157,7 +157,7 @@ class TermsControllerTest {
         .containsPattern("class=\"page-eyebrow\"[^>]*>Rechtliches<")
         .contains("<h1>Nutzungsbedingungen</h1>")
         .contains("class=\"card legal-doc\"")
-        .contains("/css/legal")
+        .contains("/css/shell/legal")
         .doesNotContain("hud-box")
         .doesNotContain("krtm-");
   }

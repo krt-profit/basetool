@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{admin.qualityTiers.title} + ' - ' + ${appTitle}">Qualitätsstufen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -9,14 +9,14 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.qualityTiers.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.qualityTiers.title},
         count=${tiers != null ? tiers.size() : null}, countId='qt-count', countFor='qt-results', actions=~{::qt-actions})}">
         <th:block th:ref="qt-actions">
             <button type="button" id="qt-add-btn" class="btn btn--cta" data-testid="qt-add" th:text="#{admin.qualityTiers.action.create}">Neue Stufe</button>
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass=null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: alert(type='danger', msgKey=${error}, extraClass=null)}"></th:block>
 
     <div class="alert alert-info" th:text="#{admin.qualityTiers.hint.inUse}">Die Mindestqualität einer Stufe, die bereits von Aufträgen verwendet wird, kann nicht mehr geändert werden. Eine verwendete Stufe kann nur deaktiviert, nicht gelöscht werden.</div>
 
@@ -72,13 +72,13 @@
             </table>
         </div>
         <th:block th:if="${#lists.isEmpty(tiers)}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.qualityTiers.empty.title', textKey='admin.qualityTiers.empty')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.qualityTiers.empty.title', textKey='admin.qualityTiers.empty')}"></th:block>
         </th:block>
         </th:block>
     </div>
 </main>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='qt-modal', titleKey='admin.qualityTiers.dialog.createTitle', titleId='qt-modal-title', variant='krt-modal--wide', body=~{::qt-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='qt-modal', titleKey='admin.qualityTiers.dialog.createTitle', titleId='qt-modal-title', variant='krt-modal--wide', body=~{::qt-modal-body})}">
     <th:block th:ref="qt-modal-body">
         <form id="qt-form" class="qt-form" method="post" th:action="@{/admin/quality-tiers}">
             <input type="hidden" id="qt-id" name="id" value="">
@@ -109,7 +109,7 @@
                     </div>
                     <div class="form-group" data-testid="qt-active">
                         <span class="form-label" aria-hidden="true" th:text="#{admin.qualityTiers.column.status}">Status</span>
-                        <th:block th:replace="~{fragments/components :: segmented(name='active', labelKey='admin.qualityTiers.column.status', selected='true',
+                        <th:block th:replace="~{kernel/fragments/components :: segmented(name='active', labelKey='admin.qualityTiers.column.status', selected='true',
                             variant='segmented--block segmented--lg',
                             options=${ {{value: 'true', labelKey: 'admin.qualityTiers.status.active'}, {value: 'false', labelKey: 'admin.qualityTiers.status.inactive'}} })}"></th:block>
                     </div>
@@ -128,7 +128,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='qt-delete-modal', titleKey='admin.qualityTiers.dialog.deleteTitle', variant='krt-modal--danger', body=~{::qt-delete-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='qt-delete-modal', titleKey='admin.qualityTiers.dialog.deleteTitle', variant='krt-modal--danger', body=~{::qt-delete-modal-body})}">
     <th:block th:ref="qt-delete-modal-body">
         <div class="krt-modal-body">
             <p class="mb-2" th:text="#{admin.qualityTiers.delete.confirm}">Diese Qualitätsstufe endgültig löschen?</p>

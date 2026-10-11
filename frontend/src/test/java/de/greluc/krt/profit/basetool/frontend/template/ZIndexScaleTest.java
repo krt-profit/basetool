@@ -116,7 +116,7 @@ class ZIndexScaleTest {
     Scan scan = scan(CssSources.fixture("z-index"));
     assertThat(scan.offenders())
         .containsExactlyInAnyOrder(
-            "static/css/styles.css: --z-high (40) is not above --z-low (50)",
+            "static/css/kernel/styles.css: --z-high (40) is not above --z-low (50)",
             "static/css/pages/planted.css: z-index: 1500",
             "static/css/pages/planted.css: z-index: var(--z-missing)");
   }
@@ -124,7 +124,7 @@ class ZIndexScaleTest {
   /**
    * Scans the stylesheets of one resources tree.
    *
-   * @param resources a directory holding {@code static/css/styles.css}
+   * @param resources a directory holding {@code static/css/kernel/styles.css}
    * @return the scale, the declaration count and the offenders
    * @throws IOException if a stylesheet cannot be read
    */
@@ -132,13 +132,15 @@ class ZIndexScaleTest {
     Path cssRoot = resources.resolve("static/css");
     List<String> offenders = new ArrayList<>();
     Map<String, Integer> scale = new LinkedHashMap<>();
-    Matcher token = TOKEN.matcher(CssSources.stripComments(read(cssRoot.resolve("styles.css"))));
+    Matcher token =
+        TOKEN.matcher(CssSources.stripComments(read(cssRoot.resolve("kernel/styles.css"))));
     String previous = null;
     while (token.find()) {
-      int value = CssSources.parseInt(token.group(2), "static/css/styles.css " + token.group(1));
+      int value =
+          CssSources.parseInt(token.group(2), "static/css/kernel/styles.css " + token.group(1));
       if (previous != null && value <= scale.get(previous)) {
         offenders.add(
-            "static/css/styles.css: "
+            "static/css/kernel/styles.css: "
                 + token.group(1)
                 + " ("
                 + value

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{admin.personalInventory.title}">Admin: Persoenliches Inventar</title>
     <th:block th:fragment="extraLinks">
@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.personalInventory.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.personalInventory.title},
         count=${page != null ? page.totalElements() : null}, countId='pi-count', countFor='pi-results')}"></th:block>
 
     <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-userform no-track">
@@ -27,7 +27,7 @@
     <div id="pi-results" class="stack gap-3">
     <th:block th:fragment="results">
     <div th:if="${selectedUserSub == null or #strings.isEmpty(selectedUserSub)}" class="card card--flush">
-        <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.personalInventory.userSelect.emptyTitle', textKey='admin.personalInventory.userSelect.empty')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.personalInventory.userSelect.emptyTitle', textKey='admin.personalInventory.userSelect.empty')}"></th:block>
     </div>
 
     <th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}"
@@ -36,7 +36,7 @@
         <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-filter no-track">
             <input type="hidden" name="userSub" th:value="${selectedUserSub}">
             <div class="toolbar">
-                <th:block th:replace="~{fragments/components :: toolbarSearch('krt-pi-q', 'q', ${filterQuery}, 'personalInventory.filter.search')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('krt-pi-q', 'q', ${filterQuery}, 'personalInventory.filter.search')}"></th:block>
                 <span class="toolbar__spacer"></span>
                 <button type="button" class="btn btn--cta krt-pi-create"
                         th:attr="data-action=@{'/admin/personal-inventory/' + ${selectedUserSub} + '/add'}"
@@ -93,16 +93,16 @@
                 </table>
             </div>
             <th:block th:if="${#lists.isEmpty(items)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.personalInventory.empty.title', textKey='admin.personalInventory.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.personalInventory.empty.title', textKey='admin.personalInventory.empty.text')}"></th:block>
             </th:block>
-            <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${page}, baseUrl=${piBase})}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${page}, baseUrl=${piBase})}"></th:block>
         </div>
     </th:block>
     </th:block>
     </div>
 </main>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-pi-modal', titleKey='personalInventory.modal.create.title', variant='krt-modal--wide', titleId='krt-pi-modal-title', open=${showItemModal != null}, closeTrigger='pi-close-modal', body=~{::krt-pi-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='krt-pi-modal', titleKey='personalInventory.modal.create.title', variant='krt-modal--wide', titleId='krt-pi-modal-title', open=${showItemModal != null}, closeTrigger='pi-close-modal', body=~{::krt-pi-modal-body})}">
     <th:block th:ref="krt-pi-modal-body">
         <form id="krt-pi-form"
               th:action="${modalAction != null ? modalAction : '/admin/personal-inventory'}"
@@ -149,7 +149,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-pi-delete-modal', titleKey='personalInventory.action.delete.confirm.title', variant='krt-modal--danger', closeTrigger='pi-close-delete', body=~{::krt-pi-delete-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='krt-pi-delete-modal', titleKey='personalInventory.action.delete.confirm.title', variant='krt-modal--danger', closeTrigger='pi-close-delete', body=~{::krt-pi-delete-modal-body})}">
     <th:block th:ref="krt-pi-delete-modal-body">
         <form id="krt-pi-delete-form" method="post">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />

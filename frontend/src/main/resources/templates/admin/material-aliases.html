@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{admin.materialAlias.title} + ' - ' + ${appTitle}">Material-Aliase - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -9,10 +9,10 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.materialAlias.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.materialAlias.title},
         count=${aliases != null ? aliases.size() : null}, countId='aliases-count', countFor='aliases-results', actions=null)}"></th:block>
 
-    <th:block th:replace="~{fragments/components :: alert('danger', ${error}, null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: alert('danger', ${error}, null)}"></th:block>
 
     <section class="card card--accent" th:if="${aliasToEdit != null}" aria-labelledby="alias-edit-title">
         <div class="card-head">
@@ -100,7 +100,7 @@
             </div>
         </div>
         <div class="empty-state" data-testid="empty-state" data-alias-empty th:hidden="${!#lists.isEmpty(aliases)}">
-            <th:block th:replace="~{fragments/components :: emptyStateBody('admin.materialAlias.empty.title', 'admin.materialAlias.empty', null)}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.materialAlias.empty.title', 'admin.materialAlias.empty', null)}"></th:block>
         </div>
     </div>
 

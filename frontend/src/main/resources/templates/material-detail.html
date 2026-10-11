@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="${material != null ? material.name : 'Material'} + ' - ' + ${appTitle}">Material Detail - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -64,8 +64,8 @@
         <h2 class="md-section-title" th:text="#{materials.detail.pricesTitle}">Preise und Terminals</h2>
 
         <div class="toolbar" th:unless="${terminalRows == null || terminalRows.isEmpty()}">
-            <th:block th:replace="~{fragments/components :: toolbarSearch(id='terminalFilter', name='terminal', value=null, placeholderKey='materials.detail.filterPlaceholder')}"></th:block>
-            <th:block th:replace="~{fragments/components :: segmented(name='terminalSort', labelKey='materials.detail.sort.label', selected='sell',
+            <th:block th:replace="~{kernel/fragments/components :: toolbarSearch(id='terminalFilter', name='terminal', value=null, placeholderKey='materials.detail.filterPlaceholder')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='terminalSort', labelKey='materials.detail.sort.label', selected='sell',
                 options=${ {{value: 'sell', labelKey: 'materials.detail.sort.sell'}, {value: 'buy', labelKey: 'materials.detail.sort.buy'}} })}"></th:block>
         </div>
 
@@ -101,12 +101,12 @@
                 </table>
             </div>
             <div id="noResultsRow" hidden>
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='materials.detail.noResults', textKey='materials.detail.noResults.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='materials.detail.noResults', textKey='materials.detail.noResults.text')}"></th:block>
             </div>
         </div>
 
         <div id="noDataRow" class="card card--flush" th:if="${terminalRows == null || terminalRows.isEmpty()}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='materials.detail.noData', textKey='materials.detail.noData.text')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='materials.detail.noData', textKey='materials.detail.noData.text')}"></th:block>
         </div>
     </th:block>
 </main>

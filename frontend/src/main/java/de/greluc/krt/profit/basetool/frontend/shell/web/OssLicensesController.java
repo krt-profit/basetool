@@ -57,6 +57,6 @@ public class OssLicensesController {
     model.addAttribute("ossGroups", catalog.groups());
     model.addAttribute("ossComponentCount", catalog.componentCount());
     model.addAttribute("ossGenerator", catalog.generator());
-    return "licenses";
+    return "shell/licenses";
   }
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{admin.orgStructure.title} + ' - ' + ${appTitle}">Org structure - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -12,14 +12,14 @@
     <span id="os-i18n" hidden
           th:attr="data-saved=#{admin.orgStructure.success.saved},data-error=#{admin.orgStructure.error.action},data-refresh-error=#{admin.orgStructure.refresh.error}"></span>
 
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{admin.orgStructure.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{admin.orgStructure.title},
         count=${nodes != null ? nodes.size() : null}, countId='org-units-count', countFor='org-structure-units', actions=~{::org-structure-actions})}">
         <th:block th:ref="org-structure-actions">
             <a th:href="@{/org-chart}" class="btn btn-ghost" th:text="#{admin.orgStructure.toChart}">Zum Organigramm</a>
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/components :: alert('danger', ${error}, null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: alert('danger', ${error}, null)}"></th:block>
 
     <div class="alert alert-info" th:text="#{admin.orgStructure.units.hint}">Wähle die übergeordnete Einheit; Staffeln/Spezialkommandos gehören in einen Bereich, Bereiche in die Organisationsleitung.</div>
 
@@ -64,7 +64,7 @@
             </table>
         </div>
         <th:block th:if="${#lists.isEmpty(nodes)}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.orgStructure.units.empty', textKey='admin.orgStructure.units.empty.text')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.orgStructure.units.empty', textKey='admin.orgStructure.units.empty.text')}"></th:block>
         </th:block>
     </th:block>
     </div>

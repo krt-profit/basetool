@@ -604,7 +604,7 @@ and search for it.
 - Targets GitHub's canonical latest-release redirect
   `https://github.com/krt-profit/basetool-sc-extractor/releases/latest`, so it never has to be
   bumped per release. The URL is hardcoded in the template, matching the existing external-link
-  pattern of [`fragments/footer.html`](../../frontend/src/main/resources/templates/fragments/footer.html)
+  pattern of [`kernel/fragments/footer.html`](../../frontend/src/main/resources/templates/kernel/fragments/footer.html)
   (handbook / repository links) — no configuration property, no backend round-trip.
 - Opens in a new tab (`target="_blank"` with `rel="noopener noreferrer"`), so the collection, the
   staged selection and any open detail pane survive the click.

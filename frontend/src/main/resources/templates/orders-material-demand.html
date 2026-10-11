@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true)}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true)}">
 <head>
     <title th:text="#{orders.demand.title} + ' - ' + ${appTitle}">Materialbedarf - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{orders.demand.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{orders.demand.title},
         actions=~{::demand-actions})}">
         <th:block th:ref="demand-actions">
             <a th:href="@{/orders}" class="btn btn-ghost" data-testid="demand-back-link"
@@ -18,7 +18,7 @@
     </th:block>
 
     <div class="toolbar demand-toolbar">
-        <th:block th:replace="~{fragments/components :: filterPopover(panelId='demandFilterPanel', panelName='material-demand',
+        <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='demandFilterPanel', panelName='material-demand',
             testid='demand-filter-toggle', body=~{::demand-filter-body})}">
             <th:block th:ref="demand-filter-body">
                 <div class="demand-filter-field">
@@ -81,7 +81,7 @@
     <div id="orders-material-demand-results" class="stack gap-6">
         <th:block th:fragment="demandResults">
         <th:block th:if="${demand == null or demand.groups() == null or demand.groups().isEmpty()}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.demand.empty.title', textKey='orders.demand.empty')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.demand.empty.title', textKey='orders.demand.empty')}"></th:block>
         </th:block>
 
         <th:block th:unless="${demand == null or demand.groups() == null or demand.groups().isEmpty()}">
@@ -245,7 +245,7 @@
             </section>
 
             <div id="demandNoMatch" hidden data-testid="demand-no-match">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='orders.demand.filter.noMatch.title', textKey='orders.demand.filter.noMatch')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.demand.filter.noMatch.title', textKey='orders.demand.filter.noMatch')}"></th:block>
             </div>
         </th:block>
         </th:block>

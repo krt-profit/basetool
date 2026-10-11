@@ -40,6 +40,6 @@ public class ImpressumController {
   @NotNull
   @GetMapping("/impressum")
   public String showImpressum() {
-    return "impressum";
+    return "shell/impressum";
   }
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="${appTitle}">Profit Basetool</title>
 </head>
@@ -33,7 +33,7 @@
         </nav>
     </div>
 
-    <th:block th:replace="~{fragments/fankit :: band}" />
+    <th:block th:replace="~{shell/fragments/fankit :: band}" />
 </main>
 </th:block>
 </body>

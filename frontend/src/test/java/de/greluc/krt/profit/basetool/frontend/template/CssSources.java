@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -46,9 +47,9 @@ final class CssSources {
    * @throws URISyntaxException if the classpath root cannot be resolved
    */
   static @NotNull Path mainResources() throws URISyntaxException {
-    URL anchor = CssSources.class.getResource("/static/css/styles.css");
-    assertThat(anchor).as("/static/css/styles.css classpath resource").isNotNull();
-    return Paths.get(anchor.toURI()).getParent().getParent().getParent();
+    URL anchor = CssSources.class.getResource("/static/css/kernel/styles.css");
+    assertThat(anchor).as("/static/css/kernel/styles.css classpath resource").isNotNull();
+    return ClasspathAssets.resources();
   }
 
   /**

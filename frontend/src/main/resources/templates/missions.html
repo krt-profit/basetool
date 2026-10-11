@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{missions.title} + ' - ' + ${appTitle}">Missions - Profit Basetool</title>
 </head>
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.mission_planning', titleText=#{missions.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.mission_planning', titleText=#{missions.title},
         count=${missionsPage != null ? missionsPage.totalElements() : null}, countId='missions-count', countFor='missions-results', actions=~{::missions-actions})}">
         <th:block th:ref="missions-actions">
             <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn btn--cta"
@@ -16,10 +16,10 @@
 
     <form id="missions-filter-form" method="get" th:action="@{/missions}" class="no-track">
         <div class="toolbar">
-            <th:block th:replace="~{fragments/components :: toolbarSearch('mission-search', 'search', ${search}, 'mission.search.placeholder')}"></th:block>
-            <th:block th:replace="~{fragments/components :: segmented(name='period', labelKey='mission.period.label', selected=${period},
+            <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('mission-search', 'search', ${search}, 'mission.search.placeholder')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='period', labelKey='mission.period.label', selected=${period},
                 options=${ {{value: 'UPCOMING', labelKey: 'mission.period.upcoming'}, {value: 'PAST', labelKey: 'mission.period.past'}, {value: 'ALL', labelKey: 'filter.all'}} })}"></th:block>
-            <th:block th:replace="~{fragments/components :: filterPopover(panelId='missions-filter-panel', panelName='missions',
+            <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='missions-filter-panel', panelName='missions',
                 testid='missions-filter-toggle', body=~{::missions-filter-body})}">
                 <th:block th:ref="missions-filter-body">
                     <div class="datetime-split-group">
@@ -43,7 +43,7 @@
             </th:block>
             <span id="missions-loading-indicator" hidden><span class="krt-loading-indicator"></span></span>
         </div>
-        <th:block th:replace="~{fragments/components :: filterChips('missions-filter-form')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: filterChips('missions-filter-form')}"></th:block>
     </form>
 
     <div id="missions-results" class="card card--flush">
@@ -95,10 +95,10 @@
         </div>
 
         <th:block th:if="${missions == null or missions.isEmpty()}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.empty', textKey='mission.empty.text')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='mission.empty', textKey='mission.empty.text')}"></th:block>
         </th:block>
 
-        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${missionsPage}, baseUrl='/missions')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${missionsPage}, baseUrl='/missions')}"></th:block>
         </th:block>
     </div>
 </main>

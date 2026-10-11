@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{admin.notificationRules.title} + ' - ' + ${appTitle}">Notification rules - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -12,7 +12,7 @@
     <span id="rule-i18n" hidden
           th:attr="data-confirm-delete-title=#{admin.notificationRules.confirmDelete.title},data-confirm-delete-body=#{admin.notificationRules.confirmDelete.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-saved=#{admin.notificationRules.success.saved},data-deleted=#{admin.notificationRules.success.deleted},data-error=#{notification.error.title},data-unknown-value=#{admin.notificationRules.selector.unknown}"></span>
 
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.notificationRules.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.notificationRules.title},
         count=${rules != null ? rules.size() : null}, countId='rules-count', countFor='rules-host', actions=null)}"></th:block>
 
     <div id="rules-host" class="card card--flush">
@@ -58,7 +58,7 @@
             </table>
         </div>
         <th:block th:if="${error == null and #lists.isEmpty(rules)}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.notificationRules.empty.title', textKey='admin.notificationRules.empty')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.notificationRules.empty.title', textKey='admin.notificationRules.empty')}"></th:block>
         </th:block>
         </th:block>
     </div>

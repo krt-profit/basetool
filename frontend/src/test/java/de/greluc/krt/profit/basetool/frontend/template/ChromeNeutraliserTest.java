@@ -28,11 +28,13 @@ import org.junit.jupiter.api.Test;
 class ChromeNeutraliserTest {
 
   private static final String SIDEBAR =
-      "<th:block th:replace=\"~{fragments/sidebar :: sidebar}\" />";
+      "<th:block th:replace=\"~{kernel/fragments/sidebar :: sidebar}\" />";
 
-  private static final String HEADER = "<th:block th:replace=\"~{fragments/header :: header}\" />";
+  private static final String HEADER =
+      "<th:block th:replace=\"~{kernel/fragments/header :: header}\" />";
 
-  private static final String TOAST = "<th:block th:replace=\"~{fragments/toast :: toast}\" />";
+  private static final String TOAST =
+      "<th:block th:replace=\"~{kernel/fragments/toast :: toast}\" />";
 
   @Test
   void aLegacyPageKeepsItsChromeCallsAndLosesItsOwnMarkup() {
@@ -74,17 +76,17 @@ class ChromeNeutraliserTest {
   @Test
   void aLayoutPageEmptiesItsContentAndTailBlocksAroundNestedBlocks() {
     String source =
-        "<html th:replace=\"~{fragments/layout :: page(pageContent=~{::pageContent})}\"><body>"
-            + "<th:block th:fragment=\"pageContent\">"
-            + "<th:block th:if=\"${a > b}\"><th:block th:replace=\"~{x :: y}\" /></th:block>"
-            + "<main>a</main></th:block>"
-            + "<th:block th:fragment=\"pageTail\"><script>b</script></th:block>"
-            + "</body></html>";
+        "<html th:replace=\"~{kernel/fragments/layout ::"
+            + " page(pageContent=~{::pageContent})}\"><body><th:block"
+            + " th:fragment=\"pageContent\"><th:block th:if=\"${a > b}\"><th:block th:replace=\"~{x"
+            + " :: y}\" /></th:block><main>a</main></th:block><th:block"
+            + " th:fragment=\"pageTail\"><script>b</script></th:block></body></html>";
 
     assertThat(ChromeNeutraliser.neutralise(source))
         .isEqualTo(
-            "<html th:replace=\"~{fragments/layout :: page(pageContent=~{::pageContent})}\"><body>"
-                + "<th:block th:fragment=\"pageContent\">"
+            "<html th:replace=\"~{kernel/fragments/layout ::"
+                + " page(pageContent=~{::pageContent})}\"><body><th:block"
+                + " th:fragment=\"pageContent\">"
                 + ChromeNeutraliser.CONTENT
                 + "</th:block>"
                 + "<th:block th:fragment=\"pageTail\">"
@@ -95,7 +97,7 @@ class ChromeNeutraliserTest {
   @Test
   void anUnbalancedLayoutBlockIsRefused() {
     String source =
-        "<html th:replace=\"~{fragments/layout :: page()}\"><body>"
+        "<html th:replace=\"~{kernel/fragments/layout :: page()}\"><body>"
             + "<th:block th:fragment=\"pageContent\"><th:block>"
             + "</th:block></body></html>";
 

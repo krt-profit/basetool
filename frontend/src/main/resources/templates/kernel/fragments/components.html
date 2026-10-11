@@ -23,7 +23,7 @@
 </th:block>
 
 <div th:fragment="emptyState" class="empty-state" data-testid="empty-state" th:id="${emptyId}">
-  <th:block th:replace="~{fragments/components :: emptyStateBody(${titleKey}, ${textKey}, ${filterHintKey})}"></th:block>
+  <th:block th:replace="~{kernel/fragments/components :: emptyStateBody(${titleKey}, ${textKey}, ${filterHintKey})}"></th:block>
   <a th:if="${actionHref != null and actionKey != null}" class="btn btn-outline" th:href="${actionHref}"
      data-testid="empty-state-action" th:text="#{__${actionKey}__}">Aktion</a>
 </div>
@@ -80,7 +80,7 @@
      th:data-list-total="${pageResponse.totalElements()}">
   <span data-testid="list-count"
         th:text="#{list.countOf(${pageResponse.page() * pageResponse.size() + 1}, ${pageResponse.page() * pageResponse.size() + #lists.size(pageResponse.content())}, ${pageResponse.totalElements()})}">1–7 von 24</span>
-  <div th:replace="~{fragments/pagination :: pagination(pageResponse=${pageResponse}, baseUrl=${baseUrl})}"></div>
+  <div th:replace="~{kernel/fragments/pagination :: pagination(pageResponse=${pageResponse}, baseUrl=${baseUrl})}"></div>
 </div>
 
 <div th:fragment="filterChips(formId)" class="filter-chips" hidden

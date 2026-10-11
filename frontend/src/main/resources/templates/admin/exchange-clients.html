@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{admin.exchangeClients.title} + ' - ' + ${appTitle}">Verbundene Anwendungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -15,7 +15,7 @@
     <span id="xc-undo-i18n" hidden
           th:attr="data-started=#{admin.exchangeClients.undo.started},data-preview=#{admin.exchangeClients.undo.preview},data-preview-active=#{admin.exchangeClients.undo.preview.active},data-preview-empty=#{admin.exchangeClients.undo.preview.empty},data-confirm-title=#{admin.exchangeClients.undo.confirm.title},data-confirm-body=#{admin.exchangeClients.undo.confirm.body},data-installation-all=#{admin.exchangeClients.undo.installation.all},data-installation-option=#{admin.exchangeClients.undo.installation.option},data-installation-revoked=#{admin.exchangeClients.undo.installation.revoked},data-summary=#{admin.exchangeClients.undo.run.summary},data-skipped-title=#{admin.exchangeClients.undo.run.skippedTitle},data-none=#{admin.exchangeClients.undo.run.none},data-more=#{admin.exchangeClients.undo.run.more},data-unnamed=#{admin.exchangeClients.undo.unnamed},data-reason-changed-afterwards=#{admin.exchangeClients.undo.reason.CHANGED_AFTERWARDS},data-reason-gone=#{admin.exchangeClients.undo.reason.GONE},data-reason-failed=#{admin.exchangeClients.undo.reason.FAILED},data-resource-blueprint=#{admin.exchangeClients.undo.resource.BLUEPRINT},data-resource-stock=#{admin.exchangeClients.undo.resource.STOCK},data-resource-ship=#{admin.exchangeClients.undo.resource.SHIP}"></span>
 
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.exchangeClients.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.exchangeClients.title},
         count=${clients != null ? #lists.size(clients) : null}, countId='xc-count', countFor='xc-registry-host', actions=~{::xc-actions})}">
         <th:block th:ref="xc-actions">
             <a href="#xc-form-title" class="btn btn--cta" data-xc-new data-testid="xc-new"
@@ -115,7 +115,7 @@
                         </table>
                     </div>
                     <th:block th:if="${error == null and #lists.isEmpty(clients)}">
-                        <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.exchangeClients.empty',
+                        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.exchangeClients.empty',
                             textKey='admin.exchangeClients.empty.text', emptyId='xc-empty')}"></th:block>
                     </th:block>
                 </div>
@@ -183,7 +183,7 @@
                         </table>
                     </div>
                     <th:block th:if="${#lists.isEmpty(undoRuns)}">
-                        <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.exchangeClients.undo.runs.empty',
+                        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.exchangeClients.undo.runs.empty',
                             textKey='admin.exchangeClients.undo.runs.empty.text', emptyId='xc-undo-runs-empty')}"></th:block>
                     </th:block>
                 </div>
@@ -242,7 +242,7 @@
         </form>
     </section>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='xc-undo-modal', titleKey='admin.exchangeClients.undo.title', variant='krt-modal--wide', body=~{::xc-undo-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='xc-undo-modal', titleKey='admin.exchangeClients.undo.title', variant='krt-modal--wide', body=~{::xc-undo-modal-body})}">
         <th:block th:ref="xc-undo-modal-body">
             <form id="xc-undo-form" class="no-track" data-client-id="" novalidate>
                 <div class="krt-modal-body">
@@ -286,7 +286,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='xc-undo-run-modal', titleKey='admin.exchangeClients.undo.run.title', variant='krt-modal--wide', body=~{::xc-undo-run-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='xc-undo-run-modal', titleKey='admin.exchangeClients.undo.run.title', variant='krt-modal--wide', body=~{::xc-undo-run-modal-body})}">
         <th:block th:ref="xc-undo-run-modal-body">
             <div class="krt-modal-body">
                 <div id="xc-undo-run-body" aria-live="polite" data-testid="xc-undo-run-body"></div>

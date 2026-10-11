@@ -323,7 +323,7 @@ class BackendRoleSyncFilterTest {
 
   @Test
   void staticAsset_skipsFilterBodyEntirely() throws Exception {
-    when(request.getRequestURI()).thenReturn("/css/styles.css");
+    when(request.getRequestURI()).thenReturn("/css/kernel/styles.css");
 
     filter.doFilterInternal(request, response, chain);
 

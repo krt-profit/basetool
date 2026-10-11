@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="${holder != null ? @handles.display(holder.handle()) : ''} + ' - ' + ${appTitle}">Halter - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -11,7 +11,7 @@
 <th:block th:fragment="pageContent">
 <main th:if="${holder != null}">
     <th:block th:with="holderName=${@handles.display(holder.handle())}, holderHref=@{/bank/manage(tab='halter')}">
-        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.bank.manage', eyebrowHref=${holderHref}, titleText=${holderName})}"></th:block>
+        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.bank.manage', eyebrowHref=${holderHref}, titleText=${holderName})}"></th:block>
     </th:block>
 
     <div class="cluster bank-holder-meta">
@@ -120,9 +120,9 @@
             </table>
         </div>
         <th:block th:if="${bookings == null or #lists.isEmpty(bookings.content())}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.holder.detail.history.empty.title', textKey='bank.holder.detail.history.empty', emptyId='bank-holder-bookings-empty')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='bank.holder.detail.history.empty.title', textKey='bank.holder.detail.history.empty', emptyId='bank-holder-bookings-empty')}"></th:block>
         </th:block>
-        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${bookings}, baseUrl=${paginationBaseUrl})}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${bookings}, baseUrl=${paginationBaseUrl})}"></th:block>
         </th:block>
         </div>
     </section>

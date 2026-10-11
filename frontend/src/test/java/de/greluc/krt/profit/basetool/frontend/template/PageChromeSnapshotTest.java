@@ -85,17 +85,17 @@ class PageChromeSnapshotTest {
   private static final String PREFIX = "chrome-oracle/";
 
   /** The layout fragment's template name, which the planted tests replace. */
-  private static final String LAYOUT = "fragments/layout";
+  private static final String LAYOUT = "kernel/fragments/layout";
 
   /** The floor of page templates that carry the chrome, so a vanished scan cannot pass. */
   private static final int PAGE_FLOOR = 90;
 
   /** A page with links, a toast and a tail, which the page-level planted changes edit. */
-  private static final String FULL_PAGE = "admin-settings.html";
+  private static final String FULL_PAGE = "settings/admin-settings.html";
 
   /** Pages the layout-level planted changes render: full chrome, no toast, and the bare shell. */
   private static final List<String> LAYOUT_PROBES =
-      List.of(FULL_PAGE, "app-link-help.html", "error.html");
+      List.of(FULL_PAGE, "shell/app-link-help.html", "error.html");
 
   private static final Path TEMPLATE_ROOT = Path.of("src", "main", "resources", "templates");
 
@@ -161,15 +161,16 @@ class PageChromeSnapshotTest {
   @Test
   void aPageWithAnotherStylesheetFails() throws Exception {
     assertPlantedPageChange(
-        source -> source.replace("/css/pages/admin-settings.css", "/css/pages/planted.css"));
+        source ->
+            source.replace("/css/pages/settings/admin-settings.css", "/css/pages/planted.css"));
   }
 
   @Test
   void aLayoutWithTheHeaderBeforeTheSidebarFails() throws Exception {
     assertPlantedLayoutChange(
         layout -> {
-          String sidebar = "<th:block th:replace=\"~{fragments/sidebar :: sidebar}\" />";
-          String header = "<th:block th:replace=\"~{fragments/header :: header}\" />";
+          String sidebar = "<th:block th:replace=\"~{kernel/fragments/sidebar :: sidebar}\" />";
+          String header = "<th:block th:replace=\"~{kernel/fragments/header :: header}\" />";
           return layout.replace(sidebar, "@@").replace(header, sidebar).replace("@@", header);
         });
   }
@@ -247,7 +248,7 @@ class PageChromeSnapshotTest {
       return files
           .filter(path -> path.toString().endsWith(".html"))
           .map(path -> TEMPLATE_ROOT.relativize(path).toString().replace('\\', '/'))
-          .filter(name -> !name.startsWith("fragments/"))
+          .filter(name -> !name.contains("fragments/"))
           .filter(PageChromeSnapshotTest::carriesTheChrome)
           .sorted()
           .toList();
@@ -257,7 +258,7 @@ class PageChromeSnapshotTest {
   private static boolean carriesTheChrome(@NotNull String name) {
     try {
       String source = Files.readString(TEMPLATE_ROOT.resolve(name), StandardCharsets.UTF_8);
-      return source.contains("fragments/head") || source.contains("fragments/layout");
+      return source.contains("kernel/fragments/head") || source.contains("kernel/fragments/layout");
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }

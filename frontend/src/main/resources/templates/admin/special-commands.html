@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{admin.specialcommands.title} + ' - ' + ${appTitle}">Spezialkommandos - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -11,7 +11,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{admin.specialcommands.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{admin.specialcommands.title},
         count=${specialCommands != null ? #lists.size(specialCommands) : 0}, countId='sc-count', countFor='sc-results', actions=~{::sc-actions})}">
         <th:block th:ref="sc-actions">
             <button type="button" id="add-sc-btn" class="btn btn--cta" data-testid="page-head-primary"
@@ -19,7 +19,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass=null)}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: alert(type='danger', msgKey=${error}, extraClass=null)}"></th:block>
 
     <form th:action="@{/admin/special-commands}" method="get" id="sc-filter-form" class="no-track">
         <div class="toolbar">
@@ -34,7 +34,7 @@
     <div id="sc-results" class="card card--flush">
         <th:block th:fragment="results">
         <th:block th:if="${catalogTruncated}">
-            <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
+            <div th:replace="~{kernel/fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
         </th:block>
         <div class="table-responsive" th:if="${specialCommands != null and !#lists.isEmpty(specialCommands)}">
             <table class="data-table data-table--stack"
@@ -80,13 +80,13 @@
             </table>
         </div>
         <th:block th:if="${specialCommands == null or #lists.isEmpty(specialCommands)}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.specialcommands.empty.title', textKey='admin.specialcommands.empty')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.specialcommands.empty.title', textKey='admin.specialcommands.empty')}"></th:block>
         </th:block>
         </th:block>
     </div>
 </main>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='specialcommand-modal', titleKey='admin.specialcommands.create', variant='krt-modal--wide', titleId='sc-modal-title', open=${openModal == 'specialcommand-modal'}, closeTrigger='', closeClass='close-sc-modal', body=~{::specialcommand-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='specialcommand-modal', titleKey='admin.specialcommands.create', variant='krt-modal--wide', titleId='sc-modal-title', open=${openModal == 'specialcommand-modal'}, closeTrigger='', closeClass='close-sc-modal', body=~{::specialcommand-modal-body})}">
     <th:block th:ref="specialcommand-modal-body">
         <form id="sc-form" method="post" th:action="${modalAction != null and openModal == 'specialcommand-modal'} ? ${modalAction} : @{/admin/special-commands}" th:object="${specialCommandForm}">
             <input type="hidden" name="version" id="edit-sc-version" th:value="*{version}">
@@ -115,7 +115,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='sc-delete-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-sc-delete-modal', body=~{::sc-delete-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='sc-delete-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-sc-delete-modal', body=~{::sc-delete-modal-body})}">
     <th:block th:ref="sc-delete-modal-body">
         <div class="krt-modal-body">
             <p th:text="#{admin.specialcommands.delete.confirm}" class="mb-2">Möchten Sie dieses Spezialkommando wirklich löschen?</p>

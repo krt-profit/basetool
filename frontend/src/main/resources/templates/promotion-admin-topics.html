@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{promotion.admin.topics.title} + ' - ' + ${appTitle}">Themenbereiche verwalten - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.admin.topics.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.admin.topics.title},
         count=${isAllSquadronsMode ? null : #lists.size(topics)}, countId='pa-count', countFor='pa-topics-results',
         actions=~{::pa-actions})}">
         <th:block th:ref="pa-actions">
@@ -29,7 +29,7 @@
     <div id="pa-topics-results">
     <th:block th:fragment="topicsResults">
     <div th:if="${#lists.isEmpty(topics)}" class="card card--flush">
-        <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.admin.topics.no.topics', textKey='promotion.admin.topics.no.topics.text')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='promotion.admin.topics.no.topics', textKey='promotion.admin.topics.no.topics.text')}"></th:block>
     </div>
 
     <div th:unless="${#lists.isEmpty(topics)}" class="master-detail pa-md" id="pa-md"
@@ -110,7 +110,7 @@
             </div>
 
             <th:block th:if="${paCats == null or #lists.isEmpty(paCats)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.admin.topics.no.categories', textKey='promotion.admin.topics.no.categories.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='promotion.admin.topics.no.categories', textKey='promotion.admin.topics.no.categories.text')}"></th:block>
             </th:block>
 
             <div class="pa-category-list" th:unless="${paCats == null or #lists.isEmpty(paCats)}">
@@ -208,7 +208,7 @@
 </main>
 
 <th:block th:unless="${isAllSquadronsMode}">
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-create-topic', titleKey='promotion.admin.topics.modal.create.title', variant='krt-modal--wide', body=~{::modal-create-topic-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='modal-create-topic', titleKey='promotion.admin.topics.modal.create.title', variant='krt-modal--wide', body=~{::modal-create-topic-body})}">
     <th:block th:ref="modal-create-topic-body">
         <div class="krt-modal-body">
         <div class="form-group">
@@ -232,7 +232,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-edit-topic', titleKey='promotion.admin.topics.modal.edit.title', variant='krt-modal--wide', body=~{::modal-edit-topic-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='modal-edit-topic', titleKey='promotion.admin.topics.modal.edit.title', variant='krt-modal--wide', body=~{::modal-edit-topic-body})}">
     <th:block th:ref="modal-edit-topic-body">
         <div class="krt-modal-body">
         <input id="et-id" type="hidden">
@@ -257,7 +257,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-create-category', titleKey='promotion.admin.category.modal.create.title', variant='krt-modal--wide', body=~{::modal-create-category-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='modal-create-category', titleKey='promotion.admin.category.modal.create.title', variant='krt-modal--wide', body=~{::modal-create-category-body})}">
     <th:block th:ref="modal-create-category-body">
         <div class="krt-modal-body">
         <input id="cc-topic-id" type="hidden">
@@ -281,7 +281,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-edit-category', titleKey='promotion.admin.category.modal.edit.title', variant='krt-modal--wide', body=~{::modal-edit-category-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='modal-edit-category', titleKey='promotion.admin.category.modal.edit.title', variant='krt-modal--wide', body=~{::modal-edit-category-body})}">
     <th:block th:ref="modal-edit-category-body">
         <div class="krt-modal-body">
         <input id="ec-id" type="hidden">

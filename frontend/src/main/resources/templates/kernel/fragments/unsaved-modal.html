@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="unsavedModal">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='unsaved-changes-modal', titleKey='unsaved.modal.title', closeId='unsaved-close-btn', closeTrigger='', body=~{fragments/unsaved-modal :: unsaved-changes-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='unsaved-changes-modal', titleKey='unsaved.modal.title', closeId='unsaved-close-btn', closeTrigger='', body=~{kernel/fragments/unsaved-modal :: unsaved-changes-modal-body})}">
         <th:block th:ref="unsaved-changes-modal-body">
             <div class="krt-modal-body">
                 <p th:text="#{unsaved.modal.message}" class="m-0">Du hast ungespeicherte Änderungen. Möchtest du die Seite wirklich verlassen und die Änderungen verwerfen?</p>

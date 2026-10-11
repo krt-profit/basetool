@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="${specialCommand != null ? specialCommand.name() + ' - ' + appTitle : appTitle}">Spezialkommando - IRIDIUM Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -12,7 +12,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main th:with="backHref=${canToggleLead or specialCommand == null} ? ${backUrl} : ${backUrl + '?unit=' + specialCommand.id()}">
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey=${canToggleLead ? 'admin.specialcommands.title' : 'leitung.title'}, eyebrowHref=@{${backHref}},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey=${canToggleLead ? 'admin.specialcommands.title' : 'leitung.title'}, eyebrowHref=@{${backHref}},
         titleText=${specialCommand != null ? specialCommand.name() : ''}, actions=~{::sk-actions})}">
         <th:block th:ref="sk-actions">
             <button id="add-member-btn" class="btn btn--cta" type="button" data-testid="page-head-primary"
@@ -40,7 +40,7 @@
     </div>
 </main>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='add-member-modal', titleKey='admin.specialcommands.members.add', closeTrigger='', closeClass='close-add-member-modal', body=~{::add-member-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='add-member-modal', titleKey='admin.specialcommands.members.add', closeTrigger='', closeClass='close-add-member-modal', body=~{::add-member-modal-body})}">
     <th:block th:ref="add-member-modal-body">
         <form th:action="@{/organisation/special-commands/{id}/members(id=${specialCommand.id()})}" method="post">
             <div class="krt-modal-body">

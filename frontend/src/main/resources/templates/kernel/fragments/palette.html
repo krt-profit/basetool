@@ -2,8 +2,8 @@
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
 <body>
 <th:block th:fragment="palette">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='nav-palette', titleKey='palette.aria',
-        variant='palette-modal', body=~{fragments/palette :: palette-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='nav-palette', titleKey='palette.aria',
+        variant='palette-modal', body=~{kernel/fragments/palette :: palette-body})}">
     </th:block>
 </th:block>
 <th:block th:fragment="palette-body">

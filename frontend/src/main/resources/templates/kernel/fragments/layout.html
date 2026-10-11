@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:fragment="page" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=${pageTitle}, additionalLinks=${pageLinks})}"></head>
+<head th:replace="~{kernel/fragments/head :: head(titleContent=${pageTitle}, additionalLinks=${pageLinks})}"></head>
 <body th:data-show-modal="${pageShowModal}">
 <th:block th:unless="${pageBare}">
-    <th:block th:replace="~{fragments/sidebar :: sidebar}" />
+    <th:block th:replace="~{kernel/fragments/sidebar :: sidebar}" />
 
-    <th:block th:replace="~{fragments/header :: header}" />
+    <th:block th:replace="~{kernel/fragments/header :: header}" />
 </th:block>
 <th:block th:replace="${pageContent}"></th:block>
 <th:block th:if="${pageToast}">
-    <th:block th:replace="~{fragments/toast :: toast}" />
+    <th:block th:replace="~{kernel/fragments/toast :: toast}" />
 </th:block>
 <th:block th:if="${pageTail != null}">
     <th:block th:replace="${pageTail}"></th:block>

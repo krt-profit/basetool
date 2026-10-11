@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{connectedApps.title} + ' - ' + ${appTitle}">Verbundene Anwendungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -15,7 +15,7 @@
     <span id="ca-undo-i18n" hidden
           th:attr="data-done=#{connectedApps.undo.done},data-skipped-title=#{connectedApps.undo.skippedTitle},data-unnamed=#{connectedApps.undo.unnamed},data-reason-changed-afterwards=#{connectedApps.undo.reason.CHANGED_AFTERWARDS},data-reason-gone=#{connectedApps.undo.reason.GONE},data-resource-blueprint=#{connectedApps.undo.resource.BLUEPRINT},data-resource-stock=#{connectedApps.undo.resource.STOCK},data-resource-ship=#{connectedApps.undo.resource.SHIP}"></span>
 
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.personal', titleText=#{connectedApps.title})}"></th:block>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.personal', titleText=#{connectedApps.title})}"></th:block>
 
     <p class="ca-approved">
         <span th:text="#{connectedApps.approvedClients.lead}">Nur zugelassene Anwendungen d&uuml;rfen sich mit deinem Konto verbinden.</span>
@@ -32,7 +32,7 @@
                  th:text="#{connectedApps.unseen.notice}">Neue Verbindung.</div>
 
             <th:block th:if="${error == null and #lists.isEmpty(apps)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='connectedApps.empty', textKey='connectedApps.empty.text', emptyId='ca-empty')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='connectedApps.empty', textKey='connectedApps.empty.text', emptyId='ca-empty')}"></th:block>
             </th:block>
 
             <div class="grid-auto ca-apps" th:if="${apps != null and !#lists.isEmpty(apps)}">
@@ -125,7 +125,7 @@
 
     <div class="alert alert-success ca-undo-result" id="ca-undo-result" hidden aria-live="polite" data-testid="ca-undo-result"></div>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='ca-undo-modal', titleKey='connectedApps.undo.title', variant='', body=~{::ca-undo-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='ca-undo-modal', titleKey='connectedApps.undo.title', variant='', body=~{::ca-undo-modal-body})}">
         <th:block th:ref="ca-undo-modal-body">
             <form id="ca-undo-form" class="no-track">
                 <div class="krt-modal-body">

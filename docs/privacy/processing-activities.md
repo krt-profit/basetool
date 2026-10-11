@@ -7,7 +7,7 @@ organisation exemption in **Art. 30(5) does not apply**: it is available only wh
 *occasional*, and this processing is continuous — a squadron-management tool runs every day and
 holds member data for as long as the membership lasts.
 
-**Controller:** the natural person named in the [Impressum](../../frontend/src/main/resources/templates/impressum.html)
+**Controller:** the natural person named in the [Impressum](../../frontend/src/main/resources/templates/shell/impressum.html)
 and in section 2 of the privacy policy. Not repeated here — the address is published where the law
 requires it and duplicating it into further files spreads personal data for no gain.
 

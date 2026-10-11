@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.livesync;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
@@ -28,7 +29,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -480,7 +480,7 @@ class LiveSyncSectionMapParityTest {
     Pattern attribute = Pattern.compile("data-livesync=\"([^\"]*)\"");
     URL anchor = LiveSyncSectionMapParityTest.class.getResource("/templates/bank-grants.html");
     assertThat(anchor).as("/templates/bank-grants.html classpath resource").isNotNull();
-    Path templatesRoot = Paths.get(anchor.toURI()).getParent();
+    Path templatesRoot = ClasspathAssets.rootOf(anchor);
     int entriesChecked = 0;
     try (Stream<Path> tree = Files.walk(templatesRoot)) {
       List<Path> templates =

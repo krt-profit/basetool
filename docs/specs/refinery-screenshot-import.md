@@ -401,7 +401,7 @@ message key and one URL.
   submits nothing and reads nothing from the form.
 - Targets GitHub's canonical latest-release redirect
   `https://github.com/krt-profit/basetool-sc-extractor/releases/latest`, hardcoded in the template
-  (same external-link pattern as `fragments/footer.html`) — no configuration property.
+  (same external-link pattern as `kernel/fragments/footer.html`) — no configuration property.
 - Opens in a new tab (`target="_blank"` with `rel="noopener noreferrer"`), so a draft already
   flashed onto the page (REQ-REFINERY-014) is never discarded by the click.
 - Sits outside the swapped `#refineryImportFormContainer` fragment, alongside the file picker

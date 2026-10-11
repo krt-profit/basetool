@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{refineryorder.detail.title} + ' - ' + ${appTitle}">Raffinerieauftrag Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -249,7 +249,7 @@
                         </li>
                     </ol>
                     <th:block th:if="${canEdit and openRun}">
-                        <th:block th:replace="~{fragments/components :: overflowMenu(id='rod-actions-menu', items=~{::rod-menu-items})}">
+                        <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='rod-actions-menu', items=~{::rod-menu-items})}">
                             <th:block th:ref="rod-menu-items">
                                 <form id="refineryCancelForm" th:action="@{/refinery-orders/{id}/delete(id=${orderId})}" method="post" class="rod-cancel-form">
                                     <button type="submit" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
@@ -288,7 +288,7 @@
     </th:block>
     </div>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='storeModal', titleKey='refineryorder.action.store', variant='krt-modal--wide', open=${showStoreModal}, closeTrigger='rod-close-store', body=~{::storeModal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='storeModal', titleKey='refineryorder.action.store', variant='krt-modal--wide', open=${showStoreModal}, closeTrigger='rod-close-store', body=~{::storeModal-body})}">
         <th:block th:ref="storeModal-body">
             <div id="refinery-store-results" class="krt-modal-flow">
             <th:block th:fragment="refineryStoreSection">
@@ -313,7 +313,7 @@
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'PIECE'}" th:text="'(' + #{material.quantity.piece} + ')'"></span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'SCU'}" th:text="'(' + #{material.quantity.scu} + ')'"></span>
                                     <th:block th:if="*{items[__${stat.index}__].quantityType == 'SCU'}">
-                                        <th:block th:replace="~{fragments/scu-hint :: scuHint(null, false)}"></th:block>
+                                        <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint(null, false)}"></th:block>
                                     </th:block>
                                 </label>
                                 <input type="text" data-scu-decimal th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:step="*{items[__${stat.index}__].quantityType == 'PIECE' ? '1' : '0.001'}" min="0" inputmode="decimal" required>

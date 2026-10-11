@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="${appTitle} + ' - ' + (${terms} != null ? ${terms.title} : ${#messages.msg('terms.unavailable.title')})">Profit Basetool - Nutzungsbedingungen</title>
     <th:block th:fragment="extraLinks">
-        <link rel="stylesheet" th:href="@{/css/legal.css}">
+        <link rel="stylesheet" th:href="@{/css/shell/legal.css}">
     </th:block>
 </head>
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.legal',
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.legal',
         titleText=${terms != null ? terms.title : #messages.msg('terms.unavailable.title')})}"></th:block>
     <div class="card legal-doc" data-testid="legal-doc">
         <th:block th:if="${terms != null}">

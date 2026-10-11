@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{operation.details} + ' - ' + ${appTitle}">Operation Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -26,7 +26,7 @@
                     data-trigger="open-modal-display" data-modal-id="edit-operation-modal"
                     ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{operation.edit}">Bearbeiten</span></button>
             <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-                <th:block th:replace="~{fragments/components :: overflowMenu(id='operation-menu', items=~{::operation-menu-items})}">
+                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='operation-menu', items=~{::operation-menu-items})}">
                     <th:block th:ref="operation-menu-items">
                         <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
                                 th:data-id="${operation.id}" data-trigger="operation-open-delete"
@@ -103,7 +103,7 @@
                         </a>
                     </th:block>
                     <th:block th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}">
-                        <th:block th:replace="~{fragments/components :: emptyState(titleKey='operation.result.empty', textKey='operation.result.empty.text')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='operation.result.empty', textKey='operation.result.empty.text')}"></th:block>
                     </th:block>
                 </div>
                 <div class="card op-payout-card" data-testid="op-payout-card">
@@ -182,10 +182,10 @@
                 </table>
             </div>
             <th:block th:if="${missions == null or missions.isEmpty()}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.empty', textKey='operation.missions.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='mission.empty', textKey='operation.missions.empty.text')}"></th:block>
             </th:block>
             <th:block th:if="${missionsPage != null and operation != null}">
-                <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${missionsPage}, baseUrl='/operations/' + ${operation.id})}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${missionsPage}, baseUrl='/operations/' + ${operation.id})}"></th:block>
             </th:block>
             </th:block>
             </div>
@@ -261,7 +261,7 @@
                     </table>
                 </div>
                 <th:block th:if="${operationPayouts == null or operationPayouts.isEmpty()}">
-                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='operation.payout.empty', textKey='operation.payout.empty.text')}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='operation.payout.empty', textKey='operation.payout.empty.text')}"></th:block>
                 </th:block>
             </div>
             </th:block>
@@ -289,7 +289,7 @@
                      th:text="#{operation.finance.truncated}">Es werden nur die ersten Eins&auml;tze angezeigt.</div>
             </th:block>
             <div th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" class="card card--flush">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.empty', textKey='operation.missions.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='mission.empty', textKey='operation.missions.empty.text')}"></th:block>
             </div>
 
             <th:block th:fragment="financeDetail">
@@ -340,7 +340,7 @@
     </div>
 
     <th:block th:if="${canEdit}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='edit-operation-modal', titleKey='operation.edit.title', variant='krt-modal--wide', body=~{::edit-operation-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='edit-operation-modal', titleKey='operation.edit.title', variant='krt-modal--wide', body=~{::edit-operation-modal-body})}">
         <th:block th:ref="edit-operation-modal-body">
             <form id="operation-form" class="op-edit-form" th:action="@{/operations/{id}/update(id=${operation.id})}" method="post">
                 <input type="hidden" name="version" th:value="${operation.version}">
@@ -389,7 +389,7 @@
     </th:block>
 </main>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-operation-modal', titleKey='general.confirm', variant='krt-modal--danger', body=~{::delete-operation-modal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='delete-operation-modal', titleKey='general.confirm', variant='krt-modal--danger', body=~{::delete-operation-modal-body})}">
     <th:block th:ref="delete-operation-modal-body">
         <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
             <div class="krt-modal-body">

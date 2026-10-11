@@ -201,7 +201,7 @@ Two binding rules shape every UI change:
   nothing, even inside a view controller. New JSON handlers go into a `@RestController`
   (REQ-FE-020, ADR-0165, ratchet in `ArchitectureTest`).
 - **A page ships no developer text and no inline page CSS** (FE-PERF-02, 2026-09-23). Templates
-  carry no comments (ADR-0214), page CSS lives in `static/css/pages/<page>.css`
+  carry no comments (ADR-0214), page CSS lives in `static/css/pages/<domain>/<page>.css`
   linked where its `<style>` block stood; the icon sprite stays inline by measurement (2.4 KB gzip).
   A page is 33–42 % smaller raw and about half the size gzipped (REQ-UI-023,
   `TemplateCommentHygieneTest`).
@@ -236,7 +236,7 @@ Two binding rules shape every UI change:
   dialog's `is-open`) win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`). The `migration`
   layer went with `inline-migration.css` on 2026-10-04 (REQ-UI-027 phase 4, `NoMigrationClassTest`).
 - **One navigation chrome, rendered once** (2026-10-03). Every app page includes
-  `fragments/header.html` and `fragments/sidebar.html`; the drawer is also the phone menu sheet, and
+  `kernel/fragments/header.html` and `kernel/fragments/sidebar.html`; the drawer is also the phone menu sheet, and
   the `Ctrl`/`⌘` + `K` quick access indexes the links the server rendered into it, so `sec:authorize`
   in that one template stays the only place that decides which pages a member is offered
   (REQ-UI-026, ADR-0240, `NavigationRenderMvcTest`, `NavigationE2eTest`).
@@ -346,7 +346,7 @@ UTF-8.
 
 A browser script gets its wording from the page, never from a literal: a `th:inline` bootstrap
 dictionary (`bookOutI18n`, `ORDER_HANDOVER_I18N`, …, declared in `types/thymeleaf-bootstrap.d.ts`
-and the module's `/* global */` header), a `window.krt*I18n` object from `fragments/head.html`, or
+and the module's `/* global */` header), a `window.krt*I18n` object from `kernel/fragments/head.html`, or
 `data-*` attributes on an element the fragment renders. The last primary literals — the book-out
 terminal picker, the order handover row and file name, the special-command modal titles, the admin
 chip — moved into the bundles on 2026-09-23 (FE-SIMP-03).
@@ -357,7 +357,7 @@ defaults after `||` any more: a script passes each string through `window.krtI18
 provide renders as its key name (`DICT.property` / `data-attribute`) and is reported once per page
 view as an `i18n_missing` client error, counted in `basetool_client_error_total`. The defaults
 `krtFetch` applies when a caller passes no toast or conflict text come from `window.krtFetchI18n`
-in `fragments/head.html`. `I18nDictionaryCoverageTest` fails the build when a key a script names
+in `kernel/fragments/head.html`. `I18nDictionaryCoverageTest` fails the build when a key a script names
 is missing from the pages that declare its dictionary, and when a literal fallback comes back.
 
 ## 8.11 Configuration

@@ -352,16 +352,16 @@
     </div>
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
     <th:block sec:authorize="isAuthenticated()">
-        <th:block th:replace="~{fragments/mobile-nav :: tabbar}" />
-        <th:block th:replace="~{fragments/palette :: palette}" />
+        <th:block th:replace="~{kernel/fragments/mobile-nav :: tabbar}" />
+        <th:block th:replace="~{kernel/fragments/palette :: palette}" />
     </th:block>
-    <script th:src="@{/js/sidebar.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/krt-palette.js}" defer th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
-    <th:block th:replace="~{fragments/toast :: toast}" />
-    <th:block th:replace="~{fragments/unsaved-modal :: unsavedModal}" />
-    <th:block th:replace="~{fragments/footer :: footer}" />
-    <th:block th:replace="~{fragments/icons :: sprite}" />
-    <script th:src="@{/js/unsaved-changes.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/sidebar.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/kernel/krt-palette.js}" defer th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
+    <th:block th:replace="~{kernel/fragments/toast :: toast}" />
+    <th:block th:replace="~{kernel/fragments/unsaved-modal :: unsavedModal}" />
+    <th:block th:replace="~{kernel/fragments/footer :: footer}" />
+    <th:block th:replace="~{kernel/fragments/icons :: sprite}" />
+    <script th:src="@{/js/kernel/unsaved-changes.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

@@ -234,7 +234,7 @@ identical.
 `InventoryItemController#getMyStackEntries` / `#getAllStackEntries`,
 `InventoryItemRepository#findUserStackEntries` / `#findGlobalStackEntries`,
 `InventoryPageController#viewMyStackEntries` / `#viewAllStackEntries`,
-`fragments/inventory-stack-entries.html`, `static/css/styles.css` (`.tree-row--leaf`, `.btn-icon`),
+`fragments/inventory-stack-entries.html`, `static/css/kernel/styles.css` (`.tree-row--leaf`, `.btn-icon`),
 `inventory-my.html` / `inventory-admin.html` (note-button DOM sync),
 `V143__add_inventory_item_stack_key_index.sql` (index rebuilt without the job-order / mission
 columns by `V218__drop_inventory_scalar_associations.sql`) ·
@@ -752,7 +752,7 @@ requirement each frontend page fetched a single `size=1000` slice and silently h
   pager (the item drilldown's title, resolved from the page's first row, likewise re-appears). A
   genuinely empty catalog entry (`totalElements == 0`) is not re-fetched.
 - **In-place pager.** The pager and the page-size picker render **inside** the swapped results
-  fragment (the shared `fragments/pagination.html` component); a page or size click swaps the
+  fragment (the shared `kernel/fragments/pagination.html` component); a page or size click swaps the
   fragment in place with history (REQ-FE-005, `krtFetch.bindSwap`), so the URL always names the
   visible page and a live-sync peer refresh (REQ-FE-010/015) re-fetches exactly that page.
 - **Fragment fetches stay lean.** A `fragment=results` render fetches only the items page — the
@@ -786,7 +786,7 @@ requirement each frontend page fetched a single `size=1000` slice and silently h
 `viewGameItemInventory_ShouldRenderPaginationControls`) · **Code:**
 `InventoryPageController#viewMaterialInventory` / `#viewGameItemInventory`,
 `templates/inventory-material.html`, `templates/inventory-game-item.html`,
-`static/js/inventory-material.js`, `static/js/inventory-game-item.js`, `fragments/pagination.html`,
+`static/js/inventory-material.js`, `static/js/inventory-game-item.js`, `kernel/fragments/pagination.html`,
 `InventoryItemController#getInventoryByMaterial` / `#getInventoryByGameItem` (backend paging) ·
 **Issues:** — · **ADR:** ADR-0104
 
@@ -1059,7 +1059,7 @@ no visibility dimension. Everything else below holds verbatim on both.
 `InventoryMultiSelectLabelE2eTest` (the header summary on both pages),
 `InventoryFilterPanelCollapseE2eTest` · **Code:** `templates/inventory-my.html`,
 `templates/inventory-admin.html` (`fragments/components :: filterPopover`, `:: filterChips`,
-`:: segmented`), `static/js/krt-filter-panel.js` (open/close, badge), `static/js/krt-filter-chips.js`,
+`:: segmented`), `static/js/kernel/krt-filter-panel.js` (open/close, badge), `static/js/kernel/krt-filter-chips.js`,
 `static/js/inventory-my.js` (`countActiveMyInventoryFilters`), `static/js/inventory-admin.js`
 (`countActiveAdminInventoryFilters`) · **Issues:** — · **ADR:** — (extends REQ-UI-017 / ADR-0120;
 mechanism generalised by REQ-FE-021 and REQ-UI-027)

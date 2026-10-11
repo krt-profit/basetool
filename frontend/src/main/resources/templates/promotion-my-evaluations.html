@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{promotion.my.title} + ' - ' + ${appTitle}">Meine Bewertungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.my.title})}"></th:block>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.promotion', titleText=#{promotion.my.title})}"></th:block>
 
     <div th:if="${isAllSquadronsMode}" class="alert alert-info"
          th:text="#{promotion.select_squadron.hint}">Bitte wähle eine Staffel, um ihr Beförderungssystem zu sehen.</div>
@@ -60,7 +60,7 @@
     </section>
 
     <div class="toolbar" th:unless="${#lists.isEmpty(eligibilitySteps)}" id="me-filter-form">
-        <th:block th:replace="~{fragments/components :: segmented(name='meOpen', labelKey='promotion.my.filter.label', selected='ALL',
+        <th:block th:replace="~{kernel/fragments/components :: segmented(name='meOpen', labelKey='promotion.my.filter.label', selected='ALL',
             options=${ {{value: 'ALL', labelKey: 'filter.all'}, {value: 'OPEN', labelKey: 'promotion.my.filter.open'}} })}"></th:block>
     </div>
 
@@ -70,7 +70,7 @@
         </div>
 
         <th:block th:if="${#lists.isEmpty(eligibilitySteps)}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.my.eligibility.none', textKey='promotion.my.eligibility.none.text')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='promotion.my.eligibility.none', textKey='promotion.my.eligibility.none.text')}"></th:block>
         </th:block>
 
         <div class="table-responsive" th:unless="${#lists.isEmpty(eligibilitySteps)}">
@@ -137,7 +137,7 @@
             </table>
         </div>
         <div id="me-open-empty" hidden>
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.my.filter.open.empty', textKey='promotion.my.filter.open.empty.text')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='promotion.my.filter.open.empty', textKey='promotion.my.filter.open.empty.text')}"></th:block>
         </div>
     </section>
 
@@ -147,7 +147,7 @@
         </div>
 
         <th:block th:if="${#lists.isEmpty(topics)}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='promotion.my.no.topics', textKey='promotion.overview.no.topics.text')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='promotion.my.no.topics', textKey='promotion.overview.no.topics.text')}"></th:block>
         </th:block>
 
         <div class="grid-auto me-levels" th:unless="${#lists.isEmpty(topics)}">

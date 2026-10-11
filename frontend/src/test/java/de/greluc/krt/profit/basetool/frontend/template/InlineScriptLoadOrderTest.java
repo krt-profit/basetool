@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -43,7 +44,7 @@ import org.junit.jupiter.api.Test;
 class InlineScriptLoadOrderTest {
 
   /** The one script that must stay synchronous and first. */
-  private static final String CLIENT_ERROR_BEACON = "/js/krt-client-error.js";
+  private static final String CLIENT_ERROR_BEACON = "/js/kernel/krt-client-error.js";
 
   /**
    * Calls an inline script may make at its top level: looking up the elements already parsed above
@@ -108,7 +109,7 @@ class InlineScriptLoadOrderTest {
     String head =
         stripComments(
             Files.readString(
-                templatesRoot().resolve("fragments/head.html"), StandardCharsets.UTF_8));
+                templatesRoot().resolve("kernel/fragments/head.html"), StandardCharsets.UTF_8));
     Matcher first = SCRIPT.matcher(head);
     assertThat(first.find()).as("head.html has scripts").isTrue();
     assertThat(first.group(1)).contains(CLIENT_ERROR_BEACON).doesNotContain("defer");
@@ -239,9 +240,7 @@ class InlineScriptLoadOrderTest {
   }
 
   private static Path templatesRoot() throws URISyntaxException {
-    return Paths.get(
-            InlineScriptLoadOrderTest.class.getResource("/templates/bank-grants.html").toURI())
-        .getParent();
+    return ClasspathAssets.templates();
   }
 
   private static List<Path> templates() throws IOException, URISyntaxException {

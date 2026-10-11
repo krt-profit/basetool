@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="${detail != null ? detail.account().name() : ''} + ' - ' + ${appTitle}">Konto - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -74,7 +74,7 @@
     </th:block>
 
     <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).BANK_MANAGEMENT)">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-reverse-modal', titleKey='bank.modal.reverse.title', variant='krt-modal--danger', body=~{::bank-reverse-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-reverse-modal', titleKey='bank.modal.reverse.title', variant='krt-modal--danger', body=~{::bank-reverse-modal-body})}">
         <th:block th:ref="bank-reverse-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="accountBody"
                   data-livesync="bank:@account/account,bookings,chart bank/grid orgunit-bank/orgUnitBank"
@@ -101,7 +101,7 @@
     </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-statement-modal', titleKey='bank.modal.statement.title', body=~{::bank-statement-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-statement-modal', titleKey='bank.modal.statement.title', body=~{::bank-statement-modal-body})}">
         <th:block th:ref="bank-statement-modal-body">
             <form class="bank-download-form no-track"
                   th:attr="data-endpoint='/api/proxy/bank/accounts/' + ${acct.id()} + '/statement',data-filename='kontoauszug-' + ${acct.accountNo()} + '.pdf',data-period-required=#{bank.error.periodRequired}">

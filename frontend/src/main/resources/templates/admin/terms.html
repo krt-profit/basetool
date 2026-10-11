@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="${appTitle} + ' - ' + #{adminTerms.title}">Profit Basetool - Zustimmungen</title>
 </head>
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{adminTerms.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{adminTerms.title},
         count=${termsPage != null ? termsPage.totalElements() : null}, countId='admin-terms-count', countFor='admin-terms-results')}"></th:block>
 
     <form id="admin-terms-filter-form" method="get" th:action="@{/admin/terms}" class="no-track">
         <div class="toolbar">
-            <th:block th:replace="~{fragments/components :: segmented(name='filter', labelKey='adminTerms.filter.label', selected=${termsFilter},
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='filter', labelKey='adminTerms.filter.label', selected=${termsFilter},
                 options=${ {{value: 'PENDING', labelKey: 'adminTerms.filter.pending', count: termsPendingCount},
                             {value: 'ACCEPTED', labelKey: 'adminTerms.filter.accepted'},
                             {value: 'ALL', labelKey: 'adminTerms.filter.all'}} })}"></th:block>
@@ -23,7 +23,7 @@
             <div th:if="${termsLoadFailed}" class="alert alert-danger" role="alert" th:text="#{adminTerms.loadFailed}">Die &Uuml;bersicht konnte nicht geladen werden.</div>
 
             <th:block th:if="${!termsLoadFailed and #lists.isEmpty(termsRows)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='adminTerms.empty', textKey='adminTerms.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='adminTerms.empty', textKey='adminTerms.empty.text')}"></th:block>
             </th:block>
 
             <div class="table-responsive" th:if="${!#lists.isEmpty(termsRows)}">
@@ -51,7 +51,7 @@
                 </table>
             </div>
 
-            <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${termsPage}, baseUrl=${'/admin/terms?filter=' + termsFilter})}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${termsPage}, baseUrl=${'/admin/terms?filter=' + termsFilter})}"></th:block>
         </th:block>
     </div>
 </main>

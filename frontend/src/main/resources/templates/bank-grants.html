@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{bank.grants.title} + ' - ' + ${appTitle}">Bank-Berechtigungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name}">
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', eyebrowHref=@{/bank}, titleText=#{bank.grants.title}, actions=~{::bank-grants-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', eyebrowHref=@{/bank}, titleText=#{bank.grants.title}, actions=~{::bank-grants-actions})}">
         <th:block th:ref="bank-grants-actions">
             <button type="button" class="btn btn--cta"
                     data-trigger="open-modal-display" data-modal-id="bank-grant-create-modal"
@@ -20,7 +20,7 @@
 
     <form id="bank-grants-filter-form" class="no-track" method="get" th:action="@{/bank/grants}">
         <div class="toolbar">
-            <th:block th:replace="~{fragments/components :: segmented(name='view', labelKey='bank.grants.view.aria', selected=${byEmployee ? 'employee' : 'account'},
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='view', labelKey='bank.grants.view.aria', selected=${byEmployee ? 'employee' : 'account'},
                 options=${ {{value: 'account', labelKey: 'bank.grants.view.account'}, {value: 'employee', labelKey: 'bank.grants.view.employee'}} })}"></th:block>
             <div class="bank-grants-filter" th:if="${!byEmployee}">
                 <label for="bank-grants-account-filter" class="visually-hidden" th:text="#{bank.grants.filter.account}">Konto</label>
@@ -108,12 +108,12 @@
             </table>
         </div>
         <th:block th:if="${#lists.isEmpty(grants)}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='bank.grants.empty.title', textKey='bank.grants.empty', emptyId='bank-grants-empty')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='bank.grants.empty.title', textKey='bank.grants.empty', emptyId='bank-grants-empty')}"></th:block>
         </th:block>
         </th:block>
     </div>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-grant-create-modal', titleKey='bank.modal.grant.title', body=~{::bank-grant-create-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-grant-create-modal', titleKey='bank.modal.grant.title', body=~{::bank-grant-create-modal-body})}">
         <th:block th:ref="bank-grant-create-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
                   data-livesync="bank/grants"
@@ -165,7 +165,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-grant-revoke-modal', titleKey='bank.modal.revoke.title', variant='krt-modal--danger', body=~{::bank-grant-revoke-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-grant-revoke-modal', titleKey='bank.modal.revoke.title', variant='krt-modal--danger', body=~{::bank-grant-revoke-modal-body})}">
         <th:block th:ref="bank-grant-revoke-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
                   data-livesync="bank/grants"

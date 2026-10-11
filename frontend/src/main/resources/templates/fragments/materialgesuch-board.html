@@ -5,7 +5,7 @@
     <span th:replace="~{materialboerse :: counts}"></span>
     <th:block th:if="${#lists.isEmpty(requests)}">
         <div class="empty-state" data-testid="empty-state">
-            <th:block th:replace="~{fragments/components :: emptyStateBody('materialgesuch.empty.title', 'materialgesuch.empty.text', null)}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('materialgesuch.empty.title', 'materialgesuch.empty.text', null)}"></th:block>
             <button type="button" class="btn btn-ghost btn-xs" data-mg-reset th:text="#{materialboerse.empty.reset}">Filter zurücksetzen</button>
         </div>
     </th:block>

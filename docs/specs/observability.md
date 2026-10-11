@@ -131,7 +131,7 @@ logged after that fix `anonymous` means an unauthenticated request again. **Enfo
 The frontend's `GlobalExceptionHandler` applies the same expected-noise demotion to **asset-shaped
 path-variable type mismatches**: when a request path whose final segment carries a filename
 extension (e.g. `GET /missions/common-handlers.js`, a crawler resolving the shared script names of
-`fragments/head.html` relative to a page URL) fails `UUID` path-variable conversion, the handler
+`kernel/fragments/head.html` relative to a page URL) fails `UUID` path-variable conversion, the handler
 renders the **404** error page (such a path names no resource — a 400 would mislabel it) and logs at
 `DEBUG`, not `WARN`. Both keys are required — target type `UUID` *and* the dotted final segment — so
 a genuinely malformed id on a real navigation (e.g. a truncated pasted link, no dot) keeps its
@@ -440,7 +440,7 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
 
 **Browser-side faults reach the server, at `DEBUG`.** A JavaScript exception after a fragment swap
 left no trace anywhere — the user saw a dead panel and the operator saw a clean log. A small beacon
-(`static/js/krt-client-error.js`, loaded as the first, non-`defer` script so it is installed before
+(`static/js/kernel/krt-client-error.js`, loaded as the first, non-`defer` script so it is installed before
 anything it watches) listens for `error` (capturing, so non-bubbling subresource failures are seen)
 and `unhandledrejection` and POSTs to **`POST /internal/client-error`**
 (`ClientErrorReportController`, authenticated). Binding constraints on that surface:
@@ -821,7 +821,7 @@ not silent — so the only detector was a human reading a log export.
   (auditd `sshd_config`/`authorized_keys` tamper watches, fail2ban SSH-jail bans)** — ingested
   **including client IPs and usernames** at a **31-day retention**. This is a deliberate,
   owner-approved data-protection decision (2026-07-02) for security monitoring and abuse
-  detection; it is conditioned on the privacy-policy extension (`privacy.html` + DE/EN
+  detection; it is conditioned on the privacy-policy extension (`shell/privacy.html` + DE/EN
   bundles) that ships with the Phase-2 PR, and Loki is deliberately excluded from backups so
   the GFS retention cannot silently extend those 31 days (ADR-0072). Since ADR-0162 the native
   edge writes access and error lines to its container stdout (`app="edge"`), which reaches Loki
@@ -1153,7 +1153,7 @@ Binding conditions on this retention:
 - **Admin-only access** — these streams are readable only through Grafana behind Keycloak OIDC
   restricted to the realm role `Admin` (REQ-OBS-008).
 - **Privacy-policy linkage (mandatory):** the decision is conditioned on the privacy policy covering
-  the temporary IP storage. `frontend/src/main/resources/templates/privacy.html` §3.8 plus the
+  the temporary IP storage. `frontend/src/main/resources/templates/shell/privacy.html` §3.8 plus the
   `privacy.h2_3_8` / `privacy.p_3_8_1` / `privacy.p_3_8_2` keys in the DE/EN bundles document the
   streams, the 31-day retention, the purpose (security monitoring / abuse detection) and the
   admin-only access. A change that widens these streams or their retention must update the privacy

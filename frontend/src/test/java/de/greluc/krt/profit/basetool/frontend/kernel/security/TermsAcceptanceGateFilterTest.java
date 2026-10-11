@@ -214,7 +214,7 @@ class TermsAcceptanceGateFilterTest {
   void skipsStaticAssets() throws Exception {
     stubStatus(false);
 
-    assertThat(invoke("/css/styles.css").getRedirectedUrl()).isNull();
+    assertThat(invoke("/css/kernel/styles.css").getRedirectedUrl()).isNull();
     verify(backendApiClient, never()).get(any(String.class), eq(TermsStatusDto.class));
   }
 
@@ -451,7 +451,8 @@ class TermsAcceptanceGateFilterTest {
     when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
         .thenThrow(new ReauthenticationRequiredException("token gone", null));
 
-    for (String path : new String[] {"/terms", "/impressum", "/terms/accept", "/css/styles.css"}) {
+    for (String path :
+        new String[] {"/terms", "/impressum", "/terms/accept", "/css/kernel/styles.css"}) {
       MockHttpServletResponse response = invoke(path);
       assertThat(response.getRedirectedUrl()).as(path).isNull();
       assertThat(response.getStatus()).as(path).isEqualTo(200);

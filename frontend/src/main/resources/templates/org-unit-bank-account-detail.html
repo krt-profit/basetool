@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="${detail != null ? detail.detail().account().name() : ''} + ' - ' + ${appTitle}">Konto - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -10,7 +10,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main th:if="${detail == null}">
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='bank.orgUnit.title', eyebrowHref=@{/org-unit-bank},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='bank.orgUnit.title', eyebrowHref=@{/org-unit-bank},
         titleText=#{bank.orgUnit.detail.notFoundTitle})}"></th:block>
     <div class="alert alert-warning" role="status" data-testid="org-unit-bank-detail-missing"
          th:text="#{bank.orgUnit.detail.notFound}">Konto nicht gefunden oder kein Zugriff.</div>
@@ -240,7 +240,7 @@
     </div>
 
     <th:block th:if="${detail.canExportStatement()}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='org-unit-statement-modal', titleKey='bank.modal.statement.title', body=~{::org-unit-statement-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='org-unit-statement-modal', titleKey='bank.modal.statement.title', body=~{::org-unit-statement-modal-body})}">
         <th:block th:ref="org-unit-statement-modal-body">
             <form class="bank-download-form no-track"
                   th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/' + ${acct.id()} + '/statement',data-filename='kontoauszug-' + ${acct.accountNo()} + '.pdf',data-period-required=#{bank.error.periodRequired}">

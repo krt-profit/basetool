@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageShowModal=${showShipModal}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageShowModal=${showShipModal}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{hangar.title} + ' - ' + ${appTitle}">Hangar - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -11,7 +11,7 @@
 <th:block th:fragment="pageContent">
 <main th:with="mineTab=${activeTab != 'unit'}">
     <th:block th:if="${mineTab}">
-        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{hangar.title}, count=null, actions=~{::hangar-actions})}">
+        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{hangar.title}, count=null, actions=~{::hangar-actions})}">
             <th:block th:ref="hangar-actions">
                 <button type="button" id="fleetview-import-btn" class="btn btn-ghost" data-testid="hangar-import"
                         th:title="#{hangar.import.description}"
@@ -23,7 +23,7 @@
                        data-testid="hangar-import-file" th:attr="aria-label=#{hangar.import.label}">
                 <button type="button" id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta"
                         data-trigger="hangar-add-ship" th:data-action="@{/hangar/add}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{hangar.ship.add}">Schiff hinzuf&uuml;gen</span></button>
-                <th:block th:replace="~{fragments/components :: overflowMenu(id='hangar-more', items=~{::hangar-more-items})}">
+                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='hangar-more', items=~{::hangar-more-items})}">
                     <th:block th:ref="hangar-more-items">
                         <button type="button" id="set-home-location-btn" class="overflow-menu__item" role="menuitem"
                                 data-trigger="hangar-open-home" data-testid="hangar-home-location"
@@ -45,7 +45,7 @@
         </th:block>
     </th:block>
     <th:block th:unless="${mineTab}">
-        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{hangar.title}, count=null, actions=null)}"></th:block>
+        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{hangar.title}, count=null, actions=null)}"></th:block>
     </th:block>
 
     <nav class="tab-nav hangar-tabs" th:aria-label="#{hangar.title}" data-testid="hangar-tabs"
@@ -66,8 +66,8 @@
     <th:block th:if="${mineTab}">
         <form id="hangar-filter-form" class="no-track" role="search" method="get" th:action="@{/hangar}">
             <div class="toolbar">
-                <th:block th:replace="~{fragments/components :: toolbarSearch('hangar-ship-filter', 'search', ${search}, 'hangar.filter.placeholder')}"></th:block>
-                <th:block th:replace="~{fragments/components :: segmented(name='fitted', labelKey='hangar.fit.label', selected=${fitted},
+                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('hangar-ship-filter', 'search', ${search}, 'hangar.filter.placeholder')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: segmented(name='fitted', labelKey='hangar.fit.label', selected=${fitted},
                     options=${ {{value: '', labelKey: 'filter.all'}, {value: 'true', labelKey: 'hangar.fit.ready'}, {value: 'false', labelKey: 'hangar.fit.notReady'}} })}"></th:block>
                 <span class="toolbar__spacer"></span>
                 <span class="toolbar__count" id="hangar-fit-summary" data-testid="hangar-fit-summary"
@@ -145,15 +145,15 @@
             </div>
 
             <th:block th:if="${#lists.isEmpty(myShips) and error == null and search == null and fitted == ''}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='hangar.empty', textKey='hangar.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='hangar.empty', textKey='hangar.empty.text')}"></th:block>
             </th:block>
             <th:block th:if="${#lists.isEmpty(myShips) and error == null and (search != null or fitted != '')}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='hangar.filter.no_results', textKey='hangar.filter.no_results.text',
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='hangar.filter.no_results', textKey='hangar.filter.no_results.text',
                     actionHref=@{/hangar(size=${pageSize})}, actionKey='hangar.filter.clear')}"></th:block>
             </th:block>
 
-            <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl})}"></th:block>
-            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+            <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+            <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
         </div>
     </th:block>
@@ -161,7 +161,7 @@
     <th:block th:unless="${mineTab}">
         <form id="squadron-filter-form" class="no-track" role="search" method="get" th:action="@{/hangar/squadron}">
             <div class="toolbar">
-                <th:block th:replace="~{fragments/components :: toolbarSearch('squadron-ship-filter', 'search', ${search}, 'hangar.filter.placeholder')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('squadron-ship-filter', 'search', ${search}, 'hangar.filter.placeholder')}"></th:block>
                 <span class="toolbar__spacer"></span>
                 <span class="hangar-legend" aria-hidden="true"
                       ><span class="hangar-legend__item"><span class="hangar-legend__swatch hangar-legend__swatch--ready"></span><span th:text="#{hangar.status.ready}">einsatzbereit</span></span
@@ -235,21 +235,21 @@
             </div>
 
             <th:block th:if="${#lists.isEmpty(overview) and error == null and search == null}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='hangar.squadron.empty', textKey='hangar.squadron.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='hangar.squadron.empty', textKey='hangar.squadron.empty.text')}"></th:block>
             </th:block>
             <th:block th:if="${#lists.isEmpty(overview) and error == null and search != null}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='hangar.filter.no_results', textKey='hangar.filter.no_results.text',
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='hangar.filter.no_results', textKey='hangar.filter.no_results.text',
                     actionHref=@{/hangar/squadron(size=${pageSize})}, actionKey='hangar.filter.clear')}"></th:block>
             </th:block>
 
-            <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl})}"></th:block>
-            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+            <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+            <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
         </div>
     </th:block>
 
     <th:block th:if="${mineTab}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='ship-modal', titleKey='hangar.ship.modal_title', variant='krt-modal--wide', titleId='modal-title', closeTrigger='', closeClass='close-ship-modal', body=~{::ship-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='ship-modal', titleKey='hangar.ship.modal_title', variant='krt-modal--wide', titleId='modal-title', closeTrigger='', closeClass='close-ship-modal', body=~{::ship-modal-body})}">
         <th:block th:ref="ship-modal-body">
             <form id="ship-form" data-testid="hangar-ship-form" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}" method="post" th:object="${shipForm}" th:action="${modalAction != null} ? ${modalAction} : @{/hangar}">
                 <input type="hidden" id="ship-version" name="version" th:value="*{version}">
@@ -277,7 +277,7 @@
                 <fieldset class="form-group ship-insurance" data-testid="ship-insurance"
                           th:with="insVal=*{insurance}, insKind=${insVal == null or insVal == '' ? null : (insVal == '0' ? 'NONE' : (insVal == 'LTI' ? 'LTI' : 'MONTHS'))}">
                     <legend th:text="#{hangar.ship.insurance}">Versicherung</legend>
-                    <th:block th:replace="~{fragments/components :: segmented(name='insuranceKind', labelKey='hangar.ship.insurance',
+                    <th:block th:replace="~{kernel/fragments/components :: segmented(name='insuranceKind', labelKey='hangar.ship.insurance',
                         selected=${insKind}, variant='segmented--block segmented--lg',
                         options=${ {{value: 'NONE', labelKey: 'hangar.ship.insurance.none'},
                                     {value: 'MONTHS', labelKey: 'hangar.ship.insurance.kind.months'},
@@ -303,7 +303,7 @@
                     <input type="checkbox" id="ship-fitted" name="fitted" th:field="*{fitted}">
                     <label for="ship-fitted" class="ship-fitted-label" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
                 </div>
-                <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
+                <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                 </div>
                 <div class="krt-modal-foot">
                     <button type="button" id="modal-delete-btn" class="btn btn-quiet-danger" hidden><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.ship.delete}">Löschen</span></button>
@@ -313,7 +313,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='import-result-modal', titleKey='hangar.import.result.title', variant='krt-modal--wide', titleId='import-result-title', closeId='import-result-close-x', closeTrigger='', body=~{::import-result-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='import-result-modal', titleKey='hangar.import.result.title', variant='krt-modal--wide', titleId='import-result-title', closeId='import-result-close-x', closeTrigger='', body=~{::import-result-modal-body})}">
         <th:block th:ref="import-result-modal-body">
             <div class="krt-modal-body">
             <div class="stat-row">
@@ -343,7 +343,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-all-confirm-modal', titleKey='hangar.delete_all.modal.title', variant='krt-modal--danger', body=~{::delete-all-confirm-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='delete-all-confirm-modal', titleKey='hangar.delete_all.modal.title', variant='krt-modal--danger', body=~{::delete-all-confirm-modal-body})}">
         <th:block th:ref="delete-all-confirm-modal-body">
             <div class="krt-modal-body">
                 <p th:text="#{hangar.delete_all.modal.body}" class="m-0">Alle eigenen Schiffe wirklich löschen?</p>
@@ -355,7 +355,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='home-location-modal', titleKey='hangar.home_location.modal.title', variant='krt-modal--wide', closeTrigger='', closeClass='close-modal-home', body=~{::home-location-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='home-location-modal', titleKey='hangar.home_location.modal.title', variant='krt-modal--wide', closeTrigger='', closeClass='close-modal-home', body=~{::home-location-modal-body})}">
         <th:block th:ref="home-location-modal-body">
 
             <form th:unless="${#lists.isEmpty(homeLocations)}" id="home-location-form" method="post"
@@ -387,7 +387,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
         <th:block th:ref="delete-confirm-modal-body">
             <div class="krt-modal-body">
                 <p th:text="#{hangar.ship.delete_confirm}" class="m-0">Schiff wirklich löschen?</p>

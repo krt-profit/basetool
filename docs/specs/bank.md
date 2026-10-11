@@ -677,7 +677,7 @@ in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
   „Buchungen (n)" + „Konto-Info" / „Ziel & Sichtbarkeit", booking rows with their details as
   sub-lines (`BankAccountDetailPatternRenderTest`).
 
-**Enforced by:** `:frontend:check` (htmlhint/eslint/stylelint/prettier) over the bank templates · `BankInPlaceFragmentMvcTest` (single Kontobewegung entry point in `accountBody`) · `BankAccountDetailPatternRenderTest`, `BankStaffPagesPatternRenderTest` · **Code:** `static/css/bank.css`, `static/css/bank-account-detail.css`, `static/css/pages/bank-*.css`, `templates/bank-*.html`, `templates/fragments/bank-account-detail.html`, `static/js/bank-account-detail.js`, `templates/fragments/bank-movement-modal.html`, `templates/fragments/scu-hint.html`, `templates/admin/bank*.html`, `static/js/bank.js` · **Issues:** #556, #997
+**Enforced by:** `:frontend:check` (htmlhint/eslint/stylelint/prettier) over the bank templates · `BankInPlaceFragmentMvcTest` (single Kontobewegung entry point in `accountBody`) · `BankAccountDetailPatternRenderTest`, `BankStaffPagesPatternRenderTest` · **Code:** `static/css/bank.css`, `static/css/bank-account-detail.css`, `static/css/pages/bank-*.css`, `templates/bank-*.html`, `templates/fragments/bank-account-detail.html`, `static/js/bank-account-detail.js`, `templates/fragments/bank-movement-modal.html`, `templates/kernel/fragments/scu-hint.html`, `templates/admin/bank*.html`, `static/js/bank.js` · **Issues:** #556, #997
 
 ### REQ-BANK-018 — API & persistence conventions
 
@@ -2645,7 +2645,7 @@ seed, no roster) · **Code:** `bank/internal/BankAccountRepository#findAllFilter
 `bank/internal/BankAccountService#getAccounts`, `bank/web/BankAccountController#getAccounts`, frontend
 `bank/web/BankProxyController#searchAccounts`, `bank/web/BankManagePageController`,
 `bank/web/BankPageController`, `bank/web/BankGrantsPageController`,
-`bank/web/BankRequestQueuePageController`, `static/js/krt-bank-account-search.js`, `static/js/bank.js`,
+`bank/web/BankRequestQueuePageController`, `static/js/kernel/krt-bank-account-search.js`, `static/js/bank.js`,
 `templates/fragments/bank-movement-modal.html`, `templates/bank-grants.html`,
 `templates/bank-manage.html` · **ADR:** ADR-0106 · **Issues:** —
 

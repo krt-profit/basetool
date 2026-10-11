@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{members.edit.title} + ' - ' + ${appTitle}">Mitglied bearbeiten - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -11,7 +11,7 @@
 <main th:with="fromProfile=${memberEditForm.source == 'profile'},
                backHref=${fromProfile ? '/profile' : '/members'},
                descriptionLength=${memberEditForm.description != null ? memberEditForm.description.length() : 0}">
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey=${fromProfile ? 'nav.profile' : 'nav.members'},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey=${fromProfile ? 'nav.profile' : 'nav.members'},
         eyebrowHref=@{${backHref}}, titleText=${user.effectiveName})}"></th:block>
 
     <div class="tab-nav member-edit-tabs" role="tablist" th:aria-label="#{members.edit.title}" data-testid="member-edit-tabs">
@@ -170,7 +170,7 @@
                 <h2 class="form-section__head" id="member-memberships-head"
                     th:text="|2 · #{members.edit.section.memberships}|">2 · Alle Mitgliedschaften</h2>
                 <th:block th:if="${memberMemberships == null or memberMemberships.isEmpty()}">
-                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='members.memberships.none', textKey='members.memberships.empty.text')}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='members.memberships.none', textKey='members.memberships.empty.text')}"></th:block>
                 </th:block>
                 <table th:if="${memberMemberships != null and !memberMemberships.isEmpty()}"
                        class="data-table data-table--stack" data-testid="member-memberships-table">

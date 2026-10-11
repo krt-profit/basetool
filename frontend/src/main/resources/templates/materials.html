@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{nav.materials.list} + ' - ' + ${appTitle}">Materialien - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.materials', titleText=#{nav.materials.list},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.materials', titleText=#{nav.materials.list},
         count=${materials != null ? #lists.size(materials) : null}, countId='materials-count')}"></th:block>
 
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
@@ -58,11 +58,11 @@
     </div>
 
     <div id="noResultsMsg" class="card card--flush" th:hidden="${materials != null and !materials.isEmpty()}">
-        <th:block th:replace="~{fragments/components :: emptyState(titleKey='materials.list.noResults', textKey='materials.list.noResults.text')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='materials.list.noResults', textKey='materials.list.noResults.text')}"></th:block>
     </div>
 </main>
 
-<script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/kernel/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/materials.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>

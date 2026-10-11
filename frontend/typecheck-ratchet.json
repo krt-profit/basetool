@@ -86,30 +86,30 @@
       "orders-material-demand.js"
     ],
     "kernel": [
-      "autocomplete.js",
-      "common-handlers.js",
-      "datetime-splitter.js",
-      "event-delegation.js",
-      "inline-style-apply.js",
-      "krt-bank-account-search.js",
-      "krt-catalog-search.js",
-      "krt-client-error.js",
-      "krt-fetch.js",
-      "krt-filter-chips.js",
-      "krt-filter-panel.js",
-      "krt-html.js",
-      "krt-list-count.js",
-      "krt-live-sync.js",
-      "krt-modal.js",
-      "krt-overflow-menu.js",
-      "krt-palette.js",
-      "krt-searchable-select.js",
-      "krt-user-search.js",
-      "safe-url.js",
-      "scu-decimal-input.js",
-      "sidebar.js",
-      "toast.js",
-      "unsaved-changes.js"
+      "kernel/autocomplete.js",
+      "kernel/common-handlers.js",
+      "kernel/datetime-splitter.js",
+      "kernel/event-delegation.js",
+      "kernel/inline-style-apply.js",
+      "kernel/krt-bank-account-search.js",
+      "kernel/krt-catalog-search.js",
+      "kernel/krt-client-error.js",
+      "kernel/krt-fetch.js",
+      "kernel/krt-filter-chips.js",
+      "kernel/krt-filter-panel.js",
+      "kernel/krt-html.js",
+      "kernel/krt-list-count.js",
+      "kernel/krt-live-sync.js",
+      "kernel/krt-modal.js",
+      "kernel/krt-overflow-menu.js",
+      "kernel/krt-palette.js",
+      "kernel/krt-searchable-select.js",
+      "kernel/krt-user-search.js",
+      "kernel/safe-url.js",
+      "kernel/scu-decimal-input.js",
+      "kernel/sidebar.js",
+      "kernel/toast.js",
+      "kernel/unsaved-changes.js"
     ],
     "leadership": [
       "leitung.js"
@@ -166,7 +166,7 @@
       "refinery-yield-badge.js"
     ],
     "settings": [
-      "admin-settings.js"
+      "settings/admin-settings.js"
     ]
   },
   "migrated": [

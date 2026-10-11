@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.support.ClasspathAssets;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
@@ -28,7 +29,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -52,10 +52,10 @@ class BackgroundReadGateContractTest {
   private static final String NOTIFICATIONS_MODULE = "/static/js/notifications.js";
 
   /** The shared transport module owning {@code krtFetch.get} and {@code window.krtTermsGate}. */
-  private static final String KRT_FETCH_MODULE = "/static/js/krt-fetch.js";
+  private static final String KRT_FETCH_MODULE = "/static/js/kernel/krt-fetch.js";
 
   /** The client-error beacon, which must work when {@code krtFetch} did not load. */
-  private static final String CLIENT_ERROR_MODULE = "/static/js/krt-client-error.js";
+  private static final String CLIENT_ERROR_MODULE = "/static/js/kernel/krt-client-error.js";
 
   /** The only scripts allowed to call {@code fetch} themselves. */
   private static final Set<String> TRANSPORT_FILES = Set.of("krt-fetch.js", "krt-client-error.js");
@@ -343,7 +343,7 @@ class BackgroundReadGateContractTest {
       throws IOException, URISyntaxException {
     URL url = BackgroundReadGateContractTest.class.getResource(anchor);
     assertThat(url).as("classpath resource %s", anchor).isNotNull();
-    Path root = Paths.get(url.toURI()).getParent();
+    Path root = ClasspathAssets.rootOf(url);
     try (Stream<Path> tree = Files.walk(root)) {
       return tree.filter(p -> p.getFileName().toString().endsWith(suffix)).toList();
     }

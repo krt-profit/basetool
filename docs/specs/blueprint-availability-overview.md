@@ -97,7 +97,7 @@ chooses between 10, 50 and 100 entries per page.
 **Enforced by:** `PersonalBlueprintOverviewServiceTest`,
 `BlueprintOverviewPageControllerTest`, `BlueprintOverviewPageControllerMvcTest` ·
 **Code:** `PersonalBlueprintOverviewService`, `BlueprintOverviewPageController`,
-`fragments/pagination.html` · **Issues:** #364
+`kernel/fragments/pagination.html` · **Issues:** #364
 
 *Amended 2026-10-03 (website overhaul phase 3):* the search also matches the display names of the
 in-scope owners (placeholder „Blueprint oder Person suchen …"), read only when a term is given.

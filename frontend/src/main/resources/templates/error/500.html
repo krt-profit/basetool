@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageBare=true, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageBare=true, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{error.generic.title} + ' - ' + ${appTitle}">System Error - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<link rel="stylesheet" th:href="@{/css/pages/error-500.css}">
+<link rel="stylesheet" th:href="@{/css/pages/shell/error-500.css}">
     </th:block>
 </head>
 <body>

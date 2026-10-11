@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{refineryorder.index.title} + ' - ' + ${appTitle}">Raffinerie - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main class="refinery-index">
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{refineryorder.index.title}, actions=~{::refinery-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{refineryorder.index.title}, actions=~{::refinery-actions})}">
         <th:block th:ref="refinery-actions">
             <a th:href="@{/refinery-orders/create(source='index')}" class="btn btn--cta" data-testid="refinery-create-link"
                ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{refineryorder.create.btn}">Neuer Auftrag</span></a>
@@ -18,12 +18,12 @@
 
     <form id="refinery-filter-form" method="get" th:action="@{/refinery-orders}" class="no-track">
         <div class="toolbar">
-            <th:block th:replace="~{fragments/components :: segmented(name='view', labelKey='refineryorder.view.label', selected=${view}, variant='refinery-segments',
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='view', labelKey='refineryorder.view.label', selected=${view}, variant='refinery-segments',
                 options=${ {{value: 'RUNNING', labelKey: 'refineryorder.view.running', count: refineryCounts?.running()},
                             {value: 'READY', labelKey: 'refineryorder.view.ready', count: refineryCounts?.ready()},
                             {value: 'COMPLETED', labelKey: 'refineryorder.view.completed', count: refineryCounts?.completed()},
                             {value: 'ALL', labelKey: 'filter.all', count: refineryCounts?.all()}} })}"></th:block>
-            <th:block th:replace="~{fragments/components :: toolbarSearch('refinery-search', 'q', ${searchQuery}, 'refineryorder.search.placeholder')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('refinery-search', 'q', ${searchQuery}, 'refineryorder.search.placeholder')}"></th:block>
             <label class="switch" for="refinery-only-mine">
                 <input type="checkbox" id="refinery-only-mine" name="onlyMine" value="true" th:checked="${onlyMine}">
                 <span class="switch__track" aria-hidden="true"></span>
@@ -31,7 +31,7 @@
             </label>
             <span id="refinery-loading-indicator" hidden><span class="krt-loading-indicator"></span></span>
         </div>
-        <th:block th:replace="~{fragments/components :: filterChips('refinery-filter-form')}"></th:block>
+        <th:block th:replace="~{kernel/fragments/components :: filterChips('refinery-filter-form')}"></th:block>
     </form>
 
     <div id="refinery-orders-results" class="card card--flush">
@@ -92,11 +92,11 @@
         </div>
 
         <th:block th:if="${#lists.isEmpty(orderRows)}">
-            <th:block th:replace="~{fragments/components :: emptyState(titleKey='refineryorder.list.empty.title', textKey='refineryorder.list.empty.text')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='refineryorder.list.empty.title', textKey='refineryorder.list.empty.text')}"></th:block>
         </th:block>
 
-        <th:block th:replace="~{fragments/components :: listFoot(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl})}"></th:block>
-        <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
+        <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl})}"></th:block>
+        <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
     </div>
 </main>

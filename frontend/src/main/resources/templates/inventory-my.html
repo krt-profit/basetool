@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{inventory.overview.my} + ' - ' + ${appTitle}">Mein Lager - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -12,7 +12,7 @@
 <th:block th:fragment="pageContent">
 <main class="lager-page">
     <th:block th:with="lagerBackHref=${view == 'items'} ? @{/inventory(view='items')} : @{/inventory}">
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.inventory', eyebrowHref=${lagerBackHref},
         titleText=#{inventory.overview.my}, count=null, actions=~{::lager-my-actions})}">
         <th:block th:ref="lager-my-actions">
             <a th:href="@{/inventory/input(source='my')}" class="btn btn--cta" data-testid="page-head-primary"
@@ -34,10 +34,10 @@
 
     <div class="toolbar lager-toolbar">
         <form th:if="${view != 'items'}" th:action="@{/inventory/my}" method="get" id="myFilterForm" class="my-inventory-filter lager-filter-form no-track">
-            <th:block th:replace="~{fragments/components :: segmented(name='personalScope', labelKey='inventory.filter.scope',
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='personalScope', labelKey='inventory.filter.scope',
                 selected=${selectedPersonalOnly == true ? 'personal' : (selectedNonPersonalOnly == true ? 'shared' : '')},
                 options=${ {{value: '', labelKey: 'filter.all'}, {value: 'personal', labelKey: 'inventory.filter.scope.personal'}, {value: 'shared', labelKey: 'inventory.filter.scope.shared'}} })}"></th:block>
-            <th:block th:replace="~{fragments/components :: filterPopover(panelId='myFilterPanel', panelName='inventory-my',
+            <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='myFilterPanel', panelName='inventory-my',
                 testid='lager-filter-toggle', body=~{::lager-my-filter-body})}">
                 <th:block th:ref="lager-my-filter-body">
                     <div class="lager-filter-field">
@@ -137,10 +137,10 @@
         </form>
         <form th:if="${view == 'items'}" th:action="@{/inventory/my}" method="get" id="myItemsFilterForm" class="my-inventory-filter lager-filter-form no-track">
             <input type="hidden" name="view" value="items">
-            <th:block th:replace="~{fragments/components :: segmented(name='personalScope', labelKey='inventory.filter.scope',
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='personalScope', labelKey='inventory.filter.scope',
                 selected=${selectedPersonalOnly == true ? 'personal' : (selectedNonPersonalOnly == true ? 'shared' : '')},
                 options=${ {{value: '', labelKey: 'filter.all'}, {value: 'personal', labelKey: 'inventory.filter.scope.personal'}, {value: 'shared', labelKey: 'inventory.filter.scope.shared'}} })}"></th:block>
-            <th:block th:replace="~{fragments/components :: filterPopover(panelId='myFilterPanel', panelName='inventory-my',
+            <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='myFilterPanel', panelName='inventory-my',
                 testid='lager-filter-toggle', body=~{::lager-my-items-filter-body})}">
                 <th:block th:ref="lager-my-items-filter-body">
                     <div class="lager-filter-field">
@@ -219,7 +219,7 @@
                     th:text="#{inventory.bulk.selectAll}"
                     data-trigger="inv-my-select-all">Alle markieren</button>
     </div>
-    <th:block th:replace="~{fragments/components :: filterChips(${view == 'items' ? 'myItemsFilterForm' : 'myFilterForm'})}"></th:block>
+    <th:block th:replace="~{kernel/fragments/components :: filterChips(${view == 'items' ? 'myItemsFilterForm' : 'myFilterForm'})}"></th:block>
 
     <div class="card card--flush lager-tree-card">
         <div class="overflow-x-auto" id="myInventoryTableContainer" th:fragment="inventoryTableFragment">
@@ -294,7 +294,7 @@
                 </div>
 
                 <th:block th:if="${#lists.isEmpty(groupedItems)}">
-                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='inventory.empty', textKey='inventory.tree.empty.text')}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='inventory.empty', textKey='inventory.tree.empty.text')}"></th:block>
                 </th:block>
             </div>
             </th:block>
@@ -360,7 +360,7 @@
                 </div>
 
                 <th:block th:if="${#lists.isEmpty(groupedItems)}">
-                    <th:block th:replace="~{fragments/components :: emptyState(titleKey='inventory.items.empty.my', textKey='inventory.tree.empty.text')}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='inventory.items.empty.my', textKey='inventory.tree.empty.text')}"></th:block>
                 </th:block>
             </div>
             </th:block>
@@ -373,7 +373,7 @@
         <span class="form-actions__summary"><strong id="bulkCheckoutCount">0</strong> <span th:text="#{filter.selected}">ausgew&auml;hlt</span></span>
         <button type="button" id="bulkClearBtn" class="btn btn-ghost" data-trigger="inv-my-clear-selection"
                 data-testid="bulk-clear" th:text="#{inventory.bulk.selectAll.clear}">Auswahl aufheben</button>
-        <th:block th:replace="~{fragments/components :: overflowMenu(id='lager-bulk-more', items=~{::lager-bulk-more-items})}">
+        <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='lager-bulk-more', items=~{::lager-bulk-more-items})}">
             <th:block th:ref="lager-bulk-more-items">
                 <button type="button" id="bulkOrgUnitBtn" class="overflow-menu__item" role="menuitem"
                         data-testid="bulk-org-unit-open"
@@ -404,7 +404,7 @@
     </div>
 </main>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bookOutModal', titleKey='inventory.bookout.title', variant='krt-modal--wide', open=${showBookOutModal != null}, closeTrigger='inv-my-close-bookout', body=~{::bookOutModal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bookOutModal', titleKey='inventory.bookout.title', variant='krt-modal--wide', open=${showBookOutModal != null}, closeTrigger='inv-my-close-bookout', body=~{::bookOutModal-body})}">
     <th:block th:ref="bookOutModal-body">
         <form id="bookOutForm" th:action="@{/inventory/{id}/book-out(id=${showBookOutModal != null ? showBookOutModal : ''})}" method="post" th:object="${inventoryBookOutForm}">
             <div class="krt-modal-body">
@@ -419,7 +419,7 @@
             <div class="form-group mb-1">
                 <label for="targetAmount" class="form-label">
                     <span th:text="#{inventory.bookout.targetAmount}">Zielbestand</span>
-                    <th:block th:replace="~{fragments/scu-hint :: scuHint('bookout-target-scu-hint', true)}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('bookout-target-scu-hint', true)}"></th:block>
                 </label>
                 <input type="text" inputmode="decimal" data-scu-decimal data-scu-allow-zero id="targetAmount" th:field="*{targetAmount}" step="0.001" min="0" class="w-full" data-trigger="inv-my-amount-from-target">
             </div>
@@ -427,7 +427,7 @@
             <div class="form-group mb-1">
                 <label for="amount" class="form-label">
                     <span th:text="#{inventory.bookout.amount}">Menge ausbuchen</span>
-                    <th:block th:replace="~{fragments/scu-hint :: scuHint('bookout-amount-scu-hint', true)}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('bookout-amount-scu-hint', true)}"></th:block>
                 </label>
                 <div class="flex-gap-sm">
                     <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required class="w-full" data-trigger="inv-my-target-from-amount">
@@ -481,7 +481,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='umbuchenModal', titleKey='inventory.rebook.title', variant='krt-modal--wide', closeTrigger='inv-my-close-umbuchen', body=~{::umbuchenModal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='umbuchenModal', titleKey='inventory.rebook.title', variant='krt-modal--wide', closeTrigger='inv-my-close-umbuchen', body=~{::umbuchenModal-body})}">
     <th:block th:ref="umbuchenModal-body">
         <form id="umbuchenForm">
             <div class="krt-modal-body">
@@ -492,7 +492,7 @@
             <div class="form-group mb-1">
                 <label for="umbuchenTargetAmount" class="form-label">
                     <span th:text="#{inventory.rebook.targetAmount}">Verbleibend</span>
-                    <th:block th:replace="~{fragments/scu-hint :: scuHint('umbuchen-target-scu-hint', true)}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('umbuchen-target-scu-hint', true)}"></th:block>
                 </label>
                 <input type="text" inputmode="decimal" data-scu-decimal data-scu-allow-zero id="umbuchenTargetAmount" step="0.001" min="0" class="w-full" data-trigger="inv-my-umbuchen-amount-from-target">
             </div>
@@ -500,7 +500,7 @@
             <div class="form-group mb-1">
                 <label for="umbuchenAmount" class="form-label">
                     <span th:text="#{inventory.rebook.amount}">Menge umbuchen</span>
-                    <th:block th:replace="~{fragments/scu-hint :: scuHint('umbuchen-amount-scu-hint', true)}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/scu-hint :: scuHint('umbuchen-amount-scu-hint', true)}"></th:block>
                 </label>
                 <div class="flex-gap-sm">
                     <input type="text" inputmode="decimal" data-scu-decimal id="umbuchenAmount" step="0.001" min="0" required class="w-full" data-trigger="inv-my-umbuchen-target-from-amount">
@@ -570,7 +570,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='noteModal', titleKey='inventory.note.label', variant='krt-modal--wide', closeTrigger='inv-my-close-note', body=~{::noteModal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='noteModal', titleKey='inventory.note.label', variant='krt-modal--wide', closeTrigger='inv-my-close-note', body=~{::noteModal-body})}">
     <th:block th:ref="noteModal-body">
         <div class="krt-modal-body">
         <div class="form-group mb-1">
@@ -590,7 +590,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bulkCheckoutModal', titleKey='inventory.bulk.checkout.modal.title', variant='krt-modal--wide', closeTrigger='inv-my-close-bulk', body=~{::bulkCheckoutModal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bulkCheckoutModal', titleKey='inventory.bulk.checkout.modal.title', variant='krt-modal--wide', closeTrigger='inv-my-close-bulk', body=~{::bulkCheckoutModal-body})}">
     <th:block th:ref="bulkCheckoutModal-body">
         <div class="krt-modal-body">
         <p id="bulkCheckoutModalMessage" class="lager-modal-message"></p>
@@ -604,7 +604,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bulkRebookModal', titleKey='inventory.bulk.rebook.modal.title', variant='krt-modal--wide', closeTrigger='inv-my-close-bulk-rebook', body=~{::bulkRebookModal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bulkRebookModal', titleKey='inventory.bulk.rebook.modal.title', variant='krt-modal--wide', closeTrigger='inv-my-close-bulk-rebook', body=~{::bulkRebookModal-body})}">
     <th:block th:ref="bulkRebookModal-body">
         <form id="bulkRebookForm">
         <div class="krt-modal-body">
@@ -662,7 +662,7 @@
     </th:block>
 </th:block>
 
-<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='orgUnitChangeModal', titleKey='inventory.orgUnitChange.modal.title', variant='krt-modal--wide', closeTrigger='inv-my-close-org-unit', body=~{::orgUnitChangeModal-body})}">
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='orgUnitChangeModal', titleKey='inventory.orgUnitChange.modal.title', variant='krt-modal--wide', closeTrigger='inv-my-close-org-unit', body=~{::orgUnitChangeModal-body})}">
     <th:block th:ref="orgUnitChangeModal-body">
         <form id="orgUnitChangeForm">
         <div class="krt-modal-body">

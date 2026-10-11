@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageBare=true, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageBare=true, pageContent=~{::pageContent})}">
 <head>
     <title th:text="(${registrationRejected} ? #{pendingApproval.rejected.title} : (${registrationNoRole} ? #{pendingApproval.noRole.title} : #{pendingApproval.title})) + ' - ' + ${appTitle}">Freigabe ausstehend - Profit Basetool</title>
     <th:block th:fragment="extraLinks">

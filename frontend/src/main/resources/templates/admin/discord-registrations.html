@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{admin.discordRegistrations.title} + ' - ' + ${appTitle}">Discord-Registrierungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -9,7 +9,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.discordRegistrations.title},
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.discordRegistrations.title},
         count=${#lists.size(registrations)}, countId='registrationsCount')}"></th:block>
 
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
@@ -72,7 +72,7 @@
                 </table>
             </div>
             <div id="registrationsEmpty" class="reg-empty" th:hidden="${!#lists.isEmpty(registrations)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.discordRegistrations.empty',
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.discordRegistrations.empty',
                     textKey='admin.discordRegistrations.empty.text')}"></th:block>
             </div>
         </div>
@@ -122,13 +122,13 @@
                 </table>
             </div>
             <div id="rejectedEmpty" class="reg-empty" th:hidden="${!#lists.isEmpty(rejected)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.discordRegistrations.rejected.empty',
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.discordRegistrations.rejected.empty',
                     textKey='admin.discordRegistrations.rejected.empty.text')}"></th:block>
             </div>
         </div>
     </section>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='reject-modal', titleKey='admin.discordRegistrations.reject.modal.title', variant='krt-modal--wide', body=~{::reject-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='reject-modal', titleKey='admin.discordRegistrations.reject.modal.title', variant='krt-modal--wide', body=~{::reject-modal-body})}">
         <th:block th:ref="reject-modal-body">
             <div class="krt-modal-body">
                 <label for="reject-reason" th:text="#{admin.discordRegistrations.reject.modal.reasonLabel}">Begründung (optional)</label>
@@ -141,7 +141,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='reopen-modal', titleKey='admin.discordRegistrations.reopen.modal.title', variant='krt-modal--wide', body=~{::reopen-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='reopen-modal', titleKey='admin.discordRegistrations.reopen.modal.title', variant='krt-modal--wide', body=~{::reopen-modal-body})}">
         <th:block th:ref="reopen-modal-body">
             <div class="krt-modal-body">
                 <p class="reg-when" th:text="#{admin.discordRegistrations.reopen.modal.hint}">Die Registrierung kehrt in die Warteschlange zurück und muss danach erneut freigegeben werden.</p>
@@ -155,7 +155,7 @@
         </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='link-modal', titleKey='admin.discordRegistrations.link.modal.title', variant='krt-modal--wide', body=~{::link-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='link-modal', titleKey='admin.discordRegistrations.link.modal.title', variant='krt-modal--wide', body=~{::link-modal-body})}">
         <th:block th:ref="link-modal-body">
             <div class="krt-modal-body">
                 <label for="link-target" th:text="#{admin.discordRegistrations.link.modal.accountLabel}">Bestehender Account</label>
@@ -171,7 +171,7 @@
             </div>
         </th:block>
     </th:block>
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='merge-modal', titleKey='admin.discordRegistrations.merge.modal.title', variant='krt-modal--wide', body=~{::merge-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='merge-modal', titleKey='admin.discordRegistrations.merge.modal.title', variant='krt-modal--wide', body=~{::merge-modal-body})}">
         <th:block th:ref="merge-modal-body">
             <div class="krt-modal-body">
                 <label for="merge-source" th:text="#{admin.discordRegistrations.merge.modal.accountLabel}">Älteres Konto</label>

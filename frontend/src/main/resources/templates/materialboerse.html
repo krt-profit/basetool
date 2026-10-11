@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{materialboerse.title} + ' - ' + ${appTitle}">Materialbörse - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -12,7 +12,7 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{materialboerse.title}, actions=~{::mb-actions})}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.logistics', titleText=#{materialboerse.title}, actions=~{::mb-actions})}">
         <th:block th:ref="mb-actions">
             <div class="overflow-menu mb-create" data-overflow-menu data-mb-cta-group="offers"
                  th:hidden="${activeMode == 'requests'}">
@@ -70,11 +70,11 @@
 
     <form id="mb-filter-form" class="no-track mb-toolbar" method="get" th:action="@{/materialboerse}">
         <div class="toolbar">
-            <th:block th:replace="~{fragments/components :: segmented(name='scope', labelKey='materialboerse.scope.label', selected=${activeScope},
+            <th:block th:replace="~{kernel/fragments/components :: segmented(name='scope', labelKey='materialboerse.scope.label', selected=${activeScope},
                 options=${ {{value: 'all', labelKey: 'filter.all', count: scopeCountAll}, {value: 'mine', labelKey: 'materialboerse.scope.mine', count: scopeCountMine}} })}"></th:block>
-            <th:block th:replace="~{fragments/components :: toolbarSearch('mb-search', 'q', ${filterQ}, 'materialgesuch.filter.search.placeholder')}"></th:block>
-            <th:block th:replace="~{fragments/components :: filterChips('mb-filter-form')}"></th:block>
-            <th:block th:replace="~{fragments/components :: filterPopover(panelId='mb-filter-panel', panelName='materialboerse',
+            <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('mb-search', 'q', ${filterQ}, 'materialgesuch.filter.search.placeholder')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: filterChips('mb-filter-form')}"></th:block>
+            <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='mb-filter-panel', panelName='materialboerse',
                 testid='mb-filter-toggle', body=~{::mb-filter-body})}">
                 <th:block th:ref="mb-filter-body">
                     <div class="form-group">
@@ -121,7 +121,7 @@
                   th:data-requests-all="${countReqAll}" th:data-requests-mine="${countReqMine}"></span>
             <th:block th:if="${#lists.isEmpty(offers)}">
                 <div class="empty-state" data-testid="empty-state">
-                    <th:block th:replace="~{fragments/components :: emptyStateBody('materialboerse.empty.title', 'materialboerse.empty.text', null)}"></th:block>
+                    <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('materialboerse.empty.title', 'materialboerse.empty.text', null)}"></th:block>
                     <button type="button" class="btn btn-ghost btn-xs" data-mb-reset th:text="#{materialboerse.empty.reset}">Filter zurücksetzen</button>
                 </div>
             </th:block>

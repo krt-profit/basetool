@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{admin.settings.title} + ' - ' + ${appTitle}">Systemeinstellungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <link rel="stylesheet" th:href="@{/css/pages/admin-settings.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/settings/admin-settings.css}">
     </th:block>
 </head>
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.settings.title})}"></th:block>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.system', titleText=#{admin.settings.title})}"></th:block>
 
     <th:block th:if="${catalogTruncated}">
-        <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
+        <div th:replace="~{kernel/fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
     </th:block>
 
     <form id="admin-settings-form" class="form-layout card" th:action="@{/admin/settings}" method="post">
@@ -41,7 +41,7 @@
             <p class="form-hint" th:text="#{admin.settings.refinery.description}">Konfiguration des Rundungsverhaltens (Units zu SCU).</p>
             <div class="form-group">
                 <span class="form-label" aria-hidden="true" th:text="#{admin.settings.refinery.roundingMode}">Rundungsmodus (Units -> SCU)</span>
-                <th:block th:replace="~{fragments/components :: segmented(name='refineryRoundingMode', labelKey='admin.settings.refinery.roundingMode',
+                <th:block th:replace="~{kernel/fragments/components :: segmented(name='refineryRoundingMode', labelKey='admin.settings.refinery.roundingMode',
                     selected=${refineryRoundingMode != null ? refineryRoundingMode : 'UP'}, variant='segmented--block segmented--lg',
                     options=${ {{value: 'UP', labelKey: 'admin.settings.refinery.rounding.up'}, {value: 'DOWN', labelKey: 'admin.settings.refinery.rounding.down'}} })}"></th:block>
             </div>
@@ -69,7 +69,7 @@
                 <span class="opt" th:text="|· #{admin.settings.savesInstantly}|">· speichert sofort</span></legend>
             <p class="form-hint" th:text="#{admin.settings.squadron.promotion.description}">Schaltet das gesamte Beförderungssystem für die Mitglieder einer Staffel an oder aus.</p>
             <th:block th:if="${#lists.isEmpty(squadrons)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.settings.squadron.promotion.empty', textKey='admin.settings.squadron.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.settings.squadron.promotion.empty', textKey='admin.settings.squadron.empty.text')}"></th:block>
             </th:block>
             <div class="table-responsive" th:unless="${#lists.isEmpty(squadrons)}">
                 <table class="data-table data-table--stack">
@@ -106,7 +106,7 @@
                 <span class="opt" th:text="|· #{admin.settings.savesInstantly}|">· speichert sofort</span></legend>
             <p class="form-hint" th:text="#{admin.settings.squadron.profit.description}">Legt fest, welche Staffeln als bearbeitende Einheit eines Auftrags ausgewählt werden können.</p>
             <th:block th:if="${#lists.isEmpty(squadrons)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.settings.squadron.profit.empty', textKey='admin.settings.squadron.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.settings.squadron.profit.empty', textKey='admin.settings.squadron.empty.text')}"></th:block>
             </th:block>
             <div class="table-responsive" th:unless="${#lists.isEmpty(squadrons)}">
                 <table class="data-table data-table--stack">
@@ -143,7 +143,7 @@
                 <span class="opt" th:text="|· #{admin.settings.savesInstantly}|">· speichert sofort</span></legend>
             <p class="form-hint" th:text="#{admin.settings.sk.profit.description}">Legt fest, welche Spezialkommandos Aufträge abarbeiten dürfen.</p>
             <th:block th:if="${#lists.isEmpty(specialCommands)}">
-                <th:block th:replace="~{fragments/components :: emptyState(titleKey='admin.settings.sk.profit.empty', textKey='admin.settings.sk.empty.text')}"></th:block>
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.settings.sk.profit.empty', textKey='admin.settings.sk.empty.text')}"></th:block>
             </th:block>
             <div class="table-responsive" th:unless="${#lists.isEmpty(specialCommands)}">
                 <table class="data-table data-table--stack">
@@ -197,7 +197,7 @@
         reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
 </script>
-<script th:src="@{/js/admin-settings.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/settings/admin-settings.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

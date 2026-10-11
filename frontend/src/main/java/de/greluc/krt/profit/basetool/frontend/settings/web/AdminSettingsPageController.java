@@ -172,7 +172,7 @@ public class AdminSettingsPageController {
     model.addAttribute(
         "catalogTruncated", squadronCatalog.truncated() || specialCommandCatalog.truncated());
 
-    return "admin-settings";
+    return "settings/admin-settings";
   }
 
   /**

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="#{missions.title} + ' - ' + ${appTitle}">Mission Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -11,7 +11,7 @@
 <div class="page-wrapper mission-page">
 
     <div th:if="${isNew}" class="mission-new-head">
-        <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.missions', eyebrowHref=@{/missions}, titleText=#{mission.create})}"></th:block>
+        <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.missions', eyebrowHref=@{/missions}, titleText=#{mission.create})}"></th:block>
     </div>
 
     <div th:unless="${isNew}" class="mission-head-sticky" id="mission-head-sticky">
@@ -35,7 +35,7 @@
                         data-testid="mission-edit-toggle" aria-controls="pane-verw" aria-pressed="false"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{mission.edit.toggle}">Bearbeiten</span></button>
                 <button id="add-participant-btn" type="button" class="btn btn--cta" data-testid="page-head-primary"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg> <span th:text="#{mission.participant.add}">Anmelden</span></button>
                 <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
-                    <th:block th:replace="~{fragments/components :: overflowMenu(id='mission-more-menu', items=~{::mission-more-items})}">
+                    <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='mission-more-menu', items=~{::mission-more-items})}">
                         <th:block th:ref="mission-more-items">
                             <button type="button" role="menuitem" class="overflow-menu__item overflow-menu__item--danger delete-mission-btn"
                                     data-testid="mission-delete"
@@ -416,7 +416,7 @@
                         </table>
                     </div>
                     <th:block th:if="${(financeEntries == null or financeEntries.isEmpty()) and (refineryOrders == null or refineryOrders.isEmpty())}">
-                        <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.finance.empty.title', textKey='mission.finance.empty')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='mission.finance.empty.title', textKey='mission.finance.empty')}"></th:block>
                     </th:block>
                 </section>
 
@@ -454,7 +454,7 @@
                         </table>
                     </div>
                     <th:block th:if="${participants == null or participants.isEmpty()}">
-                        <th:block th:replace="~{fragments/components :: emptyState(titleKey='mission.payout.empty.title', textKey='mission.participants.empty')}"></th:block>
+                        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='mission.payout.empty.title', textKey='mission.participants.empty')}"></th:block>
                     </th:block>
                 </section>
             </div>
@@ -577,7 +577,7 @@
 
                                 <div class="form-group span-all">
                                     <span class="form-label" id="mission-status-label" th:text="#{mission.status}">Status</span>
-                                    <th:block th:replace="~{fragments/components :: segmented(name='status', labelKey='mission.status', variant='segmented--block segmented--lg', selected=*{status},
+                                    <th:block th:replace="~{kernel/fragments/components :: segmented(name='status', labelKey='mission.status', variant='segmented--block segmented--lg', selected=*{status},
                                         options=${ {{value: 'PLANNED', labelKey: 'mission.status.planned'}, {value: 'ACTIVE', labelKey: 'mission.status.active'}, {value: 'COMPLETED', labelKey: 'mission.status.completed'}, {value: 'CANCELLED', labelKey: 'mission.status.cancelled'}} })}"></th:block>
                                     <div class="field-error" data-error-for="status" th:text="${#fields.hasErrors('status') ? #fields.errors('status')[0] : ''}"></div>
                                 </div>
@@ -692,7 +692,7 @@
                                 </label>
                             </div>
                             <th:block th:if="${isNew}">
-                                <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
+                                <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                             </th:block>
                         </fieldset>
 
@@ -1076,7 +1076,7 @@
     </th:block>
 
     <th:block th:if="${!isNew}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='participant-modal', titleKey='mission.participant.add', variant='krt-modal--wide', open=${openModal == 'participant-modal'}, body=~{::participant-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='participant-modal', titleKey='mission.participant.add', variant='krt-modal--wide', open=${openModal == 'participant-modal'}, body=~{::participant-modal-body})}">
         <th:block th:ref="participant-modal-body">
             <form id="add-participant-form" th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}">
                 <div class="krt-modal-body">
@@ -1131,7 +1131,7 @@
     </th:block>
 
     <th:block th:if="${!isNew}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='edit-participant-modal', titleKey='members.edit', variant='krt-modal--wide', titleId='edit-participant-title', body=~{::edit-participant-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='edit-participant-modal', titleKey='members.edit', variant='krt-modal--wide', titleId='edit-participant-title', body=~{::edit-participant-modal-body})}">
         <th:block th:ref="edit-participant-modal-body">
             <form id="edit-participant-form" method="post" th:action="${modalAction != null && openModal == 'edit-participant-modal'} ? ${modalAction} : @{/missions}">
                 <div class="krt-modal-body">
@@ -1214,7 +1214,7 @@
     </th:block>
 
     <th:block th:if="${!isNew and mission.canEdit}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='add-unit-modal', titleKey='mission.unit.add', variant='krt-modal--wide', open=${openModal == 'unit-modal'}, body=~{::add-unit-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='add-unit-modal', titleKey='mission.unit.add', variant='krt-modal--wide', open=${openModal == 'unit-modal'}, body=~{::add-unit-modal-body})}">
         <th:block th:ref="add-unit-modal-body">
             <form id="add-unit-form" th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}" th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}" th:action="@{/missions/{id}/units(id=${mission.id})}" method="post" th:object="${unitForm}">
                 <div class="krt-modal-body">
@@ -1277,7 +1277,7 @@
     </th:block>
 
     <th:block th:if="${!isNew}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='frequency-modal', titleKey='admin.mission_data.frequency_types', body=~{::frequency-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='frequency-modal', titleKey='admin.mission_data.frequency_types', body=~{::frequency-modal-body})}">
         <th:block th:ref="frequency-modal-body">
             <form id="frequency-form" method="post" th:action="@{/missions}">
                 <div class="krt-modal-body">
@@ -1297,7 +1297,7 @@
     </th:block>
 
     <th:block th:if="${!isNew}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='custom-frequency-modal', titleKey='mission.frequency.custom.add', titleId='custom-frequency-modal-title', body=~{::custom-frequency-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='custom-frequency-modal', titleKey='mission.frequency.custom.add', titleId='custom-frequency-modal-title', body=~{::custom-frequency-modal-body})}">
         <th:block th:ref="custom-frequency-modal-body">
             <form id="custom-frequency-form">
                 <div class="krt-modal-body">
@@ -1323,7 +1323,7 @@
     </th:block>
 
     <th:block th:if="${!isNew and mission.canEdit}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='edit-unit-modal', titleKey='mission.unit.edit', variant='krt-modal--wide', open=${openModal == 'edit-unit-modal'}, body=~{::edit-unit-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='edit-unit-modal', titleKey='mission.unit.edit', variant='krt-modal--wide', open=${openModal == 'edit-unit-modal'}, body=~{::edit-unit-modal-body})}">
         <th:block th:ref="edit-unit-modal-body">
             <form id="edit-unit-form" th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}" th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}" method="post" th:action="${modalAction != null && openModal == 'edit-unit-modal'} ? ${modalAction} : @{/missions}" th:object="${unitForm}">
                 <div class="krt-modal-body">
@@ -1386,7 +1386,7 @@
     </th:block>
 
     <th:block th:if="${!isNew and mission.canEdit}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='edit-crew-modal', titleKey='mission.unit.edit_crew', open=${openModal == 'edit-crew-modal'}, body=~{::edit-crew-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='edit-crew-modal', titleKey='mission.unit.edit_crew', open=${openModal == 'edit-crew-modal'}, body=~{::edit-crew-modal-body})}">
         <th:block th:ref="edit-crew-modal-body">
             <form id="edit-crew-form" method="post" th:action="${modalAction != null && openModal == 'edit-crew-modal'} ? ${modalAction} : @{/missions}" th:object="${crewForm}">
                 <div class="krt-modal-body">
@@ -1409,7 +1409,7 @@
     </th:block>
 
     <th:block th:if="${!isNew}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='finance-modal', titleKey='mission.finance.add', variant='krt-modal--wide', open=${openModal == 'finance-entry-modal'}, body=~{::finance-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='finance-modal', titleKey='mission.finance.add', variant='krt-modal--wide', open=${openModal == 'finance-entry-modal'}, body=~{::finance-modal-body})}">
         <th:block th:ref="finance-modal-body">
             <form id="add-finance-form" th:action="@{/missions/{id}/finance-entries(id=${mission.id})}" method="post" th:object="${financeForm}">
                 <div class="krt-modal-body">
@@ -1456,7 +1456,7 @@
     </th:block>
 
     <th:block sec:authorize="isAuthenticated()" th:if="${!isNew}">
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='edit-finance-entry-modal', titleKey='mission.finance.edit', variant='krt-modal--wide', open=${openModal == 'edit-finance-entry-modal'}, body=~{::edit-finance-entry-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='edit-finance-entry-modal', titleKey='mission.finance.edit', variant='krt-modal--wide', open=${openModal == 'edit-finance-entry-modal'}, body=~{::edit-finance-entry-modal-body})}">
         <th:block th:ref="edit-finance-entry-modal-body">
             <form id="edit-finance-form" method="post" th:action="${modalAction != null && openModal == 'edit-finance-entry-modal'} ? ${modalAction} : @{/missions}">
                 <div class="krt-modal-body">
@@ -1490,7 +1490,7 @@
     </th:block>
     </th:block>
 
-    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
         <th:block th:ref="delete-confirm-modal-body">
             <div class="krt-modal-body">
                 <p id="delete-confirm-message" class="confirm-text" th:text="#{info.delete.confirm.message}">Wirklich l&ouml;schen?</p>

@@ -50,7 +50,7 @@ final class ChromeNeutraliser {
   /** A page-level call of the sidebar, header or toast fragment. */
   private static final Pattern CHROME_CALL =
       Pattern.compile(
-          "<th:block\\s+th:replace=\"~\\{fragments/(sidebar|header|toast)\\s*::\\s*\\1\\}\"\\s*/?>"
+          "<th:block\\s+th:replace=\"~\\{kernel/fragments/(sidebar|header|toast)\\s*::\\s*\\1\\}\"\\s*/?>"
               + "(?:\\s*</th:block>)?");
 
   /** An opening or closing {@code th:block} tag, attribute values included. */
@@ -58,7 +58,7 @@ final class ChromeNeutraliser {
       Pattern.compile("<(/?)th:block\\b(?:[^>\"']|\"[^\"]*\"|'[^']*')*>");
 
   /** The shape that marks a page as composed through the layout fragment. */
-  private static final String LAYOUT_CALL = "fragments/layout";
+  private static final String LAYOUT_CALL = "kernel/fragments/layout";
 
   /** Not instantiable. */
   private ChromeNeutraliser() {}

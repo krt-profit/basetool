@@ -303,7 +303,7 @@ enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questi
 > The paragraph below about inline `display` versus classes describes the defect the contract ended;
 > the contract clears any inline `display` on both open and close.
 >
-> **Every dialog is rendered by `fragments/modal-wrapper.html` (2026-09-23, owner decision).** The
+> **Every dialog is rendered by `kernel/fragments/modal-wrapper.html` (2026-09-23, owner decision).** The
 > 94 hand-written shells (and the bank movement fragment) now call `modal-wrapper :: modal`, so the
 > overlay, the frame and the head exist once. The head is the design system's: an `<h2>` title and
 > the ✕ `.krt-modal-close` labelled `general.a11y.closeModal`. Until then the shells had drifted
@@ -319,7 +319,7 @@ enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questi
 
 The KRT HUD modal — `.krt-modal-overlay` scrim > `.krt-modal` frame (orange top edge + corner
 brackets) > `.krt-modal-head` (title + close-X) — is the Thymeleaf fragment
-`fragments/modal-wrapper.html :: modal`, and **every** dialog is rendered by it. The fragment
+`kernel/fragments/modal-wrapper.html :: modal`, and **every** dialog is rendered by it. The fragment
 declares no signature; a call names what it needs: `modalId` and `titleKey` (required), `body`
 (required: by convention a `<th:block th:ref="<modalId>-body">` inside the call, holding the
 `.krt-modal-body` and `.krt-modal-foot`; in a fragment file it names its template,
@@ -734,10 +734,10 @@ page and class and a per-page `patterns:` line in the report) ·
 dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither
 `PAGES` nor `NOT_PAGES`, so a page added next month is swept on the day it is added — and it runs
 in `check`, not in the stack-bound `e2e` suite) + code/design
-review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
+review for the rest · **Code:** `static/css/kernel/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
 `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
 `static/css/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personal-inventory.css`
-(`.master-row`), `static/css/promotion-admin.css` (`.pa-sort-btn`), `static/js/sidebar.js`
+(`.master-row`), `static/css/promotion-admin.css` (`.pa-sort-btn`), `static/js/kernel/sidebar.js`
 (`--krt-footer-height`).
 
 > **Until 2026-09-13 the two touch classes had no automated coverage at all** — this requirement
@@ -765,7 +765,7 @@ review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`,
 
 > **Renumbered 2026-09-22:** this requirement was `REQ-UI-010` until 2026-09-22; that id also named the per-user category grouping toggle on the trade pages in [`materials-overview-grouping.md`](materials-overview-grouping.md), which keeps it.
 
-The recurring CRUD actions use one fixed glyph from the in-house sprite (`fragments/icons.html`
+The recurring CRUD actions use one fixed glyph from the in-house sprite (`kernel/fragments/icons.html`
 in the app, `ui_kits/basetool/icons.jsx` in the design system): **delete / remove →
 `krt-icon-trash`**, **edit → `krt-icon-edit`**, **save → `krt-icon-save`** (inventory book-out →
 `krt-icon-bookout`). In **dense rows** (table / tree / compact action clusters) they render as
@@ -782,7 +782,7 @@ whose label flips with state (e.g. the org-chart edit toggle) keep their text la
   with an accessible name in `aria-label` / `title`, form / dialog instances keep a visible label.
 - [ ] Clicking the glyph triggers the button's action (no dead clicks on the inner `<svg>`).
 
-**Enforced by:** code/design review · **Code:** `fragments/icons.html`, `static/css/styles.css`
+**Enforced by:** code/design review · **Code:** `kernel/fragments/icons.html`, `static/css/kernel/styles.css`
 (`.btn-icon`, `.btn .krt-icon`), the per-feature templates.
 
 ### REQ-UI-011 — Overlay popups are not clipped by their container
@@ -849,9 +849,9 @@ instead of escaping the box.
   to a sliver and none overflows the box (regression: the input collapsed to 26px and Entfernen
   stuck out 10px to the right).
 
-**Enforced by:** code/design review · **Code:** `static/js/krt-searchable-select.js`,
+**Enforced by:** code/design review · **Code:** `static/js/kernel/krt-searchable-select.js`,
 `static/js/inventory-admin.js`, `static/js/inventory-my.js`,
-`static/css/styles.css` (`.krt-combobox__listbox`, `.krt-combobox__listbox--above`, `.assoc-pop`,
+`static/css/kernel/styles.css` (`.krt-combobox__listbox`, `.krt-combobox__listbox--above`, `.assoc-pop`,
 `.assoc-pop__menge`).
 
 ### REQ-UI-012 — User-facing labels show the display name, never the raw username
@@ -995,7 +995,7 @@ device classes of REQ-UI-009. Scrolling with the home page costs no viewport hei
 
 Binding details:
 
-- **All three elements ship as one fragment** (`fragments/fankit.html`) and are included together.
+- **All three elements ship as one fragment** (`shell/fragments/fankit.html`) and are included together.
   Section 2 requires the trademark notice wherever the logo appears and clause 2(g) requires its
   notice wherever CIG material sits, so none of the three may be rendered, moved or removed on its
   own.
@@ -1047,7 +1047,7 @@ Binding details:
 
 **Enforced by:** `FanKitComplianceMvcTest` · design review against the Fan Kit Guidelines and the
 Fankit Agreement ·
-**Code:** `fragments/fankit.html`, `index.html`, `.krt-fankit-*` in `styles.css`,
+**Code:** `shell/fragments/fankit.html`, `index.html`, `.krt-fankit-*` in `styles.css`,
 `fankit.*` in the three message bundles · **Related:** REQ-UI-009.
 
 ### REQ-UI-019 — The app wears the Basetool mark; the org mark stays on org surfaces
@@ -1102,7 +1102,7 @@ Binding details:
   `sc.png` (515 KB), `gplv3.svg`, `java.svg`, `postgres.svg`, `spring.svg`, about 570 KB in all;
   the org-branded PDF exports read the backend's own `krt.png`, not these.
 
-**Enforced by:** `BrandMarkRenderMvcTest` · **Code:** `fragments/head.html`, the `.brand` link in
+**Enforced by:** `BrandMarkRenderMvcTest` · **Code:** `kernel/fragments/head.html`, the `.brand` link in
 every page template, `META-INF/resources/logos/basetool-*`,
 `keycloak-theme/krt-theme/login/login.ftl` · **Related:** REQ-UI-002, REQ-UI-018.
 
@@ -1120,7 +1120,7 @@ Binding surface:
 |            Piece             |                                                    What it is                                                    |
 |------------------------------|------------------------------------------------------------------------------------------------------------------|
 | `/manifest.webmanifest`      | Rendered by `WebAppManifestController`, media type `application/manifest+json`, **no `produces` on the mapping** |
-| `<link rel="manifest">`      | In `fragments/head.html`, **with `?locale=` and no `crossorigin`** — the fetch must stay anonymous               |
+| `<link rel="manifest">`      | In `kernel/fragments/head.html`, **with `?locale=` and no `crossorigin`** — the fetch must stay anonymous               |
 | `theme-color`                | `#141414` — the header fill, not the black page background                                                       |
 | `mobile-web-app-capable`     | Standard spelling, plus the `apple-` prefixed legacy one; **both** ship                                          |
 | `apple-mobile-web-app-title` | From `pwa.short_name` — short, and the **same in both locales**, because the product name is a proper noun       |
@@ -1199,7 +1199,7 @@ Binding details:
 **Enforced by:** `WebAppManifestControllerTest` (including the no-service-worker sweep and the
 stylesheet colour pin), `SecurityConfigStaticAssetPermitAllTest` (the no-redirect contract),
 `AnonymousSurfaceSweepMvcTest` (the REQ-SEC-052 registry) · **Code:** `WebAppManifestController`,
-`fragments/head.html`, `SecurityConfig`, `RequestLoggingFilter`, `pwa.*` in the three message
+`kernel/fragments/head.html`, `SecurityConfig`, `RequestLoggingFilter`, `pwa.*` in the three message
 bundles, `monitoring/blackbox/blackbox.yml` + `monitoring/prometheus/prometheus.yml` +
 `monitoring/prometheus/alerts/infrastructure.yml` ·
 **Related:** REQ-UI-019 (the icon family), REQ-SEC-031 (`no-store`), REQ-SEC-052 (the public-path
@@ -1255,7 +1255,7 @@ A rendered page carries what the browser needs and nothing a developer wrote for
   response. Should a parser-level `<!--/* … */-->` block ever appear (the engine drops it at parse
   time), the star-slash pair may not appear inside it — it closes the block early and renders the
   rest.
-- **Page CSS lives in `static/css/pages/<page>.css`**, linked by a `<link rel="stylesheet">` in the
+- **Page CSS lives in `static/css/pages/<domain>/<page>.css`**, linked by a `<link rel="stylesheet">` in the
   place the page's `<style>` block used to stand. A template carries no `<style>` element. Each file
   belongs to exactly one template. Its rules sit in the `page` cascade layer (REQ-UI-024), so where
   the link stands no longer decides what it beats. Until 2026-09-23 it did: the link kept the page's
@@ -1438,7 +1438,7 @@ of one flat drawer. It is one model on every device
 ([ADR-0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md)),
 built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a desktop, 2b phone).
 
-- **One header.** Every app page renders `fragments/header.html :: header`, through the layout
+- **One header.** Every app page renders `kernel/fragments/header.html :: header`, through the layout
   fragment of REQ-FE-033 — hamburger, brand with
   `appTitle`, the quick-access trigger („Seite oder Aktion suchen …", `Strg K` / `⌘ K`) and the
   notification bell, which sits in the header's flex row instead of `position: fixed`. The admin
@@ -1504,9 +1504,9 @@ administrators, the quick-access metadata, no „Rechtliches" group, nothing of 
 visitor) · `NavigationE2eTest` (filter and hand-over, `Ctrl+K`, admin mode, the phone tab bar and
 sheet) · `DialogA11yE2eTest` (the quick access follows the dialog contract) ·
 `TouchClassLayoutE2eTest` (`main` reserves the tab bar; header, footer and tab bar within the
-chrome budget) · **Code:** `fragments/header.html`, `fragments/sidebar.html`,
-`fragments/palette.html`, `fragments/mobile-nav.html`, `static/js/sidebar.js`,
-`static/js/krt-palette.js` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019
+chrome budget) · **Code:** `kernel/fragments/header.html`, `kernel/fragments/sidebar.html`,
+`kernel/fragments/palette.html`, `kernel/fragments/mobile-nav.html`, `static/js/kernel/sidebar.js`,
+`static/js/kernel/krt-palette.js` · **Related:** REQ-UI-009, REQ-UI-013, REQ-UI-019
 
 ### REQ-UI-027 — Work pages follow three page patterns built from shared fragments
 
@@ -1702,7 +1702,7 @@ invisible on touch screens; owner decision of the same day).*
 lowest purchase and highest sale price, the first by name on a price tie, a location `null` when the
 terminal names no place.*
 
-**Clean-up (phase 4, 2026-10-04):** `inline-migration.css` and its `<link>` in `fragments/head.html`
+**Clean-up (phase 4, 2026-10-04):** `inline-migration.css` and its `<link>` in `kernel/fragments/head.html`
 are deleted. The last six one-off classes went to the design system or a page rule (the admin bank
 page onto the page head with `.alert` notices, the bank account table's number as `.cell-sub`, the
 account card's type chip as a `bank.css` rule); the two state classes are `is-hidden` and the
@@ -1723,8 +1723,8 @@ the CSP-safe width mechanism.
 on every swept page: no `.card` scrolling sideways on the phone, the head's primary action in the
 first viewport, one `.btn--cta` per `.page-actions`, no nested `.hud-box`, no text in the retired
 gray — see REQ-UI-009) ·
-**Code:** `static/css/styles.css` (`components` layer), `fragments/page-head.html`,
-`fragments/components.html`, `static/js/krt-overflow-menu.js`, `static/js/krt-filter-chips.js`,
+**Code:** `static/css/kernel/styles.css` (`components` layer), `kernel/fragments/page-head.html`,
+`kernel/fragments/components.html`, `static/js/kernel/krt-overflow-menu.js`, `static/js/kernel/krt-filter-chips.js`,
 `frontend/.stylelintrc.json`, `frontend/.stylelintrc.templates.json` · **Related:** REQ-UI-004,
 REQ-UI-006, REQ-UI-009, REQ-UI-017, REQ-UI-022, REQ-FE-021
 
