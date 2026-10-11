@@ -24,6 +24,8 @@
 
 - **Einstellungen lesen nur noch Admins.** `GET /api/v1/settings` und `GET /api/v1/settings/{key}` (der rohe Einstellungsspeicher) verlangen die Rolle ADMIN wie das Schreiben; Mitglieder und die App lesen die Schwellen und den Rundungsmodus über `GET /api/v1/orders/settings` und `GET /api/v1/refinery-orders/settings` (REQ-SEC-083).
 
+- **Einstellungsspeicher nicht zwischenspeicherbar.** Die Admin-Lesezugriffe auf `/api/v1/settings` antworten mit `Cache-Control: private, no-store`.
+
 ## [v1.14.0](https://github.com/krt-profit/basetool/releases/tag/v1.14.0) - 2026-10-10
 
 ### Added

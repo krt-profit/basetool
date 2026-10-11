@@ -23,10 +23,12 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.admin.internal.SystemSettingDto;
 import de.greluc.krt.profit.basetool.backend.admin.internal.SystemSettingService;
+import de.greluc.krt.profit.basetool.backend.filter.ApiCacheControlFilter;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,16 +38,19 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.filter.ShallowEtagHeaderFilter;
 
 /**
  * Pins the gate of the generic settings reads through the real security chain (REQ-SEC-083): a
- * signed-in member without {@code ADMIN} is forbidden on both reads, an admin is served.
+ * signed-in member without {@code ADMIN} is forbidden on both reads, an admin is served and the
+ * answer is {@code no-store} (REQ-SEC-031).
  */
 @SpringBootTest
 class SystemSettingControllerSecurityTest {
@@ -55,6 +60,10 @@ class SystemSettingControllerSecurityTest {
 
   @Autowired private WebApplicationContext context;
 
+  @Autowired private ApiCacheControlFilter apiCacheControlFilter;
+
+  @Autowired private ShallowEtagHeaderFilter shallowEtagHeaderFilter;
+
   @MockitoBean private SystemSettingService systemSettingService;
 
   private MockMvc mockMvc;
@@ -62,7 +71,11 @@ class SystemSettingControllerSecurityTest {
   /** Builds MockMvc with the real security filter chain and a service that answers one key. */
   @BeforeEach
   void setUp() {
-    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    mockMvc =
+        MockMvcBuilders.webAppContextSetup(context)
+            .addFilters(shallowEtagHeaderFilter, apiCacheControlFilter)
+            .apply(springSecurity())
+            .build();
     SystemSettingDto setting = new SystemSettingDto(KEY, "30", 1L);
     when(systemSettingService.getSetting(KEY)).thenReturn(setting);
     when(systemSettingService.getAllSettings()).thenReturn(List.of(setting));
@@ -115,5 +128,23 @@ class SystemSettingControllerSecurityTest {
         .perform(get("/api/v1/settings/" + KEY).with(as("ROLE_ADMIN")))
         .andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/settings").with(as("ROLE_ADMIN"))).andExpect(status().isOk());
+  }
+
+  /**
+   * Both reads answer {@code private, no-store} to an admin and carry no {@code ETag}, because the
+   * admin-only key store is an administration tree.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @DisplayName("an admin's read of the key store is no-store and carries no ETag")
+  void theAdminReadsAreNoStore() throws Exception {
+    for (String path : List.of("/api/v1/settings/" + KEY, "/api/v1/settings")) {
+      mockMvc
+          .perform(get(path).with(as("ROLE_ADMIN")))
+          .andExpect(status().isOk())
+          .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "private, no-store"))
+          .andExpect(header().doesNotExist(HttpHeaders.ETAG));
+    }
   }
 }

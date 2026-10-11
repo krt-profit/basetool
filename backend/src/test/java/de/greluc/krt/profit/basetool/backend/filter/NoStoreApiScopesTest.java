@@ -67,6 +67,8 @@ class NoStoreApiScopesTest {
         "/api/v1/announcements/current/admin",
         "/api/v1/notifications/admin/rules",
         "/api/v1/roles",
+        "/api/v1/settings",
+        "/api/v1/settings/job_order.age_yellow_days",
         "/api/v1/org-units/me/active",
         "/api/v1/org-units/me/memberships",
         "/api/v1/org-units/members/00000000-0000-4000-8000-000000000000/memberships",
@@ -117,6 +119,8 @@ class NoStoreApiScopesTest {
     "/api/v1/orders/requested, NO_STORE",
     "/api/v1/orders/settings, REVALIDATE",
     "/api/v1/refinery-orders/settings, REVALIDATE",
+    "/api/v1/settings, NO_STORE",
+    "/api/v1/settings/job_order.age_yellow_days, NO_STORE",
     "/api/v1/refinery-orders/all, NO_STORE",
     "/api/v1/announcements/current, REVALIDATE",
     "/api/v1/announcements/current/admin, NO_STORE",
@@ -184,7 +188,7 @@ class NoStoreApiScopesTest {
         .as(
             "the number of no-store families. Raise it here when you add one, and add the path to"
                 + " sensitiveFamiliesMatch in the same change")
-        .isEqualTo(31);
-    assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(31);
+        .isEqualTo(32);
+    assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(30);
   }
 }
