@@ -1438,7 +1438,8 @@ of one flat drawer. It is one model on every device
 ([ADR-0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md)),
 built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a desktop, 2b phone).
 
-- **One header.** Every app page renders `fragments/header.html :: header` — hamburger, brand with
+- **One header.** Every app page renders `fragments/header.html :: header`, through the layout
+  fragment of REQ-FE-033 — hamburger, brand with
   `appTitle`, the quick-access trigger („Seite oder Aktion suchen …", `Strg K` / `⌘ K`) and the
   notification bell, which sits in the header's flex row instead of `position: fixed`. The admin
   chip shows on `/admin/**` pages as before. The seven pages without the app shell (error pages,

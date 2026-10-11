@@ -1,12 +1,10 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
+<head>
     <title th:text="${appTitle}">Profit Basetool</title>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
+<th:block th:fragment="pageContent">
 <main>
     <div class="greeting hud-box">
         <h1 th:text="#{landing.title}">Profit Basetool</h1>
@@ -37,5 +35,6 @@
 
     <th:block th:replace="~{fragments/fankit :: band}" />
 </main>
+</th:block>
 </body>
 </html>

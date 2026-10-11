@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageBare=true, pageContent=~{::pageContent})}">
+<head>
     <title th:text="#{error.generic.title} + ' - ' + ${appTitle}">System Error - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <link rel="stylesheet" th:href="@{/css/pages/error-500.css}">
     </th:block>
 </head>
 <body>
-
+<th:block th:fragment="pageContent">
 <header>
     <nav>
         <a th:href="@{/}" class="brand ml-1">
@@ -29,5 +29,6 @@
         <a th:href="@{/}" class="btn-return" th:text="#{error.return}">Return to Base</a>
     </div>
 </main>
+</th:block>
 </body>
 </html>

@@ -168,6 +168,38 @@ A condition or iteration goes on a `<th:block>` around the call. In a fragment f
 script that drives it: a dialog nothing can open, or whose handlers were never loaded, is dead
 markup (the promotion admin all-squadrons view and the bare admin blueprint page were).
 
+### Page templates: one layout fragment (binding)
+
+Every page template is composed through `fragments/layout :: page` (REQ-FE-033, plan F5): the page
+hands over its parts and **never calls the head, sidebar, header or toast fragment itself**
+(`PageLayoutCompositionTest`). The shape of a page:
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title},
+    pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{x.title} + ' - ' + ${appTitle}">X</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/pages/x.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent"><main>…</main></th:block>
+<th:block th:fragment="pageTail"><script th:src="@{/js/x.js}" defer th:attr="nonce=${cspNonce}"></script></th:block>
+</body>
+</html>
+```
+
+`pageTitle` and `pageContent` are required; `pageLinks` and `pageTail` are left out when the page has
+none. `pageToast=true` renders the toast between the content and the tail, so the page's own scripts
+go into the tail to keep loading after `toast.js`. `pageBare=true` leaves out sidebar and header (the
+error pages, pending approval, terms acceptance); `pageShowModal=${…}` sets the body's
+`data-show-modal`. A different chrome is a new parameter of the layout, never a copy into a page, and
+changing the layout means rewriting the golden file `templates/page-chrome-snapshot.txt`
+(`PageChromeSnapshotTest`, `-PupdateSnapshots`) and saying so in the review. A fragment a controller
+returns (`view :: fragment`) is unaffected.
+
 ## Live update
 
 **Live update is a binding requirement: every part of the frontend must support live update to

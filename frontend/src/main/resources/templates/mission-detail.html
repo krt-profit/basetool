@@ -1,16 +1,13 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
     <title th:text="#{missions.title} + ' - ' + ${appTitle}">Mission Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
     <link rel="stylesheet" th:href="@{/css/pages/mission-detail.css}">
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <div class="page-wrapper mission-page">
 
     <div th:if="${isNew}" class="mission-new-head">
@@ -1609,5 +1606,6 @@
     };
     window.missionPresenceUserId = /*[[${authUserId}]]*/ null;
 </script>
+</th:block>
 </body>
 </html>

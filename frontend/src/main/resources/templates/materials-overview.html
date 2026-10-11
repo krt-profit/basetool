@@ -1,16 +1,13 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
     <title th:text="#{nav.materials.overview} + ' - ' + ${appTitle}">Preis-Übersicht - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/materials-overview.css}">
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <main>
     <div class="page-head" data-testid="page-head">
         <div class="page-head__main">
@@ -144,5 +141,6 @@
 </main>
 
 <script th:src="@{/js/materials-matrix.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>

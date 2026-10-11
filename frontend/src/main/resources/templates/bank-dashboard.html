@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
     <title th:text="#{bank.dashboard.title} + ' - ' + ${appTitle}">Kartellbank - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank.css}">
@@ -8,10 +8,7 @@
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-approval-request-filed=#{bank.movement.approvalRequestFiled},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey=${dashboard == null ? 'nav.section.bank' : (dashboard.management() ? 'bank.dashboard.subtitle.management(' + #lists.size(dashboard.accounts()) + ')' : 'bank.dashboard.subtitle.employee(' + #lists.size(dashboard.accounts()) + ')')}, titleText=#{bank.dashboard.title}, actions=~{::bank-dashboard-actions})}">
         <th:block th:ref="bank-dashboard-actions">
@@ -110,10 +107,11 @@
         <th:block th:replace="~{fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'bankGrid', null, true, false, true, true, true)}"></th:block>
     </th:block>
 </main>
-
-<th:block th:replace="~{fragments/toast :: toast}" />
+</th:block>
+<th:block th:fragment="pageTail">
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/bank-layout-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/bank-grants-chart-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>

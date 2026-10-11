@@ -2527,6 +2527,51 @@ marker below and the reference DTOs several domains share).
 `DtoMirrorScan` · **Code:** `kernel/model/DtoMirror` · **Related:** REQ-FE-027, REQ-FE-029,
 REQ-OPS-038
 
+### REQ-FE-033 — Every page is composed through one layout fragment
+
+Since 2026-10-11 (plan §8.2, F5) a page template does not copy the page chrome. The fragment
+`fragments/layout :: page` renders the `<html>` element, the head, the sidebar and header, the
+page's content, the toast and the page's tail, and a page hands it its own parts. It is native
+Thymeleaf (no Layout Dialect, no new dependency) and declares no signature, so a call names only
+what it needs; the parameters start with `page` so that they cannot collide with a model attribute.
+
+| Parameter | Meaning |
+| --- | --- |
+| `pageTitle` | Required. `~{::title}`, the page's `<title>`. |
+| `pageContent` | Required. `~{::pageContent}`, a `th:fragment="pageContent"` block in the body holding everything between the header and the toast. |
+| `pageLinks` | `~{::extraLinks}`, the page's own stylesheets and meta elements, a `th:fragment="extraLinks"` block in the `<head>`. |
+| `pageToast` | `true` renders `fragments/toast` after the content. |
+| `pageTail` | `~{::pageTail}`, a `th:fragment="pageTail"` block rendered after the toast: scripts and dialogs that stand after it. Without a toast, the whole body is content. |
+| `pageBare` | `true` leaves out the sidebar and the header: the seven pages without the app shell (error pages, pending approval, terms acceptance), whose own `<header>` is part of their content. |
+| `pageShowModal` | The value of the body's `data-show-modal` (the hangar). |
+
+- **No page calls the head, sidebar, header or toast fragment itself**, and every template outside
+  `fragments/` that has a `<head>` is a layout call (`PageLayoutCompositionTest`). A variant of the
+  chrome is a parameter, never a copy; changing the layout changes every page at once.
+- **The order is content, toast, tail**, as the pages had it: `toast.js` still loads after the page's
+  content and before its tail scripts, and a page whose toast stood at the very end keeps its
+  scripts in the content.
+- **Controllers are unaffected.** A page fragment a controller returns (`view :: fragment`) never
+  includes the root `th:replace`, and no route, gate, model attribute or message changes.
+- **The rendered chrome is pinned per page** (`PageChromeSnapshotTest`, golden file
+  `templates/page-chrome-snapshot.txt`): the `<html>` tag, the head's fixed part (hash) and the
+  page's own title and links, the `<body>` tag and the ordered parts (chrome, content, toast, tail)
+  of every page, rendered through the real fragments for an administrator with the page's own markup
+  neutralised; the CSP nonce, the CSRF values and the application version are masked.
+
+**Acceptance**
+
+- [x] 90 page templates were converted in stacked commits against a golden file captured before the
+  first one; the snapshot did not change in any step (2026-10-11). `organisation/unit-detail.html`
+  stays: it has no head, only the roster fragments other pages include.
+- [x] A page that drops its toast, its tail or its links, turns the chrome off or adds a body
+  attribute, and a layout that swaps header and sidebar, moves the content after the toast or
+  ignores the bare shell each make the snapshot comparison fail.
+- [x] A page that copies the chrome again, or has a head without the layout call, is reported.
+
+**Enforced by:** `PageChromeSnapshotTest`, `ChromeNeutraliserTest`, `PageLayoutCompositionTest` ·
+**Code:** `templates/fragments/layout.html` · **Related:** REQ-UI-026, REQ-FE-023, REQ-UI-023
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract

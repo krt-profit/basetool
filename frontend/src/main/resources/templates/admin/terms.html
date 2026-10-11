@@ -1,12 +1,10 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
+<head>
     <title th:text="${appTitle} + ' - ' + #{adminTerms.title}">Profit Basetool - Zustimmungen</title>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
+<th:block th:fragment="pageContent">
 <main>
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{adminTerms.title},
         count=${termsPage != null ? termsPage.totalElements() : null}, countId='admin-terms-count', countFor='admin-terms-results')}"></th:block>
@@ -58,5 +56,6 @@
     </div>
 </main>
 <script th:src="@{/js/admin-terms.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>
