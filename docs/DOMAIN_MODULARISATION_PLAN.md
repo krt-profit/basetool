@@ -1498,11 +1498,13 @@ observer's `beforeUserPurge` waits for §7.6 is settled here: it left `StockChan
 `lower`, `beforeDelete` and `beforeWipe`.
 **P4-1 — move the inventory into `inventory.web` / `inventory.internal`** (carried from P3-5e,
 §7.5). It waits until the layer classes that consume `inventory.api` have left the layer packages:
-the GDPR orchestrator (`UserDeletionService`), identity's `MeController`, the org-unit membership
+identity's `MeController`, the org-unit membership
 service and repository (`InventoryOrgUnitReconciler`), the blueprint's craftability read (P3-7), the
 job order's `JobOrderStockProjectionService` and `JobOrderMapper`, and the earmark finders of
-`JobOrderRepository` and `MissionRepository`. The Lager's own controller, services, mapper and
-repository then move together; NullAway already covers the `inventory` tree.
+`JobOrderRepository` and `MissionRepository`. The GDPR orchestrator (`UserDeletionService`) left
+that list with P4 slice a: it no longer consumes `inventory.api`, and the Lager purge is the
+inventory's own `InventoryUserErasure`. The Lager's own controller, services, mapper and
+repository then move together, with that participant; NullAway already covers the `inventory` tree.
 **P4-2 — move the blueprint into `blueprint.web` / `blueprint.internal`** (carried from
 P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
 The five published interfaces already cover every foreign caller, so the move touches no
