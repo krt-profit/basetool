@@ -68,7 +68,7 @@ class MaterialExchangeOfferClampDataTest {
   @Test
   void clamp_reducesActiveOfferWhenStockDropsBelowOfferedAmount() {
     MaterialExchangeOffer offer = activeOffer(80.0);
-    UUID itemId = offer.getInventoryItem().getId();
+    UUID itemId = offer.getInventoryItemId();
     entityManager.flush();
 
     int changed = offerRepository.clampOfferedAmountToStock(itemId, 30.0);
@@ -80,7 +80,7 @@ class MaterialExchangeOfferClampDataTest {
   @Test
   void clamp_isNoOpWhenStockDidNotDropBelowOfferedAmount() {
     MaterialExchangeOffer offer = activeOffer(80.0);
-    UUID itemId = offer.getInventoryItem().getId();
+    UUID itemId = offer.getInventoryItemId();
     entityManager.flush();
 
     int changed = offerRepository.clampOfferedAmountToStock(itemId, 90.0);
@@ -93,7 +93,7 @@ class MaterialExchangeOfferClampDataTest {
   void clamp_leavesDeactivatedOffersUntouched() {
     MaterialExchangeOffer offer = activeOffer(80.0);
     offer.setStatus(MaterialExchangeOfferStatus.DEACTIVATED);
-    UUID itemId = offer.getInventoryItem().getId();
+    UUID itemId = offer.getInventoryItemId();
     entityManager.flush();
 
     int changed = offerRepository.clampOfferedAmountToStock(itemId, 30.0);
@@ -105,7 +105,7 @@ class MaterialExchangeOfferClampDataTest {
   @Test
   void clampItem_reducesActiveStockBackedItemOfferWhenStockDropsBelowQuantity() {
     MaterialExchangeOffer offer = activeItemStockOffer(8);
-    UUID itemId = offer.getInventoryItem().getId();
+    UUID itemId = offer.getInventoryItemId();
     entityManager.flush();
 
     int changed = offerRepository.clampItemQuantityToStock(itemId, 3);
@@ -117,7 +117,7 @@ class MaterialExchangeOfferClampDataTest {
   @Test
   void clampItem_isNoOpWhenStockDidNotDropBelowQuantity() {
     MaterialExchangeOffer offer = activeItemStockOffer(8);
-    UUID itemId = offer.getInventoryItem().getId();
+    UUID itemId = offer.getInventoryItemId();
     entityManager.flush();
 
     int changed = offerRepository.clampItemQuantityToStock(itemId, 12);
@@ -129,7 +129,7 @@ class MaterialExchangeOfferClampDataTest {
   @Test
   void clampItem_leavesMaterialOffersUntouched() {
     MaterialExchangeOffer material = activeOffer(80.0);
-    UUID itemId = material.getInventoryItem().getId();
+    UUID itemId = material.getInventoryItemId();
     entityManager.flush();
 
     int changed = offerRepository.clampItemQuantityToStock(itemId, 1);
@@ -199,7 +199,7 @@ class MaterialExchangeOfferClampDataTest {
     return offerRepository.save(
         MaterialExchangeOffer.builder()
             .kind(MaterialExchangeOfferKind.ITEM)
-            .inventoryItem(item)
+            .inventoryItemId(item.getId())
             .owner(user)
             .owningOrgUnit(orgUnit)
             .itemProductKey("prod-key")
@@ -248,7 +248,7 @@ class MaterialExchangeOfferClampDataTest {
     return offerRepository.save(
         MaterialExchangeOffer.builder()
             .kind(MaterialExchangeOfferKind.MATERIAL)
-            .inventoryItem(item)
+            .inventoryItemId(item.getId())
             .owner(user)
             .owningOrgUnit(orgUnit)
             .offeredAmount(offeredAmount)

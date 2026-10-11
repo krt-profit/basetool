@@ -41,7 +41,7 @@ rule notifies the owner and excludes the actor, so an officer resetting their ow
 ### REQ-HANGAR-008 — An admin changing a member's hangar or blueprints tells the member
 
 `HangarService#addShipByAdmin`, `#updateShipByAdmin` and `#deleteShipByAdmin` (the admin endpoints under
-`/hangar/users/{userId}/ships`) publish `HANGAR_CHANGED_BY_ADMIN`; `PersonalBlueprintService#addForUser`,
+`/hangar/admin/users/{userId}/ships`) publish `HANGAR_CHANGED_BY_ADMIN`; `PersonalBlueprintService#addForUser`,
 `#addBatchForUser`, `#updateForUser`, `#deleteForUser` and the admin import apply
 (`#announceImportByAdmin`) publish `BLUEPRINT_CHANGED_BY_ADMIN`; the global purge
 `#deleteAllForAllUsers` counts the removable blueprints per owner first and publishes

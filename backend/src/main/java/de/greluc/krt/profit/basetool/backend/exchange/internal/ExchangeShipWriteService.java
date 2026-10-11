@@ -27,12 +27,12 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemR
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.service.HangarService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
@@ -96,7 +96,7 @@ public class ExchangeShipWriteService {
   private final ExchangeLocationResolver locationResolver;
   private final ShipRepository shipRepository;
   private final ExchangeShipLinkRepository linkRepository;
-  private final HangarService hangarService;
+  private final ShipCommands shipCommands;
   private final ExchangeChangeRepository changeRepository;
   private final ExchangeJournalService journalService;
   private final ExchangeMassChangeGuard guard;
@@ -444,7 +444,7 @@ public class ExchangeShipWriteService {
         yield 0;
       }
       case Create create -> {
-        Ship saved = hangarService.addShipForClient(caller.member(), create.dto());
+        Ship saved = shipCommands.addShipForClient(caller.member(), create.dto());
         relink(caller, create.externalId(), saved.getId());
         journalService.record(
             caller,
@@ -459,7 +459,7 @@ public class ExchangeShipWriteService {
       case Update update -> {
         Map<String, Object> after = update.before();
         if (update.changes()) {
-          after = state(hangarService.updateShip(caller.member(), update.shipId(), update.dto()));
+          after = state(shipCommands.updateShip(caller.member(), update.shipId(), update.dto()));
         }
         relink(caller, update.externalId(), update.shipId());
         journalService.record(
@@ -473,7 +473,7 @@ public class ExchangeShipWriteService {
         yield 0;
       }
       case Remove remove -> {
-        int detached = hangarService.deleteShip(caller.member(), remove.shipId());
+        int detached = shipCommands.deleteShip(caller.member(), remove.shipId());
         journalService.record(
             caller,
             batch,

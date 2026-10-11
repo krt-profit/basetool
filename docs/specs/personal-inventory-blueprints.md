@@ -236,7 +236,7 @@ it preserves the surrounding guarantees:
 - **Opt-in only**, default off (`NOT NULL DEFAULT FALSE`); nothing changes for users who do not
   enable it.
 - It widens **whose** blueprints are counted, never **who may open** the views — the
-  viewer-access gates (`OwnerScopeService.canAccessBlueprintOverview`,
+  viewer-access gates (`BlueprintAccessPolicy.canAccessBlueprintOverview`,
   `canSeeJobOrderBlueprintOwners`) are unchanged, so a non-member still cannot open either view.
 - **Read-only** exposure by **display name only** (`User.getEffectiveName()`, never the `sub` or
   e-mail); it grants no edit rights on the owner's blueprints.
@@ -404,7 +404,8 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 **Code links:** [`BlueprintCraftabilityService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintCraftabilityService.java),
 [`BlueprintModifierMath`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintModifierMath.java),
 [`PersonalBlueprintController#craftability`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/PersonalBlueprintController.java),
-[`InventoryItemService#getOwnedStockSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/InventoryItemService.java),
+[`InventoryCraftableStock#ownedStockSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/InventoryCraftableStock.java)
+(the blueprint's `CraftableStockSource`),
 [`RefineryOrderService#pendingYieldSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/refinery/internal/RefineryOrderService.java),
 [`BlueprintCraftabilityDto`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto/BlueprintCraftabilityDto.java),
 [`PersonalInventoryBlueprintsPageController#craftability`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageController.java),

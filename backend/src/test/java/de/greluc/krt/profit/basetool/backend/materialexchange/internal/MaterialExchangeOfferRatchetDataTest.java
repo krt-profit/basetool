@@ -150,7 +150,7 @@ class MaterialExchangeOfferRatchetDataTest {
    * @return the offer's row as it was written
    */
   private InventoryItem detach(MaterialExchangeOffer offer) {
-    InventoryItem row = offer.getInventoryItem();
+    InventoryItem row = inventoryItemRepository.findById(offer.getInventoryItemId()).orElseThrow();
     entityManager.flush();
     entityManager.clear();
     return row;
@@ -223,7 +223,7 @@ class MaterialExchangeOfferRatchetDataTest {
     return offerRepository.save(
         MaterialExchangeOffer.builder()
             .kind(MaterialExchangeOfferKind.MATERIAL)
-            .inventoryItem(item)
+            .inventoryItemId(item.getId())
             .owner(user)
             .owningOrgUnit(orgUnit)
             .offeredAmount(offered)

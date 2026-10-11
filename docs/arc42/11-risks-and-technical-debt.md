@@ -390,8 +390,14 @@ scope gate), then `exchange` and the bank as packages (2026-10-10), which enter 
 boundary before their Gradle extraction. Phase 3 began with `materialexchange` (2026-10-10), the
 Lager reaching it only through its own `StockChangeObserver` and `StockOfferLookup`, then `refinery`
 with the second module access policy, `joborder` with the third and `mission` with the fourth;
-the inventory follows in five parts, the first taking its access policy out of the scope hub. The
-baseline is at 79 class edges.
+the inventory followed in five parts (its access policy out of the scope hub, its stock commands,
+the job-order and refinery Lager writes through them, its business associations as ids, and the end
+of its job-order edges); its move into module packages waits for Phase 4, because layer classes
+still consume its API; then `hangar` with the sixth module access policy and its ship
+commands; and the blueprint's first part, which ended its `blueprint -> inventory` and
+`identity -> blueprint` edges, and its published API for the exchange, the Materialbörse and
+the job order. The blueprint's move into module packages waits for the inventory's (Phase
+4). The baseline is at 45 class edges.
 The frontend is packaged by domain since 2026-10-10 (plan F4, REQ-FE-032): its controllers, mirrors
 and forms live in `<domain>.web` and `<domain>.model` beside the typed clients, the kernel in the
 eight `kernel.*` packages. The cross-domain references between domains are page composition and no

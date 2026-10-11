@@ -153,8 +153,8 @@ GET /api/v1/hangar/ships | HangarController#getAllShips | pre=hasAuthority('HANG
 POST /api/v1/hangar/ships | HangarController#addShip | pre=isAuthenticated() | url=POST /api/v1/hangar/ships -> authenticated
 POST /api/v1/hangar/ships/home-location | HangarController#setHomeLocationForMyShips | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 POST /api/v1/hangar/ships/reset-fitted | HangarController#resetAllFittedStatus | pre=hasAnyRole('ADMIN','OFFICER') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
-DELETE /api/v1/hangar/ships/{id} | HangarController#deleteMyShip | pre=isAuthenticated() and @ownerScopeService.canEditShip(#id) | url=DELETE /api/v1/hangar/ships/* -> authenticated
-PUT /api/v1/hangar/ships/{id} | HangarController#updateMyShip | pre=isAuthenticated() and @ownerScopeService.canEditShip(#id) | url=PUT /api/v1/hangar/ships/* -> authenticated
+DELETE /api/v1/hangar/ships/{id} | HangarController#deleteMyShip | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=DELETE /api/v1/hangar/ships/* -> authenticated
+PUT /api/v1/hangar/ships/{id} | HangarController#updateMyShip | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=PUT /api/v1/hangar/ships/* -> authenticated
 GET /api/v1/hangar/squadron-overview | HangarController#getSquadronOverview | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 POST /api/v1/inventory | InventoryItemController#createInventoryItem | pre=hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','KRT_MEMBER') | url=/api/v1/inventory -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_LOGISTICIAN,ROLE_OFFICER)
 GET /api/v1/inventory/aggregated | InventoryItemController#getAggregatedInventory | pre=hasAnyRole('ADMIN','OFFICER','LOGISTICIAN','KRT_MEMBER') | url=/api/v1/inventory/** -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_LOGISTICIAN,ROLE_OFFICER)
@@ -413,8 +413,8 @@ POST /api/v1/personal-blueprints/batch | PersonalBlueprintController#addBatch | 
 GET /api/v1/personal-blueprints/craftability | PersonalBlueprintController#craftability | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/personal-blueprints/import/apply | PersonalBlueprintController#applyImport | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/personal-blueprints/import/preview | PersonalBlueprintController#previewImport | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/personal-blueprints/overview | PersonalBlueprintOverviewController#listAvailableBlueprints | pre=@ownerScopeService.canAccessBlueprintOverview() | url=anyRequest -> authenticated
-GET /api/v1/personal-blueprints/overview/owners | PersonalBlueprintOverviewController#listOwners | pre=@ownerScopeService.canAccessBlueprintOverview() | url=anyRequest -> authenticated
+GET /api/v1/personal-blueprints/overview | PersonalBlueprintOverviewController#listAvailableBlueprints | pre=@blueprintAccessPolicy.canAccessBlueprintOverview() | url=anyRequest -> authenticated
+GET /api/v1/personal-blueprints/overview/owners | PersonalBlueprintOverviewController#listOwners | pre=@blueprintAccessPolicy.canAccessBlueprintOverview() | url=anyRequest -> authenticated
 DELETE /api/v1/personal-blueprints/{id} | PersonalBlueprintController#delete | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/personal-blueprints/{id} | PersonalBlueprintController#update | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/personal-blueprints/{id}/recipe | PersonalBlueprintController#recipe | pre=isAuthenticated() | url=anyRequest -> authenticated

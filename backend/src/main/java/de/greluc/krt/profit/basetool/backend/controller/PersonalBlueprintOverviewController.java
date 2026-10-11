@@ -43,13 +43,13 @@ import org.springframework.web.bind.annotation.RestController;
  * Read-only REST endpoints for the org-unit blueprint availability overview: which blueprints the
  * members of the caller's oversight org units own, and who owns a given one.
  *
- * <p>Gated by {@code @ownerScopeService.canAccessBlueprintOverview()}; row scope is resolved in
+ * <p>Gated by {@code @blueprintAccessPolicy.canAccessBlueprintOverview()}; row scope is resolved in
  * {@link PersonalBlueprintOverviewService}.
  */
 @RestController
 @RequestMapping("/api/v1/personal-blueprints/overview")
 @RequiredArgsConstructor
-@PreAuthorize("@ownerScopeService.canAccessBlueprintOverview()")
+@PreAuthorize("@blueprintAccessPolicy.canAccessBlueprintOverview()")
 @Tag(
     name = "Blueprint Availability",
     description = "Org-unit blueprint availability overview (#364).")

@@ -1,0 +1,38 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
+
+import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
+import java.util.List;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * One ship type on the squadron overview.
+ *
+ * @param shipType the ship type
+ * @param count how many ships of the type the scope holds
+ * @param fittedCount how many of them are fitted
+ * @param details the ships, or {@code null} when the owner details are not requested
+ */
+public record SquadronShipOverviewDto(
+    ShipTypeDto shipType,
+    long count,
+    long fittedCount,
+    @Nullable List<SquadronShipDetailDto> details) {}

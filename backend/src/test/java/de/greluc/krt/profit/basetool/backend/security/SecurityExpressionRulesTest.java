@@ -27,6 +27,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
@@ -36,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.BeanCall;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionSources.Declared;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.BlueprintAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -64,7 +66,7 @@ class SecurityExpressionRulesTest {
    */
   private static final Map<String, Integer> REFERENCE_FLOORS =
       Map.ofEntries(
-          Map.entry("ownerScopeService", 6),
+          Map.entry("ownerScopeService", 3),
           Map.entry("operationAccessPolicy", 8),
           Map.entry("refineryAccessPolicy", 8),
           Map.entry("missionSecurityService", 39),
@@ -76,7 +78,9 @@ class SecurityExpressionRulesTest {
           Map.entry("connectedAppsGate", 1),
           Map.entry("jobOrderAccessPolicy", 29),
           Map.entry("missionAccessPolicy", 6),
-          Map.entry("inventoryAccessPolicy", 9));
+          Map.entry("inventoryAccessPolicy", 9),
+          Map.entry("hangarAccessPolicy", 2),
+          Map.entry("blueprintAccessPolicy", 1));
 
   /**
    * The classes that carry the security beans' explicit names; a bean referenced from SpEL must be
@@ -96,7 +100,9 @@ class SecurityExpressionRulesTest {
           Map.entry("connectedAppsGate", ConnectedAppsGate.class),
           Map.entry("jobOrderAccessPolicy", JobOrderAccessPolicy.class),
           Map.entry("missionAccessPolicy", MissionAccessPolicy.class),
-          Map.entry("inventoryAccessPolicy", InventoryAccessPolicy.class));
+          Map.entry("inventoryAccessPolicy", InventoryAccessPolicy.class),
+          Map.entry("hangarAccessPolicy", HangarAccessPolicy.class),
+          Map.entry("blueprintAccessPolicy", BlueprintAccessPolicy.class));
 
   @Test
   @DisplayName("every security expression follows the constant-SpEL rules")

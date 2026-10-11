@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.DefaultBlueprintKeys;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCommands;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
@@ -31,9 +35,6 @@ import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
-import de.greluc.krt.profit.basetool.backend.service.DefaultBlueprintKeyService;
-import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -91,9 +92,9 @@ public class ExchangeBlueprintWriteService {
   private static final String CLIENT_CHANNEL = "client";
 
   private final PersonalBlueprintRepository blueprintRepository;
-  private final PersonalBlueprintService blueprintService;
-  private final BlueprintProductService productService;
-  private final DefaultBlueprintKeyService defaultKeys;
+  private final PersonalBlueprintCommands blueprintService;
+  private final BlueprintProducts productService;
+  private final DefaultBlueprintKeys defaultKeys;
   private final ExchangeResolveService resolveService;
   private final ExchangeChangeRepository changeRepository;
   private final ExchangeJournalService journalService;
@@ -297,7 +298,7 @@ public class ExchangeBlueprintWriteService {
       return key;
     }
     if (keysByBt.isEmpty()) {
-      for (BlueprintProductService.ResolvedProduct product : productService.allProducts()) {
+      for (ResolvedProduct product : productService.allProducts()) {
         keysByBt.put(
             ExchangeBlueprintFeedService.keyOf(product.productKey()), product.productKey());
       }

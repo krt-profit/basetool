@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.MemberCreatedObserver;
 import de.greluc.krt.profit.basetool.backend.identity.api.RolesChangedObserver;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
@@ -92,7 +93,7 @@ public class UserReconciliationService {
 
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
-  private final DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
+  private final MemberCreatedObserver memberCreatedObserver;
   private final ApplicationEventPublisher eventPublisher;
   private final UserRegistrationService userRegistrationService;
   private final UserService userService;
@@ -219,7 +220,7 @@ public class UserReconciliationService {
     if (changed || user.isNew()) {
       User saved = userRepository.save(user);
       if (created) {
-        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId());
+        memberCreatedObserver.afterMemberCreated(user.getId());
       }
       if (newPendingRegistration) {
         eventPublisher.publishEvent(
@@ -325,7 +326,7 @@ public class UserReconciliationService {
     if (changed || user.isNew()) {
       userRepository.save(user);
       if (created) {
-        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId());
+        memberCreatedObserver.afterMemberCreated(user.getId());
       }
       if (newPendingRegistration) {
         eventPublisher.publishEvent(

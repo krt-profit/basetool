@@ -33,6 +33,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAlias;
@@ -46,7 +47,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportStatus;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

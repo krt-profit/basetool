@@ -20,7 +20,8 @@ text filter applied by the backend across the user's whole fleet, and the shared
 from `fragments/pagination.html`.
 
 Who may see which ships (per-`sub` isolation — `/my-ships` derives the owner from the JWT, never the
-URL) is unchanged; see [`security-and-access.md`](security-and-access.md) and `HangarService`.
+URL) is unchanged; see [`security-and-access.md`](security-and-access.md), `HangarService` and the
+per-ship gates of `HangarAccessPolicy` (`canSeeShip` / `canEditShip`, REQ-ORG-011).
 
 ## Requirements
 
@@ -125,7 +126,7 @@ names, never values. Deleting a ship first detaches it from mission units and re
 
 **Enforced by:** `HangarServiceTest`, `HangarImportServiceTest`, `AuditReportServiceTest`,
 `AdminAuditLogPageControllerTest`, `AuditReportProxyControllerTest`, `AuditPdfTitleKeysTest`,
-`ExchangeShipWriteControllerTest` ·
+`ExchangeShipWriteControllerTest`, `HangarModuleContractTest` ·
 **Code:** `HangarService`, `HangarImportService`, `AuditEventType.HANGAR_*` · **Issues:** #2098
 (epic #2078).
 

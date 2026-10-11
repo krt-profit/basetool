@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
@@ -871,7 +871,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow(a.jobOrderId, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
+      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow(a.jobOrderId, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
       FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
       AND a.inventoryItem.material IS NOT NULL
       """)
@@ -884,12 +884,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    *
    * @param jobOrderIds the orders whose earmarked item stock to project; an empty collection yields
    *     an empty list.
-   * @return one {@link de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow}
-   *     per game-item job-order allocation, never {@code null}.
+   * @return one {@link
+   *     de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow} per game-item
+   *     job-order allocation, never {@code null}.
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow(a.jobOrderId, a.inventoryItem.gameItem.id, a.amount)
+      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow(a.jobOrderId, a.inventoryItem.gameItem.id, a.amount)
       FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
       AND a.inventoryItem.gameItem IS NOT NULL
       """)
@@ -995,7 +996,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       i.personal = :personal AND i.stolen = :stolen AND
       ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
       :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
-      o.inventoryItem = i) ORDER BY i.createdAt ASC, i.id ASC
+      o.inventoryItemId = i.id) ORDER BY i.createdAt ASC, i.id ASC
       """)
   List<InventoryItem> findMergeGroupForUpdate(
       @Param("userId") UUID userId,
@@ -1056,7 +1057,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       i.personal = :personal AND i.stolen = :stolen AND
       ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
       :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
-      o.inventoryItem = i)
+      o.inventoryItemId = i.id)
       """)
   long countMergeCandidates(
       @Param("userId") UUID userId,
@@ -1359,4 +1360,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
      */
     double getAmount();
   }
+
+  /**
+   * Loads the given Lager rows with their material in one read, for a page of Materialbörse offers.
+   *
+   * @param ids the rows
+   * @return the existing rows
+   */
+  @EntityGraph(attributePaths = {"material"})
+  List<InventoryItem> findWithMaterialByIdIn(Collection<UUID> ids);
 }

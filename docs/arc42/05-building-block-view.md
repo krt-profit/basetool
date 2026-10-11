@@ -160,7 +160,7 @@ REQ-MOD-006).
 
 The exchange is the first module whose lower neighbours had to stop naming it: the security
 configuration takes the acting-member filter from `platform.api.ActingMemberFilterProvider`, the
-blueprint upload preview hands the exchange envelope to `service.BlueprintEnvelopeReader`, and the
+blueprint upload preview hands the exchange envelope to `blueprint.api.BlueprintEnvelopeReader`, and the
 token converter, the account deletion and the blueprint source names ask
 `platform.api.ClientDirectory`; all three SPIs are implemented in `exchange.internal`. The relay
 headers are platform vocabulary (`platform.api.ActingMemberHeader`). The relay surface itself is

@@ -98,7 +98,8 @@ requirements — the gates are parallel, not a replacement. The orphaned-link wa
 - [ ] An item earmark whose order no longer requests the gameItem is flagged orphaned.
 
 **Enforced by:** `InventoryItemServiceAllocationTest` item cases · **Code:**
-`InventoryItemService`, `JobOrderItemService.requiredGameItemIds`,
+`InventoryItemService`, `EarmarkTargets.JobOrders` (`JobOrderEarmarkTargets`),
+`JobOrderItemService.requiredGameItemIds`,
 `JobOrderQueryService` · **Issues:** —
 
 ### REQ-INV-032 — Production booking books the produced stock in

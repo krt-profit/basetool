@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderStockReadService;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
-import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -47,7 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class MaterialCollectionController {
 
-  private final InventoryItemService inventoryItemService;
+  private final JobOrderStockReadService jobOrderStockReadService;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
@@ -77,7 +77,7 @@ public class MaterialCollectionController {
   public List<MaterialCollectionEntryDto> getMaterialCollection(
       @PathVariable @NotNull UUID jobOrderId) {
     List<MaterialCollectionEntryDto> entries =
-        inventoryItemService.getMaterialCollection(jobOrderId);
+        jobOrderStockReadService.getMaterialCollection(jobOrderId);
     return jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)
         ? entries
         : inventoryOwnerRedactor.redactMaterialCollection(entries);

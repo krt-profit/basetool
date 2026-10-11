@@ -1,8 +1,5 @@
-blueprint -> inventory: BlueprintCraftabilityService -> InventoryItemService
-blueprint -> inventory: BlueprintCraftabilityService -> OwnedStockSlice
 catalogue -> hangar: LocationService -> ShipRepository
 catalogue -> refinery: LocationService -> RefineryOrderRepository
-identity -> blueprint: UserReconciliationService -> DefaultBlueprintProvisioningService
 identity -> inventory: MeController -> InventoryProperties
 identity -> joborder: UserDtoRedaction -> JobOrderAssigneeDto
 identity -> orgunit: MeController -> OrgUnitMembershipOptionDto
@@ -34,17 +31,6 @@ identity -> privacy: UserController -> UserDeletionService
 identity -> privacy: UserRegistrationService -> UserDeletionService
 identity -> scope: MeController -> OwnerScopeService
 identity -> scope: UserService -> OwnerScopeService
-inventory -> joborder: InventoryAggregationService -> JobOrder
-inventory -> joborder: InventoryAggregationService -> JobOrderItem
-inventory -> joborder: InventoryAggregationService -> JobOrderItemStockEntryDto
-inventory -> joborder: InventoryAggregationService -> JobOrderItemStockGroupDto
-inventory -> joborder: InventoryAggregationService -> JobOrderRepository
-inventory -> joborder: InventoryItemRepository -> JobOrderGameItemStockRow
-inventory -> joborder: InventoryItemRepository -> JobOrderMaterialStockRow
-inventory -> joborder: InventoryItemService -> JobOrder
-inventory -> joborder: InventoryItemService -> JobOrderItemService
-inventory -> joborder: InventoryItemService -> JobOrderItemStockGroupDto
-inventory -> joborder: InventoryItemService -> JobOrderRepository
 mission -> operation: Mission -> Operation
 mission -> operation: MissionDto -> OperationDto
 mission -> operation: MissionListDto -> OperationDto
@@ -57,5 +43,3 @@ mission -> refinery: MissionFinanceSummaryDto -> RefineryOrderDto
 mission -> refinery: MissionService -> RefineryOrder
 notification -> orgunit: OrgUnitRef -> OrgUnitKind
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler
-scope -> hangar: AccessGateService -> Ship
-scope -> hangar: AccessGateService -> ShipRepository
