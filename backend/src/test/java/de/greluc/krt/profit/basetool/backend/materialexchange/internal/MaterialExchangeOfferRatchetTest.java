@@ -192,11 +192,11 @@ class MaterialExchangeOfferRatchetTest {
   }
 
   @Test
-  void beforeUserPurgeAuditsTheMembersOffersWithReasonUserDeletion() {
+  void removeOffersOnRowsOfAuditsTheMembersOffersWithReasonUserDeletion() {
     OfferStock offer = material(10.0, "Quantainium");
     when(offerRepository.findActiveStockByRowOwner(OWNER)).thenReturn(List.of(offer));
 
-    int removed = ratchet.beforeUserPurge(OWNER);
+    int removed = ratchet.removeOffersOnRowsOf(OWNER);
 
     assertThat(removed).isEqualTo(1);
     assertThat(details(AuditEventType.MARKET_OFFER_REMOVED, offer.getId(), "Quantainium"))

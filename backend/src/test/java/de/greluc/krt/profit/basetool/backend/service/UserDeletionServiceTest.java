@@ -28,14 +28,16 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayPropertie
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
-import de.greluc.krt.profit.basetool.backend.personalinventory.api.PersonalInventoryErasure;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
-import de.greluc.krt.profit.basetool.backend.repository.*;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Erased;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Phase;
+import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -50,7 +52,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.Spy;
@@ -68,23 +69,9 @@ import org.springframework.web.client.ResourceAccessException;
 class UserDeletionServiceTest {
 
   @Mock private UserRepository userRepository;
-  @Mock private InventoryItemRepository inventoryItemRepository;
-  @Mock private ShipRepository shipRepository;
-  @Mock private RefineryOrderRepository refineryOrderRepository;
-  @Mock private MissionRepository missionRepository;
-  @Mock private MissionOwnershipRepository missionOwnershipRepository;
-  @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private MissionParticipantRepository missionParticipantRepository;
-  @Mock private MaterialClaimRepository materialClaimRepository;
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
-  @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
   @Mock private KeycloakService keycloakService;
-  @Mock private PersonalInventoryErasure personalInventoryErasure;
-  @Mock private PersonalBlueprintRepository personalBlueprintRepository;
-  @Mock private NotificationRepository notificationRepository;
-  @Mock private NotificationRuleRepository notificationRuleRepository;
-  @Mock private MemberEvaluationErasure memberEvaluationErasure;
 
   @Mock private UserService userService;
 
@@ -106,7 +93,12 @@ class UserDeletionServiceTest {
       new ExchangeClientDirectory(
           new IngestGatewayProperties(gatewayClientIds), Mockito.mock(KnownExchangeClients.class));
 
-  @InjectMocks private UserDeletionService userDeletionService;
+  /** What the fake participants and the user repository did, in the order it happened. */
+  private final List<String> calls = new ArrayList<>();
+
+  private final List<UserErasureParticipant> participants = new ArrayList<>();
+
+  private UserDeletionService userDeletionService;
 
   private User user;
   private User admin;
@@ -132,45 +124,105 @@ class UserDeletionServiceTest {
     lenient()
         .when(responsibleHolderTracker.snapshotResponsibleHoldersForUser(any()))
         .thenReturn(Map.of());
+    lenient()
+        .doAnswer(
+            _ -> {
+              calls.add("delete user");
+              return null;
+            })
+        .when(userRepository)
+        .delete(any());
+
+    userDeletionService =
+        new UserDeletionService(
+            clientDirectory,
+            userRepository,
+            userApprovalEventRepository,
+            auditService,
+            participants,
+            keycloakService,
+            responsibleHolderTrackerProvider,
+            userService,
+            eventPublisher);
+  }
+
+  /**
+   * Registers a participant that records its run and returns the given counts.
+   *
+   * @param name how the run appears in {@link #calls}
+   * @param phase the participant's phase
+   * @param position its position within the phase
+   * @param result the counts it reports
+   */
+  private void participant(String name, Phase phase, int position, Map<Erased, Integer> result) {
+    participants.add(
+        new UserErasureParticipant() {
+          @Override
+          public Phase phase() {
+            return phase;
+          }
+
+          @Override
+          public int position() {
+            return position;
+          }
+
+          @Override
+          public Map<Erased, Integer> erase(UUID erasedUserId, UUID fallbackAdminId) {
+            assertEquals(userId, erasedUserId);
+            calls.add(name + " -> " + fallbackAdminId);
+            return result;
+          }
+        });
   }
 
   @Test
-  void shouldPurgeAccountDataAndReassignSharedAggregates() {
+  void shouldRunEveryParticipantByPhaseThenPositionBeforeDeletingTheUser() {
+    participant("unlink b", Phase.UNLINK, 20, Map.of());
+    participant("reassign", Phase.REASSIGN, 10, Map.of());
+    participant("delete b", Phase.DELETE, 20, Map.of());
+    participant("unlink a", Phase.UNLINK, 10, Map.of());
+    participant("delete a", Phase.DELETE, 10, Map.of());
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
     userDeletionService.deleteUser(userId);
 
-    InOrder purge = inOrder(offerRatchet, inventoryItemRepository);
-    purge.verify(offerRatchet).beforeUserPurge(userId);
-    purge.verify(inventoryItemRepository).deleteByUserId(userId);
-    verify(shipRepository).deleteByOwnerId(userId);
-    verify(personalInventoryErasure).deleteAllItemsOf(userId);
-    verify(personalBlueprintRepository).deleteAllByOwnerUserId(userId);
-    verify(notificationRepository).deleteAllForRecipient(userId);
-    verify(notificationRuleRepository).deleteSelectorsByUserId(userId);
-    verify(memberEvaluationErasure).deleteAllEvaluationsOf(userId);
-    verify(refineryOrderRepository).updateOwner(user, admin);
-    verify(missionRepository).updateOwner(user, admin);
-    verify(missionOwnershipRepository).updateOwner(user, admin);
-    verify(missionRepository).removeManager(userId);
-    verify(jobOrderRepository).removeAssignee(userId);
-    verify(missionParticipantRepository).unlinkUser(userId);
-    verify(materialClaimRepository).unlinkClaimedByUser(userId);
-    verify(userApprovalEventRepository).deleteByUserId(userId);
-    verify(userApprovalEventRepository).clearDecidedBy(userId);
-    verify(userRepository).clearApprovedBy(userId);
-    verify(userRepository).delete(user);
+    assertEquals(
+        List.of(
+            "delete a -> " + adminId,
+            "delete b -> " + adminId,
+            "reassign -> " + adminId,
+            "unlink a -> " + adminId,
+            "unlink b -> " + adminId,
+            "delete user"),
+        calls);
+  }
+
+  @Test
+  void shouldClearTheApprovalTrailAfterTheParticipantsAndBeforeDeletingTheUser() {
+    participant("only", Phase.UNLINK, 10, Map.of());
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+
+    userDeletionService.deleteUser(userId);
+
+    InOrder order = inOrder(userApprovalEventRepository, userRepository);
+    order.verify(userApprovalEventRepository).deleteByUserId(userId);
+    order.verify(userApprovalEventRepository).clearDecidedBy(userId);
+    order.verify(userRepository).clearApprovedBy(userId);
+    order.verify(userRepository).delete(user);
+    assertEquals(List.of("only -> " + adminId, "delete user"), calls);
   }
 
   @Test
   void deleteUser_recordsPurgeAndReassignmentEventsWithRowCounts_whenRowsAffected() {
+    participant(
+        "lager and hangar", Phase.DELETE, 10, Map.of(Erased.INVENTORY_ROWS, 3, Erased.SHIPS, 7));
+    participant("blueprints", Phase.DELETE, 20, Map.of(Erased.BLUEPRINTS, 8));
+    participant("refinery", Phase.REASSIGN, 10, Map.of(Erased.REFINERY_ORDERS_REASSIGNED, 2));
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
-    when(inventoryItemRepository.deleteByUserId(userId)).thenReturn(3);
-    when(shipRepository.deleteByOwnerId(userId)).thenReturn(7);
-    when(personalBlueprintRepository.deleteAllByOwnerUserId(userId)).thenReturn(8);
-    when(refineryOrderRepository.updateOwner(user, admin)).thenReturn(2);
 
     userDeletionService.deleteUser(userId);
 
@@ -183,35 +235,83 @@ class UserDeletionServiceTest {
             argThat(
                 d ->
                     d != null
-                        && d.toString().contains("inventoryRows=3")
-                        && d.toString().contains("ships=7")));
+                        && d.toString()
+                            .equals(
+                                "reason=user-deletion inventoryRows=3 ships=7 fromUser="
+                                    + userId)));
     verify(auditService)
         .record(
             eq(AuditEventType.PERSONAL_DATA_PURGED_ON_USER_DELETION),
             isNull(),
             isNull(),
             eq(userId),
-            argThat(d -> d != null && d.toString().contains("blueprints=8")));
+            argThat(
+                d ->
+                    d != null
+                        && d.toString()
+                            .equals(
+                                "reason=user-deletion personalInventory=0 blueprints=8"
+                                    + " notifications=0 ruleSelectors=0 evaluations=0")));
     verify(auditService)
         .record(
             eq(AuditEventType.REFINERY_ORDERS_REASSIGNED),
             isNull(),
             isNull(),
             eq(userId),
-            argThat(d -> d != null && d.toString().contains("rows=2")));
+            argThat(
+                d ->
+                    d != null
+                        && d.toString()
+                            .equals(
+                                "reason=user-deletion rows=2 fromUser="
+                                    + userId
+                                    + " toAdmin="
+                                    + adminId)));
+    verify(auditService)
+        .record(
+            eq(AuditEventType.USER_DELETED),
+            isNull(),
+            isNull(),
+            eq(userId),
+            argThat(
+                d ->
+                    d != null
+                        && d.toString()
+                            .equals(
+                                "inventoryRows=3 ships=7 personalInventory=0 blueprints=8"
+                                    + " notifications=0 ruleSelectors=0 evaluations=0"
+                                    + " refineryOrdersReassignedTo="
+                                    + adminId)));
+  }
+
+  @Test
+  void deleteUser_sumsTheCountsOfParticipantsReportingTheSameKind() {
+    participant("first", Phase.DELETE, 10, Map.of(Erased.NOTIFICATIONS, 2));
+    participant("second", Phase.DELETE, 20, Map.of(Erased.NOTIFICATIONS, 3));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+
+    userDeletionService.deleteUser(userId);
+
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PERSONAL_DATA_PURGED_ON_USER_DELETION),
+            isNull(),
+            isNull(),
+            eq(userId),
+            argThat(d -> d != null && d.toString().contains("notifications=5")));
   }
 
   @Test
   void deleteUser_refusesWhenKeycloakStillHasTheAccount_evenThoughTheStoredFlagSaysOtherwise() {
+    participant("never", Phase.DELETE, 10, Map.of());
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(keycloakService.userExists(userId)).thenReturn(true);
 
     assertThrows(BadRequestException.class, () -> userDeletionService.deleteUser(userId));
 
     verify(userRepository, never()).delete(any());
-    verify(inventoryItemRepository, never()).deleteByUserId(any());
-    verify(shipRepository, never()).deleteByOwnerId(any());
-    verify(personalBlueprintRepository, never()).deleteAllByOwnerUserId(any());
+    assertEquals(List.of(), calls);
   }
 
   /**
@@ -305,6 +405,7 @@ class UserDeletionServiceTest {
 
   @Test
   void deleteUser_refusesWhenKeycloakCannotBeReached_ratherThanAssumingTheAccountIsGone() {
+    participant("never", Phase.DELETE, 10, Map.of());
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(keycloakService.userExists(userId))
         .thenThrow(new ResourceAccessException("keycloak unreachable"));
@@ -312,8 +413,7 @@ class UserDeletionServiceTest {
     assertThrows(ResourceAccessException.class, () -> userDeletionService.deleteUser(userId));
 
     verify(userRepository, never()).delete(any());
-    verify(inventoryItemRepository, never()).deleteByUserId(any());
-    verify(personalInventoryErasure, never()).deleteAllItemsOf(any());
+    assertEquals(List.of(), calls);
   }
 
   @Test
@@ -367,22 +467,6 @@ class UserDeletionServiceTest {
     assertThrows(BadRequestException.class, () -> userDeletionService.deleteUser(userId));
 
     verify(eventPublisher, never()).publishEvent(any(Object.class));
-  }
-
-  @Test
-  void shouldReassignMissionOwnershipCompanionBeforeDeletingUser() {
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
-
-    userDeletionService.deleteUser(userId);
-
-    var inOrder =
-        inOrder(
-            missionRepository, missionOwnershipRepository, materialClaimRepository, userRepository);
-    inOrder.verify(missionRepository).updateOwner(user, admin);
-    inOrder.verify(missionOwnershipRepository).updateOwner(user, admin);
-    inOrder.verify(materialClaimRepository).unlinkClaimedByUser(userId);
-    inOrder.verify(userRepository).delete(user);
   }
 
   @Test
@@ -446,9 +530,11 @@ class UserDeletionServiceTest {
       when(userRepository.findAllAdmins()).thenReturn(List.of(toDelete));
       when(userService.getCurrentUser()).thenReturn(Optional.of(currentAdmin));
 
+      participant("reassign", Phase.REASSIGN, 10, Map.of());
+
       userDeletionService.deleteUser(userId);
 
-      verify(refineryOrderRepository).updateOwner(toDelete, currentAdmin);
+      assertEquals(List.of("reassign -> " + currentAdminId, "delete user"), calls);
       verify(userRepository).delete(toDelete);
     }
 

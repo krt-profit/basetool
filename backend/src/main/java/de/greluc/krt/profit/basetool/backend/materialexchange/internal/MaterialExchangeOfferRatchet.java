@@ -139,9 +139,8 @@ public class MaterialExchangeOfferRatchet implements StockChangeObserver {
    * @param userId the member
    * @return the number of offers the purge will remove
    */
-  @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public int beforeUserPurge(@NotNull UUID userId) {
+  public int removeOffersOnRowsOf(@NotNull UUID userId) {
     return removed(
         offerRepository.findActiveStockByRowOwner(userId), StockChangeReason.USER_DELETION);
   }

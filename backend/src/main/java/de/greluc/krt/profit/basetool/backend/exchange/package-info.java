@@ -38,7 +38,6 @@
       "notification::api",
       "operation::api",
       "orgunit::api",
-      "personalinventory::api",
       "platform::api",
       "refinery::api",
       "scope::api"

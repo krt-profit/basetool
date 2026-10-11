@@ -20,39 +20,43 @@
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import java.lang.reflect.Method;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Erased;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Phase;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
+/** The promotion module's part of the account deletion. */
 @ExtendWith(MockitoExtension.class)
 class MemberEvaluationErasureServiceTest {
 
   @Mock private MemberEvaluationRepository memberEvaluationRepository;
 
-  @InjectMocks private MemberEvaluationErasureService erasure;
+  @InjectMocks private MemberEvaluationErasureService participant;
+
+  private final UUID userId = UUID.randomUUID();
+  private final UUID adminId = UUID.randomUUID();
 
   @Test
-  void deletesEveryGradeOfTheMemberAndReportsTheCount() {
-    UUID userId = UUID.randomUUID();
-    when(memberEvaluationRepository.deleteAllByUserId(userId)).thenReturn(3);
-
-    assertThat(erasure.deleteAllEvaluationsOf(userId)).isEqualTo(3);
+  void runsInTheDeletePhaseAtItsPosition() {
+    assertThat(participant.phase()).isEqualTo(Phase.DELETE);
+    assertThat(participant.position()).isEqualTo(70);
   }
 
   @Test
-  void runsOnlyInsideTheCallersTransaction() throws NoSuchMethodException {
-    Method method =
-        MemberEvaluationErasureService.class.getMethod("deleteAllEvaluationsOf", UUID.class);
+  void deletesEveryGradeOfTheMemberAndReportsTheCount() {
+    when(memberEvaluationRepository.deleteAllByUserId(userId)).thenReturn(3);
 
-    assertThat(method.getAnnotation(Transactional.class).propagation())
-        .isEqualTo(Propagation.MANDATORY);
+    assertThat(participant.erase(userId, adminId)).isEqualTo(Map.of(Erased.EVALUATIONS, 3));
+    verify(memberEvaluationRepository).deleteAllByUserId(userId);
+    verifyNoMoreInteractions(memberEvaluationRepository);
   }
 }

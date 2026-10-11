@@ -20,38 +20,43 @@
 package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import java.lang.reflect.Method;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Erased;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Phase;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
+/** The personal inventory's part of the account deletion. */
 @ExtendWith(MockitoExtension.class)
 class PersonalInventoryErasureServiceTest {
 
   @Mock private PersonalInventoryItemRepository personalInventoryItemRepository;
 
-  @InjectMocks private PersonalInventoryErasureService erasure;
+  @InjectMocks private PersonalInventoryErasureService participant;
+
+  private final UUID userId = UUID.randomUUID();
+  private final UUID adminId = UUID.randomUUID();
 
   @Test
-  void deletesEveryRowOfTheOwnerAndReportsTheCount() {
-    UUID userId = UUID.randomUUID();
-    when(personalInventoryItemRepository.deleteByOwnerUserId(userId)).thenReturn(3);
-
-    assertThat(erasure.deleteAllItemsOf(userId)).isEqualTo(3);
+  void runsInTheDeletePhaseAtItsPosition() {
+    assertThat(participant.phase()).isEqualTo(Phase.DELETE);
+    assertThat(participant.position()).isEqualTo(40);
   }
 
   @Test
-  void runsOnlyInsideTheCallersTransaction() throws NoSuchMethodException {
-    Method method = PersonalInventoryErasureService.class.getMethod("deleteAllItemsOf", UUID.class);
+  void deletesEveryRowOfTheOwnerAndReportsTheCount() {
+    when(personalInventoryItemRepository.deleteByOwnerUserId(userId)).thenReturn(3);
 
-    assertThat(method.getAnnotation(Transactional.class).propagation())
-        .isEqualTo(Propagation.MANDATORY);
+    assertThat(participant.erase(userId, adminId)).isEqualTo(Map.of(Erased.PERSONAL_INVENTORY, 3));
+    verify(personalInventoryItemRepository).deleteByOwnerUserId(userId);
+    verifyNoMoreInteractions(personalInventoryItemRepository);
   }
 }
