@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedCityCommands;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedCityQueries;
+import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedModuleCache;
 import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
@@ -113,6 +114,11 @@ import org.springframework.util.ClassUtils;
 class CachedCatalogueEntityInvariantTest {
 
   private static final Pageable ALL = PageRequest.of(0, 500);
+
+  private static final String BACKEND_ROOT = "de.greluc.krt.profit.basetool.backend";
+
+  private static final Set<Class<?>> PLANTED_SPLIT =
+      Set.of(PlantedCityQueries.class, PlantedCityCommands.class);
 
   /** Declares the planted query/command split as beans of this test's context only. */
   @TestConfiguration
@@ -229,6 +235,15 @@ class CachedCatalogueEntityInvariantTest {
             repository inside the write, never through a cached getter of another bean.\
             """)
         .isEmpty();
+  }
+
+  @Test
+  @DisplayName("proof: a cached service outside the service package is selected")
+  void aCachedServiceOutsideTheServicePackageIsSelected() {
+    assertThat(isCachedService(PlantedModuleCache.class)).isTrue();
+    assertThat(isCachedService(CityService.class)).isTrue();
+    assertThat(isCachedService(PlantedCityQueries.class)).isFalse();
+    assertThat(isCachedService(Object.class)).isFalse();
   }
 
   @Test
@@ -804,8 +819,7 @@ class CachedCatalogueEntityInvariantTest {
         continue;
       }
       Class<?> target = ClassUtils.getUserClass(type);
-      if (!target.getPackageName().startsWith("de.greluc.krt.profit.basetool.backend.service")
-          || !hasCacheableMethod(target)) {
+      if (!isCachedService(target)) {
         continue;
       }
       for (Method method : target.getDeclaredMethods()) {
@@ -815,6 +829,21 @@ class CachedCatalogueEntityInvariantTest {
       }
     }
     return mutators;
+  }
+
+  /**
+   * Whether a bean class is a cached service of the backend wherever its package lies: it is
+   * declared below the backend root and has a {@code @Cacheable} method. The planted split is
+   * excluded by class, so a module package that gains a cached service cannot fall out of the
+   * selection.
+   *
+   * @param type the bean's user class
+   * @return whether the case list must name its mutators
+   */
+  static boolean isCachedService(Class<?> type) {
+    return type.getPackageName().startsWith(BACKEND_ROOT)
+        && !PLANTED_SPLIT.contains(type)
+        && hasCacheableMethod(type);
   }
 
   private static boolean hasCacheableMethod(Class<?> type) {

@@ -64,6 +64,21 @@ public final class CachedEntityFixtures {
     }
   }
 
+  /** A cached service that lies outside the {@code service} package, as a moved module's would. */
+  public static class PlantedModuleCache {
+
+    /**
+     * A cached read.
+     *
+     * @param id the key
+     * @return the key
+     */
+    @Cacheable(cacheNames = CacheConfig.CITIES_CACHE, key = "'planted-module-' + #id")
+    public UUID find(UUID id) {
+      return id;
+    }
+  }
+
   /** The command half: edits the instance the query half cached. */
   public static class PlantedCityCommands {
 
