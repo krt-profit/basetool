@@ -21,8 +21,6 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceContribution;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceContributor;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

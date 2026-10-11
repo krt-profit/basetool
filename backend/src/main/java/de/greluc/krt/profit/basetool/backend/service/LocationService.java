@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationUsage;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
@@ -30,8 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Cached CRUD service for the admin-curated {@code location} reference table.
  *
  * <p>{@code hidden} removes a row from normal dropdowns; {@code delete} is rejected with {@link
- * EntityInUseException} while any ship or refinery order references the location.
+ * EntityInUseException} while any registered {@link LocationUsage} reports the location in use.
  */
 @Service
 @RequiredArgsConstructor
@@ -57,8 +57,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class LocationService {
 
   private final LocationRepository locationRepository;
-  private final ShipRepository shipRepository;
-  private final RefineryOrderRepository refineryOrderRepository;
+  private final List<LocationUsage> locationUsages;
 
   /**
    * Returns cached page of locations.
@@ -184,19 +183,19 @@ public class LocationService {
    * Hard-deletes a location after checking it is unreferenced.
    *
    * @param id location primary key
-   * @throws EntityInUseException when at least one ship or refinery order still references the
-   *     location
+   * @throws EntityInUseException when a registered usage still references the location; the first
+   *     one by position names it
    */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.LOCATIONS_CACHE, allEntries = true)
   public void deleteLocation(@NotNull UUID id) {
-    if (shipRepository.existsByLocationId(id)) {
-      throw new EntityInUseException(
-          "Cannot delete location: It is currently used by one or more ships.");
-    }
-    if (refineryOrderRepository.existsByLocationId(id)) {
-      throw new EntityInUseException(
-          "Cannot delete location: It is currently used by one or more refinery orders.");
+    List<LocationUsage> inAskingOrder =
+        locationUsages.stream().sorted(Comparator.comparingInt(LocationUsage::position)).toList();
+    for (LocationUsage usage : inAskingOrder) {
+      if (usage.isUsed(id)) {
+        throw new EntityInUseException(
+            "Cannot delete location: It is currently used by one or more " + usage.users() + ".");
+      }
     }
     Location location = getLocation(id);
     locationRepository.delete(location);

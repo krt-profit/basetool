@@ -20,11 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;

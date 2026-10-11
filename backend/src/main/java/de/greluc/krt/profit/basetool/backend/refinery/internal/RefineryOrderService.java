@@ -38,9 +38,6 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
@@ -51,7 +48,6 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -420,7 +416,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
 
   @Contract("null -> null")
   @Nullable
-  private static Double zeroToNull(Double value) {
+  private static Double zeroToNull(@Nullable Double value) {
     if (value == null) {
       return null;
     }
@@ -852,7 +848,8 @@ public class RefineryOrderService implements CraftabilityYieldSource {
 
   /**
    * Writes the user's final stored amount back into the matching {@link
-   * de.greluc.krt.profit.basetool.backend.model.RefineryGood}, converting SCU back to units (×100).
+   * de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryGood}, converting SCU back to
+   * units (×100).
    */
   private void updateGoodOutputQuantity(RefineryOrder order, RefineryOrderStoreItemDto itemDto) {
     if (order.getGoods() == null

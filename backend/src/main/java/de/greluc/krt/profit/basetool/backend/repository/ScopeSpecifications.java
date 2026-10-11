@@ -32,8 +32,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
  *
  * <p>{@link #OPERATION_SCOPE_PREDICATE}, {@link #MISSION_SCOPE_PREDICATE} and {@link
  * #JOB_ORDER_SCOPE_PREDICATE} include their aggregate's visibility escapes; {@link
- * #SHIP_SCOPE_TRIPLE}, {@link #REFINERY_ORDER_SCOPE_TRIPLE} and {@link
- * #INVENTORY_ITEM_SCOPE_TRIPLE} are the plain strict-staffel triple.
+ * #SHIP_SCOPE_TRIPLE} and {@link #INVENTORY_ITEM_SCOPE_TRIPLE} are the plain strict-staffel triple.
  */
 public final class ScopeSpecifications {
 
@@ -82,19 +81,6 @@ public final class ScopeSpecifications {
         :isAdminAllScope = true
         OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)
         OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)
-       )
-      """;
-
-  /**
-   * RefineryOrder's scope predicate (alias {@code r}): the plain triple; refinery is strict-staffel
-   * (REQ-ORG-003).
-   */
-  static final String REFINERY_ORDER_SCOPE_TRIPLE =
-      """
-      (
-        :isAdminAllScope = true
-        OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)
-        OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)
        )
       """;
 

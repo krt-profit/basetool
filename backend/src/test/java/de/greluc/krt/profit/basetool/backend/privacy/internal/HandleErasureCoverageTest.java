@@ -23,9 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage.Coverage;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage.Disposition;
-import de.greluc.krt.profit.basetool.backend.service.HandleAnonymisationService;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -33,7 +31,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Requires every column {@link PersonSearchTargets} registers as naming a person to carry a
  * disposition in {@link HandleErasureCoverage}, keeping the Art. 17 erasure's column set closed
- * (REQ-SEC-062, ADR-0183).
+ * (REQ-SEC-062, ADR-0183). The tie between the {@code ANONYMISED} dispositions and the columns the
+ * participants rewrite is {@code HandleAnonymisationCoverageTest}.
  */
 class HandleErasureCoverageTest {
 
@@ -97,30 +96,6 @@ class HandleErasureCoverageTest {
                     .hasSizeGreaterThan(25);
               }
             });
-  }
-
-  @Test
-  void theAnonymisedSetMatchesWhatTheServiceActuallyRewrites() {
-    Set<String> declared =
-        HandleErasureCoverage.COVERAGE.entrySet().stream()
-            .filter(e -> e.getValue().disposition() == Disposition.ANONYMISED)
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toSet());
-
-    assertThat(declared)
-        .as("HandleAnonymisationService.ANONYMISED_COLUMNS is the one list; this map must match it")
-        .isEqualTo(Set.copyOf(HandleAnonymisationService.ANONYMISED_COLUMNS));
-  }
-
-  @Test
-  void everyAnonymisedColumnIsAlsoSearchable() {
-    Set<String> registered = registeredColumns();
-    assertThat(HandleAnonymisationService.ANONYMISED_COLUMNS)
-        .as(
-            "A column the erasure rewrites but the search cannot reach is a column an admin cannot"
-                + " verify afterwards -- and for an already-deleted account the search is the only"
-                + " route to it at all.")
-        .allSatisfy(column -> assertThat(registered).contains(column));
   }
 
   @Test

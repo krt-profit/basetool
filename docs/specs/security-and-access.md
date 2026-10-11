@@ -5024,8 +5024,18 @@ When an admin grants the member's wish, the member's handle MUST be replaced by 
 about what happened is altered — only the name goes.
 
 **Twelve columns in eight statements**, and the reason it is all of them: erasing eleven reads as a
-completed erasure while still naming the person on the twelfth. `HandleAnonymisationService.ANONYMISED_COLUMNS`
-is the authoritative list.
+completed erasure while still naming the person on the twelfth. The union of
+`HandleAnonymisationParticipant#columns()` over the registered participants is the authoritative
+list; `HandleAnonymisationCoverageTest` holds it equal to the `ANONYMISED` dispositions of
+`HandleErasureCoverage` and to the live schema.
+
+**The anonymisation is an orchestrator over participants** (plan §7.6, `platform.api`).
+`HandleAnonymisationService` normalises the spellings, runs every `HandleAnonymisationParticipant`
+inside its one transaction by position — `AuditHandleAnonymisation` (audit), `BankHandleAnonymisation`
+(bank), `JobOrderHandleAnonymisation` (job order) — writes the activity trail's
+`HANDLE_SNAPSHOTS_ANONYMISED` marker from the summed counts, and then lets each participant record
+its own marker: the bank writes the bank trail's. Each module rewrites the columns of its own
+tables.
 
 |                                   Where                                   |                         Matched by                          |
 |---------------------------------------------------------------------------|-------------------------------------------------------------|
@@ -5135,8 +5145,13 @@ it.
 - [x] The match on the handover columns is case-insensitive.
 - [x] Nothing is deleted: row counts, timestamps, event types, amounts and subjects are unchanged.
 
-**Enforced by:** `HandleAnonymisationServiceTest`, `HandleErasureCoverageTest` · **Code:**
-`service/HandleAnonymisationService`, `kernel/HandleAnonymisation`, `privacy/internal/HandleErasureCoverage`,
+**Enforced by:** `HandleAnonymisationEndStateTest` (real Postgres: every covered column, the rows
+that must stay, the counts and both marker rows), `HandleAnonymisationServiceTest`,
+`HandleErasureCoverageTest`, `HandleAnonymisationCoverageTest` · **Code:**
+`service/HandleAnonymisationService`, `platform/api/HandleAnonymisationParticipant`,
+`service/AuditHandleAnonymisation`, `bank/internal/BankHandleAnonymisation`,
+`joborder/internal/JobOrderHandleAnonymisation`, `kernel/HandleAnonymisation`,
+`privacy/internal/HandleErasureCoverage`,
 `repository/AuditEventRepository#anonymiseActorHandle`,
 `bank/internal/BankAuditEventRepository#anonymiseActorHandle`,
 `bank/internal/BankTransactionRepository#anonymiseCounterpartyHandle`,

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import java.time.OffsetDateTime;
 import java.util.*;
 import org.junit.jupiter.api.Test;
