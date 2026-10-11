@@ -1273,7 +1273,9 @@ as each pair is decoupled.
     own `InventoryItemMapper`, `InventoryItemRepository` and services. Mission and job order
     could move because no layer class used their packages. **Tracked for Phase 4:** move the
     inventory into `inventory.web` / `inventory.internal` once those consumers have left the
-    layer packages (P4-1, §7.6), then NullAway covers it without a further change.
+    layer packages (P4-1, §7.6), then NullAway covers it without a further change. *Update
+    2026-10-11:* part 1 of P4-1 moved the services, the controller and the participants (§7.6);
+    the repositories, the mapper and the entities wait for a read API.
 
 - `hangar` — **done 2026-10-10** (P3-6).
   1. *Characterise*: `HangarModuleContractTest` pins that creating, updating and deleting a ship
@@ -1757,15 +1759,83 @@ layer repository and close no package cycle. (6) The ledger check reads `BankHol
 (`existsByUserId` on both accounts) instead of counting rows with a native query; the message and the
 409 are unchanged. (7) The two coverage tests that read the old static lists now run in a transaction,
 because a participant is `MANDATORY` even for its declarations.
-**P4-1 — move the inventory into `inventory.web` / `inventory.internal`** (carried from P3-5e,
-§7.5). It waits until the layer classes that consume `inventory.api` have left the layer packages:
-identity's `MeController`, the org-unit membership
-service and repository (`InventoryOrgUnitReconciler`), the blueprint's craftability read (P3-7), the
-job order's `JobOrderStockProjectionService` and `JobOrderMapper`, and the earmark finders of
-`JobOrderRepository` and `MissionRepository`. The GDPR orchestrator (`UserDeletionService`) left
-that list with P4 slice a: it no longer consumes `inventory.api`, and the Lager purge is the
-inventory's own `InventoryUserErasure`. The Lager's own controller, services, mapper and
-repository then move together, with that participant; NullAway already covers the `inventory` tree.
+**P4-1 — move the inventory into `inventory.web` / `inventory.internal` — part 1 done 2026-10-11**
+(carried from P3-5e, §7.5). The Lager's controller, services, access policy and participants move; its
+data layer (entities, repositories, mapper, DTOs, projections) stays in the layer packages, for the
+reasons below, and is **part 2**.
+1. *Probe* (not a guess): a class-dependency graph over the compiled `main` classes (`jdeps
+   -verbose:class`, nested and generated classes folded onto their source type, one node per first
+   package segment), the inventory types reassigned to `inventory`. Moving all 58 inventory types
+   put 14 nodes into one strongly connected set (`admin`, `blueprint`, `catalogue`, `config`,
+   `identity`, `integration`, `inventory`, `mapper`, `model`, `notification`, `orgunit`, `privacy`,
+   `repository`, `service`). Moving only the controller, the services, the policy, the stock commands,
+   the earmark cache, the craftable-stock source and the four GDPR participants (17 types) left
+   `config`, `integration`, `mapper`, `orgunit`, `repository` and `service` in the set, closed by
+   exactly these layer-to-inventory imports:
+   - `OrgUnitMembershipService -> InventoryOrgUnitReconciler`;
+   - `InventoryItemMapper -> inventory.api.StockViewerAccess`, `EarmarkTargets.Lookup`,
+     `JobOrderEarmark`, `MissionEarmark`, and `JobOrderMapper -> StockViewerAccess`;
+   - `InventoryItemRepository -> JobOrderMaterialStockRow`, `JobOrderGameItemStockRow`;
+     `JobOrderRepository -> JobOrderEarmark`; `MissionRepository -> MissionEarmark`;
+   - `JobOrderStockProjectionService -> JobOrderMaterialStockRow`.
+   With them gone the set is empty (re-probed on the compiled result).
+2. *Inversion*: `orgunit.api.FirstMembershipObserver` (`@ObserverSpi`, `onUserGainedFirstOrgUnit`,
+   `onUserLostLastOrgUnit`, both `MANDATORY`), owned by the org-unit module and implemented by
+   `InventoryOrgUnitReconciler`; `OrgUnitMembershipService` asks it at the same four sites, in the same
+   transaction. The mapper's two seams follow `MissionViewerAccess` and `MissionOperationLookup`:
+   `mapper.StockViewerAccess` (was `inventory.api`) and `mapper.InventoryEarmarkLookup` (was
+   `EarmarkTargets.Lookup`, which only the Lager used), implemented by `StockViewerAccessService` and
+   `InventoryEarmarkTargetCache`. The records the layer reads, `JobOrderEarmark`, `MissionEarmark`,
+   `JobOrderMaterialStockRow` and `JobOrderGameItemStockRow`, moved from `inventory.api` to
+   `model.projection` (the domain map assigns the four to `inventory` by class rule); the read SPIs
+   `EarmarkTargets.Missions` / `JobOrders` stay in `inventory.api` and return them.
+3. *Move*: `InventoryItemController` into `inventory.web`; `InventoryItemService`,
+   `InventoryAggregationService`, `InventoryCheckoutService`, `InventoryOrgUnitChangeService`,
+   `InventoryStolenMarkService`, `InventoryAccessPolicy`, `InventoryStockCommands`,
+   `InventoryEarmarkTargetCache`, `StockViewerAccessService`, `AllocationReductions`,
+   `InventoryCraftableStock` (the blueprint's `CraftableStockSource`, so P4-2 is unblocked) and the four
+   GDPR participants (`InventoryUserErasure`, `InventoryUserReassignment`, `InventoryExportSections`,
+   `InventoryMentionSource`) into `inventory.internal`. NullAway took in the moved tree: 19 findings,
+   all optional parameters (`@Nullable` on the filters of the aggregation methods, the excluded target of
+   the slice sums, the audit amount and the reduction plan, the pool of a rebooked row), two slice
+   lookups and the book-out façade that return `null`, one `Objects.requireNonNull` where the check-in's
+   invariant (exactly one of material and game item) holds, and the same call on the earmark memo's
+   entry, which the loop above it always fills. The 19 tests of the moved classes moved with them.
+4. *Stays, and the import that blocks it*:
+   - `InventoryItemRepository` (and the two allocation repositories): twelve of its finders are read by
+     ten classes of the exchange, the job order and the Materialbörse and by the layer's
+     `JobOrderStockProjectionService`, which is itself read by the exchange. In `inventory.internal`
+     they would sit behind Spring Modulith's named interface, and the projection service would close
+     `service ⇄ inventory` (probed). Needs a published read API for the twelve finders, or the
+     projection service in the job order's `api`.
+   - `InventoryItemMapper`: `JobOrderQueryService` (`toDto`), `JobOrderStockReadService`
+     (`gameItemToReferenceDto`) and `JobOrderMapper` (`uses`) read it. Same question.
+   - `InventoryItemCatalogService`: `joborder.web.GameItemController` calls it.
+   - The entities `InventoryItem`, `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
+     `CheckoutType` and `BulkRebookMode`: `JobOrderMaterial`, `JobOrderHandoverItem` and `MaterialClaim`
+     hold `InventoryItem`, and the repositories and the mapper import them (11 import edges that put
+     `model`, `repository` and `mapper` into the set).
+   - The Lager DTOs and `model.projection` aggregates: the mapper and the repository return them, and
+     `JobOrderItemStockGroupDto` embeds `InventoryGameItemReferenceDto`.
+   **Part 2** moves them once those readers go through `inventory.api`; the entity association of the
+   three job-order entities becomes an id first (as `MaterialExchangeOffer.inventoryItem` did in 5d-4).
+5. *Gates*: baseline **36 → 35** (`orgunit -> inventory: OrgUnitMembershipService ->
+   InventoryOrgUnitReconciler`; the file holds 35 lines in 7 module pairs), written by
+   `ModuleBaselineTest`'s store. `ModularityTest` stays green, so no foreign module reaches an
+   `inventory.internal` type. `ArchitectureTest` and the tenancy guard needed no new floor: their
+   selections are annotation-based and still select the controller and the services (re-measured, no
+   selection shrank). The mapper-seam names are `StockViewerAccess` (leaf helper, as before) and
+   `InventoryEarmarkLookup`, matched by the inventory name rule.
+**Corrections:** (1) The wait list was too long: a layer class that consumes `inventory.api` closes a
+cycle only when the moved implementation also reaches its package. `MeController` (it reads
+`InventoryProperties`) and `BlueprintCraftabilityService` (it asks `blueprint.api.CraftableStockSource`)
+stay where they are: nothing in the moved tree depends on the `controller` package, and the
+craftability service names no inventory type. (2) `OrgUnitMembershipRepository` never called the reconciler,
+only its Javadoc named it; only the service did. (3) The package-info of nine modules allowed
+`hangar/hangar::api` since F5 part 2 (`07ecf4061`), a bulk path rewrite that reached the Java sources;
+`ModularityTest` failed on `main` and is restored to `hangar::api` here. (4) The GDPR slices a, c, d
+and e recorded "the inventory participants sit in `service` until P4-1": since this step they sit in
+`inventory.internal`; the blueprint's and the notification's still sit in `service`.
 **P4-2 — move the blueprint into `blueprint.web` / `blueprint.internal`** (carried from
 P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
 The five published interfaces already cover every foreign caller, so the move touches no

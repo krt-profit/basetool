@@ -138,7 +138,10 @@ edge, since every module may depend on either.
 
 Since then the later phases of the plan shrank it step by step; on 2026-10-11, after plan §7.6
 P4-3 (the catalogue's `LocationService` asks the `catalogue.api.LocationUsage` SPI instead of the
-ship and refinery repositories), the file holds **36 class edges in 8 module pairs**.
+ship and refinery repositories), the file holds **36 class edges in 8 module pairs**, and **35 in 7**
+after plan §7.6 P4-1 part 1 (the org-unit module's membership service asks its
+`orgunit.api.FirstMembershipObserver` SPI, which the Lager implements, instead of naming
+`InventoryOrgUnitReconciler`).
 
 **Acceptance**
 

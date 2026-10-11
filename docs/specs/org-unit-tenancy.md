@@ -330,7 +330,7 @@ row**, independent of the row's `owning_org_unit_id` stamp. This must hold in bo
 product owner called out:
 
 - the owner **switched org units** — the row stays stamped to the former unit (a unit-switch is
-  not a `NULL`↔non-`NULL` transition, so the [`InventoryOrgUnitReconciler`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/InventoryOrgUnitReconciler.java)
+  not a `NULL`↔non-`NULL` transition, so the [`InventoryOrgUnitReconciler`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/inventory/internal/InventoryOrgUnitReconciler.java)
   does not re-stamp inventory, see `REQ-INV-004`; ships and refinery orders have no reconciler at
   all), so the owner is no longer a member of the row's owning unit;
 - the owner **has no org unit at all** yet the row is **still stamped to one** (the demote to

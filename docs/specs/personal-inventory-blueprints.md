@@ -404,7 +404,7 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 **Code links:** [`BlueprintCraftabilityService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintCraftabilityService.java),
 [`BlueprintModifierMath`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintModifierMath.java),
 [`PersonalBlueprintController#craftability`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/PersonalBlueprintController.java),
-[`InventoryCraftableStock#ownedStockSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/InventoryCraftableStock.java)
+[`InventoryCraftableStock#ownedStockSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/inventory/internal/InventoryCraftableStock.java)
 (the blueprint's `CraftableStockSource`),
 [`RefineryOrderService#pendingYieldSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/refinery/internal/RefineryOrderService.java),
 [`BlueprintCraftabilityDto`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto/BlueprintCraftabilityDto.java),
