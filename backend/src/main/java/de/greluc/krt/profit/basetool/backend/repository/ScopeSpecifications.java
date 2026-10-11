@@ -30,31 +30,14 @@ package de.greluc.krt.profit.basetool.backend.repository;
  * literals. The class is {@code public} because constant folding leaves no compiled reference to
  * it.
  *
- * <p>{@link #OPERATION_SCOPE_PREDICATE}, {@link #MISSION_SCOPE_PREDICATE} and {@link
- * #JOB_ORDER_SCOPE_PREDICATE} include their aggregate's visibility escapes; {@link
- * #SHIP_SCOPE_TRIPLE} and {@link #INVENTORY_ITEM_SCOPE_TRIPLE} are the plain strict-staffel triple.
+ * <p>{@link #MISSION_SCOPE_PREDICATE} and {@link #JOB_ORDER_SCOPE_PREDICATE} include their
+ * aggregate's visibility escapes; {@link #SHIP_SCOPE_TRIPLE} and {@link
+ * #INVENTORY_ITEM_SCOPE_TRIPLE} are the plain strict-staffel triple.
  */
 public final class ScopeSpecifications {
 
   /** Non-instantiable JPQL-fragment constant holder. */
   private ScopeSpecifications() {}
-
-  /**
-   * Operation's scope predicate (alias {@code o}): the triple plus the read escapes of REQ-ORG-003,
-   * so an ownerless leadership operation is visible to organisation members and above, and a
-   * participant of one of its missions sees it regardless of owning org unit.
-   */
-  static final String OPERATION_SCOPE_PREDICATE =
-      """
-      (
-        :isAdminAllScope = true
-        OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)
-        OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)
-        OR (o.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)
-        OR (:viewerUserId IS NOT NULL AND EXISTS (SELECT p.id FROM MissionParticipant p
-         WHERE p.mission.operationId = o.id AND p.user.id = :viewerUserId))
-       )
-      """;
 
   /**
    * Mission's scope predicate (alias {@code m}): the triple plus the public escape ({@code

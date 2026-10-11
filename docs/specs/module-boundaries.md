@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-05.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
 > **Owner area:** MOD · **Related ADRs:** ADR-0231, ADR-0233
 
 # Backend module boundaries
@@ -138,10 +138,11 @@ edge, since every module may depend on either.
 
 Since then the later phases of the plan shrank it step by step; on 2026-10-11, after plan §7.6
 P4-3 (the catalogue's `LocationService` asks the `catalogue.api.LocationUsage` SPI instead of the
-ship and refinery repositories), the file holds **36 class edges in 8 module pairs**, and **35 in 7**
-after plan §7.6 P4-1 part 1 (the org-unit module's membership service asks its
+ship and refinery repositories), the file held 36 class edges in 8 module pairs. After P4-4 (the
+mission embeds its own `MissionOperationDto`, so the operation's types move into `operation.internal`)
+it held 33 in 7, and after plan §7.6 P4-1 part 1 (the org-unit module's membership service asks its
 `orgunit.api.FirstMembershipObserver` SPI, which the Lager implements, instead of naming
-`InventoryOrgUnitReconciler`).
+`InventoryOrgUnitReconciler`) it holds **32 class edges in 6 module pairs**.
 
 **Acceptance**
 

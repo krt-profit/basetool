@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
-import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -40,6 +39,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The "paid out" flag of one participant of an operation, toggled by mission managers or higher.
@@ -104,6 +104,7 @@ public class OperationPayoutStatus extends AbstractEntity<UUID> {
    * not lost — callers that want the live "currently paid?" answer must read {@link #paidOut}.
    */
   @Column(name = "paid_out_at")
+  @Nullable
   private Instant paidOutAt;
 
   /**
@@ -113,5 +114,6 @@ public class OperationPayoutStatus extends AbstractEntity<UUID> {
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "paid_out_by_user_id")
+  @Nullable
   private User paidOutByUser;
 }

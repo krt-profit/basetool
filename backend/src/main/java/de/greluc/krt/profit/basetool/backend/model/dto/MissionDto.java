@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
 import java.util.List;
@@ -50,7 +51,7 @@ public record MissionDto(
     Set<MissionParticipantDto> participants,
     List<MissionUnitDto> assignedUnits,
     List<MissionFrequencyDto> frequencies,
-    OperationDto operation,
+    @Schema(ref = "#/components/schemas/OperationDto") MissionOperationDto operation,
     UserReferenceDto owner,
     Set<UserReferenceDto> managers,
     Boolean canEdit,

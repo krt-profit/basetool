@@ -181,11 +181,12 @@ per-transaction memo `MissionOperationSummaryCache`. The SPI's record `MissionOp
 the memo's interface `MissionOperationLookup` sit in `model.dto` and `mapper`, because the mapper
 reads them and a `mapper -> mission` edge would close a package cycle with the moved mission
 services (as `MissionViewerAccess` does). So a page of missions costs one statement
-for its operations whatever its size. `Operation.missions` is a read-only join-column view. The
-`Operation` entity, its repository and mapper and the DTOs the mission module embeds still stay in
-the layer packages, because `MissionDto`, `MissionListDto`, `MissionMapper` and `MissionPeerRedactor`
-embed or read `OperationDto` (plan §7.5, P4-4), so the operation's JPQL scope fragment still sits in
-`ScopeSpecifications`.
+for its operations whatever its size. `Operation.missions` is a read-only join-column view. Since
+P4-4 the mission embeds the operation as its own record `MissionOperationDto` (the components of
+`OperationDto`, built by `MissionMapper` from the summary), so the `Operation` entity, its status,
+repository, mapper and DTOs sit in `operation.internal` and `OperationAccessPolicy` owns the JPQL
+scope fragment of the operation queries; the OpenAPI document still refers to `OperationDto` from
+the mission DTOs.
 
 The refinery side follows the same pattern since P3-8b. `RefineryOrder` references its mission by id
 (`RefineryOrder.missionId`, the same `mission_id` column and foreign key) and `Mission` no longer

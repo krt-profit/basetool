@@ -890,6 +890,8 @@ their "must stay green" period here (D-01).
   still widen together is now tested end to end instead. (3) The detach command removes the
   foreign write, not the `mission -> operation` edges: those are the association and the DTO
   embedding of (1), and leave with P3-8 and the `OperationSummaryProvider` SPI.
+  *(P4-4, 2026-10-11: the types moved into `operation.internal` and the policy owns the fragment,
+  §7.6.)*
 - `promotion` — **done 2026-10-05** (P2-3), the second module, after `operation`, to take its access
   policy out of the scope hub. `PromotionAccessPolicy` (bean `promotionAccessPolicy`, `promotion.internal`) owns
   the per-Staffel feature flag, the read gate and the feature assertion; the three methods left
@@ -1405,7 +1407,8 @@ as each pair is decoupled.
   `OperationRepository`, `OperationMapper` and the operation DTOs still do not move: read from the
   imports, `MissionDto`/`MissionListDto` (`model.dto`) and `MissionMapper`/`OperationFinanceService`
   (`mapper`) would close `model.dto ⇄ operation` and `mapper ⇄ operation` cycles, and
-  `BusinessMetricsCollector` (`task`) reads the repository. They move once (2) is done. The refinery
+  `BusinessMetricsCollector` (`task`) reads the repository. They move once (2) is done. *(P4-4,
+  2026-10-11: done, §7.6.)* The refinery
   association (`Mission.refineryOrders`, `RefineryOrder.mission`, the `MissionFinanceContributor` SPI)
   is the other half of P3-8 and still blocks the refinery's entities, repository and mapper (done
   as P3-8b below).
@@ -1477,7 +1480,7 @@ as each pair is decoupled.
   edges of P3-8a plus one: `MissionDto` and `MissionListDto` (`model`) and `MissionMapper`
   (`mapper`, with its generated implementation) embed `OperationDto` and `OperationMapper`, and
   `MissionPeerRedactor` (`mission.internal`) reads `OperationDto`. They move once the mission DTOs
-  stop embedding the operation's DTO (§5.2). Tracked as P4-4 (§7.6). (4) The six cases of a request's
+  stop embedding the operation's DTO (§5.2). Tracked as P4-4 (§7.6). *(Done 2026-10-11, §7.6.)* (4) The six cases of a request's
   mission reference keep their behaviour. On create, an absent reference and one without an id
   leave the order unlinked, and one with an id links it after the participant check. On update, an
   absent reference unlinks, one without an id leaves the link as it was, and one with an id
@@ -1910,25 +1913,64 @@ fits both without a change. (5) `RefineryOrderStatus` and the request records st
 `BusinessMetricsCollector`, which sits in `app`, and the controller of the same module read them. (6)
 `RefineryOrderDto` keeps its `@NotNull` on `location` and `goods`; `location` also carries
 `@Nullable` because the import draft leaves it unset when the screenshot names no known location.
-**P4-4 — move the operation's entity, repository, mapper and DTOs into `operation.internal` /
-`operation.api`** (carried from P3-8b, §7.5) — **still blocked, checked 2026-10-11 after P4-3, not
-started.** The probe above, run with the seven operation types (`Operation`, `OperationStatus`,
-`OperationRepository`, `OperationMapper`, `OperationDto`, `OperationReferenceDto`,
-`OperationCreateDto`) reassigned to `operation`, finds exactly three class edges that enter the
-operation from inside the cycle: `MissionDto -> OperationDto` and `MissionListDto -> OperationDto`
-(both embed `OperationDto operation`) and `MissionMapper -> OperationMapper` (it builds that field
-from the summary the operation implements). Those are the three edges of the baseline's
-`mission -> operation` lines; `MissionPeerRedactor` no longer reads `OperationDto`, so the plan's
-"four classes" is three. The only other class that reads the operation's types is
-`BusinessMetricsCollector`, which sits outside the cycle in `app`. The operation's own outgoing
-edges (`admin`, `mapper`, `model`, `notification`, `repository`, `service`, and `refinery` through
-`refinery.api` only) leave the cycle and need no inversion.
-What blocks the move is the wire shape, not a missing inversion: the mission DTOs embed the
-operation's full DTO, so `model -> operation` would meet `operation -> model` (`Mission`, `User`,
-`OrgUnit`) in a package cycle, and the mission (rank 9) reaching `operation.api` (rank 11) would stay
-a frozen upward edge. It becomes feasible when the REST DTO separation (§5.2) gives the mission a
-DTO of its own for the embedded operation, which changes the OpenAPI schema name unless the new
-record keeps `OperationDto`'s name and fields.
+**P4-4 — the operation's entity, repository, mapper and DTOs move into `operation.internal` — done
+2026-10-11** (carried from P3-8b, §7.5).
+1. *Characterise*: `MissionEmbeddedOperationWireShapeTest` pins the wire shape of the operation a
+   mission DTO embeds: the JSON of `MissionListDto.operation` field by field, in order, with the
+   `null` payout flag, and that the embedded type of `MissionDto` and `MissionListDto` has the
+   components of the operation endpoint's `OperationDto` in the same order. Green on `21aa62c98`
+   before the change. The rest was already pinned and stayed green: `MissionOperationReadNoNPlusOneTest`
+   (the statement count for 3 and 25 missions, and every field of the embedded operation),
+   `OperationAccessPolicyDifferentialTest`, `OperationModuleContractTest`, `OperationMapperTest`, and
+   `OpenApiGeneratorTest` with the frozen contract types, which leave `openapi.json` untouched.
+2. *Inversion*: the mission owns what it embeds. `model.dto.MissionOperationDto` has the nine
+   components of `OperationDto` in the same order, with `status` as the status name (the summary of
+   P3-8a already carries it so); `MissionOperationDto.of(MissionOperationSummary)` builds it, and
+   `MissionMapper.resolveOperation` fills it from the `MissionOperationLookup` memo. `MissionMapper`
+   no longer touches `OperationMapper`, and `OperationMapper#toDtoFromSummary` is gone.
+   `OperationMapperTest` pins instead that the JSON of the embedded record equals the JSON of
+   `toDto` of the entity. The OpenAPI document keeps the `OperationDto` reference: the `operation`
+   component of both mission DTOs carries `@Schema(ref = "#/components/schemas/OperationDto")`, so no
+   second schema appears and the wire contract is the one of `OperationDto`.
+3. *Probe*: after the move no class outside the `operation` module names the seven types except
+   `BusinessMetricsCollector` (`task`), which reads the repository and the status the way it reads
+   `refinery.internal` and `bank.internal`. The architecture test's own cycle rules run over the
+   compiled classes (the top-level slices and the layers inside each module) and pass with the seven
+   types reassigned, so neither `model <-> operation` nor `mapper <-> operation` nor
+   `repository <-> operation` closes a package cycle. Nothing else needed an inversion.
+4. *Move*: `Operation`, `OperationStatus`, `OperationRepository`, `OperationMapper`, `OperationDto`,
+   `OperationCreateDto` and `OperationReferenceDto` go to `operation.internal`. No other module
+   reads an operation DTO, so `operation.api` keeps only the events; the module's published surface
+   is unchanged. The constructor expression of `findAllReferenceScoped` names the new package.
+5. *Scope fragment*: `OPERATION_SCOPE_PREDICATE` left `ScopeSpecifications` and is now a
+   package-private constant of `OperationAccessPolicy`, spliced into the three scoped queries of the
+   repository with the same text; `OperationAccessPolicyDifferentialTest` is unchanged.
+6. *NullAway*: the whole `operation` tree is checked now (the check is by package, so the services
+   joined the moved types). The compile named 14 sites, fixed by `@Nullable` where the code allows
+   null: the entity's `description`, `owningOrgUnit` and, on the payout status, `paidOutAt` and
+   `paidOutByUser`; the DTO components `description`, `owningSquadron`, `payoutPreliminary`,
+   `paidOutAt`, `paidOutByName`; the repository's optional filter parameters, the oldest-created
+   finder and `memberOf`; the three optional sums of the mission total.
+7. *Gates*: the domain map loses `name ^Operation operation`, which assigns no class once the package
+   rule takes the tree; the architecture test's model-code floor drops 343 to 340; `OperationMapperTest`
+   and `OperationStatusTest` moved into `operation.internal` of the test tree.
+Baseline **36 → 33** (`mission -> operation: MissionDto -> OperationDto`,
+`MissionListDto -> OperationDto`, `MissionMapper -> OperationMapper`), rewritten by
+`ModuleBaselineTest`; the file holds 33 lines in 7 module pairs.
+**Corrections:** (1) P4-3 and P3-8a named the DTO separation of §5.2 as the condition; it needed one
+record, not a separate DTO layer: the mission keeps the wire shape through a record of its own and the
+operation module keeps `OperationDto` for its endpoints. (2) A second type named `OperationDto`
+would have been the obvious way to keep the schema name, and `OpenApiGeneratorTest` refuses it
+(`ExposedTypes.collisions`, REQ-API-018): two exposed types with one schema name document only one
+of them. The reference on the component avoids that and defines nothing twice. (3) `MissionPeerRedactor`
+copies `operation()` through without reading its type, so it needed no change. (4) The status of the
+embedded operation is a string in the mission's record, as in the summary; the schema still lists the
+four constants because the reference points at `OperationDto`, and the constants are
+`OperationStatus`'s. A fifth constant would reach the mission as its name unchanged. (5) Nothing
+stayed behind: the seven types and the scope fragment all moved. (6) `main` carried a defect from
+the asset move F5 (2 of 5): its path rewrite turned `hangar::api` into `hangar/hangar::api` in the
+`allowedDependencies` of nine backend modules, so `ModularityTest` failed with "no module found";
+the nine declarations read `hangar::api` again, in a commit of their own.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
