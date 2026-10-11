@@ -987,8 +987,8 @@ their "must stay green" period here (D-01).
   one membership query and two dead methods. (2) Like `MemberEvaluationErasure`,
   `BankHandleSnapshots` cannot sit in `bank.api` while its caller lives in the `service` package the
   bank depends on; it stays there, registered in `BANK_CLASSES` and assigned by a `class` rule, and
-  is carried into Phase 4 with the GDPR participants (§7.6; still open after P4 slice a, it goes with
-  the anonymisation slice). (3) `BusinessMetricsCollector` (`app`)
+  is carried into Phase 4 with the GDPR participants (§7.6; still open after P4 slice a, it went
+  with the anonymisation slice, P4 slice b). (3) `BusinessMetricsCollector` (`app`)
   still reads the booking-request repository directly; it leaves with the per-module gauges of §5.1.
 
 ### 7.5 Phase 3 — the business core
@@ -1061,7 +1061,7 @@ as each pair is decoupled.
   `mission -> refinery` association and the `MissionFinanceContributor` SPI), where
   `RefineryOrder.mission` becomes an id. So the policy does not own the refinery's JPQL scope
   fragment yet either. *(P3-8b, 2026-10-11: the association and the SPI are done; two imports still
-  block the move, now tracked as P4-3.)* (2) No command API: no other module writes a refinery order. The
+  block the move, now tracked as P4-3; done 2026-10-11, §7.6.)* (2) No command API: no other module writes a refinery order. The
   store still creates Lager rows itself (write family 2 of the evidence appendix); that write
   becomes a call of the Lager's `StockCommands` with P3-5.
 - `joborder` — **done 2026-10-10.**
@@ -1469,6 +1469,7 @@ as each pair is decoupled.
   and the operation's three finance classes need no inversion for the cycle, and
   `REFINERY_ORDER_SCOPE_TRIPLE` is package-private to `repository` (it becomes the policy's
   fragment with the move), so `RefineryAccessPolicy` does not own the JPQL scope fragment yet.
+  *(P4-3, 2026-10-11: the move is done and the policy owns the fragment, §7.6.)*
   (3) The `Operation` entity, `OperationStatus`, `OperationRepository`, `OperationMapper` and the
   operation DTOs still do not move. The refinery half is gone, but the probe still finds the three
   edges of P3-8a plus one: `MissionDto` and `MissionListDto` (`model`) and `MissionMapper`
@@ -1503,13 +1504,15 @@ Carried into this phase from Phase 2: `service.MemberEvaluationErasure` (promoti
 `personalinventory.api.PersonalInventoryErasure` were the interim erasure commands `UserDeletionService`
 called; both were replaced by `UserErasureParticipant` implementations in P4 slice a (below), and
 `MemberEvaluationErasure` left the `service` package with that step (P2-3); `service.BankHandleSnapshots`
-(bank) goes the same way with the anonymisation slice (P2-5).
+(bank) went the same way with the anonymisation slice (P4 slice b below, P2-5).
 
 **Slices of the GDPR participants.** The five SPIs are one family each and ship as stacked pull
 requests, each green on its own: (a) `UserErasureParticipant` with the orchestrator — **done
 2026-10-11**; (b) `HandleAnonymisationParticipant`, which replaces `service.BankHandleSnapshots`
-and the audit, job-order and handover repositories `HandleAnonymisationService` writes; (c)
-`PersonalDataExportSection`, one per module for the sections of `DataExportSections`; (d)
+and the audit, job-order and handover repositories `HandleAnonymisationService` writes — **done
+2026-10-11**; (c)
+`PersonalDataExportSection`, one per module for the sections of `DataExportSections` — **done
+2026-10-11**; (d)
 `PersonMentionSource`, for the targets of `PersonSearchTargets`; (e) `UserReassignmentParticipant`,
 for the `FOLLOWS_THE_MEMBER` / `STAYS_WITH_THE_ACT` lists of `UserAccountMergeService` — **done
 2026-10-11**. Each rewrites its live-schema coverage test to compare the union of the registered
@@ -1575,6 +1578,91 @@ P4-2 (§7.5), and the notification services still live in the layer packages; ea
 moves with its module. (7) The plan's remark that the inventory
 observer's `beforeUserPurge` waits for §7.6 is settled here: it left `StockChangeObserver`, which keeps
 `lower`, `beforeDelete` and `beforeWipe`.
+**P4 slice b — done 2026-10-11 (the handle-anonymisation participants).** `HandleAnonymisationService`
+no longer names a foreign repository or `BankHandleSnapshots`: it normalises the spellings, runs the
+registered `HandleAnonymisationParticipant`s and writes the activity trail's marker row. Its
+collaborators fall from six to two (the participants and the audit recorder).
+1. *Characterise*: `HandleAnonymisationEndStateTest` (real Postgres, added before the change and
+   green on the unchanged code) gives a member a handle snapshot in each of the twelve covered
+   columns, matched by id or by spelling, beside a second member and unrelated names whose rows of
+   the same tables must stay, and pins every rewritten and every untouched value, the eight counts
+   and the two marker rows with their exact details. Proven able to fail: dropping the item-handover
+   rewrite or the bank-holder rewrite turns it red.
+2. *SPI*: `platform.api.HandleAnonymisationParticipant` (`@ObserverSpi`, every implementation
+   `MANDATORY`) with `position()`, `columns()` (the `table.column` set it rewrites),
+   `anonymise(userId, spellings)`, which returns the rows rewritten per table (`Rewritten`: activity
+   audit, bank audit, bank transactions, booking requests, bank holders, job orders, material and
+   item handovers), and `recordAnonymised(userId, rewritten)`, which lets a participant write its own
+   marker. Three implementations, one per module:
+   - `AuditHandleAnonymisation` (10, `service`): the actor snapshot by id, then the subject label per
+     spelling;
+   - `BankHandleAnonymisation` (20, `bank.internal`, the former `BankHandleSnapshotService`): the
+     four bank tables by id, and the bank trail's own `HANDLE_SNAPSHOTS_ANONYMISED` marker;
+   - `JobOrderHandleAnonymisation` (30, `joborder.internal`): per spelling the order contact, the
+     material-handover recipient and the item-handover recipient.
+3. *Orchestrator*: `HandleAnonymisationService.inRunOrder()` sorts by position; the activity trail's
+   marker is written from the summed counts after the participants, then each participant records
+   its own marker, so the activity row still precedes the bank row. `ANONYMISED_COLUMNS` is gone.
+4. *Gates*: `HandleAnonymisationCoverageTest` holds the union of the participants' `columns()` equal
+   to the `ANONYMISED` dispositions of `HandleErasureCoverage`, every such column to a text column of
+   the live schema and to a `PersonSearchTargets` column, and pins the run order and the uniqueness
+   of the positions (a planted drift in the registry is found); `HandleErasureCoverageTest` lost the
+   two checks against the constant; `ArchitectureTest.BANK_CLASSES` is empty and the domain map lost
+   the `BankHandleSnapshots` rule.
+Baseline **38 → 38**: the orchestrator reached the bank and the job order from rank 13, so no edge
+was in play.
+**Corrections:** (1) The SPI is owned by `platform.api`, as in slice a: `audit` (rank 1) is a
+participant and may not depend on `privacy`/`identity`. (2) The baseline file holds 38 edges since
+P3-8b; slice a's line "43 → 43" quoted the number before that step and is corrected here. (3) Statements
+of independent tables swapped places because one participant per module runs its statements
+together: the audit subject-label rewrite now runs before the bank tables, the job-order rewrites
+per spelling follow them; no foreign key relates the tables and `HandleAnonymisationEndStateTest`
+pins the result. (4) The audit participant sits in `service`, not in `audit.internal`: the audit
+repository stays in the layer package `repository`, and a class in `audit` using it would close a
+package cycle `audit` ⇄ `repository` (the lesson of P3-8a); it moves with the audit module's
+repository. (5) The sentinel is no parameter: every participant reads `kernel.HandleAnonymisation`.
+(6) The spellings reach the participants as the distinct, trimmed, non-blank list, longest first,
+that the orchestrator always built; a participant with no text-matched column ignores it.
+**P4 slice c — done 2026-10-11 (the export sections).** `DataExportService` no longer reads a
+central list: it runs the sections the modules declare, and `DataExportSections` is gone.
+1. *Characterise*: `PersonalDataExportCatalogueTest` (reading order, key, legal basis, a digest of
+   every statement, the scrubbed and the exempted columns of the 45 sections against a committed
+   catalogue) and `DataExportEndStateTest` (real Postgres: a member with a row in every one of the
+   45 sections next to a second member whose rows and handle must not appear; the JSON compared with
+   a committed document after ids, instants and the job-order display id are replaced), both added
+   before the change in their own commit and green on the unchanged code. Proven able to fail:
+   dropping the scrub of the market offers' remark and changing the legal basis of the realm roles
+   turn both red.
+2. *SPI*: `platform.api.PersonalDataExportSection` with `sections()` and the nested `Section`
+   record (position, key, `LegalBasis`, rationale, statement, `scrubbedColumns`,
+   `unscrubbedPersonColumns`; `scrubbing(...)` and `keeping(...)` extend one). It is a pure
+   declaration, so it is not an `@ObserverSpi` and no participant is transactional. Sixteen
+   implementations, one per owning module: identity (5 sections), orgunit (2), orgchart (1),
+   promotion (1), inventory (1), hangar (1), exchange (6), personalinventory (1), blueprint (1),
+   notification (3), mission (5), refinery (1), joborder (2), materialexchange (4), bank (9: seven
+   bank sections and the two bank audit trails), audit (2). The inventory's and the blueprint's sit
+   in `service`, assigned by their names, until their modules move (P4-1, P4-2).
+3. *Registry*: `privacy.internal.PersonalDataExportRegistry` collects the beans, orders them by
+   position and refuses a duplicate key or position at startup. The two maps of the old class,
+   `FREE_TEXT_COLUMNS` and `UNSCRUBBED_PERSON_COLUMNS`, became declarations on the section that
+   selects the column.
+4. *Gates*: the tests read the union of the participants, found by scanning
+   (`ExportSectionDeclarations`), not a list: `GdprParticipantCoverageTest` derives the exported
+   member columns from it (a section a participant declares closes its gap, shown by a planted
+   participant; the floor stays 44), `DataExportScrubCoverageTest`, the two PDF label tests and the
+   integration tests use it, and the new `PersonalDataExportOwnershipTest` holds every section to
+   the module that owns the table its `:userId` condition filters.
+The export JSON and PDF are unchanged. Baseline **36 → 36** (the file holds 36 since P4-3): the declarations are SQL text and name
+no class.
+**Corrections:** (1) The plan and the evidence counted 36 sections; there are 45. (2) The reading
+order is global and a module's sections are not contiguous in it (identity's `realmRoles` follows
+the org-chart placement, the bank's audit trails follow the activity trail), so the position sits on
+each section (10, 20, ... in the old order) and not on the participant, as the erasure's does.
+(3) The legal basis is an enum; the export and the PDF still carry its name. (4) The leaf-helper
+floor of `ArchitectureTest` fell from 63 to 62 with the class. (5) The characterisation first
+asserted that the external contact is absent from the whole document, which is wrong for the
+member's own prose; it now separates a name in a column no section selects (must be absent) from
+one in the member's own text (stays).
 
 **P4 slice e — done 2026-10-11 (the account-merge participants).** `UserAccountMergeService` no
 longer holds the two lists of member columns or any SQL: it asks the registered
@@ -1613,8 +1701,8 @@ audit row from the rows they report and keeps the RSI-handle carry-over.
    still finds it); `UserReassignmentOrderTest` pins the eighteen participants, their order, columns
    and conflict keys and that no column is declared twice (56 in all); `TableOwnershipTest` lists
    `OwnedRowsMover` where it listed `UserAccountMergeService` as the one class running the merge's SQL.
-Baseline **38 → 38**: the service already reached every module by table name only, and a participant
-sits in its own module. (The slice-a line "43 → 43" quoted the number before P3-8b; the file has held 38 since.)
+Baseline **36 → 36**: the service already reached every module by table name only, and a participant
+sits in its own module. (The slice-a line "43 → 43" quoted the number before P3-8b; the file held 38 until P4-3 took it to 36.)
 **Corrections:** (1) The SPI is owned by `platform.api`: `audit` (rank 1) declares staying columns and
 may not depend on identity or privacy. (2) The org-unit module has two participants, not one: the
 old list put the org-chart position between the memberships and the Grand-Admiral office, and the
@@ -1641,19 +1729,95 @@ repository then move together, with that participant; NullAway already covers th
 P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
 The five published interfaces already cover every foreign caller, so the move touches no
 other module; the §8.1 idioms go with it.
-**P4-3 — move the refinery's entities into `refinery.internal` / `refinery.api`** (carried from
-P3-8b, §7.5). It waits for the two imports the probe names: `LocationService`'s in-use check of
-`RefineryOrderRepository` (a catalogue-owned usage SPI, as for the hangar's ships) and
-`UserDeletionService`'s owner reassignment (the GDPR `UserReassignmentParticipant`). The move then
-takes `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`, the repository with
-`RefineryMissionProfitAggregate`, `RefineryOrderMapper`, the three order DTOs and the two request
-DTOs together, publishes the order DTOs and a finance view of the orders through `refinery.api` for
-`OperationFinanceService`, `OperationPayoutCalculator` and `OperationPayoutService`, and lets
-`RefineryAccessPolicy` own `REFINERY_ORDER_SCOPE_TRIPLE`.
+**P4-3 — the refinery's entities move into `refinery.internal` / `refinery.api` — done
+2026-10-11** (carried from P3-8b, §7.5).
+1. *Characterise*: `LocationDeleteInUseIntegrationTest` (real Postgres) pins the in-use check of a
+   location delete: an unused location is deleted; one a ship references is refused with the ships'
+   message, one a refinery order references with the orders' message, and one both reference with
+   the ships' message first. Green on `c042014ee` before the change, and proven able to fail:
+   swapping the two checks turns two of the four red. The refinery side was already pinned by
+   `RefineryAccessPolicyDifferentialTest`, `RefineryOrderRepositoryScopedTest`,
+   `RefineryOrderRepositoryListFilterTest`, `RefineryOrderReadNoNPlusOneTest`,
+   `RefineryOrderMissionReferenceContractTest` and `RefineryMissionLinkContractTest`, which reads
+   the operation's finance views against the database; they stayed green unchanged in behaviour.
+2. *Inversion*: `catalogue.api.LocationUsage` (`position()`, `users()`, `isUsed(locationId)`), a
+   read SPI the catalogue owns and every module whose rows point at a location implements:
+   `hangar.internal.ShipLocationUsage` (position 10) and `refinery.internal.RefineryLocationUsage`
+   (position 20), both `MANDATORY` in the delete's transaction. `LocationService.deleteLocation`
+   asks the registered usages in position order and the first one that reports the location in use
+   names the refusal: `Cannot delete location: It is currently used by one or more <users>.` — the
+   two messages, their order and the `EntityInUseException` (409) are byte-identical.
+3. *Probe* (not a guess): a class-dependency graph over the compiled `main` classes, ArchUnit-imported,
+   nested and generated classes folded onto their source type, one node per first package segment,
+   the twelve types reassigned to `refinery`. Before the SPI exactly one edge closed a cycle,
+   `LocationService -> RefineryOrderRepository` (`service ↔ refinery`, which also put `hangar` and
+   `mission` into the strongly connected set); with it taken out the set was empty. The second edge
+   of P3-8b, `UserDeletionService -> RefineryOrderRepository`, was already gone with P4 slice a
+   (`RefineryOwnerReassignment`), so no GDPR participant was needed here. The refinery slice's
+   predecessors after the move are `exchange` (the extract and draft records of `refinery.api`),
+   `operation` (below) and `task` (`BusinessMetricsCollector`, which is `app` and reads the
+   repository and the status the way it reads `bank.internal` and `materialexchange.internal`).
+4. *Move*: `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`, `RefineryOrderRepository` with
+   `RefineryMissionProfitAggregate`, `RefineryOrderMapper` with `RefineryOrderMissionLookup` and
+   the two request records go to `refinery.internal`; `RefineryOrderDto`, `RefineryGoodDto` and
+   `RefineryOrderListDto` go to `refinery.api` (`RefineryImportDraftDto` embeds the first two).
+   `REFINERY_ORDER_SCOPE_TRIPLE` left `ScopeSpecifications` and is now a package-private constant of
+   `RefineryAccessPolicy`, spliced into the four scoped queries of the repository with the same
+   text; `RefineryAccessPolicyDifferentialTest` is unchanged.
+5. *Finance view*: the operation module ranks above the refinery, so its three finance classes read
+   the orders through the refinery-owned `refinery.api.RefineryOrderFinanceReader`
+   (`linesOfMissions`, `linesOfMission`, `figuresOfMissions`, `profitByMission`), implemented by
+   `refinery.internal.RefineryOrderFinanceReads` with the same repository calls and the same
+   mapper as before, in the caller's transaction. A `RefineryOrderFigures` record (mission, owner
+   id and the three amounts, an absent amount as zero) replaces the entity in
+   `OperationPayoutCalculator`, and a `RefineryOrderLine` pairs the figures with the order's DTO for
+   the two finance views; the payout path takes the figures only, so it builds no DTO and costs no
+   statement more. `OperationFinanceService` and `OperationPayoutService` no longer name a refinery
+   entity, repository or mapper.
+6. *NullAway*: the `refinery` tree is checked, so the moved types are now covered. The entity's
+   nullable columns, the DTO components the draft and the mapper leave out, the repository's search
+   pattern and the id setter's parameter (a new order is persisted without an id) carry
+   `@Nullable`; the generated MapStruct implementation is the first one inside a checked tree, so
+   the compile gets `NullAway:TreatGeneratedAsUnannotated`.
+7. *Gates*: the architecture test's model-code floor drops 344 → 343 (the DTOs, the request records
+   and the status left the model tree), the domain map lost the class rule of
+   `RefineryMissionProfitAggregate` and the name rule `^(Refinery|ImportIssue|ImportSuggestion)`,
+   which now assign no class (the package rule takes them all). The tests of the moved types moved
+   into the matching packages of the test tree.
+Baseline **38 → 36** (`catalogue -> hangar: LocationService -> ShipRepository`,
+`catalogue -> refinery: LocationService -> RefineryOrderRepository`); the file holds 36 lines in 8
+module pairs. P4 slice a recorded "43 → 43", but the file at `c042014ee` already held 38 lines.
+**Corrections:** (1) Only the first of the two imports of P3-8b was left; the second went with P4
+slice a. (2) The usage SPI removed a second baseline edge nobody had asked for: the hangar's ship
+check was the same kind of import. (3) The delete has no deactivate counterpart: `hidden` is a flag
+the update sets without a check, so only the delete asks. (4) Four tables point at `location`:
+`ship`, `refinery_order`, `inventory_item` and `material_price`. Only the first two are checked
+today, so deleting a location that a Lager row or a price references fails at the foreign key; that
+behaviour is unchanged and is not an omission to fix here. `inventory` (P4-1) and the catalogue
+itself can implement `LocationUsage` when someone decides the refusal should name them; the SPI
+fits both without a change. (5) `RefineryOrderStatus` and the request records stay internal: only
+`BusinessMetricsCollector`, which sits in `app`, and the controller of the same module read them. (6)
+`RefineryOrderDto` keeps its `@NotNull` on `location` and `goods`; `location` also carries
+`@Nullable` because the import draft leaves it unset when the screenshot names no known location.
 **P4-4 — move the operation's entity, repository, mapper and DTOs into `operation.internal` /
-`operation.api`** (carried from P3-8b, §7.5), once the mission DTOs stop embedding `OperationDto`
-(the REST DTO separation of §5.2): `MissionDto`, `MissionListDto`, `MissionMapper` and
-`MissionPeerRedactor` are the four classes that close the cycle today.
+`operation.api`** (carried from P3-8b, §7.5) — **still blocked, checked 2026-10-11 after P4-3, not
+started.** The probe above, run with the seven operation types (`Operation`, `OperationStatus`,
+`OperationRepository`, `OperationMapper`, `OperationDto`, `OperationReferenceDto`,
+`OperationCreateDto`) reassigned to `operation`, finds exactly three class edges that enter the
+operation from inside the cycle: `MissionDto -> OperationDto` and `MissionListDto -> OperationDto`
+(both embed `OperationDto operation`) and `MissionMapper -> OperationMapper` (it builds that field
+from the summary the operation implements). Those are the three edges of the baseline's
+`mission -> operation` lines; `MissionPeerRedactor` no longer reads `OperationDto`, so the plan's
+"four classes" is three. The only other class that reads the operation's types is
+`BusinessMetricsCollector`, which sits outside the cycle in `app`. The operation's own outgoing
+edges (`admin`, `mapper`, `model`, `notification`, `repository`, `service`, and `refinery` through
+`refinery.api` only) leave the cycle and need no inversion.
+What blocks the move is the wire shape, not a missing inversion: the mission DTOs embed the
+operation's full DTO, so `model -> operation` would meet `operation -> model` (`Mission`, `User`,
+`OrgUnit`) in a package cycle, and the mission (rank 9) reaching `operation.api` (rank 11) would stay
+a frozen upward edge. It becomes feasible when the REST DTO separation (§5.2) gives the mission a
+DTO of its own for the embedded operation, which changes the OpenAPI schema name unless the new
+record keeps `OperationDto`'s name and fields.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 

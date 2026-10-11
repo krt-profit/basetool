@@ -20,8 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

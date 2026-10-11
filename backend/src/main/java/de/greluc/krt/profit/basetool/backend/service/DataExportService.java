@@ -26,9 +26,9 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections.Section;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonalDataExportRegistry;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -50,9 +50,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Assembles a member's Art. 15 / Art. 20 data export (REQ-SEC-058).
  *
- * <p>The {@link DataExportSections} statements select only the requester's own columns; free text
- * the requester wrote is passed through {@link HandleScrubber}. Each section carries its legal
- * basis, so the Art. 20 portable subset is identifiable.
+ * <p>The statements of the {@link PersonalDataExportRegistry} sections select only the requester's
+ * own columns; free text the requester wrote is passed through {@link HandleScrubber}. Each section
+ * carries its legal basis, so the Art. 20 portable subset is identifiable.
  */
 @Service
 @RequiredArgsConstructor
@@ -64,6 +64,7 @@ public class DataExportService {
 
   private final UserRepository userRepository;
   private final AuditRecorder auditRecorder;
+  private final PersonalDataExportRegistry exportRegistry;
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -128,9 +129,10 @@ public class DataExportService {
 
     HandleScrubber scrubber = scrubberForOthers(userId);
 
-    List<ExportSection> sections = new ArrayList<>(DataExportSections.SECTIONS.size());
+    List<Section> declared = exportRegistry.sections();
+    List<ExportSection> sections = new ArrayList<>(declared.size());
     boolean scrubbed = false;
-    for (Section section : DataExportSections.SECTIONS) {
+    for (Section section : declared) {
       Query query =
           entityManager
               .createNativeQuery(section.sql(), Tuple.class)
@@ -147,9 +149,7 @@ public class DataExportService {
         for (TupleElement<?> element : tuple.getElements()) {
           String name = element.getAlias();
           Object value = tuple.get(name);
-          if (sectionHasProse
-              && DataExportSections.isScrubbed(section.key(), name)
-              && value instanceof String text) {
+          if (sectionHasProse && section.scrubs(name) && value instanceof String text) {
             String cleaned = scrubber.scrub(text);
             if (cleaned != null && !cleaned.equals(text)) {
               scrubbed = true;
@@ -160,7 +160,7 @@ public class DataExportService {
         }
         rows.add(row);
       }
-      sections.add(new ExportSection(section.key(), section.legalBasis(), rows, truncated));
+      sections.add(new ExportSection(section.key(), section.legalBasis().name(), rows, truncated));
     }
 
     DataExport export =

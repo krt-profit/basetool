@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

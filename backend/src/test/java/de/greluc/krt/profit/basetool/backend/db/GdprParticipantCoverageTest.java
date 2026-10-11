@@ -26,14 +26,17 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
@@ -42,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.UserAccountMergeService;
 import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -62,7 +66,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Holds the three GDPR registries against every column that references a member (REQ-DATA-021): the
  * erasure of {@link UserDeletionService} and its {@link UserErasureParticipant}s, the Art. 15
- * export of {@link DataExportSections} and the account merge of {@link UserAccountMergeService}.
+ * export of the {@link PersonalDataExportSection}s and the account merge of {@link
+ * UserAccountMergeService}.
  *
  * <p>A column references a member when it carries a foreign key to {@code app_user}, or when it is
  * a {@code uuid} named {@code user_id}, {@code owner_id}, {@code *_user_id}, {@code *_by}, {@code
@@ -74,6 +79,9 @@ class GdprParticipantCoverageTest {
 
   /** Today's count of member-referencing columns; the sweep must see at least this many. */
   private static final int REFERENCE_FLOOR = 56;
+
+  /** Today's count of export sections keyed by a member column; the union must hold this many. */
+  private static final int EXPORT_SECTION_FLOOR = 44;
 
   /** The {@code ON DELETE} actions that let the database itself erase or unlink the reference. */
   private static final Set<Character> ERASED_BY_THE_DATABASE = Set.of('c', 'n', 'd');
@@ -264,16 +272,18 @@ class GdprParticipantCoverageTest {
   @DisplayName("every member reference is exported or listed as not exported")
   void everyMemberReferenceHasAnExportDisposition() {
     Map<String, Character> references = memberReferences(new JdbcTemplate(dataSource));
-    Set<String> exported = exportedKeys(new JdbcTemplate(dataSource));
+    Set<String> exported =
+        exportedKeys(new JdbcTemplate(dataSource), ExportSectionDeclarations.inReadingOrder());
     assertThat(exported)
         .as("export section keys (an emptied registry would pass vacuously)")
-        .hasSizeGreaterThanOrEqualTo(DataExportSections.SECTIONS.size() - 1);
+        .hasSizeGreaterThanOrEqualTo(EXPORT_SECTION_FLOOR);
 
     assertThat(exportGaps(references.keySet(), exported))
         .as(
             """
             Member references the Art. 15 export (REQ-SEC-058) does not answer for. Add a section \
-            to DataExportSections, or list the column in NOT_EXPORTED with its reason.\
+            to the owning module's PersonalDataExportSection, or list the column in NOT_EXPORTED with \
+            its reason.\
             """)
         .isEmpty();
     assertThat(staleKeys(NOT_EXPORTED.keySet(), references.keySet()))
@@ -325,6 +335,44 @@ class GdprParticipantCoverageTest {
     assertThat(erasureGaps(references)).containsAll(planted);
     assertThat(exportGaps(references.keySet(), Set.of())).containsAll(planted);
     assertThat(mergeGaps(references.keySet())).containsAll(planted);
+  }
+
+  @Test
+  @DisplayName("proof: a section a participant declares for a planted column closes its gap")
+  void aSectionAParticipantDeclaresClosesTheGapOfItsColumn() throws SQLException {
+    Section planted =
+        new Section(
+            9000,
+            "g11Planted",
+            LegalBasis.ART_15,
+            "A planted section that exports the planted member column.",
+            "SELECT member_id FROM g11_planted WHERE member_id = :userId");
+    PersonalDataExportSection participant = () -> List.of(planted);
+
+    Set<String> gaps =
+        RolledBackTransaction.run(
+            dataSource,
+            jdbc -> {
+              jdbc.execute(
+                  """
+                  CREATE TABLE g11_planted (
+                      id UUID PRIMARY KEY,
+                      member_id UUID REFERENCES app_user (id)
+                  )
+                  """);
+              Map<String, Character> references = memberReferences(jdbc);
+              Set<String> declared =
+                  exportedKeys(
+                      jdbc,
+                      ExportSectionDeclarations.inReadingOrder(
+                          java.util.stream.Stream.concat(
+                                  ExportSectionDeclarations.participants().stream(),
+                                  java.util.stream.Stream.of(participant))
+                              .toList()));
+              return exportGaps(references.keySet(), declared);
+            });
+
+    assertThat(gaps).doesNotContain("g11_planted.member_id");
   }
 
   @Test
@@ -424,7 +472,7 @@ class GdprParticipantCoverageTest {
     return missing;
   }
 
-  private static Set<String> exportedKeys(JdbcTemplate jdbc) {
+  private static Set<String> exportedKeys(JdbcTemplate jdbc, List<Section> declared) {
     Set<String> tables =
         new TreeSet<>(
             jdbc.queryForList(
@@ -434,7 +482,7 @@ class GdprParticipantCoverageTest {
                 """,
                 String.class));
     Set<String> keys = new TreeSet<>();
-    for (DataExportSections.Section section : DataExportSections.SECTIONS) {
+    for (Section section : declared) {
       String key = exportKey(section.sql(), tables);
       if (key != null) {
         keys.add(key);
@@ -443,7 +491,7 @@ class GdprParticipantCoverageTest {
     return keys;
   }
 
-  private static @Nullable String exportKey(String sql, Set<String> tables) {
+  static @Nullable String exportKey(String sql, Set<String> tables) {
     String text = SqlReferences.scannable(sql);
     Matcher where = EXPORT_KEY.matcher(text);
     Matcher from = FIRST_FROM.matcher(text);

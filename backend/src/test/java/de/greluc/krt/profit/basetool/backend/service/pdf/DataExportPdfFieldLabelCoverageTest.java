@@ -21,8 +21,9 @@ package de.greluc.krt.profit.basetool.backend.service.pdf;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportProjection;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -60,7 +61,7 @@ class DataExportPdfFieldLabelCoverageTest {
   /** Every alias the four verbatim sections yield, deduplicated across them. */
   private static Set<String> printedFieldNames() {
     Set<String> out = new LinkedHashSet<>();
-    for (DataExportSections.Section section : DataExportSections.SECTIONS) {
+    for (Section section : ExportSectionDeclarations.inReadingOrder()) {
       if (!DataExportPdfFormat.VERBATIM_SECTIONS.contains(section.key())) {
         continue;
       }

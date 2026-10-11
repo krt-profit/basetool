@@ -186,7 +186,7 @@ class TableOwnershipTest {
   static final Map<String, String> DYNAMIC_NATIVE_SQL_CLASSES =
       Map.of(
           "de.greluc.krt.profit.basetool.backend.service.DataExportService",
-          "Runs the Art. 15 export sections of DataExportSections across every module.",
+          "Runs the Art. 15 export sections that every module declares.",
           "de.greluc.krt.profit.basetool.backend.service.PersonSearchService",
           "Runs the person search over the PersonSearchTargets registry across every module.",
           "de.greluc.krt.profit.basetool.backend.platform.api.OwnedRowsMover",

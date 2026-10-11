@@ -1,0 +1,513 @@
+{
+  "subjectId" : "<uuid>",
+  "subjectHandle" : "Zzz Subject Display",
+  "generatedAt" : "<instant>",
+  "thirdPartyHandlesRemoved" : true,
+  "outOfScope" : [ "platformLogsMetricsTraces", "backups", "keycloakAccountRecord" ],
+  "sections" : [ {
+    "key" : "account",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "id" : "<uuid>",
+      "username" : "ZzzExportSubjectZzz",
+      "display_name" : "Zzz Subject Display",
+      "email" : null,
+      "description" : "Fliegt oft mit #OTHER_MEMBER# und ZzzExportExternalZzz",
+      "user_rank" : 1,
+      "join_date" : null,
+      "discord_user_id" : null,
+      "discord_guild_nickname" : null,
+      "rsi_handle" : null,
+      "default_payout_preference" : null,
+      "share_blueprints_globally" : false,
+      "approval_status" : "ACTIVE",
+      "approved_at" : null,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "termsAcceptances",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "terms_version" : "2026-01",
+      "accepted_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "registrationDecisions",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "decision" : "APPROVED",
+      "reason" : "Freigabe nach Absprache mit #OTHER_MEMBER#",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "deletionRequests",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "status" : "PENDING",
+      "erase_history_requested" : false,
+      "decision_note" : null,
+      "created_at" : "<instant>",
+      "decided_at" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "orgUnitMemberships",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "org_unit" : "IRIDIUM",
+      "shorthand" : "IRI",
+      "kind" : "SQUADRON",
+      "role" : "MEMBER",
+      "is_logistician" : false,
+      "is_mission_manager" : false,
+      "joined_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "orgChartPositions",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "position_type" : "AREA_LEAD",
+      "name" : null,
+      "display_name" : null,
+      "org_unit" : null,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "realmRoles",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "code" : "ZZZ_EXPORT_ROLE",
+      "role" : "ZZZ Export Role"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "orgUnitsAsGrandAdmiral",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "org_unit" : "Zzz Export Leitung",
+      "shorthand" : "ZXL",
+      "kind" : "ORGANISATIONSLEITUNG"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "evaluations",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "category" : "Zzz Export Category",
+      "assigned_level" : "LEVEL_A",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "warehouseContributions",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "amount" : 40.0,
+      "quality" : 500,
+      "personal" : false,
+      "stolen" : false,
+      "note" : "Lager von ZzzExportSubjectZzz fuer #OTHER_MEMBER#",
+      "material" : "Zzz Export Ore",
+      "location" : "Zzz Export Hub",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "hangar",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "name" : "Schiff von ZzzExportSubjectZzz und #OTHER_MEMBER#",
+      "ship_type" : "Zzz Export Hull",
+      "insurance" : "LTI",
+      "fitted" : false,
+      "location" : "Zzz Export Hub",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "connectedApps",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "client_id" : "zzz-export-client",
+      "client" : "Zzz Export Client",
+      "label" : "Rechner von #OTHER_MEMBER#",
+      "first_seen_at" : "<instant>",
+      "last_seen_at" : "<instant>",
+      "revoked_at" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "connectedAppRevocations",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "client_id" : "zzz-export-client",
+      "client" : "Zzz Export Client",
+      "revoked_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "exchangeChanges",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "resource" : "STOCK",
+      "entity_key" : "m:<uuid>|l:<uuid>|q:500|s:0",
+      "source_channel" : "system",
+      "source_client" : null,
+      "changed_at" : "<instant>"
+    }, {
+      "resource" : "SHIP",
+      "entity_key" : "<uuid>",
+      "source_channel" : "system",
+      "source_client" : null,
+      "changed_at" : "<instant>"
+    }, {
+      "resource" : "BLUEPRINT",
+      "entity_key" : "export-ZzzExportSubjectZzz",
+      "source_channel" : "system",
+      "source_client" : null,
+      "changed_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "exchangeJournal",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "client_id" : "zzz-export-client",
+      "resource" : "STOCK",
+      "entity_key" : "stock-1",
+      "action" : "STOCK_SET_QUANTITY",
+      "before_state" : "{\"von\":\"#OTHER_MEMBER#\"}",
+      "after_state" : "{\"an\":\"#OTHER_MEMBER#\"}",
+      "recorded_at" : "<instant>",
+      "undone_at" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "exchangeBulkUndoSkips",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "run_id" : "<uuid>",
+      "client_id" : "zzz-export-client",
+      "resource" : "STOCK",
+      "reason" : "GONE",
+      "started_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "exchangeShipLinks",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "client_id" : "zzz-export-client",
+      "external_id" : "ext-1",
+      "ship_id" : "<uuid>",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "personalInventory",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "name" : "Probe #OTHER_MEMBER#",
+      "quantity" : 1,
+      "location_type" : "CITY",
+      "location_name_snapshot" : "Export City",
+      "note" : "Uebergabe an #OTHER_MEMBER# erledigt",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "personalBlueprints",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "product_name" : "Export Product",
+      "acquired_at" : null,
+      "note" : "Plan von #OTHER_MEMBER#",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "notifications",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "type" : "JOB_ORDER_CREATED",
+      "entity_type" : null,
+      "params" : "{\"actor\":\"#OTHER_MEMBER#\"}",
+      "is_read" : false,
+      "read_at" : null,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "notificationMutes",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "notification_type" : "JOB_ORDER_CREATED",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "notificationRuleTargets",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "rule" : "Regel fuer #OTHER_MEMBER#",
+      "kind" : "SPECIFIC_USER"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "missionsOwned",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "name" : "Konvoi mit #OTHER_MEMBER#",
+      "description" : "Absprache mit ZzzExportExternalZzz und #OTHER_MEMBER#",
+      "status" : "PLANNED",
+      "meeting_point" : "Treffpunkt #OTHER_MEMBER#",
+      "planned_start_time" : null,
+      "planned_end_time" : null,
+      "created_at" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "missionParticipations",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "mission" : "Konvoi mit #OTHER_MEMBER#",
+      "comment" : "Dabei mit #OTHER_MEMBER#",
+      "payout_preference" : "PERSONAL",
+      "is_mission_lead_participant" : false,
+      "start_time" : null,
+      "end_time" : null,
+      "created_at" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "missionsManaged",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "mission" : "Konvoi mit #OTHER_MEMBER#",
+      "status" : "PLANNED"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "missionsAsPartyLead",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "mission" : "Bergung mit #OTHER_MEMBER#",
+      "status" : "PLANNED",
+      "planned_start_time" : null,
+      "planned_end_time" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "missionUnitResponsibilities",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "mission" : "Konvoi mit #OTHER_MEMBER#",
+      "unit" : "Hornet von #OTHER_MEMBER#",
+      "ship_type" : "Zzz Export Hull",
+      "high_value_unit" : true,
+      "created_at" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "refineryOrdersOwned",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "status" : "OPEN",
+      "started_at" : null,
+      "duration_minutes" : 60,
+      "expenses" : 100.0,
+      "ore_sales" : null,
+      "location" : "Zzz Export Hub",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "jobOrderAssignments",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "display_id" : <n>,
+      "type" : "MATERIAL",
+      "status" : "OPEN",
+      "note" : "Uebernommen von #OTHER_MEMBER#",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "materialClaims",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "job_order" : 1,
+      "material" : "Zzz Export Ore",
+      "amount" : 5.0,
+      "quality_requirement" : "GOOD",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "marketOffers",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "offer_kind" : "ITEM",
+      "item_name" : "Zzz Angebot",
+      "offered_amount" : null,
+      "remark" : "Abholung bei #OTHER_MEMBER#",
+      "status" : "ACTIVE",
+      "released_at" : "<instant>",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "marketRequests",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "request_kind" : "ITEM",
+      "item_name" : "Zzz Gesuch",
+      "requested_amount" : null,
+      "min_quality" : null,
+      "remark" : "Melden bei #OTHER_MEMBER#",
+      "status" : "ACTIVE",
+      "posted_at" : "<instant>",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "marketInterests",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "item_name" : "Zzz Fremdes Angebot",
+      "offer_kind" : "ITEM",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "marketRequestInterests",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "request_kind" : "ITEM",
+      "item_name" : "Zzz Fremdes Gesuch",
+      "material" : null,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankHolderRegistration",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "handle" : "ZzzExportSubjectZzz",
+      "active" : true,
+      "role_managed" : false,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankAccountGrants",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "account_no" : "ZZZ-EXPORT-1",
+      "account" : "Kasse von #OTHER_MEMBER#",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankAccountBookingGrants",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "account_no" : "ZZZ-EXPORT-1",
+      "account" : "Kasse von #OTHER_MEMBER#",
+      "can_deposit" : true,
+      "can_withdraw" : false,
+      "can_transfer" : true,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankApprovalLimits",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "account_no" : "ZZZ-EXPORT-1",
+      "account" : "Kasse von #OTHER_MEMBER#",
+      "limit_amount" : 5000.0000,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankBookingsAsCounterparty",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "type" : "DEPOSIT",
+      "note" : "Einzahlung von #OTHER_MEMBER#",
+      "justification" : "Abgesprochen mit ZzzExportExternalZzz",
+      "transfer_fee" : 0.0000,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankRequestsRaised",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "type" : "DEPOSIT",
+      "amount" : 1500.0000,
+      "note" : "Einzahlung von #OTHER_MEMBER#",
+      "justification" : "Abgesprochen mit #OTHER_MEMBER#",
+      "status" : "PENDING",
+      "created_at" : "<instant>",
+      "decided_at" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankRequestsAsCounterparty",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "type" : "DEPOSIT",
+      "amount" : 1500.0000,
+      "note" : "Einzahlung von #OTHER_MEMBER#",
+      "justification" : "Abgesprochen mit #OTHER_MEMBER#",
+      "status" : "PENDING",
+      "created_at" : "<instant>",
+      "decided_at" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "auditActionsByMember",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "occurred_at" : "<instant>",
+      "domain" : "JOB_ORDER",
+      "event_type" : "JOB_ORDER_CREATED",
+      "client_id" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "auditActionsOnMember",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "occurred_at" : "<instant>",
+      "domain" : "JOB_ORDER",
+      "event_type" : "JOB_ORDER_CREATED"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankAuditActionsByMember",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "occurred_at" : "<instant>",
+      "event_type" : "ACCOUNT_CREATED",
+      "client_id" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankAuditActionsOnMember",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "occurred_at" : "<instant>",
+      "event_type" : "ACCOUNT_CREATED"
+    } ],
+    "truncated" : false
+  } ]
+}

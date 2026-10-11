@@ -147,6 +147,7 @@ tasks.named<JavaCompile>("compileJava") {
     check("NullAway", CheckSeverity.ERROR)
     disable("StringConcatToTextBlock")
     option("NullAway:AnnotatedPackages", nullAwayPackages)
+    option("NullAway:TreatGeneratedAsUnannotated", "true")
   }
 }
 

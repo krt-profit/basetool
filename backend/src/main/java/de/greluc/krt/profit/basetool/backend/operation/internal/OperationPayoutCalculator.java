@@ -25,7 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFigures;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -56,18 +56,15 @@ public final class OperationPayoutCalculator {
    */
   @NotNull
   public static BigDecimal computeTotalSum(
-      @NotNull List<MissionFinanceEntry> entries, @NotNull List<RefineryOrder> orders) {
+      @NotNull List<MissionFinanceEntry> entries, @NotNull List<RefineryOrderFigures> orders) {
     BigDecimal total = BigDecimal.ZERO;
     for (MissionFinanceEntry entry : entries) {
       if (entry.getType() != null) {
         total = total.add(entry.getType().signed(entry.getAmount()));
       }
     }
-    for (RefineryOrder order : orders) {
-      double sales = order.getOreSales() != null ? order.getOreSales() : 0d;
-      double costs = order.getExpenses() != null ? order.getExpenses() : 0d;
-      double otherCosts = order.getOtherExpenses() != null ? order.getOtherExpenses() : 0d;
-      double profit = sales - costs - otherCosts;
+    for (RefineryOrderFigures order : orders) {
+      double profit = order.profit();
       if (profit != 0d) {
         total = total.add(BigDecimal.valueOf(profit));
       }
@@ -88,7 +85,7 @@ public final class OperationPayoutCalculator {
    */
   @NotNull
   public static Map<String, BigDecimal> computePersonalExpensesByParticipant(
-      @NotNull List<MissionFinanceEntry> entries, @NotNull List<RefineryOrder> orders) {
+      @NotNull List<MissionFinanceEntry> entries, @NotNull List<RefineryOrderFigures> orders) {
     Map<String, BigDecimal> byKey = new HashMap<>();
     for (MissionFinanceEntry entry : entries) {
       if (entry.getType() != FinanceType.EXPENSE) {
@@ -104,17 +101,15 @@ public final class OperationPayoutCalculator {
       }
       byKey.merge(key, entry.getAmount(), BigDecimal::add);
     }
-    for (RefineryOrder order : orders) {
-      if (order.getOwner() == null) {
+    for (RefineryOrderFigures order : orders) {
+      if (order.ownerId() == null) {
         continue;
       }
-      double costs = order.getExpenses() != null ? order.getExpenses() : 0d;
-      double otherCosts = order.getOtherExpenses() != null ? order.getOtherExpenses() : 0d;
-      double total = costs + otherCosts;
+      double total = order.advancedCosts();
       if (total <= 0d) {
         continue;
       }
-      String key = order.getOwner().getId().toString();
+      String key = order.ownerId().toString();
       byKey.merge(key, BigDecimal.valueOf(total), BigDecimal::add);
     }
     return byKey;
