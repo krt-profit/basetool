@@ -17,22 +17,37 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global krtAutocomplete, LOCATION_MSG, LOCATION_CONFLICT */
 
 document.addEventListener('DOMContentLoaded', () => {
-    const dataList = document.getElementById('locationNames-data');
+    const dataList = /** @type {HTMLDataListElement | null} */ (
+        document.getElementById('locationNames-data')
+    );
     const locationNames = dataList
         ? Array.from(dataList.options).map((o) => {
               return o.value;
           })
         : [];
-    const inpLocations = document.getElementById('filterLocations');
+    const inpLocations = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('filterLocations')
+    );
     if (inpLocations) krtAutocomplete(inpLocations, locationNames);
 });
 
+/**
+ * Hides every table row whose first cell does not contain the query, case-insensitively.
+ *
+ * @param {string} tableId id of the table to filter
+ * @param {string} query the text to look for
+ */
 function filterTable(tableId, query) {
     const filter = query.toUpperCase();
     const table = document.getElementById(tableId);
+    if (!table) {
+        return;
+    }
     const tr = table.getElementsByTagName('tr');
     for (let i = 1; i < tr.length; i++) {
         const td = tr[i].getElementsByTagName('td')[0];
@@ -50,6 +65,12 @@ function filterTable(tableId, query) {
 window.filterTable = filterTable;
 
 document.addEventListener('DOMContentLoaded', () => {
+    /**
+     * Sets a toggle button's label from its on/off label attributes.
+     *
+     * @param {Element | null} btn the toggle button
+     * @param {boolean | undefined} flagValue the flag the label reflects
+     */
     function patchButton(btn, flagValue) {
         if (!btn) {
             return;
@@ -59,6 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
             : btn.getAttribute('data-label-off');
     }
 
+    /**
+     * Patches both toggle forms of a location row from the updated location.
+     *
+     * @param {Element | null} row the location's table row
+     * @param {ApiDto<'LocationDto'> | null} updated the location as saved
+     */
     function patchRow(row, updated) {
         if (!row || !updated) {
             return;
@@ -67,14 +94,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const homeForm = row.querySelector('form[data-location-toggle="home"]');
         if (visForm) {
             patchButton(visForm.querySelector('button'), updated.hidden);
-            const visInput = visForm.querySelector('input[name="hidden"]');
+            const visInput = /** @type {HTMLInputElement | null} */ (
+                visForm.querySelector('input[name="hidden"]')
+            );
             if (visInput) {
                 visInput.value = String(!updated.hidden);
             }
         }
         if (homeForm) {
             patchButton(homeForm.querySelector('button'), updated.homeLocation);
-            const homeInput = homeForm.querySelector('input[name="homeLocation"]');
+            const homeInput = /** @type {HTMLInputElement | null} */ (
+                homeForm.querySelector('input[name="homeLocation"]')
+            );
             if (homeInput) {
                 homeInput.value = String(!updated.homeLocation);
             }
@@ -82,7 +113,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('submit', (event) => {
-        const form = event.target.closest('form[data-location-toggle]');
+        const form = /** @type {HTMLFormElement | null} */ (
+            /** @type {Element} */ (event.target).closest('form[data-location-toggle]')
+        );
         if (!form) {
             return;
         }
@@ -92,14 +125,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const row = form.closest('tr');
-        const button = form.querySelector('button[type="submit"]');
+        const button = /** @type {HTMLButtonElement | null} */ (
+            form.querySelector('button[type="submit"]')
+        );
         if (button) {
             button.disabled = true;
         }
         window.krtFetch
             .write({
                 method: 'POST',
-                url: form.getAttribute('action'),
+                url: /** @type {string} */ (form.getAttribute('action')),
                 successMessage: LOCATION_MSG.success,
                 errorMessage: LOCATION_MSG.error,
                 conflict: LOCATION_CONFLICT,

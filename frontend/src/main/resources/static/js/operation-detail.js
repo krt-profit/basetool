@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
 
 const OPERATION_SECTIONS = {
@@ -133,7 +135,11 @@ function withOverview(keys) {
 })();
 
 (function () {
-    const tabs = Array.from(document.querySelectorAll('#operation-tabs > .tab[data-tab]'));
+    const tabs = Array.from(
+        /** @type {NodeListOf<HTMLElement>} */ (
+            document.querySelectorAll('#operation-tabs > .tab[data-tab]')
+        ),
+    );
     const panes = Array.from(document.querySelectorAll('.tab-panes > .tab-pane'));
     if (!tabs.length) return;
     const STORAGE_KEY = `krt.operation.${window.operationId || 'new'}.tab`;
@@ -415,7 +421,7 @@ function adoptOperationFormValues(form) {
             );
             window.krtFetch.write({
                 method: 'POST',
-                url: form.getAttribute('action'),
+                url: /** @type {string} */ (form.getAttribute('action')),
                 serialize: 'operation:core',
                 submitter: document.querySelector('button[type="submit"][form="operation-form"]'),
                 payload() {
@@ -609,8 +615,9 @@ document.addEventListener('change', (ev) => {
 });
 
 (function () {
-    const opId = window.operationId;
-    if (!opId) return;
+    const currentOperationId = window.operationId;
+    if (!currentOperationId) return;
+    const opId = currentOperationId;
 
     /**
      * Loads one mission's finance breakdown the first time its row opens.

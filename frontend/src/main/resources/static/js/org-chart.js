@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global OC_I18N */
 
 const ORG_CHART_SECTIONS = {
@@ -31,6 +33,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
     const editHint = document.getElementById('oc-edit-hint');
     const modal = document.getElementById('oc-modal');
     const modalContent = modal ? modal.querySelector('.krt-modal') : null;
+    /** @type {HTMLElement | null} */
     let lastTrigger = null;
 
     function refreshChart(keepScroll) {
@@ -87,12 +90,12 @@ const ORG_CHART_UNITS_SECTION = 'units';
     }
 
     function field(id) {
-        const el = document.getElementById(id);
+        const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
         return el ? el.value : '';
     }
 
     function setField(id, value) {
-        const el = document.getElementById(id);
+        const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
         if (el) {
             el.value = value === null || value === undefined ? '' : value;
         }
@@ -345,16 +348,20 @@ const ORG_CHART_UNITS_SECTION = 'units';
         });
 
         window.krtEvents.on('click', 'oc-ga-remove', (btn) => {
-            window.showKrtConfirm(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm).then((ok) => {
-                if (ok) {
-                    const olId = encodeURIComponent(btn.getAttribute('data-org-unit-id'));
-                    send(
-                        'DELETE',
-                        `/organisation/leitung/organisationsleitung/${olId}/grand-admiral/ajax`,
-                        null,
-                    );
-                }
-            });
+            window
+                .showKrtConfirm?.(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm)
+                .then((ok) => {
+                    if (ok) {
+                        const olId = encodeURIComponent(
+                            String(btn.getAttribute('data-org-unit-id')),
+                        );
+                        send(
+                            'DELETE',
+                            `/organisation/leitung/organisationsleitung/${olId}/grand-admiral/ajax`,
+                            null,
+                        );
+                    }
+                });
         });
 
         window.krtEvents.on('click', 'oc-reassign', (btn) => {
@@ -381,9 +388,9 @@ const ORG_CHART_UNITS_SECTION = 'units';
             const isCommand = btn.getAttribute('data-position-type') === 'COMMAND_LEAD';
             const message = isCommand ? OC_I18N.removeConfirmCommand : OC_I18N.removeConfirm;
             const title = OC_I18N.removeConfirmTitle;
-            window.showKrtConfirm(title, message).then((ok) => {
+            window.showKrtConfirm?.(title, message).then((ok) => {
                 if (ok) {
-                    const id = encodeURIComponent(btn.getAttribute('data-position-id'));
+                    const id = encodeURIComponent(String(btn.getAttribute('data-position-id')));
                     send('DELETE', `/org-chart/positions/${id}/ajax`, null);
                 }
             });
@@ -392,10 +399,10 @@ const ORG_CHART_UNITS_SECTION = 'units';
         window.krtEvents.on('click', 'oc-vacate', (btn) => {
             const title = OC_I18N.vacateConfirmTitle;
             const message = OC_I18N.vacateConfirm;
-            window.showKrtConfirm(title, message).then((ok) => {
+            window.showKrtConfirm?.(title, message).then((ok) => {
                 if (ok) {
-                    const id = encodeURIComponent(btn.getAttribute('data-position-id'));
-                    const version = encodeURIComponent(btn.getAttribute('data-version'));
+                    const id = encodeURIComponent(String(btn.getAttribute('data-position-id')));
+                    const version = encodeURIComponent(String(btn.getAttribute('data-version')));
                     send(
                         'DELETE',
                         `/org-chart/positions/${id}/leader/ajax?version=${version}`,
@@ -597,6 +604,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
         if (!chart) {
             return;
         }
+        const scroller = chart;
         const bar = document.createElement('div');
         bar.className = 'oc-scrollbar';
         bar.setAttribute('aria-hidden', 'true');
@@ -606,15 +614,15 @@ const ORG_CHART_UNITS_SECTION = 'units';
         chart.insertAdjacentElement('afterend', bar);
 
         function measure() {
-            const overflow = chart.scrollWidth - chart.clientWidth;
+            const overflow = scroller.scrollWidth - scroller.clientWidth;
             if (overflow <= 1) {
                 bar.classList.remove('oc-scrollbar--active');
-                chart.classList.remove('oc-chart--proxied');
+                scroller.classList.remove('oc-chart--proxied');
                 return;
             }
-            track.style.width = `${chart.scrollWidth}px`;
+            track.style.width = `${scroller.scrollWidth}px`;
             bar.classList.add('oc-scrollbar--active');
-            chart.classList.add('oc-chart--proxied');
+            scroller.classList.add('oc-chart--proxied');
         }
 
         function mirror(from, to) {
@@ -626,10 +634,10 @@ const ORG_CHART_UNITS_SECTION = 'units';
             }
         }
         bar.addEventListener('scroll', () => {
-            mirror(bar, chart);
+            mirror(bar, scroller);
         });
-        chart.addEventListener('scroll', () => {
-            mirror(chart, bar);
+        scroller.addEventListener('scroll', () => {
+            mirror(scroller, bar);
         });
 
         let rafPending = false;

@@ -135,6 +135,17 @@ and we will not convert the sources to TypeScript.**
   walks the affected path, and reports it as a UI failure far from the cause. It remains the
   behavioural gate; it is not a substitute for a contract check.
 
+## Amendment 2026-10-11 — the opt-in ratchets per domain
+
+Per-file opt-in stays the mechanism; it now has a floor. `frontend/typecheck-ratchet.json` assigns
+every script to one domain and lists the migrated domains, in which every script must carry
+`// @ts-check`. `:frontend:testTypecheckRatchet` fails when a migrated domain gets an unchecked
+script, when a domain leaves the migrated list or the checked-script count falls, when a script
+belongs to no domain, when any script suppresses the check, or when `tsconfig.json` hides scripts
+(REQ-FE-018). All 124 scripts were checked on that day (65 of 113 before), after the three largest
+were split into parts that load by consecutive `defer` tags in the original order. The decision
+above is unchanged: no conversion to TypeScript, no module, no build step.
+
 ## Amendment 2026-09-23 — `defer`, and still no build step (FE-PERF-05)
 
 "No `<script>` tag changes" held for the type check; the tags did change for load order: every

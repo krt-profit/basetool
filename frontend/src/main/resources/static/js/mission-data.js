@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global MISSION_MSG, MISSION_CONFLICT, MISSION_TITLES */
 
 const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
@@ -32,9 +34,20 @@ function selectedMissionKind() {
     return kind && MISSION_KINDS.indexOf(kind) !== -1 ? kind : MISSION_KINDS[0];
 }
 
+/**
+ * Builds the query string that carries the three inactive-toggles and the selected kind.
+ *
+ * @returns {string} the query string without a leading question mark
+ */
 function missionFilterParams() {
+    /**
+     * Reads a filter checkbox.
+     *
+     * @param {string} id the checkbox id
+     * @returns {boolean} whether it is checked; false when absent
+     */
     function checked(id) {
-        const el = document.getElementById(id);
+        const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
         return el ? el.checked : false;
     }
     return `includeInactiveSquadrons=${checked(
@@ -55,15 +68,19 @@ function missionFilterParams() {
  */
 function selectMissionKind(kind, focusRow) {
     const want = kind && MISSION_KINDS.indexOf(kind) !== -1 ? kind : MISSION_KINDS[0];
-    document.querySelectorAll('.md-kind-row').forEach((row) => {
-        const on = row.getAttribute('data-md-kind') === want;
-        row.classList.toggle('is-active', on);
-        row.setAttribute('aria-selected', String(on));
-        row.setAttribute('tabindex', on ? '0' : '-1');
-        const pane = document.getElementById(row.getAttribute('aria-controls'));
-        if (pane) pane.hidden = !on;
-        if (on && focusRow) row.focus();
-    });
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.md-kind-row')).forEach(
+        (row) => {
+            const on = row.getAttribute('data-md-kind') === want;
+            row.classList.toggle('is-active', on);
+            row.setAttribute('aria-selected', String(on));
+            row.setAttribute('tabindex', on ? '0' : '-1');
+            const pane = document.getElementById(
+                /** @type {string} */ (row.getAttribute('aria-controls')),
+            );
+            if (pane) pane.hidden = !on;
+            if (on && focusRow) row.focus();
+        },
+    );
     try {
         const url = new URL(window.location.href);
         url.searchParams.set('kind', want);
@@ -72,8 +89,14 @@ function selectMissionKind(kind, focusRow) {
     persistMissionFilters();
 }
 
+/**
+ * Moves the selection of the master list with the arrow, Home and End keys.
+ *
+ * @param {KeyboardEvent} e the keydown event
+ */
 function onMissionKindKeydown(e) {
-    const list = e.target && e.target.closest ? e.target.closest('#md-kind-list') : null;
+    const target = /** @type {Element | null} */ (e.target);
+    const list = target && target.closest ? target.closest('#md-kind-list') : null;
     if (!list) return;
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') {
         return;
@@ -83,6 +106,7 @@ function onMissionKindKeydown(e) {
     const current = rows.findIndex((r) => {
         return r.getAttribute('aria-selected') === 'true';
     });
+    /** @type {number} */
     let idx;
     if (e.key === 'ArrowDown') idx = Math.min(rows.length - 1, current + 1);
     else if (e.key === 'ArrowUp') idx = Math.max(0, current - 1);
@@ -91,6 +115,12 @@ function onMissionKindKeydown(e) {
     selectMissionKind(rows[idx].getAttribute('data-md-kind'), true);
 }
 
+/**
+ * Maps a form action to the id of the result section it changes.
+ *
+ * @param {string} action the form's action URL
+ * @returns {string | null} the section id, or null for an unknown action
+ */
 function missionSectionForAction(action) {
     if (action.indexOf('/squadrons') !== -1) return 'squadrons-results';
     if (action.indexOf('/job-types') !== -1) return 'jobtypes-results';
@@ -98,6 +128,11 @@ function missionSectionForAction(action) {
     return null;
 }
 
+/**
+ * Re-renders the result section a form action changed.
+ *
+ * @param {string} action the form's action URL
+ */
 function reswapMissionSection(action) {
     const section = missionSectionForAction(action);
     if (section && window.krtFetch) {
@@ -110,8 +145,15 @@ function reswapMissionSection(action) {
     }
 }
 
+/**
+ * Submits a mission-data form through krtFetch and re-renders the affected section.
+ *
+ * @param {HTMLFormElement} form the form to submit
+ * @param {string} successMessage the already-localized success toast
+ * @param {(() => void) | null} onSuccess runs after a successful save, before the re-render
+ */
 function missionWrite(form, successMessage, onSuccess) {
-    const action = form.getAttribute('action');
+    const action = /** @type {string} */ (form.getAttribute('action'));
     window.krtFetch.submitForm({
         form,
         submitter: form.querySelector('button[type="submit"]'),
@@ -128,64 +170,92 @@ function missionWrite(form, successMessage, onSuccess) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    /**
+     * Looks up a control of one of the data dialogs by id; the dialogs always render them.
+     *
+     * @param {string} id the element id
+     * @returns {HTMLInputElement} the control
+     */
+    function dialogField(id) {
+        return /** @type {HTMLInputElement} */ (document.getElementById(id));
+    }
+
     const sqModal = document.getElementById('squadron-modal');
-    const sqForm = document.getElementById('squadron-form');
-    const sqTitle = document.getElementById('squadron-modal-title');
+    const sqForm = /** @type {HTMLFormElement} */ (document.getElementById('squadron-form'));
+    const sqTitle = /** @type {HTMLElement} */ (document.getElementById('squadron-modal-title'));
     const sqAddBtn = document.getElementById('add-squadron-btn');
-    const sqClose = document.querySelector('.close-squadron-modal');
+    const sqClose = /** @type {HTMLElement | null} */ (
+        document.querySelector('.close-squadron-modal')
+    );
 
     if (sqAddBtn) {
-        sqAddBtn.onclick = function () {
+        sqAddBtn.onclick = () => {
             sqForm.action = window.safeSameOriginUrl(
-                this.getAttribute('data-action'),
+                sqAddBtn.getAttribute('data-action'),
                 sqForm.action,
             );
             sqTitle.innerText = MISSION_TITLES.squadronCreate;
-            document.getElementById('sq-name').value = '';
-            document.getElementById('sq-shorthand').value = '';
-            document.getElementById('sq-desc').value = '';
-            document.getElementById('edit-squadron-version').value = '0';
+            dialogField('sq-name').value = '';
+            dialogField('sq-shorthand').value = '';
+            dialogField('sq-desc').value = '';
+            dialogField('edit-squadron-version').value = '0';
             window.krtModal.open(sqModal);
         };
     }
 
     document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.edit-squadron-btn');
+        const btn = /** @type {Element} */ (e.target).closest('.edit-squadron-btn');
         if (!btn) return;
         sqForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), sqForm.action);
         sqTitle.innerText = MISSION_TITLES.edit;
-        document.getElementById('sq-name').value = btn.getAttribute('data-name');
-        document.getElementById('sq-shorthand').value = btn.getAttribute('data-shorthand');
-        document.getElementById('sq-desc').value = btn.getAttribute('data-desc');
-        document.getElementById('edit-squadron-version').value = btn.getAttribute('data-version');
+        dialogField('sq-name').value = btn.getAttribute('data-name') ?? '';
+        dialogField('sq-shorthand').value = btn.getAttribute('data-shorthand') ?? '';
+        dialogField('sq-desc').value = btn.getAttribute('data-desc') ?? '';
+        dialogField('edit-squadron-version').value = btn.getAttribute('data-version') ?? '';
         window.krtModal.open(sqModal);
     });
 
     if (sqClose) sqClose.onclick = () => window.krtModal.close(sqModal);
 
     const jtModal = document.getElementById('jobtype-modal');
-    const jtForm = document.getElementById('jobtype-form');
-    const jtTitle = document.getElementById('jobtype-modal-title');
+    const jtForm = /** @type {HTMLFormElement} */ (document.getElementById('jobtype-form'));
+    const jtTitle = /** @type {HTMLElement} */ (document.getElementById('jobtype-modal-title'));
     const jtAddBtn = document.getElementById('add-jobtype-btn');
-    const jtClose = document.querySelector('.close-jobtype-modal');
-    const jtArchetypeSelect = document.getElementById('jt-archetype');
+    const jtClose = /** @type {HTMLElement | null} */ (
+        document.querySelector('.close-jobtype-modal')
+    );
+    const jtArchetypeSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('jt-archetype')
+    );
     const jtLeadershipGroup = document.getElementById('jt-leadership-group');
-    const jtLeadership = document.getElementById('jt-leadership');
+    const jtLeadership = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('jt-leadership')
+    );
     const jtMissionLeadGroup = document.getElementById('jt-missionlead-group');
 
+    /** Shows the mission-lead option only for a leadership mission job type. */
     function updateMissionLeadVisibility() {
+        if (!jtArchetypeSelect) {
+            return;
+        }
         const eligible =
             jtArchetypeSelect.value === 'MISSION' && jtLeadership && jtLeadership.checked;
         if (jtMissionLeadGroup) {
             jtMissionLeadGroup.style.display = eligible ? 'block' : 'none';
             if (!eligible) {
-                const cb = document.getElementById('jt-missionlead');
+                const cb = /** @type {HTMLInputElement | null} */ (
+                    document.getElementById('jt-missionlead')
+                );
                 if (cb) cb.checked = false;
             }
         }
     }
 
+    /** Shows the leadership option for mission and crew archetypes and hides it otherwise. */
     function updateLeadershipVisibility() {
+        if (!jtArchetypeSelect || !jtLeadershipGroup) {
+            return;
+        }
         if (jtArchetypeSelect.value === 'MISSION' || jtArchetypeSelect.value === 'CREW') {
             jtLeadershipGroup.style.display = 'block';
         } else {
@@ -203,36 +273,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (jtAddBtn) {
-        jtAddBtn.onclick = function () {
+        jtAddBtn.onclick = () => {
             jtForm.action = window.safeSameOriginUrl(
-                this.getAttribute('data-action'),
+                jtAddBtn.getAttribute('data-action'),
                 jtForm.action,
             );
             jtTitle.innerText = MISSION_TITLES.jobTypeCreate;
-            document.getElementById('jt-name').value = '';
-            document.getElementById('jt-desc').value = '';
-            document.getElementById('jt-archetype').value = 'MISSION';
-            document.getElementById('jt-leadership').checked = false;
-            document.getElementById('jt-missionlead').checked = false;
-            document.getElementById('edit-jobtype-version').value = '0';
+            dialogField('jt-name').value = '';
+            dialogField('jt-desc').value = '';
+            dialogField('jt-archetype').value = 'MISSION';
+            dialogField('jt-leadership').checked = false;
+            dialogField('jt-missionlead').checked = false;
+            dialogField('edit-jobtype-version').value = '0';
             updateLeadershipVisibility();
             window.krtModal.open(jtModal);
         };
     }
 
     document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.edit-jobtype-btn');
+        const btn = /** @type {Element} */ (e.target).closest('.edit-jobtype-btn');
         if (!btn) return;
         jtForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), jtForm.action);
         jtTitle.innerText = MISSION_TITLES.edit;
-        document.getElementById('jt-name').value = btn.getAttribute('data-name');
-        document.getElementById('jt-desc').value = btn.getAttribute('data-desc');
-        document.getElementById('jt-archetype').value = btn.getAttribute('data-archetype');
-        document.getElementById('jt-leadership').checked =
-            btn.getAttribute('data-leadership') === 'true';
-        document.getElementById('jt-missionlead').checked =
-            btn.getAttribute('data-mission-lead') === 'true';
-        document.getElementById('edit-jobtype-version').value = btn.getAttribute('data-version');
+        dialogField('jt-name').value = btn.getAttribute('data-name') ?? '';
+        dialogField('jt-desc').value = btn.getAttribute('data-desc') ?? '';
+        dialogField('jt-archetype').value = btn.getAttribute('data-archetype') ?? '';
+        dialogField('jt-leadership').checked = btn.getAttribute('data-leadership') === 'true';
+        dialogField('jt-missionlead').checked = btn.getAttribute('data-mission-lead') === 'true';
+        dialogField('edit-jobtype-version').value = btn.getAttribute('data-version') ?? '';
         updateLeadershipVisibility();
         window.krtModal.open(jtModal);
     });
@@ -240,33 +308,35 @@ document.addEventListener('DOMContentLoaded', () => {
     if (jtClose) jtClose.onclick = () => window.krtModal.close(jtModal);
 
     const ftModal = document.getElementById('frequency-type-modal');
-    const ftForm = document.getElementById('freqtype-form');
-    const ftTitle = document.getElementById('freqtype-modal-title');
+    const ftForm = /** @type {HTMLFormElement} */ (document.getElementById('freqtype-form'));
+    const ftTitle = /** @type {HTMLElement} */ (document.getElementById('freqtype-modal-title'));
     const ftAddBtn = document.getElementById('add-freqtype-btn');
-    const ftClose = document.querySelector('.close-freqtype-modal');
+    const ftClose = /** @type {HTMLElement | null} */ (
+        document.querySelector('.close-freqtype-modal')
+    );
 
     if (ftAddBtn) {
-        ftAddBtn.onclick = function () {
+        ftAddBtn.onclick = () => {
             ftForm.action = window.safeSameOriginUrl(
-                this.getAttribute('data-action'),
+                ftAddBtn.getAttribute('data-action'),
                 ftForm.action,
             );
             ftTitle.innerText = MISSION_TITLES.freqTypeCreate;
-            document.getElementById('ft-name').value = '';
-            document.getElementById('ft-desc').value = '';
-            document.getElementById('edit-freqtype-version').value = '0';
+            dialogField('ft-name').value = '';
+            dialogField('ft-desc').value = '';
+            dialogField('edit-freqtype-version').value = '0';
             window.krtModal.open(ftModal);
         };
     }
 
     document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.edit-freqtype-btn');
+        const btn = /** @type {Element} */ (e.target).closest('.edit-freqtype-btn');
         if (!btn) return;
         ftForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), ftForm.action);
         ftTitle.innerText = MISSION_TITLES.edit;
-        document.getElementById('ft-name').value = btn.getAttribute('data-name');
-        document.getElementById('ft-desc').value = btn.getAttribute('data-desc');
-        document.getElementById('edit-freqtype-version').value = btn.getAttribute('data-version');
+        dialogField('ft-name').value = btn.getAttribute('data-name') ?? '';
+        dialogField('ft-desc').value = btn.getAttribute('data-desc') ?? '';
+        dialogField('edit-freqtype-version').value = btn.getAttribute('data-version') ?? '';
         window.krtModal.open(ftModal);
     });
 
@@ -278,13 +348,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.target === ftModal) window.krtModal.close(ftModal);
     };
     const deleteModal = document.getElementById('delete-confirm-modal');
-    const deleteForm = document.getElementById('delete-confirm-form');
-    const deleteClose = document.querySelectorAll('.close-delete-modal');
+    const deleteForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('delete-confirm-form')
+    );
+    const deleteClose = /** @type {NodeListOf<HTMLElement>} */ (
+        document.querySelectorAll('.close-delete-modal')
+    );
 
     if (deleteModal) {
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('.delete-btn');
-            if (!btn) return;
+            const btn = /** @type {Element} */ (e.target).closest('.delete-btn');
+            if (!btn || !deleteForm) return;
             deleteForm.action = window.safeSameOriginUrl(
                 btn.getAttribute('data-action'),
                 deleteForm.action,
@@ -307,6 +381,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('keydown', onMissionKindKeydown);
 
+    /**
+     * Turns a dialog form into an in-place save that closes its modal on success.
+     *
+     * @param {HTMLFormElement | null} form the dialog form
+     * @param {HTMLElement | null} modal the dialog to close after the save
+     */
     function wireModalSave(form, modal) {
         if (!form) {
             return;
@@ -344,7 +424,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('submit', (e) => {
-        const actForm = e.target.closest('form[action*="/activate"]');
+        const actForm = /** @type {HTMLFormElement | null} */ (
+            /** @type {Element} */ (e.target).closest('form[action*="/activate"]')
+        );
         if (!actForm) {
             return;
         }
@@ -357,25 +439,37 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+/**
+ * Makes the rows of a table container draggable and posts the new order after a drop.
+ *
+ * @param {string} containerId id of the element holding the draggable rows
+ * @param {string} reorderUrl endpoint that receives the ordered row ids
+ */
 function setupDragAndDrop(containerId, reorderUrl) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
+    /** @type {HTMLElement | null} */
     let draggedRow = null;
 
     container.addEventListener('dragstart', (e) => {
-        draggedRow = e.target.closest('tr.draggable-row');
+        draggedRow = /** @type {HTMLElement | null} */ (
+            /** @type {Element} */ (e.target).closest('tr.draggable-row')
+        );
         if (!draggedRow) return;
         draggedRow.style.opacity = '0.5';
+        if (!e.dataTransfer) return;
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', draggedRow.dataset.id);
+        e.dataTransfer.setData('text/plain', /** @type {string} */ (draggedRow.dataset.id));
     });
 
     container.addEventListener('dragend', (_e) => {
         if (!draggedRow) return;
         draggedRow.style.opacity = '1';
 
-        const rows = Array.from(container.querySelectorAll('tr.draggable-row'));
+        const rows = /** @type {HTMLElement[]} */ (
+            Array.from(container.querySelectorAll('tr.draggable-row'))
+        );
         const newOrderIds = rows.map((row) => row.dataset.id);
 
         const reswapFreqTypes = function () {
@@ -415,16 +509,17 @@ function setupDragAndDrop(containerId, reorderUrl) {
 
     container.addEventListener('dragover', (e) => {
         e.preventDefault();
+        if (!e.dataTransfer) return;
         e.dataTransfer.dropEffect = 'move';
-        const targetRow = e.target.closest('tr.draggable-row');
+        const targetRow = /** @type {Element} */ (e.target).closest('tr.draggable-row');
         if (!targetRow || targetRow === draggedRow) return;
 
         const bounding = targetRow.getBoundingClientRect();
         const offset = bounding.y + bounding.height / 2;
         if (e.clientY - offset > 0) {
-            targetRow.after(draggedRow);
+            targetRow.after(/** @type {HTMLElement} */ (draggedRow));
         } else {
-            targetRow.before(draggedRow);
+            targetRow.before(/** @type {HTMLElement} */ (draggedRow));
         }
     });
 
@@ -445,6 +540,11 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 
 const MISSION_FILTER_PREF_KEY = 'admin_mission_data_filters';
 
+/**
+ * Reads the stored filter preference.
+ *
+ * @returns {Record<string, unknown> | null} the stored object, or null when absent or unreadable
+ */
 function readMissionFilterPref() {
     try {
         const raw = localStorage.getItem(MISSION_FILTER_PREF_KEY);
@@ -455,9 +555,16 @@ function readMissionFilterPref() {
     }
 }
 
+/** Stores the three inactive-toggles and the selected kind as the page's preference. */
 function persistMissionFilters() {
+    /**
+     * Reads a filter checkbox.
+     *
+     * @param {string} id the checkbox id
+     * @returns {boolean} whether it is checked; false when absent
+     */
     function checked(id) {
-        const el = document.getElementById(id);
+        const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
         return el ? el.checked : false;
     }
     try {
@@ -474,6 +581,12 @@ function persistMissionFilters() {
 }
 
 if (window.krtFetch) {
+    /**
+     * Re-renders a result section whenever its inactive-toggle changes.
+     *
+     * @param {string} checkboxId id of the toggle checkbox
+     * @param {string} sectionId id of the result section it controls
+     */
     const wireFilter = function (checkboxId, sectionId) {
         const cb = document.getElementById(checkboxId);
         if (!cb) return;
@@ -518,9 +631,10 @@ if (window.krtFetch) {
         if (saved === null) {
             return;
         }
+        /** @type {HTMLInputElement[]} */
         const changed = [];
         toggles.forEach((toggle) => {
-            const el = document.getElementById(toggle.id);
+            const el = /** @type {HTMLInputElement | null} */ (document.getElementById(toggle.id));
             const want = saved[toggle.pref] === true;
             if (el && el.checked !== want) {
                 el.checked = want;

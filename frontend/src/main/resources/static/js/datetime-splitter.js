@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * Splits each `.datetime-split-group` into local date and time inputs backed by a hidden UTC value;
  * the one place forms convert between UTC and browser-local time.
@@ -26,7 +28,7 @@
             timePart.value = '';
         } else if (hasZoneInfo(v)) {
             const d = new Date(v);
-            if (!isNaN(d)) {
+            if (!isNaN(d.getTime())) {
                 datePart.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
                 timePart.value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
             }
@@ -36,7 +38,7 @@
             timePart.value = parts[1].substring(0, 5);
         } else {
             const d = new Date(v);
-            if (!isNaN(d)) {
+            if (!isNaN(d.getTime())) {
                 datePart.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
                 timePart.value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
             }
@@ -88,7 +90,7 @@
                 const [y, m, d] = dVal.split('-').map(Number);
                 const [hh, mm] = tVal.split(':').map(Number);
                 const local = new Date(y, m - 1, d, hh, mm, 0, 0);
-                hidden.value = isNaN(local) ? '' : local.toISOString();
+                hidden.value = isNaN(local.getTime()) ? '' : local.toISOString();
             } else if (filterRole && (dVal || tVal)) {
                 let y, m, d;
                 if (dVal) {
@@ -110,7 +112,7 @@
                     mm = 0;
                 }
                 const local = new Date(y, m - 1, d, hh, mm, 0, 0);
-                hidden.value = isNaN(local) ? '' : local.toISOString();
+                hidden.value = isNaN(local.getTime()) ? '' : local.toISOString();
             } else if (dVal) {
                 hidden.value = dVal;
             } else {
@@ -133,7 +135,9 @@
 
                 if (group.hasAttribute('data-validate-after')) {
                     const targetId = group.getAttribute('data-validate-after');
-                    const targetHidden = document.getElementById(targetId);
+                    const targetHidden = /** @type {HTMLInputElement | null} */ (
+                        document.getElementById(targetId)
+                    );
                     if (targetHidden && targetHidden.value) {
                         const targetDate = new Date(targetHidden.value);
                         if (selectedDate <= targetDate) {

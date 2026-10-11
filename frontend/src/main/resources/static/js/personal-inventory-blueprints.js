@@ -1,21 +1,42 @@
+// @ts-check
+
 (function () {
     'use strict';
 
+    /** @type {HTMLInputElement | null} */
     let searchInput = null;
+    /** @type {HTMLElement | null} */
     let resultsEl = null;
+    /** @type {HTMLElement | null} */
     let stagingListEl = null;
+    /** @type {HTMLButtonElement | null} */
     let addSelectedBtn = null;
+    /** @type {HTMLElement | null} */
     let editModal = null;
+    /** @type {HTMLFormElement | null} */
     let editForm = null;
+    /** @type {HTMLElement | null} */
     let deleteModal = null;
+    /** @type {HTMLFormElement | null} */
     let deleteForm = null;
+    /** @type {HTMLElement | null} */
     let deleteAllModal = null;
+    /** @type {HTMLFormElement | null} */
     let deleteAllForm = null;
+    /** @type {HTMLButtonElement | null} */
     let deleteAllBtn = null;
+    /** @type {number | null} */
     let debounceTimer = null;
 
+    /** @type {Map<string, string>} */
     const staged = new Map();
 
+    /**
+     * Looks an element up by id.
+     *
+     * @param {string} id the element id
+     * @returns {HTMLElement | null} the element, or null when absent
+     */
     function $(id) {
         return document.getElementById(id);
     }
@@ -29,17 +50,17 @@
     }
 
     function init() {
-        searchInput = $('krt-bp-search-input');
+        searchInput = /** @type {HTMLInputElement | null} */ ($('krt-bp-search-input'));
         resultsEl = $('krt-bp-search-results');
         stagingListEl = $('krt-bp-staging-list');
-        addSelectedBtn = $('krt-bp-add-selected');
+        addSelectedBtn = /** @type {HTMLButtonElement | null} */ ($('krt-bp-add-selected'));
         editModal = $('krt-bp-edit-modal');
-        editForm = $('krt-bp-edit-form');
+        editForm = /** @type {HTMLFormElement | null} */ ($('krt-bp-edit-form'));
         deleteModal = $('krt-bp-delete-modal');
-        deleteForm = $('krt-bp-delete-form');
+        deleteForm = /** @type {HTMLFormElement | null} */ ($('krt-bp-delete-form'));
         deleteAllModal = $('krt-bp-delete-all-modal');
-        deleteAllForm = $('krt-bp-delete-all-form');
-        deleteAllBtn = $('krt-bp-delete-all-open');
+        deleteAllForm = /** @type {HTMLFormElement | null} */ ($('krt-bp-delete-all-form'));
+        deleteAllBtn = /** @type {HTMLButtonElement | null} */ ($('krt-bp-delete-all-open'));
         wireLiveSync();
 
         if (searchInput) {
@@ -47,7 +68,10 @@
             searchInput.addEventListener('focus', onSearchInput);
             document.addEventListener('click', (e) => {
                 if (!resultsEl) return;
-                if (e.target !== searchInput && !resultsEl.contains(e.target)) {
+                if (
+                    e.target !== searchInput &&
+                    !resultsEl.contains(/** @type {Node | null} */ (e.target))
+                ) {
                     resultsEl.hidden = true;
                 }
             });
@@ -80,6 +104,11 @@
         if (!document.querySelector('form.krt-pi-userform [name="userSub"]')) {
             return;
         }
+        /**
+         * Stores the picked member, or clears the stored one.
+         *
+         * @param {string | null} value the member's sub, empty to clear
+         */
         function persistMember(value) {
             try {
                 if (value) {
@@ -90,7 +119,7 @@
             } catch (_e) {}
         }
         document.addEventListener('change', (e) => {
-            const sel = e.target;
+            const sel = /** @type {HTMLSelectElement} */ (e.target);
             if (sel.matches && sel.matches('form.krt-pi-userform [name="userSub"]')) {
                 persistMember(sel.value);
             }
@@ -100,6 +129,7 @@
             persistMember(params.get('userSub'));
             return;
         }
+        /** @type {string | null} */
         let saved;
         try {
             const raw = localStorage.getItem(ADMIN_USER_PREF_KEY);
@@ -122,20 +152,29 @@
      */
     function wireAdminSwap() {
         if (!window.krtFetch || !document.getElementById('bp-results')) return;
+        /** @type {number | null} */
         let filterTimer = null;
+        /**
+         * Re-swaps the results from a filter form's current values.
+         *
+         * @param {HTMLFormElement} form the filter form
+         */
         function swapFilter(form) {
-            const params = new URLSearchParams(new FormData(form)).toString();
+            const params = new URLSearchParams(
+                /** @type {Record<string, string>} */ (/** @type {unknown} */ (new FormData(form))),
+            ).toString();
             const url = form.getAttribute('action') + (params ? `?${params}` : '');
             window.krtFetch.swap({ url, container: '#bp-results', history: true });
         }
         document.addEventListener('submit', (e) => {
-            if (!e.target.classList || !e.target.classList.contains('krt-pi-filter')) return;
+            const target = /** @type {HTMLFormElement} */ (e.target);
+            if (!target.classList || !target.classList.contains('krt-pi-filter')) return;
             e.preventDefault();
             if (filterTimer) clearTimeout(filterTimer);
-            swapFilter(e.target);
+            swapFilter(target);
         });
         document.addEventListener('input', (e) => {
-            const input = e.target;
+            const input = /** @type {HTMLInputElement | null} */ (e.target);
             const form = input && input.form;
             if (!form || !form.classList.contains('krt-pi-filter') || input.name !== 'q') return;
             if (filterTimer) clearTimeout(filterTimer);
@@ -172,6 +211,11 @@
             });
     }
 
+    /**
+     * Renders the blueprint type-ahead results.
+     *
+     * @param {ApiDto<'BlueprintProductDto'>[] | null} items the matching products
+     */
     function renderResults(items) {
         if (!resultsEl) return;
         if (!items || items.length === 0) {
@@ -185,7 +229,7 @@
             return;
         }
         const html = items.map((it) => {
-            const isStaged = staged.has(it.productKey);
+            const isStaged = staged.has(/** @type {string} */ (it.productKey));
             const blocked = it.ownedByCurrentUser;
             const cls = `krt-pi-typeahead-item krt-bp-result${
                 blocked ? ' krt-bp-result-owned' : ''
@@ -207,18 +251,26 @@
             }</span><span class="krt-pi-typeahead-meta">${meta}</span></button>`;
         });
         krtHtml.set(resultsEl, html);
-        resultsEl.querySelectorAll('.krt-bp-result').forEach((btn) => {
+        /** @type {NodeListOf<HTMLButtonElement>} */ (
+            resultsEl.querySelectorAll('.krt-bp-result')
+        ).forEach((btn) => {
             if (btn.disabled) return;
             btn.addEventListener('click', () => {
                 toggleStaged(btn.getAttribute('data-key'), btn.getAttribute('data-name'));
                 btn.classList.toggle(
                     'krt-bp-result-staged',
-                    staged.has(btn.getAttribute('data-key')),
+                    staged.has(/** @type {string} */ (btn.getAttribute('data-key'))),
                 );
             });
         });
     }
 
+    /**
+     * Adds a blueprint to the staging list, or removes it when already staged.
+     *
+     * @param {string | null} key the product key
+     * @param {string | null} name the display name
+     */
     function toggleStaged(key, name) {
         if (!key) return;
         if (staged.has(key)) {
@@ -342,7 +394,7 @@
         }
         const toolbar = $('krt-bp-craft-toolbar');
         if (toolbar) {
-            const q = $('krt-bp-q');
+            const q = /** @type {HTMLInputElement | null} */ ($('krt-bp-q'));
             toolbar.classList.toggle('is-empty', total === 0 && !(q && q.value));
         }
         if (deleteAllBtn) {
@@ -400,11 +452,23 @@
             });
     }
 
+    /**
+     * Fills an endpoint template with an id and keeps it same-origin.
+     *
+     * @param {string | undefined} template the endpoint with an `ID_PLACEHOLDER`
+     * @param {string | null} id the blueprint id
+     * @returns {string} the URL
+     */
     function resolveUrl(template, id) {
-        const raw = (template || '').replace('ID_PLACEHOLDER', encodeURIComponent(id));
+        const raw = (template || '').replace('ID_PLACEHOLDER', encodeURIComponent(String(id)));
         return window.safeSameOriginUrl ? window.safeSameOriginUrl(raw, raw) : raw;
     }
 
+    /**
+     * Opens the edit dialog prefilled from the row's button.
+     *
+     * @param {HTMLElement} btn the activated button, carrying the blueprint's values
+     */
     function openEdit(btn) {
         if (!editModal || !editForm) return;
         editForm.action = resolveUrl(endpoints().updateNote, btn.getAttribute('data-id'));
@@ -420,6 +484,11 @@
         if (editModal) window.krtModal.close(editModal);
     }
 
+    /**
+     * Opens the delete confirmation for one blueprint.
+     *
+     * @param {HTMLElement} btn the activated button, carrying the blueprint's id and name
+     */
     function openDelete(btn) {
         if (!deleteModal || !deleteForm) return;
         deleteForm.action = resolveUrl(endpoints().remove, btn.getAttribute('data-id'));
@@ -443,29 +512,50 @@
         if (deleteAllModal) window.krtModal.close(deleteAllModal);
     }
 
+    /**
+     * Sets a form field by id; null and the string `null` clear it.
+     *
+     * @param {string} id the field's element id
+     * @param {string | null} value the value
+     */
     function setValue(id, value) {
-        const el = $(id);
+        const el = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ ($(id));
         if (el) el.value = value == null || value === 'null' ? '' : value;
     }
 
+    /**
+     * Maps the acquired-at attribute onto a field value.
+     *
+     * @param {string | null} value the raw attribute
+     * @returns {string} the value, empty for none
+     */
     function normalizeAcquired(value) {
         return !value || value === 'null' ? '' : value;
     }
 
+    /**
+     * Saves the edited note and acquisition date.
+     *
+     * @param {Event} e the form's submit event
+     */
     function submitEditNote(e) {
         e.preventDefault();
         if (!editForm || !window.krtFetch) {
             return;
         }
-        const noteEl = $('krt-bp-edit-note');
-        const versionEl = $('krt-bp-edit-version');
-        const acquiredEl = $('krt-bp-edit-acquired');
+        const noteEl = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (
+            $('krt-bp-edit-note')
+        );
+        const versionEl = /** @type {HTMLInputElement | null} */ ($('krt-bp-edit-version'));
+        const acquiredEl = /** @type {HTMLInputElement | null} */ ($('krt-bp-edit-acquired'));
         const payload = {
             note: noteEl ? noteEl.value : '',
             acquiredAt: acquiredEl && acquiredEl.value ? acquiredEl.value : null,
             version: versionEl && versionEl.value ? Number(versionEl.value) : null,
         };
-        const submitBtn = editForm.querySelector('button[type="submit"]');
+        const submitBtn = /** @type {HTMLButtonElement | null} */ (
+            editForm.querySelector('button[type="submit"]')
+        );
         if (submitBtn) {
             submitBtn.disabled = true;
         }
@@ -489,6 +579,11 @@
             });
     }
 
+    /**
+     * Patches the list row and detail pane of an updated blueprint in place.
+     *
+     * @param {ApiDto<'PersonalBlueprintResponse'> | null} dto the updated blueprint
+     */
     function patchBlueprintRow(dto) {
         if (!dto || !dto.id) {
             return;
@@ -498,7 +593,7 @@
             return;
         }
         const newNote = dto.note == null ? '' : dto.note;
-        let row = null;
+        let row = /** @type {Element | null} */ (null);
         document.querySelectorAll('#krt-bp-master-rows .master-row').forEach((r) => {
             if (r.getAttribute('data-id') === dto.id) {
                 row = r;
@@ -509,7 +604,7 @@
             if (dto.version != null) {
                 row.setAttribute('data-version', String(dto.version));
             }
-            let marker = row.querySelector('.master-row-note');
+            let marker = /** @type {HTMLElement | null} */ (row.querySelector('.master-row-note'));
             if (newNote.trim() !== '') {
                 if (!marker) {
                     let aside = row.querySelector('.krt-bp-row-aside');
@@ -552,12 +647,19 @@
         recountAndSync();
     }
 
+    /**
+     * Deletes the blueprint of the open confirmation.
+     *
+     * @param {Event} e the form's submit event
+     */
     function submitDeleteBp(e) {
         e.preventDefault();
         if (!deleteForm || !window.krtFetch) {
             return;
         }
-        const submitBtn = deleteForm.querySelector('button[type="submit"]');
+        const submitBtn = /** @type {HTMLButtonElement | null} */ (
+            deleteForm.querySelector('button[type="submit"]')
+        );
         if (submitBtn) {
             submitBtn.disabled = true;
         }
@@ -580,6 +682,11 @@
             });
     }
 
+    /**
+     * Deletes every removable blueprint of the viewed user.
+     *
+     * @param {Event} e the form's submit event
+     */
     function submitDeleteAll(e) {
         e.preventDefault();
         if (!deleteAllForm) {
@@ -589,7 +696,9 @@
             deleteAllForm.submit();
             return;
         }
-        const submitBtn = deleteAllForm.querySelector('button[type="submit"]');
+        const submitBtn = /** @type {HTMLButtonElement | null} */ (
+            deleteAllForm.querySelector('button[type="submit"]')
+        );
         if (submitBtn) {
             submitBtn.disabled = true;
         }

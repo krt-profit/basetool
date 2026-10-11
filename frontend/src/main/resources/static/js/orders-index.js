@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global KRT_ORDERS_AGE_YELLOW, KRT_ORDERS_AGE_RED, KRT_ORDERS_LIVESYNC_UPDATES, KRT_ORDERS_SECTION_REFRESH_ERROR */
 
 const ORDERS_SECTIONS = {
@@ -79,7 +81,7 @@ function colorOrderAges(root) {
         const utcDateStr = el.getAttribute('data-utc');
         if (utcDateStr) {
             const date = new Date(utcDateStr);
-            if (!isNaN(date)) {
+            if (!isNaN(date.getTime())) {
                 const diffDays = Math.floor(
                     (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
                 );
@@ -170,6 +172,7 @@ function writeSquadronFilter(ids) {
     } catch (_e) {}
 }
 
+/** @returns {HTMLInputElement[]} the squadron filter checkboxes */
 function squadronBoxes() {
     return Array.prototype.slice.call(document.querySelectorAll('input.sqCheck'));
 }
@@ -212,7 +215,7 @@ function toggleSquadronMulti() {
 }
 
 function toggleSquadronAll() {
-    const allBox = document.getElementById('sqAll');
+    const allBox = /** @type {HTMLInputElement | null} */ (document.getElementById('sqAll'));
     if (!allBox) return;
     squadronBoxes().forEach((b) => {
         b.checked = allBox.checked;
@@ -223,7 +226,7 @@ function toggleSquadronAll() {
 }
 
 function updateSquadronState() {
-    const allBox = document.getElementById('sqAll');
+    const allBox = /** @type {HTMLInputElement | null} */ (document.getElementById('sqAll'));
     const boxes = squadronBoxes();
     if (allBox) allBox.checked = boxes.length > 0 && boxes.every((b) => b.checked);
     updateSquadronHeaderText();
@@ -232,14 +235,16 @@ function updateSquadronState() {
 }
 
 function applyOrdersFilter() {
-    const filterForm = document.getElementById('orders-filter-form');
+    const filterForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('orders-filter-form')
+    );
     const resultsContainer = document.getElementById('orders-results');
     if (!filterForm || !resultsContainer || !window.krtFetch) return;
     const data = new FormData(filterForm);
     const params = new URLSearchParams();
     for (const [key, value] of data.entries()) {
         if (key === 'squadronId') continue;
-        if (value !== '') params.append(key, value);
+        if (value !== '') params.append(key, /** @type {string} */ (value));
     }
     const boxes = scopeHidesSquadronFilter() ? [] : squadronBoxes();
     if (boxes.length > 0) {
@@ -278,7 +283,7 @@ function restoreSquadronFilter() {
     boxes.forEach((b) => {
         b.checked = savedSet[b.value] === true;
     });
-    const allBox = document.getElementById('sqAll');
+    const allBox = /** @type {HTMLInputElement | null} */ (document.getElementById('sqAll'));
     if (allBox) allBox.checked = boxes.every((b) => b.checked);
     updateSquadronHeaderText();
     return (
@@ -288,6 +293,7 @@ function restoreSquadronFilter() {
 
 const ORDERS_STATUS_FILTER_KEY = 'orders_status_filter';
 
+/** @returns {HTMLInputElement[]} the status filter checkboxes */
 function statusBoxes() {
     return Array.prototype.slice.call(
         document.querySelectorAll('#orders-filter-form input[name="status"]'),
@@ -342,6 +348,7 @@ function restoreStatusFilter() {
 const ORDERS_SCOPE_FILTER_KEY = 'orders_scope_filter';
 const ORDERS_SCOPES = ['MINE', 'TO_PROCESS', 'ALL'];
 
+/** @returns {HTMLInputElement[]} the scope filter radio buttons */
 function scopeInputs() {
     return Array.prototype.slice.call(
         document.querySelectorAll('#orders-filter-form input[name="scope"]'),
@@ -428,7 +435,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 }
 
 document.addEventListener('click', (e) => {
-    if (!e.target.closest('.multi-select-container')) {
+    if (!(/** @type {Element} */ (e.target).closest('.multi-select-container'))) {
         document
             .querySelectorAll('.multi-select-options.open')
             .forEach((o) => o.classList.remove('open'));

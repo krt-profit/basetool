@@ -773,18 +773,27 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Reads the mission-detail page module ({@code static/js/mission-detail.js}) from the classpath,
-   * for script-content assertions.
+   * Reads the mission-detail page script ({@code static/js/mission-detail.js} and its parts) from
+   * the classpath, for script-content assertions.
    *
-   * @return the full UTF-8 source of the module
-   * @throws IOException if the classpath resource cannot be read
+   * @return the UTF-8 source of all parts, concatenated in load order
+   * @throws IOException if a classpath resource cannot be read
    */
   private static String missionDetailModuleSource() throws IOException {
-    try (var in =
-        new org.springframework.core.io.ClassPathResource("static/js/mission-detail.js")
-            .getInputStream()) {
-      return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    StringBuilder source = new StringBuilder();
+    for (String part :
+        List.of(
+            "mission-detail.js",
+            "mission-detail-modals.js",
+            "mission-detail-participants.js",
+            "mission-detail-actions.js",
+            "mission-detail-tabs.js")) {
+      try (var in =
+          new org.springframework.core.io.ClassPathResource("static/js/" + part).getInputStream()) {
+        source.append(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+      }
     }
+    return source.toString();
   }
 
   @Test

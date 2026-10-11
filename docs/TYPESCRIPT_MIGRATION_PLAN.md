@@ -89,7 +89,12 @@ migration cost is discovered per file, and every fix survives into the TypeScrip
   files carry `// @ts-check`. Opting in surfaced one live collision the prefix had missed: both
   `inventory-admin.js` and `materials-profit-calculation.js` declared a global `getTranslations`
   with different shapes (renamed `adminFilterTranslations`).
-- **Exit criteria:** all 96 files carry `// @ts-check`; `checkJs` flipped to `true` globally and the
+- **Done 2026-10-11 (modularisation plan §7.8, F5):** all 124 files carry `// @ts-check` (113
+  before; the three largest scripts were split into 14 parts first), and
+  `frontend/typecheck-ratchet.json` marks all 22 domains migrated, so a new script without the
+  pragma fails `:frontend:testTypecheckRatchet`. What remains of the exit criteria below is the
+  mechanical flip.
+- **Exit criteria:** all files carry `// @ts-check`; `checkJs` flipped to `true` globally and the
   per-file comments removed; gate green.
 
 ### Phase 2 — Eliminate the inline template JavaScript

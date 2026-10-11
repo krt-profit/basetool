@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global ALIAS_MSG, ALIAS_CONFLICT */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -159,10 +161,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('submit', (event) => {
-        const createForm = event.target.closest('form[data-alias-create]');
-        const updateForm = event.target.closest('form[data-alias-update]');
-        const deleteForm = event.target.closest('form[data-alias-delete]');
-        const form = createForm || updateForm || deleteForm;
+        const target = /** @type {Element} */ (event.target);
+        const createForm = target.closest('form[data-alias-create]');
+        const updateForm = target.closest('form[data-alias-update]');
+        const deleteForm = target.closest('form[data-alias-delete]');
+        const form = /** @type {HTMLFormElement | null} */ (createForm || updateForm || deleteForm);
         if (!form) {
             return;
         }
@@ -171,14 +174,17 @@ document.addEventListener('DOMContentLoaded', () => {
             form.submit();
             return;
         }
-        const submitBtn = form.querySelector('button[type="submit"]');
+        const submitBtn = /** @type {HTMLButtonElement | null} */ (
+            form.querySelector('button[type="submit"]')
+        );
         if (submitBtn) {
             submitBtn.disabled = true;
         }
 
+        /** @type {KrtWriteOpts} */
         const opts = {
             method: 'POST',
-            url: form.getAttribute('action'),
+            url: /** @type {string} */ (form.getAttribute('action')),
             conflict: ALIAS_CONFLICT,
         };
         if (deleteForm) {

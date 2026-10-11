@@ -17,14 +17,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global MSG_SAVED, MSG_ERROR */
 
 document.addEventListener('DOMContentLoaded', () => {
+    /**
+     * Marks the active button of an override group and updates the mismatch flag of the chip.
+     *
+     * @param {HTMLFormElement} form the override form that was just saved
+     * @param {string} action the saved override: 'yes', 'no' or the default
+     */
     function patchOverrideGroup(form, action) {
         const group = form.parentElement;
         if (group) {
             group.querySelectorAll('form').forEach((f) => {
-                const actionInput = f.querySelector('input[name="action"]');
+                const actionInput = /** @type {HTMLInputElement | null} */ (
+                    f.querySelector('input[name="action"]')
+                );
                 const btn = f.querySelector('button');
                 if (!actionInput || !btn) {
                     return;
@@ -48,8 +58,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Saves one override choice and patches the group on success.
+     *
+     * @param {HTMLFormElement} form the override form carrying the chosen action
+     */
     function submitOverride(form) {
-        const actionInput = form.querySelector('input[name="action"]');
+        const actionInput = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="action"]')
+        );
         const action = actionInput ? actionInput.value : '';
         window.krtFetch.write({
             method: 'POST',
@@ -62,12 +79,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * Toggles the visibility flag through the form's endpoint and flips the button on success.
+     *
+     * @param {HTMLFormElement} form the visibility form
+     */
     function submitVisibility(form) {
         const btn = form.querySelector('button');
-        const hiddenInput = form.querySelector('input[name="hidden"]');
+        const hiddenInput = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="hidden"]')
+        );
         window.krtFetch.write({
             method: 'POST',
-            url: form.getAttribute('action'),
+            url: /** @type {string} */ (form.getAttribute('action')),
             successMessage: MSG_SAVED,
             errorMessage: MSG_ERROR,
             onSuccess() {
@@ -87,23 +111,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    document
-        .querySelectorAll('form[action*="/loading-dock"], form[action*="/auto-load"]')
-        .forEach((form) => {
-            form.addEventListener('click', (ev) => {
-                ev.stopPropagation();
-            });
-            form.addEventListener('submit', (ev) => {
-                ev.preventDefault();
-                ev.stopPropagation();
-                if (!window.krtFetch) {
-                    form.submit();
-                    return;
-                }
-                submitOverride(form);
-            });
+    /** @type {NodeListOf<HTMLFormElement>} */ (
+        document.querySelectorAll('form[action*="/loading-dock"], form[action*="/auto-load"]')
+    ).forEach((form) => {
+        form.addEventListener('click', (ev) => {
+            ev.stopPropagation();
         });
-    document.querySelectorAll('form[action*="/toggle-visibility"]').forEach((form) => {
+        form.addEventListener('submit', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (!window.krtFetch) {
+                form.submit();
+                return;
+            }
+            submitOverride(form);
+        });
+    });
+    /** @type {NodeListOf<HTMLFormElement>} */ (
+        document.querySelectorAll('form[action*="/toggle-visibility"]')
+    ).forEach((form) => {
         form.addEventListener('click', (ev) => {
             ev.stopPropagation();
         });
@@ -131,15 +157,21 @@ document.addEventListener('DOMContentLoaded', () => {
         el.textContent = `${day}.${month}.${year} ${hours}:${minutes}`;
     });
 
-    const filterInput = document.getElementById('filterUex');
-    const systems = document.querySelectorAll('details.uex-system');
+    const filterInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('filterUex')
+    );
+    const systems = /** @type {NodeListOf<HTMLDetailsElement>} */ (
+        document.querySelectorAll('details.uex-system')
+    );
     if (filterInput) {
         filterInput.addEventListener('input', () => {
             const q = (filterInput.value || '').trim().toLowerCase();
             systems.forEach((sysEl) => {
                 const sysName = (sysEl.getAttribute('data-system-name') || '').toLowerCase();
                 let anyMatch = false;
-                const nestedNames = sysEl.querySelectorAll('[data-name]');
+                const nestedNames = /** @type {NodeListOf<HTMLElement>} */ (
+                    sysEl.querySelectorAll('[data-name]')
+                );
                 const systemSelfMatches = q !== '' && sysName.indexOf(q) !== -1;
                 nestedNames.forEach((el) => {
                     const n = (el.getAttribute('data-name') || '').toLowerCase();

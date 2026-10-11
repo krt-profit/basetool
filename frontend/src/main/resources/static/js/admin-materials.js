@@ -17,10 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global CAT_MSG, CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR, krtAutocomplete */
 
+/** @type {string[]} */
 const materialNames = [];
 
+/** Refills the material-name list from the page's datalist. */
 function readMaterialNames() {
     const dataList = /** @type {HTMLDataListElement | null} */ (
         document.getElementById('materialNames-data')
@@ -35,9 +39,16 @@ function readMaterialNames() {
 
 document.addEventListener('DOMContentLoaded', () => {
     readMaterialNames();
-    const inpMaterials = document.getElementById('filterMaterials');
+    const inpMaterials = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('filterMaterials')
+    );
     if (inpMaterials) krtAutocomplete(inpMaterials, materialNames);
 
+    /**
+     * Appends a new category to every category select.
+     *
+     * @param {Required<ApiDto<'MaterialCategoryDto'>>} cat the created category
+     */
     function addCategoryOption(cat) {
         document
             .querySelectorAll('select[data-update-type="CATEGORY"], #cm-category')
@@ -48,16 +59,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 sel.appendChild(opt);
             });
     }
+    /**
+     * Removes a category from every category select.
+     *
+     * @param {string} id the deleted category's id
+     */
     function removeCategoryOption(id) {
-        document
-            .querySelectorAll('select[data-update-type="CATEGORY"] option, #cm-category option')
-            .forEach((opt) => {
-                if (opt.value === id) {
-                    opt.remove();
-                }
-            });
+        /** @type {NodeListOf<HTMLOptionElement>} */ (
+            document.querySelectorAll(
+                'select[data-update-type="CATEGORY"] option, #cm-category option',
+            )
+        ).forEach((opt) => {
+            if (opt.value === id) {
+                opt.remove();
+            }
+        });
     }
 
+    /**
+     * Builds the table row of a created category, including its delete form.
+     *
+     * @param {Required<ApiDto<'MaterialCategoryDto'>>} cat the created category
+     * @returns {HTMLTableRowElement} the new row
+     */
     function buildCategoryRow(cat) {
         const tr = document.createElement('tr');
         tr.setAttribute('data-category-row', '');
@@ -107,7 +131,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('submit', (event) => {
-        const form = event.target.closest('form[data-category-create]');
+        const form = /** @type {HTMLFormElement | null} */ (
+            /** @type {Element} */ (event.target).closest('form[data-category-create]')
+        );
         if (!form) {
             return;
         }
@@ -116,7 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
             form.submit();
             return;
         }
-        const nameInput = form.querySelector('input[name="name"]');
+        const nameInput = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="name"]')
+        );
         const name = nameInput ? nameInput.value.trim() : '';
         if (!name) {
             if (nameInput) {
@@ -126,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         window.krtFetch.write({
             method: 'POST',
-            url: form.getAttribute('action'),
+            url: /** @type {string} */ (form.getAttribute('action')),
             payload: { name },
             successMessage: CAT_MSG.createSuccess,
             errorMessage: CAT_MSG.createError,
@@ -149,7 +177,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.addEventListener('submit', (event) => {
-        const form = event.target.closest('form[data-krt-confirm]');
+        const form = /** @type {HTMLFormElement | null} */ (
+            /** @type {Element} */ (event.target).closest('form[data-krt-confirm]')
+        );
         if (!form || form.dataset.krtConfirmed === 'true') {
             return;
         }
@@ -167,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.krtFetch && categoryId) {
                 window.krtFetch.write({
                     method: 'POST',
-                    url: form.getAttribute('action'),
+                    url: /** @type {string} */ (form.getAttribute('action')),
                     successMessage: CAT_MSG.deleteSuccess,
                     errorMessage: CAT_MSG.deleteError,
                     conflict: CAT_CONFLICT,
@@ -188,9 +218,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+/**
+ * Hides every table row whose first cell does not contain the query, case-insensitively.
+ *
+ * @param {string} tableId id of the table to filter
+ * @param {string} query the text to look for
+ */
 function filterTable(tableId, query) {
     const filter = query.toUpperCase();
     const table = document.getElementById(tableId);
+    if (!table) {
+        return;
+    }
     const tr = table.getElementsByTagName('tr');
     for (let i = 1; i < tr.length; i++) {
         const td = tr[i].getElementsByTagName('td')[0];
@@ -207,9 +246,18 @@ function filterTable(tableId, query) {
 
 window.filterTable = filterTable;
 
+/**
+ * Saves one inline-edited field of a material row.
+ *
+ * @param {HTMLInputElement | HTMLSelectElement} selectElement the changed select or checkbox
+ */
 function updateMaterial(selectElement) {
-    const tr = selectElement.closest('tr');
-    const matId = tr.getAttribute('data-mat-id');
+    const closestRow = selectElement.closest('tr');
+    if (!closestRow) {
+        return;
+    }
+    const tr = closestRow;
+    const matId = /** @type {string} */ (tr.getAttribute('data-mat-id'));
     const updateType = selectElement.getAttribute('data-update-type');
     if (!window.krtFetch) {
         return;
@@ -217,11 +265,18 @@ function updateMaterial(selectElement) {
 
     selectElement.disabled = true;
 
+    /**
+     * Builds the update payload from the row's current version and the control's value.
+     *
+     * @returns {Record<string, unknown>} the request body
+     */
     function buildRequestBody() {
+        /** @type {Record<string, unknown>} */
         const requestBody = {
             updateType,
-            version: parseInt(tr.getAttribute('data-version'), 10),
+            version: parseInt(/** @type {string} */ (tr.getAttribute('data-version')), 10),
         };
+        const checkbox = /** @type {HTMLInputElement} */ (selectElement);
         if (updateType === 'QUANTITY_TYPE') {
             requestBody.quantityType = selectElement.value;
         } else if (updateType === 'CATEGORY') {
@@ -229,11 +284,11 @@ function updateMaterial(selectElement) {
         } else if (updateType === 'REFINED') {
             requestBody.refinedMaterialId = selectElement.value || null;
         } else if (updateType === 'MANUAL_RAW') {
-            requestBody.isManualRawMaterial = selectElement.checked;
+            requestBody.isManualRawMaterial = checkbox.checked;
         } else if (updateType === 'JOB_ORDER') {
-            requestBody.isJobOrder = selectElement.checked;
+            requestBody.isJobOrder = checkbox.checked;
         } else if (updateType === 'VISIBILITY') {
-            requestBody.isVisible = selectElement.checked;
+            requestBody.isVisible = checkbox.checked;
         }
         return requestBody;
     }
@@ -256,47 +311,76 @@ function updateMaterial(selectElement) {
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'admin-materials-update', (el) => {
-        updateMaterial(el);
+        updateMaterial(/** @type {HTMLInputElement | HTMLSelectElement} */ (el));
     });
 }
 
+/**
+ * Looks up a text, select or textarea control of the create-material modal.
+ *
+ * @param {string} id the control's element id
+ * @returns {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement} the control
+ */
+function createMaterialField(id) {
+    return /** @type {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement} */ (
+        document.getElementById(id)
+    );
+}
+
+/**
+ * Looks up a checkbox of the create-material modal.
+ *
+ * @param {string} id the checkbox's element id
+ * @returns {HTMLInputElement} the checkbox
+ */
+function createMaterialCheckbox(id) {
+    return /** @type {HTMLInputElement} */ (document.getElementById(id));
+}
+
+/** Resets the create-material form to its defaults and opens the modal. */
 function openCreateMaterialModal() {
-    document.getElementById('cm-name').value = '';
-    document.getElementById('cm-type').value = 'RAW';
-    document.getElementById('cm-quantity-type').value = 'SCU';
-    document.getElementById('cm-description').value = '';
-    document.getElementById('cm-refined').value = '';
-    document.getElementById('cm-category').value = '';
-    document.getElementById('cm-manual-raw').checked = true;
-    document.getElementById('cm-job-order').checked = false;
-    document.getElementById('cm-illegal').checked = false;
-    document.getElementById('cm-volatile-qt').checked = false;
-    document.getElementById('cm-volatile-time').checked = false;
+    createMaterialField('cm-name').value = '';
+    createMaterialField('cm-type').value = 'RAW';
+    createMaterialField('cm-quantity-type').value = 'SCU';
+    createMaterialField('cm-description').value = '';
+    createMaterialField('cm-refined').value = '';
+    createMaterialField('cm-category').value = '';
+    createMaterialCheckbox('cm-manual-raw').checked = true;
+    createMaterialCheckbox('cm-job-order').checked = false;
+    createMaterialCheckbox('cm-illegal').checked = false;
+    createMaterialCheckbox('cm-volatile-qt').checked = false;
+    createMaterialCheckbox('cm-volatile-time').checked = false;
     window.krtModal.open('modal-create-material', {
         focus: document.getElementById('cm-name'),
     });
 }
+/** Closes the create-material modal. */
 function closeCreateMaterialModal() {
     window.krtModal.close('modal-create-material');
 }
+/**
+ * Creates a material from the modal's fields and refreshes the table on success.
+ *
+ * @param {HTMLElement} btn the submit button, disabled while the request runs
+ */
 function submitCreateMaterial(btn) {
-    const name = document.getElementById('cm-name').value.trim();
+    const name = createMaterialField('cm-name').value.trim();
     if (!name) {
-        document.getElementById('cm-name').focus();
+        createMaterialField('cm-name').focus();
         return;
     }
     const payload = {
         name,
-        type: document.getElementById('cm-type').value,
-        quantityType: document.getElementById('cm-quantity-type').value,
-        description: document.getElementById('cm-description').value || null,
-        refinedMaterialId: document.getElementById('cm-refined').value || null,
-        categoryId: document.getElementById('cm-category').value || null,
-        isManualRawMaterial: document.getElementById('cm-manual-raw').checked,
-        isJobOrder: document.getElementById('cm-job-order').checked,
-        isIllegal: document.getElementById('cm-illegal').checked,
-        isVolatileQt: document.getElementById('cm-volatile-qt').checked,
-        isVolatileTime: document.getElementById('cm-volatile-time').checked,
+        type: createMaterialField('cm-type').value,
+        quantityType: createMaterialField('cm-quantity-type').value,
+        description: createMaterialField('cm-description').value || null,
+        refinedMaterialId: createMaterialField('cm-refined').value || null,
+        categoryId: createMaterialField('cm-category').value || null,
+        isManualRawMaterial: createMaterialCheckbox('cm-manual-raw').checked,
+        isJobOrder: createMaterialCheckbox('cm-job-order').checked,
+        isIllegal: createMaterialCheckbox('cm-illegal').checked,
+        isVolatileQt: createMaterialCheckbox('cm-volatile-qt').checked,
+        isVolatileTime: createMaterialCheckbox('cm-volatile-time').checked,
     };
 
     if (!window.krtFetch) {
@@ -317,6 +401,12 @@ function submitCreateMaterial(btn) {
     });
 }
 
+/**
+ * Replaces the current element matching the selector with the one from the fetched document.
+ *
+ * @param {ParentNode} fresh the freshly fetched page
+ * @param {string} selector the element to swap
+ */
 function replaceFromDocument(fresh, selector) {
     const current = document.querySelector(selector);
     const next = fresh.querySelector(selector);
@@ -325,6 +415,11 @@ function replaceFromDocument(fresh, selector) {
     }
 }
 
+/**
+ * Re-fetches the page and swaps the materials table in place.
+ *
+ * @returns {Promise<boolean>} true when the table was refreshed
+ */
 function refreshMaterialsTable() {
     return window.krtFetch
         .get(window.location.pathname + window.location.search)

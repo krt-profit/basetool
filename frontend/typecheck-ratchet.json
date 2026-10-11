@@ -1,0 +1,196 @@
+{
+  "domains": {
+    "audit": [
+      "audit-log.js"
+    ],
+    "bank": [
+      "bank-account-detail.js",
+      "bank-grants-chart-prefs.js",
+      "bank-grants.js",
+      "bank-holder-detail.js",
+      "bank-layout-prefs.js",
+      "bank-manage.js",
+      "bank-requests.js",
+      "bank.js",
+      "org-unit-bank.js"
+    ],
+    "blueprint": [
+      "admin-blueprints.js",
+      "admin-default-blueprints.js",
+      "blueprint-overview.js"
+    ],
+    "catalogue": [
+      "admin-material-aliases.js",
+      "admin-materials.js",
+      "admin-quality-tiers.js",
+      "locations.js",
+      "material-detail.js",
+      "materials-matrix.js",
+      "materials-profit-calculation.js",
+      "materials.js",
+      "mission-data.js",
+      "p4k-import.js",
+      "ship-data.js",
+      "sync-reports.js",
+      "uex.js"
+    ],
+    "dashboard": [
+      "announcement.js",
+      "index.js"
+    ],
+    "exchange": [
+      "admin-exchange-clients.js",
+      "connected-apps-confirm.js",
+      "connected-apps.js"
+    ],
+    "hangar": [
+      "hangar-squadron.js",
+      "hangar.js"
+    ],
+    "identity": [
+      "admin-deletion-requests.js",
+      "admin-person-search.js",
+      "admin-terms.js",
+      "discord-registrations.js",
+      "member-edit.js",
+      "members.js",
+      "pending-approval.js",
+      "profile-notification-prefs.js",
+      "profile.js",
+      "terms-accept.js"
+    ],
+    "inventory": [
+      "inventory-admin.js",
+      "inventory-common.js",
+      "inventory-game-item.js",
+      "inventory-herkunft.js",
+      "inventory-index.js",
+      "inventory-input.js",
+      "inventory-material.js",
+      "inventory-materialboerse.js",
+      "inventory-my.js",
+      "inventory-note-modal.js"
+    ],
+    "joborder": [
+      "item-collection.js",
+      "material-collection.js",
+      "orders-create.js",
+      "orders-detail-claims.js",
+      "orders-detail-edit.js",
+      "orders-detail-events.js",
+      "orders-detail-production.js",
+      "orders-detail-reports.js",
+      "orders-detail.js",
+      "orders-index-reorder.js",
+      "orders-index.js",
+      "orders-material-demand.js"
+    ],
+    "kernel": [
+      "autocomplete.js",
+      "common-handlers.js",
+      "datetime-splitter.js",
+      "event-delegation.js",
+      "inline-style-apply.js",
+      "krt-bank-account-search.js",
+      "krt-catalog-search.js",
+      "krt-client-error.js",
+      "krt-fetch.js",
+      "krt-filter-chips.js",
+      "krt-filter-panel.js",
+      "krt-html.js",
+      "krt-list-count.js",
+      "krt-live-sync.js",
+      "krt-modal.js",
+      "krt-overflow-menu.js",
+      "krt-palette.js",
+      "krt-searchable-select.js",
+      "krt-user-search.js",
+      "safe-url.js",
+      "scu-decimal-input.js",
+      "sidebar.js",
+      "toast.js",
+      "unsaved-changes.js"
+    ],
+    "leadership": [
+      "leitung.js"
+    ],
+    "materialexchange": [
+      "materialboerse-release.js",
+      "materialboerse.js",
+      "materialgesuch-modal.js"
+    ],
+    "mission": [
+      "mission-detail-actions.js",
+      "mission-detail-modals.js",
+      "mission-detail-participants.js",
+      "mission-detail-tabs.js",
+      "mission-detail.js",
+      "mission-presence.js",
+      "missions.js"
+    ],
+    "notification": [
+      "notification-rules.js",
+      "notifications-page.js",
+      "notifications.js"
+    ],
+    "operation": [
+      "operation-detail.js",
+      "operations-index.js",
+      "operations.js"
+    ],
+    "orgchart": [
+      "org-chart.js"
+    ],
+    "orgunit": [
+      "admin-org-structure.js",
+      "special-command-detail.js",
+      "special-commands.js"
+    ],
+    "personalinventory": [
+      "admin-personal-blueprints-purge.js",
+      "personal-inventory-blueprints-import.js",
+      "personal-inventory-blueprints-recipe.js",
+      "personal-inventory-blueprints.js",
+      "personal-inventory.js"
+    ],
+    "promotion": [
+      "promotion-admin-rank-requirements.js",
+      "promotion-admin-topics.js",
+      "promotion-manage.js",
+      "promotion-my-evaluations.js"
+    ],
+    "refinery": [
+      "refinery-orders-create.js",
+      "refinery-orders-details.js",
+      "refinery-orders-index.js",
+      "refinery-yield-badge.js"
+    ],
+    "settings": [
+      "admin-settings.js"
+    ]
+  },
+  "migrated": [
+    "audit",
+    "bank",
+    "blueprint",
+    "catalogue",
+    "dashboard",
+    "exchange",
+    "hangar",
+    "identity",
+    "inventory",
+    "joborder",
+    "kernel",
+    "leadership",
+    "materialexchange",
+    "mission",
+    "notification",
+    "operation",
+    "orgchart",
+    "orgunit",
+    "personalinventory",
+    "promotion",
+    "refinery",
+    "settings"
+  ]
+}

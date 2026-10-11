@@ -17,8 +17,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global MSG_OWNER_UPDATED, MSG_LOCATION_UPDATED, MSG_DELIVERED_UPDATED, MSG_ERROR_GENERIC */
 
+/**
+ * Finds the collection row of an inventory entry.
+ *
+ * @param {string | null} inventoryId the inventory entry id
+ * @returns {Element | null} the table row, or null when it is not on the page
+ */
 function collectionRow(inventoryId) {
     return document.querySelector(`tr[data-inventory-id="${inventoryId}"]`);
 }
@@ -110,11 +118,18 @@ function broadcastCollectionChanged() {
     }
 }
 
+/**
+ * Transfers a collection row's entry to another owner or location and syncs the row.
+ *
+ * @param {string | null} inventoryId the inventory entry id
+ * @param {{ targetUserId?: string, targetLocationId?: string }} target the new owner or location
+ * @param {string} successMessage the toast text on success
+ */
 async function collectionTransfer(inventoryId, target, successMessage) {
     const row = collectionRow(inventoryId);
     if (!window.krtFetch || !row) return;
-    const amount = parseFloat(row.getAttribute('data-amount'));
-    const version = parseInt(row.getAttribute('data-version'), 10);
+    const amount = parseFloat(row.getAttribute('data-amount') ?? '');
+    const version = parseInt(row.getAttribute('data-version') ?? '', 10);
     row.querySelectorAll('select').forEach((s) => {
         s.disabled = true;
     });
@@ -142,7 +157,9 @@ async function collectionTransfer(inventoryId, target, successMessage) {
                 row.querySelectorAll('[data-inventory-id]').forEach((el) => {
                     el.setAttribute('data-inventory-id', body.id);
                 });
-                const deliveredCheckbox = row.querySelector('.delivered-checkbox');
+                const deliveredCheckbox = /** @type {HTMLInputElement | null} */ (
+                    row.querySelector('.delivered-checkbox')
+                );
                 if (deliveredCheckbox) {
                     deliveredCheckbox.checked = false;
                 }
@@ -157,7 +174,7 @@ async function collectionTransfer(inventoryId, target, successMessage) {
 }
 
 document.addEventListener('change', (e) => {
-    const el = e.target;
+    const el = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (e.target);
     if (!el || !el.matches) return;
     if (el.matches('[data-role="owner-select"]')) {
         collectionTransfer(
@@ -172,10 +189,15 @@ document.addEventListener('change', (e) => {
             MSG_LOCATION_UPDATED,
         );
     } else if (el.matches('.delivered-checkbox')) {
-        onDeliveredToggle(el);
+        onDeliveredToggle(/** @type {HTMLInputElement} */ (el));
     }
 });
 
+/**
+ * Persists the delivered flag of a collection row and reverts the checkbox when the write fails.
+ *
+ * @param {HTMLInputElement} cb the delivered checkbox that was toggled
+ */
 async function onDeliveredToggle(cb) {
     const inventoryId = cb.getAttribute('data-inventory-id');
     const row = collectionRow(inventoryId);
@@ -187,7 +209,7 @@ async function onDeliveredToggle(cb) {
         payload: {
             delivered: cb.checked,
             jobOrderId: cb.getAttribute('data-job-order-id'),
-            version: parseInt(row.getAttribute('data-version'), 10),
+            version: parseInt(row.getAttribute('data-version') ?? '', 10),
         },
         containerSelector: `tr[data-inventory-id="${inventoryId}"]`,
         toast: false,

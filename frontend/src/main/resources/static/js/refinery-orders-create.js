@@ -17,13 +17,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_MISSION_PARTICIPANT_REQUIRED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
 
 window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
+/**
+ * Derives a material row's SCU amount from its unit quantity.
+ *
+ * @param {string | number | null} index the row index
+ */
 function calcScu(index) {
-    const unitInput = document.getElementById(`outputQuantity_${index}`);
-    const scuInput = document.getElementById(`outputQuantityScu_${index}`);
+    const unitInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById(`outputQuantity_${index}`)
+    );
+    const scuInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById(`outputQuantityScu_${index}`)
+    );
     if (unitInput && scuInput) {
         const valStr = unitInput.value.replace(/\./g, '').replace(',', '.');
         const val = parseFloat(valStr);
@@ -40,13 +51,21 @@ function calcScu(index) {
     }
 }
 
+/**
+ * Shows the refined material of a row's selected input material.
+ *
+ * @param {KrtRefineryControl} selectElement the row's material control
+ */
 function updateOutputMaterial(selectElement) {
-    const entryBlock = selectElement.closest('.material-entry');
-    const outputDisplay = entryBlock.querySelector('span[id^="outputMaterialDisplay_"]');
+    const entryBlock = /** @type {Element} */ (selectElement.closest('.material-entry'));
+    const outputDisplay = /** @type {HTMLElement} */ (
+        entryBlock.querySelector('span[id^="outputMaterialDisplay_"]')
+    );
 
     let refinedName = selectElement.dataset.refinedName || '';
     if (!refinedName && selectElement.tagName === 'SELECT') {
-        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        const rawSelect = /** @type {HTMLSelectElement} */ (selectElement);
+        const selectedOption = rawSelect.options[rawSelect.selectedIndex];
         refinedName = (selectedOption && selectedOption.getAttribute('data-refined-name')) || '';
     }
     if (refinedName) {
@@ -68,8 +87,12 @@ function setStartedAtNow() {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
 
-    const dateInput = document.querySelector('.datetime-split-group .date-part');
-    const timeInput = document.querySelector('.datetime-split-group .time-part');
+    const dateInput = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('.datetime-split-group .date-part')
+    );
+    const timeInput = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('.datetime-split-group .time-part')
+    );
 
     if (dateInput && timeInput) {
         dateInput.value = `${year}-${month}-${day}`;
@@ -80,15 +103,17 @@ function setStartedAtNow() {
 }
 
 function addMaterialRow() {
-    const container = document.getElementById('materials-container');
+    const container = /** @type {HTMLElement} */ (document.getElementById('materials-container'));
     const entries = container.querySelectorAll('.material-entry');
     const count = entries.length;
 
-    const template = entries[0].cloneNode(true);
+    const template = /** @type {Element} */ (entries[0].cloneNode(true));
 
     const clonedPicker = template.querySelector('.krt-combobox');
     if (clonedPicker) {
-        const hiddenField = clonedPicker.querySelector('input[type="hidden"]');
+        const hiddenField = /** @type {HTMLInputElement | null} */ (
+            clonedPicker.querySelector('input[type="hidden"]')
+        );
         const freshSelect = document.createElement('select');
         if (hiddenField) {
             freshSelect.id = hiddenField.id;
@@ -97,8 +122,10 @@ function addMaterialRow() {
         freshSelect.required = true;
         freshSelect.setAttribute('data-trigger', 'rfc-update-output');
         freshSelect.setAttribute('data-krt-combobox', 'remote-materials-raw');
-        clonedPicker.parentNode.replaceChild(freshSelect, clonedPicker);
-        const clonedLabel = freshSelect.parentNode.querySelector('label');
+        /** @type {Node} */ (clonedPicker.parentNode).replaceChild(freshSelect, clonedPicker);
+        const clonedLabel = /** @type {ParentNode} */ (freshSelect.parentNode).querySelector(
+            'label',
+        );
         if (clonedLabel) {
             clonedLabel.removeAttribute('id');
             if (hiddenField) {
@@ -129,7 +156,9 @@ function addMaterialRow() {
         }
     }
 
-    const inputs = template.querySelectorAll('input, select');
+    const inputs = /** @type {NodeListOf<KrtRefineryControl>} */ (
+        template.querySelectorAll('input, select')
+    );
     inputs.forEach((input) => {
         if (input.id) {
             input.id = input.id.replace(/_\d+$/, `_${count}`);
@@ -138,16 +167,18 @@ function addMaterialRow() {
             input.name = input.name.replace(/\[\d+\]/, `[${count}]`);
         }
         if (input.hasAttribute('data-index')) {
-            input.setAttribute('data-index', count);
+            input.setAttribute('data-index', String(count));
         }
         if (input.tagName.toLowerCase() === 'select') {
-            input.selectedIndex = 0;
+            /** @type {HTMLSelectElement} */ (input).selectedIndex = 0;
         } else {
             input.value = '';
         }
     });
 
-    const displaySpan = template.querySelector('span[id^="outputMaterialDisplay_"]');
+    const displaySpan = /** @type {HTMLElement | null} */ (
+        template.querySelector('span[id^="outputMaterialDisplay_"]')
+    );
     if (displaySpan) {
         displaySpan.id = displaySpan.id.replace(/_\d+$/, `_${count}`);
         displaySpan.innerText = '-';
@@ -179,14 +210,21 @@ function addMaterialRow() {
     }
 }
 
+/**
+ * Removes a material row and renumbers the remaining ones.
+ *
+ * @param {Element} button the row's remove button
+ */
 function removeMaterialRow(button) {
-    const entry = button.closest('.material-entry');
+    const entry = /** @type {Element} */ (button.closest('.material-entry'));
     entry.remove();
 
-    const container = document.getElementById('materials-container');
+    const container = /** @type {HTMLElement} */ (document.getElementById('materials-container'));
     const entries = container.querySelectorAll('.material-entry');
     entries.forEach((entry, index) => {
-        const inputs = entry.querySelectorAll('input, select');
+        const inputs = /** @type {NodeListOf<KrtRefineryControl>} */ (
+            entry.querySelectorAll('input, select')
+        );
         inputs.forEach((input) => {
             if (input.id) {
                 input.id = input.id.replace(/_\d+$/, `_${index}`);
@@ -195,10 +233,12 @@ function removeMaterialRow(button) {
                 input.name = input.name.replace(/\[\d+\]/, `[${index}]`);
             }
             if (input.hasAttribute('data-index')) {
-                input.setAttribute('data-index', index);
+                input.setAttribute('data-index', String(index));
             }
         });
-        const displaySpan = entry.querySelector('span[id^="outputMaterialDisplay_"]');
+        const displaySpan = /** @type {HTMLElement | null} */ (
+            entry.querySelector('span[id^="outputMaterialDisplay_"]')
+        );
         if (displaySpan) {
             displaySpan.id = displaySpan.id.replace(/_\d+$/, `_${index}`);
         }
@@ -221,19 +261,21 @@ function removeMaterialRow(button) {
 }
 
 function updateMethodRatings() {
-    const methodSelect = document.getElementById('refiningMethodId');
+    const methodSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('refiningMethodId')
+    );
     const ratingsDiv = document.getElementById('methodRatings');
     if (!methodSelect || !ratingsDiv) return;
 
     const selectedOption = methodSelect.options[methodSelect.selectedIndex];
 
     if (selectedOption && selectedOption.value !== '') {
-        document.getElementById('ratingYieldVal').innerText =
-            RATING_LEVELS[selectedOption.getAttribute('data-yield')] || '-';
-        document.getElementById('ratingCostVal').innerText =
-            RATING_LEVELS[selectedOption.getAttribute('data-cost')] || '-';
-        document.getElementById('ratingSpeedVal').innerText =
-            SPEED_LEVELS[selectedOption.getAttribute('data-speed')] || '-';
+        /** @type {HTMLElement} */ (document.getElementById('ratingYieldVal')).innerText =
+            RATING_LEVELS[/** @type {string} */ (selectedOption.getAttribute('data-yield'))] || '-';
+        /** @type {HTMLElement} */ (document.getElementById('ratingCostVal')).innerText =
+            RATING_LEVELS[/** @type {string} */ (selectedOption.getAttribute('data-cost'))] || '-';
+        /** @type {HTMLElement} */ (document.getElementById('ratingSpeedVal')).innerText =
+            SPEED_LEVELS[/** @type {string} */ (selectedOption.getAttribute('data-speed'))] || '-';
         ratingsDiv.hidden = false;
     } else {
         ratingsDiv.hidden = true;
@@ -241,10 +283,18 @@ function updateMethodRatings() {
 }
 
 function updateEndsAt() {
-    const startedAtInput = document.getElementById('startedAt');
-    const durationHoursInput = document.getElementById('durationHours');
-    const durationMinutesInput = document.getElementById('durationMinutes');
-    const endsAtDisplay = document.querySelector('#endsAtDisplay span');
+    const startedAtInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('startedAt')
+    );
+    const durationHoursInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('durationHours')
+    );
+    const durationMinutesInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('durationMinutes')
+    );
+    const endsAtDisplay = /** @type {HTMLElement | null} */ (
+        document.querySelector('#endsAtDisplay span')
+    );
 
     if (!startedAtInput || !durationHoursInput || !durationMinutesInput || !endsAtDisplay) return;
 
@@ -254,7 +304,7 @@ function updateEndsAt() {
 
     if (startedAt) {
         const startDate = new Date(startedAt);
-        if (!isNaN(startDate)) {
+        if (!isNaN(startDate.getTime())) {
             const totalMinutes = hours * 60 + minutes;
             const endDate = new Date(startDate.getTime() + totalMinutes * 60000);
 
@@ -292,14 +342,16 @@ function fillRefineryPattern(pattern, args) {
  * the server computes the stored value.
  */
 function updateProfitPreview() {
-    const expensesEl = document.getElementById('expenses');
-    const otherExpensesEl = document.getElementById('otherExpenses');
-    const oreSalesEl = document.getElementById('oreSales');
+    const expensesEl = /** @type {HTMLInputElement | null} */ (document.getElementById('expenses'));
+    const otherExpensesEl = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('otherExpenses')
+    );
+    const oreSalesEl = /** @type {HTMLInputElement | null} */ (document.getElementById('oreSales'));
     const preview = document.getElementById('profitPreview');
     if (!preview) return;
-    const expenses = parseFloat(expensesEl && expensesEl.value) || 0;
-    const otherExpenses = parseFloat(otherExpensesEl && otherExpensesEl.value) || 0;
-    const oreSales = parseFloat(oreSalesEl && oreSalesEl.value) || 0;
+    const expenses = parseFloat(expensesEl ? expensesEl.value : '') || 0;
+    const otherExpenses = parseFloat(otherExpensesEl ? otherExpensesEl.value : '') || 0;
+    const oreSales = parseFloat(oreSalesEl ? oreSalesEl.value : '') || 0;
     const locale = document.documentElement.lang || undefined;
     const profit = Math.round(oreSales - expenses - otherExpenses);
     const sign = profit > 0 ? '+ ' : profit < 0 ? '− ' : '';
@@ -319,8 +371,9 @@ function updateProfitPreview() {
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
     window.krtEvents.on('focusout', 'rfc-update-profit', (el) => {
-        if (el.value.trim() === '') {
-            el.value = '0';
+        const field = /** @type {HTMLInputElement} */ (el);
+        if (field.value.trim() === '') {
+            field.value = '0';
             updateProfitPreview();
         }
     });
@@ -331,10 +384,10 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         removeMaterialRow(el);
     });
     window.krtEvents.on('change', 'rfc-update-output', (el) => {
-        updateOutputMaterial(el);
+        updateOutputMaterial(/** @type {KrtRefineryControl} */ (el));
     });
     window.krtEvents.on('change', 'rfc-location-change', (el) => {
-        window.krtRefineryYield.onLocationChange(el);
+        window.krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
     });
     window.krtEvents.on('input', 'rfc-calc-scu', (el) => {
         calcScu(el.getAttribute('data-index'));
@@ -344,8 +397,11 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         if (fileInput) fileInput.click();
     });
     window.krtEvents.on('change', 'rfc-import-file', (el) => {
-        if (el.files && el.files.length > 0) {
-            const importForm = document.getElementById('refineryImportForm');
+        const fileField = /** @type {HTMLInputElement} */ (el);
+        if (fileField.files && fileField.files.length > 0) {
+            const importForm = /** @type {HTMLFormElement | null} */ (
+                document.getElementById('refineryImportForm')
+            );
             if (importForm) importForm.requestSubmit();
         }
     });
@@ -353,9 +409,12 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const materialId = el.getAttribute('data-material-id');
         const materialName = el.getAttribute('data-material-name') || '';
         const entry = el.closest('.material-entry');
-        const select = entry ? entry.querySelector('[id^="inputMaterialId_"]') : null;
+        const select = /** @type {KrtRefineryControl | null} */ (
+            entry ? entry.querySelector('[id^="inputMaterialId_"]') : null
+        );
         if (!select || !materialId) return;
-        function applySuggestion(match) {
+        /** @param {any} match the matched catalog row, or null when the lookup found none */
+        const applySuggestion = (match) => {
             if (select.krtCombobox) {
                 if (match) {
                     select.krtCombobox.setValue(materialId, match.name, {
@@ -370,7 +429,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 select.value = materialId;
             }
             select.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+        };
         window.krtFetch
             .getJson(`/catalog/material-search?raw=true&q=${encodeURIComponent(materialName)}`)
             .then((list) => {
@@ -406,6 +465,12 @@ function _refineryCreateErrorMessage(status, body) {
     return status === 400 ? MSG_RFC_MATERIAL_INVALID : MSG_RFC_CREATE_FAILED;
 }
 
+/**
+ * Submits the create form in place, or natively when `krtFetch` is missing.
+ *
+ * @param {HTMLFormElement} form the refinery-order form
+ * @param {HTMLElement | null} submitter the control that triggered the submit
+ */
 function _submitRefineryCreate(form, submitter) {
     if (!window.krtFetch) {
         form.submit();
@@ -429,6 +494,12 @@ function _submitRefineryCreate(form, submitter) {
         },
     });
 }
+
+/**
+ * Re-binds the form's listeners and recomputes its derived displays.
+ *
+ * @param {boolean} fromSwap whether the form was just re-rendered by an import swap
+ */
 function _reinitRefineryForm(fromSwap) {
     const startedAt = document.getElementById('startedAt');
     const dHours = document.getElementById('durationHours');
@@ -447,11 +518,15 @@ function _reinitRefineryForm(fromSwap) {
     }
     updateMethodRatings();
     document.querySelectorAll('.material-entry').forEach((_, index) => calcScu(index));
-    document.querySelectorAll('[id^="inputMaterialId_"]').forEach((select) => {
+    /** @type {NodeListOf<KrtRefineryControl>} */ (
+        document.querySelectorAll('[id^="inputMaterialId_"]')
+    ).forEach((select) => {
         if (select.value) updateOutputMaterial(select);
     });
     if (window.krtRefineryYield) {
-        const locationSelect = document.getElementById('locationId');
+        const locationSelect = /** @type {KrtRefineryControl | null} */ (
+            document.getElementById('locationId')
+        );
         if (
             fromSwap &&
             locationSelect &&
@@ -465,7 +540,9 @@ function _reinitRefineryForm(fromSwap) {
     }
     updateProfitPreview();
     updateEndsAt();
-    const createForm = document.querySelector('form[data-testid="refinery-form"]');
+    const createForm = /** @type {(HTMLFormElement & { _rfcSubmitBound?: boolean }) | null} */ (
+        document.querySelector('form[data-testid="refinery-form"]')
+    );
     if (createForm && !createForm._rfcSubmitBound) {
         createForm._rfcSubmitBound = true;
         createForm.addEventListener('submit', (e) => {

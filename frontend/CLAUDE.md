@@ -250,7 +250,16 @@ debt rather than anything TS 7 introduced.
   Safari / iOS 18.4. `Promise.try`, `RegExp.escape` and `Float16Array` are in TypeScript's `ES2025`
   lib but above the floor, so ESLint rejects them.
 - **Opt in per file** with a leading `// @ts-check`. A file that opts in **must** be error-free —
-  there is no partial state. Prefer opting in any file you substantially touch.
+  there is no partial state. Prefer opting in any file you substantially touch. No script carries
+  `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`.
+- **The ratchet per domain** (`frontend/typecheck-ratchet.json`, `:frontend:testTypecheckRatchet`):
+  every script of `static/js` is listed under exactly one domain, so **a new script must be added
+  to its domain's list** or the build fails. A domain under `"migrated"` holds only checked scripts:
+  a new script there needs `// @ts-check` from its first commit. To migrate a domain, bring its
+  last unchecked scripts to green, add the domain to `"migrated"` and to `MIGRATED_FLOOR` (and raise
+  `CHECKED_FILES_FLOOR`) in `scripts/typecheck-ratchet.mjs`; the list and the floors never shrink.
+  A script that is too large to check is split first at top-level statement boundaries into parts
+  loaded by consecutive `defer` tags in the original order, the first part keeping the file name.
 - **Declare shared contracts in the same change.** A new `window.krt*` API, a new custom DOM event
   or a new Thymeleaf bootstrap constant goes into `frontend/types/globals.d.ts` or
   `frontend/types/thymeleaf-bootstrap.d.ts` as part of the change that introduces it. A bootstrap
