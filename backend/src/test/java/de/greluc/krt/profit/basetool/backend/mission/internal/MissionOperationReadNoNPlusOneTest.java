@@ -218,7 +218,7 @@ class MissionOperationReadNoNPlusOneTest {
     mission.setName(name);
     mission.setStatus("PLANNED");
     mission.setOwningOrgUnit(unit);
-    mission.setOperation(operation);
+    mission.setOperationId(operation == null ? null : operation.getId());
     Mission saved = missionRepository.save(mission);
     missions.add(saved);
     return saved;

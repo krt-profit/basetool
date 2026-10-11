@@ -20,7 +20,7 @@
 /**
  * The operation module: Operationen, their finance view and payouts (plan §5.1 rank 11). The
  * Operation entity, its repository, mapper and the DTOs the mission module embeds stay in the layer
- * packages until Mission references an operation by id (plan §7.5).
+ * packages until the mission DTOs stop embedding the operation's DTO (plan §7.5).
  */
 @ApplicationModule(
     allowedDependencies = {

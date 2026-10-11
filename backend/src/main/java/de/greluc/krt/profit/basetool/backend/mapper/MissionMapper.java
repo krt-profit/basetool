@@ -60,16 +60,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 /** MapStruct mapper between Mission entities and DTOs. */
 @Mapper(
     config = CentralMapperConfig.class,
-    uses = {
-      ShipMapper.class,
-      ShipTypeMapper.class,
-      UserMapper.class,
-      OperationMapper.class,
-      SquadronMapper.class
-    })
+    uses = {ShipMapper.class, ShipTypeMapper.class, UserMapper.class, SquadronMapper.class})
 public abstract class MissionMapper {
 
+  /** Projects the operation a mission belongs to from the per-transaction operation memo. */
+  private static final String OPERATION_EXPRESSION =
+      "java(mission.getOperationId() == null ? null : operationMapper.toDtoFromSummary("
+          + "missionOperationLookup.operation(mission.getOperationId())))";
+
   @Autowired protected MissionViewerAccess missionViewerAccess;
+
+  @Autowired protected MissionOperationLookup missionOperationLookup;
+
+  @Autowired protected OperationMapper operationMapper;
 
   /**
    * The same {@link UserMapper} the generated subclass delegates the roster's {@code UserDto}s to,
@@ -122,6 +125,7 @@ public abstract class MissionMapper {
       target = "registeredParticipants",
       expression = "java(resolveRegisteredParticipants(mission))")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
+  @Mapping(target = "operation", expression = OPERATION_EXPRESSION)
   public abstract MissionDto toDto(Mission mission);
 
   /**
@@ -181,6 +185,7 @@ public abstract class MissionMapper {
    */
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
   @Mapping(target = "owningSquadron", source = "mission.owningOrgUnit")
+  @Mapping(target = "operation", expression = OPERATION_EXPRESSION)
   @Mapping(target = "registeredCount", expression = "java(registeredCount)")
   @Mapping(target = "signedUp", expression = "java(signedUp)")
   public abstract MissionListDto toListDto(Mission mission, long registeredCount, boolean signedUp);

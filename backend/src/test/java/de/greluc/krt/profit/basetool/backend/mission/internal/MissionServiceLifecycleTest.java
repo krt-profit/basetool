@@ -34,6 +34,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
@@ -47,7 +48,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
@@ -90,7 +90,7 @@ class MissionServiceLifecycleTest {
   @Mock private FrequencyTypeRepository frequencyTypeRepository;
   @Mock private MissionFrequencyRepository missionFrequencyRepository;
   @Mock private MissionOwnershipRepository missionOwnershipRepository;
-  @Mock private OperationRepository operationRepository;
+  @Mock private OperationSummaryProvider operationSummaryProvider;
   @Mock private UserService userService;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private AuthHelperService authHelperService;
@@ -111,7 +111,7 @@ class MissionServiceLifecycleTest {
             frequencyTypeRepository,
             missionFrequencyRepository,
             missionOwnershipRepository,
-            operationRepository,
+            operationSummaryProvider,
             userService,
             ownerScopeService,
             authHelperService,

@@ -68,6 +68,12 @@ material bucket at its own quality floor in memory, instead of one `SUM` per mat
 one claim query per SK order. The single-order write paths keep the per-order queries (a bounded
 handful) via a shared resolver-parameterised projection.
 
+A business association held as an **id** (plan §5.6) is read through the owning module's read SPI and
+a per-transaction memo whose first miss loads everything the persistence context needs in one
+statement. The mission's operation is the case: `Mission.operationId` is resolved by
+`MissionOperationSummaryCache` over `mission.api.OperationSummaryProvider`, so a page of missions
+costs one statement for its operations whatever its size (`MissionOperationReadNoNPlusOneTest`).
+
 **Writes are batched** (BE-PERF-04, 2026-09-22). `hibernate.jdbc.batch_size=50`, the driver's
 `reWriteBatchedInserts` (a Hikari data-source property, so no URL change is needed), and
 `in_clause_parameter_padding`. A 100-recipient notification fan-out reaches the database as two

@@ -211,7 +211,7 @@ class OperationPayoutStatusConcurrencyTest {
           Mission mission = new Mission();
           mission.setName("PayoutRace-Mission-" + tag);
           mission.setStatus("COMPLETED");
-          mission.setOperation(operation);
+          mission.setOperationId(operation.getId());
           mission.setActualStartTime(ACTUAL_START);
           mission.setActualEndTime(ACTUAL_END);
           mission = missionRepository.save(mission);

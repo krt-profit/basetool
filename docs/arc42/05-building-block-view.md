@@ -149,7 +149,7 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | `materialexchange` | the two after-commit events | the offer and request entities, repositories and DTOs, the board services, `MaterialExchangeOfferRatchet` (the Lager's `StockChangeObserver`) and `MaterialExchangeStockOfferLookup` (its `StockOfferLookup`) | `MaterialExchangeController`, `MaterialRequestController` |
 | `refinery` | `RefineryDraftBuilder` (the exchange's refinery draft), the screenshot-extract and draft records, the problem codes | `RefineryOrderService` (also the blueprint craftability's `CraftabilityYieldSource`), `RefineryImportService`, `RefineryAccessPolicy`, the live-sync authorizer, the import settings and the store requests | `RefineryOrderController`, `RefineryImportController` |
 | `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the live-sync authorizer, the integrity task, its own repositories and the request DTOs | `JobOrderController`, `MaterialClaimController`, `MaterialCollectionController`, `JobOrderItemStockController` |
-| `mission` | `MissionCommands` (`detachFromOperation`) | the mission, structure, participant, timeline and finance services, `MissionSecurityService`, `MissionAccessPolicy`, the viewer-access service, the section counters, the peer redaction, the hangar's `ShipDeletionObserver` and the catalogue's `JobTypeDesignationObserver` implementations, the live-sync authorizer, its own repositories and the request DTOs | `MissionController`, `MissionFinanceEntryController` |
+| `mission` | `MissionCommands` (`detachFromOperation`), the read SPI `OperationSummaryProvider` (the operation module implements it) | the mission, structure, participant, timeline and finance services, `MissionSecurityService`, `MissionAccessPolicy`, the viewer-access service, the section counters, the peer redaction, the hangar's `ShipDeletionObserver` and the catalogue's `JobTypeDesignationObserver` implementations, `MissionOperationSummaryCache` (the per-transaction memo behind `mapper.MissionOperationLookup`), the live-sync authorizer, its own repositories and the request DTOs | `MissionController`, `MissionFinanceEntryController` |
 | `orgchart` | — (publishes nothing; orgunit reaches it through `orgunit.api.MembershipChangeObserver`) | `OrgChartPosition` and its repository and enums, `OrgChartService`, `OrgChartReadService`, `LeitungViewService`, `OrgChartPositionMapper`, the chart and Leitung DTOs | `OrgChartController`, `LeitungController` |
 | `promotion` | — (publishes nothing; the GDPR deletion calls `service.MemberEvaluationErasure`, which the module implements) | the entities, repositories, services, mappers and records, `PromotionAccessPolicy` | the six promotion controllers |
 
@@ -173,9 +173,19 @@ first access policy taken out of the scope hub (ADR-0236): the operation endpoin
 live-sync room and the payout ledger check ask it instead of `OwnerScopeService`. Deleting an
 operation detaches its missions through the mission module's first published command,
 `mission.api.MissionCommands#detachFromOperation` (`MANDATORY`), instead of writing `Mission`
-rows itself. The `Operation` entity, its repository and mapper and the DTOs the mission module
-embeds stay in the layer packages until `Mission` references its operation by id (plan §7.5), so
-the operation's JPQL scope fragment still sits in `ScopeSpecifications`.
+rows itself. Since P3-8a `Mission` references its operation by id (`Mission.operationId`, the
+same `operation_id` column and foreign key): what a mission DTO shows of the operation comes
+through the mission-owned read SPI `mission.api.OperationSummaryProvider`, which
+`operation.internal.OperationSummaryReader` implements with one projection query, and the
+per-transaction memo `MissionOperationSummaryCache`. The SPI's record `MissionOperationSummary` and
+the memo's interface `MissionOperationLookup` sit in `model.dto` and `mapper`, because the mapper
+reads them and a `mapper -> mission` edge would close a package cycle with the moved mission
+services (as `MissionViewerAccess` does). So a page of missions costs one statement
+for its operations whatever its size. `Operation.missions` is a read-only join-column view. The
+`Operation` entity, its repository and mapper and the DTOs the mission module embeds still stay in
+the layer packages, because `MissionDto` and `MissionListDto` embed `OperationDto` and the refinery
+association still ties `Mission` to `RefineryOrder` (plan §7.5), so the operation's JPQL scope
+fragment still sits in `ScopeSpecifications`.
 
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:

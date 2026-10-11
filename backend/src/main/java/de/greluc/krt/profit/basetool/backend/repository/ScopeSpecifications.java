@@ -53,7 +53,7 @@ public final class ScopeSpecifications {
         OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)
         OR (o.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)
         OR (:viewerUserId IS NOT NULL AND EXISTS (SELECT p.id FROM MissionParticipant p
-         WHERE p.mission.operation = o AND p.user.id = :viewerUserId))
+         WHERE p.mission.operationId = o.id AND p.user.id = :viewerUserId))
        )
       """;
 

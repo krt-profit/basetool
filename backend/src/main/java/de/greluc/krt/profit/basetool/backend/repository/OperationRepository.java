@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import java.time.Instant;
 import java.util.Collection;
@@ -57,6 +58,21 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    */
   @Query("SELECT MIN(o.createdAt) FROM Operation o WHERE o.status = :status")
   Instant findOldestCreatedAtByStatus(@Param("status") OperationStatus status);
+
+  /**
+   * Projects the given operations into the summaries the mission module embeds, with the owning org
+   * unit's reference, in one statement.
+   *
+   * @param ids the operations
+   * @return the summaries of the operations that exist, in no particular order
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary(
+      o.id, o.name, o.description, CAST(o.status AS string), ou.id, ou.name, ou.shorthand, o.version,
+      o.createdAt, o.updatedAt) FROM Operation o LEFT JOIN o.owningOrgUnit ou WHERE o.id IN :ids
+      """)
+  List<MissionOperationSummary> findSummaries(@Param("ids") Collection<UUID> ids);
 
   /**
    * Pre-fetches the missions of an operation, their participants, and the participants' user
@@ -162,8 +178,8 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
           + " string), '%') ESCAPE '\\' OR CAST(o.description AS string) ILIKE CONCAT('%',"
           + " CAST(:query AS string), '%') ESCAPE '\\') AND (CAST(o.status AS string) IN (:status))"
           + " AND (CAST(:start AS timestamp) IS NULL OR (SELECT MIN(m.plannedStartTime) FROM"
-          + " Mission m WHERE m.operation = o) >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
-          + " (SELECT MAX(m.plannedEndTime) FROM Mission m WHERE m.operation = o) <= :end)")
+          + " Mission m WHERE m.operationId = o.id) >= :start) AND (CAST(:end AS timestamp) IS NULL"
+          + " OR (SELECT MAX(m.plannedEndTime) FROM Mission m WHERE m.operationId = o.id) <= :end)")
   Page<Operation> searchOperations(
       @Param("query") String query,
       @Param("start") Instant start,
@@ -187,7 +203,7 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    */
   @Query(
       """
-      SELECT COUNT(p) > 0 FROM MissionParticipant p WHERE p.mission.operation.id = :operationId
+      SELECT COUNT(p) > 0 FROM MissionParticipant p WHERE p.mission.operationId = :operationId
       AND p.user.id = :userId
       """)
   boolean existsParticipantUserInOperation(

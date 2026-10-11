@@ -267,10 +267,9 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private Set<RefineryOrder> refineryOrders = new LinkedHashSet<>();
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "operation_id")
+  @Column(name = "operation_id")
   @OptimisticLock(excluded = true)
-  private Operation operation;
+  private UUID operationId;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owner_id")

@@ -351,7 +351,7 @@ class OperationModuleContractTest {
     Mission mission = new Mission();
     mission.setName("Contract Mission " + UUID.randomUUID());
     mission.setStatus("PLANNED");
-    mission.setOperation(operation);
+    mission.setOperationId(operation.getId());
     mission.setOwningOrgUnit(operation.getOwningOrgUnit());
     mission = missionRepository.save(mission);
     operation.getMissions().add(mission);

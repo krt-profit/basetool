@@ -20,8 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.mapper;
 
 import de.greluc.krt.profit.basetool.backend.model.Operation;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -41,6 +44,33 @@ public interface OperationMapper {
   @Mapping(target = "payoutPreliminary", ignore = true)
   @Mapping(target = "withPayoutPreliminary", ignore = true)
   OperationDto toDto(Operation entity);
+
+  /**
+   * Maps the summary the mission module embeds to the same DTO {@link #toDto(Operation)} builds
+   * from the entity; the payout flag stays {@code null}.
+   *
+   * @param summary the summary to project; {@code null} returns {@code null}
+   * @return the operation DTO
+   */
+  @Mapping(target = "owningSquadron", expression = "java(owningSquadron(summary))")
+  @Mapping(target = "payoutPreliminary", ignore = true)
+  @Mapping(target = "withPayoutPreliminary", ignore = true)
+  OperationDto toDtoFromSummary(MissionOperationSummary summary);
+
+  /**
+   * Builds the owning-squadron reference of a summary.
+   *
+   * @param summary the summary carrying the owning org unit's columns
+   * @return the reference, or {@code null} for an ownerless operation
+   */
+  @Nullable
+  default SquadronReferenceDto owningSquadron(MissionOperationSummary summary) {
+    if (summary.owningOrgUnitId() == null) {
+      return null;
+    }
+    return new SquadronReferenceDto(
+        summary.owningOrgUnitId(), summary.owningOrgUnitName(), summary.owningOrgUnitShorthand());
+  }
 
   /**
    * Builds a new {@link Operation} entity from a create-DTO. Server-managed fields ({@code id},

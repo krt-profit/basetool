@@ -29,13 +29,13 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
+import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
 import de.greluc.krt.profit.basetool.backend.model.MissionOwnership;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
@@ -46,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -99,7 +98,7 @@ public class MissionService implements MissionCommands {
   private final FrequencyTypeRepository frequencyTypeRepository;
   private final MissionFrequencyRepository missionFrequencyRepository;
   private final MissionOwnershipRepository missionOwnershipRepository;
-  private final OperationRepository operationRepository;
+  private final OperationSummaryProvider operationSummaryProvider;
   private final UserService userService;
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
@@ -368,13 +367,25 @@ public class MissionService implements MissionCommands {
     mission.setIsInternal(request.isInternal() != null ? request.isInternal() : Boolean.FALSE);
 
     if (request.operationId() != null) {
-      Operation op =
-          Entities.require(
-              operationRepository.findById(request.operationId()), "Operation not found");
-      mission.setOperation(op);
+      mission.setOperationId(requireOperation(request.operationId()));
     } else {
-      mission.setOperation(null);
+      mission.setOperationId(null);
     }
+  }
+
+  /**
+   * Confirms that an operation exists before a mission is linked to it.
+   *
+   * @param operationId the operation to link
+   * @return {@code operationId}
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no operation
+   *     matches
+   */
+  private @NotNull UUID requireOperation(@NotNull UUID operationId) {
+    if (!operationSummaryProvider.operations(Set.of(operationId)).containsKey(operationId)) {
+      throw new NotFoundException("Operation not found");
+    }
+    return operationId;
   }
 
   /**
@@ -419,11 +430,9 @@ public class MissionService implements MissionCommands {
     notificationPublisher.statusChanged(mission, oldStatus);
 
     if (operationId != null) {
-      Operation op =
-          Entities.require(operationRepository.findById(operationId), "Operation not found");
-      mission.setOperation(op);
+      mission.setOperationId(requireOperation(operationId));
     } else {
-      mission.setOperation(null);
+      mission.setOperationId(null);
     }
 
     Mission saved = missionRepository.save(mission);
@@ -1289,7 +1298,7 @@ public class MissionService implements MissionCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public void detachFromOperation(@NotNull UUID operationId) {
     for (Mission mission : missionRepository.findAllLinkedToOperation(operationId)) {
-      mission.setOperation(null);
+      mission.setOperationId(null);
     }
   }
 }
