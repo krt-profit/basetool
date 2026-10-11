@@ -87,7 +87,7 @@ its back/forward cache.
 
 Mutations use `krtFetch.write(...)`; no page may hand-roll a `fetch` write or a CSRF-header read.
 `krtCsrf` is the single source of truth, reading the freshest `meta[name="_csrf"]` /
-`meta[name="_csrf_header"]` tags. Hard-coded header names (e.g. the former `members.html`
+`meta[name="_csrf_header"]` tags. Hard-coded header names (e.g. the former `identity/members.html`
 `X-CSRF-TOKEN`) are forbidden.
 
 **Multipart / `FormData` writes use `krtFetch.submitForm(...)` (S10, #916).** A form-POST write — a
@@ -633,7 +633,7 @@ swap with no navigation request). **Issues:** the epic children
 `hangar/hangar.html`, `catalogue/ship-data.html`, `personalinventory/personal-inventory.html`, `blueprint/personal-inventory-blueprints.html`,
 `personal-inventory*.js`, `bank.js`, `bank/bank-account-detail.html`, `bank/bank-manage.html`,
 `bank/bank-grants.html`, `promotion/promotion-admin-topics.html`, `promotion/promotion-admin-rank-requirements.html`,
-`promotion/promotion-manage.html`, `orgchart/org-chart.html`, `members.html`, `member-edit.html`, `profile.html`,
+`promotion/promotion-manage.html`, `orgchart/org-chart.html`, `identity/members.html`, `identity/member-edit.html`, `identity/profile.html`,
 `dashboard/index.html`, and the #582 admin pages — `announcement.html`, `sync-reports.html`, `locations.html`,
 `catalogue/materials.html`, `material-aliases.html`, `settings/admin-settings.html`, `uex.html`,
 `catalogue/fragments/admin-uex.html`, `mission-data.html`, `special-commands.html`,
@@ -2225,7 +2225,7 @@ A filter, a search or a pager is not unsaved data, and the guard must not treat 
 - [x] An unsaved edit in a data form still opens the dialog when a link is clicked.
 
 **Enforced by:** `UnsavedChangesGuardE2eTest` · **Code:** `unsaved-changes.js`,
-`kernel/fragments/unsaved-modal.html`, `admin-terms.js`, `admin/terms.html` · **Related:** REQ-FE-005,
+`kernel/fragments/unsaved-modal.html`, `admin-terms.js`, `identity/admin/terms.html` · **Related:** REQ-FE-005,
 REQ-FE-021
 
 ### REQ-FE-025 — The route table and its gates are pinned, and every handler carries a gate
@@ -2562,7 +2562,7 @@ what it needs; the parameters start with `page` so that they cannot collide with
 **Acceptance**
 
 - [x] 90 page templates were converted in stacked commits against a golden file captured before the
-  first one; the snapshot did not change in any step (2026-10-11). `organisation/unit-detail.html`
+  first one; the snapshot did not change in any step (2026-10-11). `orgunit/organisation/unit-detail.html`
   stays: it has no head, only the roster fragments other pages include.
 - [x] A page that drops its toast, its tail or its links, turns the chrome off or adds a body
   attribute, and a layout that swaps header and sidebar, moves the content after the toast or

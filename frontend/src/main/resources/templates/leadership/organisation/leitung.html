@@ -5,8 +5,8 @@
     <th:block th:fragment="extraLinks">
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-        <link rel="stylesheet" th:href="@{/css/organisation-unit-detail.css}"/>
-        <link rel="stylesheet" th:href="@{/css/leitung.css}"/>
+        <link rel="stylesheet" th:href="@{/css/orgunit/organisation-unit-detail.css}"/>
+        <link rel="stylesheet" th:href="@{/css/leadership/leitung.css}"/>
     </th:block>
 </head>
 <body>
@@ -131,7 +131,7 @@
                                         <td th:attr="data-label=#{leitung.column.rank}" th:text="#{'leitung.rank.' + ${m.role()}}">OL-Mitglied</td>
                                         <td class="cell-actions">
                                             <th:block th:if="${u.canAppointLead()}">
-                                                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'lt-menu-' + u.id() + '-' + m.userId()}, items=~{organisation/leitung :: lt-ol-items})}">
+                                                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'lt-menu-' + u.id() + '-' + m.userId()}, items=~{leadership/organisation/leitung :: lt-ol-items})}">
                                                     <th:block th:ref="lt-ol-items">
                                                         <button th:unless="${isGa}" type="button" class="overflow-menu__item" role="menuitem"
                                                                 data-leitung-action="set-grand-admiral" th:data-unit-id="${u.id()}" th:data-user-id="${m.userId()}"
@@ -193,7 +193,7 @@
                                         <td th:attr="data-label=#{leitung.column.rank}" th:text="#{'leitung.rank.' + ${m.role()}}">Bereichsleiter</td>
                                         <td class="cell-actions">
                                             <th:block th:if="${removable}">
-                                                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'lt-menu-' + u.id() + '-' + m.userId()}, items=~{organisation/leitung :: lt-bereich-items})}">
+                                                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'lt-menu-' + u.id() + '-' + m.userId()}, items=~{leadership/organisation/leitung :: lt-bereich-items})}">
                                                     <th:block th:ref="lt-bereich-items">
                                                         <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
                                                                 data-leitung-action="remove-bereich-role" th:data-unit-id="${u.id()}" th:data-user-id="${m.userId()}"
@@ -277,7 +277,7 @@
                                         </td>
                                         <td class="cell-actions">
                                             <th:block th:if="${editable and m.role() != 'MEMBER'}">
-                                                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'lt-menu-' + u.id() + '-' + m.userId()}, items=~{organisation/leitung :: lt-squadron-items})}">
+                                                <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'lt-menu-' + u.id() + '-' + m.userId()}, items=~{leadership/organisation/leitung :: lt-squadron-items})}">
                                                     <th:block th:ref="lt-squadron-items">
                                                         <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
                                                                 data-leitung-action="clear-rank" th:data-unit-id="${u.id()}" th:data-user-id="${m.userId()}"
@@ -354,7 +354,7 @@
                         </div>
                         <div class="unit-tabpanel" role="tabpanel" data-lt-panel="members"
                              th:id="'lt-panel-' + ${u.id()} + '-members'" th:aria-labelledby="'lt-tab-' + ${u.id()} + '-members'">
-                            <th:block th:replace="~{organisation/unit-detail :: skRoster(skId=${u.id()}, members=${skRosters.get(u.id())}, showFlags=${flagsKnown}, canLead=${u.canAppointLead()}, canRemove=${u.canManageRoster()}, leadMode='leitung', selfUserId=${selfUserId}, admin=${leitung.admin()}, refreshUrl=${'/organisation/leitung?unit=' + u.id()}, refreshContainer='#leitung-sections', refreshFragment='leitungSections')}"></th:block>
+                            <th:block th:replace="~{orgunit/organisation/unit-detail :: skRoster(skId=${u.id()}, members=${skRosters.get(u.id())}, showFlags=${flagsKnown}, canLead=${u.canAppointLead()}, canRemove=${u.canManageRoster()}, leadMode='leitung', selfUserId=${selfUserId}, admin=${leitung.admin()}, refreshUrl=${'/organisation/leitung?unit=' + u.id()}, refreshContainer='#leitung-sections', refreshFragment='leitungSections')}"></th:block>
                         </div>
                     </section>
                 </div>
@@ -428,8 +428,8 @@
         reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
     };
 </script>
-<script th:src="@{/js/leitung.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/special-command-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/leadership/leitung.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/orgunit/special-command-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

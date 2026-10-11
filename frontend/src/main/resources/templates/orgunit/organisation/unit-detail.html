@@ -67,7 +67,7 @@
                 </td>
                 <td class="cell-actions">
                     <th:block th:if="${rowLead or canRemove}">
-                        <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'sk-menu-' + skId + '-' + m.userId()}, items=~{organisation/unit-detail :: sk-row-items})}">
+                        <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'sk-menu-' + skId + '-' + m.userId()}, items=~{orgunit/organisation/unit-detail :: sk-row-items})}">
                             <th:block th:ref="sk-row-items">
                                 <form th:if="${rowLead and leadMode == 'admin'}" class="unit-menu-form" method="post"
                                       th:action="@{/admin/special-commands/{id}/members/{userId}/lead(id=${skId},userId=${m.userId()})}">

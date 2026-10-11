@@ -142,9 +142,9 @@ public class LeitungPageController {
       model.addAttribute("skFlagsKnown", flagsKnown);
     }
     if ("leitungSections".equals(fragment)) {
-      return "organisation/leitung :: leitungSections";
+      return "leadership/organisation/leitung :: leitungSections";
     }
-    return "organisation/leitung";
+    return "leadership/organisation/leitung";
   }
 
   /**

@@ -5,8 +5,8 @@
     <th:block th:fragment="extraLinks">
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-        <link rel="stylesheet" th:href="@{/css/organisation-unit-detail.css}">
-        <link rel="stylesheet" th:href="@{/css/pages/organisation-special-command-detail.css}">
+        <link rel="stylesheet" th:href="@{/css/orgunit/organisation-unit-detail.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/orgunit/organisation-special-command-detail.css}">
     </th:block>
 </head>
 <body>
@@ -34,7 +34,7 @@
         </div>
         <div id="members-results" class="unit-tabpanel" role="tabpanel" aria-labelledby="sk-tab-members">
         <th:block th:fragment="membersResults">
-            <th:block th:replace="~{organisation/unit-detail :: skRoster(skId=${specialCommand.id()}, members=${members}, showFlags=true, canLead=${canToggleLead}, canRemove=true, leadMode='admin', selfUserId=null, admin=true, refreshUrl=${'/organisation/special-commands/' + specialCommand.id()}, refreshContainer='#members-results', refreshFragment='members')}"></th:block>
+            <th:block th:replace="~{orgunit/organisation/unit-detail :: skRoster(skId=${specialCommand.id()}, members=${members}, showFlags=true, canLead=${canToggleLead}, canRemove=true, leadMode='admin', selfUserId=null, admin=true, refreshUrl=${'/organisation/special-commands/' + specialCommand.id()}, refreshContainer='#members-results', refreshFragment='members')}"></th:block>
         </th:block>
         </div>
     </div>
@@ -79,7 +79,7 @@
         reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
     };
 </script>
-<script th:src="@{/js/special-command-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/orgunit/special-command-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

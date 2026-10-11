@@ -125,7 +125,7 @@ design-system convention: linked → the Discord brand mark in the inherited lin
 - [x] The three message bundles (default/de/en) carry `members.discord`, `members.discord.linked`,
   `members.discord.not_linked` (umlauts `\uXXXX`-escaped in the `.properties`).
 
-**Enforced by:** `UserMapperTest` (linked / not-linked / blank-id → `discordLinked`) · `MembersPageDiscordColumnRenderTest` (icon rendered only for the linked member + column header) · `DtoOpenApiContractTest` (frontend mirror ⊆ committed `openapi.json`) · `MessageBundleConsistencyTest` (key parity) · **Code:** `UserDto`, `UserMapper`, `members.html`, `messages*.properties`
+**Enforced by:** `UserMapperTest` (linked / not-linked / blank-id → `discordLinked`) · `MembersPageDiscordColumnRenderTest` (icon rendered only for the linked member + column header) · `DtoOpenApiContractTest` (frontend mirror ⊆ committed `openapi.json`) · `MessageBundleConsistencyTest` (key parity) · **Code:** `UserDto`, `UserMapper`, `identity/members.html`, `messages*.properties`
 
 ### REQ-SEC-016 — Fail-closed guild + KRT-Mitglied membership gate
 
@@ -390,7 +390,7 @@ forward) · `DtoOpenApiContractTest` (frontend mirror ⊆ committed `openapi.jso
 `MessageBundleConsistencyTest` (key parity) · **Code:** `UserRegistrationService`,
 `DiscordRegistrationAdminController`, `KeycloakService`, `UserDeletionService`, `ApprovalDecision`,
 `LinkRegistrationRequest` (backend + frontend), `AdminDiscordRegistrationsPageController`,
-`admin/discord-registrations.html`, `discord-registrations.js`, `messages*.properties` · **Decision:** ADR-0111
+`identity/admin/discord-registrations.html`, `discord-registrations.js`, `messages*.properties` · **Decision:** ADR-0111
 
 ### REQ-SEC-017 — PENDING approval withholds all authorities (fail-safe default)
 
@@ -451,7 +451,7 @@ new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itsel
   FKs carry no `ON DELETE` clause, so without this the delete fails with a `409`
   (`user_approval_event_user_id_fkey`); the approval audit of **other** users is preserved.
 - [ ] Legacy rows backfilled `ACTIVE` (V173). _(schema-validated on boot; T1.4 e2e.)_
-- [x] The PENDING waiting page (`pending-approval.html`) states in plain language that the tool
+- [x] The PENDING waiting page (`identity/pending-approval.html`) states in plain language that the tool
   cannot be used until an admin approves the account, and sets the expectation that approval is
   manual and may take 1–2 days (`pendingApproval.message` / `pendingApproval.patience` in the
   default/de/en bundles).
@@ -492,7 +492,7 @@ new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itsel
   re-login, and confirms it (`pendingApproval.approved`) before redirecting. A caller already
   `REJECTED` at page load is served no poll script at all.
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserRegistrationServiceTest` (approve/reject + 409) + `UserReconciliationServiceTest` (`DiscordSyncTests`: new credential ⇒ PENDING, new admin ⇒ ACTIVE; `SyncKeycloakUserTests`: scheduled-sync fail-safe) + `UserDeletionServiceTest` (approval-audit cleanup precedes the user delete) + `BackendRoleSyncFilterTest` (verdict expiry + poll-path exemption + `forgetApprovalVerdict`) + `PendingApprovalPageControllerTest` (status poll + the per-state render branch, incl. the unreadable-backend fallback and the redirect-loop regression) + `PendingApprovalRenderMvcTest` (the rendered page for all three states: which block exists, which is visible, which copy it carries, and whether the poll is wired) + `PendingApprovalAccessFilterTest` (backend `/api/**` gate, incl. the percent-encoded-prefix bypass) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `PendingApprovalAccessFilter`, `UserRegistrationService`, `UserDeletionService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `PendingApprovalPageController`, `pending-approval.html`, `pending-approval.js`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724, post-approval double re-login · **ADR:** ADR-0122
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserRegistrationServiceTest` (approve/reject + 409) + `UserReconciliationServiceTest` (`DiscordSyncTests`: new credential ⇒ PENDING, new admin ⇒ ACTIVE; `SyncKeycloakUserTests`: scheduled-sync fail-safe) + `UserDeletionServiceTest` (approval-audit cleanup precedes the user delete) + `BackendRoleSyncFilterTest` (verdict expiry + poll-path exemption + `forgetApprovalVerdict`) + `PendingApprovalPageControllerTest` (status poll + the per-state render branch, incl. the unreadable-backend fallback and the redirect-loop regression) + `PendingApprovalRenderMvcTest` (the rendered page for all three states: which block exists, which is visible, which copy it carries, and whether the poll is wired) + `PendingApprovalAccessFilterTest` (backend `/api/**` gate, incl. the percent-encoded-prefix bypass) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `PendingApprovalAccessFilter`, `UserRegistrationService`, `UserDeletionService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `PendingApprovalPageController`, `identity/pending-approval.html`, `pending-approval.js`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724, post-approval double re-login · **ADR:** ADR-0122
 
 ### REQ-NOTIF-012 — Admins notified on new PENDING registration
 
@@ -660,7 +660,7 @@ match.
   `guild_nick` → `discord_guild_nickname`, sync mode FORCE; the `discord_guild_nickname` protocol
   mapper) are configured per the runbook. If absent, the column stays `null` (graceful no-op).
 
-**Enforced by:** `DiscordGuildNicknameReaderTest` (keycloak-spi fail-open matrix) · `UserReconciliationServiceTest` (claim persisted / absent) · `AdminDiscordRegistrationsNicknameRenderTest` (frontend column) · `DtoOpenApiContractTest` (frontend mirror ⊆ committed `openapi.json`) · `MessageBundleConsistencyTest` (key parity) · **Code:** `DiscordIdentityProvider`, `DiscordGuildNicknameReader`, `User`, `V178__add_discord_guild_nickname_to_app_user.sql`, `UserReconciliationService.syncUser`, `PendingRegistrationDto` (backend + frontend), `DiscordRegistrationAdminController`, `admin/discord-registrations.html` · **Issues:** #720
+**Enforced by:** `DiscordGuildNicknameReaderTest` (keycloak-spi fail-open matrix) · `UserReconciliationServiceTest` (claim persisted / absent) · `AdminDiscordRegistrationsNicknameRenderTest` (frontend column) · `DtoOpenApiContractTest` (frontend mirror ⊆ committed `openapi.json`) · `MessageBundleConsistencyTest` (key parity) · **Code:** `DiscordIdentityProvider`, `DiscordGuildNicknameReader`, `User`, `V178__add_discord_guild_nickname_to_app_user.sql`, `UserReconciliationService.syncUser`, `PendingRegistrationDto` (backend + frontend), `DiscordRegistrationAdminController`, `identity/admin/discord-registrations.html` · **Issues:** #720
 
 ## Out of scope
 

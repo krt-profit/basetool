@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{members.edit.title} + ' - ' + ${appTitle}">Mitglied bearbeiten - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<link rel="stylesheet" th:href="@{/css/pages/member-edit.css}">
+<link rel="stylesheet" th:href="@{/css/pages/identity/member-edit.css}">
     </th:block>
 </head>
 <body>
@@ -242,7 +242,7 @@
         conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
     };
 </script>
-<script th:src="@{/js/member-edit.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/identity/member-edit.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

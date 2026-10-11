@@ -102,7 +102,7 @@ class PendingApprovalPageControllerTest {
     Model model = new ConcurrentModel();
 
     assertThat(controller.pendingApproval(model, new MockHttpServletRequest()))
-        .isEqualTo("pending-approval");
+        .isEqualTo("identity/pending-approval");
     assertThat(model.getAttribute(PendingApprovalPageController.MODEL_REJECTED))
         .as("a pending registration gets the waiting copy")
         .isEqualTo(Boolean.FALSE);
@@ -115,7 +115,7 @@ class PendingApprovalPageControllerTest {
     Model model = new ConcurrentModel();
 
     assertThat(controller.pendingApproval(model, new MockHttpServletRequest()))
-        .isEqualTo("pending-approval");
+        .isEqualTo("identity/pending-approval");
     assertThat(model.getAttribute(PendingApprovalPageController.MODEL_REJECTED))
         .as("a rejected registration gets the rejection copy, not the waiting copy")
         .isEqualTo(Boolean.TRUE);
@@ -161,7 +161,7 @@ class PendingApprovalPageControllerTest {
     request.setSession(session);
     Model model = new ConcurrentModel();
 
-    assertThat(controller.pendingApproval(model, request)).isEqualTo("pending-approval");
+    assertThat(controller.pendingApproval(model, request)).isEqualTo("identity/pending-approval");
     assertThat(model.getAttribute(PendingApprovalPageController.MODEL_NO_ROLE))
         .as("the role-less copy, not the waiting copy: this member has already been approved")
         .isEqualTo(Boolean.TRUE);
@@ -181,7 +181,7 @@ class PendingApprovalPageControllerTest {
     request.setSession(session);
     Model model = new ConcurrentModel();
 
-    assertThat(controller.pendingApproval(model, request)).isEqualTo("pending-approval");
+    assertThat(controller.pendingApproval(model, request)).isEqualTo("identity/pending-approval");
     assertThat(model.getAttribute(PendingApprovalPageController.MODEL_REJECTED)).isEqualTo(true);
     assertThat(model.getAttribute(PendingApprovalPageController.MODEL_NO_ROLE)).isEqualTo(false);
   }
@@ -216,7 +216,7 @@ class PendingApprovalPageControllerTest {
     Model model = new ConcurrentModel();
 
     assertThat(controller.pendingApproval(model, new MockHttpServletRequest()))
-        .isEqualTo("pending-approval");
+        .isEqualTo("identity/pending-approval");
     assertThat(model.getAttribute(PendingApprovalPageController.MODEL_REJECTED))
         .isEqualTo(Boolean.FALSE);
   }
@@ -227,7 +227,7 @@ class PendingApprovalPageControllerTest {
     Model model = new ConcurrentModel();
 
     assertThat(controller.pendingApproval(model, new MockHttpServletRequest()))
-        .isEqualTo("pending-approval");
+        .isEqualTo("identity/pending-approval");
     assertThat(model.getAttribute(PendingApprovalPageController.MODEL_REJECTED))
         .isEqualTo(Boolean.FALSE);
   }

@@ -48,16 +48,16 @@
       "hangar/hangar.js"
     ],
     "identity": [
-      "admin-deletion-requests.js",
-      "admin-person-search.js",
-      "admin-terms.js",
-      "discord-registrations.js",
-      "member-edit.js",
-      "members.js",
-      "pending-approval.js",
-      "profile-notification-prefs.js",
-      "profile.js",
-      "terms-accept.js"
+      "identity/admin-deletion-requests.js",
+      "identity/admin-person-search.js",
+      "identity/admin-terms.js",
+      "identity/discord-registrations.js",
+      "identity/member-edit.js",
+      "identity/members.js",
+      "identity/pending-approval.js",
+      "identity/profile-notification-prefs.js",
+      "identity/profile.js",
+      "identity/terms-accept.js"
     ],
     "inventory": [
       "inventory/inventory-admin.js",
@@ -112,7 +112,7 @@
       "kernel/unsaved-changes.js"
     ],
     "leadership": [
-      "leitung.js"
+      "leadership/leitung.js"
     ],
     "materialexchange": [
       "materialexchange/materialboerse-release.js",
@@ -142,9 +142,9 @@
       "orgchart/org-chart.js"
     ],
     "orgunit": [
-      "admin-org-structure.js",
-      "special-command-detail.js",
-      "special-commands.js"
+      "orgunit/admin-org-structure.js",
+      "orgunit/special-command-detail.js",
+      "orgunit/special-commands.js"
     ],
     "personalinventory": [
       "personalinventory/admin-personal-blueprints-purge.js",

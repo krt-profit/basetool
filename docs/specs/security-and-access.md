@@ -1644,8 +1644,8 @@ wording moved server-side, ADR-0138), `MessageBundleConsistencyTest` (DE/EN key 
 cannot exist in one locale only) · **Text:** `terms.list_4_1_5`, `terms.p_4_2` and
 `terms.list_4_2_1`–`_5` in the **backend's**
 `messages_de.properties` / `messages.properties` / `messages_en.properties`, served by `GET
-/api/v1/terms/document` (REQ-SEC-028) and rendered by the frontend's `templates/terms.html` via
-`fragments/terms-body.html` · **Technical counterpart:** REQ-INGEST-011
+/api/v1/terms/document` (REQ-SEC-028) and rendered by the frontend's `templates/identity/terms.html` via
+`identity/fragments/terms-body.html` · **Technical counterpart:** REQ-INGEST-011
 ([`desktop-ingest.md`](desktop-ingest.md)), ADR-0018
 
 ### REQ-SEC-028 — Terms-of-Use consent is recorded, versioned and enforced
@@ -4258,7 +4258,7 @@ it) · `UserRegistrationServiceTest` (the `PENDING` path passes the waiver) ·
 · `MessageBundleConsistencyTest` · **Code:** `AccountConsolidationService`,
 `UserController#consolidateAccount`, `ConsolidateAccountRequest` (backend + frontend),
 `UserDeletionService.KeycloakPresenceCheck`, `MemberManagementController#consolidateMemberAjax`,
-`members.html`, `messages*.properties` · **Issues:** #1827, #1828 · **Decision:**
+`identity/members.html`, `messages*.properties` · **Issues:** #1827, #1828 · **Decision:**
 [ADR-0160](../adr/0160-a-duplicate-account-stays-consolidatable-after-approval.md)
 
 ### REQ-SEC-056 — The authorities cache TTL is configuration, bounded at both ends
@@ -4676,7 +4676,7 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 `kernel/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
 `service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
 `controller/AdminDataExportController`, frontend `identity/web/DataExportProxyController`,
-`templates/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
+`templates/identity/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
 links, beside the separate deletion card) · **Decision:**
 [ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md) ·
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
@@ -4686,7 +4686,7 @@ links, beside the separate deletion card) · **Decision:**
 Deleting a member is two acts, and the application MUST notice when only the first has happened.
 An admin removes the account in the Keycloak console; the nightly roster sync then flips
 `app_user.in_keycloak` to `false`; and only then does the member list render its delete action
-(`members.html` gates on `!user.inKeycloak`, and `UserDeletionService` refuses an account the flag
+(`identity/members.html` gates on `!user.inKeycloak`, and `UserDeletionService` refuses an account the flag
 still claims is present). The second act is therefore **not offered until the first is done, and not
 performed unless somebody comes back for it.**
 
@@ -4889,8 +4889,8 @@ aggregates.
 **Enforced by:** `PersonSearchCoverageTest`, `AdminPersonSearchControllerSecurityTest` · **Code:**
 `privacy/internal/PersonSearchTargets`, `service/PersonSearchService`,
 `controller/AdminPersonSearchController`, `model/dto/PersonSearchHitDto`,
-`frontend/identity/web/AdminPersonSearchPageController`, `templates/admin/person-search.html`,
-`static/js/admin-person-search.js` · **Decision:**
+`frontend/identity/web/AdminPersonSearchPageController`, `templates/identity/admin/person-search.html`,
+`static/js/identity/admin-person-search.js` · **Decision:**
 [ADR-0184](../adr/0184-the-person-search-is-a-checked-registry-not-a-schema-sweep.md) ·
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
 
@@ -4996,8 +4996,8 @@ from a statute rather than from operational taste.
 `privacy/api/events/AccountDeletionRequestDeclinedEvent`, `db/migration/V242`, `db/migration/V243`,
 `frontend/identity/web/DeletionRequestProxyController`,
 `frontend/identity/web/AdminDeletionRequestsPageController`,
-`templates/fragments/profile-deletion-card.html`, `templates/admin/deletion-requests.html`,
-`static/js/profile.js`, `static/js/admin-deletion-requests.js` · **Decision:**
+`templates/identity/fragments/profile-deletion-card.html`, `templates/identity/admin/deletion-requests.html`,
+`static/js/identity/profile.js`, `static/js/identity/admin-deletion-requests.js` · **Decision:**
 [ADR-0181](../adr/0181-self-service-deletion-is-a-request-an-admin-executes.md) ·
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
 
@@ -5526,7 +5526,7 @@ data lands on the main profile; the Basetool never discloses the stored handle t
 `UserService#updateUserRsiHandle`, `UserRepository#existsOtherAccountWithName`, `UserController`,
 `UserAccountMergeService`, `HandleSpellings`, `PersonSearchTargets`, `DataExportSections`,
 `HandleErasureCoverage`, frontend `ProfileRsiHandleProxyController`, `ProfileController`,
-`MemberManagementController`, `profile.html`, `profile.js`, `member-edit.html` · **Record:**
+`MemberManagementController`, `identity/profile.html`, `profile.js`, `identity/member-edit.html` · **Record:**
 [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md) (A1) · **Related:**
 REQ-XCH-031, REQ-SEC-046, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061, REQ-SEC-062
 

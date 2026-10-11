@@ -5,7 +5,7 @@
     <th:block th:fragment="extraLinks">
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-        <link rel="stylesheet" th:href="@{/css/pages/admin-special-commands.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/orgunit/admin-special-commands.css}">
     </th:block>
 </head>
 <body>
@@ -146,7 +146,7 @@
         reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ ''
     };
 </script>
-<script th:src="@{/js/special-commands.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/orgunit/special-commands.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

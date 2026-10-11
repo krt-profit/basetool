@@ -94,7 +94,7 @@ class ProfileControllerMvcTest {
     mockMvc
         .perform(get("/profile").with(oidcLogin()))
         .andExpect(status().isOk())
-        .andExpect(view().name("profile"))
+        .andExpect(view().name("identity/profile"))
         .andExpect(model().attribute("monthsInSquadron", expectedMonths));
   }
 
@@ -105,7 +105,7 @@ class ProfileControllerMvcTest {
     mockMvc
         .perform(get("/profile").with(oidcLogin()))
         .andExpect(status().isOk())
-        .andExpect(view().name("profile"))
+        .andExpect(view().name("identity/profile"))
         .andExpect(model().attributeDoesNotExist("monthsInSquadron"));
   }
 

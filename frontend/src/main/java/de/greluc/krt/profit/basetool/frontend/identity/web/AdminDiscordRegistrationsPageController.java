@@ -88,7 +88,7 @@ public class AdminDiscordRegistrationsPageController {
       model.addAttribute("registrations", List.of());
     }
     model.addAttribute("rejected", loadRejected());
-    return "admin/discord-registrations";
+    return "identity/admin/discord-registrations";
   }
 
   /**

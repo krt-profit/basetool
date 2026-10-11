@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{admin.discordRegistrations.title} + ' - ' + ${appTitle}">Discord-Registrierungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<link rel="stylesheet" th:href="@{/css/pages/admin-discord-registrations.css}">
+<link rel="stylesheet" th:href="@{/css/pages/identity/admin-discord-registrations.css}">
     </th:block>
 </head>
 <body>
@@ -210,7 +210,7 @@
         reject: /*[[#{admin.discordRegistrations.reject}]]*/ 'Ablehnen'
     };
 </script>
-<script th:src="@{/js/discord-registrations.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/identity/discord-registrations.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

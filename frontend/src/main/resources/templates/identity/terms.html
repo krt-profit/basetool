@@ -13,7 +13,7 @@
         titleText=${terms != null ? terms.title : #messages.msg('terms.unavailable.title')})}"></th:block>
     <div class="card legal-doc" data-testid="legal-doc">
         <th:block th:if="${terms != null}">
-            <th:block th:replace="~{fragments/terms-body :: termsBody(${terms})}" />
+            <th:block th:replace="~{identity/fragments/terms-body :: termsBody(${terms})}" />
         </th:block>
         <p th:if="${terms == null}" class="alert alert-warning" th:text="#{terms.unavailable}">Die Nutzungsbedingungen k&ouml;nnen gerade nicht geladen werden.</p>
     </div>

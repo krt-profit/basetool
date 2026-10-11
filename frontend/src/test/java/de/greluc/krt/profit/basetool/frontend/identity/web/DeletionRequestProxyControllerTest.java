@@ -167,7 +167,7 @@ class DeletionRequestProxyControllerTest {
 
     String view = controller.card(model);
 
-    assertEquals("fragments/profile-deletion-card :: card", view);
+    assertEquals("identity/fragments/profile-deletion-card :: card", view);
     assertEquals(PENDING, model.getAttribute("deletionRequest"));
   }
 
@@ -181,7 +181,7 @@ class DeletionRequestProxyControllerTest {
 
     String view = controller.card(model);
 
-    assertEquals("fragments/profile-deletion-card :: card", view);
+    assertEquals("identity/fragments/profile-deletion-card :: card", view);
     assertNull(model.getAttribute("deletionRequest"));
     assertEquals(true, model.getAttribute("deletionRequestUnavailable"));
   }

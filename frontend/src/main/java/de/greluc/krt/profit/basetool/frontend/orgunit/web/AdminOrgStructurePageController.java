@@ -123,12 +123,12 @@ public class AdminOrgStructurePageController {
     model.addAttribute("hasOl", nodes.stream().anyMatch(n -> KIND_OL.equals(n.kind())));
     model.addAttribute("departments", DEPARTMENTS);
     if ("units".equalsIgnoreCase(fragment)) {
-      return "admin/org-structure :: orgStructureUnits";
+      return "orgunit/admin/org-structure :: orgStructureUnits";
     }
     if ("forms".equalsIgnoreCase(fragment)) {
-      return "admin/org-structure :: orgStructureForms";
+      return "orgunit/admin/org-structure :: orgStructureForms";
     }
-    return "admin/org-structure";
+    return "orgunit/admin/org-structure";
   }
 
   /**

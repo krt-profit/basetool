@@ -1,33 +1,3 @@
-admin/deletion-requests.html html <html lang="de">
-admin/deletion-requests.html head-fixed 08d6bee55c3b4da6
-admin/deletion-requests.html head-own <title>Löschanträge - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/admin-deletion-requests.css">
-admin/deletion-requests.html body <body>
-admin/deletion-requests.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-admin/discord-registrations.html html <html lang="de">
-admin/discord-registrations.html head-fixed 08d6bee55c3b4da6
-admin/discord-registrations.html head-own <title>Discord-Registrierungen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/admin-discord-registrations.css">
-admin/discord-registrations.html body <body>
-admin/discord-registrations.html parts chrome:1e932c1674d72a5e x-content
-admin/org-structure.html html <html lang="de">
-admin/org-structure.html head-fixed 08d6bee55c3b4da6
-admin/org-structure.html head-own <title>Organisationsstruktur - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/admin-org-structure.css">
-admin/org-structure.html body <body>
-admin/org-structure.html parts chrome:1e932c1674d72a5e x-content
-admin/person-search.html html <html lang="de">
-admin/person-search.html head-fixed 08d6bee55c3b4da6
-admin/person-search.html head-own <title>Personensuche - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/admin-person-search.css">
-admin/person-search.html body <body>
-admin/person-search.html parts chrome:1e932c1674d72a5e x-content
-admin/special-commands.html html <html lang="de">
-admin/special-commands.html head-fixed 08d6bee55c3b4da6
-admin/special-commands.html head-own <title>Spezialkommandos verwalten - Profit Basetool – Alle Staffeln</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/pages/admin-special-commands.css">
-admin/special-commands.html body <body>
-admin/special-commands.html parts chrome:1e932c1674d72a5e x-content
-admin/terms.html html <html lang="de">
-admin/terms.html head-fixed 08d6bee55c3b4da6
-admin/terms.html head-own <title>Profit Basetool – Alle Staffeln - Zustimmung zu den Nutzungsbedingungen</title>
-admin/terms.html body <body>
-admin/terms.html parts chrome:1e932c1674d72a5e x-content
 audit/admin/audit-log.html html <html lang="de">
 audit/admin/audit-log.html head-fixed 08d6bee55c3b4da6
 audit/admin/audit-log.html head-own <title>Audit-Logs - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/bank/bank.css"><link rel="stylesheet" href="/css/pages/audit/admin-audit-log.css">
@@ -228,6 +198,56 @@ hangar/hangar.html head-fixed 08d6bee55c3b4da6
 hangar/hangar.html head-own <title>Hangar - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/hangar/hangar.css">
 hangar/hangar.html body <body>
 hangar/hangar.html parts chrome:1e932c1674d72a5e x-content
+identity/admin/deletion-requests.html html <html lang="de">
+identity/admin/deletion-requests.html head-fixed 08d6bee55c3b4da6
+identity/admin/deletion-requests.html head-own <title>Löschanträge - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/identity/admin-deletion-requests.css">
+identity/admin/deletion-requests.html body <body>
+identity/admin/deletion-requests.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+identity/admin/discord-registrations.html html <html lang="de">
+identity/admin/discord-registrations.html head-fixed 08d6bee55c3b4da6
+identity/admin/discord-registrations.html head-own <title>Discord-Registrierungen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/identity/admin-discord-registrations.css">
+identity/admin/discord-registrations.html body <body>
+identity/admin/discord-registrations.html parts chrome:1e932c1674d72a5e x-content
+identity/admin/person-search.html html <html lang="de">
+identity/admin/person-search.html head-fixed 08d6bee55c3b4da6
+identity/admin/person-search.html head-own <title>Personensuche - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/identity/admin-person-search.css">
+identity/admin/person-search.html body <body>
+identity/admin/person-search.html parts chrome:1e932c1674d72a5e x-content
+identity/admin/terms.html html <html lang="de">
+identity/admin/terms.html head-fixed 08d6bee55c3b4da6
+identity/admin/terms.html head-own <title>Profit Basetool – Alle Staffeln - Zustimmung zu den Nutzungsbedingungen</title>
+identity/admin/terms.html body <body>
+identity/admin/terms.html parts chrome:1e932c1674d72a5e x-content
+identity/member-edit.html html <html lang="de">
+identity/member-edit.html head-fixed 08d6bee55c3b4da6
+identity/member-edit.html head-own <title>Mitglied bearbeiten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/identity/member-edit.css">
+identity/member-edit.html body <body>
+identity/member-edit.html parts chrome:1e932c1674d72a5e x-content
+identity/members.html html <html lang="de">
+identity/members.html head-fixed 08d6bee55c3b4da6
+identity/members.html head-own <title>Mitgliederverwaltung - Profit Basetool – Alle Staffeln</title>
+identity/members.html body <body>
+identity/members.html parts chrome:1e932c1674d72a5e x-content
+identity/pending-approval.html html <html lang="de">
+identity/pending-approval.html head-fixed 08d6bee55c3b4da6
+identity/pending-approval.html head-own <title>Freigabe ausstehend - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/identity/pending-approval.css">
+identity/pending-approval.html body <body>
+identity/pending-approval.html parts x-content
+identity/profile.html html <html lang="de">
+identity/profile.html head-fixed 08d6bee55c3b4da6
+identity/profile.html head-own <title>Benutzerprofil - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/identity/profile.css">
+identity/profile.html body <body>
+identity/profile.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+identity/terms-accept.html html <html lang="de">
+identity/terms-accept.html head-fixed 08d6bee55c3b4da6
+identity/terms-accept.html head-own <title>Profit Basetool – Alle Staffeln - Nutzungsbedingungen bestätigen</title><link rel="stylesheet" href="/css/shell/legal.css"><link rel="stylesheet" href="/css/identity/terms-accept.css">
+identity/terms-accept.html body <body>
+identity/terms-accept.html parts x-content
+identity/terms.html html <html lang="de">
+identity/terms.html head-fixed 08d6bee55c3b4da6
+identity/terms.html head-own <title>Profit Basetool – Alle Staffeln - Nutzungsbedingungen</title><link rel="stylesheet" href="/css/shell/legal.css">
+identity/terms.html body <body>
+identity/terms.html parts chrome:1e932c1674d72a5e x-content
 inventory/inventory-admin.html html <html lang="de">
 inventory/inventory-admin.html head-fixed 08d6bee55c3b4da6
 inventory/inventory-admin.html head-own <title>Globales Lager - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/inventory/inventory-lager.css">
@@ -288,21 +308,16 @@ joborder/orders-material-demand.html head-fixed 08d6bee55c3b4da6
 joborder/orders-material-demand.html head-own <title>Materialbedarf - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/joborder/orders-material-demand.css">
 joborder/orders-material-demand.html body <body>
 joborder/orders-material-demand.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df
+leadership/organisation/leitung.html html <html lang="de">
+leadership/organisation/leitung.html head-fixed 08d6bee55c3b4da6
+leadership/organisation/leitung.html head-own <title>Leitung - Profit Basetool – Alle Staffeln</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/orgunit/organisation-unit-detail.css"/><link rel="stylesheet" href="/css/leadership/leitung.css"/>
+leadership/organisation/leitung.html body <body>
+leadership/organisation/leitung.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
 materialexchange/materialboerse.html html <html lang="de">
 materialexchange/materialboerse.html head-fixed 08d6bee55c3b4da6
 materialexchange/materialboerse.html head-own <title>Materialbörse - Profit Basetool – Alle Staffeln</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/materialexchange/materialboerse.css"/><link rel="stylesheet" href="/css/pages/materialexchange/materialboerse.css"/>
 materialexchange/materialboerse.html body <body>
 materialexchange/materialboerse.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-member-edit.html html <html lang="de">
-member-edit.html head-fixed 08d6bee55c3b4da6
-member-edit.html head-own <title>Mitglied bearbeiten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/member-edit.css">
-member-edit.html body <body>
-member-edit.html parts chrome:1e932c1674d72a5e x-content
-members.html html <html lang="de">
-members.html head-fixed 08d6bee55c3b4da6
-members.html head-own <title>Mitgliederverwaltung - Profit Basetool – Alle Staffeln</title>
-members.html body <body>
-members.html parts chrome:1e932c1674d72a5e x-content
 mission/mission-detail.html html <html lang="de">
 mission/mission-detail.html head-fixed 08d6bee55c3b4da6
 mission/mission-detail.html head-own <title>Einsatzverwaltung - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/mission/mission-detail.css">
@@ -333,26 +348,26 @@ operation/operations-index.html head-fixed 08d6bee55c3b4da6
 operation/operations-index.html head-own <title>Operationen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/operation/operations-index.css">
 operation/operations-index.html body <body>
 operation/operations-index.html parts chrome:1e932c1674d72a5e x-content
-organisation/leitung.html html <html lang="de">
-organisation/leitung.html head-fixed 08d6bee55c3b4da6
-organisation/leitung.html head-own <title>Leitung - Profit Basetool – Alle Staffeln</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/organisation-unit-detail.css"/><link rel="stylesheet" href="/css/leitung.css"/>
-organisation/leitung.html body <body>
-organisation/leitung.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-organisation/special-command-detail.html html <html lang="de">
-organisation/special-command-detail.html head-fixed 08d6bee55c3b4da6
-organisation/special-command-detail.html head-own <title>Profit Basetool – Alle Staffeln</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/organisation-unit-detail.css"><link rel="stylesheet" href="/css/pages/organisation-special-command-detail.css">
-organisation/special-command-detail.html body <body>
-organisation/special-command-detail.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
 orgchart/org-chart.html html <html lang="de">
 orgchart/org-chart.html head-fixed 08d6bee55c3b4da6
 orgchart/org-chart.html head-own <title>Organigramm - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/orgchart/org-chart.css">
 orgchart/org-chart.html body <body>
 orgchart/org-chart.html parts chrome:1e932c1674d72a5e x-content
-pending-approval.html html <html lang="de">
-pending-approval.html head-fixed 08d6bee55c3b4da6
-pending-approval.html head-own <title>Freigabe ausstehend - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/pending-approval.css">
-pending-approval.html body <body>
-pending-approval.html parts x-content
+orgunit/admin/org-structure.html html <html lang="de">
+orgunit/admin/org-structure.html head-fixed 08d6bee55c3b4da6
+orgunit/admin/org-structure.html head-own <title>Organisationsstruktur - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/orgunit/admin-org-structure.css">
+orgunit/admin/org-structure.html body <body>
+orgunit/admin/org-structure.html parts chrome:1e932c1674d72a5e x-content
+orgunit/admin/special-commands.html html <html lang="de">
+orgunit/admin/special-commands.html head-fixed 08d6bee55c3b4da6
+orgunit/admin/special-commands.html head-own <title>Spezialkommandos verwalten - Profit Basetool – Alle Staffeln</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/pages/orgunit/admin-special-commands.css">
+orgunit/admin/special-commands.html body <body>
+orgunit/admin/special-commands.html parts chrome:1e932c1674d72a5e x-content
+orgunit/organisation/special-command-detail.html html <html lang="de">
+orgunit/organisation/special-command-detail.html head-fixed 08d6bee55c3b4da6
+orgunit/organisation/special-command-detail.html head-own <title>Profit Basetool – Alle Staffeln</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/orgunit/organisation-unit-detail.css"><link rel="stylesheet" href="/css/pages/orgunit/organisation-special-command-detail.css">
+orgunit/organisation/special-command-detail.html body <body>
+orgunit/organisation/special-command-detail.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
 personalinventory/admin/personal-inventory.html html <html lang="de">
 personalinventory/admin/personal-inventory.html head-fixed 08d6bee55c3b4da6
 personalinventory/admin/personal-inventory.html head-own <title>Persönliche Inventare (Admin)</title><link rel="stylesheet" href="/css/personalinventory/personal-inventory.css"><link rel="stylesheet" href="/css/pages/personalinventory/admin-personal-inventory.css">
@@ -363,11 +378,6 @@ personalinventory/personal-inventory.html head-fixed 08d6bee55c3b4da6
 personalinventory/personal-inventory.html head-own <title>Persönliches Inventar</title><link rel="stylesheet" href="/css/personalinventory/personal-inventory.css">
 personalinventory/personal-inventory.html body <body>
 personalinventory/personal-inventory.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-profile.html html <html lang="de">
-profile.html head-fixed 08d6bee55c3b4da6
-profile.html head-own <title>Benutzerprofil - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/profile.css">
-profile.html body <body>
-profile.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
 promotion/promotion-admin-rank-requirements.html html <html lang="de">
 promotion/promotion-admin-rank-requirements.html head-fixed 08d6bee55c3b4da6
 promotion/promotion-admin-rank-requirements.html head-own <title>Rangvoraussetzungen verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/promotion/promotion-admin.css"><link rel="stylesheet" href="/css/pages/promotion/promotion-admin-rank-requirements.css">
@@ -438,13 +448,3 @@ shell/sc-links.html head-fixed 08d6bee55c3b4da6
 shell/sc-links.html head-own <title>Star-Citizen-Links - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/shell/sc-links.css">
 shell/sc-links.html body <body>
 shell/sc-links.html parts chrome:1e932c1674d72a5e x-content
-terms-accept.html html <html lang="de">
-terms-accept.html head-fixed 08d6bee55c3b4da6
-terms-accept.html head-own <title>Profit Basetool – Alle Staffeln - Nutzungsbedingungen bestätigen</title><link rel="stylesheet" href="/css/shell/legal.css"><link rel="stylesheet" href="/css/terms-accept.css">
-terms-accept.html body <body>
-terms-accept.html parts x-content
-terms.html html <html lang="de">
-terms.html head-fixed 08d6bee55c3b4da6
-terms.html head-own <title>Profit Basetool – Alle Staffeln - Nutzungsbedingungen</title><link rel="stylesheet" href="/css/shell/legal.css">
-terms.html body <body>
-terms.html parts chrome:1e932c1674d72a5e x-content

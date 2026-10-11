@@ -1058,7 +1058,7 @@ member's own decision; it changes nothing for anybody else and nothing about wha
 `service/NotificationMuteService`, `controller/NotificationController#preferences`,
 `V271__create_notification_mute.sql`, frontend `NotificationPreferenceWriteController`,
 `NotificationPreferenceProxyController`, `notification/fragments/profile-notification-prefs.html`,
-`static/js/profile-notification-prefs.js` · **Decision:**
+`static/js/identity/profile-notification-prefs.js` · **Decision:**
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 

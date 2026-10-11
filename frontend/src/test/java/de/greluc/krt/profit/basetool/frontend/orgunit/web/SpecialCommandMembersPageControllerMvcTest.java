@@ -108,7 +108,7 @@ class SpecialCommandMembersPageControllerMvcTest {
     mockMvc
         .perform(get("/organisation/special-commands/" + skId))
         .andExpect(status().isOk())
-        .andExpect(view().name("organisation/special-command-detail"))
+        .andExpect(view().name("orgunit/organisation/special-command-detail"))
         .andExpect(model().attribute("canToggleLead", true))
         .andExpect(model().attribute("backUrl", "/admin/special-commands"))
         .andExpect(
@@ -202,7 +202,7 @@ class SpecialCommandMembersPageControllerMvcTest {
     mockMvc
         .perform(get("/organisation/special-commands/" + skId))
         .andExpect(status().isOk())
-        .andExpect(view().name("organisation/special-command-detail"))
+        .andExpect(view().name("orgunit/organisation/special-command-detail"))
         .andExpect(model().attribute("canToggleLead", false))
         .andExpect(model().attribute("backUrl", "/organisation/leitung"))
         .andExpect(content().string(not(containsString("/members/" + memberId + "/lead"))))
@@ -253,7 +253,7 @@ class SpecialCommandMembersPageControllerMvcTest {
     mockMvc
         .perform(get("/organisation/special-commands/" + skId).param("fragment", "members"))
         .andExpect(status().isOk())
-        .andExpect(view().name("organisation/special-command-detail :: membersResults"))
+        .andExpect(view().name("orgunit/organisation/special-command-detail :: membersResults"))
         .andExpect(content().string(containsString("Pilot")))
         .andExpect(content().string(not(containsString("add-member-modal"))));
   }

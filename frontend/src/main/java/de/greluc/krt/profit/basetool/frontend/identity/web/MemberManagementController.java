@@ -156,9 +156,9 @@ public class MemberManagementController {
       model.addAttribute("error", "error.members.load");
     }
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
-      return "members :: membersTableFragment";
+      return "identity/members :: membersTableFragment";
     }
-    return "members";
+    return "identity/members";
   }
 
   /**
@@ -273,7 +273,7 @@ public class MemberManagementController {
                   form.staffelDetailLoaded()));
         }
       }
-      return "member-edit";
+      return "identity/member-edit";
     } catch (Exception e) {
       log.error("Could not fetch member details", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.member.details.load");

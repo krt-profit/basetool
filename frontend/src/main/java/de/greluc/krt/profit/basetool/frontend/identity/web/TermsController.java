@@ -61,6 +61,6 @@ public class TermsController {
       log.debug("Terms document unavailable; rendering the notice instead", e);
       model.addAttribute("terms", null);
     }
-    return "terms";
+    return "identity/terms";
   }
 }

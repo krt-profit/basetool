@@ -175,7 +175,7 @@ class TermsAcceptancePageControllerTest {
     mockMvc
         .perform(get("/terms/accept"))
         .andExpect(status().isOk())
-        .andExpect(view().name("terms-accept"));
+        .andExpect(view().name("identity/terms-accept"));
   }
 
   /**
@@ -204,7 +204,7 @@ class TermsAcceptancePageControllerTest {
     mockMvc
         .perform(get("/terms/accept"))
         .andExpect(status().isOk())
-        .andExpect(view().name("terms-accept"));
+        .andExpect(view().name("identity/terms-accept"));
   }
 
   /** Accepting relays to the backend and reports success to the page's AJAX write. */

@@ -112,8 +112,8 @@ public class AdminSpecialCommandsPageController {
       model.addAttribute("error", "error.admin.specialcommands.load");
     }
     return "results".equals(fragment)
-        ? "admin/special-commands :: results"
-        : "admin/special-commands";
+        ? "orgunit/admin/special-commands :: results"
+        : "orgunit/admin/special-commands";
   }
 
   /**

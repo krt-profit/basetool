@@ -93,6 +93,8 @@ public class AdminPersonSearchPageController {
       model.addAttribute("error", "admin.personSearch.tooShort");
     }
 
-    return "results".equals(fragment) ? "admin/person-search :: results" : "admin/person-search";
+    return "results".equals(fragment)
+        ? "identity/admin/person-search :: results"
+        : "identity/admin/person-search";
   }
 }

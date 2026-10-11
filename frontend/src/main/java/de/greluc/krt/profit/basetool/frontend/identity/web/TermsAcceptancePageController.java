@@ -72,7 +72,7 @@ public class TermsAcceptancePageController {
       log.debug("Terms status could not be read; rendering the consent page anyway.", e);
     }
     model.addAttribute("terms", identityClient.termsDocument());
-    return "terms-accept";
+    return "identity/terms-accept";
   }
 
   /**

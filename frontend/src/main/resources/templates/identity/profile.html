@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{profile.title} + ' - ' + ${appTitle}">User Profile - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<link rel="stylesheet" th:href="@{/css/pages/profile.css}">
+<link rel="stylesheet" th:href="@{/css/pages/identity/profile.css}">
     </th:block>
 </head>
 <body>
@@ -197,7 +197,7 @@
                 </div>
 
                 <div id="profile-deletion-host">
-                    <div th:replace="~{fragments/profile-deletion-card :: card}"></div>
+                    <div th:replace="~{identity/fragments/profile-deletion-card :: card}"></div>
                 </div>
             </div>
         </div>
@@ -249,8 +249,8 @@
         notificationPrefsError: /*[[#{profile.notifications.error}]]*/ 'The setting could not be saved.'
     };
 </script>
-<script th:src="@{/js/profile.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/profile-notification-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/identity/profile.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/identity/profile-notification-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

@@ -67,7 +67,7 @@ class AdminSpecialCommandsPageControllerTest {
 
     String view = controller.listSpecialCommands(false, null, model);
 
-    assertEquals("admin/special-commands", view);
+    assertEquals("orgunit/admin/special-commands", view);
     List<SpecialCommandDto> commands =
         (List<SpecialCommandDto>) model.getAttribute("specialCommands");
     assertNotNull(commands);

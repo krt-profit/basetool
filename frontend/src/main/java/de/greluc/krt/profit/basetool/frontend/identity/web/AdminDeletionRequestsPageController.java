@@ -74,7 +74,7 @@ public class AdminDeletionRequestsPageController {
       model.addAttribute("requests", List.of());
       model.addAttribute("error", "admin.deletionRequests.error.load");
     }
-    return "admin/deletion-requests";
+    return "identity/admin/deletion-requests";
   }
 
   /**
@@ -89,7 +89,7 @@ public class AdminDeletionRequestsPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String rows(@NotNull Model model) {
     model.addAttribute("requests", identityClient.deletionRequests());
-    return "admin/deletion-requests :: rows";
+    return "identity/admin/deletion-requests :: rows";
   }
 
   /**

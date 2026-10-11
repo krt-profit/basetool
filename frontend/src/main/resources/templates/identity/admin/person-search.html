@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{admin.personSearch.title} + ' - ' + ${appTitle}">Personensuche - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<link rel="stylesheet" th:href="@{/css/pages/admin-person-search.css}">
+<link rel="stylesheet" th:href="@{/css/pages/identity/admin-person-search.css}">
     </th:block>
 </head>
 <body>
@@ -91,7 +91,7 @@
     </div>
 </main>
 
-<script th:src="@{/js/admin-person-search.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/identity/admin-person-search.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

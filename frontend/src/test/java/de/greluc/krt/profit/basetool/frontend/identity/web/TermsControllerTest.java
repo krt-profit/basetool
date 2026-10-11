@@ -91,7 +91,10 @@ class TermsControllerTest {
 
   @Test
   void shouldReturnTermsView() throws Exception {
-    mockMvc.perform(get("/terms")).andExpect(status().isOk()).andExpect(view().name("terms"));
+    mockMvc
+        .perform(get("/terms"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/terms"));
   }
 
   /**
@@ -107,7 +110,7 @@ class TermsControllerTest {
     mockMvc
         .perform(get("/terms"))
         .andExpect(status().isOk())
-        .andExpect(view().name("terms"))
+        .andExpect(view().name("identity/terms"))
         .andExpect(
             content()
                 .string(

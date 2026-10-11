@@ -31,6 +31,7 @@ import {
     MIGRATED_FLOOR,
     evaluate,
     isChecked,
+    layoutViolations,
     loadTree,
 } from './typecheck-ratchet.mjs';
 
@@ -98,6 +99,15 @@ test('the real tree satisfies the ratchet', () => {
         checkedFloor: CHECKED_FILES_FLOOR,
     });
     assert.deepEqual(violations, []);
+    assert.deepEqual(layoutViolations(loadTree(root).manifest), []);
+});
+
+test('a script outside its domain folder fails', () => {
+    const manifest = { domains: { alpha: ['alpha/a.js', 'beta/b.js', 'c.js', 'alpha/sub/d.js'] } };
+    assert.deepEqual(
+        layoutViolations(manifest).map((v) => v.split(' ')[0]),
+        ['beta/b.js', 'c.js', 'alpha/sub/d.js'],
+    );
 });
 
 test('a valid tree passes', () => {
