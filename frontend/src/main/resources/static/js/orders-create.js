@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global materialIndex: writable, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_MATERIAL_LABEL, MSG_AMOUNT_LABEL, MSG_MINQUALITY_LABEL, SCU_HINT_TEXT, MSG_SCMDB_SUCCESS, MSG_SCMDB_SOME_UNKNOWN, MSG_SCMDB_NO_MATCH, MSG_SCMDB_NOT_FOUND, ITEM_I18N, EDIT_ITEMS, MSG_MATERIAL_INVALID, MSG_ITEM_INVALID, MSG_CREATE_FAILED, MSG_UPDATE_FAILED, showFrontendErrorToast */
 
 function buildScuHint() {
@@ -292,7 +294,10 @@ async function findJobOrderMaterialByName(normalizedName) {
 }
 
 async function importFromScmdb() {
-    const text = document.getElementById('scmdb-import-text').value;
+    const importField = /** @type {HTMLTextAreaElement} */ (
+        document.getElementById('scmdb-import-text')
+    );
+    const text = importField.value;
     const lines = text.split('\n');
 
     let foundAny = false;
@@ -315,13 +320,18 @@ async function importFromScmdb() {
             const material = await findJobOrderMaterialByName(materialName);
 
             if (material) {
-                const container = document.getElementById('materials-container');
+                const container = /** @type {HTMLElement} */ (
+                    document.getElementById('materials-container')
+                );
+                /** @type {Element | null} */
                 let targetRow = null;
 
                 if (!foundAny) {
                     const rows = container.getElementsByClassName('material-row');
                     if (rows.length > 0) {
-                        const firstSelect = rows[0].querySelector('[data-role="material-select"]');
+                        const firstSelect = /** @type {HTMLInputElement | null} */ (
+                            rows[0].querySelector('[data-role="material-select"]')
+                        );
                         if (firstSelect && !firstSelect.value) {
                             targetRow = rows[0];
                         }
@@ -330,11 +340,15 @@ async function importFromScmdb() {
 
                 if (!targetRow) {
                     addMaterialRow();
-                    targetRow = container.lastElementChild;
+                    targetRow = /** @type {Element} */ (container.lastElementChild);
                 }
 
-                const matField = targetRow.querySelector('[data-role="material-select"]');
-                const amountInput = targetRow.querySelector('[data-role="material-amount"]');
+                const matField = /** @type {HTMLInputElement} */ (
+                    targetRow.querySelector('[data-role="material-select"]')
+                );
+                const amountInput = /** @type {HTMLInputElement} */ (
+                    targetRow.querySelector('[data-role="material-amount"]')
+                );
 
                 if (matField.krtCombobox) {
                     matField.krtCombobox.setValue(material.id, material.name, {
@@ -343,7 +357,7 @@ async function importFromScmdb() {
                 } else {
                     matField.value = material.id;
                 }
-                amountInput.value = amount;
+                amountInput.value = String(amount);
                 refreshMaterialUnit(targetRow);
 
                 foundAny = true;
@@ -354,7 +368,7 @@ async function importFromScmdb() {
     }
 
     if (foundAny) {
-        document.getElementById('scmdb-import-text').value = '';
+        importField.value = '';
         syncMaterialRemoveButtons();
         updateMaterialSummary();
         if (window.krtModal) {
@@ -381,7 +395,7 @@ async function importFromScmdb() {
 }
 
 function addMaterialRow() {
-    const container = document.getElementById('materials-container');
+    const container = /** @type {HTMLElement} */ (document.getElementById('materials-container'));
 
     const row = document.createElement('div');
     row.className = 'material-row material-grid';
@@ -440,16 +454,21 @@ function fetchItemOptions(query) {
 function setFormDisabled(containerId, disabled) {
     const c = document.getElementById(containerId);
     if (!c) return;
-    c.querySelectorAll('input, select, textarea, button').forEach((el) => {
+    /** @type {NodeListOf<HTMLInputElement>} */ (
+        c.querySelectorAll('input, select, textarea, button')
+    ).forEach((el) => {
         el.disabled = disabled;
     });
 }
 
 function toggleOrderMode() {
-    const checked = document.querySelector('input[name="orderModeToggle"]:checked');
+    const checked = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="orderModeToggle"]:checked')
+    );
     const mode = checked ? checked.value : 'material';
-    document.getElementById('mode-material').hidden = mode !== 'material';
-    document.getElementById('mode-item').hidden = mode !== 'item';
+    /** @type {HTMLElement} */ (document.getElementById('mode-material')).hidden =
+        mode !== 'material';
+    /** @type {HTMLElement} */ (document.getElementById('mode-item')).hidden = mode !== 'item';
     setFormDisabled('mode-material', mode !== 'material');
     setFormDisabled('mode-item', mode !== 'item');
     if (mode === 'material') {
@@ -464,7 +483,7 @@ function addItemLine(prefill) {
     if (!container) return null;
     const row = document.createElement('div');
     row.className = 'item-line';
-    row.dataset.lineIndex = idx;
+    row.dataset.lineIndex = String(idx);
     const manufactured = Number(prefill.manufactured) || 0;
     const minAmount = manufactured > 0 ? manufactured : 1;
     let idInput = krtHtml``;
@@ -507,7 +526,9 @@ function addItemLine(prefill) {
     );
     copyTemplateOptions('item-options-template', row.querySelector('[data-role="item-select"]'));
     container.appendChild(row);
-    const itemSelect = row.querySelector('select[data-role="item-select"]');
+    const itemSelect = /** @type {HTMLSelectElement | null} */ (
+        row.querySelector('select[data-role="item-select"]')
+    );
     if (itemSelect && prefill.gameItemId) {
         const seeded = document.createElement('option');
         seeded.value = prefill.gameItemId;
@@ -659,18 +680,20 @@ function loadDerivation(row, qualities) {
 const itemLinesContainer = document.getElementById('item-lines');
 if (itemLinesContainer) {
     itemLinesContainer.addEventListener('change', (e) => {
-        const row = e.target.closest('.item-line');
+        const target = /** @type {Element} */ (e.target);
+        const row = target.closest('.item-line');
         if (!row) return;
-        if (e.target.matches('[data-role="item-select"]')) {
+        if (target.matches('[data-role="item-select"]')) {
             loadBlueprints(row);
-        } else if (e.target.matches('[data-role="blueprint-select"]')) {
+        } else if (target.matches('[data-role="blueprint-select"]')) {
             loadDerivation(row);
-        } else if (e.target.matches('[data-role="amount"]')) {
+        } else if (target.matches('[data-role="amount"]')) {
             loadDerivation(row);
         }
     });
     itemLinesContainer.addEventListener('click', (e) => {
-        const removeBtn = e.target.closest('[data-trigger="orders-remove-item"]');
+        const target = /** @type {Element} */ (e.target);
+        const removeBtn = target.closest('[data-trigger="orders-remove-item"]');
         if (removeBtn) {
             const row = removeBtn.closest('.item-line');
             if (row) {
@@ -679,12 +702,14 @@ if (itemLinesContainer) {
             }
             return;
         }
-        const adoptBtn = e.target.closest('[data-trigger="orders-adopt-sub"]');
+        const adoptBtn = /** @type {HTMLElement | null} */ (
+            target.closest('[data-trigger="orders-adopt-sub"]')
+        );
         if (adoptBtn) {
             addItemLine({
                 gameItemId: adoptBtn.dataset.gameItemId,
                 gameItemName: adoptBtn.dataset.gameItemName,
-                amount: parseInt(adoptBtn.dataset.amount, 10) || 1,
+                amount: parseInt(adoptBtn.dataset.amount ?? '', 10) || 1,
                 parentId: adoptBtn.dataset.parent,
             });
         }
@@ -703,8 +728,9 @@ toggleOrderMode();
 const materialsContainerEl = document.getElementById('materials-container');
 if (materialsContainerEl) {
     materialsContainerEl.addEventListener('change', (e) => {
-        if (e.target && e.target.matches && e.target.matches('[data-role="material-select"]')) {
-            refreshMaterialUnit(e.target.closest('.material-row'));
+        const target = /** @type {Element | null} */ (e.target);
+        if (target && target.matches && target.matches('[data-role="material-select"]')) {
+            refreshMaterialUnit(target.closest('.material-row'));
         }
     });
     materialsContainerEl.querySelectorAll('.material-row').forEach(refreshMaterialUnit);
@@ -759,7 +785,9 @@ function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
         },
     });
 }
-const _materialCreateForm = document.querySelector('#mode-material form');
+const _materialCreateForm = /** @type {HTMLFormElement | null} */ (
+    document.querySelector('#mode-material form')
+);
 if (_materialCreateForm) {
     _materialCreateForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -771,12 +799,16 @@ if (_materialCreateForm) {
         );
     });
 }
-const _itemCreateForm = document.querySelector('#mode-item form');
+const _itemCreateForm = /** @type {HTMLFormElement | null} */ (
+    document.querySelector('#mode-item form')
+);
 if (_itemCreateForm) {
     _itemCreateForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const failed =
-            _itemCreateForm.getAttribute('action').indexOf('/items/update') >= 0
+            /** @type {string} */ (_itemCreateForm.getAttribute('action')).indexOf(
+                '/items/update',
+            ) >= 0
                 ? MSG_UPDATE_FAILED
                 : MSG_CREATE_FAILED;
         _submitOrderCreate(_itemCreateForm, MSG_ITEM_INVALID, failed, e.submitter);

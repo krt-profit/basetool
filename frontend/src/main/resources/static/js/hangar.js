@@ -17,14 +17,28 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global hangarI18n, hangarConflict */
 
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
     const closeBtn = document.querySelector('.close-ship-modal');
-    const form = document.getElementById('ship-form');
-    const modalTitle = document.getElementById('modal-title');
-    const filterForm = document.getElementById('hangar-filter-form');
+    const form = /** @type {HTMLFormElement} */ (document.getElementById('ship-form'));
+    const modalTitle = /** @type {HTMLElement} */ (document.getElementById('modal-title'));
+    const filterForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('hangar-filter-form')
+    );
+
+    /**
+     * Looks up a control of the ship form by id; the ship form always renders them.
+     *
+     * @param {string} id the element id
+     * @returns {HTMLInputElement} the control
+     */
+    function shipField(id) {
+        return /** @type {HTMLInputElement} */ (document.getElementById(id));
+    }
 
     function currentListUrl() {
         const query = new URLSearchParams(window.location.search).toString();
@@ -103,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const count = total === null ? 0 : total;
         ['set-home-location-btn', 'delete-all-ships-btn'].forEach((id) => {
-            const item = document.getElementById(id);
+            const item = /** @type {HTMLButtonElement | null} */ (document.getElementById(id));
             if (!item) return;
             const empty = count === 0;
             item.disabled = empty;
@@ -125,10 +139,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const insuranceValue = document.getElementById('ship-insurance');
-    const insuranceMonths = document.getElementById('ship-insurance-months');
+    const insuranceValue = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('ship-insurance')
+    );
+    const insuranceMonths = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('ship-insurance-months')
+    );
     const insuranceMonthsRow = document.getElementById('ship-insurance-months-row');
-    const insuranceKinds = Array.from(form.querySelectorAll('input[name="insuranceKind"]'));
+    const insuranceKinds = Array.from(
+        /** @type {NodeListOf<HTMLInputElement>} */ (
+            form.querySelectorAll('input[name="insuranceKind"]')
+        ),
+    );
     if (insuranceKinds.length) {
         insuranceKinds[0].required = true;
     }
@@ -204,7 +226,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
 
     const deleteModal = document.getElementById('delete-confirm-modal');
-    const deleteForm = document.getElementById('delete-confirm-form');
+    const deleteForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('delete-confirm-form')
+    );
     const closeDeleteBtns = document.querySelectorAll('.close-delete-modal');
 
     window.addEventListener('click', (e) => {
@@ -212,31 +236,41 @@ document.addEventListener('DOMContentLoaded', () => {
         if (deleteModal && e.target === deleteModal) window.krtModal.close(deleteModal);
     });
 
-    const modalDeleteBtn = document.getElementById('modal-delete-btn');
+    const modalDeleteBtn = /** @type {HTMLElement} */ (document.getElementById('modal-delete-btn'));
 
+    /**
+     * Opens the ship dialog blank, posting to the clicked button's action.
+     *
+     * @param {HTMLElement} btn the add button
+     */
     function openAddModal(btn) {
         modalTitle.textContent = form.getAttribute('data-title-add');
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
-        document.getElementById('ship-name').value = '';
-        document.getElementById('ship-type').value = '';
+        shipField('ship-name').value = '';
+        shipField('ship-type').value = '';
         setInsurance('');
-        document.getElementById('ship-location').value = '';
-        document.getElementById('ship-fitted').checked = false;
-        document.getElementById('ship-version').value = '';
+        shipField('ship-location').value = '';
+        shipField('ship-fitted').checked = false;
+        shipField('ship-version').value = '';
         modalDeleteBtn.hidden = true;
         openModal();
     }
 
+    /**
+     * Opens the ship dialog filled from the clicked button's data attributes.
+     *
+     * @param {HTMLElement} btn the edit button
+     */
     function openEditModal(btn) {
         modalTitle.textContent = form.getAttribute('data-title-edit');
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
-        document.getElementById('ship-name').value = btn.getAttribute('data-name');
-        document.getElementById('ship-type').value = btn.getAttribute('data-type');
+        shipField('ship-name').value = btn.getAttribute('data-name') ?? '';
+        shipField('ship-type').value = btn.getAttribute('data-type') ?? '';
         setInsurance(btn.getAttribute('data-ins'));
-        document.getElementById('ship-location').value = btn.getAttribute('data-loc') || '';
-        document.getElementById('ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
-        document.getElementById('ship-version').value = btn.getAttribute('data-version');
-        const action = btn.getAttribute('data-action');
+        shipField('ship-location').value = btn.getAttribute('data-loc') || '';
+        shipField('ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
+        shipField('ship-version').value = btn.getAttribute('data-version') ?? '';
+        const action = /** @type {string} */ (btn.getAttribute('data-action'));
         modalDeleteBtn.setAttribute('data-action', action.replace('/update', '/delete'));
         modalDeleteBtn.hidden = false;
         openModal();
@@ -248,6 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     modalDeleteBtn.addEventListener('click', () => {
+        if (!deleteForm) return;
         deleteForm.action = window.safeSameOriginUrl(
             modalDeleteBtn.getAttribute('data-action'),
             deleteForm.action,
@@ -266,7 +301,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (deleteForm) {
         deleteForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            const submitBtn = deleteForm.querySelector('button[type="submit"]');
+            const submitBtn = /** @type {HTMLButtonElement | null} */ (
+                deleteForm.querySelector('button[type="submit"]')
+            );
             if (submitBtn) submitBtn.disabled = true;
             window.krtFetch
                 .write({
@@ -297,10 +334,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     (function () {
         const importBtn = document.getElementById('fleetview-import-btn');
-        const fileInput = document.getElementById('fleetview-file');
+        const fileInput = /** @type {HTMLInputElement | null} */ (
+            document.getElementById('fleetview-file')
+        );
         const resultModal = document.getElementById('import-result-modal');
         const closeResultBtn = document.getElementById('import-result-close');
         const closeResultX = document.getElementById('import-result-close-x');
+
+        /**
+         * Looks up an element of the import result dialog; the dialog always renders them.
+         *
+         * @param {string} id the element id
+         * @returns {HTMLElement} the element
+         */
+        function resultElement(id) {
+            return /** @type {HTMLElement} */ (document.getElementById(id));
+        }
 
         function showError(msg) {
             if (window.showFrontendErrorToast) {
@@ -319,11 +368,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function openResultModal(data) {
-            document.getElementById('import-res-imported').textContent = data.importedCount;
-            document.getElementById('import-res-skipped').textContent = data.skippedCount;
-            document.getElementById('import-res-duplicates').textContent = data.duplicateCount;
+            resultElement('import-res-imported').textContent = data.importedCount;
+            resultElement('import-res-skipped').textContent = data.skippedCount;
+            resultElement('import-res-duplicates').textContent = data.duplicateCount;
 
-            const skipSection = document.getElementById('import-skip-section');
+            const skipSection = resultElement('import-skip-section');
             const skipList = document.getElementById('import-skip-list');
             const hasSkipped = !!(data.skippedShips && data.skippedShips.length > 0);
             if (hasSkipped) {
@@ -331,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             skipSection.hidden = !hasSkipped;
 
-            const dupSection = document.getElementById('import-dup-section');
+            const dupSection = resultElement('import-dup-section');
             const dupList = document.getElementById('import-dup-list');
             const hasDuplicates = !!(data.duplicateShips && data.duplicateShips.length > 0);
             if (hasDuplicates) {
@@ -346,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!btn) return;
             btn.addEventListener('click', () => {
                 window.krtModal.close(resultModal);
-                if (document.getElementById('import-res-imported').textContent !== '0') {
+                if (resultElement('import-res-imported').textContent !== '0') {
                     afterHangarWrite();
                 }
             });
@@ -359,9 +408,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         function upload(file) {
-            const maxBytes = Number(importBtn.getAttribute('data-max-bytes'));
+            if (!importBtn || !fileInput) return;
+            const button = importBtn;
+            const input = fileInput;
+            const maxBytes = Number(button.getAttribute('data-max-bytes'));
             if (maxBytes > 0 && file.size > maxBytes) {
-                showError(importBtn.getAttribute('data-error-toolarge'));
+                showError(button.getAttribute('data-error-toolarge'));
                 return;
             }
             if (!window.krtFetch) {
@@ -372,17 +424,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             function showFailure(detail) {
                 showError(
-                    importBtn.getAttribute('data-error-failed') + (detail ? ` (${detail})` : ''),
+                    button.getAttribute('data-error-failed') + (detail ? ` (${detail})` : ''),
                 );
             }
 
-            importBtn.setAttribute('aria-busy', 'true');
+            button.setAttribute('aria-busy', 'true');
             window.krtFetch
                 .submitForm({
                     url: '/hangar/import/ships',
                     method: 'POST',
                     formData,
-                    submitter: importBtn,
+                    submitter: button,
                     toast: false,
                     onSuccess(data) {
                         openResultModal(data);
@@ -397,8 +449,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                 })
                 .then(() => {
-                    importBtn.removeAttribute('aria-busy');
-                    fileInput.value = '';
+                    button.removeAttribute('aria-busy');
+                    input.value = '';
                 });
         }
 
@@ -416,10 +468,16 @@ document.addEventListener('DOMContentLoaded', () => {
     })();
 
     (function () {
-        const deleteAllBtn = document.getElementById('delete-all-ships-btn');
+        const deleteAllBtn = /** @type {HTMLButtonElement | null} */ (
+            document.getElementById('delete-all-ships-btn')
+        );
         const deleteAllModal = document.getElementById('delete-all-confirm-modal');
-        const deleteAllConfirmBtn = document.getElementById('delete-all-confirm-btn');
-        const deleteAllCancelBtn = document.getElementById('delete-all-cancel-btn');
+        const deleteAllConfirmBtn = /** @type {HTMLButtonElement} */ (
+            document.getElementById('delete-all-confirm-btn')
+        );
+        const deleteAllCancelBtn = /** @type {HTMLButtonElement} */ (
+            document.getElementById('delete-all-cancel-btn')
+        );
 
         if (!deleteAllBtn || !deleteAllModal) return;
 
@@ -447,14 +505,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'DELETE',
                     url: '/hangar/ships/all',
                     toast: false,
-                    errorMessage: deleteAllBtn.getAttribute('data-error-failed'),
+                    errorMessage: /** @type {string} */ (
+                        deleteAllBtn.getAttribute('data-error-failed')
+                    ),
                     conflict: hangarConflict,
                     onSuccess() {
                         window.krtModal.close(deleteAllModal);
                         afterHangarWrite();
                         if (window.showFrontendSuccessToast) {
                             window.showFrontendSuccessToast(
-                                deleteAllBtn.getAttribute('data-success'),
+                                /** @type {string} */ (deleteAllBtn.getAttribute('data-success')),
                             );
                         }
                     },
@@ -485,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             window.krtEvents.on('click', 'hangar-open-home', (btn) => {
-                if (btn && btn.disabled) return;
+                if (btn && /** @type {HTMLButtonElement} */ (btn).disabled) return;
                 refreshHomeBody();
                 window.krtModal.open(homeModal);
             });
@@ -500,12 +560,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        const homeForm = document.getElementById('home-location-form');
+        const homeForm = /** @type {HTMLFormElement | null} */ (
+            document.getElementById('home-location-form')
+        );
         if (homeForm) {
             homeForm.addEventListener('submit', (e) => {
                 e.preventDefault();
-                const submitBtn = homeForm.querySelector('button[type="submit"]');
-                const select = homeForm.querySelector('select[name="locationId"]');
+                const submitBtn = /** @type {HTMLButtonElement | null} */ (
+                    homeForm.querySelector('button[type="submit"]')
+                );
+                const select = /** @type {HTMLSelectElement | null} */ (
+                    homeForm.querySelector('select[name="locationId"]')
+                );
                 const locationId = select ? select.value : '';
                 if (!locationId) {
                     return;
@@ -538,18 +604,22 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const action = form.getAttribute('action') || form.action;
         const isUpdate = /\/update$/.test(action);
-        const versionRaw = document.getElementById('ship-version').value;
-        const ownerSel = form.querySelector('[name="owningOrgUnitId"]');
+        const versionRaw = shipField('ship-version').value;
+        const ownerSel = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            form.querySelector('[name="owningOrgUnitId"]')
+        );
         const payload = {
-            name: document.getElementById('ship-name').value || null,
-            shipTypeId: document.getElementById('ship-type').value || null,
+            name: shipField('ship-name').value || null,
+            shipTypeId: shipField('ship-type').value || null,
             insurance: syncInsurance() || null,
-            locationId: document.getElementById('ship-location').value || null,
-            fitted: document.getElementById('ship-fitted').checked,
+            locationId: shipField('ship-location').value || null,
+            fitted: shipField('ship-fitted').checked,
             version: isUpdate && versionRaw ? Number(versionRaw) : null,
             owningOrgUnitId: isUpdate ? null : ownerSel && ownerSel.value ? ownerSel.value : null,
         };
-        const submitBtn = form.querySelector('button[type="submit"]');
+        const submitBtn = /** @type {HTMLButtonElement | null} */ (
+            form.querySelector('button[type="submit"]')
+        );
         if (submitBtn) submitBtn.disabled = true;
         window.krtFetch
             .write({
@@ -569,8 +639,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     });
 
-    const manufacturerSelect = document.getElementById('ship-manufacturer');
-    const shipTypeSelect = document.getElementById('ship-type');
+    const manufacturerSelect = /** @type {HTMLSelectElement} */ (
+        document.getElementById('ship-manufacturer')
+    );
+    const shipTypeSelect = /** @type {HTMLSelectElement} */ (document.getElementById('ship-type'));
     const shipTypeAllOptions = Array.from(shipTypeSelect.options);
 
     manufacturerSelect.addEventListener('change', function () {
@@ -591,6 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    /** @type {number | null} */
     let hangarFilterTimer = null;
 
     function filterUrl() {
@@ -599,7 +672,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = new FormData(filterForm);
             for (const [key, value] of data.entries()) {
                 if (value !== '') {
-                    params.append(key, value);
+                    params.append(key, String(value));
                 }
             }
         }
@@ -607,6 +680,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return `/hangar${query ? `?${query}` : ''}`;
     }
 
+    /**
+     * Swaps the list for the filter form's current state, or for `url` when given.
+     *
+     * @param {string | null} [url] the list URL to load instead of the form's state
+     */
     function applyHangarFilter(url) {
         const target = url || filterUrl();
         if (!hangarResults || !window.krtFetch) {
@@ -618,49 +696,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (filterForm) {
         filterForm.addEventListener('input', (e) => {
-            if (!e.target || e.target.id !== 'hangar-ship-filter') {
+            const target = /** @type {HTMLElement | null} */ (e.target);
+            if (!target || target.id !== 'hangar-ship-filter') {
                 return;
             }
-            clearTimeout(hangarFilterTimer);
+            clearTimeout(hangarFilterTimer ?? undefined);
             hangarFilterTimer = setTimeout(() => {
                 applyHangarFilter();
             }, 300);
         });
 
         filterForm.addEventListener('change', (e) => {
-            if (!e.target || e.target.name !== 'fitted') {
+            const target = /** @type {HTMLInputElement | null} */ (e.target);
+            if (!target || target.name !== 'fitted') {
                 return;
             }
-            clearTimeout(hangarFilterTimer);
+            clearTimeout(hangarFilterTimer ?? undefined);
             applyHangarFilter();
         });
 
         filterForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            clearTimeout(hangarFilterTimer);
+            clearTimeout(hangarFilterTimer ?? undefined);
             applyHangarFilter();
         });
     }
 
     if (hangarResults) {
         hangarResults.addEventListener('click', (e) => {
-            const clear = e.target.closest
-                ? e.target.closest('[data-testid="empty-state-action"]')
+            const target = /** @type {Element} */ (e.target);
+            const clear = target.closest
+                ? target.closest('[data-testid="empty-state-action"]')
                 : null;
             if (!clear || !hangarResults.contains(clear)) {
                 return;
             }
             e.preventDefault();
-            const input = document.getElementById('hangar-ship-filter');
+            const input = /** @type {HTMLInputElement | null} */ (
+                document.getElementById('hangar-ship-filter')
+            );
             if (input) {
                 input.value = '';
             }
             if (filterForm) {
-                filterForm.querySelectorAll('input[name="fitted"]').forEach((radio) => {
+                /** @type {NodeListOf<HTMLInputElement>} */ (
+                    filterForm.querySelectorAll('input[name="fitted"]')
+                ).forEach((radio) => {
                     radio.checked = radio.value === '';
                 });
             }
-            clearTimeout(hangarFilterTimer);
+            clearTimeout(hangarFilterTimer ?? undefined);
             applyHangarFilter(clear.getAttribute('href'));
         });
     }

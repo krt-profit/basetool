@@ -9,14 +9,24 @@
  * The location is never sent — the modal only carries material / quality / amount.
  * Delegated via window.krtEvents so lazily-loaded leaf rows need no re-binding.
  */
+
+// @ts-check
+
 (function () {
     'use strict';
 
     const i18n = window.materialboerseInventoryI18n || {};
-    if (!window.krtEvents || !window.krtMaterialRelease || !window.krtFetch) {
+    const release = window.krtMaterialRelease;
+    if (!window.krtEvents || !release || !window.krtFetch) {
         return;
     }
 
+    /**
+     * Updates the status chip of one Lager item.
+     *
+     * @param {string | null} itemId the item the chip belongs to
+     * @param {boolean} released whether the item is now offered on the board
+     */
     function setStatus(itemId, released) {
         const chip = document.querySelector(`[data-boerse-status-for="${itemId}"]`);
         if (!chip) {
@@ -27,10 +37,11 @@
         chip.classList.toggle('chip--muted', !released);
     }
 
-    window.krtEvents.on('change', 'inv-boerse-toggle', (el) => {
+    window.krtEvents.on('change', 'inv-boerse-toggle', (element) => {
+        const el = /** @type {HTMLInputElement} */ (element);
         const itemId = el.getAttribute('data-id');
         if (el.checked) {
-            window.krtMaterialRelease.open(
+            release.open(
                 'lager',
                 {
                     itemId,
@@ -49,6 +60,9 @@
                     },
                 },
             );
+            return;
+        }
+        if (!window.showKrtConfirm) {
             return;
         }
         window

@@ -1538,7 +1538,7 @@ domain stays a package.
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
 | F3 — **done 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 — **done 2026-10-10** | Package-by-domain move in one pull request; route/gate snapshot byte-identical. Released only after a release carrying F2 is in production (D-10) |
-| F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
+| F5 — **started 2026-10-11** | Templates and assets per domain (§8.2), with the page chrome as one layout fragment. Done so far: the type-check ratchet (below) |
 
 *F1 as built (2026-10-04).* `service.BackendErrorMapper` classifies every failed call into one case
 of its sealed `Outcome` (`Problem`, `Reauthentication`, `CircuitOpen`, `BulkheadFull`, `Timeout`,
@@ -1654,6 +1654,46 @@ old class names in its flash maps; they resolve to no class, so the value fails 
 before the allow-list is consulted — dropped on `basetool_session_value_dropped_total`, not refused
 on `basetool_session_type_refused_total` — once per session, never the login (deployment.md).
 
+*F5 type-check ratchet as built (2026-10-11).* Design: `frontend/typecheck-ratchet.json` assigns
+every script of `static/js` to exactly one domain — the 21 frontend domains of §5.9 that have
+scripts (`audit` … `settings`) plus `kernel` for the shared infrastructure, 22 names in all — and
+lists the domains that are *migrated*. Every domain of the manifest must be migrated (a new domain
+cannot enter unchecked), and a migrated domain holds only scripts whose leading comments carry
+`// @ts-check`; the scan includes subfolders of `static/js`, `vendor/` excepted. `frontend/scripts/typecheck-ratchet.mjs` is the guard and
+`typecheck-ratchet.test.mjs` its test, wired as `:frontend:testTypecheckRatchet` into `check` (zero
+dependencies, like `testTrustedTypesJs`). It fails on: a script in no domain, in two, or a listed
+script that does not exist; an unchecked script in a migrated domain; a domain dropped from the
+migrated list (`MIGRATED_FLOOR`, which only grows); fewer checked scripts than
+`CHECKED_FILES_FLOOR`; `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error` anywhere; a `tsconfig.json`
+that excludes anything beyond vendor, `node_modules` and `build`, that stops including the scripts,
+or that loses `strict`. The test proves each rule on planted trees (among them an unchecked
+file in a migrated domain, a stray file, a stray file in a subfolder, a new unmigrated domain, a
+dropped domain, each suppression pragma) and runs the real tree. *Review corrections (same day):*
+the first version scanned only the top level of `static/js` although `tsconfig.json` includes
+`static/js/**`, so a script in a subfolder escaped every rule, and a new domain missing from
+`"migrated"` passed; both are closed and tested. Numbers: before, 113 scripts, 65 checked (58 %), 48 unchecked, 3 domains
+(`exchange`, `leadership`, `notification`) fully checked; after, 124 scripts, 124 checked, all 22
+domains migrated. The 48 scripts carried 2,393 type errors under `checkJs` (the three giants 538,
+221 and 185 of them); all are fixed by casts at the query, `@type`/`@param` JSDoc, and null guards,
+with no `any` element handle and no suppression. `types/*.d.ts` gained the `Window` members the
+scripts read, `KrtLiveSyncHandlers` and corrected bootstrap dictionaries; `safeSameOriginUrl` became
+non-optional because `head.html` loads it on every page.
+*The three giants* were split first, as byte-exact cuts at top-level statement boundaries (each
+proven by concatenating the parts against `git show` of the original) into parts that load by
+consecutive `defer` tags in the original order, the first part keeping the file name:
+`mission-detail.js` (3,283 lines) into 5 parts of 541 to 918 lines, `orders-detail.js`
+(2,650) into 6 parts of 293 to 944 lines, `bank.js` (2,211) into 3 parts, loaded by all nine bank
+pages. Corrections: **there are no domain folders yet** — the 113 scripts sat in one flat folder, and
+moving them would rewrite 113 template references and ~35 tests that F5's template track is
+changing at the same time, so the "folder" of the ratchet is the manifest's domain name today and
+the asset move turns each name into a folder (the keys are chosen to be the folder names). `bank.js`
+keeps 2,081 of its lines in one immediately invoked function whose sections call each other (modal
+priming, previews, movement rows); cutting inside it would have meant a shared object and about 60
+rewritten call sites, a refactor and not a split, so only its four trailing immediately invoked functions left it —
+the 20 % claim holds for the folder, not for that file. Every part lives in its domain, so the
+parts of a giant add to the domain's list in the same change. A load-time throw in one part now
+skips only the rest of that part, not the rest of the former file.
+
 ### 7.9 REST API track
 
 **Delivery decided 2026-10-04 (D-24):** the waves below are built and merged one by one, but ship
@@ -1711,7 +1751,7 @@ JSpecify stays out for now (ADR-0192).
 | --- | --- | --- | --- |
 | **Document the browser baseline — decided: "Baseline 2025", ES2025** (D-16). **Done 2026-10-04**: TypeScript 7.0.2 accepts the `ES2025` lib (proven by a planted checked file), `tsconfig.json` and `eslint.config.mjs` are at 2025, the floor is in `ui-design-system.md` and REQ-FE-018, and ESLint rejects the three ES2025 APIs above the floor, which the `ES2025` lib declares. The features already shipped imply Chrome 105, Firefox 121, Safari 16.4; the decided floor is at least Chrome 122, Firefox 131, Safari/iOS 18.4 (iterator helpers; `Promise.try`, `RegExp.escape` and `Float16Array` need newer releases), which brings Set methods, iterator helpers, popover and same-document view transitions. Raise the type check's `lib`/`target` and ESLint's `ecmaVersion` from 2023 to 2025 once TypeScript 7 is proven to accept the `ES2025` lib; write the floor into `ui-design-system.md` and REQ-FE-018 | Every other modern-feature decision needs this answer; today a newer API in an unchecked file passes every gate | Members who cannot update iOS to 18.4 or later lose functions; the rejected alternative was "Baseline widely available" (ES2024, Safari 17.4) | `typecheckJs`, `lintJs`, the E2E browser matrix |
 | **ESLint core autofix rules** — **done 2026-10-04**: all five are errors for the browser and Node scripts, autofix applied (1,345 arrow callbacks, 723 template literals, 9 logical assignments, 1 `Object.hasOwn`; 5 `parseInt` radixes and 3 `||=` by hand); `?.`/`??` stay a by-hand change in `@ts-check` files (`prefer-template` for 664 concatenations, `prefer-arrow-callback`, `prefer-object-has-own`, `radix`, `logical-assignment-operators`); `?.`/`??` by hand while a file opts into `@ts-check` (the semantics differ for falsy values) | Consistent modern code with no new dependency | About 1,800 sites; conflicts with in-flight branches | `lintJs`, `typecheckJs`, E2E |
-| **Type-check ratchet per domain folder**; the three largest scripts (mission detail, bank, order detail — 20 % of all JavaScript) split before they are checked | Null safety reaches the files that change most | Cast churn in DOM-heavy code | A folder is "migrated" only when fully checked |
+| **Type-check ratchet per domain folder** — **done 2026-10-11** (§7.8, F5; 124 of 124 scripts checked, 22 of 22 domains migrated; the domain is a manifest name until the asset move makes it a folder); the three largest scripts (mission detail, bank, order detail — 20 % of all JavaScript) split before they are checked (mission detail into 5 parts, order detail into 6, bank into 3 with its first function still 2,081 lines) | Null safety reaches the files that change most | Cast churn in DOM-heavy code | A folder is "migrated" only when fully checked; `:frontend:testTypecheckRatchet`, proven on planted trees |
 | **Finish ADR-0069**: the 70 inline script blocks (1,860 lines, never linted) move into modules; one page puts eleven `[[#{…}]]` markers into a script without `th:inline` (a likely i18n defect). **Done 2026-10-04** (ADR-0069 amendment): on that day 67 blocks with 1,645 lines remained, 55 of them already pure data bootstraps; the eleven blocks with code moved into their modules (one new, `org-unit-bank.js`), five empty error-page blocks were deleted. Every inline script is now a `th:inline="javascript"` bootstrap of literals, checked against a grammar by `InlineScriptDataOnlyTest` (planted fixture, floors of 100 templates / 55 blocks); the head's `krtEvents` stub is its one listed exception. *Correction:* the eleven-marker defect had already been fixed (B-04); what was still broken was the `'[[#{…}]]'` form inside inlined string literals on the mission-data and special-commands admin pages, which rendered the texts in quotes — fixed by the move | Lintable, checkable code | Timing of inline versus module code | `InlineScriptLoadOrderTest`, `InlineScriptDataOnlyTest`, E2E |
 | **One read path**: `krtFetch.get`/`getJson` with re-authentication, the terms gate, refusal of redirected or non-JSON answers and `AbortController`; then forbid `fetch(` outside the transport and ban `XMLHttpRequest`. **Done 2026-10-04** (REQ-FE-031): 61 raw reads in 33 scripts plus one inline read in `members.html` migrated, `swap` reads through `get` too; ESLint bans `fetch`/`XMLHttpRequest`, and `BackgroundReadGateContractTest` pins the same for templates, which ESLint never sees | 56 raw reads behave the same way on session loss | Pickers that silently emptied now send the user to the login — the intended contract | A new E2E for a picker after session loss |
 | **Trusted Types**, report-only first through the existing `csp_violation` beacon, then enforced: two named policies, a tagged-template HTML builder, no default policy. **Done 2026-10-04 except the production switch** (ADR-0239): `krt-html` behind the `krtHtml` builder, `krt-fragment` inside `krt-fetch.js`; 42 builder sites, 26 clears and one `DOMParser` read migrated, `escape-html.js` removed; ESLint bans every sink and policy outside the two helpers; the report-only header is the default of `APP_SECURITY_TRUSTED_TYPES` (`report` / `enforce`), with the gauge `basetool_trusted_types_mode`. **The only remaining step** is switching production to `enforce`, a production configuration change the owner approves after a quiet period (`deployment.md` → *Trusted Types: report, then enforce*) | DOM-XSS becomes a browser-enforced property | Every future sink must use the helpers; under enforcement even `innerHTML = ''` throws | A violation collector in the dialog page-walk E2E (proven by a planted violation), `:frontend:testEslintBans`, `:frontend:testTrustedTypesJs`, `TrustedTypesModeTest` |

@@ -17,14 +17,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global noteI18n, inventoryConflictI18n */
 
+/** @type {HTMLElement | null} */
 let activeNoteButton = null;
 
+/**
+ * Opens the note dialog for one note button, prefilled with its note.
+ *
+ * @param {HTMLElement} btn the note button that was activated
+ */
 function openNoteModal(btn) {
     activeNoteButton = btn;
     const modal = document.getElementById('noteModal');
-    const ta = document.getElementById('noteModalTextarea');
+    const ta = /** @type {HTMLTextAreaElement | null} */ (
+        document.getElementById('noteModalTextarea')
+    );
+    if (!ta) return;
     const note = btn.getAttribute('data-note') || '';
     ta.value = note;
     updateNoteCounter();
@@ -41,7 +52,9 @@ function closeNoteModal() {
 }
 
 function updateNoteCounter() {
-    const ta = document.getElementById('noteModalTextarea');
+    const ta = /** @type {HTMLTextAreaElement | null} */ (
+        document.getElementById('noteModalTextarea')
+    );
     const counter = document.getElementById('noteModalCounter');
     if (ta && counter) counter.textContent = `${ta.value ? ta.value.length : 0} / 1000`;
 }
@@ -58,7 +71,10 @@ function showInventoryToast(type, msg) {
 
 function saveNote() {
     if (!activeNoteButton) return;
-    const ta = document.getElementById('noteModalTextarea');
+    const ta = /** @type {HTMLTextAreaElement | null} */ (
+        document.getElementById('noteModalTextarea')
+    );
+    if (!ta) return;
     submitNoteUpdate(ta.value || '');
 }
 
@@ -73,10 +89,16 @@ function removeNote() {
     });
 }
 
+/**
+ * Sends the note of the active button, queued behind earlier writes of the same entry.
+ *
+ * @param {string} noteValue the note to store; empty removes it
+ * @returns {Promise<unknown> | undefined} the write, undefined when no button is active
+ */
 function submitNoteUpdate(noteValue) {
     const btn = activeNoteButton;
     if (!btn) return;
-    const id = btn.getAttribute('data-id');
+    const id = /** @type {string} */ (btn.getAttribute('data-id'));
     if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
         return window.krtFetch.serialize(`inv-note:${id}`, () => {
             return runNoteUpdate(btn, id, noteValue);
@@ -85,6 +107,14 @@ function submitNoteUpdate(noteValue) {
     return runNoteUpdate(btn, id, noteValue);
 }
 
+/**
+ * Writes the note of one entry and patches every note control of it in place.
+ *
+ * @param {HTMLElement} btn the note button the write started from
+ * @param {string} id the entry id
+ * @param {string} noteValue the note to store; empty removes it
+ * @returns {Promise<unknown>} the write
+ */
 function runNoteUpdate(btn, id, noteValue) {
     if (!window.krtFetch) return Promise.resolve();
     const version = btn.getAttribute('data-version');
@@ -109,8 +139,8 @@ function runNoteUpdate(btn, id, noteValue) {
             if (updated && updated.version != null) {
                 window.krtFetch.syncVersion(btn.closest('.tree-row--leaf'), updated.version);
             }
-            const noteBtns = document.querySelectorAll(
-                `button.inventory-note-btn[data-id="${id}"]`,
+            const noteBtns = /** @type {NodeListOf<HTMLElement>} */ (
+                document.querySelectorAll(`button.inventory-note-btn[data-id="${id}"]`)
             );
             noteBtns.forEach((b) => {
                 b.setAttribute(
@@ -123,7 +153,9 @@ function runNoteUpdate(btn, id, noteValue) {
                 b.classList.toggle('btn-outline', !isEmpty);
                 b.classList.toggle('btn-ghost', isEmpty);
             });
-            const previews = document.querySelectorAll(`[data-note-for="${id}"]`);
+            const previews = /** @type {NodeListOf<HTMLElement>} */ (
+                document.querySelectorAll(`[data-note-for="${id}"]`)
+            );
             previews.forEach((p) => {
                 if (isEmpty) {
                     p.remove();

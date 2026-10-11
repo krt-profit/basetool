@@ -1799,10 +1799,25 @@ with its own scope — which would both misrepresent the runtime and blind the c
 cross-file globals and redeclaration collisions it exists to catch.
 
 **Opt-in per file.** Checking is enabled per file by a leading `// @ts-check`; `checkJs` stays
-`false` globally so the ~40k pre-existing lines do not have to be fixed at once. **A file that
+`false` globally so a script that has not been brought to green does not have to be. **A file that
 opts in must be error-free** — there is no partial state, and opting a file in is what makes its
-errors a build failure. Coverage is expected to grow, and the sequencing lives in
-[`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md).
+errors a build failure. No script carries `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`. The
+sequencing lives in [`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md).
+
+**The ratchet per domain.** `frontend/typecheck-ratchet.json` assigns every script of `static/js`
+to exactly one domain (the frontend's domains of the modularisation plan §5.9, plus `kernel` for the
+shared infrastructure; subfolders of `static/js` are scanned too, `vendor/` excepted) and lists the
+domains that are **migrated**. **Every domain of the manifest must be migrated**, so the manifest
+cannot hold an unchecked domain; a migrated domain holds only scripts that opt in, so a new script
+that skips the pragma fails the build, and the list of migrated domains only grows. `:frontend:testTypecheckRatchet` (in `check`;
+`scripts/typecheck-ratchet.mjs`, proven on planted trees by `typecheck-ratchet.test.mjs`) fails on
+a script that belongs to no domain, on a domain dropped from the list (`MIGRATED_FLOOR`), on a
+number of checked scripts below `CHECKED_FILES_FLOOR`, on a suppression pragma, and on a
+`tsconfig.json` that excludes scripts or loses `strict`. Migrating a domain edits the manifest and
+raises the floors in the same change. A script that is too large to check is split first into
+parts loaded by consecutive `defer` tags in the original order (ADR-0069 stays; no module, no
+import map). While the scripts share one flat folder, the domain is a name in the manifest; the
+asset move of step F5 turns each name into a folder.
 
 **Backend DTO shapes are never restated by hand.** `:frontend:generateApiTypes` derives
 `build/generated/ts/api.d.ts` from `backend/src/main/resources/api/openapi.json` on every build,

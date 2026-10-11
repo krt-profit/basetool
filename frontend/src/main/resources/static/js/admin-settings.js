@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global MSG_ENABLED, MSG_DISABLED, MSG_ERROR, MSG_SAVED, MSG_PROFIT_ENABLED, MSG_PROFIT_DISABLED, MSG_PROFIT_ERROR, MSG_PROFIT_SAVED, SAVE_SUCCESS, SAVE_ERROR, SAVE_CONFLICT */
 
 /**
@@ -31,48 +33,51 @@
  * @param {{ on: string, off: string, saved: string, error: string }} labels localized strings
  */
 function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
-    document.querySelectorAll(selector).forEach((checkbox) => {
-        checkbox.addEventListener('change', () => {
-            if (!window.krtFetch) {
-                return;
-            }
-            const id = checkbox.getAttribute(idAttribute) || '';
-            const checked = checkbox.checked;
-            const labelSpan = checkbox.parentElement
-                ? checkbox.parentElement.querySelector('.toggle-state-text')
-                : null;
-            if (labelSpan) {
-                labelSpan.textContent = checked ? labels.on : labels.off;
-            }
-            function revert() {
-                checkbox.checked = !checked;
-                if (labelSpan) {
-                    labelSpan.textContent = !checked ? labels.on : labels.off;
+    /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll(selector)).forEach(
+        (checkbox) => {
+            checkbox.addEventListener('change', () => {
+                if (!window.krtFetch) {
+                    return;
                 }
-            }
-            window.krtFetch.write({
-                method: 'PATCH',
-                url: urlFor(id),
-                payload: bodyFor(checked),
-                submitter: checkbox,
-                successMessage: labels.saved,
-                errorMessage: labels.error,
-                conflict: SAVE_CONFLICT,
-                onError(status) {
-                    revert();
-                    if (status === 409) {
-                        return false;
+                const id = checkbox.getAttribute(idAttribute) || '';
+                const checked = checkbox.checked;
+                const labelSpan = checkbox.parentElement
+                    ? checkbox.parentElement.querySelector('.toggle-state-text')
+                    : null;
+                if (labelSpan) {
+                    labelSpan.textContent = checked ? labels.on : labels.off;
+                }
+                function revert() {
+                    checkbox.checked = !checked;
+                    if (labelSpan) {
+                        labelSpan.textContent = !checked ? labels.on : labels.off;
                     }
-                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(labels.error);
-                    return true;
-                },
-                onNetworkError() {
-                    revert();
-                    return false;
-                },
+                }
+                window.krtFetch.write({
+                    method: 'PATCH',
+                    url: urlFor(id),
+                    payload: bodyFor(checked),
+                    submitter: checkbox,
+                    successMessage: labels.saved,
+                    errorMessage: labels.error,
+                    conflict: SAVE_CONFLICT,
+                    onError(status) {
+                        revert();
+                        if (status === 409) {
+                            return false;
+                        }
+                        if (window.showFrontendErrorToast)
+                            window.showFrontendErrorToast(labels.error);
+                        return true;
+                    },
+                    onNetworkError() {
+                        revert();
+                        return false;
+                    },
+                });
             });
-        });
-    });
+        },
+    );
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -118,7 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    const settingsForm = document.getElementById('admin-settings-form');
+    const settingsForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('admin-settings-form')
+    );
     if (!settingsForm) {
         return;
     }
@@ -128,7 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
             settingsForm.submit();
             return;
         }
-        const el = settingsForm.elements;
+        const el = /** @type {Record<string, HTMLInputElement>} */ (
+            /** @type {unknown} */ (settingsForm.elements)
+        );
         const payload = {
             ageYellowDays: el['ageYellowDays'].value,
             ageYellowVersion: Number(el['ageYellowVersion'].value),
@@ -139,14 +148,16 @@ document.addEventListener('DOMContentLoaded', () => {
             transferFeePercent: el['transferFeePercent'].value,
             transferFeeVersion: Number(el['transferFeeVersion'].value),
         };
-        const submitBtn = settingsForm.querySelector('button[type="submit"]');
+        const submitBtn = /** @type {HTMLButtonElement | null} */ (
+            settingsForm.querySelector('button[type="submit"]')
+        );
         if (submitBtn) {
             submitBtn.disabled = true;
         }
         window.krtFetch
             .write({
                 method: 'POST',
-                url: settingsForm.getAttribute('action'),
+                url: settingsForm.getAttribute('action') || '',
                 payload,
                 successMessage: SAVE_SUCCESS,
                 errorMessage: SAVE_ERROR,

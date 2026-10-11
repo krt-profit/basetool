@@ -1,3 +1,23 @@
+// @ts-check
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 (function () {
     'use strict';
 
@@ -107,7 +127,9 @@
      */
     function bankLiveSyncUpdates() {
         const main = document.querySelector('main[data-bank-livesync-updates]');
-        return main ? main.getAttribute('data-bank-livesync-updates') : undefined;
+        return main
+            ? /** @type {string} */ (main.getAttribute('data-bank-livesync-updates'))
+            : undefined;
     }
 
     /**
@@ -130,15 +152,18 @@
      */
     function bankRefreshError() {
         const main = document.querySelector('main[data-bank-refresh-error]');
-        return main ? main.getAttribute('data-bank-refresh-error') : genericError();
+        return main
+            ? /** @type {string} */ (main.getAttribute('data-bank-refresh-error'))
+            : genericError();
     }
 
     /**
      * Builds a live-sync receiver refresh closure for one section map. It re-renders each present
      * container once (deduplicated by container) from the viewer's own pathname and query.
      *
-     * @param {Object} sectionMap the section → {container, fragmentValue} map for the room
-     * @returns {function(string[]): void} the refresh handler passed to createReceiver
+     * @param {Record<string, {container: string, fragmentValue: string}>} sectionMap the section →
+     *     {container, fragmentValue} map for the room
+     * @returns {(keys: string[]) => void} the refresh handler passed to createReceiver
      */
     function makeBankReceiverRefresh(sectionMap) {
         return function (keys) {
@@ -147,6 +172,7 @@
             }
             const url = window.location.pathname + window.location.search;
             const errorMessage = bankRefreshError();
+            /** @type {Record<string, boolean>} */
             const done = {};
             keys.forEach((key) => {
                 const cfg = sectionMap[key];
@@ -234,8 +260,12 @@
             { Accept: 'application/json', 'Content-Type': 'application/json' },
             base || {},
         );
-        const token = document.querySelector('meta[name="_csrf"]')?.content;
-        const header = document.querySelector('meta[name="_csrf_header"]')?.content;
+        const token = /** @type {HTMLMetaElement | null} */ (
+            document.querySelector('meta[name="_csrf"]')
+        )?.content;
+        const header = /** @type {HTMLMetaElement | null} */ (
+            document.querySelector('meta[name="_csrf_header"]')
+        )?.content;
         if (token && header && header !== 'undefined' && token !== 'undefined') {
             headers[header] = token;
         }
@@ -249,7 +279,9 @@
      */
     function genericError() {
         const main = document.querySelector('main[data-bank-generic-error]');
-        return main ? main.getAttribute('data-bank-generic-error') : 'Error';
+        return main
+            ? /** @type {string} */ (main.getAttribute('data-bank-generic-error'))
+            : 'Error';
     }
 
     /**
@@ -260,7 +292,9 @@
      */
     function approvalRequestFiledMessage() {
         const main = document.querySelector('main[data-bank-approval-request-filed]');
-        return main ? main.getAttribute('data-bank-approval-request-filed') : genericError();
+        return main
+            ? /** @type {string} */ (main.getAttribute('data-bank-approval-request-filed'))
+            : genericError();
     }
 
     /**
@@ -305,10 +339,14 @@
      * @param {HTMLElement} modal the overlay element being opened
      */
     function primeModal(trigger, modal) {
-        const form = modal.querySelector('form.bank-ajax-form');
+        const form = /** @type {HTMLFormElement | null} */ (
+            modal.querySelector('form.bank-ajax-form')
+        );
         if (form) {
             clearErrors(form);
-            const staffNote = form.querySelector('[name="staffNote"]');
+            const staffNote = /** @type {HTMLInputElement | null} */ (
+                form.querySelector('[name="staffNote"]')
+            );
             if (staffNote) {
                 staffNote.value = '';
             }
@@ -319,14 +357,16 @@
             }
             const key = attr.name.slice('data-field-'.length);
             if (form) {
-                for (const el of Array.from(form.elements)) {
+                for (const el of /** @type {HTMLInputElement[]} */ (Array.from(form.elements))) {
                     if (el.name && el.name.toLowerCase() === key) {
                         el.value = attr.value;
                     }
                 }
             }
             modal.querySelectorAll('[data-bank-label]').forEach((el) => {
-                if (el.getAttribute('data-bank-label').toLowerCase() === key) {
+                if (
+                    /** @type {string} */ (el.getAttribute('data-bank-label')).toLowerCase() === key
+                ) {
                     el.textContent = attr.value;
                 }
             });
@@ -335,20 +375,26 @@
             updateFeePreview(form);
         }
         if (form && form.querySelector('[data-limit-warning]')) {
-            const typeSelect = form.querySelector('select[data-role="org-unit-request-type"]');
+            const typeSelect = /** @type {HTMLSelectElement | null} */ (
+                form.querySelector('select[data-role="org-unit-request-type"]')
+            );
             if (typeSelect) {
                 syncRequestTypeRows(typeSelect);
             }
             updateLimitWarning(form);
         }
         if (form && form.querySelector('[data-split-row]')) {
-            const splitToggle = form.querySelector('[data-role="bank-split-toggle"]');
+            const splitToggle = /** @type {HTMLInputElement | null} */ (
+                form.querySelector('[data-role="bank-split-toggle"]')
+            );
             if (splitToggle) {
                 toggleSplitRow(splitToggle);
             }
         }
         if (form) {
-            const movementType = form.querySelector('[data-role="bank-movement-type"]');
+            const movementType = /** @type {HTMLSelectElement | null} */ (
+                form.querySelector('[data-role="bank-movement-type"]')
+            );
             if (movementType) {
                 syncMovementRows(movementType);
             }
@@ -356,11 +402,16 @@
     }
 
     document.addEventListener('click', (event) => {
-        const trigger = event.target.closest('[data-trigger="open-modal-display"][data-modal-id]');
+        const target = /** @type {Element} */ (event.target);
+        const trigger = /** @type {HTMLElement | null} */ (
+            target.closest('[data-trigger="open-modal-display"][data-modal-id]')
+        );
         if (!trigger) {
             return;
         }
-        const modal = document.getElementById(trigger.getAttribute('data-modal-id'));
+        const modal = document.getElementById(
+            /** @type {string} */ (trigger.getAttribute('data-modal-id')),
+        );
         if (modal && modal.classList.contains('krt-modal-overlay')) {
             primeModal(trigger, modal);
             if (modal.id === 'bank-confirm-request-modal') {
@@ -373,8 +424,8 @@
      * Fills a counterparty org-unit <select> from the chosen user's memberships (REQ-BANK-044). It
      * stays disabled while loading or without a user, and auto-selects a single membership.
      *
-     * @param {HTMLElement} userSelect the counterparty user picker (native select or combobox value
-     *     input)
+     * @param {HTMLInputElement | HTMLSelectElement} userSelect the counterparty user picker (native
+     *     select or combobox value input)
      * @param {HTMLSelectElement} orgSelect the dependent org-unit picker
      */
     async function fillCounterpartyOrgUnits(userSelect, orgSelect) {
@@ -413,11 +464,18 @@
     }
 
     document.addEventListener('change', (event) => {
-        const userSelect = event.target.closest('[data-counterparty-user]');
+        const target = /** @type {Element} */ (event.target);
+        const userSelect = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            target.closest('[data-counterparty-user]')
+        );
         if (!userSelect) {
             return;
         }
-        const orgSelect = document.getElementById(userSelect.getAttribute('data-orgunit-target'));
+        const orgSelect = /** @type {HTMLSelectElement | null} */ (
+            document.getElementById(
+                /** @type {string} */ (userSelect.getAttribute('data-orgunit-target')),
+            )
+        );
         if (orgSelect) {
             fillCounterpartyOrgUnits(userSelect, orgSelect);
         }
@@ -451,11 +509,21 @@
             return;
         }
         const external = toggle.checked && !toggle.disabled;
-        const registeredRow = section.querySelector('[data-cp-registered-row]');
-        const externalRow = section.querySelector('[data-cp-external-row]');
-        const userSelect = section.querySelector('[data-counterparty-user]');
-        const nameInput = section.querySelector('[data-counterparty-name]');
-        const orgSelect = section.querySelector('[data-counterparty-orgunit]');
+        const registeredRow = /** @type {HTMLElement | null} */ (
+            section.querySelector('[data-cp-registered-row]')
+        );
+        const externalRow = /** @type {HTMLElement | null} */ (
+            section.querySelector('[data-cp-external-row]')
+        );
+        const userSelect = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            section.querySelector('[data-counterparty-user]')
+        );
+        const nameInput = /** @type {HTMLInputElement | null} */ (
+            section.querySelector('[data-counterparty-name]')
+        );
+        const orgSelect = /** @type {HTMLSelectElement | null} */ (
+            section.querySelector('[data-counterparty-orgunit]')
+        );
         if (registeredRow) {
             registeredRow.hidden = external;
         }
@@ -472,7 +540,9 @@
             resetCounterpartyOrgUnitOptions(orgSelect);
             if (external) {
                 const form = toggle.closest('form');
-                const source = form ? form.querySelector('[data-bank-all-orgunits]') : null;
+                const source = /** @type {HTMLSelectElement | null} */ (
+                    form ? form.querySelector('[data-bank-all-orgunits]') : null
+                );
                 if (source) {
                     Array.prototype.forEach.call(source.options, (option) => {
                         if (option.value) {
@@ -488,7 +558,10 @@
     }
 
     document.addEventListener('change', (event) => {
-        const toggle = event.target.closest('[data-role="bank-cp-external-toggle"]');
+        const target = /** @type {Element} */ (event.target);
+        const toggle = /** @type {HTMLInputElement | null} */ (
+            target.closest('[data-role="bank-cp-external-toggle"]')
+        );
         if (toggle) {
             toggleCounterpartyExternal(toggle);
         }
@@ -498,7 +571,7 @@
      * Converts one form control into its JSON value: checkboxes to booleans,
      * whitelisted names to numbers/booleans, everything else stays a string.
      *
-     * @param {HTMLElement} el the form control
+     * @param {HTMLInputElement} el the form control
      * @returns {*} the JSON-ready value; '' and null mark "omit this field"
      */
     function fieldValue(el) {
@@ -527,14 +600,18 @@
      */
     async function submitBankForm(form) {
         clearErrors(form);
-        const movementSource = form.querySelector('[data-role="bank-movement-source"]');
+        const movementSource = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            form.querySelector('[data-role="bank-movement-source"]')
+        );
         if (movementSource) {
             form.setAttribute('data-account-id', movementSource.value || '');
         }
         const method = (form.getAttribute('data-method') || 'POST').toUpperCase();
+        /** @type {Record<string, any>} */
         const body = {};
+        /** @type {Record<string, string>} */
         const placeholders = {};
-        for (const el of Array.from(form.elements)) {
+        for (const el of /** @type {HTMLInputElement[]} */ (Array.from(form.elements))) {
             if (!el.name || el.disabled) {
                 continue;
             }
@@ -552,12 +629,13 @@
         if (accountId) {
             body[form.getAttribute('data-account-id-field') || 'accountId'] = accountId;
         }
-        const endpoint = form
-            .getAttribute('data-endpoint')
-            .replace(/\{([^}]+)\}/g, (match, name) => {
+        const endpoint = /** @type {string} */ (form.getAttribute('data-endpoint')).replace(
+            /\{([^}]+)\}/g,
+            (match, name) => {
                 const filled = placeholders[name.toLowerCase()];
                 return filled !== undefined ? encodeURIComponent(filled) : match;
-            });
+            },
+        );
 
         const submitButton = form.querySelector('button[type="submit"]');
         await window.krtFetch.write({
@@ -616,7 +694,9 @@
      */
     function resolveBankLiveSyncAccount(form, ref) {
         if (ref === 'account') {
-            const primed = form.querySelector('[name="_livesyncAccount"]');
+            const primed = /** @type {HTMLInputElement | null} */ (
+                form.querySelector('[name="_livesyncAccount"]')
+            );
             return (
                 form.getAttribute('data-livesync-account') ||
                 form.getAttribute('data-account-id') ||
@@ -624,9 +704,10 @@
             );
         }
         if (ref === 'destination') {
-            const el =
+            const el = /** @type {HTMLInputElement | null} */ (
                 form.querySelector('[name="destinationAccountId"]') ||
-                form.querySelector('[name="_livesyncDestination"]');
+                    form.querySelector('[name="_livesyncDestination"]')
+            );
             return el && !el.disabled && el.value ? el.value : null;
         }
         return null;
@@ -648,6 +729,7 @@
         if (!spec) {
             return;
         }
+        /** @type {Record<string, boolean>} */
         const sent = {};
         spec.trim()
             .split(/\s+/)
@@ -723,7 +805,7 @@
             .swap({
                 url,
                 container: spec.container,
-                fragmentValue: form.getAttribute('data-refresh'),
+                fragmentValue: /** @type {string} */ (form.getAttribute('data-refresh')),
                 errorMessage: refreshError || genericError(),
             })
             .then((swapped) => {
@@ -736,7 +818,8 @@
     }
 
     document.addEventListener('submit', (event) => {
-        const form = event.target.closest('form.bank-ajax-form');
+        const target = /** @type {Element} */ (event.target);
+        const form = /** @type {HTMLFormElement | null} */ (target.closest('form.bank-ajax-form'));
         if (!form) {
             return;
         }
@@ -764,22 +847,34 @@
      * @param {HTMLFormElement} form the booking form carrying a `[data-fee-preview]` block
      */
     function updateFeePreview(form) {
-        const preview = form.querySelector('[data-fee-preview]');
-        const amountEl = form.querySelector('input[name="amount"]');
+        const preview = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-fee-preview]')
+        );
+        const amountEl = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="amount"]')
+        );
         if (!preview || !amountEl) {
             return;
         }
         const rate = transferFeeRate();
-        const typeEl = form.querySelector('[data-role="bank-movement-type"]');
+        const typeEl = /** @type {HTMLSelectElement | null} */ (
+            form.querySelector('[data-role="bank-movement-type"]')
+        );
         const type = typeEl ? typeEl.value : null;
-        const src = form.querySelector('[name="sourceHolderId"]');
-        const dst = form.querySelector('[name="destinationHolderId"]');
+        const src = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            form.querySelector('[name="sourceHolderId"]')
+        );
+        const dst = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            form.querySelector('[name="destinationHolderId"]')
+        );
         const sameHolder = !!(src && dst && src.value && src.value === dst.value);
         const feeApplies = rate > 0 && type !== 'DEPOSIT' && !(type === 'TRANSFER' && sameHolder);
-        const inclusiveRow = form.querySelector('[data-fee-inclusive-row]');
-        const inclusiveToggle = inclusiveRow
-            ? inclusiveRow.querySelector('input[name="feeInclusive"]')
-            : null;
+        const inclusiveRow = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-fee-inclusive-row]')
+        );
+        const inclusiveToggle = /** @type {HTMLInputElement | null} */ (
+            inclusiveRow ? inclusiveRow.querySelector('input[name="feeInclusive"]') : null
+        );
         if (inclusiveRow) {
             inclusiveRow.hidden = !feeApplies;
         }
@@ -813,6 +908,11 @@
         preview.hidden = false;
     }
 
+    /**
+     * Recomputes the fee preview for the form the edited field belongs to.
+     *
+     * @param {Element | null} target the field that fired the event
+     */
     function recomputeFeePreviewFrom(target) {
         const form = target && target.closest ? target.closest('form') : null;
         if (form && form.querySelector('[data-fee-preview]')) {
@@ -828,13 +928,21 @@
      * @param {HTMLFormElement} form the org-unit request form carrying a `[data-limit-warning]` block
      */
     function updateLimitWarning(form) {
-        const warning = form.querySelector('[data-limit-warning]');
-        const amountEl = form.querySelector('input[name="amount"]');
-        const accountEl = form.querySelector('select[name="sourceAccountId"]');
+        const warning = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-limit-warning]')
+        );
+        const amountEl = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="amount"]')
+        );
+        const accountEl = /** @type {HTMLSelectElement | null} */ (
+            form.querySelector('select[name="sourceAccountId"]')
+        );
         if (!warning || !amountEl || !accountEl) {
             return;
         }
-        const typeEl = form.querySelector('select[data-role="org-unit-request-type"]');
+        const typeEl = /** @type {HTMLSelectElement | null} */ (
+            form.querySelector('select[data-role="org-unit-request-type"]')
+        );
         if (typeEl && typeEl.value === 'DEPOSIT') {
             warning.hidden = true;
             return;
@@ -858,7 +966,7 @@
     /**
      * Recomputes the over-limit warning for the form the edited field belongs to.
      *
-     * @param {EventTarget} target the field that fired the event
+     * @param {Element | null} target the field that fired the event
      */
     function recomputeLimitWarningFrom(target) {
         const form = target && target.closest ? target.closest('form') : null;
@@ -875,17 +983,23 @@
      * @param {HTMLFormElement} form the org-unit request form
      */
     function updateJustificationRequired(form) {
-        const input = form.querySelector('input[name="justification"]');
+        const input = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="justification"]')
+        );
         if (!input) {
             return;
         }
-        const typeEl = form.querySelector('select[data-role="org-unit-request-type"]');
+        const typeEl = /** @type {HTMLSelectElement | null} */ (
+            form.querySelector('select[data-role="org-unit-request-type"]')
+        );
         const type = typeEl ? typeEl.value : null;
         if (type !== 'WITHDRAWAL' && type !== 'TRANSFER') {
             input.required = false;
             return;
         }
-        const accountEl = form.querySelector('select[name="sourceAccountId"]');
+        const accountEl = /** @type {HTMLSelectElement | null} */ (
+            form.querySelector('select[name="sourceAccountId"]')
+        );
         const option = accountEl ? accountEl.options[accountEl.selectedIndex] : null;
         input.required = !!option && option.getAttribute('data-requires-justification') === 'true';
     }
@@ -894,7 +1008,7 @@
      * Recomputes the justification-required flag for the edited field's form, only when it has a
      * `[data-request-justification-only]` wrapper.
      *
-     * @param {EventTarget} target the field that fired the event
+     * @param {Element | null} target the field that fired the event
      */
     function recomputeJustificationRequiredFrom(target) {
         const form = target && target.closest ? target.closest('form') : null;
@@ -914,8 +1028,10 @@
         if (!form) {
             return;
         }
-        const row = form.querySelector('[data-split-row]');
-        const input = form.querySelector('input[name="splitPercent"]');
+        const row = /** @type {HTMLElement | null} */ (form.querySelector('[data-split-row]'));
+        const input = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="splitPercent"]')
+        );
         const on = toggle.checked && !toggle.disabled;
         if (row) {
             row.hidden = !on;
@@ -937,9 +1053,15 @@
      * @param {HTMLFormElement} form the deposit/request form carrying a `[data-split-preview]` block
      */
     function updateSplitPreview(form) {
-        const preview = form.querySelector('[data-split-preview]');
-        const amountEl = form.querySelector('input[name="amount"]');
-        const percentEl = form.querySelector('input[name="splitPercent"]');
+        const preview = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-split-preview]')
+        );
+        const amountEl = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="amount"]')
+        );
+        const percentEl = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="splitPercent"]')
+        );
         if (!preview || !amountEl || !percentEl) {
             return;
         }
@@ -975,7 +1097,7 @@
     /**
      * Recomputes the split preview for the form the edited field belongs to (amount or percentage).
      *
-     * @param {EventTarget} target the field that fired the event
+     * @param {Element | null} target the field that fired the event
      */
     function recomputeSplitPreviewFrom(target) {
         const form = target && target.closest ? target.closest('form') : null;
@@ -985,7 +1107,10 @@
     }
 
     document.addEventListener('change', (event) => {
-        const toggle = event.target.closest('[data-role="bank-split-toggle"]');
+        const target = /** @type {Element} */ (event.target);
+        const toggle = /** @type {HTMLInputElement | null} */ (
+            target.closest('[data-role="bank-split-toggle"]')
+        );
         if (toggle) {
             toggleSplitRow(toggle);
         }
@@ -1002,7 +1127,9 @@
         if (!panel) {
             return;
         }
-        const result = panel.querySelector('[data-balance-result]');
+        const result = /** @type {HTMLElement | null} */ (
+            panel.querySelector('[data-balance-result]')
+        );
         const ownEl = panel.querySelector('[data-balance-own]');
         if (!result || !ownEl) {
             return;
@@ -1024,7 +1151,7 @@
      * Dispatches one field edit to the fee preview, limit warning, justification flag, split preview
      * and balance calculator.
      *
-     * @param {EventTarget} target the field that fired the event
+     * @param {Element | null} target the field that fired the event
      */
     function onBankFieldEdit(target) {
         recomputeFeePreviewFrom(target);
@@ -1032,15 +1159,15 @@
         recomputeJustificationRequiredFrom(target);
         recomputeSplitPreviewFrom(target);
         if (target && target.matches && target.matches('[data-balance-input]')) {
-            updateBalanceCalc(target);
+            updateBalanceCalc(/** @type {HTMLInputElement} */ (target));
         }
     }
 
     document.addEventListener('input', (event) => {
-        onBankFieldEdit(event.target);
+        onBankFieldEdit(/** @type {Element} */ (event.target));
     });
     document.addEventListener('change', (event) => {
-        onBankFieldEdit(event.target);
+        onBankFieldEdit(/** @type {Element} */ (event.target));
     });
 
     /**
@@ -1076,19 +1203,24 @@
      * version, then patches the row in place.
      */
     document.addEventListener('click', async (event) => {
-        const flagButton = event.target.closest('button.matrix-flag[data-flag]');
+        const target = /** @type {Element} */ (event.target);
+        const flagButton = /** @type {HTMLButtonElement | null} */ (
+            target.closest('button.matrix-flag[data-flag]')
+        );
         if (!flagButton) {
             return;
         }
-        const row = flagButton.closest('tr[data-user-id][data-account-id]');
+        const row = /** @type {HTMLTableRowElement | null} */ (
+            flagButton.closest('tr[data-user-id][data-account-id]')
+        );
         if (!row) {
             return;
         }
-        const flag = flagButton.getAttribute('data-flag');
+        const flag = /** @type {string} */ (flagButton.getAttribute('data-flag'));
         const newValue = row.getAttribute(FLAG_ATTR[flag]) !== 'true';
         const endpoint = `/api/proxy/bank/grants/${encodeURIComponent(
-            row.getAttribute('data-user-id'),
-        )}/${encodeURIComponent(row.getAttribute('data-account-id'))}`;
+            /** @type {string} */ (row.getAttribute('data-user-id')),
+        )}/${encodeURIComponent(/** @type {string} */ (row.getAttribute('data-account-id')))}`;
         await window.krtFetch.write({
             method: 'PATCH',
             url: endpoint,
@@ -1131,14 +1263,17 @@
     });
 
     document.addEventListener('change', (event) => {
-        const select = event.target.closest('[data-role="bank-grants-filter"]');
+        const target = /** @type {Element} */ (event.target);
+        const select = /** @type {HTMLSelectElement | null} */ (
+            target.closest('[data-role="bank-grants-filter"]')
+        );
         if (!select) {
             return;
         }
         const params = new URLSearchParams();
-        params.set('view', select.getAttribute('data-view'));
+        params.set('view', /** @type {string} */ (select.getAttribute('data-view')));
         if (select.value) {
-            params.set(select.getAttribute('data-param'), select.value);
+            params.set(/** @type {string} */ (select.getAttribute('data-param')), select.value);
         }
         window.location.assign(`/bank/grants?${params.toString()}`);
     });
@@ -1167,7 +1302,7 @@
         }
         const type = select.value;
         const allowedKinds = ACCOUNT_TYPE_OWNER_KINDS[type];
-        const orgRow = form.querySelector('.bank-row-orgunit');
+        const orgRow = /** @type {HTMLElement | null} */ (form.querySelector('.bank-row-orgunit'));
         if (!orgRow) {
             return;
         }
@@ -1196,13 +1331,18 @@
     }
 
     document.addEventListener('change', (event) => {
-        const select = event.target.closest('select[data-role="bank-account-type"]');
+        const target = /** @type {Element} */ (event.target);
+        const select = /** @type {HTMLSelectElement | null} */ (
+            target.closest('select[data-role="bank-account-type"]')
+        );
         if (select) {
             syncAccountTypeRows(select);
         }
     });
 
-    document.querySelectorAll('select[data-role="bank-account-type"]').forEach(syncAccountTypeRows);
+    /** @type {NodeListOf<HTMLSelectElement>} */ (
+        document.querySelectorAll('select[data-role="bank-account-type"]')
+    ).forEach(syncAccountTypeRows);
 
     /**
      * Toggles a transfer-only row and its select: shown, enabled and required only for a transfer,
@@ -1216,7 +1356,9 @@
             return;
         }
         row.hidden = !isTransfer;
-        const control = row.querySelector('select, .krt-combobox input[type="hidden"]');
+        const control = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            row.querySelector('select, .krt-combobox input[type="hidden"]')
+        );
         if (control) {
             control.disabled = !isTransfer;
             control.required = isTransfer;
@@ -1228,7 +1370,9 @@
                 }
             }
             const box = control.closest ? control.closest('.krt-combobox') : null;
-            const textbox = box ? box.querySelector('.krt-combobox__input') : null;
+            const textbox = /** @type {HTMLInputElement | null} */ (
+                box ? box.querySelector('.krt-combobox__input') : null
+            );
             if (textbox) {
                 textbox.disabled = !isTransfer;
             }
@@ -1250,7 +1394,9 @@
         const type = select.value;
         const isTransfer = type === 'TRANSFER';
         const isDeposit = type === 'DEPOSIT';
-        const account = form.querySelector('select[data-role="org-unit-request-account"]');
+        const account = /** @type {HTMLSelectElement | null} */ (
+            form.querySelector('select[data-role="org-unit-request-account"]')
+        );
         if (account) {
             let currentVisible = false;
             Array.prototype.forEach.call(account.options, (option) => {
@@ -1269,20 +1415,30 @@
                 account.value = first ? first.value : '';
             }
         }
-        const depositHint = form.querySelector('[data-deposit-hint]');
-        const debitHint = form.querySelector('[data-debit-hint]');
+        const depositHint = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-deposit-hint]')
+        );
+        const debitHint = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-debit-hint]')
+        );
         if (depositHint) {
             depositHint.hidden = !isDeposit;
         }
         if (debitHint) {
             debitHint.hidden = isDeposit;
         }
-        const row = form.querySelector('[data-request-transfer-only]');
+        const row = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-request-transfer-only]')
+        );
         toggleTransferOnlyControl(row, isTransfer);
-        const splitBlock = form.querySelector('[data-split-deposit-only]');
+        const splitBlock = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-split-deposit-only]')
+        );
         if (splitBlock) {
             splitBlock.hidden = !isDeposit;
-            const splitToggle = splitBlock.querySelector('[data-role="bank-split-toggle"]');
+            const splitToggle = /** @type {HTMLInputElement | null} */ (
+                splitBlock.querySelector('[data-role="bank-split-toggle"]')
+            );
             if (splitToggle) {
                 splitToggle.disabled = !isDeposit;
                 if (!isDeposit) {
@@ -1291,11 +1447,15 @@
                 toggleSplitRow(splitToggle);
             }
         }
-        const justificationRow = form.querySelector('[data-request-justification-only]');
+        const justificationRow = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-request-justification-only]')
+        );
         if (justificationRow) {
             const isDebit = type === 'WITHDRAWAL' || type === 'TRANSFER';
             justificationRow.hidden = !isDebit;
-            const input = justificationRow.querySelector('input[name="justification"]');
+            const input = /** @type {HTMLInputElement | null} */ (
+                justificationRow.querySelector('input[name="justification"]')
+            );
             if (input) {
                 input.disabled = !isDebit;
                 if (!isDebit) {
@@ -1318,27 +1478,33 @@
      * @param {boolean} on whether the block is active (the request is a withdrawal)
      */
     function syncRequestCounterparty(form, on) {
-        const block = form.querySelector('[data-request-withdrawal-only]');
+        const block = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-request-withdrawal-only]')
+        );
         if (!block) {
             return;
         }
         block.hidden = !on;
-        block
-            .querySelectorAll(
+        /** @type {NodeListOf<HTMLInputElement | HTMLSelectElement>} */ (
+            block.querySelectorAll(
                 'select, .krt-combobox input[type="hidden"], input:not(.krt-combobox__input)',
             )
-            .forEach((control) => {
-                control.disabled = !on;
-                const box = control.closest ? control.closest('.krt-combobox') : null;
-                const textbox = box ? box.querySelector('.krt-combobox__input') : null;
-                if (textbox) {
-                    textbox.disabled = !on;
-                }
-            });
+        ).forEach((control) => {
+            control.disabled = !on;
+            const box = control.closest ? control.closest('.krt-combobox') : null;
+            const textbox = /** @type {HTMLInputElement | null} */ (
+                box ? box.querySelector('.krt-combobox__input') : null
+            );
+            if (textbox) {
+                textbox.disabled = !on;
+            }
+        });
         if (!on) {
             return;
         }
-        const picker = block.querySelector('[data-counterparty-user]');
+        const picker = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            block.querySelector('[data-counterparty-user]')
+        );
         if (picker && picker.value && !picker.dataset.cpUnitsPrimed) {
             picker.dataset.cpUnitsPrimed = 'true';
             picker.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1346,7 +1512,10 @@
     }
 
     document.addEventListener('change', (event) => {
-        const select = event.target.closest('select[data-role="org-unit-request-type"]');
+        const target = /** @type {Element} */ (event.target);
+        const select = /** @type {HTMLSelectElement | null} */ (
+            target.closest('select[data-role="org-unit-request-type"]')
+        );
         if (select) {
             syncRequestTypeRows(select);
         }
@@ -1356,14 +1525,15 @@
      * Enables or disables one movement-modal control, clearing its value (or combobox selection) when
      * disabled; a combobox's visible textbox mirrors the disabled state.
      *
-     * @param {HTMLElement} control the form control to toggle
+     * @param {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement} control the form control to
+     *     toggle
      * @param {boolean} on whether the owning row is active for the current movement type
      */
     function setMovementControlActive(control, on) {
         control.disabled = !on;
         if (control.type === 'checkbox') {
             if (!on) {
-                control.checked = false;
+                /** @type {HTMLInputElement} */ (control).checked = false;
             }
         } else if (!on) {
             if (control.krtCombobox) {
@@ -1373,7 +1543,9 @@
             }
         }
         const box = control.closest ? control.closest('.krt-combobox') : null;
-        const textbox = box ? box.querySelector('.krt-combobox__input') : null;
+        const textbox = /** @type {HTMLInputElement | null} */ (
+            box ? box.querySelector('.krt-combobox__input') : null
+        );
         if (textbox) {
             textbox.disabled = !on;
         }
@@ -1387,8 +1559,10 @@
      */
     function setMovementRowActive(row, on) {
         row.hidden = !on;
-        row.querySelectorAll(
-            'input:not(.krt-combobox__input), select, textarea, .krt-combobox input[type="hidden"]',
+        /** @type {NodeListOf<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>} */ (
+            row.querySelectorAll(
+                'input:not(.krt-combobox__input), select, textarea, .krt-combobox input[type="hidden"]',
+            )
         ).forEach((control) => {
             setMovementControlActive(control, on);
         });
@@ -1402,8 +1576,12 @@
      * @param {HTMLFormElement} form the movement form
      */
     function updateMovementJustification(form) {
-        const input = form.querySelector('input[name="justification"]');
-        const typeEl = form.querySelector('[data-role="bank-movement-type"]');
+        const input = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="justification"]')
+        );
+        const typeEl = /** @type {HTMLSelectElement | null} */ (
+            form.querySelector('[data-role="bank-movement-type"]')
+        );
         if (!input || !typeEl) {
             return;
         }
@@ -1412,10 +1590,13 @@
             input.required = false;
             return;
         }
-        const source = form.querySelector('[data-role="bank-movement-source"]');
+        const source = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            form.querySelector('[data-role="bank-movement-source"]')
+        );
         if (source) {
-            if (source.options) {
-                const option = source.options[source.selectedIndex];
+            const sourceSelect = /** @type {HTMLSelectElement} */ (source);
+            if (sourceSelect.options) {
+                const option = sourceSelect.options[sourceSelect.selectedIndex];
                 input.required =
                     !!option && option.getAttribute('data-requires-justification') === 'true';
             } else {
@@ -1445,15 +1626,23 @@
             form.setAttribute('data-endpoint', spec.endpoint);
             form.setAttribute('data-account-id-field', spec.accountField);
         }
-        form.querySelectorAll('[data-movement-types]').forEach((row) => {
-            const types = row.getAttribute('data-movement-types').split(/\s+/);
+        /** @type {NodeListOf<HTMLElement>} */ (
+            form.querySelectorAll('[data-movement-types]')
+        ).forEach((row) => {
+            const types = /** @type {string} */ (row.getAttribute('data-movement-types')).split(
+                /\s+/,
+            );
             setMovementRowActive(row, types.indexOf(type) !== -1);
         });
-        const splitToggle = form.querySelector('[data-role="bank-split-toggle"]');
+        const splitToggle = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('[data-role="bank-split-toggle"]')
+        );
         if (splitToggle) {
             toggleSplitRow(splitToggle);
         }
-        form.querySelectorAll('[data-role="bank-cp-external-toggle"]').forEach((t) => {
+        /** @type {NodeListOf<HTMLInputElement>} */ (
+            form.querySelectorAll('[data-role="bank-cp-external-toggle"]')
+        ).forEach((t) => {
             if (!t.disabled) {
                 toggleCounterpartyExternal(t);
             }
@@ -1477,14 +1666,20 @@
     }
 
     document.addEventListener('change', (event) => {
-        const select = event.target.closest('select[data-role="bank-movement-type"]');
+        const target = /** @type {Element} */ (event.target);
+        const select = /** @type {HTMLSelectElement | null} */ (
+            target.closest('select[data-role="bank-movement-type"]')
+        );
         if (select) {
             syncMovementRows(select);
         }
     });
 
     document.addEventListener('change', (event) => {
-        const source = event.target.closest('[data-role="bank-movement-source"]');
+        const target = /** @type {Element} */ (event.target);
+        const source = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            target.closest('[data-role="bank-movement-source"]')
+        );
         if (!source) {
             return;
         }
@@ -1506,7 +1701,9 @@
      * @param {HTMLElement} modal the confirm modal overlay
      */
     function applyConfirmModalState(trigger, modal) {
-        const form = modal.querySelector('form.bank-ajax-form');
+        const form = /** @type {HTMLFormElement | null} */ (
+            modal.querySelector('form.bank-ajax-form')
+        );
         if (!form) {
             return;
         }
@@ -1514,10 +1711,16 @@
             trigger.getAttribute('data-field-requiresownerapproval') === 'true';
         const alreadyGranted = trigger.getAttribute('data-field-ownerapprovalgranted') === 'true';
         const isTransfer = trigger.getAttribute('data-field-reqtype') === 'TRANSFER';
-        const submit = form.querySelector('button[type="submit"]');
+        const submit = /** @type {HTMLButtonElement | null} */ (
+            form.querySelector('button[type="submit"]')
+        );
 
-        const block = form.querySelector('[data-owner-approval-block]');
-        const checkbox = form.querySelector('[data-owner-approval-check]');
+        const block = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-owner-approval-block]')
+        );
+        const checkbox = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('[data-owner-approval-check]')
+        );
         if (block) {
             block.hidden = !requiresApproval;
         }
@@ -1529,7 +1732,9 @@
             submit.disabled = requiresApproval && !(checkbox && checkbox.checked);
         }
 
-        const splitNotice = form.querySelector('[data-split-confirm]');
+        const splitNotice = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-split-confirm]')
+        );
         if (splitNotice) {
             const splitEnabled = trigger.getAttribute('data-field-splitenabled') === 'true';
             splitNotice.hidden = !splitEnabled;
@@ -1543,7 +1748,9 @@
             }
         }
 
-        const justificationNotice = form.querySelector('[data-confirm-justification]');
+        const justificationNotice = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-confirm-justification]')
+        );
         if (justificationNotice) {
             const justification = trigger.getAttribute('data-field-justification');
             const present = justification != null && justification.trim() !== '';
@@ -1554,7 +1761,9 @@
             justificationNotice.hidden = !present;
         }
 
-        const destRow = form.querySelector('[data-confirm-destination-holder]');
+        const destRow = /** @type {HTMLElement | null} */ (
+            form.querySelector('[data-confirm-destination-holder]')
+        );
         toggleTransferOnlyControl(destRow, isTransfer);
         const holderLabel = form.querySelector('[data-confirm-holder-label]');
         if (holderLabel) {
@@ -1568,12 +1777,17 @@
     }
 
     document.addEventListener('change', (event) => {
-        const checkbox = event.target.closest('[data-owner-approval-check]');
+        const target = /** @type {Element} */ (event.target);
+        const checkbox = /** @type {HTMLInputElement | null} */ (
+            target.closest('[data-owner-approval-check]')
+        );
         if (!checkbox) {
             return;
         }
         const form = checkbox.closest('form');
-        const submit = form ? form.querySelector('button[type="submit"]') : null;
+        const submit = /** @type {HTMLButtonElement | null} */ (
+            form ? form.querySelector('button[type="submit"]') : null
+        );
         if (submit) {
             submit.disabled = !checkbox.checked;
         }
@@ -1584,7 +1798,7 @@
      *
      * @param {string} url the proxy URL
      * @param {string} filename the download filename
-     * @param {function(string):void} onError receives the localized error message
+     * @param {(message: string) => void} onError receives the localized error message
      */
     async function downloadBankPdf(url, filename, onError) {
         const headers = csrfHeaders();
@@ -1618,13 +1832,16 @@
     }
 
     document.addEventListener('click', (event) => {
-        const button = event.target.closest('.bank-download-btn[data-download-url]');
+        const target = /** @type {Element} */ (event.target);
+        const button = /** @type {HTMLButtonElement | null} */ (
+            target.closest('.bank-download-btn[data-download-url]')
+        );
         if (!button) {
             return;
         }
         button.disabled = true;
         downloadBankPdf(
-            button.getAttribute('data-download-url'),
+            /** @type {string} */ (button.getAttribute('data-download-url')),
             button.getAttribute('data-filename') || 'report.pdf',
             (message) => {
                 if (typeof window.showFrontendErrorToast === 'function') {
@@ -1641,11 +1858,18 @@
      * `data-confirm-token`.
      */
     document.addEventListener('input', (event) => {
-        const input = event.target.closest('input[data-confirm-token][data-confirm-submit]');
+        const target = /** @type {Element} */ (event.target);
+        const input = /** @type {HTMLInputElement | null} */ (
+            target.closest('input[data-confirm-token][data-confirm-submit]')
+        );
         if (!input) {
             return;
         }
-        const submit = document.getElementById(input.getAttribute('data-confirm-submit'));
+        const submit = /** @type {HTMLButtonElement | null} */ (
+            document.getElementById(
+                /** @type {string} */ (input.getAttribute('data-confirm-submit')),
+            )
+        );
         if (submit) {
             submit.disabled = input.value !== input.getAttribute('data-confirm-token');
         }
@@ -1656,7 +1880,8 @@
      * closes and the confirm input resets. Without krtFetch the form submits natively.
      */
     document.addEventListener('submit', (event) => {
-        const form = event.target.closest('form[data-bank-wipe]');
+        const target = /** @type {Element} */ (event.target);
+        const form = /** @type {HTMLFormElement | null} */ (target.closest('form[data-bank-wipe]'));
         if (!form) {
             return;
         }
@@ -1665,9 +1890,13 @@
             form.submit();
             return;
         }
-        const confirmInput = form.querySelector('input[name="confirm"]');
+        const confirmInput = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="confirm"]')
+        );
         const confirmValue = confirmInput ? confirmInput.value : '';
-        const submitBtn = form.querySelector('button[type="submit"]');
+        const submitBtn = /** @type {HTMLButtonElement | null} */ (
+            form.querySelector('button[type="submit"]')
+        );
         if (submitBtn) {
             submitBtn.disabled = true;
         }
@@ -1693,9 +1922,11 @@
                         window.showFrontendSuccessToast(message);
                     }
                     const overlay = form.closest('.krt-modal-overlay');
-                    const closeBtn = overlay
-                        ? overlay.querySelector('[data-trigger="close-modal-display"]')
-                        : null;
+                    const closeBtn = /** @type {HTMLElement | null} */ (
+                        overlay
+                            ? overlay.querySelector('[data-trigger="close-modal-display"]')
+                            : null
+                    );
                     if (closeBtn) {
                         closeBtn.click();
                     }
@@ -1718,14 +1949,19 @@
      * Statement export form: requires the hidden UTC `from`/`to` instants, then downloads the PDF.
      */
     document.addEventListener('submit', (event) => {
-        const form = event.target.closest('form.bank-download-form');
+        const target = /** @type {Element} */ (event.target);
+        const form = /** @type {HTMLFormElement | null} */ (
+            target.closest('form.bank-download-form')
+        );
         if (!form) {
             return;
         }
         event.preventDefault();
         clearErrors(form);
-        const from = form.querySelector('input[name="from"]');
-        const to = form.querySelector('input[name="to"]');
+        const from = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="from"]')
+        );
+        const to = /** @type {HTMLInputElement | null} */ (form.querySelector('input[name="to"]'));
         const required = form.getAttribute('data-period-required') || genericError();
         let valid = true;
         if (!from || !from.value) {
@@ -1740,8 +1976,8 @@
             return;
         }
         const url = `${form.getAttribute('data-endpoint')}?from=${encodeURIComponent(
-            from.value,
-        )}&to=${encodeURIComponent(to.value)}`;
+            /** @type {HTMLInputElement} */ (from).value,
+        )}&to=${encodeURIComponent(/** @type {HTMLInputElement} */ (to).value)}`;
         downloadBankPdf(url, form.getAttribute('data-filename') || 'kontoauszug.pdf', (message) => {
             showError(form, '_global', message);
         });
@@ -1755,12 +1991,16 @@
      * @param {HTMLInputElement} input the account-filter search box that fired the event
      */
     function applyAccountNameFilter(input) {
-        const scope = document.querySelector(input.getAttribute('data-filter-scope'));
+        const scope = document.querySelector(
+            /** @type {string} */ (input.getAttribute('data-filter-scope')),
+        );
         if (!scope) {
             return;
         }
         const term = input.value.trim().toLowerCase();
-        const items = scope.querySelectorAll('[data-filter-name]');
+        const items = /** @type {NodeListOf<HTMLElement>} */ (
+            scope.querySelectorAll('[data-filter-name]')
+        );
         let visible = 0;
         items.forEach((item) => {
             const name = (item.getAttribute('data-filter-name') || '').toLowerCase();
@@ -1770,7 +2010,9 @@
                 visible += 1;
             }
         });
-        scope.querySelectorAll('[data-bank-acc-group]').forEach((groupEl) => {
+        /** @type {NodeListOf<HTMLElement>} */ (
+            scope.querySelectorAll('[data-bank-acc-group]')
+        ).forEach((groupEl) => {
             const anyVisible = Array.prototype.some.call(
                 groupEl.querySelectorAll('[data-filter-name]'),
                 (item) => {
@@ -1780,14 +2022,19 @@
             groupEl.hidden = !anyVisible;
         });
         const emptySelector = input.getAttribute('data-filter-empty');
-        const empty = emptySelector ? document.querySelector(emptySelector) : null;
+        const empty = /** @type {HTMLElement | null} */ (
+            emptySelector ? document.querySelector(emptySelector) : null
+        );
         if (empty) {
             empty.hidden = items.length === 0 || visible > 0;
         }
     }
 
     document.addEventListener('input', (event) => {
-        const input = event.target.closest ? event.target.closest('[data-bank-acc-filter]') : null;
+        const target = /** @type {Element} */ (event.target);
+        const input = /** @type {HTMLInputElement | null} */ (
+            target.closest ? target.closest('[data-bank-acc-filter]') : null
+        );
         if (input) {
             applyAccountNameFilter(input);
         }
@@ -1810,402 +2057,25 @@
     }
 
     document.addEventListener('click', (event) => {
-        const toggle = event.target.closest
-            ? event.target.closest('[data-trigger="bank-row-expand"]')
-            : null;
+        const target = /** @type {Element} */ (event.target);
+        const toggle = /** @type {HTMLElement | null} */ (
+            target.closest ? target.closest('[data-trigger="bank-row-expand"]') : null
+        );
         if (toggle) {
             toggleAriaRegion(toggle);
             return;
         }
-        if (event.target.closest('a, button, input, select, textarea, label')) {
+        if (target.closest('a, button, input, select, textarea, label')) {
             return;
         }
-        const row = event.target.closest('tr.bank-booking-row.is-expandable');
+        const row = target.closest('tr.bank-booking-row.is-expandable');
         if (row) {
-            const btn = row.querySelector('[data-trigger="bank-row-expand"]');
+            const btn = /** @type {HTMLElement | null} */ (
+                row.querySelector('[data-trigger="bank-row-expand"]')
+            );
             if (btn) {
                 toggleAriaRegion(btn);
             }
-        }
-    });
-})();
-
-(function () {
-    function viewToggles() {
-        return document.querySelector('[data-bank-view-toggles]');
-    }
-
-    function storageKey() {
-        const main = document.querySelector('main[data-user-id]');
-        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
-        return `bank_dashboard_view_${uid}`;
-    }
-
-    function layoutCheckbox() {
-        return document.querySelector('input[data-bank-view-layout]');
-    }
-
-    function groupCheckbox() {
-        return document.querySelector('input[data-bank-view-group]');
-    }
-
-    function renderedState() {
-        const layoutEl = layoutCheckbox();
-        const groupEl = groupCheckbox();
-        return {
-            layout: layoutEl && layoutEl.checked ? 'table' : 'card',
-            group: groupEl && groupEl.checked ? 'bereich' : 'alpha',
-        };
-    }
-
-    function readSaved() {
-        try {
-            const raw = localStorage.getItem(storageKey());
-            if (raw === null) {
-                return null;
-            }
-            const parsed = JSON.parse(raw) || {};
-            return {
-                layout: parsed.layout === 'table' ? 'table' : 'card',
-                group: parsed.group === 'bereich' ? 'bereich' : 'alpha',
-            };
-        } catch {
-            return null;
-        }
-    }
-
-    function writeSaved(state) {
-        try {
-            localStorage.setItem(storageKey(), JSON.stringify(state));
-        } catch {}
-    }
-
-    function applyCheckboxStates(state) {
-        const layoutEl = layoutCheckbox();
-        const groupEl = groupCheckbox();
-        if (layoutEl) {
-            layoutEl.checked = state.layout === 'table';
-        }
-        if (groupEl) {
-            groupEl.checked = state.group === 'bereich';
-        }
-    }
-
-    function reapplyNameFilter() {
-        const input = document.querySelector('[data-bank-acc-filter]');
-        if (input && input.value) {
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-    }
-
-    function fetchView(state) {
-        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
-            window.location.reload();
-            return;
-        }
-        window.krtFetch
-            .swap({
-                url: `/bank?layout=${state.layout}&group=${state.group}`,
-                container: '#bank-grid-results',
-                fragmentValue: 'bankGrid',
-                history: true,
-            })
-            .then(() => {
-                reapplyNameFilter();
-            });
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!viewToggles()) {
-            return;
-        }
-        if (/[?&](layout|group)=/.test(window.location.search)) {
-            writeSaved(renderedState());
-            return;
-        }
-        const saved = readSaved();
-        if (saved === null) {
-            writeSaved(renderedState());
-            return;
-        }
-        const current = renderedState();
-        if (saved.layout !== current.layout || saved.group !== current.group) {
-            applyCheckboxStates(saved);
-            fetchView(saved);
-        }
-    });
-
-    document.addEventListener('change', (event) => {
-        const checkbox = event.target.closest
-            ? event.target.closest('input[data-bank-view-layout],input[data-bank-view-group]')
-            : null;
-        if (!checkbox) {
-            return;
-        }
-        const state = renderedState();
-        writeSaved(state);
-        fetchView(state);
-    });
-})();
-
-(function () {
-    function toggleGroup() {
-        return document.querySelector('[data-ou-view-toggles]');
-    }
-
-    function layoutCheckbox() {
-        return document.querySelector('input[data-ou-view-layout]');
-    }
-
-    function storageKey() {
-        const main = document.querySelector('main[data-user-id]');
-        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
-        return `org_unit_bank_view_${uid}`;
-    }
-
-    function renderedLayout() {
-        const checkbox = layoutCheckbox();
-        return checkbox && checkbox.checked ? 'table' : 'card';
-    }
-
-    function readSaved() {
-        try {
-            const raw = localStorage.getItem(storageKey());
-            if (raw === null) {
-                return null;
-            }
-            const parsed = JSON.parse(raw) || {};
-            return parsed.layout === 'table' ? 'table' : 'card';
-        } catch {
-            return null;
-        }
-    }
-
-    function writeSaved(layout) {
-        try {
-            localStorage.setItem(storageKey(), JSON.stringify({ layout }));
-        } catch {}
-    }
-
-    function reapplyNameFilter() {
-        const input = document.querySelector('#ou-panel-konten [data-bank-acc-filter]');
-        if (input && input.value) {
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-    }
-
-    function fetchView(layout) {
-        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
-            window.location.reload();
-            return;
-        }
-        window.krtFetch
-            .swap({
-                url: `/org-unit-bank?layout=${layout}`,
-                container: '#ou-acc-results',
-                fragmentValue: 'orgUnitBankAccounts',
-                history: true,
-            })
-            .then(() => {
-                reapplyNameFilter();
-            });
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!toggleGroup()) {
-            return;
-        }
-        if (/[?&]layout=/.test(window.location.search)) {
-            writeSaved(renderedLayout());
-            return;
-        }
-        const saved = readSaved();
-        if (saved === null) {
-            writeSaved(renderedLayout());
-            return;
-        }
-        if (saved !== renderedLayout()) {
-            const checkbox = layoutCheckbox();
-            if (checkbox) {
-                checkbox.checked = saved === 'table';
-            }
-            fetchView(saved);
-        }
-    });
-
-    document.addEventListener('change', (event) => {
-        const checkbox = event.target.closest
-            ? event.target.closest('input[data-ou-view-layout]')
-            : null;
-        if (!checkbox) {
-            return;
-        }
-        const layout = checkbox.checked ? 'table' : 'card';
-        writeSaved(layout);
-        fetchView(layout);
-    });
-})();
-
-(function () {
-    function storageKey() {
-        const main = document.querySelector('main[data-user-id]');
-        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
-        return `bank_grants_view_${uid}`;
-    }
-
-    function onGrantsPage() {
-        return !!document.querySelector('[data-role="bank-grants-filter"]');
-    }
-
-    function readSaved() {
-        try {
-            const raw = localStorage.getItem(storageKey());
-            if (raw === null) {
-                return null;
-            }
-            const parsed = JSON.parse(raw) || {};
-            return {
-                view: parsed.view === 'employee' ? 'employee' : 'account',
-                accountId: typeof parsed.accountId === 'string' ? parsed.accountId : null,
-                userId: typeof parsed.userId === 'string' ? parsed.userId : null,
-            };
-        } catch {
-            return null;
-        }
-    }
-
-    function writeSaved(state) {
-        try {
-            localStorage.setItem(storageKey(), JSON.stringify(state));
-        } catch {}
-    }
-
-    function urlState() {
-        const params = new URLSearchParams(window.location.search);
-        const view =
-            (params.get('view') || '').toLowerCase() === 'employee' ? 'employee' : 'account';
-        return {
-            view,
-            accountId: view === 'account' ? params.get('accountId') : null,
-            userId: view === 'employee' ? params.get('userId') : null,
-        };
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!onGrantsPage()) {
-            return;
-        }
-        if (/[?&](view|accountId|userId)=/.test(window.location.search)) {
-            writeSaved(urlState());
-            return;
-        }
-        const saved = readSaved();
-        if (saved === null) {
-            writeSaved(urlState());
-            return;
-        }
-        if (saved.view === 'employee' || saved.accountId || saved.userId) {
-            const params = new URLSearchParams();
-            params.set('view', saved.view);
-            if (saved.view === 'account' && saved.accountId) {
-                params.set('accountId', saved.accountId);
-            }
-            if (saved.view === 'employee' && saved.userId) {
-                params.set('userId', saved.userId);
-            }
-            window.location.replace(`/bank/grants?${params.toString()}`);
-        }
-    });
-
-    document.addEventListener('change', (event) => {
-        const select = event.target.closest
-            ? event.target.closest('[data-role="bank-grants-filter"]')
-            : null;
-        if (!select) {
-            return;
-        }
-        const view = select.getAttribute('data-view') === 'employee' ? 'employee' : 'account';
-        writeSaved({
-            view,
-            accountId: view === 'account' && select.value ? select.value : null,
-            userId: view === 'employee' && select.value ? select.value : null,
-        });
-    });
-})();
-
-(function () {
-    const CHART_CONTAINER_IDS = ['bank-chart-results', 'org-unit-bank-chart-results'];
-
-    function storageKey() {
-        const main = document.querySelector('main[data-user-id]');
-        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
-        return `bank_chart_range_${uid}`;
-    }
-
-    function chartContainer() {
-        for (let i = 0; i < CHART_CONTAINER_IDS.length; i++) {
-            const el = document.getElementById(CHART_CONTAINER_IDS[i]);
-            if (el) {
-                return el;
-            }
-        }
-        return null;
-    }
-
-    function renderedRange() {
-        const active = document.querySelector('.bank-chart-range-btn.is-active[data-range]');
-        return active ? active.getAttribute('data-range') : null;
-    }
-
-    function readSaved() {
-        try {
-            const raw = localStorage.getItem(storageKey());
-            if (raw === null) {
-                return null;
-            }
-            const parsed = JSON.parse(raw) || {};
-            return typeof parsed.range === 'string' ? parsed.range : null;
-        } catch {
-            return null;
-        }
-    }
-
-    function writeSaved(range) {
-        try {
-            localStorage.setItem(storageKey(), JSON.stringify({ range }));
-        } catch {}
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const container = chartContainer();
-        if (!container) {
-            return;
-        }
-        if (/[?&]chartRange=/.test(window.location.search)) {
-            const rendered = renderedRange();
-            if (rendered) {
-                writeSaved(rendered);
-            }
-            return;
-        }
-        const saved = readSaved();
-        if (saved === null || saved === renderedRange()) {
-            return;
-        }
-        const link = container.querySelector(`a.bank-chart-range-btn[data-range="${saved}"]`);
-        if (link) {
-            link.click();
-        }
-    });
-
-    document.addEventListener('krt:swapped', (event) => {
-        const container = event.detail && event.detail.container;
-        if (!container || CHART_CONTAINER_IDS.indexOf(container.id) === -1) {
-            return;
-        }
-        const rendered = renderedRange();
-        if (rendered) {
-            writeSaved(rendered);
         }
     });
 })();

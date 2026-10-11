@@ -1,3 +1,5 @@
+// @ts-check
+
 (function () {
     'use strict';
 
@@ -93,7 +95,7 @@
     }
 
     /**
-     * Navigates to the same-origin URL in `data-href` through {@link navigateSafe}.
+     * Navigates to the same-origin URL in `data-href` through `navigateSafe`.
      */
     on('click', 'navigate-href', (el, event) => {
         if (navigateSafe(el.getAttribute('data-href'))) {
@@ -103,13 +105,14 @@
 
     /**
      * Navigates to `data-url-template` with its `{value}` placeholder replaced by the URL-encoded
-     * selected value, through {@link navigateSafe}.
+     * selected value, through `navigateSafe`.
      */
     on('change', 'navigate-select', (el) => {
-        if (!el.value) return;
-        const template = el.getAttribute('data-url-template');
+        const select = /** @type {HTMLSelectElement} */ (el);
+        if (!select.value) return;
+        const template = select.getAttribute('data-url-template');
         if (!template) return;
-        navigateSafe(template.replace('{value}', encodeURIComponent(el.value)));
+        navigateSafe(template.replace('{value}', encodeURIComponent(select.value)));
     });
 
     /**
@@ -131,8 +134,9 @@
      * Submits the control's form whenever the control changes.
      */
     on('change', 'submit-form', (el) => {
-        if (el.form && typeof el.form.submit === 'function') {
-            el.form.submit();
+        const control = /** @type {HTMLInputElement} */ (el);
+        if (control.form && typeof control.form.submit === 'function') {
+            control.form.submit();
         }
     });
 
@@ -143,7 +147,7 @@
     function submitFormByIdHandler(el, event) {
         const id = el.getAttribute('data-form-id');
         if (!id) return;
-        const form = document.getElementById(id);
+        const form = /** @type {HTMLFormElement | null} */ (document.getElementById(id));
         if (!form || typeof form.submit !== 'function') return;
         if (event && typeof event.preventDefault === 'function' && el.tagName === 'BUTTON') {
             event.preventDefault();
@@ -161,7 +165,7 @@
         if (typeof window.filterTable !== 'function') return;
         const tableId = el.getAttribute('data-table-id');
         if (!tableId) return;
-        window.filterTable(tableId, el.value);
+        window.filterTable(tableId, /** @type {HTMLInputElement} */ (el).value);
     }
     on('input', 'filter-table', filterTableHandler);
     on('keyup', 'filter-table', filterTableHandler);

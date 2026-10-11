@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global MSG_SAVED, MSG_DELETED, MSG_ERROR, MSG_CONFLICT, MSG_DELETE_TOPIC_TITLE, MSG_DELETE_TOPIC_MSG, MSG_DELETE_CATEGORY_TITLE, MSG_DELETE_CATEGORY_MSG, MSG_OK, MSG_CANCEL, MSG_DIRTY_LEAVE, MSG_REFRESH_FAILED */
 
 function toastSuccess(msg) {
@@ -26,6 +28,16 @@ function toastError(msg) {
     if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
 }
 
+/**
+ * Looks up a form control of the page's modals; the template always renders them.
+ *
+ * @param {string} id the control's element id
+ * @returns {HTMLInputElement} the control (an input, select or textarea; only `value` is used)
+ */
+function paControl(id) {
+    return /** @type {HTMLInputElement} */ (document.getElementById(id));
+}
+
 function closeModal(id) {
     window.krtModal.close(id);
 }
@@ -33,6 +45,7 @@ function openModal(id) {
     window.krtModal.open(id);
 }
 
+/** @type {string | null} */
 let paSelectedTopicId = null;
 
 function paTopicsUrl() {
@@ -62,7 +75,9 @@ function paRefreshTopics() {
  * @param {boolean} focusRow whether the selected master row takes the focus
  */
 function paSelectTopic(topicId, focusRow) {
-    const rows = Array.from(document.querySelectorAll('.pa-topic-row'));
+    const rows = Array.from(
+        /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.pa-topic-row')),
+    );
     if (rows.length === 0) {
         paSelectedTopicId = null;
         return;
@@ -78,14 +93,16 @@ function paSelectTopic(topicId, focusRow) {
         r.setAttribute('aria-selected', String(on));
         r.setAttribute('tabindex', on ? '0' : '-1');
     });
-    document.querySelectorAll('.pa-topic-pane').forEach((pane) => {
-        pane.hidden = pane.getAttribute('data-pa-topic-id') !== id;
-    });
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.pa-topic-pane')).forEach(
+        (pane) => {
+            pane.hidden = pane.getAttribute('data-pa-topic-id') !== id;
+        },
+    );
     paSelectedTopicId = id;
     if (focusRow) target.focus();
     try {
         const url = new URL(window.location.href);
-        url.searchParams.set('topic', id);
+        url.searchParams.set('topic', String(id));
         window.history.replaceState(window.history.state, '', url.pathname + url.search);
     } catch (_e) {}
 }
@@ -149,24 +166,24 @@ function apiCall(url, method, body) {
 }
 
 function openCreateTopicModal() {
-    document.getElementById('ct-name').value = '';
-    document.getElementById('ct-desc').value = '';
-    document.getElementById('ct-sort').value = 0;
+    paControl('ct-name').value = '';
+    paControl('ct-desc').value = '';
+    paControl('ct-sort').value = '0';
     openModal('modal-create-topic');
 }
 function openEditTopicModal(btn) {
-    document.getElementById('et-id').value = btn.getAttribute('data-pa-id');
-    document.getElementById('et-version').value = btn.getAttribute('data-pa-version');
-    document.getElementById('et-name').value = btn.getAttribute('data-pa-name');
-    document.getElementById('et-desc').value = btn.getAttribute('data-pa-description') || '';
-    document.getElementById('et-sort').value = btn.getAttribute('data-pa-sort');
+    paControl('et-id').value = btn.getAttribute('data-pa-id') ?? '';
+    paControl('et-version').value = btn.getAttribute('data-pa-version') ?? '';
+    paControl('et-name').value = btn.getAttribute('data-pa-name') ?? '';
+    paControl('et-desc').value = btn.getAttribute('data-pa-description') || '';
+    paControl('et-sort').value = btn.getAttribute('data-pa-sort') ?? '';
     openModal('modal-edit-topic');
 }
 function createTopic() {
     const body = {
-        name: document.getElementById('ct-name').value,
-        description: document.getElementById('ct-desc').value || null,
-        sortOrder: parseInt(document.getElementById('ct-sort').value, 10) || 0,
+        name: paControl('ct-name').value,
+        description: paControl('ct-desc').value || null,
+        sortOrder: parseInt(paControl('ct-sort').value, 10) || 0,
     };
     apiCall('/api/proxy/promotion/topics', 'POST', body).then((data) => {
         if (!data) return;
@@ -177,12 +194,12 @@ function createTopic() {
     });
 }
 function updateTopic() {
-    const id = document.getElementById('et-id').value;
+    const id = paControl('et-id').value;
     const body = {
-        version: parseInt(document.getElementById('et-version').value, 10),
-        name: document.getElementById('et-name').value,
-        description: document.getElementById('et-desc').value || null,
-        sortOrder: parseInt(document.getElementById('et-sort').value, 10) || 0,
+        version: parseInt(paControl('et-version').value, 10),
+        name: paControl('et-name').value,
+        description: paControl('et-desc').value || null,
+        sortOrder: parseInt(paControl('et-sort').value, 10) || 0,
     };
     apiCall(`/api/proxy/promotion/topics/${id}`, 'PUT', body).then((data) => {
         if (!data) return;
@@ -213,27 +230,27 @@ function deleteTopic(btn) {
 }
 
 function openCreateCategoryModal(btn) {
-    document.getElementById('cc-topic-id').value = btn.getAttribute('data-pa-topic-id');
-    document.getElementById('cc-name').value = '';
-    document.getElementById('cc-desc').value = '';
-    document.getElementById('cc-sort').value = 0;
+    paControl('cc-topic-id').value = btn.getAttribute('data-pa-topic-id') ?? '';
+    paControl('cc-name').value = '';
+    paControl('cc-desc').value = '';
+    paControl('cc-sort').value = '0';
     openModal('modal-create-category');
 }
 function openEditCategoryModal(btn) {
-    document.getElementById('ec-id').value = btn.getAttribute('data-pa-id');
-    document.getElementById('ec-version').value = btn.getAttribute('data-pa-version');
-    document.getElementById('ec-topic-id').value = btn.getAttribute('data-pa-topic-id');
-    document.getElementById('ec-name').value = btn.getAttribute('data-pa-name');
-    document.getElementById('ec-desc').value = btn.getAttribute('data-pa-description') || '';
-    document.getElementById('ec-sort').value = btn.getAttribute('data-pa-sort');
+    paControl('ec-id').value = btn.getAttribute('data-pa-id') ?? '';
+    paControl('ec-version').value = btn.getAttribute('data-pa-version') ?? '';
+    paControl('ec-topic-id').value = btn.getAttribute('data-pa-topic-id') ?? '';
+    paControl('ec-name').value = btn.getAttribute('data-pa-name') ?? '';
+    paControl('ec-desc').value = btn.getAttribute('data-pa-description') || '';
+    paControl('ec-sort').value = btn.getAttribute('data-pa-sort') ?? '';
     openModal('modal-edit-category');
 }
 function createCategory() {
     const body = {
-        topicId: document.getElementById('cc-topic-id').value,
-        name: document.getElementById('cc-name').value,
-        description: document.getElementById('cc-desc').value || null,
-        sortOrder: parseInt(document.getElementById('cc-sort').value, 10) || 0,
+        topicId: paControl('cc-topic-id').value,
+        name: paControl('cc-name').value,
+        description: paControl('cc-desc').value || null,
+        sortOrder: parseInt(paControl('cc-sort').value, 10) || 0,
     };
     apiCall('/api/proxy/promotion/categories', 'POST', body).then((data) => {
         if (!data) return;
@@ -243,13 +260,13 @@ function createCategory() {
     });
 }
 function updateCategory() {
-    const id = document.getElementById('ec-id').value;
+    const id = paControl('ec-id').value;
     const body = {
-        version: parseInt(document.getElementById('ec-version').value, 10),
-        topicId: document.getElementById('ec-topic-id').value,
-        name: document.getElementById('ec-name').value,
-        description: document.getElementById('ec-desc').value || null,
-        sortOrder: parseInt(document.getElementById('ec-sort').value, 10) || 0,
+        version: parseInt(paControl('ec-version').value, 10),
+        topicId: paControl('ec-topic-id').value,
+        name: paControl('ec-name').value,
+        description: paControl('ec-desc').value || null,
+        sortOrder: parseInt(paControl('ec-sort').value, 10) || 0,
     };
     apiCall(`/api/proxy/promotion/categories/${id}`, 'PUT', body).then((data) => {
         if (!data) return;

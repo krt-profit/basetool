@@ -17,10 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG, INV_OWNER_PICKER_MSG */
 
 document.addEventListener('DOMContentLoaded', () => {
-    const matSelect = document.getElementById('materialId');
+    const matSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('materialId')
+    );
     if (matSelect) {
         matSelect.addEventListener('change', function () {
             filterOrderSelects(this.value);
@@ -31,7 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    const gameItemSelect = document.getElementById('gameItemId');
+    const gameItemSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('gameItemId')
+    );
     if (gameItemSelect) {
         gameItemSelect.addEventListener('change', function () {
             filterOrderSelects(this.value);
@@ -62,23 +68,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('click', (event) => {
-        if (event.target.closest('[data-trigger="inv-input-add-order"]')) {
+        const target = /** @type {Element} */ (event.target);
+        if (target.closest('[data-trigger="inv-input-add-order"]')) {
             addAllocRow('jobOrder');
-        } else if (event.target.closest('[data-trigger="inv-input-add-mission"]')) {
+        } else if (target.closest('[data-trigger="inv-input-add-mission"]')) {
             addAllocRow('mission');
-        } else if (event.target.closest('[data-trigger="inv-input-remove-alloc"]')) {
-            removeAllocRow(event.target.closest('[data-trigger="inv-input-remove-alloc"]'));
+        } else if (target.closest('[data-trigger="inv-input-remove-alloc"]')) {
+            removeAllocRow(
+                /** @type {Element} */ (target.closest('[data-trigger="inv-input-remove-alloc"]')),
+            );
         }
     });
     document.addEventListener('input', (event) => {
-        if (event.target.matches('[data-alloc-amount]') || event.target.id === 'amount') {
+        const target = /** @type {Element} */ (event.target);
+        if (target.matches('[data-alloc-amount]') || target.id === 'amount') {
             updateAllocOver();
         }
     });
     document.addEventListener('change', (event) => {
-        if (event.target.matches('[data-alloc-target]')) {
+        const target = /** @type {Element} */ (event.target);
+        if (target.matches('[data-alloc-target]')) {
             updateAllocOver();
-        } else if (event.target.matches('input[name="inventoryCatalogMode"]')) {
+        } else if (target.matches('input[name="inventoryCatalogMode"]')) {
             applyCatalogMode();
         }
     });
@@ -87,6 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     startOrderNeedsLiveSync();
 });
+
+/**
+ * @typedef {ApiDto<'OrgUnitMembershipOptionDto'> & {orgUnitId: string}} InventoryInputOwnerOption
+ */
 
 const INVENTORY_INPUT_ORDER_SECTIONS = {
     demand: { container: '#jobOrderAllocGroup', fragmentValue: 'demand' },
@@ -120,21 +135,31 @@ function refreshOrderNeeds() {
 }
 
 function currentCatalogMode() {
-    const checked = document.querySelector('input[name="inventoryCatalogMode"]:checked');
+    const checked = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="inventoryCatalogMode"]:checked')
+    );
     return checked && checked.value === 'item' ? 'item' : 'material';
 }
 
 function activeCatalogId() {
-    const el = document.getElementById(
-        currentCatalogMode() === 'item' ? 'gameItemId' : 'materialId',
+    const el = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+        document.getElementById(currentCatalogMode() === 'item' ? 'gameItemId' : 'materialId')
     );
     return el ? el.value : '';
 }
 
+/**
+ * Enables or disables every control of one catalog block.
+ *
+ * @param {string} blockId the block's element id
+ * @param {boolean} disabled whether the controls are disabled
+ */
 function setCatalogBlockDisabled(blockId, disabled) {
     const block = document.getElementById(blockId);
     if (!block) return;
-    block.querySelectorAll('input, select, textarea, button').forEach((el) => {
+    /** @type {NodeListOf<HTMLInputElement>} */ (
+        block.querySelectorAll('input, select, textarea, button')
+    ).forEach((el) => {
         el.disabled = disabled;
     });
 }
@@ -150,7 +175,9 @@ function applyCatalogMode() {
     if (mode === 'item') {
         applyItemAmountMode();
     } else {
-        const matSelect = document.getElementById('materialId');
+        const matSelect = /** @type {HTMLSelectElement | null} */ (
+            document.getElementById('materialId')
+        );
         if (matSelect) updateAmountFieldForMaterial(matSelect);
     }
     syncPersonalAllocations();
@@ -167,25 +194,42 @@ function applyItemAmountMode() {
     updateMergeOptIn('PIECE');
 }
 
+/**
+ * Mirrors the picked game item's label into the hidden name field.
+ *
+ * @param {HTMLSelectElement | HTMLInputElement} control the game item select or its combobox input
+ */
 function syncGameItemNameEcho(control) {
-    const echo = document.getElementById('gameItemName');
+    const echo = /** @type {HTMLInputElement | null} */ (document.getElementById('gameItemName'));
     if (!echo) return;
     let label = '';
     const wrapper = control.closest('.krt-combobox');
     if (wrapper) {
-        const textbox = wrapper.querySelector('.krt-combobox__input');
+        const textbox = /** @type {HTMLInputElement | null} */ (
+            wrapper.querySelector('.krt-combobox__input')
+        );
         label = textbox ? textbox.value.trim() : '';
-    } else if (control.tagName === 'SELECT' && control.selectedOptions[0]) {
-        label = control.selectedOptions[0].textContent.trim();
+    } else if (
+        control.tagName === 'SELECT' &&
+        /** @type {HTMLSelectElement} */ (control).selectedOptions[0]
+    ) {
+        label = /** @type {string} */ (
+            /** @type {HTMLSelectElement} */ (control).selectedOptions[0].textContent
+        ).trim();
     }
     echo.value = label;
 }
 
+/**
+ * Adapts the amount field's step and unit label to the picked material's quantity type.
+ *
+ * @param {HTMLSelectElement} selectElement the material select
+ */
 function updateAmountFieldForMaterial(selectElement) {
     const amountInput = document.getElementById('amount');
     const unitSpan = document.getElementById('amount-unit');
     const scuHint = document.getElementById('amount-scu-hint');
-    if (!amountInput) return;
+    if (!amountInput || !unitSpan) return;
 
     let qtType = selectElement.dataset.quantityType || '';
     if (!qtType && selectElement.tagName === 'SELECT') {
@@ -214,26 +258,52 @@ let mergeOptInQuantityType = '';
 let mergeProbeTimer = 0;
 let mergeProbeSequence = 0;
 
+/**
+ * Records the picked quantity type and re-probes for a mergeable stack.
+ *
+ * @param {string} qtType the quantity type, `PIECE`, `SCU` or empty
+ */
 function updateMergeOptIn(qtType) {
     mergeOptInQuantityType = qtType;
     scheduleMergeProbe();
 }
 
+/**
+ * Shows or hides the merge opt-in row; hiding it clears the checkbox.
+ *
+ * @param {boolean} visible whether the row is shown
+ */
 function setMergeOptInVisible(visible) {
     const mergeRow = document.getElementById('merge-stock-row');
-    const mergeCheckbox = document.getElementById('mergeStock');
+    const mergeCheckbox = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('mergeStock')
+    );
     if (!mergeRow) return;
     mergeRow.hidden = !visible;
     if (!visible && mergeCheckbox) mergeCheckbox.checked = false;
 }
 
+/**
+ * The trimmed value of an enabled form field, or an empty string.
+ *
+ * @param {string} id the field's element id
+ * @returns {string} the value
+ */
 function fieldValue(id) {
-    const el = document.getElementById(id);
+    const el = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+        document.getElementById(id)
+    );
     return el && !el.disabled ? String(el.value || '').trim() : '';
 }
 
+/**
+ * Whether a checkbox is ticked.
+ *
+ * @param {string} id the checkbox's element id
+ * @returns {boolean} true when it exists and is ticked
+ */
 function fieldChecked(id) {
-    const el = document.getElementById(id);
+    const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
     return !!(el && el.checked);
 }
 
@@ -279,11 +349,14 @@ function scheduleMergeProbe() {
 }
 
 const OWNER_KIND_ORDER = ['ORGANISATIONSLEITUNG', 'BEREICH', 'SQUADRON', 'SPECIAL_COMMAND'];
+/** @type {{nodes: Node[], value: string, visible: boolean, required: boolean} | null} */
 let ownOwnerOptions = null;
 let ownerReloadSequence = 0;
 
 function ownerPickerParts() {
-    const select = document.getElementById('owningOrgUnitId');
+    const select = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('owningOrgUnitId')
+    );
     const wrapper = select ? select.closest('.owner-picker') : null;
     return select && wrapper ? { select, wrapper } : null;
 }
@@ -292,9 +365,11 @@ function captureOwnOwnerOptions() {
     const parts = ownerPickerParts();
     if (!parts) return;
     ownOwnerOptions = {
-        nodes: Array.prototype.map.call(parts.select.childNodes, (node) => {
-            return node.cloneNode(true);
-        }),
+        nodes: /** @type {Node[]} */ (
+            Array.prototype.map.call(parts.select.childNodes, (/** @type {Node} */ node) => {
+                return node.cloneNode(true);
+            })
+        ),
         value: parts.select.value,
         visible: !parts.wrapper.classList.contains('is-hidden'),
         required: parts.select.required,
@@ -315,6 +390,13 @@ function restoreOwnOwnerOptions() {
     parts.wrapper.classList.toggle('is-hidden', !ownOwnerOptions.visible);
 }
 
+/**
+ * Builds the option of one owner org unit.
+ *
+ * @param {InventoryInputOwnerOption} membership the org unit
+ * @param {string} selectedId the id to preselect
+ * @returns {HTMLOptionElement} the option
+ */
 function ownerOption(membership, selectedId) {
     const option = document.createElement('option');
     option.value = membership.orgUnitId;
@@ -323,9 +405,15 @@ function ownerOption(membership, selectedId) {
     return option;
 }
 
+/**
+ * Rebuilds the owner picker from a user's memberships.
+ *
+ * @param {unknown} memberships the answer of the memberships endpoint
+ */
 function renderOwnerOptions(memberships) {
     const parts = ownerPickerParts();
     if (!parts) return;
+    /** @type {InventoryInputOwnerOption[]} */
     const list = Array.isArray(memberships)
         ? memberships.filter((m) => {
               return m && m.orgUnitId;
@@ -359,6 +447,7 @@ function renderOwnerOptions(memberships) {
             return m.kind === kind;
         });
         if (!ofKind.length) return;
+        /** @type {HTMLSelectElement | HTMLOptGroupElement} */
         let parent = select;
         if (grouped) {
             const group = document.createElement('optgroup');
@@ -371,7 +460,7 @@ function renderOwnerOptions(memberships) {
         });
     });
     list.filter((m) => {
-        return OWNER_KIND_ORDER.indexOf(m.kind) < 0;
+        return OWNER_KIND_ORDER.indexOf(/** @type {string} */ (m.kind)) < 0;
     }).forEach((m) => {
         select.appendChild(ownerOption(m, preset));
     });
@@ -405,22 +494,35 @@ function reloadOwnerPickerForUser() {
         });
 }
 
+/**
+ * The amount inputs left blank in a dimension that has two or more targets.
+ *
+ * @param {string} dimension `jobOrder` or `mission`
+ * @returns {HTMLInputElement[]} the blank inputs
+ */
 function blankAmountRows(dimension) {
     const targeted = allocTargetedRows(dimension);
     if (targeted.length < 2) return [];
-    return targeted
-        .map((select) => {
-            const row = select.closest('[data-alloc-row]');
-            return row ? row.querySelector('[data-alloc-amount]') : null;
-        })
-        .filter((input) => {
-            return !!input && String(input.value || '').trim() === '';
-        });
+    return /** @type {HTMLInputElement[]} */ (
+        targeted
+            .map((select) => {
+                const row = select.closest('[data-alloc-row]');
+                return row ? row.querySelector('[data-alloc-amount]') : null;
+            })
+            .filter((input) => {
+                return (
+                    !!input &&
+                    String(/** @type {HTMLInputElement} */ (input).value || '').trim() === ''
+                );
+            })
+    );
 }
 
 function markBlankAllocationAmounts() {
     const blank = blankAmountRows('jobOrder').concat(blankAmountRows('mission'));
-    document.querySelectorAll('[data-alloc-amount]').forEach((input) => {
+    /** @type {NodeListOf<HTMLInputElement>} */ (
+        document.querySelectorAll('[data-alloc-amount]')
+    ).forEach((input) => {
         if (blank.indexOf(input) >= 0) {
             input.setAttribute('aria-invalid', 'true');
         } else {
@@ -432,6 +534,12 @@ function markBlankAllocationAmounts() {
     return blank;
 }
 
+/**
+ * The element ids and name prefix of one allocation dimension.
+ *
+ * @param {string} dimension `jobOrder` or `mission`
+ * @returns {{rows: string, template: string, prefix: string, group: string, singleHint: string}} the config
+ */
 function allocConfig(dimension) {
     return dimension === 'jobOrder'
         ? {
@@ -450,37 +558,66 @@ function allocConfig(dimension) {
           };
 }
 
+/**
+ * The target selects of a dimension that have a value.
+ *
+ * @param {string} dimension `jobOrder` or `mission`
+ * @returns {HTMLSelectElement[]} the selects
+ */
 function allocTargetedRows(dimension) {
-    return Array.prototype.filter.call(
-        document.querySelectorAll(`#${allocConfig(dimension).rows} [data-alloc-target]`),
-        (select) => {
-            return !!select.value;
-        },
+    return /** @type {HTMLSelectElement[]} */ (
+        Array.prototype.filter.call(
+            document.querySelectorAll(`#${allocConfig(dimension).rows} [data-alloc-target]`),
+            (/** @type {HTMLSelectElement} */ select) => {
+                return !!select.value;
+            },
+        )
     );
 }
 
+/**
+ * Shows the single-target hint while a dimension has at most one target.
+ *
+ * @param {string} dimension `jobOrder` or `mission`
+ */
 function updateAllocSingleHint(dimension) {
     const hint = document.getElementById(allocConfig(dimension).singleHint);
     if (!hint) return;
     hint.hidden = allocTargetedRows(dimension).length > 1;
 }
 
+/**
+ * Renumbers the form field names of a dimension's rows.
+ *
+ * @param {string} dimension `jobOrder` or `mission`
+ */
 function reindexAllocRows(dimension) {
     const cfg = allocConfig(dimension);
     const container = document.getElementById(cfg.rows);
     if (!container) return;
     container.querySelectorAll('[data-alloc-row]').forEach((row, index) => {
-        const select = row.querySelector('[data-alloc-target]');
-        const amount = row.querySelector('[data-alloc-amount]');
+        const select = /** @type {HTMLSelectElement | null} */ (
+            row.querySelector('[data-alloc-target]')
+        );
+        const amount = /** @type {HTMLInputElement | null} */ (
+            row.querySelector('[data-alloc-amount]')
+        );
         if (select) select.name = `${cfg.prefix}[${index}].targetId`;
         if (amount) amount.name = `${cfg.prefix}[${index}].amount`;
     });
 }
 
+/**
+ * Appends an empty allocation row to a dimension.
+ *
+ * @param {string} dimension `jobOrder` or `mission`
+ */
 function addAllocRow(dimension) {
     const cfg = allocConfig(dimension);
     const container = document.getElementById(cfg.rows);
-    const template = document.getElementById(cfg.template);
+    const template = /** @type {HTMLTemplateElement | null} */ (
+        document.getElementById(cfg.template)
+    );
     if (!container || !template) return;
     container.appendChild(template.content.cloneNode(true));
     reindexAllocRows(dimension);
@@ -490,6 +627,11 @@ function addAllocRow(dimension) {
     updateAllocOver();
 }
 
+/**
+ * Removes the allocation row of a remove button.
+ *
+ * @param {Element} button the remove button
+ */
 function removeAllocRow(button) {
     const row = button.closest('[data-alloc-row]');
     if (!row) return;
@@ -500,9 +642,16 @@ function removeAllocRow(button) {
     updateAllocOver();
 }
 
+/**
+ * Disables the job orders that do not need the picked catalog entry.
+ *
+ * @param {string} catalogId the picked material or game item id
+ */
 function filterOrderSelects(catalogId) {
     const attr = currentCatalogMode() === 'item' ? 'data-game-items' : 'data-materials';
-    document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]').forEach((select) => {
+    /** @type {NodeListOf<HTMLSelectElement>} */ (
+        document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]')
+    ).forEach((select) => {
         let hasSelectedValid = false;
         for (let i = 1; i < select.options.length; i++) {
             const option = select.options[i];
@@ -520,6 +669,11 @@ function filterOrderSelects(catalogId) {
 
 let orderNeeds = readEmbeddedOrderNeeds();
 
+/**
+ * Reads the order needs the page embedded.
+ *
+ * @returns {Record<string, any>} the needs by dimension, empty when missing or malformed
+ */
 function readEmbeddedOrderNeeds() {
     const group = document.getElementById('jobOrderAllocGroup');
     const raw = group ? group.getAttribute('data-order-needs') : '';
@@ -531,15 +685,29 @@ function readEmbeddedOrderNeeds() {
     }
 }
 
+/**
+ * The order needs of one catalog mode, keyed by order id.
+ *
+ * @param {boolean} itemMode true for game items, false for materials
+ * @returns {Record<string, any>} the needs
+ */
 function needsMapFor(itemMode) {
     const key = itemMode ? 'gameItems' : 'materials';
     return (orderNeeds && orderNeeds[key]) || {};
 }
 
+/**
+ * The outstanding amount and quality floor an order still needs of a material.
+ *
+ * @param {string} orderId the order id
+ * @param {string} materialId the material id
+ * @returns {{outstanding: number, floor: number | null} | null} the need, null when the order has none
+ */
 function orderNeedFor(orderId, materialId) {
     const buckets = needsMapFor(false)[orderId];
     if (!buckets || !buckets.length || !materialId) return null;
     let outstanding = 0;
+    /** @type {number | null} */
     let floor = null;
     let matched = false;
     buckets.forEach((bucket) => {
@@ -556,6 +724,13 @@ function orderNeedFor(orderId, materialId) {
     return matched ? { outstanding, floor } : null;
 }
 
+/**
+ * The outstanding amount an order still needs of a game item.
+ *
+ * @param {string} orderId the order id
+ * @param {string} gameItemId the game item id
+ * @returns {{outstanding: number, floor: null} | null} the need, null when the order has none
+ */
 function orderItemNeedFor(orderId, gameItemId) {
     const needs = needsMapFor(true)[orderId];
     if (!needs || !needs.length || !gameItemId) return null;
@@ -569,14 +744,26 @@ function orderItemNeedFor(orderId, gameItemId) {
     };
 }
 
+/**
+ * The quantity type of the picked material.
+ *
+ * @returns {string} `PIECE`, `SCU` or empty
+ */
 function pickedMaterialQuantityType() {
-    const el = document.getElementById('materialId');
+    const el = /** @type {HTMLSelectElement | null} */ (document.getElementById('materialId'));
     if (!el) return '';
     if (el.dataset && el.dataset.quantityType) return el.dataset.quantityType;
     const opt = el.selectedOptions && el.selectedOptions[0];
     return (opt && opt.getAttribute('data-quantity-type')) || '';
 }
 
+/**
+ * Formats an order need: whole for pieces, three decimals for SCU.
+ *
+ * @param {number | string} amount the amount
+ * @param {boolean} isPiece whether it is counted in whole pieces
+ * @returns {string} the formatted amount
+ */
 function formatNeedAmount(amount, isPiece) {
     const n = typeof amount === 'number' ? amount : parseFloat(amount);
     if (isNaN(n)) return '0';
@@ -588,15 +775,24 @@ function relabelOrderOptions() {
     const catalogId = activeCatalogId();
     const isPiece = itemMode || pickedMaterialQuantityType() === 'PIECE';
     const unit = isPiece ? MSG_UNIT_PIECE : MSG_UNIT_SCU;
-    const grade = itemMode ? NaN : parseInt((document.getElementById('quality') || {}).value, 10);
-    document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]').forEach((select) => {
+    const qualityInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('quality')
+    );
+    const grade = itemMode ? NaN : parseInt(qualityInput ? qualityInput.value : '', 10);
+    /** @type {NodeListOf<HTMLSelectElement>} */ (
+        document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]')
+    ).forEach((select) => {
         for (let i = 1; i < select.options.length; i++) {
             applyOrderOptionLabel(select.options[i], catalogId, itemMode, isPiece, unit, grade);
         }
     });
-    const template = document.getElementById('jobOrderRowTemplate');
+    const template = /** @type {HTMLTemplateElement | null} */ (
+        document.getElementById('jobOrderRowTemplate')
+    );
     if (template && template.content) {
-        template.content.querySelectorAll('[data-alloc-target] option').forEach((option) => {
+        /** @type {NodeListOf<HTMLOptionElement>} */ (
+            template.content.querySelectorAll('[data-alloc-target] option')
+        ).forEach((option) => {
             if (option.value) {
                 applyOrderOptionLabel(option, catalogId, itemMode, isPiece, unit, grade);
             }
@@ -604,6 +800,16 @@ function relabelOrderOptions() {
     }
 }
 
+/**
+ * Appends an order option's outstanding need and quality warning to its base label.
+ *
+ * @param {HTMLOptionElement} option the order option
+ * @param {string} catalogId the picked material or game item id
+ * @param {boolean} itemMode whether the catalog mode is game item
+ * @param {boolean} isPiece whether the amounts are whole pieces
+ * @param {string} unit the unit label
+ * @param {number} grade the typed quality, NaN when none
+ */
 function applyOrderOptionLabel(option, catalogId, itemMode, isPiece, unit, grade) {
     if (!option.dataset.baseLabel) option.dataset.baseLabel = option.textContent;
     const base = option.dataset.baseLabel;
@@ -616,6 +822,7 @@ function applyOrderOptionLabel(option, catalogId, itemMode, isPiece, unit, grade
         option.textContent = base;
         return;
     }
+    /** @type {string[]} */
     const parts = [];
     parts.push(
         need.outstanding > 0
@@ -631,14 +838,20 @@ function applyOrderOptionLabel(option, catalogId, itemMode, isPiece, unit, grade
     option.textContent = `${base} · ${parts.join(' · ')}`;
 }
 
+/**
+ * The sum of a dimension's allocation amounts.
+ *
+ * @param {string} dimension `jobOrder` or `mission`
+ * @returns {number} the sum
+ */
 function allocDimensionSum(dimension) {
     let sum = 0;
-    document
-        .querySelectorAll(`#${allocConfig(dimension).rows} [data-alloc-amount]`)
-        .forEach((input) => {
-            const value = parseFloat(input.value);
-            if (!isNaN(value)) sum += value;
-        });
+    /** @type {NodeListOf<HTMLInputElement>} */ (
+        document.querySelectorAll(`#${allocConfig(dimension).rows} [data-alloc-amount]`)
+    ).forEach((input) => {
+        const value = parseFloat(input.value);
+        if (!isNaN(value)) sum += value;
+    });
     return sum;
 }
 
@@ -648,7 +861,7 @@ function updateAllocOver() {
     markBlankAllocationAmounts();
     const overEl = document.getElementById('inputAllocOver');
     if (!overEl) return;
-    const amountEl = document.getElementById('amount');
+    const amountEl = /** @type {HTMLInputElement | null} */ (document.getElementById('amount'));
     const raw = amountEl ? amountEl.value : '';
     const amount = window.krtScuInput && amountEl ? window.krtScuInput.parse(raw) : parseFloat(raw);
     const total = isNaN(amount) ? 0 : amount;
@@ -658,7 +871,7 @@ function updateAllocOver() {
 }
 
 function syncPersonalAllocations() {
-    const personal = document.getElementById('personal');
+    const personal = /** @type {HTMLInputElement | null} */ (document.getElementById('personal'));
     const on = !!(personal && personal.checked);
     const itemMode = currentCatalogMode() === 'item';
     ['jobOrder', 'mission'].forEach((dimension) => {
@@ -676,7 +889,9 @@ function syncPersonalAllocations() {
 
 (function () {
     if (!window.krtFetch) return;
-    const form = document.getElementById('inventory-input-form');
+    const form = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('inventory-input-form')
+    );
     if (!form) return;
     form.addEventListener('submit', (event) => {
         event.preventDefault();

@@ -1,20 +1,31 @@
+// @ts-check
+
 (function () {
     'use strict';
 
-    const form = document.getElementById('operations-filter-form');
+    const filterForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('operations-filter-form')
+    );
     const resultsContainer = document.getElementById('operations-results');
     const loadingIndicator = document.getElementById('operations-loading-indicator');
     const resetBtn = document.getElementById('operations-filter-reset');
 
-    if (!form || !resultsContainer || !window.krtFetch) return;
+    if (!filterForm || !resultsContainer || !window.krtFetch) return;
+    const form = filterForm;
 
+    /** @type {number | null} */
     let debounceTimer = null;
 
+    /**
+     * Serialises the filter form into a query string, omitting empty fields.
+     *
+     * @returns {string} the query string without the leading question mark
+     */
     function buildQueryString() {
         const data = new FormData(form);
         const params = new URLSearchParams();
         for (const [key, value] of data.entries()) {
-            if (value !== '') params.append(key, value);
+            if (value !== '') params.append(key, String(value));
         }
         return params.toString();
     }
@@ -32,7 +43,7 @@
     window.krtOperationsReload = loadResults;
 
     function onFilterChange() {
-        clearTimeout(debounceTimer);
+        clearTimeout(debounceTimer ?? undefined);
         debounceTimer = setTimeout(loadResults, 300);
     }
 
@@ -40,11 +51,15 @@
     const PERIODS = ['UPCOMING', 'PAST', 'ALL'];
 
     function periodInputs() {
-        return form.querySelectorAll('input[name="period"]');
+        return /** @type {NodeListOf<HTMLInputElement>} */ (
+            form.querySelectorAll('input[name="period"]')
+        );
     }
 
     function currentPeriod() {
-        const checked = form.querySelector('input[name="period"]:checked');
+        const checked = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="period"]:checked')
+        );
         return checked ? checked.value : 'UPCOMING';
     }
 
@@ -104,8 +119,10 @@
 
     if (resetBtn) {
         resetBtn.addEventListener('click', () => {
-            form.querySelectorAll(
-                'input[type="search"], input[type="text"], input[type="hidden"], input[type="date"], input[type="time"]',
+            /** @type {NodeListOf<HTMLInputElement>} */ (
+                form.querySelectorAll(
+                    'input[type="search"], input[type="text"], input[type="hidden"], input[type="date"], input[type="time"]',
+                )
             ).forEach((el) => {
                 el.value = '';
             });

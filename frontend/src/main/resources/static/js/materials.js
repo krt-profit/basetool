@@ -17,22 +17,31 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global krtAutocomplete */
 
 document.addEventListener('DOMContentLoaded', () => {
-    const dataEl = document.getElementById('materialNames-data');
+    const dataEl = /** @type {HTMLDataListElement | null} */ (
+        document.getElementById('materialNames-data')
+    );
     const materialNames = dataEl
         ? Array.from(dataEl.options).map((opt) => {
               return opt.value;
           })
         : [];
-    const inp = document.getElementById('materialFilter');
+    const inp = /** @type {HTMLInputElement | null} */ (document.getElementById('materialFilter'));
     if (inp) krtAutocomplete(inp, materialNames);
 
     initGroupingView();
 });
 
 const GROUP_PREF_KEY = 'materials_group_by_category';
+/**
+ * Reads the stored grouping preference.
+ *
+ * @returns {string | null} the stored value, or null when unset or storage is unavailable
+ */
 function readGroupPref() {
     try {
         return localStorage.getItem(GROUP_PREF_KEY);
@@ -40,14 +49,24 @@ function readGroupPref() {
         return null;
     }
 }
+/**
+ * Stores the grouping preference; silent when storage is unavailable.
+ *
+ * @param {string} value '1' for grouped, '0' for flat
+ */
 function writeGroupPref(value) {
     try {
         localStorage.setItem(GROUP_PREF_KEY, value);
     } catch (_e) {}
 }
 
+/**
+ * Whether the category-grouped view is active; true when the toggle is absent.
+ *
+ * @returns {boolean} true for the grouped view
+ */
 function isGroupedMode() {
-    const box = document.getElementById('groupByCategory');
+    const box = /** @type {HTMLInputElement | null} */ (document.getElementById('groupByCategory'));
     return !box || box.checked;
 }
 
@@ -61,7 +80,7 @@ function applyGroupingView() {
 }
 
 function initGroupingView() {
-    const box = document.getElementById('groupByCategory');
+    const box = /** @type {HTMLInputElement | null} */ (document.getElementById('groupByCategory'));
     if (box) {
         const pref = readGroupPref();
         if (pref !== null) {
@@ -89,6 +108,11 @@ function setKindExpanded(toggle, expanded) {
     if (content) content.hidden = !expanded;
 }
 
+/**
+ * Flips one category open or closed.
+ *
+ * @param {Element} toggle the category's toggle button
+ */
 function toggleKindGroup(toggle) {
     setKindExpanded(toggle, toggle.getAttribute('aria-expanded') !== 'true');
 }
@@ -102,18 +126,23 @@ function toggleKindGroup(toggle) {
  */
 function filterCards(scope, filter) {
     let visibleCount = 0;
-    scope.querySelectorAll('.material-card').forEach((card) => {
-        const title = card.querySelector('.material-title');
-        const text = title ? title.textContent || '' : '';
-        const visible = text.toUpperCase().indexOf(filter) > -1;
-        card.hidden = !visible;
-        if (visible) visibleCount++;
-    });
+    /** @type {NodeListOf<HTMLElement>} */ (scope.querySelectorAll('.material-card')).forEach(
+        (card) => {
+            const title = card.querySelector('.material-title');
+            const text = title ? title.textContent || '' : '';
+            const visible = text.toUpperCase().indexOf(filter) > -1;
+            card.hidden = !visible;
+            if (visible) visibleCount++;
+        },
+    );
     return visibleCount;
 }
 
+/** Applies the filter text to the active view and toggles the no-results message. */
 function filterMaterials() {
-    const input = document.getElementById('materialFilter');
+    const input = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('materialFilter')
+    );
     const filter = (input ? input.value : '').toUpperCase();
     const totalVisibleCount = isGroupedMode() ? filterGroupedView(filter) : filterFlatView(filter);
 
@@ -123,9 +152,17 @@ function filterMaterials() {
     }
 }
 
+/**
+ * Filters the cards of every category group and hides the groups left empty.
+ *
+ * @param {string} filter the upper-cased filter text
+ * @returns {number} the number of visible cards
+ */
 function filterGroupedView(filter) {
     let totalVisibleCount = 0;
-    document.querySelectorAll('#materialsGrouped .kind-group').forEach((group) => {
+    /** @type {NodeListOf<HTMLElement>} */ (
+        document.querySelectorAll('#materialsGrouped .kind-group')
+    ).forEach((group) => {
         const visibleInGroup = filterCards(group, filter);
         group.hidden = visibleInGroup === 0;
         totalVisibleCount += visibleInGroup;
@@ -137,6 +174,12 @@ function filterGroupedView(filter) {
     return totalVisibleCount;
 }
 
+/**
+ * Filters the cards of the flat view.
+ *
+ * @param {string} filter the upper-cased filter text
+ * @returns {number} the number of visible cards
+ */
 function filterFlatView(filter) {
     const container = document.getElementById('materialsFlat');
     return container ? filterCards(container, filter) : 0;

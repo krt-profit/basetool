@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 (function () {
     function clamp01(t) {
         return t < 0 ? 0 : t > 1 ? 1 : t;
@@ -34,6 +36,7 @@
             return;
         }
         const q = parseFloat(range.value);
+        /** @type {number | null} */
         let value = null;
         const segs = slider.querySelectorAll('.bp-seg');
         if (segs.length) {
@@ -87,7 +90,7 @@
     }
 
     document.addEventListener('input', (e) => {
-        const t = e.target;
+        const t = /** @type {Element | null} */ (e.target);
         if (t && t.classList && t.classList.contains('bp-range')) {
             const slider = t.closest('.bp-slider');
             if (slider) {
@@ -108,22 +111,23 @@
         }
     }
 
+    /** @type {number | null} */
     let searchTimer = null;
 
     document.addEventListener('submit', (e) => {
-        const form = e.target;
+        const form = /** @type {HTMLFormElement | null} */ (e.target);
         if (!form || form.id !== 'admin-bp-filter') {
             return;
         }
         e.preventDefault();
-        clearTimeout(searchTimer);
+        clearTimeout(searchTimer ?? undefined);
         search(form);
     });
 
     const filterForm = document.getElementById('admin-bp-filter');
     if (filterForm && window.krtFetch) {
         filterForm.addEventListener('input', () => {
-            clearTimeout(searchTimer);
+            clearTimeout(searchTimer ?? undefined);
             searchTimer = setTimeout(() => {
                 search(filterForm);
             }, 300);

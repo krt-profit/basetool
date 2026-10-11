@@ -1,3 +1,5 @@
+// @ts-check
+
 (function () {
     'use strict';
 
@@ -15,6 +17,7 @@
     const BUDGET_CAPACITY = 5;
     const BUDGET_REFILL_MS = 60000;
 
+    /** @type {{ tokens: number, at: number } | null} */
     let memoryBudget = null;
 
     let sending = false;
@@ -138,6 +141,7 @@
         if (!token || !header) {
             return false;
         }
+        /** @type {Record<string, string>} */
         const headers = {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
@@ -147,6 +151,7 @@
             sending = false;
         };
         try {
+            /** @type {RequestInit} */
             const init = {
                 method: 'POST',
                 headers,
@@ -206,7 +211,10 @@
         'error',
         (event) => {
             try {
-                const target = event ? event.target : null;
+                const target =
+                    /** @type {{ tagName?: string, src?: string, href?: string } | null} */ (
+                        event ? event.target : null
+                    );
                 if (target && target !== window && target.tagName) {
                     report(
                         KIND_RESOURCE_ERROR,
@@ -257,6 +265,7 @@
     window.addEventListener('unhandledrejection', (event) => {
         try {
             const reason = event ? event.reason : null;
+            /** @type {string | null} */
             let message = null;
             if (reason && typeof reason === 'object' && typeof reason.message === 'string') {
                 message = reason.message;

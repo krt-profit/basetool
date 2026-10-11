@@ -1,19 +1,37 @@
+// @ts-check
+
 (function () {
     'use strict';
 
     const SEARCH_LIMIT = 2000;
 
+    /** @type {HTMLElement | null} */
     let modal = null;
+    /** @type {HTMLElement | null} */
     let deleteModal = null;
+    /** @type {HTMLFormElement | null} */
     let form = null;
+    /** @type {HTMLFormElement | null} */
     let deleteForm = null;
+    /** @type {HTMLElement | null} */
     let titleEl = null;
+    /** @type {HTMLInputElement | null} */
     let searchInput = null;
+    /** @type {HTMLElement | null} */
     let resultsEl = null;
+    /** @type {HTMLInputElement | null} */
     let hiddenUexId = null;
+    /** @type {HTMLInputElement | null} */
     let hiddenLocationType = null;
+    /** @type {number | null} */
     let debounceTimer = null;
 
+    /**
+     * Looks an element up by id.
+     *
+     * @param {string} id the element id
+     * @returns {HTMLElement | null} the element, or null when absent
+     */
     function $(id) {
         return document.getElementById(id);
     }
@@ -21,20 +39,23 @@
     function init() {
         modal = $('krt-pi-modal');
         deleteModal = $('krt-pi-delete-modal');
-        form = $('krt-pi-form');
-        deleteForm = $('krt-pi-delete-form');
+        form = /** @type {HTMLFormElement | null} */ ($('krt-pi-form'));
+        deleteForm = /** @type {HTMLFormElement | null} */ ($('krt-pi-delete-form'));
         titleEl = $('krt-pi-modal-title');
-        searchInput = $('krt-pi-location-search');
+        searchInput = /** @type {HTMLInputElement | null} */ ($('krt-pi-location-search'));
         resultsEl = $('krt-pi-location-results');
-        hiddenUexId = $('krt-pi-location-uex-id');
-        hiddenLocationType = $('krt-pi-location-type');
+        hiddenUexId = /** @type {HTMLInputElement | null} */ ($('krt-pi-location-uex-id'));
+        hiddenLocationType = /** @type {HTMLInputElement | null} */ ($('krt-pi-location-type'));
 
         if (searchInput) {
             searchInput.addEventListener('input', onSearchInput);
             searchInput.addEventListener('focus', onSearchInput);
             document.addEventListener('click', (e) => {
                 if (!resultsEl) return;
-                if (e.target !== searchInput && !resultsEl.contains(e.target)) {
+                if (
+                    e.target !== searchInput &&
+                    !resultsEl.contains(/** @type {Node | null} */ (e.target))
+                ) {
                     resultsEl.hidden = true;
                 }
             });
@@ -56,6 +77,11 @@
         if (!document.querySelector('form.krt-pi-userform [name="userSub"]')) {
             return;
         }
+        /**
+         * Stores the picked member, or clears the stored one.
+         *
+         * @param {string | null} value the member's sub, empty to clear
+         */
         function persistMember(value) {
             try {
                 if (value) {
@@ -66,7 +92,7 @@
             } catch (_e) {}
         }
         document.addEventListener('change', (e) => {
-            const sel = e.target;
+            const sel = /** @type {HTMLSelectElement} */ (e.target);
             if (sel.matches && sel.matches('form.krt-pi-userform [name="userSub"]')) {
                 persistMember(sel.value);
             }
@@ -76,6 +102,7 @@
             persistMember(params.get('userSub'));
             return;
         }
+        /** @type {string | null} */
         let saved;
         try {
             const raw = localStorage.getItem(ADMIN_USER_PREF_KEY);
@@ -125,14 +152,28 @@
         });
     }
 
+    /**
+     * The value of one named field of the item form.
+     *
+     * @param {string} name the field name
+     * @returns {string} the value, empty when the field is missing
+     */
     function fieldValue(name) {
         if (!form) {
             return '';
         }
-        const el = form.querySelector(`[name="${name}"]`);
+        const el = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (
+            form.querySelector(`[name="${name}"]`)
+        );
         return el ? el.value : '';
     }
 
+    /**
+     * Parses an integer field.
+     *
+     * @param {string | null | undefined} raw the raw value
+     * @returns {number | null} the integer, or null when blank or not a number
+     */
     function toIntOrNull(raw) {
         if (raw == null || String(raw).trim() === '') {
             return null;
@@ -160,6 +201,7 @@
             }
             return;
         }
+        /** @type {Record<string, unknown>} */
         const payload = {
             name: fieldValue('name'),
             note: fieldValue('note'),
@@ -170,7 +212,9 @@
         if (isUpdate) {
             payload.version = toIntOrNull(fieldValue('version'));
         }
-        const submitBtn = form.querySelector('button[type="submit"]');
+        const submitBtn = /** @type {HTMLButtonElement | null} */ (
+            form.querySelector('button[type="submit"]')
+        );
         if (submitBtn) {
             submitBtn.disabled = true;
         }
@@ -200,7 +244,9 @@
         }
         const i18n = window.krtPersonalInventoryI18n || {};
         const action = deleteForm.getAttribute('action') || deleteForm.action;
-        const btn = deleteForm.querySelector('button[type="submit"]');
+        const btn = /** @type {HTMLButtonElement | null} */ (
+            deleteForm.querySelector('button[type="submit"]')
+        );
         if (btn) {
             btn.disabled = true;
         }
@@ -228,17 +274,28 @@
             return;
         }
         window.krtFetch.bindSwap({ container: '#pi-results', history: true });
+        /** @type {number | null} */
         let timer = null;
+        /**
+         * Re-swaps the results from a filter form's current values.
+         *
+         * @param {HTMLFormElement | null} formEl the filter form
+         */
         function swapFromForm(formEl) {
             if (!formEl) {
                 return;
             }
-            const params = new URLSearchParams(new FormData(formEl)).toString();
+            const params = new URLSearchParams(
+                /** @type {Record<string, string>} */ (
+                    /** @type {unknown} */ (new FormData(formEl))
+                ),
+            ).toString();
             const url = formEl.getAttribute('action') + (params ? `?${params}` : '');
             window.krtFetch.swap({ url, container: '#pi-results', history: true });
         }
         document.addEventListener('submit', (e) => {
-            if (!e.target.classList || !e.target.classList.contains('krt-pi-filter')) {
+            const target = /** @type {HTMLFormElement} */ (e.target);
+            if (!target.classList || !target.classList.contains('krt-pi-filter')) {
                 return;
             }
             e.preventDefault();
@@ -246,10 +303,10 @@
                 clearTimeout(timer);
                 timer = null;
             }
-            swapFromForm(e.target);
+            swapFromForm(target);
         });
         document.addEventListener('input', (e) => {
-            const t = e.target;
+            const t = /** @type {HTMLInputElement} */ (e.target);
             if (!t.matches || !t.matches('form.krt-pi-filter input[type="search"]')) {
                 return;
             }
@@ -263,7 +320,7 @@
             }, 300);
         });
         document.addEventListener('change', (e) => {
-            const sel = e.target;
+            const sel = /** @type {HTMLSelectElement} */ (e.target);
             if (!sel.matches || !sel.matches('form.krt-pi-userform [name="userSub"]')) {
                 return;
             }
@@ -277,6 +334,11 @@
         });
     }
 
+    /**
+     * Mirrors the result total into the active tab's count badge.
+     *
+     * @param {ParentNode | null | undefined} root the swapped container, the document when absent
+     */
     function syncCounts(root) {
         const meta = (root || document).querySelector('#pi-total-meta');
         if (!meta) {
@@ -289,6 +351,11 @@
         }
     }
 
+    /**
+     * Opens the create dialog.
+     *
+     * @param {HTMLElement} btn the activated button, carrying the create endpoint
+     */
     function openCreate(btn) {
         if (!modal || !form) return;
         const i18n = window.krtPersonalInventoryI18n || {};
@@ -298,6 +365,11 @@
         window.krtModal.open(modal);
     }
 
+    /**
+     * Opens the edit dialog prefilled from the row's button.
+     *
+     * @param {HTMLElement} btn the activated button, carrying the entry's values
+     */
     function openEdit(btn) {
         if (!modal || !form) return;
         const i18n = window.krtPersonalInventoryI18n || {};
@@ -319,6 +391,11 @@
         if (modal) window.krtModal.close(modal);
     }
 
+    /**
+     * Opens the delete confirmation for one entry.
+     *
+     * @param {HTMLElement} btn the activated button, carrying the delete endpoint and name
+     */
     function openDelete(btn) {
         if (!deleteModal || !deleteForm) return;
         deleteForm.action = window.safeSameOriginUrl(
@@ -340,9 +417,17 @@
         if (deleteModal) window.krtModal.close(deleteModal);
     }
 
+    /**
+     * Sets one named field of the item form.
+     *
+     * @param {string} name the field name
+     * @param {string | null} value the value, null clears it
+     */
     function setField(name, value) {
         if (!form) return;
-        const el = form.querySelector(`[name="${name}"]`);
+        const el = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (
+            form.querySelector(`[name="${name}"]`)
+        );
         if (el) el.value = value == null ? '' : value;
     }
 
@@ -384,6 +469,11 @@
             });
     }
 
+    /**
+     * Renders the location type-ahead results.
+     *
+     * @param {ApiDto<'UexLocationDto'>[] | null} items the matching locations
+     */
     function renderResults(items) {
         if (!resultsEl) return;
         if (!items || items.length === 0) {
@@ -424,7 +514,7 @@
                 if (hiddenLocationType)
                     hiddenLocationType.value = btn.getAttribute('data-type') || '';
                 if (searchInput) searchInput.value = btn.getAttribute('data-name') || '';
-                resultsEl.hidden = true;
+                if (resultsEl) resultsEl.hidden = true;
             });
         });
     }
@@ -432,8 +522,11 @@
     /**
      * Restricts the quantity input to a positive integer by stripping non-digit characters and
      * clamping it to at least 1; no upper bound is enforced.
+     *
+     * @param {HTMLElement} element the quantity input
      */
-    function sanitizeQuantity(input) {
+    function sanitizeQuantity(element) {
+        const input = /** @type {HTMLInputElement | null} */ (element);
         if (!input) return;
         const raw = input.value || '';
         let digitsOnly = raw.replace(/[^0-9]/g, '');

@@ -679,6 +679,26 @@ val typecheckJs =
     inputs.file("tsconfig.json")
   }
 
+val testTypecheckRatchet =
+  tasks.register<NodeTask>("testTypecheckRatchet") {
+    group = "verification"
+    description =
+      "Holds the type-check ratchet: migrated domains are fully checked, and the ratchet fires on planted trees."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/typecheck-ratchet.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/typecheck-ratchet.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/typecheck-ratchet.mjs"))
+    inputs.file(layout.projectDirectory.file("typecheck-ratchet.json"))
+    inputs.file(layout.projectDirectory.file("tsconfig.json"))
+    inputs.files(
+      fileTree("src/main/resources/static/js") {
+        include("*.js")
+      }
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testGenApiTypes =
   tasks.register<NodeTask>("testGenApiTypes") {
     group = "verification"
@@ -760,6 +780,7 @@ tasks.named("check").configure {
     testKrtFetchReadJs,
     testTrustedTypesJs,
     testEslintBans,
+    testTypecheckRatchet,
     testPromotionCsvEscape,
     lintCss,
     lintCssInline,

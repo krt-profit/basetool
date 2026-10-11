@@ -10,17 +10,52 @@
  * The modal markup lives in fragments/materialboerse-modal.html; strings come from
  * window.materialboerseI18n. No native dialogs, no full-page reload.
  */
+
+// @ts-check
+
 (function () {
     'use strict';
 
+    /**
+     * The seed values `open` takes from its caller; absent fields are blank.
+     *
+     * @typedef {object} MaterialReleaseContext
+     * @property {string | null} [itemId] the inventory entry to offer
+     * @property {string | null} [offerId] the offer being edited
+     * @property {string | null} [version] the offer's version
+     * @property {string | null} [kind] `MATERIAL` or `ITEM`
+     * @property {string | null} [material] the material or item name
+     * @property {string | null} [quality] the quality tier
+     * @property {string | number | null} [amount] the stock, or the offered quantity in edit mode
+     * @property {string | number | null} [available] the entry's total stock in edit mode
+     * @property {string | null} [quantityType] `SCU` or `PIECE`
+     * @property {string | null} [remark] the remark text
+     */
+
+    /**
+     * What a dialog session remembers between `open` and its close.
+     *
+     * @typedef {object} MaterialReleaseState
+     * @property {string | null} mode `new`, `lager`, `item`, `edit` or null while closed
+     * @property {string | null} itemId the picked inventory entry
+     * @property {string | null} productKey the picked blueprint product
+     * @property {string | null} offerId the offer being edited
+     * @property {string | null} version the offer's version
+     * @property {number | null} available the stock ceiling of the amount field
+     * @property {string | null} quantityType `SCU`, `PIECE` or null
+     * @property {((body: any) => void | Promise<unknown>) | null} onDone runs with the response body on success
+     * @property {(() => void) | null} onCancel runs when the dialog is dismissed
+     */
+
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
-    const modal = document.getElementById('mb-modal');
+    const modal = /** @type {HTMLElement} */ (document.getElementById('mb-modal'));
     if (!modal || !window.krtFetch) {
         return;
     }
 
     const SERIALIZE_KEY = 'materialboerse';
     const MATERIALBOARD_TOPIC = 'materialboard';
+    /** @type {MaterialReleaseState} */
     let state = {
         mode: null,
         itemId: null,
@@ -34,10 +69,13 @@
     };
     let pickerItems = [];
     let productItems = [];
+    /** @type {HTMLElement | null} */
     let lastFocused = null;
     let pickerSeq = 0;
+    /** @type {number | null} */
     let pickerSearchTimer = null;
     let itemPickerSeq = 0;
+    /** @type {number | null} */
     let itemPickerSearchTimer = null;
     const PICKER_SEARCH_DEBOUNCE_MS = 200;
     let pickerListOpen = false;
@@ -48,6 +86,13 @@
         return String(template || '').replace('{0}', value);
     }
 
+    /**
+     * Finds an element inside the modal.
+     *
+     * @template {HTMLElement} [T=HTMLElement]
+     * @param {string} sel the selector
+     * @returns {T | null} the element, or null
+     */
     function q(sel) {
         return modal.querySelector(sel);
     }
@@ -105,10 +150,12 @@
     /**
      * Sets the offered-amount field: value, max (kept in state.available), unit label and step for
      * the quantity type, and the max hint. A null max disables the input.
-     * @param value the initial offered amount, or '' / null for empty.
-     * @param max the item's current stock as the ceiling, or null when unknown.
+     *
+     * @param {string | number | null | undefined} value the initial offered amount, or '' / null for empty.
+     * @param {string | number | null | undefined} max the item's current stock as the ceiling, or null when unknown.
      */
     function setAmountField(value, max) {
+        /** @type {HTMLInputElement | null} */
         const input = q('[data-mb-amount]');
         const hint = q('[data-mb-amount-hint]');
         const unit = q('[data-mb-amount-unit]');
@@ -145,6 +192,7 @@
 
     /** Reads the offered amount from the field as a Number (NaN when empty/invalid). */
     function readOfferedAmount() {
+        /** @type {HTMLInputElement | null} */
         const input = q('[data-mb-amount]');
         return input ? Number(input.value) : NaN;
     }
@@ -174,6 +222,7 @@
     }
 
     function updateCharCount() {
+        /** @type {HTMLTextAreaElement | null} */
         const ta = q('[data-mb-remark]');
         const counter = q('[data-mb-charcount]');
         if (ta && counter) {
@@ -185,18 +234,21 @@
     }
 
     /**
-     * Opens the modal.
-     * @param mode 'new' | 'lager' | 'edit'
-     * @param ctx {itemId?, material?, quantityType?, quality?, amount?, available?, offerId?,
-     *        version?, remark?} — quantityType drives the SCU/PIECE unit; for 'edit', amount is the
-     *        current offered quantity and available is the item's total stock (the ceiling); for
-     *        'lager'/'new' amount is the item's stock (the default + max).
-     * @param doneOrOpts either an onDone callback(body), or {onDone, onCancel} — onCancel fires when
-     *        the dialog is dismissed without submitting (e.g. to revert a Lager checkbox).
+     * Opens the modal. The context's quantityType drives the SCU/PIECE unit; for `edit`, amount is
+     * the current offered quantity and available is the item's total stock (the ceiling); for
+     * `lager` and `new` amount is the item's stock (the default and the maximum).
+     *
+     * @param {string} mode `new`, `lager`, `item` or `edit`
+     * @param {MaterialReleaseContext | null} [ctx] the seed values
+     * @param {((body: any) => void | Promise<unknown>) | { onDone?: (body: any) => void | Promise<unknown>, onCancel?: () => void } | null} [doneOrOpts]
+     *     an onDone callback taking the response body, or an `{onDone, onCancel}` pair whose
+     *     onCancel fires when the dialog is dismissed without submitting
      */
     function open(mode, ctx, doneOrOpts) {
         ctx ||= {};
+        /** @type {((body: any) => void | Promise<unknown>) | null} */
         let onDone = null;
+        /** @type {(() => void) | null} */
         let onCancel = null;
         if (typeof doneOrOpts === 'function') {
             onDone = doneOrOpts;
@@ -231,6 +283,7 @@
         toggle('[data-mb-amount-block]', !isItem);
         toggle('[data-mb-qty-block]', isItem);
         toggle('[data-mb-qty-error]', false);
+        /** @type {HTMLInputElement | null} */
         const qtyInput = q('[data-mb-item-qty]');
         if (qtyInput) {
             qtyInput.value = '';
@@ -247,18 +300,21 @@
             }
         }
 
-        const ta = q('[data-mb-remark]');
+        const ta = /** @type {HTMLTextAreaElement} */ (q('[data-mb-remark]'));
         ta.value = ctx.remark || '';
         updateCharCount();
 
         if (isNew) {
             pickerKind = 'MATERIAL';
-            const materialRadio = modal.querySelector('[data-mb-kind-radio][value="MATERIAL"]');
+            const materialRadio = /** @type {HTMLInputElement | null} */ (
+                modal.querySelector('[data-mb-kind-radio][value="MATERIAL"]')
+            );
             if (materialRadio) {
                 materialRadio.checked = true;
             }
             loadPicker('');
         } else if (isItem) {
+            /** @type {HTMLInputElement | null} */
             const itemInput = q('[data-mb-item-picker-input]');
             if (itemInput) {
                 itemInput.value = '';
@@ -266,7 +322,7 @@
             loadItemPicker('');
         }
 
-        lastFocused = document.activeElement;
+        lastFocused = /** @type {HTMLElement | null} */ (document.activeElement);
         window.krtModal.open(modal);
         const first = isNew
             ? q('[data-mb-picker-input]')
@@ -375,12 +431,14 @@
     /**
      * Applies the Material/Item radio selection (REQ-MARKET-002): clears any picked row and reloads
      * the picker, still closed, filtered to that kind.
-     * @param kind the chosen row kind ('MATERIAL' or 'ITEM'); anything else falls back to 'MATERIAL'.
+     *
+     * @param {string} kind the chosen row kind ('MATERIAL' or 'ITEM'); anything else falls back to 'MATERIAL'.
      */
     function setPickerKind(kind) {
         pickerKind = kind === 'ITEM' ? 'ITEM' : 'MATERIAL';
         state.itemId = null;
         state.quantityType = null;
+        /** @type {HTMLInputElement | null} */
         const input = q('[data-mb-picker-input]');
         if (input) {
             input.value = '';
@@ -437,6 +495,11 @@
         toggle('[data-mb-fact-quality-wrap]', show);
     }
 
+    /**
+     * Takes over a picked stock row: its facts, its amount ceiling and its name.
+     *
+     * @param {Element} li the clicked picker option
+     */
     function pickItem(li) {
         state.itemId = li.getAttribute('data-item-id');
         state.quantityType = li.getAttribute('data-quantity-type');
@@ -445,9 +508,10 @@
         setFacts(li.getAttribute('data-material'), isItem ? null : li.getAttribute('data-quality'));
         toggleQualityFact(!isItem);
         setAmountField(amount, amount);
+        /** @type {HTMLInputElement | null} */
         const input = q('[data-mb-picker-input]');
         if (input) {
-            input.value = li.getAttribute('data-material');
+            input.value = li.getAttribute('data-material') ?? '';
         }
         closePickerList();
     }
@@ -526,17 +590,23 @@
         list.hidden = !itemPickerListOpen;
     }
 
+    /**
+     * Takes over a picked blueprint product.
+     *
+     * @param {Element} li the clicked picker option
+     */
     function pickProduct(li) {
         state.productKey = li.getAttribute('data-product-key');
+        /** @type {HTMLInputElement | null} */
         const input = q('[data-mb-item-picker-input]');
         if (input) {
-            input.value = li.getAttribute('data-name');
+            input.value = li.getAttribute('data-name') ?? '';
         }
         closeItemPickerList();
     }
 
     function submit() {
-        const remark = q('[data-mb-remark]').value;
+        const remark = /** @type {HTMLTextAreaElement} */ (q('[data-mb-remark]')).value;
         if (state.mode === 'edit') {
             const offeredAmount = validateOfferedAmount();
             if (offeredAmount === null) {
@@ -598,6 +668,7 @@
         if (!state.productKey) {
             return;
         }
+        /** @type {HTMLInputElement | null} */
         const qtyInput = q('[data-mb-item-qty]');
         const quantity = qtyInput ? parseInt(qtyInput.value, 10) : NaN;
         if (isNaN(quantity) || quantity < 1) {
@@ -629,31 +700,30 @@
     }
 
     document.addEventListener('click', (e) => {
+        const target = /** @type {Element} */ (e.target);
         if (!isModalOpen()) {
             if (
-                e.target.closest('[data-mb-picker-list] .krt-combobox__option') ||
-                e.target.closest('[data-mb-item-picker-list] .krt-combobox__option')
+                target.closest('[data-mb-picker-list] .krt-combobox__option') ||
+                target.closest('[data-mb-item-picker-list] .krt-combobox__option')
             ) {
                 return;
             }
         }
-        if (
-            !e.target.closest('[data-mb-combobox]') &&
-            !e.target.closest('[data-mb-item-combobox]')
-        ) {
+        if (!target.closest('[data-mb-combobox]') && !target.closest('[data-mb-item-combobox]')) {
             closePickerList();
             closeItemPickerList();
         }
-        if (e.target.closest('[data-mb-modal-close], .mb-modal-close') || e.target === modal) {
+        if (target.closest('[data-mb-modal-close], .mb-modal-close') || target === modal) {
             cancel();
             return;
         }
-        if (e.target.closest('[data-mb-modal-submit]')) {
+        if (target.closest('[data-mb-modal-submit]')) {
             submit();
             return;
         }
-        if (e.target.closest('[data-mb-amount-max]')) {
+        if (target.closest('[data-mb-amount-max]')) {
             if (state.available != null) {
+                /** @type {HTMLInputElement | null} */
                 const input = q('[data-mb-amount]');
                 if (input) {
                     input.value = String(state.available);
@@ -661,42 +731,44 @@
             }
             return;
         }
-        if (e.target.closest('[data-mb-picker-input]')) {
+        if (target.closest('[data-mb-picker-input]')) {
             openPickerList();
             return;
         }
-        if (e.target.closest('[data-mb-item-picker-input]')) {
+        if (target.closest('[data-mb-item-picker-input]')) {
             openItemPickerList();
             return;
         }
-        const li = e.target.closest('[data-mb-picker-list] .krt-combobox__option');
+        const li = target.closest('[data-mb-picker-list] .krt-combobox__option');
         if (li) {
             pickItem(li);
             return;
         }
-        const pli = e.target.closest('[data-mb-item-picker-list] .krt-combobox__option');
+        const pli = target.closest('[data-mb-item-picker-list] .krt-combobox__option');
         if (pli) {
             pickProduct(pli);
         }
     });
 
     document.addEventListener('input', (e) => {
-        if (e.target.matches('[data-mb-remark]')) {
+        const target = /** @type {HTMLInputElement} */ (e.target);
+        if (target.matches('[data-mb-remark]')) {
             updateCharCount();
-        } else if (e.target.matches('[data-mb-picker-input]')) {
+        } else if (target.matches('[data-mb-picker-input]')) {
             openPickerList();
-            searchPicker(e.target.value);
-        } else if (e.target.matches('[data-mb-item-picker-input]')) {
+            searchPicker(target.value);
+        } else if (target.matches('[data-mb-item-picker-input]')) {
             openItemPickerList();
-            searchItemPicker(e.target.value);
-        } else if (e.target.matches('[data-mb-item-qty]')) {
+            searchItemPicker(target.value);
+        } else if (target.matches('[data-mb-item-qty]')) {
             toggle('[data-mb-qty-error]', false);
         }
     });
 
     document.addEventListener('change', (e) => {
-        if (e.target.matches('[data-mb-kind-radio]')) {
-            setPickerKind(e.target.value);
+        const target = /** @type {HTMLInputElement} */ (e.target);
+        if (target.matches('[data-mb-kind-radio]')) {
+            setPickerKind(target.value);
         }
     });
 

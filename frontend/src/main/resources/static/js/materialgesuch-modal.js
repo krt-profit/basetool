@@ -10,17 +10,50 @@
  * window.krtMaterialRequest. Markup lives in fragments/materialgesuch-modal.html; strings come from
  * window.materialgesuchI18n. No native dialogs, no full-page reload.
  */
+
+// @ts-check
+
 (function () {
     'use strict';
 
+    /**
+     * The seed values `open` takes from its caller; absent fields are blank.
+     *
+     * @typedef {object} MaterialRequestContext
+     * @property {string | null} [requestId] the request being edited
+     * @property {string | null} [version] the request's version
+     * @property {string | null} [kind] `MATERIAL` or `ITEM`
+     * @property {string | null} [subject] the requested material or item name
+     * @property {string | number | null} [minQuality] the minimum quality
+     * @property {string | number | null} [amount] the desired quantity
+     * @property {string | null} [quantityType] `SCU` or `PIECE`
+     * @property {string | null} [remark] the remark text
+     */
+
+    /**
+     * What a dialog session remembers between `open` and its close.
+     *
+     * @typedef {object} MaterialRequestState
+     * @property {string | null} mode `new`, `edit` or null while closed
+     * @property {string | null} requestId the request being edited
+     * @property {string | null} version the request's version
+     * @property {string} kind `MATERIAL` or `ITEM`
+     * @property {string | null} materialId the picked material
+     * @property {string | null} productKey the picked blueprint product
+     * @property {string} quantityType `SCU` or `PIECE`
+     * @property {((body: any) => void | Promise<unknown>) | null} onDone runs with the response body on success
+     * @property {(() => void) | null} onCancel runs when the dialog is dismissed
+     */
+
     const i18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
-    const modal = document.getElementById('mg-modal');
+    const modal = /** @type {HTMLElement} */ (document.getElementById('mg-modal'));
     if (!modal || !window.krtFetch) {
         return;
     }
 
     const SERIALIZE_KEY = 'materialgesuch';
     const MATERIALBOARD_TOPIC = 'materialboard';
+    /** @type {MaterialRequestState} */
     let state = {
         mode: null,
         requestId: null,
@@ -32,13 +65,16 @@
         onDone: null,
         onCancel: null,
     };
+    /** @type {HTMLElement | null} */
     let lastFocused = null;
     const PICKER_SEARCH_DEBOUNCE_MS = 200;
     let materialSeq = 0;
+    /** @type {number | null} */
     let materialTimer = null;
     let materialListOpen = false;
     let materialItems = [];
     let itemSeq = 0;
+    /** @type {number | null} */
     let itemTimer = null;
     let itemListOpen = false;
     let productItems = [];
@@ -47,6 +83,13 @@
         return String(template || '').replace('{0}', value);
     }
 
+    /**
+     * Finds an element inside the modal.
+     *
+     * @template {HTMLElement} [T=HTMLElement]
+     * @param {string} sel the selector
+     * @returns {T | null} the element, or null
+     */
     function q(sel) {
         return modal.querySelector(sel);
     }
@@ -79,6 +122,7 @@
     }
 
     function updateCharCount() {
+        /** @type {HTMLTextAreaElement | null} */
         const ta = q('[data-mg-remark]');
         const counter = q('[data-mg-charcount]');
         if (ta && counter) {
@@ -93,6 +137,7 @@
     function applyQuantityUnit() {
         const isPiece = state.kind === 'ITEM' || state.quantityType === 'PIECE';
         const unit = q('[data-mg-qty-unit]');
+        /** @type {HTMLInputElement | null} */
         const input = q('[data-mg-qty]');
         if (unit) {
             unit.textContent = isPiece
@@ -105,15 +150,18 @@
     }
 
     /**
-     * Opens the modal.
-     * @param mode 'new' | 'edit'
-     * @param ctx for 'new': {kind}. For 'edit': {requestId, version, kind, subject, minQuality,
-     *        amount, quantityType, remark}.
-     * @param doneOrOpts an onDone callback(body), or {onDone, onCancel}.
+     * Opens the modal. For `new` the context carries the kind; for `edit` the request's fields.
+     *
+     * @param {string} mode `new` or `edit`
+     * @param {MaterialRequestContext | null} [ctx] the seed values
+     * @param {((body: any) => void | Promise<unknown>) | { onDone?: (body: any) => void | Promise<unknown>, onCancel?: () => void } | null} [doneOrOpts]
+     *     an onDone callback taking the response body, or an `{onDone, onCancel}` pair
      */
     function open(mode, ctx, doneOrOpts) {
         ctx ||= {};
+        /** @type {((body: any) => void | Promise<unknown>) | null} */
         let onDone = null;
+        /** @type {(() => void) | null} */
         let onCancel = null;
         if (typeof doneOrOpts === 'function') {
             onDone = doneOrOpts;
@@ -167,11 +215,11 @@
         }
         applyQuantityUnit();
 
-        const ta = q('[data-mg-remark]');
+        const ta = /** @type {HTMLTextAreaElement} */ (q('[data-mg-remark]'));
         ta.value = ctx.remark || '';
         updateCharCount();
 
-        lastFocused = document.activeElement;
+        lastFocused = /** @type {HTMLElement | null} */ (document.activeElement);
         window.krtModal.open(modal);
         const first = isEdit
             ? q('[data-mg-qty]')
@@ -184,6 +232,7 @@
     }
 
     function setValue(sel, value) {
+        /** @type {HTMLInputElement | null} */
         const el = q(sel);
         if (el) {
             el.value = value == null || value === '' ? '' : String(value);
@@ -191,7 +240,9 @@
     }
 
     function setKindRadio(kind) {
-        const radio = modal.querySelector(`[data-mg-kind-radio][value="${kind}"]`);
+        const radio = /** @type {HTMLInputElement | null} */ (
+            modal.querySelector(`[data-mg-kind-radio][value="${kind}"]`)
+        );
         if (radio) {
             radio.checked = true;
         }
@@ -312,6 +363,11 @@
         list.hidden = !materialListOpen;
     }
 
+    /**
+     * Takes over a picked material: its id, its unit and its name.
+     *
+     * @param {Element} li the clicked picker option
+     */
     function pickMaterial(li) {
         state.materialId = li.getAttribute('data-material-id');
         state.quantityType = li.getAttribute('data-quantity-type') === 'PIECE' ? 'PIECE' : 'SCU';
@@ -391,6 +447,11 @@
         list.hidden = !itemListOpen;
     }
 
+    /**
+     * Takes over a picked blueprint product.
+     *
+     * @param {Element} li the clicked picker option
+     */
     function pickProduct(li) {
         state.productKey = li.getAttribute('data-product-key');
         setValue('[data-mg-item-picker-input]', li.getAttribute('data-name'));
@@ -399,6 +460,7 @@
 
     /** Reads the optional min-quality field; returns undefined when blank, null on an invalid value. */
     function readMinQuality() {
+        /** @type {HTMLInputElement | null} */
         const input = q('[data-mg-min-quality]');
         const raw = input ? input.value.trim() : '';
         if (raw === '') {
@@ -413,6 +475,7 @@
 
     /** Reads the desired-quantity field; returns null when non-positive or (for items) non-whole. */
     function readQuantity() {
+        /** @type {HTMLInputElement | null} */
         const input = q('[data-mg-qty]');
         const n = input ? Number(input.value) : NaN;
         if (isNaN(n) || n <= 0) {
@@ -426,7 +489,7 @@
     }
 
     function submit() {
-        const remark = q('[data-mg-remark]').value;
+        const remark = /** @type {HTMLTextAreaElement} */ (q('[data-mg-remark]')).value;
         const minQuality = readMinQuality();
         if (minQuality === null) {
             toggle('[data-mg-quality-error]', true);
@@ -521,67 +584,67 @@
     }
 
     document.addEventListener('click', (e) => {
+        const target = /** @type {Element} */ (e.target);
         if (!isModalOpen()) {
             if (
-                e.target.closest('[data-mg-picker-list] .krt-combobox__option') ||
-                e.target.closest('[data-mg-item-picker-list] .krt-combobox__option')
+                target.closest('[data-mg-picker-list] .krt-combobox__option') ||
+                target.closest('[data-mg-item-picker-list] .krt-combobox__option')
             ) {
                 return;
             }
         }
-        if (
-            !e.target.closest('[data-mg-combobox]') &&
-            !e.target.closest('[data-mg-item-combobox]')
-        ) {
+        if (!target.closest('[data-mg-combobox]') && !target.closest('[data-mg-item-combobox]')) {
             closeMaterialList();
             closeItemList();
         }
-        if (e.target.closest('[data-mg-modal-close], .mg-modal-close') || e.target === modal) {
+        if (target.closest('[data-mg-modal-close], .mg-modal-close') || target === modal) {
             cancel();
             return;
         }
-        if (e.target.closest('[data-mg-modal-submit]')) {
+        if (target.closest('[data-mg-modal-submit]')) {
             submit();
             return;
         }
-        if (e.target.closest('[data-mg-picker-input]')) {
+        if (target.closest('[data-mg-picker-input]')) {
             openMaterialList();
             return;
         }
-        if (e.target.closest('[data-mg-item-picker-input]')) {
+        if (target.closest('[data-mg-item-picker-input]')) {
             openItemList();
             return;
         }
-        const li = e.target.closest('[data-mg-picker-list] .krt-combobox__option');
+        const li = target.closest('[data-mg-picker-list] .krt-combobox__option');
         if (li) {
             pickMaterial(li);
             return;
         }
-        const pli = e.target.closest('[data-mg-item-picker-list] .krt-combobox__option');
+        const pli = target.closest('[data-mg-item-picker-list] .krt-combobox__option');
         if (pli) {
             pickProduct(pli);
         }
     });
 
     document.addEventListener('input', (e) => {
-        if (e.target.matches('[data-mg-remark]')) {
+        const target = /** @type {HTMLInputElement} */ (e.target);
+        if (target.matches('[data-mg-remark]')) {
             updateCharCount();
-        } else if (e.target.matches('[data-mg-picker-input]')) {
+        } else if (target.matches('[data-mg-picker-input]')) {
             openMaterialList();
-            searchMaterialPicker(e.target.value);
-        } else if (e.target.matches('[data-mg-item-picker-input]')) {
+            searchMaterialPicker(target.value);
+        } else if (target.matches('[data-mg-item-picker-input]')) {
             openItemList();
-            searchItemPicker(e.target.value);
-        } else if (e.target.matches('[data-mg-qty]')) {
+            searchItemPicker(target.value);
+        } else if (target.matches('[data-mg-qty]')) {
             toggle('[data-mg-qty-error]', false);
-        } else if (e.target.matches('[data-mg-min-quality]')) {
+        } else if (target.matches('[data-mg-min-quality]')) {
             toggle('[data-mg-quality-error]', false);
         }
     });
 
     document.addEventListener('change', (e) => {
-        if (e.target.matches('[data-mg-kind-radio]')) {
-            setKind(e.target.value);
+        const target = /** @type {HTMLInputElement} */ (e.target);
+        if (target.matches('[data-mg-kind-radio]')) {
+            setKind(target.value);
         }
     });
 
