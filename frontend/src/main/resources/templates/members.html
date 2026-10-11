@@ -1,12 +1,10 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
+<head>
     <title th:text="#{members.title} + ' - ' + ${appTitle}">Mitgliederverwaltung - Profit Basetool</title>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
+<th:block th:fragment="pageContent">
 <main>
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.members', titleText=#{members.title},
         count=${usersPage != null ? usersPage.totalElements() : null}, countId='members-count', countFor='members-results', actions=~{::members-actions})}">
@@ -149,5 +147,6 @@
     const MSG_CONSOLIDATE_NO_TARGET = /*[[#{error.user.consolidate.no_target}]]*/ "";
 </script>
 <script th:src="@{/js/members.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>

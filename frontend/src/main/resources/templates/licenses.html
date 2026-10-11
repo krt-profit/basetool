@@ -1,15 +1,13 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
     <title th:text="${appTitle} + ' - ' + #{licenses.title}">Profit Basetool - Open-Source-Lizenzen</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/legal.css}">
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
+<th:block th:fragment="pageContent">
 <main>
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.legal', titleText=#{licenses.title})}"></th:block>
     <div class="card legal-doc" data-testid="legal-doc">
@@ -67,5 +65,6 @@
         </th:block>
     </div>
 </main>
+</th:block>
 </body>
 </html>

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
     <title th:text="${detail != null ? detail.account().name() : ''} + ' - ' + ${appTitle}">Konto - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank.css}">
@@ -8,10 +8,7 @@
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <main class="bank-detail" th:if="${detail != null}" th:with="acct=${detail.account()}, caps=${detail.capabilities()}"
       th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-approval-request-filed=#{bank.movement.approvalRequestFiled},data-bank-livesync-updates=#{livesync.updates_available},data-bank-account-id=${acct.id()},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
     <div id="bank-account-results">
@@ -146,9 +143,10 @@
     </th:block>
     </div>
 </main>
-
-<th:block th:replace="~{fragments/toast :: toast}" />
+</th:block>
+<th:block th:fragment="pageTail">
 <script th:src="@{/js/bank-account-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>

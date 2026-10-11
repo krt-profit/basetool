@@ -1,16 +1,13 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
     <title th:text="#{connectedApps.title} + ' - ' + ${appTitle}">Verbundene Anwendungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/pages/connected-apps.css}">
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <main>
     <span id="ca-i18n" hidden
           th:attr="data-disconnected=#{connectedApps.success.disconnected},data-error=#{notification.error.title},data-confirm-ok=#{connectedApps.confirm.ok},data-confirm-cancel=#{general.cancel},data-confirm-client-title=#{connectedApps.confirmClient.title},data-confirm-client-body=#{connectedApps.confirmClient.body},data-confirm-installation-title=#{connectedApps.confirmInstallation.title},data-confirm-installation-body=#{connectedApps.confirmInstallation.body}"></span>
@@ -162,5 +159,6 @@
 </main>
 
 <script th:src="@{/js/connected-apps.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>

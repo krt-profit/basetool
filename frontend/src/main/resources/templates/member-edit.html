@@ -1,15 +1,13 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
     <title th:text="#{members.edit.title} + ' - ' + ${appTitle}">Mitglied bearbeiten - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <link rel="stylesheet" th:href="@{/css/pages/member-edit.css}">
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
+<th:block th:fragment="pageContent">
 <main th:with="fromProfile=${memberEditForm.source == 'profile'},
                backHref=${fromProfile ? '/profile' : '/members'},
                descriptionLength=${memberEditForm.description != null ? memberEditForm.description.length() : 0}">
@@ -245,5 +243,6 @@
     };
 </script>
 <script th:src="@{/js/member-edit.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>

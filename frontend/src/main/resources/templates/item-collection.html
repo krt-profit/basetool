@@ -1,16 +1,13 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true)}">
+<head>
     <title th:text="#{item.collection.title} + ' - ' + ${appTitle}">Itemsammelübersicht - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <link rel="stylesheet" th:href="@{/css/pages/item-collection.css}">
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <main>
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='orders.detail.group.order', eyebrowHref=@{/orders/{id}(id=${jobOrderId})},
         titleText=#{item.collection.title})}"></th:block>
@@ -112,7 +109,6 @@
     window.orderId = /*[[${jobOrderId}]]*/ null;
 </script>
 <script th:src="@{/js/item-collection.js}" defer th:attr="nonce=${cspNonce}"></script>
-
-<th:block th:replace="~{fragments/toast :: toast}" />
+</th:block>
 </body>
 </html>
