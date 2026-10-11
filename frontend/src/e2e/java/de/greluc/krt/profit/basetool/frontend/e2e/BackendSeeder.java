@@ -1597,15 +1597,16 @@ public final class BackendSeeder {
    * @param password the Keycloak password
    * @param missionId the mission to add the participant to
    * @param externalName the external participant's name; must not match any registered user's name
-   * @return the mission id echoed back by the endpoint's {@code MissionDto} response
+   * @return the mission id, unchanged
    */
   public String addExternalParticipant(
       String username, String password, String missionId, String externalName) {
-    return seedEntity(
+    postBody(
         username,
         password,
         "/api/v1/missions/" + missionId + "/participants",
         "{\"guestName\":\"" + externalName + "\"}");
+    return missionId;
   }
 
   /**
