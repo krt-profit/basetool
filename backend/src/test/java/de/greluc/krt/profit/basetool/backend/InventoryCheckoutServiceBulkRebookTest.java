@@ -252,7 +252,7 @@ class InventoryCheckoutServiceBulkRebookTest {
     InventoryItem item = row(UUID.randomUUID(), here, 8.0);
     JobOrder order = new JobOrder();
     order.setId(UUID.randomUUID());
-    InventoryAllocations.addJobOrder(item, order, 8.0, false);
+    InventoryAllocations.addJobOrder(item, order.getId(), 8.0, false);
     given(item);
     when(locationRepository.findById(there.getId())).thenReturn(Optional.of(there));
 
@@ -325,7 +325,7 @@ class InventoryCheckoutServiceBulkRebookTest {
         row(UUID.fromString("00000000-0000-0000-0000-000000000002"), here, 6.0);
     JobOrder order = new JobOrder();
     order.setId(UUID.randomUUID());
-    InventoryAllocations.addJobOrder(earmarked, order, 6.0, false);
+    InventoryAllocations.addJobOrder(earmarked, order.getId(), 6.0, false);
     given(plain);
     given(earmarked);
 

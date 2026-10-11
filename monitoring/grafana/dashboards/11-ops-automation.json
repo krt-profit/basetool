@@ -402,6 +402,51 @@
           }
         }
       ]
+    },
+    {
+      "id": 10,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 24
+      },
+      "type": "stat",
+      "title": "Host scripts out of date",
+      "description": "Host scripts that differ from, or are missing against, the manifest of the release deploy.sh last compared them with. Backs HostScriptDrift and HostScriptsCheckStale. 0 is in sync; No data means no tick has compared yet (see HostScriptsCheckStale).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {},
+      "targets": [
+        {
+          "expr": "count(basetool_host_scripts_drift) or (0 * max(basetool_host_scripts_check_timestamp_seconds))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

@@ -120,3 +120,21 @@ groups:
         annotations:
           summary: "container-cleanup stale >8d or metric absent"
           description: "The weekly container-cleanup last succeeded more than 8 days ago, or its metric is absent — an early disk-fill indicator. `{app=\"ops-cleanup\"}` in Grafana -> Explore -> Loki over the last 10d shows the last run and what it reclaimed; an empty stream means the timer never fired (`systemctl list-timers iri-container-cleanup.timer`) or the optional job was never installed on this host. Not visible via `journalctl -u iri-container-cleanup.service` (stdout/stderr are appended to /var/log/iri-container-cleanup.log). The job never prunes volumes (ADR-0194), so it reclaims less than the retired Docker host's did — that is correct rather than a partial run."
+
+      - alert: HostScriptDrift
+        expr: basetool_host_scripts_drift > 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host script {{ $labels.file }} is not the deployed release's ({{ $labels.kind }})"
+          description: "deploy.sh hashes every script the role installs under /var/iri/code/scripts and compares it with the host-scripts.sha256 manifest its release carries; {{ $labels.file }} is `{{ $labels.kind }}` (`differs` = other bytes, `missing` = not installed). Scripts reach a host only through the Ansible role, never the config bundle, so a stale one keeps running until the role is re-run from the release's tag: `ansible-playbook site.yml --limit <host> --tags deploy,scripts --check --diff`, then without `--check` (an owner-approved host write on production). A stale deploy.sh, lib/common.sh, lib/container-runtime.sh or render-env-d.py also makes deploy.sh REFUSE the next release (`HOST SCRIPTS:` FATAL, DeployFailed). Which files: `{app=\"ops-deploy\"} |~ \"host scripts:\"` in Grafana -> Explore -> Loki. docs/deployment.md, Before a promotion: the host scripts."
+
+      - alert: HostScriptsCheckStale
+        expr: (time() - basetool_host_scripts_check_timestamp_seconds) > 12 * 3600 or absent(basetool_host_scripts_check_timestamp_seconds)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host scripts have not been compared with a release manifest for over 12h, or never"
+          description: "No deploy tick has compared the host scripts with a release manifest for 12 hours, or the metric is absent. Absent on a host with a deployed release means its deploy.sh predates the check (ADR-0247) and is stale: run the role from the release tag with `--tags deploy,scripts`. It is also absent while the deployed release carries no host-scripts.sha256 (the first release that ships one starts the check), and stale while the deploy timer is stopped (DeployHeartbeatStale names that) or a failed target sits in its backoff. `{app=\"ops-deploy\"} |~ \"host scripts:\"` in Grafana -> Explore -> Loki shows the last comparison."

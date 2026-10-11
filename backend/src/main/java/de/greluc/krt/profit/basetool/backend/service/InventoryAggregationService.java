@@ -970,9 +970,7 @@ public class InventoryAggregationService {
                       : item.getUser().getUsername();
               Optional<InventoryJobOrderAllocation> slice =
                   item.getJobOrderAllocations().stream()
-                      .filter(
-                          a ->
-                              a.getJobOrder() != null && jobOrderId.equals(a.getJobOrder().getId()))
+                      .filter(a -> jobOrderId.equals(a.getJobOrderId()))
                       .findFirst();
               boolean delivered =
                   slice.map(a -> Boolean.TRUE.equals(a.getDelivered())).orElse(false);
@@ -1037,8 +1035,7 @@ public class InventoryAggregationService {
                     : row.getUser().getUsername();
             Optional<InventoryJobOrderAllocation> slice =
                 row.getJobOrderAllocations().stream()
-                    .filter(
-                        a -> a.getJobOrder() != null && jobOrderId.equals(a.getJobOrder().getId()))
+                    .filter(a -> jobOrderId.equals(a.getJobOrderId()))
                     .findFirst();
             long allocatedQuantity =
                 Math.round(

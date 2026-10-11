@@ -26,8 +26,10 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
+import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationTimedProperties;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -66,8 +68,37 @@ class NotificationTimedRunnerTest {
   }
 
   private NotificationTimedRunner runnerOf(TimedNoticeProducer... producers) {
+    return runnerWithBudget(100, producers);
+  }
+
+  private NotificationTimedRunner runnerWithBudget(int budget, TimedNoticeProducer... producers) {
     return new NotificationTimedRunner(
-        List.of(producers), notificationRepository, meterRegistry, new NoOpTransactionManager());
+        List.of(producers),
+        notificationRepository,
+        meterRegistry,
+        new NotificationTimedProperties(true, Duration.ofMinutes(1), budget),
+        new NoOpTransactionManager());
+  }
+
+  private final List<Integer> limits = new ArrayList<>();
+
+  private TimedNoticeProducer greedy(String kind, int pending) {
+    return new TimedNoticeProducer() {
+      private int left = pending;
+
+      @Override
+      public String kind() {
+        return kind;
+      }
+
+      @Override
+      public int produce(Instant now, int limit) {
+        limits.add(limit);
+        int handled = Math.min(limit, left);
+        left -= handled;
+        return handled;
+      }
+    };
   }
 
   private TimedNoticeProducer producer(String kind, int count) {
@@ -78,7 +109,7 @@ class NotificationTimedRunnerTest {
       }
 
       @Override
-      public int produce(Instant now) {
+      public int produce(Instant now, int limit) {
         calls.add(kind + "@" + now);
         return count;
       }
@@ -93,7 +124,7 @@ class NotificationTimedRunnerTest {
       }
 
       @Override
-      public int produce(Instant now) {
+      public int produce(Instant now, int limit) {
         calls.add(kind);
         throw new IllegalStateException("boom " + kind);
       }
@@ -144,6 +175,50 @@ class NotificationTimedRunnerTest {
 
     assertThat(calls).containsExactly("bad", "good@" + NOW);
     assertThat(produced("good")).isEqualTo(4);
+  }
+
+  @Test
+  void aBacklogOfAThousandIsAnnouncedOverSuccessiveRunsAndNeverTwice() {
+    NotificationTimedRunner runner = runnerWithBudget(100, greedy("backlog", 1_000));
+
+    int runs = 0;
+    int total = 0;
+    int produced;
+    do {
+      produced = runner.runOnce(NOW);
+      assertThat(produced).isLessThanOrEqualTo(100);
+      total += produced;
+      runs++;
+    } while (produced > 0);
+
+    assertThat(total).isEqualTo(1_000);
+    assertThat(runs).isEqualTo(11);
+    assertThat(produced("backlog")).isEqualTo(1_000);
+  }
+
+  @Test
+  void theBudgetIsSharedSoALaterProducerGetsOnlyWhatIsLeft() {
+    NotificationTimedRunner runner =
+        runnerWithBudget(100, greedy("first", 70), greedy("second", 70));
+
+    assertThat(runner.runOnce(NOW)).isEqualTo(100);
+    assertThat(limits).containsExactly(100, 30);
+    assertThat(produced("first")).isEqualTo(70);
+    assertThat(produced("second")).isEqualTo(30);
+
+    limits.clear();
+    assertThat(runner.runOnce(NOW)).isEqualTo(40);
+    assertThat(limits).containsExactly(100, 100);
+  }
+
+  @Test
+  void aSpentBudgetLeavesLaterProducersUntouched() {
+    NotificationTimedRunner runner =
+        runnerWithBudget(50, greedy("first", 500), greedy("second", 5));
+
+    assertThat(runner.runOnce(NOW)).isEqualTo(50);
+    assertThat(limits).containsExactly(50);
+    assertThat(produced("second")).isZero();
   }
 
   @Test

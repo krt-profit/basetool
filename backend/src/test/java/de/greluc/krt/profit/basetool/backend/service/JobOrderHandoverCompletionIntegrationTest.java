@@ -128,7 +128,7 @@ class JobOrderHandoverCompletionIntegrationTest {
           inv1.setMaterial(aslarite);
           inv1.setQuality(800);
           inv1.setAmount(1.835);
-          InventoryAllocations.addJobOrder(inv1, jobOrder, inv1.getAmount(), false);
+          InventoryAllocations.addJobOrder(inv1, jobOrder.getId(), inv1.getAmount(), false);
           inv1 = inventoryItemRepository.save(inv1);
 
           InventoryItem inv2 = new InventoryItem();
@@ -142,7 +142,7 @@ class JobOrderHandoverCompletionIntegrationTest {
           inv2.setMaterial(ouratite);
           inv2.setQuality(900);
           inv2.setAmount(5.730999999999999);
-          InventoryAllocations.addJobOrder(inv2, jobOrder, inv2.getAmount(), false);
+          InventoryAllocations.addJobOrder(inv2, jobOrder.getId(), inv2.getAmount(), false);
           inv2 = inventoryItemRepository.save(inv2);
 
           return new Fixture(jobOrder.getId(), inv1.getId(), inv2.getId());

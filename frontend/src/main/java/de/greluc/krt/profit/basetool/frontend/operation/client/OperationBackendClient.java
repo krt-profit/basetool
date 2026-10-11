@@ -19,17 +19,17 @@
 
 package de.greluc.krt.profit.basetool.frontend.operation.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OperationFinanceSummaryDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutStatusDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutStatusUpdateDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutSummaryDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.form.OperationForm;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceSummaryDto;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
+import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
+import de.greluc.krt.profit.basetool.frontend.operation.model.OperationFinanceSummaryDto;
+import de.greluc.krt.profit.basetool.frontend.operation.model.OperationForm;
+import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutStatusDto;
+import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutStatusUpdateDto;
+import de.greluc.krt.profit.basetool.frontend.operation.model.OperationPayoutSummaryDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;

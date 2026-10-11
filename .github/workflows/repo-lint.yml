@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 concurrency:
@@ -244,7 +246,7 @@ jobs:
       - name: adr-numbering / Check ADR numbering
         if: ${{ !cancelled() }}
         env:
-          ADR_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+          ADR_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.merge_group.base_sha || '' }}
         run: scripts/check-adr-numbering.sh
 
       - name: adr-registry / Self-test the ADR registry checker
@@ -358,6 +360,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/host-updates-metrics.test.sh
 
+      - name: host-scripts-selftest / Self-test the host script manifest and its parity with the role
+        if: ${{ !cancelled() }}
+        run: bash scripts/host-scripts-manifest.test.sh
+
       - name: container-runtime-selftest / Self-test the container-runtime seam
         if: ${{ !cancelled() }}
         run: bash scripts/container-runtime.test.sh
@@ -464,9 +470,22 @@ jobs:
         env:
           PROM_IMAGE: ${{ steps.prom-image.outputs.image }}
         run: |
-          docker run --rm --entrypoint sh \
-            -v "$PWD/monitoring/prometheus:/work" -w /work \
-            "$PROM_IMAGE" -c 'promtool test rules tests/*_test.yml'
+          set -euo pipefail
+          out="$(mktemp -d)"
+          export PROM_IMAGE out
+          cd monitoring/prometheus
+          # shellcheck disable=SC2016
+          printf '%s\n' tests/*_test.yml | xargs -P "$(nproc)" -I{} sh -c '
+            file="$1"
+            log="$out/$(basename "$file").log"
+            if docker run --rm --entrypoint sh -v "$PWD:/work" -w /work \
+                "$PROM_IMAGE" -c "promtool test rules $file" >"$log" 2>&1; then
+              cat "$log"
+            else
+              cat "$log"
+              echo "::error file=monitoring/prometheus/$file::promtool test rules failed"
+              exit 1
+            fi' _ {}
 
       - name: monitoring-configs / Self-test the monitoring config checker
         if: ${{ !cancelled() }}

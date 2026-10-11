@@ -37,7 +37,7 @@
                 <button th:if="${mission.canEdit or mission.canManageManagers}" id="mission-edit-btn" type="button" class="btn btn-ghost"
                         data-testid="mission-edit-toggle" aria-controls="pane-verw" aria-pressed="false"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{mission.edit.toggle}">Bearbeiten</span></button>
                 <button id="add-participant-btn" type="button" class="btn btn--cta" data-testid="page-head-primary"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg> <span th:text="#{mission.participant.add}">Anmelden</span></button>
-                <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                     <th:block th:replace="~{fragments/components :: overflowMenu(id='mission-more-menu', items=~{::mission-more-items})}">
                         <th:block th:ref="mission-more-items">
                             <button type="button" role="menuitem" class="overflow-menu__item overflow-menu__item--danger delete-mission-btn"
@@ -239,7 +239,7 @@
                     </th:block>
                 </div>
             </div>
-            <details class="more" open sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)"
+            <details class="more" open sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)"
                      th:if="${!#strings.isEmpty(mission.description)}">
                 <summary><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg> <span th:text="#{mission.overview.details_collapse}">Detaillierte Beschreibung anzeigen</span></summary>
                 <div class="more-body">
@@ -339,7 +339,7 @@
             <div id="finance-results"><th:block th:fragment="financeSection">
             <span id="finance-count-meta" hidden th:text="${(financeIncomeCount ?: 0) + (financeExpenseCount ?: 0)}"></span>
 
-            <div class="kpi-grid fin-kpis" data-testid="mission-finance-kpis" th:if="${financeSum != null}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
+            <div class="kpi-grid fin-kpis" data-testid="mission-finance-kpis" th:if="${financeSum != null}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)">
                 <div class="kpi-total">
                     <div class="kpi-label" th:text="#{mission.finance.kpi.total}">Gesamtergebnis</div>
                     <div class="kpi-value"><span th:classappend="${financeSum >= 0 ? 'is-pos' : 'is-neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')}">0</span> <span class="kpi-unit">aUEC</span></div>
@@ -363,7 +363,7 @@
             </div>
 
             <div class="pane-grid-fin">
-                <section class="card card--flush fin-card" data-testid="mission-finance-list" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
+                <section class="card card--flush fin-card" data-testid="mission-finance-list" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)">
                     <div class="card-head fin-card-head">
                         <h2 class="card-title" th:text="#{mission.finances}">Finanzen</h2>
                         <button type="button" class="btn btn--cta" data-trigger="open-modal-display" data-modal-id="finance-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.finance.add}">Finanzeintrag hinzuf&uuml;gen</span></button>
@@ -600,7 +600,7 @@
                                     <div class="field-error" data-error-for="meetingPoint" th:text="${#fields.hasErrors('meetingPoint') ? #fields.errors('meetingPoint')[0] : ''}"></div>
                                 </div>
 
-                                <div class="form-group span-all" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
+                                <div class="form-group span-all" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).MISSION_MANAGER)">
                                     <label for="mission-description" th:text="#{mission.description}">Description</label>
                                     <textarea id="mission-description" name="description" rows="5" maxlength="20000" th:text="*{description}"></textarea>
                                     <small class="form-hint" th:text="#{mission.description.markdown_hint}">Markdown wird unterst&uuml;tzt.</small>

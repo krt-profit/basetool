@@ -138,10 +138,10 @@ class InventoryStockMergeTest {
     UUID survivorId = UUID.randomUUID();
     JobOrder order = jobOrder(UUID.randomUUID());
     InventoryItem survivor = row(survivorId, QuantityType.PIECE, 5.0, "note-a");
-    InventoryAllocations.addJobOrder(survivor, order, 5.0, false);
+    InventoryAllocations.addJobOrder(survivor, order.getId(), 5.0, false);
     InventoryItem victim1 = row(UUID.randomUUID(), QuantityType.PIECE, 3.0, "note-b");
     InventoryItem victim2 = row(UUID.randomUUID(), QuantityType.PIECE, 2.0, "note-a");
-    InventoryAllocations.addJobOrder(victim2, order, 2.0, true);
+    InventoryAllocations.addJobOrder(victim2, order.getId(), 2.0, true);
 
     when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
     when(inventoryItemRepository.findMergeGroupForUpdate(
@@ -157,7 +157,8 @@ class InventoryStockMergeTest {
 
     assertEquals(1, survivor.getJobOrderAllocations().size(), "same-order slices fold into one");
     InventoryJobOrderAllocation slice = survivor.getJobOrderAllocations().get(0);
-    assertSame(order, slice.getJobOrder(), "the surviving slice keeps the shared job order");
+    assertEquals(
+        order.getId(), slice.getJobOrderId(), "the surviving slice keeps the shared job order");
     assertEquals(7.0, slice.getAmount(), 1e-9, "the shared order's slice amount is summed");
     assertTrue(slice.getDelivered(), "delivered is OR-combined across the folded slices");
 

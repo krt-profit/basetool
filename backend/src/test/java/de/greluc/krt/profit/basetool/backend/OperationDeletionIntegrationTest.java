@@ -133,7 +133,7 @@ class OperationDeletionIntegrationTest {
     item.setLocation(location);
     item.setQuality(100);
     item.setAmount(10.0);
-    InventoryAllocations.addMission(item, mission, item.getAmount());
+    InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
     item = inventoryItemRepository.save(item);
 
     RefineryOrder order = new RefineryOrder();
@@ -185,7 +185,7 @@ class OperationDeletionIntegrationTest {
                 () ->
                     new AssertionError(
                         "inventory item must keep its mission link when the operation is deleted"));
-    assertEquals(missionId, survivedAllocation.getMission().getId());
+    assertEquals(missionId, survivedAllocation.getMissionId());
 
     RefineryOrder survivedOrder = refineryOrderRepository.findById(orderId).orElseThrow();
     assertNotNull(

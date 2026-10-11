@@ -53,7 +53,7 @@ class UriTagCapacityTest {
 
   /** Mocked so the context starts without a backend; nothing here issues a request. */
   @MockitoBean
-  private de.greluc.krt.profit.basetool.frontend.service.BackendApiClient backendApiClient;
+  private de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient backendApiClient;
 
   /** The frontend is an OAuth2 client; the registry is what the security chain wires through. */
   @MockitoBean

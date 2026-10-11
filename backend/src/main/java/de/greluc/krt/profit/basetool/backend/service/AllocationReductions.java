@@ -148,15 +148,15 @@ public final class AllocationReductions {
     List<Double> sliceAmounts = new ArrayList<>();
     if (jobOrderDimension) {
       for (InventoryJobOrderAllocation a : item.getJobOrderAllocations()) {
-        if (a.getJobOrder() != null) {
-          targets.add(a.getJobOrder().getId());
+        if (a.getJobOrderId() != null) {
+          targets.add(a.getJobOrderId());
           sliceAmounts.add(a.getAmount() != null ? a.getAmount() : 0.0);
         }
       }
     } else {
       for (InventoryMissionAllocation a : item.getMissionAllocations()) {
-        if (a.getMission() != null) {
-          targets.add(a.getMission().getId());
+        if (a.getMissionId() != null) {
+          targets.add(a.getMissionId());
           sliceAmounts.add(a.getAmount() != null ? a.getAmount() : 0.0);
         }
       }

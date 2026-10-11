@@ -8,3 +8,4 @@ COPY docker/acme /config/docker/acme
 COPY keycloak-theme /config/keycloak-theme
 COPY monitoring /config/monitoring
 COPY quadlet /config/quadlet
+COPY docker/config/host-scripts.sha256 /config/host-scripts.sha256

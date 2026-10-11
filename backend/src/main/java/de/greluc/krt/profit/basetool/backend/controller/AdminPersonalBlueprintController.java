@@ -49,6 +49,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -247,8 +248,11 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "400", description = "Validation failed."),
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
+  @Transactional
   public BlueprintImportResultDto applyImportForUser(
       @PathVariable UUID userId, @NotNull @Valid @RequestBody BlueprintImportApplyRequest request) {
-    return importService.applyImport(userId, request.resolutions());
+    BlueprintImportResultDto result = importService.applyImport(userId, request.resolutions());
+    service.announceImportByAdmin(userId, result);
+    return result;
   }
 }
