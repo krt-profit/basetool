@@ -29,8 +29,5 @@ identity -> privacy: UserController -> UserDeletionService
 identity -> privacy: UserRegistrationService -> UserDeletionService
 identity -> scope: MeController -> OwnerScopeService
 identity -> scope: UserService -> OwnerScopeService
-mission -> operation: MissionDto -> OperationDto
-mission -> operation: MissionListDto -> OperationDto
-mission -> operation: MissionMapper -> OperationMapper
 notification -> orgunit: OrgUnitRef -> OrgUnitKind
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler

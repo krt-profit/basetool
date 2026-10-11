@@ -28,12 +28,8 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
-import de.greluc.krt.profit.basetool.backend.model.Operation;
-import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
@@ -142,8 +138,8 @@ public class OperationService {
    * scope, sorted by name: {@code PLANNED} and {@code ACTIVE} always, {@code COMPLETED} and {@code
    * CANCELED} only when created within the last {@link #REFERENCE_TERMINAL_CUTOFF_MONTHS} months.
    *
-   * @return slim {@link de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto} list
-   *     within the caller's scope and the status/recency bound
+   * @return slim {@link OperationReferenceDto} list within the caller's scope and the
+   *     status/recency bound
    */
   @NotNull
   public List<OperationReferenceDto> findAllReference() {
@@ -193,9 +189,8 @@ public class OperationService {
    * pick is ignored and {@code OwnerScopeService.currentOrgUnit()} is stamped.
    *
    * @param operation transient entity
-   * @param owningOrgUnitId optional picker output from {@link
-   *     de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto#owningOrgUnitId}, or
-   *     {@code null}
+   * @param owningOrgUnitId optional picker output from {@link OperationCreateDto#owningOrgUnitId},
+   *     or {@code null}
    * @return the persisted operation
    */
   @Transactional

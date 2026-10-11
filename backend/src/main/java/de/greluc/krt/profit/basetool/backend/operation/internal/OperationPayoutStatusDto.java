@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import java.time.Instant;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Response of the operation payout paid-out toggle ({@code PUT
@@ -32,4 +33,7 @@ import java.time.Instant;
  * @param paidOutByName effective name of the user who flipped the flag, or {@code null}
  */
 public record OperationPayoutStatusDto(
-    String participantKey, boolean paidOut, Instant paidOutAt, String paidOutByName) {}
+    String participantKey,
+    boolean paidOut,
+    @Nullable Instant paidOutAt,
+    @Nullable String paidOutByName) {}

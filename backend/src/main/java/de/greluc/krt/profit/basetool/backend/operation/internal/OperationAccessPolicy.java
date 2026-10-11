@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.UUID;
@@ -42,6 +41,24 @@ public class OperationAccessPolicy {
 
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "operationAccessPolicy";
+
+  /**
+   * The org-unit scope predicate of the operation queries (alias {@code o}, REQ-ORG-003): the
+   * triple plus the read escapes, so an ownerless leadership operation is visible to organisation
+   * members and above, and a participant of one of its missions sees it regardless of owning org
+   * unit.
+   */
+  static final String OPERATION_SCOPE_PREDICATE =
+      """
+      (
+        :isAdminAllScope = true
+        OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)
+        OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)
+        OR (o.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)
+        OR (:viewerUserId IS NOT NULL AND EXISTS (SELECT p.id FROM MissionParticipant p
+         WHERE p.mission.operationId = o.id AND p.user.id = :viewerUserId))
+       )
+      """;
 
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelper;

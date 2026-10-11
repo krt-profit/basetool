@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
 > **Owner area:** DB/DATA · **Migration conventions:** [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md)
 
 # Data & persistence
@@ -694,9 +694,10 @@ centralised:
   `GameItemRepository`, whose `name` is not unique), and a base interface method can only declare one
   return type.
 - **`repository.ScopeSpecifications`** holds one `static final String` JPQL fragment per aggregate
-  (`OPERATION_SCOPE_PREDICATE`, `MISSION_SCOPE_PREDICATE`, `SHIP_SCOPE_TRIPLE`,
-  `INVENTORY_ITEM_SCOPE_TRIPLE`, `JOB_ORDER_SCOPE_PREDICATE`; the refinery's
-  `REFINERY_ORDER_SCOPE_TRIPLE` lives in `RefineryAccessPolicy` since P4-3),
+  (`MISSION_SCOPE_PREDICATE`, `SHIP_SCOPE_TRIPLE`, `INVENTORY_ITEM_SCOPE_TRIPLE`,
+  `JOB_ORDER_SCOPE_PREDICATE`; the refinery's `REFINERY_ORDER_SCOPE_TRIPLE` lives in
+  `RefineryAccessPolicy` since P4-3 and the operation's `OPERATION_SCOPE_PREDICATE` in
+  `OperationAccessPolicy` since P4-4),
   referenced from each repository's `@Query` value via compile-time constant-expression concatenation
   (JLS 15.28/4.12.4 — the same technique REQ-SEC-002a's `Roles.X` constants use inside
   `@PreAuthorize`, since an annotation value cannot invoke a method). The alias is baked into each
