@@ -925,7 +925,7 @@ their "must stay green" period here (D-01).
      `BlueprintUploadPreviewServiceTest` was added for the one exchange path a lower module used.
   2. *Inversions* (5 baseline edges, **108 → 103**; the `blueprint -> exchange` and
      `scope -> exchange` pairs are gone): the blueprint upload preview hands the envelope to the
-     blueprint-owned SPI `service.BlueprintEnvelopeReader` (implemented by
+     blueprint-owned SPI `service.BlueprintEnvelopeReader` (since P3-7a in `blueprint.api`; implemented by
      `ExchangeBlueprintEnvelopeReader`, same binding, validation and draft resolution in the
      caller's transaction); `PersonalBlueprintService`, `CustomJwtGrantedAuthoritiesConverter` and
      `UserDeletionService` ask `platform.api.ClientDirectory` (`displayNames`, `isGatewayClient`,
@@ -1298,6 +1298,44 @@ as each pair is decoupled.
   nullness; the overview has always sent `details` as `null` without the owner details and
   `locationName` as `null` for a ship without a location, which the annotations now state. No
   N+1 test was added: the move changes no query or fetch plan.
+
+- `blueprint` — **in two parts** (P3-7a, P3-7b), each releasable on its own.
+  - **P3-7a — done 2026-10-10.**
+    1. *Characterise*: `BlueprintModuleContractTest` pins that adding, updating and removing a
+       personal blueprint record `BLUEPRINT_ADDED`, `BLUEPRINT_UPDATED` and `BLUEPRINT_REMOVED` in
+       the command's transaction. It also pins that another member reaches none of the owner's
+       blueprints (404, nothing recorded) and that a plain member is refused on both overview
+       reads.
+    2. *Access policy* (§5.4): `BlueprintAccessPolicy` (bean `blueprintAccessPolicy`) gates the
+       org-unit blueprint overview. Two matrix lines changed, in expression text only.
+       `BlueprintAccessPolicyDifferentialTest` compares the policy, the live hub and a restatement
+       for 14 callers (admin, officer without a seat, member of none, and each of the eleven
+       membership roles). It is proven able to fail.
+    3. *Inversions* (baseline **48 → 45**):
+       - `blueprint -> inventory` is gone. The craftability asks its own read SPI
+         `blueprint.api.CraftableStockSource`, which inventory implements in
+         `InventoryCraftableStock`. Stock and pending refinery yield now share one record,
+         `blueprint.api.CraftabilitySlice`, which replaces `CraftabilityYieldSource.YieldSlice`;
+         `InventoryItemService#getOwnedStockSlices` is gone.
+       - `identity -> blueprint` is gone. Creating a member account calls
+         `identity.api.MemberCreatedObserver` (`@ObserverSpi`, `MANDATORY`), which
+         `DefaultBlueprintGrantOnCreation` implements by granting the default blueprints, as
+         before, in the creating transaction.
+       - `blueprint` is a declared module with an `api` package. `CraftabilityYieldSource` and
+         `BlueprintEnvelopeReader` moved there from `service`, and every higher-ranked module
+         allows `blueprint::api`.
+    **Corrections:**
+    (1) §5.3 lists the default-blueprint grant as an after-commit event. It stays a same-transaction
+    observer instead, because the grant records `BLUEPRINT_DEFAULTS_GRANTED` with the request's
+    actor, and listeners never write audit rows. A failed grant still rolls the account creation
+    back, exactly as before. The provisioning task still heals a missed grant.
+    (2) The overview gate's predicate stays in the scope kernel (`RequestScopeResolver`). Identity's
+    `/me` capability view reads it too, and an `identity -> blueprint` edge would break the ranks.
+    The policy builds on it, and the differential test keeps both live copies in step.
+  - **P3-7b — open.** Published query and command APIs for the exchange and the Materialbörse:
+    the product resolution, the import preview and name resolution, the variant-family resolver
+    and the personal-blueprint writes. Then the move into `blueprint.web` / `blueprint.internal`,
+    NullAway over the module, and the idioms.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |

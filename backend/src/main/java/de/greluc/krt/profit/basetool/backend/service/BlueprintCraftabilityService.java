@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftabilitySlice;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftabilityYieldSource;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftableStockSource;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -27,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CraftabilityGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CraftabilityMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
-import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind;
@@ -71,7 +73,7 @@ public class BlueprintCraftabilityService {
 
   private final PersonalBlueprintService personalBlueprintService;
   private final BlueprintProductService blueprintProductService;
-  private final InventoryItemService inventoryItemService;
+  private final CraftableStockSource craftableStockSource;
   private final CraftabilityYieldSource craftabilityYieldSource;
   private final BlueprintRepository blueprintRepository;
   private final GameItemRepository gameItemRepository;
@@ -100,16 +102,13 @@ public class BlueprintCraftabilityService {
     Map<String, Blueprint> recipes =
         blueprintProductService.resolveRepresentativeBlueprints(productKeys);
 
-    Map<UUID, List<OwnedStockSlice>> inventory =
-        slicesPerMaterial(inventoryItemService.getOwnedStockSlices(userId));
-    Map<UUID, List<OwnedStockSlice>> withRefinery = inventory;
+    Map<UUID, List<CraftabilitySlice>> inventory =
+        slicesPerMaterial(craftableStockSource.ownedStockSlices(userId));
+    Map<UUID, List<CraftabilitySlice>> withRefinery = inventory;
     if (includeRefinery) {
-      List<OwnedStockSlice> merged =
-          new ArrayList<>(inventoryItemService.getOwnedStockSlices(userId));
-      for (CraftabilityYieldSource.YieldSlice slice :
-          craftabilityYieldSource.pendingYieldSlices(userId)) {
-        merged.add(new OwnedStockSlice(slice.materialId(), slice.quality(), slice.totalScu()));
-      }
+      List<CraftabilitySlice> merged =
+          new ArrayList<>(craftableStockSource.ownedStockSlices(userId));
+      merged.addAll(craftabilityYieldSource.pendingYieldSlices(userId));
       withRefinery = slicesPerMaterial(merged);
     }
 
@@ -204,8 +203,8 @@ public class BlueprintCraftabilityService {
   private BlueprintCraftabilityDto computeOne(
       @NotNull UUID blueprintId,
       @Nullable Blueprint recipe,
-      @NotNull Map<UUID, List<OwnedStockSlice>> inventory,
-      @NotNull Map<UUID, List<OwnedStockSlice>> withRefinery,
+      @NotNull Map<UUID, List<CraftabilitySlice>> inventory,
+      @NotNull Map<UUID, List<CraftabilitySlice>> withRefinery,
       @NotNull Map<UUID, Material> itemBridges) {
     if (recipe == null) {
       return new BlueprintCraftabilityDto(
@@ -430,11 +429,11 @@ public class BlueprintCraftabilityService {
    */
   @NotNull
   private static Availability availability(
-      @Nullable List<OwnedStockSlice> slices, int floor, double required) {
+      @Nullable List<CraftabilitySlice> slices, int floor, double required) {
     if (slices == null || slices.isEmpty()) {
       return new Availability(0.0d, null, required);
     }
-    List<OwnedStockSlice> qualifying =
+    List<CraftabilitySlice> qualifying =
         slices.stream()
             .filter(
                 s ->
@@ -442,15 +441,15 @@ public class BlueprintCraftabilityService {
                         && s.quality() >= floor
                         && s.totalScu() != null
                         && s.totalScu() > 0.0d)
-            .sorted(Comparator.comparingInt(OwnedStockSlice::quality).reversed())
+            .sorted(Comparator.comparingInt(CraftabilitySlice::quality).reversed())
             .toList();
-    double available = qualifying.stream().mapToDouble(OwnedStockSlice::totalScu).sum();
+    double available = qualifying.stream().mapToDouble(CraftabilitySlice::totalScu).sum();
     double missing = Math.max(0.0d, required - available);
 
     double needed = required;
     double consumed = 0.0d;
     double weighted = 0.0d;
-    for (OwnedStockSlice slice : qualifying) {
+    for (CraftabilitySlice slice : qualifying) {
       double take = Math.min(slice.totalScu(), needed - consumed);
       if (take <= 0.0d) {
         break;
@@ -473,11 +472,11 @@ public class BlueprintCraftabilityService {
    * @return slices keyed by material id
    */
   @NotNull
-  private static Map<UUID, List<OwnedStockSlice>> slicesPerMaterial(
-      @NotNull List<OwnedStockSlice> slices) {
+  private static Map<UUID, List<CraftabilitySlice>> slicesPerMaterial(
+      @NotNull List<CraftabilitySlice> slices) {
     return slices.stream()
         .filter(s -> s.materialId() != null)
-        .collect(Collectors.groupingBy(OwnedStockSlice::materialId));
+        .collect(Collectors.groupingBy(CraftabilitySlice::materialId));
   }
 
   /**

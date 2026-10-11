@@ -28,13 +28,15 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftabilitySlice;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftabilityYieldSource;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.CraftableStockSource;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CraftabilityMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
-import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind;
@@ -66,7 +68,7 @@ class BlueprintCraftabilityServiceTest {
 
   @Mock private PersonalBlueprintService personalBlueprintService;
   @Mock private BlueprintProductService blueprintProductService;
-  @Mock private InventoryItemService inventoryItemService;
+  @Mock private CraftableStockSource craftableStockSource;
   @Mock private CraftabilityYieldSource refineryOrderService;
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private GameItemRepository gameItemRepository;
@@ -78,12 +80,12 @@ class BlueprintCraftabilityServiceTest {
     stubOwned(owned("widget", "Widget"));
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))
         .thenReturn(Map.of("widget", twoSlotBlueprint()));
-    when(inventoryItemService.getOwnedStockSlices(USER_ID))
+    when(craftableStockSource.ownedStockSlices(USER_ID))
         .thenReturn(
             List.of(
-                new OwnedStockSlice(MAT_A, 1000, 25.0),
-                new OwnedStockSlice(MAT_A, 300, 100.0),
-                new OwnedStockSlice(MAT_B, 600, 12.0)));
+                new CraftabilitySlice(MAT_A, 1000, 25.0),
+                new CraftabilitySlice(MAT_A, 300, 100.0),
+                new CraftabilitySlice(MAT_B, 600, 12.0)));
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
@@ -119,9 +121,10 @@ class BlueprintCraftabilityServiceTest {
     stubOwned(owned("widget", "Widget"));
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))
         .thenReturn(Map.of("widget", twoSlotBlueprint()));
-    when(inventoryItemService.getOwnedStockSlices(USER_ID))
+    when(craftableStockSource.ownedStockSlices(USER_ID))
         .thenReturn(
-            List.of(new OwnedStockSlice(MAT_A, 300, 100.0), new OwnedStockSlice(MAT_B, 600, 50.0)));
+            List.of(
+                new CraftabilitySlice(MAT_A, 300, 100.0), new CraftabilitySlice(MAT_B, 600, 50.0)));
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
@@ -138,11 +141,12 @@ class BlueprintCraftabilityServiceTest {
     stubOwned(owned("widget", "Widget"));
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))
         .thenReturn(Map.of("widget", twoSlotBlueprint()));
-    when(inventoryItemService.getOwnedStockSlices(USER_ID))
+    when(craftableStockSource.ownedStockSlices(USER_ID))
         .thenReturn(
-            List.of(new OwnedStockSlice(MAT_A, 1000, 6.0), new OwnedStockSlice(MAT_B, 600, 50.0)));
+            List.of(
+                new CraftabilitySlice(MAT_A, 1000, 6.0), new CraftabilitySlice(MAT_B, 600, 50.0)));
     when(refineryOrderService.pendingYieldSlices(USER_ID))
-        .thenReturn(List.of(new CraftabilityYieldSource.YieldSlice(MAT_A, 900, 8.0)));
+        .thenReturn(List.of(new CraftabilitySlice(MAT_A, 900, 8.0)));
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, true));
 
@@ -165,8 +169,8 @@ class BlueprintCraftabilityServiceTest {
     bp.addIngredient(resource(0, material(MAT_A, "Hadanite", QuantityType.PIECE), 2.6, null, slot));
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))
         .thenReturn(Map.of("widget", bp));
-    when(inventoryItemService.getOwnedStockSlices(USER_ID))
-        .thenReturn(List.of(new OwnedStockSlice(MAT_A, 400, 7.0)));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilitySlice(MAT_A, 400, 7.0)));
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
@@ -196,8 +200,8 @@ class BlueprintCraftabilityServiceTest {
     when(gameItemRepository.findAllById(any())).thenReturn(List.of(beradom));
     when(materialRepository.findByNameInIgnoreCase(any()))
         .thenReturn(List.of(material(MAT_A, "Beradom", QuantityType.PIECE)));
-    when(inventoryItemService.getOwnedStockSlices(USER_ID))
-        .thenReturn(List.of(new OwnedStockSlice(MAT_A, 400, 7.0)));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilitySlice(MAT_A, 400, 7.0)));
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
@@ -230,7 +234,7 @@ class BlueprintCraftabilityServiceTest {
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))
         .thenReturn(Map.of("widget", bp));
     when(blueprintRepository.findCraftableOutputItemIds(any())).thenReturn(List.of(GI_A));
-    when(inventoryItemService.getOwnedStockSlices(USER_ID)).thenReturn(List.of());
+    when(craftableStockSource.ownedStockSlices(USER_ID)).thenReturn(List.of());
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
@@ -246,9 +250,10 @@ class BlueprintCraftabilityServiceTest {
     stubOwned(owned("widget", "Widget"));
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))
         .thenReturn(Map.of("widget", twoSlotBlueprint()));
-    when(inventoryItemService.getOwnedStockSlices(USER_ID))
+    when(craftableStockSource.ownedStockSlices(USER_ID))
         .thenReturn(
-            List.of(new OwnedStockSlice(MAT_A, 1000, 25.0), new OwnedStockSlice(MAT_B, 600, 12.0)));
+            List.of(
+                new CraftabilitySlice(MAT_A, 1000, 25.0), new CraftabilitySlice(MAT_B, 600, 12.0)));
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
@@ -286,7 +291,7 @@ class BlueprintCraftabilityServiceTest {
   void computeForOwner_unresolvedRecipeIsReported() {
     stubOwned(owned("widget", "Widget"));
     when(blueprintProductService.resolveRepresentativeBlueprints(any())).thenReturn(Map.of());
-    when(inventoryItemService.getOwnedStockSlices(USER_ID)).thenReturn(List.of());
+    when(craftableStockSource.ownedStockSlices(USER_ID)).thenReturn(List.of());
 
     BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 

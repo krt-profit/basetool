@@ -164,6 +164,7 @@ class UexCategory catalogue UEX category reference row
 class JobOrderAllocationDto inventory job-order slice of an inventory entry (REQ-INV-027), mapped by InventoryItemMapper
 class CraftabilityYieldSource blueprint pending-yield SPI of the craftability, implemented by the refinery (plan 5.3)
 class BlueprintEnvelopeReader blueprint upload-preview envelope SPI, implemented by the exchange (plan 5.3)
+class BlueprintAccessPolicy blueprint the blueprint module's access policy (plan 5.4)
 class BlueprintPackTags blueprint log-name clean-up used only by BlueprintImportService
 class BasetoolErrorController platform container error dispatch as RFC 7807
 class MemberEvaluationErasure promotion GDPR erasure command; in service until 7.6, a promotion package would close a service-promotion package cycle
@@ -182,6 +183,7 @@ package notification notification the notification module's package tree (plan 5
 package privacy privacy the GDPR module's package tree, transitional (plan 5.1 rank 13, 7.6)
 package inventory inventory the inventory module's package tree (plan 5.2)
 package hangar hangar the hangar module's package tree (plan 5.2)
+package blueprint blueprint the blueprint module's package tree (plan 5.2)
 package refinery refinery the refinery module's package tree (plan 5.2)
 package scope scope the scope module's package tree (plan 5.2)
 package kernel kernel the kernel's package tree (plan 5.1 rank 0)

@@ -17,33 +17,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Stock a member will own once a pending process finishes, as the blueprint craftability counts it
- * beside the Lager (plan §5.3); implemented by the refinery for its open orders.
+ * The stock a member owns, as the blueprint craftability counts it (plan §5.3); implemented by the
+ * inventory module over the Lager.
  */
-public interface CraftabilityYieldSource {
+public interface CraftableStockSource {
 
   /**
-   * One pending yield total.
-   *
-   * @param materialId the output material
-   * @param quality the output quality
-   * @param totalScu the summed yield in SCU
-   */
-  record YieldSlice(UUID materialId, Integer quality, Double totalScu) {}
-
-  /**
-   * Sums the pending yield of the member into one SCU total per (output material, quality).
+   * Sums the member's own Lager stock, personal and shared, into one SCU total per material and
+   * quality.
    *
    * @param userId the owning member
-   * @return one slice per (output material, quality), never {@code null}
+   * @return one slice per (material, quality), never {@code null}
    */
   @NotNull
-  List<YieldSlice> pendingYieldSlices(@NotNull UUID userId);
+  List<CraftabilitySlice> ownedStockSlices(@NotNull UUID userId);
 }

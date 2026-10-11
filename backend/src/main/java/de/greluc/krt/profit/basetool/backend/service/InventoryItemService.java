@@ -62,7 +62,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
-import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -113,17 +112,6 @@ public class InventoryItemService {
   private final InventoryAggregationService inventoryAggregationService;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryProperties inventoryProperties;
-
-  /**
-   * Pools the user's entire stock (personal and shared rows) into one SCU total per (material,
-   * quality) pair for the blueprint craftability calculation. Owner-scoped, never org-unit-scoped.
-   *
-   * @param userId the owning user; never {@code null}
-   * @return one slice per (material, quality) the user owns; never {@code null}
-   */
-  public List<OwnedStockSlice> getOwnedStockSlices(@NotNull UUID userId) {
-    return inventoryAggregationService.getOwnedStockSlices(userId);
-  }
 
   /**
    * Aggregated per-material inventory view — used by the squadron-wide inventory page.

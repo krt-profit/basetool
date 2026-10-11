@@ -425,8 +425,8 @@ POST /api/v1/personal-blueprints/batch | PersonalBlueprintController#addBatch | 
 GET /api/v1/personal-blueprints/craftability | PersonalBlueprintController#craftability | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/personal-blueprints/import/apply | PersonalBlueprintController#applyImport | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/personal-blueprints/import/preview | PersonalBlueprintController#previewImport | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/personal-blueprints/overview | PersonalBlueprintOverviewController#listAvailableBlueprints | pre=@ownerScopeService.canAccessBlueprintOverview() | url=anyRequest -> authenticated
-GET /api/v1/personal-blueprints/overview/owners | PersonalBlueprintOverviewController#listOwners | pre=@ownerScopeService.canAccessBlueprintOverview() | url=anyRequest -> authenticated
+GET /api/v1/personal-blueprints/overview | PersonalBlueprintOverviewController#listAvailableBlueprints | pre=@blueprintAccessPolicy.canAccessBlueprintOverview() | url=anyRequest -> authenticated
+GET /api/v1/personal-blueprints/overview/owners | PersonalBlueprintOverviewController#listOwners | pre=@blueprintAccessPolicy.canAccessBlueprintOverview() | url=anyRequest -> authenticated
 DELETE /api/v1/personal-blueprints/{id} | PersonalBlueprintController#delete | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/personal-blueprints/{id} | PersonalBlueprintController#update | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/personal-blueprints/{id}/recipe | PersonalBlueprintController#recipe | pre=isAuthenticated() | url=anyRequest -> authenticated
