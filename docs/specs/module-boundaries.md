@@ -191,8 +191,8 @@ declared in the same pull request that creates it (plan §5.2, §5.7, step P1-13
 A module without an `api` package keeps all its types in its base package, which is its unnamed
 interface: `kernel` today. A module that publishes nothing yet keeps every type below its base
 package and outside an `api` package, so it exposes no type at all; no declaration allows it,
-and Spring Modulith reports any module that reaches into it: `dashboard`, `operation` and
-`orgchart` today, which no other module uses. Its dependents allow it by bare name (`"kernel"`, not
+and Spring Modulith reports any module that reaches into it: `dashboard`, `orgchart`,
+`personalinventory` and `promotion` today, which no other module uses. Its dependents allow it by bare name (`"kernel"`, not
 `"kernel::api"`), it publishes no named interface, and no type lies below its base package. A
 module that may depend on no declared module says so with `allowedDependencies = {}`: the
 annotation's default is Spring Modulith's "everything allowed" sentinel, not an empty list.

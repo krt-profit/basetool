@@ -902,7 +902,8 @@ their "must stay green" period here (D-01).
   §5.4 do not apply, because the per-row checks are the unchanged kernel `canSeeSquadron` /
   `canEditSquadron`. Controllers moved to `promotion.web`, everything else to `promotion.internal`.
   The GDPR deletion reaches the module through `MemberEvaluationErasure` (`MANDATORY`), which sits
-  in the `service` package beside `UserDeletionService`, assigned to `promotion` by a `class` rule.
+  in the `service` package beside `UserDeletionService`, assigned to `promotion` by a `class` rule
+  (replaced by the module's `UserErasureParticipant` in P4 slice a, §7.6).
   **Correction to §5.2:** a module cannot publish a type in `<module>.api` while the caller sits in
   a layer package the module itself depends on — `service → promotion.api` plus `promotion →
   service` closes a top-level package cycle; the type is carried into Phase 4 and replaced by the GDPR
@@ -917,7 +918,9 @@ their "must stay green" period here (D-01).
   (`MANDATORY`), which the module publishes as its `api`; unlike promotion the module depends on
   nothing in `service`, so no package cycle forces the type out of its module. It is carried into
   Phase 4 like `MemberEvaluationErasure` (§7.6). Every declared module of a higher rank allows
-  `personalinventory::api`. The move removes no baseline edge (108).
+  `personalinventory::api`. The move removes no baseline edge (108). (P4 slice a, §7.6, replaced the
+  command by the module's `UserErasureParticipant`; the module now publishes nothing and the nine
+  declarations that allowed `personalinventory::api` dropped it.)
 - `exchange` (as a package) — **done 2026-10-10.** Its "must stay green" period starts here
   (D-01); Phase 5 extracts it next (D-23).
   1. *Characterise*: the relay contract was already pinned (G-18 wire contract and golden answers,
@@ -984,7 +987,8 @@ their "must stay green" period here (D-01).
   one membership query and two dead methods. (2) Like `MemberEvaluationErasure`,
   `BankHandleSnapshots` cannot sit in `bank.api` while its caller lives in the `service` package the
   bank depends on; it stays there, registered in `BANK_CLASSES` and assigned by a `class` rule, and
-  is carried into Phase 4 with the GDPR participants (§7.6). (3) `BusinessMetricsCollector` (`app`)
+  is carried into Phase 4 with the GDPR participants (§7.6; still open after P4 slice a, it goes with
+  the anonymisation slice). (3) `BusinessMetricsCollector` (`app`)
   still reads the booking-request repository directly; it leaves with the per-module gauges of §5.1.
 
 ### 7.5 Phase 3 — the business core
@@ -1014,7 +1018,8 @@ as each pair is decoupled.
   ownership inside their services; their only scope-hub call is `currentOrgUnit` for stamping.
   No command API is published yet: no other module writes an offer or a request. **Corrections:**
   (1) `beforeWipe` takes the three scope components instead of `ScopePredicate`, which lives in
-  the `service` package, so `inventory.api` depends on no layer package; `beforeUserPurge` stays on
+  the `service` package, so `inventory.api` depends on no layer package; `beforeUserPurge` (left
+  the observer in P4 slice a, §7.6) stays on
   the stock observer rather than a GDPR participant until §7.6 introduces those. (2)
   `MaterialExchangeOffer.inventoryItem` stays an association for now: converting it rewrites the
   fetch plan of eight queries and two entity graphs, and nothing needs the id until `InventoryItem`
@@ -1193,7 +1198,7 @@ as each pair is decoupled.
     REQ-SEC-005 until the owner decides. `StockWriteOwnershipTest` makes "only inventory writes
     Lager rows" a gate (a `save*`/`delete*`/`@Modifying` call on the Lager repository, a row or
     earmark setter, an earmark mutator), proven able to fail on a planted writer; the GDPR
-    orchestrator is its one listed exception until Phase 4. The job-order and refinery unit tests
+    orchestrator was its one listed exception until Phase 4 (gone with P4 slice a, §7.6). The job-order and refinery unit tests
     run against a real `InventoryStockCommands` over their mocks, so they still verify the writes.
   - **5d-1 — done 2026-10-10.** Write family 7: `inventory.api.StockSoldForTarget`
     (`soldForMissions`, an `@ObserverSpi`, `MANDATORY`), implemented by
@@ -1417,9 +1422,80 @@ run `MANDATORY` inside the orchestrator's one transaction, and the deletion and 
 rows stay in the orchestrator — and `catalogue`, whose caches switch to read models. Identity's REST
 surface sheds the six domains it hosts today.
 Carried into this phase from Phase 2: `service.MemberEvaluationErasure` (promotion) and
-`personalinventory.api.PersonalInventoryErasure` are the interim erasure commands `UserDeletionService`
-calls; both are replaced by `UserErasureParticipant` implementations here, and
-`MemberEvaluationErasure` leaves the `service` package with that step (P2-3); `service.BankHandleSnapshots` (bank) goes the same way (P2-5).
+`personalinventory.api.PersonalInventoryErasure` were the interim erasure commands `UserDeletionService`
+called; both were replaced by `UserErasureParticipant` implementations in P4 slice a (below), and
+`MemberEvaluationErasure` left the `service` package with that step (P2-3); `service.BankHandleSnapshots`
+(bank) goes the same way with the anonymisation slice (P2-5).
+
+**Slices of the GDPR participants.** The five SPIs are one family each and ship as stacked pull
+requests, each green on its own: (a) `UserErasureParticipant` with the orchestrator — **done
+2026-10-11**; (b) `HandleAnonymisationParticipant`, which replaces `service.BankHandleSnapshots`
+and the audit, job-order and handover repositories `HandleAnonymisationService` writes; (c)
+`PersonalDataExportSection`, one per module for the sections of `DataExportSections`; (d)
+`PersonMentionSource`, for the targets of `PersonSearchTargets`; (e) `UserReassignmentParticipant`,
+for the `FOLLOWS_THE_MEMBER` / `STAYS_WITH_THE_ACT` lists of `UserAccountMergeService`. Each rewrites
+its live-schema coverage test to compare the union of the registered participants with
+`information_schema` (the erasure's is done), so an unclaimed member column still fails the build.
+
+**P4 slice a — done 2026-10-11 (the erasure participants).** `UserDeletionService` no longer names a
+foreign repository: it runs the registered `UserErasureParticipant`s and writes the deletion's audit
+rows. Its constructor falls from 22 collaborators to 9.
+1. *Characterise*: `UserDeletionEndStateTest` (real Postgres, added before the change and green on
+   the unchanged code) deletes a member who owns rows in every store — Lager rows with a
+   Materialbörse offer, ships, "Mein Inventar", personal blueprints, notifications, a rule selector,
+   an evaluation, a mission with companion, manager and participant rows, refinery orders, a job-order
+   assignee and a claim stamp — beside a second member whose rows must stay, and pins every table's
+   end state and the audit rows with their order and exact details. Proven able to fail: moving the
+   offers' audit behind the Lager purge, or dropping the participant unlink, turns it red.
+2. *SPI*: `platform.api.UserErasureParticipant` (`@ObserverSpi`, every implementation `MANDATORY`)
+   with `phase()` (`DELETE`, `REASSIGN`, `UNLINK`, in the order they run), `position()` (ascending
+   within the phase) and `erase(userId, fallbackAdminId)`, which returns the counts the audit rows
+   report (`Erased`: Lager rows, ships, "Mein Inventar", blueprints, notifications, rule selectors,
+   evaluations, refinery orders reassigned). Eleven implementations, one per module and phase:
+   - `DELETE`: `MaterialExchangeOfferErasure` (10; audits the offers on the member's Lager rows
+     before their cascading delete, through `MaterialExchangeOfferRatchet.removeOffersOnRowsOf`,
+     the former `StockChangeObserver.beforeUserPurge`), `InventoryUserErasure` (20),
+     `HangarUserErasure` (30), `PersonalInventoryErasureService` (40), `PersonalBlueprintUserErasure`
+     (50), `NotificationUserErasure` (60; notifications, then rule selectors),
+     `MemberEvaluationErasureService` (70);
+   - `REASSIGN`: `MissionOwnerReassignment` (10; missions, then the ownership companions) and
+     `RefineryOwnerReassignment` (20);
+   - `UNLINK`: `MissionMemberUnlink` (10; manager seats, then participant links) and
+     `JobOrderMemberUnlink` (20; assignee seats, then claim stamps).
+   The reassigning participants read the two accounts through `UserRepository.getReferenceById`, which
+   returns the instances the orchestrator already loaded, so the bulk updates bind the same entities.
+3. *Orchestrator*: `UserDeletionService.inRunOrder()` sorts by phase, then position; the audit rows
+   (`INVENTORY_PURGED_ON_USER_DELETION`, `PERSONAL_DATA_PURGED_ON_USER_DELETION`,
+   `REFINERY_ORDERS_REASSIGNED`, `USER_DELETED`) are written from the summed counts after the
+   participants, in the old order and with the old details. The approval trail, the responsible-holder
+   bracket and the delete of the row stay where they were.
+4. *Gates*: `UserErasureOrderTest` pins the eleven participants in run order and the uniqueness of
+   `(phase, position)`; `GdprParticipantCoverageTest` now reads the calls of the orchestrator and of
+   every participant, so an unclaimed `app_user` column still fails (a planted step only a
+   participant performs is found); `StockWriteOwnershipTest` lost its one exception;
+   `ModularityTest` lists `personalinventory` among the modules that publish nothing; the domain map
+   lost the `MemberEvaluationErasure` rule. The participants of the unmoved inventory and blueprint
+   and the notification services sit in `service`, assigned by their names.
+Baseline **43 → 43**: no edge was in play, since the orchestrator already reached every module from
+rank 13.
+**Corrections:** (1) The SPI is owned by `platform.api`, not by identity as §7.6 and ADR-0232 first
+read: `notification` is a participant, sits at rank 1 and may not depend on identity (rank 3); the
+same holds for `audit` in slice (b). (2) The phases are not "REASSIGN, UNLINK, DELETE": the deletion
+has always purged first, then reassigned, then unlinked, and the contract is that statement order
+(the offers must be audited before their rows go), so the enum runs `DELETE`, `REASSIGN`, `UNLINK`.
+(3) Statements of independent tables swapped places inside a phase because one participant per
+module and phase runs them together: the mission ownership companions follow the missions directly
+(before the refinery orders), and the mission participants are unlinked before the job-order seats;
+no foreign key relates the pairs, and `UserDeletionEndStateTest` pins the result. (4) The three
+audit rows are now written after all participants, not between two of them; their order and details
+are unchanged. (5) `PersonalInventoryErasure` was the only type of `personalinventory.api`, so the
+module now publishes nothing, as `promotion` does, and nine package declarations dropped
+`personalinventory::api`. (6) The inventory, blueprint and notification participants sit in
+`service` for now, assigned by their names: the Lager and the blueprint moves wait for P4-1 and
+P4-2 (§7.5), and the notification services still live in the layer packages; each participant
+moves with its module. (7) The plan's remark that the inventory
+observer's `beforeUserPurge` waits for §7.6 is settled here: it left `StockChangeObserver`, which keeps
+`lower`, `beforeDelete` and `beforeWipe`.
 **P4-1 — move the inventory into `inventory.web` / `inventory.internal`** (carried from P3-5e,
 §7.5). It waits until the layer classes that consume `inventory.api` have left the layer packages:
 the GDPR orchestrator (`UserDeletionService`), identity's `MeController`, the org-unit membership
