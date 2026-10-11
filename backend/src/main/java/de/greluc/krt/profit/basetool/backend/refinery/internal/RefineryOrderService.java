@@ -474,7 +474,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
       if (!requestedMissionId.equals(order.getMissionId())) {
         order.setMissionId(resolveMissionForOwner(requestedMissionId, order.getOwner()));
       }
-    } else {
+    } else if (!details.isMissionReferenceWithoutId()) {
       order.setMissionId(null);
     }
 

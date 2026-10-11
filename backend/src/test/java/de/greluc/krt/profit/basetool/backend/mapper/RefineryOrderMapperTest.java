@@ -244,6 +244,46 @@ class RefineryOrderMapperTest {
   }
 
   @Test
+  void toEntity_fromAnUpdateRequest_marksAMissionReferenceWithoutAnId() {
+    RefineryOrderUpdateRequest withoutId =
+        new RefineryOrderUpdateRequest(
+            null,
+            new MissionReferenceDto(null, "Op Sunfire", null, null),
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            null,
+            java.util.List.of(),
+            null);
+    RefineryOrderUpdateRequest absent =
+        new RefineryOrderUpdateRequest(
+            null, null, null, 30L, 1.0, 2.0, 3.0, null, null, java.util.List.of(), null);
+    RefineryOrderUpdateRequest withId =
+        new RefineryOrderUpdateRequest(
+            null,
+            new MissionReferenceDto(UUID.randomUUID(), null, null, null),
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            null,
+            java.util.List.of(),
+            null);
+
+    org.junit.jupiter.api.Assertions.assertTrue(
+        mapper.toEntity(withoutId).isMissionReferenceWithoutId());
+    org.junit.jupiter.api.Assertions.assertFalse(
+        mapper.toEntity(absent).isMissionReferenceWithoutId());
+    org.junit.jupiter.api.Assertions.assertFalse(
+        mapper.toEntity(withId).isMissionReferenceWithoutId());
+  }
+
+  @Test
   void toDto_resolvesTheLinkedMissionThroughTheLookup() {
     UUID missionId = UUID.randomUUID();
     Instant planned = Instant.parse("2026-10-01T18:00:00Z");

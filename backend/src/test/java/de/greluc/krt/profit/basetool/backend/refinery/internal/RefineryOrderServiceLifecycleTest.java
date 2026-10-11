@@ -982,6 +982,22 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
+    void missionReferenceWithoutAnId_leavesTheLinkAsItWas() {
+      RefineryOrder existing = newSavedOrder();
+      existing.setMissionId(MISSION_ID);
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.save(existing)).thenReturn(existing);
+
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setMissionReferenceWithoutId(true);
+
+      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+
+      assertEquals(MISSION_ID, existing.getMissionId());
+      verifyNoInteractions(missionParticipantRepository);
+    }
+
+    @Test
     void missionChanged_ownerIsParticipant_isAccepted() {
       RefineryOrder existing = newSavedOrder();
       Mission mission = new Mission();

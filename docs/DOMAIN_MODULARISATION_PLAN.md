@@ -1469,10 +1469,13 @@ as each pair is decoupled.
   edges of P3-8a plus one: `MissionDto` and `MissionListDto` (`model`) and `MissionMapper`
   (`mapper`, with its generated implementation) embed `OperationDto` and `OperationMapper`, and
   `MissionPeerRedactor` (`mission.internal`) reads `OperationDto`. They move once the mission DTOs
-  stop embedding the operation's DTO (§5.2). Tracked as P4-4 (§7.6). (4) A refinery-order update whose
-  mission reference carries no id used to leave the link as it was; it now clears it, like an absent
-  reference (the create path always did). The web form sends no reference or one with an id, so
-  no first-party client sends the other shape. (5) The list read costs one statement more than
+  stop embedding the operation's DTO (§5.2). Tracked as P4-4 (§7.6). (4) The six cases of a request's
+  mission reference keep their behaviour. On create, an absent reference and one without an id
+  leave the order unlinked, and one with an id links it after the participant check. On update, an
+  absent reference unlinks, one without an id leaves the link as it was, and one with an id
+  re-links. Because `RefineryOrder` holds only the id now, the update mapping marks the transient
+  order with the `@Transient` flag `missionReferenceWithoutId` and the service reads it.
+  `RefineryOrderMissionReferenceContractTest` pins all six, green on `afbeb41ef` first. (5) The list read costs one statement more than
   before, as the mission left the page query's join fetch for the read API above; the count
   stays flat in the page size, which is what REQ-DATA-003 asks.
 

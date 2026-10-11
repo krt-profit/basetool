@@ -125,6 +125,7 @@ public interface RefineryOrderMapper {
   @Mapping(target = "status", ignore = true)
   @Mapping(target = "owner", ignore = true)
   @Mapping(target = "missionId", source = "mission.id")
+  @Mapping(target = "missionReferenceWithoutId", ignore = true)
   @Mapping(target = "owningOrgUnit", ignore = true)
   @Mapping(target = "storedAt", ignore = true)
   @Mapping(target = "readyNotifiedAt", ignore = true)
@@ -143,6 +144,9 @@ public interface RefineryOrderMapper {
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "owner", ignore = true)
   @Mapping(target = "missionId", source = "mission.id")
+  @Mapping(
+      target = "missionReferenceWithoutId",
+      expression = "java(request.mission() != null && request.mission().id() == null)")
   @Mapping(target = "owningOrgUnit", ignore = true)
   @Mapping(target = "storedAt", ignore = true)
   @Mapping(target = "readyNotifiedAt", ignore = true)

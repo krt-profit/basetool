@@ -76,6 +76,12 @@ public class RefineryOrder extends AbstractEntity<UUID> {
   @Column(name = "mission_id")
   private UUID missionId;
 
+  /**
+   * Carried only by the transient order of an update request whose mission reference has no id: the
+   * order's current link is then left as it is. Never persisted.
+   */
+  @Transient private boolean missionReferenceWithoutId;
+
   private Instant startedAt;
 
   /** When the order-ready notice was raised, or {@code null} (REQ-REFINERY-023). */
