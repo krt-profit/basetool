@@ -1511,9 +1511,10 @@ requests, each green on its own: (a) `UserErasureParticipant` with the orchestra
 and the audit, job-order and handover repositories `HandleAnonymisationService` writes; (c)
 `PersonalDataExportSection`, one per module for the sections of `DataExportSections`; (d)
 `PersonMentionSource`, for the targets of `PersonSearchTargets`; (e) `UserReassignmentParticipant`,
-for the `FOLLOWS_THE_MEMBER` / `STAYS_WITH_THE_ACT` lists of `UserAccountMergeService`. Each rewrites
-its live-schema coverage test to compare the union of the registered participants with
-`information_schema` (the erasure's is done), so an unclaimed member column still fails the build.
+for the `FOLLOWS_THE_MEMBER` / `STAYS_WITH_THE_ACT` lists of `UserAccountMergeService` — **done
+2026-10-11**. Each rewrites its live-schema coverage test to compare the union of the registered
+participants with `information_schema` (the erasure's and the merge's are done), so an unclaimed
+member column still fails the build.
 
 **P4 slice a — done 2026-10-11 (the erasure participants).** `UserDeletionService` no longer names a
 foreign repository: it runs the registered `UserErasureParticipant`s and writes the deletion's audit
@@ -1574,6 +1575,59 @@ P4-2 (§7.5), and the notification services still live in the layer packages; ea
 moves with its module. (7) The plan's remark that the inventory
 observer's `beforeUserPurge` waits for §7.6 is settled here: it left `StockChangeObserver`, which keeps
 `lower`, `beforeDelete` and `beforeWipe`.
+
+**P4 slice e — done 2026-10-11 (the account-merge participants).** `UserAccountMergeService` no
+longer holds the two lists of member columns or any SQL: it asks the registered
+`UserReassignmentParticipant`s to refuse the merge, runs them by position, writes the `USER_MERGED`
+audit row from the rows they report and keeps the RSI-handle carry-over.
+1. *Characterise*: `UserAccountMergeEndStateTest` (real Postgres, added before the change and green
+   on the unchanged code) gives the source rows in all 29 followed columns, the target the same key in
+   every table with a unique constraint, a bystander a row of each kind and three staying columns the
+   source, and pins the rows each table moves, the duplicates dropped, the bystander's rows, the rows
+   that stay and the `USER_MERGED` details with their key order, plus the zero-row merge and the
+   refusal of two ledgers before anything moves. Proven able to fail: dropping a followed column or a
+   conflict key turns it red.
+2. *SPI*: `platform.api.UserReassignmentParticipant` (`@ObserverSpi`, every implementation
+   `MANDATORY`) with `position()`, `followsTheMember()` (`OwnedRows`: table, column and the remainder
+   of the unique constraint), `staysWithTheAct()`, `assertMergeable(source, target)` and
+   `reassign(source, target)`, which returns the rows moved per column. The statements run in one
+   engine, `platform.api.OwnedRowsMover` (delete the source rows the target already holds, then
+   re-point), and `OwnedRowsReassignment` is the base of a participant that only declares columns.
+   Eighteen implementations in seventeen modules, in the order the old list read:
+   - follow: `InventoryUserReassignment` (10), `HangarUserReassignment` (20),
+     `RefineryUserReassignment` (30), `PersonalInventoryUserReassignment` (40),
+     `PersonalBlueprintUserReassignment` (50), `OrgUnitMembershipUserReassignment` (60),
+     `OrgChartUserReassignment` (70), `OrgUnitGrandAdmiralReassignment` (80),
+     `MissionUserReassignment` (90), `JobOrderUserReassignment` (100),
+     `MaterialExchangeUserReassignment` (110), `BankUserReassignment` (120, also refuses two
+     ledgers), `NotificationUserReassignment` (130), `PromotionUserReassignment` (140),
+     `ExchangeUserReassignment` (150);
+   - stay only: `AuditUserReassignment` (160), `OperationUserReassignment` (170),
+     `IdentityUserReassignment` (180).
+   The 29 followed and 27 staying columns are the old lists, redistributed to their owning modules.
+3. *Orchestrator*: `UserAccountMergeService.inRunOrder()` sorts by position; the ledger check runs
+   first, as before, the audit row lists the moved columns in participant order, which is the old
+   list order, and `followedColumns()` / `staysWithTheAct()` are now the union of the declarations.
+4. *Gates*: `UserAccountMergeCoverageTest` and `GdprParticipantCoverageTest` compare the union of the
+   participants with the live schema (an unclaimed member column still fails; the planted-table proof
+   still finds it); `UserReassignmentOrderTest` pins the eighteen participants, their order, columns
+   and conflict keys and that no column is declared twice (56 in all); `TableOwnershipTest` lists
+   `OwnedRowsMover` where it listed `UserAccountMergeService` as the one class running the merge's SQL.
+Baseline **38 → 38**: the service already reached every module by table name only, and a participant
+sits in its own module. (The slice-a line "43 → 43" quoted the number before P3-8b; the file has held 38 since.)
+**Corrections:** (1) The SPI is owned by `platform.api`: `audit` (rank 1) declares staying columns and
+may not depend on identity or privacy. (2) The org-unit module has two participants, not one: the
+old list put the org-chart position between the memberships and the Grand-Admiral office, and the
+audit row's key order is part of the observable result, so the three are separate participants at 60,
+70 and 80. (3) Three modules, `audit`, `operation` and `identity`, own staying columns only; they
+need a participant for the coverage test to find their columns. (4) The participants are declarative
+and share one engine instead of each running SQL; a module that later needs its own reassignment
+overrides `reassign`. (5) The inventory and blueprint participants sit in `service`, assigned by their
+names, until their modules move (P4-1, P4-2); the others sit in `<module>.internal`, since they use no
+layer repository and close no package cycle. (6) The ledger check reads `BankHolderRepository`
+(`existsByUserId` on both accounts) instead of counting rows with a native query; the message and the
+409 are unchanged. (7) The two coverage tests that read the old static lists now run in a transaction,
+because a participant is `MANDATORY` even for its declarations.
 **P4-1 — move the inventory into `inventory.web` / `inventory.internal`** (carried from P3-5e,
 §7.5). It waits until the layer classes that consume `inventory.api` have left the layer packages:
 identity's `MeController`, the org-unit membership

@@ -34,13 +34,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Verifies that every column referencing {@code app_user} appears in exactly one of {@code
- * UserAccountMergeService}'s two classifications, and that no classification names a missing
- * column.
+ * Verifies that every column referencing {@code app_user} appears in exactly one of the two
+ * classifications the {@code UserReassignmentParticipant}s declare, and that no classification
+ * names a missing column.
  */
 @SpringBootTest
+@Transactional
 class UserAccountMergeCoverageTest {
 
   @MockitoBean private RoleRepository roleRepository;
@@ -48,6 +50,8 @@ class UserAccountMergeCoverageTest {
   @MockitoBean private SquadronRepository squadronRepository;
 
   @Autowired private DataSource dataSource;
+
+  @Autowired private UserAccountMergeService mergeService;
 
   /**
    * Columns referencing {@code app_user} without a foreign key, added to the swept set by hand: the
@@ -88,8 +92,8 @@ class UserAccountMergeCoverageTest {
         .as("columns referencing app_user (a sweep matching none would pass vacuously)")
         .hasSizeGreaterThanOrEqualTo(40);
 
-    Set<String> follows = new LinkedHashSet<>(UserAccountMergeService.followedColumns());
-    Set<String> stays = new LinkedHashSet<>(UserAccountMergeService.STAYS_WITH_THE_ACT);
+    Set<String> follows = new LinkedHashSet<>(mergeService.followedColumns());
+    Set<String> stays = new LinkedHashSet<>(mergeService.staysWithTheAct());
 
     Set<String> classified = new LinkedHashSet<>(follows);
     classified.addAll(stays);
@@ -101,9 +105,9 @@ class UserAccountMergeCoverageTest {
             """
             These columns reference a member and the account merge has no opinion about them, so \
             the merge would silently leave their rows on the emptied account. Decide which side \
-            each belongs on and add it to FOLLOWS_THE_MEMBER (it says "this belongs to X") or to \
-            STAYS_WITH_THE_ACT (it says "X did this, then"). Do not add it to whichever list is \
-            shorter.\
+            each belongs on and declare it in the owning module's UserReassignmentParticipant as \
+            followed (it says "this belongs to X") or as staying (it says "X did this, then"). Do \
+            not pick whichever list is shorter.\
             """)
         .isEmpty();
 

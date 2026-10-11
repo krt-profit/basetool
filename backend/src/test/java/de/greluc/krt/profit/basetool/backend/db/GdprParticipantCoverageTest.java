@@ -57,6 +57,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Holds the three GDPR registries against every column that references a member (REQ-DATA-021): the
@@ -222,6 +223,8 @@ class GdprParticipantCoverageTest {
 
   @Autowired private DataSource dataSource;
 
+  @Autowired private UserAccountMergeService mergeService;
+
   @Test
   @DisplayName("every member reference is erased by the database, the deletion, or retained")
   void everyMemberReferenceHasAnErasureDisposition() {
@@ -282,14 +285,16 @@ class GdprParticipantCoverageTest {
   }
 
   @Test
+  @Transactional
   @DisplayName("every member reference is classified by the account merge or listed")
   void everyMemberReferenceHasAMergeDisposition() {
     Map<String, Character> references = memberReferences(new JdbcTemplate(dataSource));
     assertThat(mergeGaps(references.keySet()))
         .as(
             """
-            Member references the account merge (REQ-SEC-046) has no opinion about. Classify the \
-            column in UserAccountMergeService, or list it in NOT_MERGED with its reason.\
+            Member references the account merge (REQ-SEC-046) has no opinion about. Declare the \
+            column in the owning module's UserReassignmentParticipant, or list it in NOT_MERGED \
+            with its reason.\
             """)
         .isEmpty();
     assertThat(staleKeys(NOT_MERGED.keySet(), references.keySet()))
@@ -298,6 +303,7 @@ class GdprParticipantCoverageTest {
   }
 
   @Test
+  @Transactional
   @DisplayName("proof: a planted table referencing a member is reported by all three registries")
   void aPlantedMemberReferenceIsReported() throws SQLException {
     Map<String, Character> references =
@@ -458,10 +464,10 @@ class GdprParticipantCoverageTest {
     return gaps;
   }
 
-  private static Set<String> mergeGaps(Set<String> references) {
+  private Set<String> mergeGaps(Set<String> references) {
     Set<String> gaps = new TreeSet<>(references);
-    gaps.removeAll(UserAccountMergeService.followedColumns());
-    gaps.removeAll(UserAccountMergeService.STAYS_WITH_THE_ACT);
+    gaps.removeAll(mergeService.followedColumns());
+    gaps.removeAll(mergeService.staysWithTheAct());
     gaps.removeAll(NOT_MERGED.keySet());
     return gaps;
   }
