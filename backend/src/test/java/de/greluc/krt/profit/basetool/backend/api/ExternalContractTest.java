@@ -598,7 +598,8 @@ class ExternalContractTest {
                       "count",
                       "fittedCount"))
               .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
-          new ContractOperation("/api/v1/announcement", "get", Set.of("content", "updatedAt")),
+          new ContractOperation(
+              "/api/v1/announcements/current", "get", Set.of("content", "updatedAt")),
           new ContractOperation(
                   "/api/v1/notifications",
                   "get",
@@ -1140,7 +1141,7 @@ class ExternalContractTest {
                       "version"))
               .addressedBy(Set.of("page:integer", "size:integer")),
           new ContractOperation(
-                  "/api/v1/material-requests",
+                  "/api/v1/material-exchange/requests",
                   "get",
                   Set.of(
                       "content",
@@ -1175,24 +1176,24 @@ class ExternalContractTest {
               "delete",
               Set.of("id", "interestCount", "viewerInterested", "version")),
           new ContractOperation(
-              "/api/v1/material-requests/{id}/interest",
+              "/api/v1/material-exchange/requests/{id}/interest",
               "post",
               Set.of("id", "interestCount", "viewerInterested", "version")),
           new ContractOperation(
-              "/api/v1/material-requests/{id}/interest",
+              "/api/v1/material-exchange/requests/{id}/interest",
               "delete",
               Set.of("id", "interestCount", "viewerInterested", "version")),
           new ContractOperation(
               "/api/v1/material-exchange/offers/{id}/deactivate", "post", Set.of("id", "status")),
           new ContractOperation(
-              "/api/v1/material-requests/{id}/deactivate", "post", Set.of("id", "status")),
+              "/api/v1/material-exchange/requests/{id}/deactivate", "post", Set.of("id", "status")),
           new ContractOperation(
               "/api/v1/material-exchange/offers",
               "post",
               Set.of(),
               Set.of("inventoryItemId", "offeredAmount")),
           new ContractOperation(
-              "/api/v1/material-requests",
+              "/api/v1/material-exchange/requests",
               "post",
               Set.of(),
               Set.of("materialId", "requestedAmount")),
@@ -1746,14 +1747,17 @@ class ExternalContractTest {
               Set.of(),
               Set.of("productKey", "quantity")),
           new ContractOperation(
-              "/api/v1/material-requests/item", "post", Set.of(), Set.of("productKey", "quantity")),
+              "/api/v1/material-exchange/requests/item",
+              "post",
+              Set.of(),
+              Set.of("productKey", "quantity")),
           new ContractOperation(
               "/api/v1/material-exchange/offers/{id}/remark",
               "put",
               Set.of(),
               Set.of("offeredAmount", "version")),
           new ContractOperation(
-              "/api/v1/material-requests/{id}",
+              "/api/v1/material-exchange/requests/{id}",
               "put",
               Set.of(),
               Set.of("desiredAmount", "version")),
@@ -1796,13 +1800,9 @@ class ExternalContractTest {
                   Set.of("ownerName", "orgUnitMember"))
               .addressedBy(Set.of("productKey:string")),
           new ContractOperation(
-              "/api/v1/hangar/import/fleetview",
-              "post",
-              Set.of("importedCount", "skippedCount", "duplicateCount"),
-              Set.of("file")),
-          new ContractOperation(
               "/api/v1/hangar/ships/home-location", "post", Set.of(), Set.of("locationId")),
-          new ContractOperation("/api/v1/settings/{key}", "get", Set.of("value")),
+          new ContractOperation(
+              "/api/v1/orders/settings", "get", Set.of("ageYellowDays", "ageRedDays")),
           new ContractOperation(
                   "/api/v1/materials/matrix",
                   "get",
@@ -1859,12 +1859,11 @@ class ExternalContractTest {
           "post /api/v1/personal-blueprints/import/preview",
           "post /api/v1/personal-blueprints/import/apply",
           "post /api/v1/personal-blueprints/batch",
-          "post /api/v1/hangar/import/fleetview",
           "post /api/v1/hangar/ships/home-location",
           "post /api/v1/material-exchange/item-offers",
-          "post /api/v1/material-requests/item",
+          "post /api/v1/material-exchange/requests/item",
           "put /api/v1/material-exchange/offers/{id}/remark",
-          "put /api/v1/material-requests/{id}",
+          "put /api/v1/material-exchange/requests/{id}",
           "get /api/v1/materials/{id}",
           "post /api/v1/inventory/bulk-checkout",
           "post /api/v1/inventory/bulk-rebook",

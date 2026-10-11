@@ -54,10 +54,12 @@ import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrganisationsleitungDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderCreateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SpecialCommandDto;
@@ -177,21 +179,6 @@ class MassAssignmentGuardTest {
                   Set.of("id"),
                   Map.of())),
           Map.entry(
-              RefineryOrderDto.class,
-              new DualUse(
-                  FROZEN + " and the app's refinery contract",
-                  Set.of("id", "owningSquadron"),
-                  Map.of(
-                      "owner",
-                      "create on behalf, honoured only when"
-                          + " RefineryAccessPolicy.canManageUserRefineryOrders admits the caller"
-                          + " (REQ-SEC-005); the proof forges an owner outside the caller's units",
-                      "status",
-                      "forced to OPEN on create; client-settable on the edit form by owner"
-                          + " decision",
-                      "owningOrgUnitId",
-                      STAMP))),
-          Map.entry(
               RefiningMethodDto.class,
               new DualUse(FROZEN + "; create resets id and version", Set.of("id"), Map.of())),
           Map.entry(
@@ -241,6 +228,19 @@ class MassAssignmentGuardTest {
           Map.entry(InventoryItemCreateDto.class, Map.of("owningOrgUnitId", STAMP)),
           Map.entry(ShipRequestDto.class, Map.of("owningOrgUnitId", STAMP)),
           Map.entry(RefineryOrderStoreItemDto.class, Map.of("owningOrgUnitId", STAMP)),
+          Map.entry(RefineryOrderCreateRequest.class, Map.of("owningOrgUnitId", STAMP)),
+          Map.entry(
+              RefineryOrderUpdateRequest.class,
+              Map.of(
+                  "status",
+                  "the status the edit form sets; a stored order refuses a change,"
+                      + " RefineryOrderService.updateRefineryOrder (owner decision)")),
+          Map.entry(
+              MissionReferenceDto.class,
+              Map.of(
+                  "status",
+                  "a mission reference: only its id is read, RefineryOrderService resolves the"
+                      + " mission and checks the owner takes part")),
           Map.entry(
               BookInDto.class,
               Map.of(

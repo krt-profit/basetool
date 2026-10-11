@@ -164,7 +164,7 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousAnnouncementWithUnauthorized() throws Exception {
-    mockMvc.perform(get("/api/v1/announcement")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/announcements/current")).andExpect(status().isUnauthorized());
   }
 
   /**
@@ -295,7 +295,7 @@ class ApiVhostAnonymousSurfaceTest {
       strings = {
         "/api/v1/material-exchange/offers",
         "/api/v1/material-exchange/releasable-items",
-        "/api/v1/material-requests"
+        "/api/v1/material-exchange/requests"
       })
   @WithAnonymousUser
   void shouldRefuseAnonymousBoardReadsWithUnauthorized(String path) throws Exception {
@@ -655,14 +655,13 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The blueprint, Fleetview-import and settings paths: the settings read answers anonymously with
-   * the two job-order age thresholds, everything else is refused without a token.
+   * The blueprint, ship-import and settings paths: every one is refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
   @Test
   @WithAnonymousUser
-  void shouldRefuseAnonymousBlueprintAndFleetImports() throws Exception {
+  void shouldRefuseAnonymousBlueprintAndShipImports() throws Exception {
     mockMvc
         .perform(get("/api/v1/personal-blueprints/overview"))
         .andExpect(status().isUnauthorized());
@@ -691,7 +690,7 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            multipart("/api/v1/hangar/import/fleetview")
+            multipart("/api/v1/hangar/import/ships")
                 .file(new MockMultipartFile("file", "x.json", "application/json", new byte[] {123}))
                 .with(csrf()))
         .andExpect(status().isUnauthorized());
@@ -708,6 +707,8 @@ class ApiVhostAnonymousSurfaceTest {
     mockMvc
         .perform(get("/api/v1/settings/job_order.age_red_days"))
         .andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/orders/settings")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/refinery-orders/settings")).andExpect(status().isUnauthorized());
   }
 
   /**
@@ -744,7 +745,7 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            post("/api/v1/material-requests/item")
+            post("/api/v1/material-exchange/requests/item")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -758,7 +759,7 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            put("/api/v1/material-requests/" + ABSENT_MISSION)
+            put("/api/v1/material-exchange/requests/" + ABSENT_MISSION)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))

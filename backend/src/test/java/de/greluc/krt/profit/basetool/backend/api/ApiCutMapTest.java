@@ -64,7 +64,8 @@ class ApiCutMapTest {
               + "|orders/[^/]+/inventory/.*|missions/[^/]+/participants/add"
               + "|users/me/(payout-preference|blueprint-sharing|read-announcement/.*"
               + "|memberships|pickable-org-units|org-unit-ids)"
-              + "|orders/item-catalog.*|inventory/item-catalog|kommando-groups/.*)$");
+              + "|orders/item-catalog.*|inventory/item-catalog|kommando-groups/.*"
+              + "|material-exchange/items/[^/]+/deactivate)$");
 
   /** The verbs the document and the map use. */
   private static final Set<String> VERBS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE");
@@ -98,7 +99,7 @@ class ApiCutMapTest {
   void theMapParses() throws IOException {
     List<Entry> entries = map();
 
-    assertThat(entries).hasSizeGreaterThanOrEqualTo(184);
+    assertThat(entries).hasSizeGreaterThanOrEqualTo(185);
     assertThat(entries).allSatisfy(e -> assertThat(e.wave()).isBetween(1, 6));
     assertThat(entries).allSatisfy(e -> assertThat(VERBS).contains(e.verb()));
     assertThat(entries).allSatisfy(e -> assertThat(e.tier()).isIn("T1", "T2"));

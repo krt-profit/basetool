@@ -93,7 +93,8 @@ jobs:
           while read -r verb path code; do
             probe "$verb" "$path" "$code"
           done <<'PROBES'
-          GET /api/v1/announcement 401
+          GET /api/v1/announcement 410
+          GET /api/v1/announcements/current 401
           PUT /api/v1/announcements/00000000-0000-4000-8000-00000000cafe/read 401
           GET /api/v1/app/version-policy 200
           GET /api/v1/bank/accounts 401
@@ -157,7 +158,7 @@ jobs:
           DELETE /api/v1/finance-entries/00000000-0000-4000-8000-00000000cafe 410
           GET /api/v1/game-items 401
           GET /api/v1/game-items/00000000-0000-4000-8000-00000000cafe/blueprints 401
-          POST /api/v1/hangar/import/fleetview 401
+          POST /api/v1/hangar/import/fleetview 410
           GET /api/v1/hangar/my-ships 401
           POST /api/v1/hangar/ships 401
           DELETE /api/v1/hangar/ships 401
@@ -201,13 +202,20 @@ jobs:
           PUT /api/v1/material-exchange/offers/00000000-0000-4000-8000-00000000cafe/remark 401
           GET /api/v1/material-exchange/releasable-items 401
           GET /api/v1/material-exchange/released-item-ids 401
-          GET /api/v1/material-requests 401
-          POST /api/v1/material-requests 401
-          POST /api/v1/material-requests/item 401
-          PUT /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe 401
-          POST /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/deactivate 401
-          POST /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/interest 401
-          DELETE /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/interest 401
+          GET /api/v1/material-exchange/requests 401
+          POST /api/v1/material-exchange/requests 401
+          POST /api/v1/material-exchange/requests/item 401
+          PUT /api/v1/material-exchange/requests/00000000-0000-4000-8000-00000000cafe 401
+          POST /api/v1/material-exchange/requests/00000000-0000-4000-8000-00000000cafe/deactivate 401
+          POST /api/v1/material-exchange/requests/00000000-0000-4000-8000-00000000cafe/interest 401
+          DELETE /api/v1/material-exchange/requests/00000000-0000-4000-8000-00000000cafe/interest 401
+          GET /api/v1/material-requests 410
+          POST /api/v1/material-requests 410
+          POST /api/v1/material-requests/item 410
+          PUT /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe 410
+          POST /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/deactivate 410
+          POST /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/interest 410
+          DELETE /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe/interest 410
           GET /api/v1/materials/matrix 401
           GET /api/v1/materials/prices-overview 401
           GET /api/v1/materials/profit-calculation 401
@@ -309,6 +317,7 @@ jobs:
           POST /api/v1/orders/items 401
           GET /api/v1/orders/lookup 401
           GET /api/v1/orders/material-demand 401
+          GET /api/v1/orders/settings 401
           GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe 401
           PUT /api/v1/orders/00000000-0000-4000-8000-00000000cafe 401
           DELETE /api/v1/orders/00000000-0000-4000-8000-00000000cafe/allocations/00000000-0000-4000-8000-00000000cafe 401
@@ -387,7 +396,6 @@ jobs:
           DELETE /api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe 401
           POST /api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe/store 401
           GET /api/v1/refining-methods 401
-          GET /api/v1/settings/job_order.age_yellow_days 401
           GET /api/v1/ship-types 401
           GET /api/v1/terminals 401
           POST /api/v1/terms/acceptance 401
@@ -408,6 +416,7 @@ jobs:
           GET /api/v1/users/search-bank 410
           GET /api/v1/users/00000000-0000-4000-8000-00000000cafe/memberships 410
           POST /api/v1/announcement 404
+          POST /api/v1/announcements/current 404
           GET /api/v1/announcements/00000000-0000-4000-8000-00000000cafe/read 404
           POST /api/v1/app/version-policy 404
           PUT /api/v1/bank/accounts 404
@@ -494,6 +503,11 @@ jobs:
           GET /api/v1/material-exchange/offers/00000000-0000-4000-8000-00000000cafe/remark 404
           POST /api/v1/material-exchange/releasable-items 404
           POST /api/v1/material-exchange/released-item-ids 404
+          PUT /api/v1/material-exchange/requests 404
+          GET /api/v1/material-exchange/requests/item 404
+          GET /api/v1/material-exchange/requests/00000000-0000-4000-8000-00000000cafe 404
+          GET /api/v1/material-exchange/requests/00000000-0000-4000-8000-00000000cafe/deactivate 404
+          GET /api/v1/material-exchange/requests/00000000-0000-4000-8000-00000000cafe/interest 404
           PUT /api/v1/material-requests 404
           GET /api/v1/material-requests/item 404
           GET /api/v1/material-requests/00000000-0000-4000-8000-00000000cafe 404
@@ -583,6 +597,7 @@ jobs:
           GET /api/v1/orders/items 404
           POST /api/v1/orders/lookup 404
           POST /api/v1/orders/material-demand 404
+          POST /api/v1/orders/settings 404
           POST /api/v1/orders/00000000-0000-4000-8000-00000000cafe 404
           GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/allocations/00000000-0000-4000-8000-00000000cafe 404
           GET /api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe 404
@@ -642,7 +657,6 @@ jobs:
           POST /api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe 404
           GET /api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe/store 404
           POST /api/v1/refining-methods 404
-          POST /api/v1/settings/job_order.age_yellow_days 404
           POST /api/v1/ship-types 404
           POST /api/v1/terminals 404
           GET /api/v1/terms/acceptance 404
@@ -685,7 +699,7 @@ jobs:
           POST /api/v1/bank/admin/wipe-reset 404
           PATCH /api/v1/bank/accounts/00000000-0000-4000-8000-00000000cafe/approval-tiers 404
           POST /api/v1/inventory/all 404
-          GET /api/v1/settings/job_order.age_green_days 404
+          GET /api/v1/settings/job_order.age_yellow_days 404
           PUT /api/v1/bank/org-units/accounts/00000000-0000-4000-8000-00000000cafe/visibility/all-members/maybe 404
           GET /api/v2/ping 404
           GET /actuator/health 404

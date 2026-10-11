@@ -58,7 +58,7 @@
     "name" : "refinery"
   } ],
   "paths" : {
-    "/api/v1/announcement" : {
+    "/api/v1/announcements/current" : {
       "delete" : {
         "operationId" : "deleteAnnouncement",
         "responses" : {
@@ -386,7 +386,7 @@
         "x-domain" : "dashboard"
       }
     },
-    "/api/v1/announcement/admin" : {
+    "/api/v1/announcements/current/admin" : {
       "get" : {
         "operationId" : "getAdminAnnouncement",
         "responses" : {
@@ -401,21 +401,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy: no-cache, must-revalidate",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -16683,128 +16674,6 @@
         "x-domain" : "hangar"
       }
     },
-    "/api/v1/hangar/import/fleetview" : {
-      "post" : {
-        "deprecated" : true,
-        "description" : "**DEPRECATED**\n- Sunset Date: 2027-05-14\n- Replacement: `/api/v1/hangar/import/ships`",
-        "operationId" : "importFleetview",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "type" : "object",
-                "properties" : {
-                  "file" : {
-                    "type" : "string",
-                    "format" : "binary"
-                  }
-                },
-                "required" : [ "file" ]
-              }
-            }
-          }
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/FleetviewImportResponseDto"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "tags" : [ "hangar" ],
-        "x-contract-tier" : "T1",
-        "x-domain" : "hangar"
-      }
-    },
     "/api/v1/hangar/import/ships" : {
       "post" : {
         "operationId" : "importShips",
@@ -25279,123 +25148,6 @@
         "x-domain" : "materialexchange"
       }
     },
-    "/api/v1/material-exchange/items/{inventoryItemId}/deactivate" : {
-      "post" : {
-        "operationId" : "deactivateForItem",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "inventoryItemId",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialExchangeOfferDto"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Deactivate the active offer for a Lager row.",
-        "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T2",
-        "x-domain" : "materialexchange"
-      }
-    },
     "/api/v1/material-exchange/offers" : {
       "get" : {
         "operationId" : "board_1",
@@ -25687,6 +25439,123 @@
         "summary" : "Release a Lager row to the Materialbörse.",
         "tags" : [ "materialexchange" ],
         "x-contract-tier" : "T1",
+        "x-domain" : "materialexchange"
+      }
+    },
+    "/api/v1/material-exchange/offers/deactivate" : {
+      "post" : {
+        "operationId" : "deactivateForItem",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "inventoryItemId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialExchangeOfferDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Deactivate the active offer for a Lager row.",
+        "tags" : [ "materialexchange" ],
+        "x-contract-tier" : "T2",
         "x-domain" : "materialexchange"
       }
     },
@@ -26558,6 +26427,1125 @@
         "x-domain" : "materialexchange"
       }
     },
+    "/api/v1/material-exchange/requests" : {
+      "get" : {
+        "operationId" : "board",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "tab",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "minQuality",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "minAmount",
+          "required" : false,
+          "schema" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseMaterialRequestDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List Materialbörse requests (board), filtered and sorted.",
+        "tags" : [ "materialexchange" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "materialexchange"
+      },
+      "post" : {
+        "operationId" : "createMaterialRequest",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MaterialRequestCreateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialRequestDto"
+                }
+              }
+            },
+            "description" : "Created"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Post a material request (Gesuch) to the Materialbörse.",
+        "tags" : [ "materialexchange" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "materialexchange"
+      }
+    },
+    "/api/v1/material-exchange/requests/counts" : {
+      "get" : {
+        "operationId" : "counts",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialExchangeCountsDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Materialbörse Gesuche board tab counts.",
+        "tags" : [ "materialexchange" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "materialexchange"
+      }
+    },
+    "/api/v1/material-exchange/requests/item" : {
+      "post" : {
+        "operationId" : "createItemRequest",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MaterialItemRequestCreateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialRequestDto"
+                }
+              }
+            },
+            "description" : "Created"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Post a craftable-item request (Gesuch) to the Materialbörse.",
+        "tags" : [ "materialexchange" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "materialexchange"
+      }
+    },
+    "/api/v1/material-exchange/requests/{id}" : {
+      "get" : {
+        "operationId" : "detail",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialRequestDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Get one Materialbörse request detail.",
+        "tags" : [ "materialexchange" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "materialexchange"
+      },
+      "put" : {
+        "operationId" : "updateRequest",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MaterialRequestUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialRequestDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Edit a Materialbörse request (desired quantity, minimum quality, remark).",
+        "tags" : [ "materialexchange" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "materialexchange"
+      }
+    },
+    "/api/v1/material-exchange/requests/{id}/deactivate" : {
+      "post" : {
+        "operationId" : "deactivate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialRequestDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Deactivate a Materialbörse request.",
+        "tags" : [ "materialexchange" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "materialexchange"
+      }
+    },
+    "/api/v1/material-exchange/requests/{id}/interest" : {
+      "delete" : {
+        "operationId" : "withdrawFulfillment",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialRequestDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Withdraw a fulfilment signal from a Materialbörse request.",
+        "tags" : [ "materialexchange" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "materialexchange"
+      },
+      "post" : {
+        "operationId" : "signalFulfillment",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialRequestDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Signal that you can supply a Materialbörse request.",
+        "tags" : [ "materialexchange" ],
+        "x-contract-tier" : "T1",
+        "x-domain" : "materialexchange"
+      }
+    },
     "/api/v1/material-external-aliases" : {
       "get" : {
         "description" : "Admin-only. Returns the curated cross-reference table, sorted alphabetically.",
@@ -27153,1125 +28141,6 @@
         "tags" : [ "catalogue" ],
         "x-contract-tier" : "T2",
         "x-domain" : "catalogue"
-      }
-    },
-    "/api/v1/material-requests" : {
-      "get" : {
-        "operationId" : "board",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "tab",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "q",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "minQuality",
-          "required" : false,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }, {
-          "in" : "query",
-          "name" : "minAmount",
-          "required" : false,
-          "schema" : {
-            "type" : "number",
-            "format" : "double"
-          }
-        }, {
-          "in" : "query",
-          "name" : "sort",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }, {
-          "in" : "query",
-          "name" : "size",
-          "required" : false,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PageResponseMaterialRequestDto"
-                }
-              }
-            },
-            "description" : "OK",
-            "headers" : {
-              "Cache-Control" : {
-                "description" : "Caching policy: private, no-store",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            }
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "List Materialbörse requests (board), filtered and sorted.",
-        "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
-        "x-domain" : "materialexchange"
-      },
-      "post" : {
-        "operationId" : "createMaterialRequest",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MaterialRequestCreateRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "201" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialRequestDto"
-                }
-              }
-            },
-            "description" : "Created"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Post a material request (Gesuch) to the Materialbörse.",
-        "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
-        "x-domain" : "materialexchange"
-      }
-    },
-    "/api/v1/material-requests/counts" : {
-      "get" : {
-        "operationId" : "counts",
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialExchangeCountsDto"
-                }
-              }
-            },
-            "description" : "OK",
-            "headers" : {
-              "Cache-Control" : {
-                "description" : "Caching policy: private, no-store",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            }
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Materialbörse Gesuche board tab counts.",
-        "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T2",
-        "x-domain" : "materialexchange"
-      }
-    },
-    "/api/v1/material-requests/item" : {
-      "post" : {
-        "operationId" : "createItemRequest",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MaterialItemRequestCreateRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "201" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialRequestDto"
-                }
-              }
-            },
-            "description" : "Created"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Post a craftable-item request (Gesuch) to the Materialbörse.",
-        "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
-        "x-domain" : "materialexchange"
-      }
-    },
-    "/api/v1/material-requests/{id}" : {
-      "get" : {
-        "operationId" : "detail",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialRequestDto"
-                }
-              }
-            },
-            "description" : "OK",
-            "headers" : {
-              "Cache-Control" : {
-                "description" : "Caching policy: private, no-store",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            }
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Get one Materialbörse request detail.",
-        "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T2",
-        "x-domain" : "materialexchange"
-      },
-      "put" : {
-        "operationId" : "updateRequest",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MaterialRequestUpdateRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialRequestDto"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Edit a Materialbörse request (desired quantity, minimum quality, remark).",
-        "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
-        "x-domain" : "materialexchange"
-      }
-    },
-    "/api/v1/material-requests/{id}/deactivate" : {
-      "post" : {
-        "operationId" : "deactivate",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialRequestDto"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Deactivate a Materialbörse request.",
-        "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
-        "x-domain" : "materialexchange"
-      }
-    },
-    "/api/v1/material-requests/{id}/interest" : {
-      "delete" : {
-        "operationId" : "withdrawFulfillment",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialRequestDto"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Withdraw a fulfilment signal from a Materialbörse request.",
-        "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
-        "x-domain" : "materialexchange"
-      },
-      "post" : {
-        "operationId" : "signalFulfillment",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialRequestDto"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Signal that you can supply a Materialbörse request.",
-        "tags" : [ "materialexchange" ],
-        "x-contract-tier" : "T1",
-        "x-domain" : "materialexchange"
       }
     },
     "/api/v1/materials" : {
@@ -41019,6 +40888,128 @@
         "summary" : "Get my requested job orders",
         "tags" : [ "joborder" ],
         "x-contract-tier" : "T2",
+        "x-domain" : "joborder"
+      }
+    },
+    "/api/v1/orders/settings" : {
+      "get" : {
+        "operationId" : "settings_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderSettingsDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: no-cache, must-revalidate",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Get the job-order ageing thresholds.",
+        "tags" : [ "joborder" ],
+        "x-contract-tier" : "T1",
         "x-domain" : "joborder"
       }
     },
@@ -57478,7 +57469,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/RefineryOrderDto"
+                "$ref" : "#/components/schemas/RefineryOrderCreateRequest"
               }
             }
           },
@@ -58022,6 +58013,128 @@
         "x-domain" : "refinery"
       }
     },
+    "/api/v1/refinery-orders/settings" : {
+      "get" : {
+        "operationId" : "settings",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RefinerySettingsDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: no-cache, must-revalidate",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Get the refinery settings.",
+        "tags" : [ "refinery" ],
+        "x-contract-tier" : "T2",
+        "x-domain" : "refinery"
+      }
+    },
     "/api/v1/refinery-orders/users/{userId}" : {
       "get" : {
         "operationId" : "getUserRefineryOrders",
@@ -58180,7 +58293,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/RefineryOrderDto"
+                "$ref" : "#/components/schemas/RefineryOrderCreateRequest"
               }
             }
           },
@@ -58423,7 +58536,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/RefineryOrderDto"
+                "$ref" : "#/components/schemas/RefineryOrderUpdateRequest"
               }
             }
           },
@@ -58769,7 +58882,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/RefineryOrderDto"
+                "$ref" : "#/components/schemas/RefineryOrderUpdateRequest"
               }
             }
           },
@@ -60237,7 +60350,7 @@
           }
         },
         "tags" : [ "admin-system" ],
-        "x-contract-tier" : "T1",
+        "x-contract-tier" : "T2",
         "x-domain" : "admin-system"
       },
       "put" : {
@@ -75232,6 +75345,19 @@
           }
         }
       },
+      "JobOrderSettingsDto" : {
+        "type" : "object",
+        "properties" : {
+          "ageRedDays" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ageYellowDays" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "JobTypeDto" : {
         "type" : "object",
         "properties" : {
@@ -81312,6 +81438,59 @@
           }
         }
       },
+      "RefineryOrderCreateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryGoodDto"
+            },
+            "minItems" : 1
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/LocationDto"
+          },
+          "mission" : {
+            "$ref" : "#/components/schemas/MissionReferenceDto"
+          },
+          "oreSales" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "otherExpenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "owningOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "refiningMethod" : {
+            "$ref" : "#/components/schemas/RefiningMethodDto"
+          },
+          "startedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        },
+        "required" : [ "goods", "location" ]
+      },
       "RefineryOrderDto" : {
         "type" : "object",
         "properties" : {
@@ -81507,6 +81686,70 @@
           }
         },
         "required" : [ "amount", "locationId", "materialId", "quality" ]
+      },
+      "RefineryOrderUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryGoodDto"
+            },
+            "minItems" : 1
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/LocationDto"
+          },
+          "mission" : {
+            "$ref" : "#/components/schemas/MissionReferenceDto"
+          },
+          "oreSales" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "otherExpenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "refiningMethod" : {
+            "$ref" : "#/components/schemas/RefiningMethodDto"
+          },
+          "startedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "goods", "location" ]
+      },
+      "RefinerySettingsDto" : {
+        "type" : "object",
+        "properties" : {
+          "roundingMode" : {
+            "type" : "string"
+          }
+        }
       },
       "RefiningMethodDto" : {
         "type" : "object",

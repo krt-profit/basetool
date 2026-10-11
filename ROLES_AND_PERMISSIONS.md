@@ -525,7 +525,7 @@ Notes are visible to everyone who sees the job order.
 order-ownership check: naming anybody but yourself requires
 `canManageUserInventory(<receiver>)` of the inventory access policy — admin, self, or a **shared editable org
 unit** with that receiver — and any other value is refused with `403` (REQ-SEC-039). The Einbuchen
-path (`POST /api/v1/inventory`) and the `owner` override of `POST /api/v1/refinery-orders` carry the
+path (`POST /api/v1/inventory`) and the owner-on-behalf create `POST /api/v1/refinery-orders/users/{userId}` (which replaced the `owner` override of `POST /api/v1/refinery-orders` in wave 6 of the API cut) carry the
 same gate. **Amended 2026-08-30:** all three previously accepted the flat `ROLE_LOGISTICIAN`, which
 is the OR-union over every membership and carries no org unit, so a logistician of any Staffel could
 write into any other Staffel's member ledger (REQ-SEC-005). The store dialog therefore shows the
@@ -751,8 +751,8 @@ OL seat (REQ-ROLE-005) does not count.
 | **Admin-only** master data – also to read (cities, space stations, outposts, POIs, material aliases, blueprints) (`hasRole('ADMIN')`)                                                                                                      |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Write** master data (create/change/delete/visibility/overrides) (`hasRole('ADMIN')`)                                                                                                                                                     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | UEX location typeahead / blueprint product search (`isAuthenticated()`)                                                                                                                                                                    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Read** announcement (`GET /announcement`, `isAuthenticated()`)                                                                                                                                                                           |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Write/delete** announcement (incl. raw read view `GET /announcement/admin`) (`hasRole('ADMIN')`)                                                                                                                                         |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| **Read** announcement (`GET /announcements/current`, `isAuthenticated()`)                                                                                                                                                                           |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Write/delete** announcement (incl. raw read view `GET /announcements/current/admin`) (`hasRole('ADMIN')`)                                                                                                                                         |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read/clean up sync reports (`hasRole('ADMIN')`)                                                                                                                                                                                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read **audit logs** (Bank/Lager/Aufträge/Raffinerie/Mein Inventar/Missionen/Operationen/Rollen/Beförderung/Materialbörse/Hangar/Blueprints/Verbundene Anwendungen) + time-range PDF/JSON + retention cleanup (`/admin/audit-log`, `/api/v1/audit/**`, URL **and** method gate `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Write system setting (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                                                                                           |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |

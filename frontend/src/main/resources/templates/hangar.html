@@ -21,7 +21,7 @@
                         th:data-uploading="#{hangar.import.uploading}"
                         th:data-error-toolarge="#{hangar.import.error.tooLarge}"
                         th:data-max-bytes="${hangarImportMaxBytes}"
-                        th:data-error-failed="#{hangar.import.error.failed}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg> <span th:text="#{hangar.import.open}">Fleetview importieren</span></button>
+                        th:data-error-failed="#{hangar.import.error.failed}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg> <span th:text="#{hangar.import.open}">Schiffsliste importieren</span></button>
                 <input type="file" id="fleetview-file" accept=".json,application/json" hidden
                        data-testid="hangar-import-file" th:attr="aria-label=#{hangar.import.label}">
                 <button type="button" id="add-ship-btn" data-testid="hangar-add-ship" class="btn btn--cta"

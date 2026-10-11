@@ -389,7 +389,11 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/app/version-policy")
                     .permitAll()
-                    .requestMatchers("/api/v1/*/admin/**", "/api/v1/roles", "/api/v1/roles/**")
+                    .requestMatchers(
+                        "/api/v1/*/admin/**",
+                        "/api/v1/announcements/current/admin",
+                        "/api/v1/roles",
+                        "/api/v1/roles/**")
                     .hasRole(Roles.ADMIN)
                     .requestMatchers("/api/v1/users/search", "/api/v1/users/search/references")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
@@ -419,8 +423,6 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/hangar/ships/*")
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/hangar/import/ships")
-                    .authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/hangar/import/fleetview")
                     .authenticated()
                     .requestMatchers("/api/v1/hangar/**")
                     .hasAnyAuthority(

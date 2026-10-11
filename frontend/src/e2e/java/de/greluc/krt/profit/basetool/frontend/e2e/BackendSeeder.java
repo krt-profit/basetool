@@ -522,7 +522,7 @@ public final class BackendSeeder {
             + locationId
             + "\",\"hidden\":false,\"homeLocation\":false}"
             + missionJson
-            + ",\"status\":\"OPEN\",\"goods\":[{\"inputMaterial\":{\"id\":\""
+            + ",\"goods\":[{\"inputMaterial\":{\"id\":\""
             + inputMaterialId
             + "\"},\"inputQuantity\":100,\"outputQuantity\":100,\"quality\":750}]"
             + owningJson
@@ -559,7 +559,7 @@ public final class BackendSeeder {
     String body =
         "{\"location\":{\"id\":\""
             + locationId
-            + "\",\"hidden\":false,\"homeLocation\":false},\"status\":\"OPEN\",\"goods\":"
+            + "\",\"hidden\":false,\"homeLocation\":false},\"goods\":"
             + goodsJson
             + owningJson
             + "}";
@@ -611,9 +611,7 @@ public final class BackendSeeder {
       String inputMaterialId,
       long version) {
     String body =
-        "{\"id\":\""
-            + orderId
-            + "\",\"location\":{\"id\":\""
+        "{\"location\":{\"id\":\""
             + locationId
             + "\",\"hidden\":false,\"homeLocation\":false},\"status\":\"IN_PROGRESS\","
             + "\"goods\":[{\"inputMaterial\":{\"id\":\""

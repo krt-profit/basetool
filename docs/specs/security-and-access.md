@@ -388,15 +388,17 @@ does so by delegating its management branch to `canManageMission` rather than sh
 bare `ROLE_MISSION_MANAGER` authority. (Unlinked **guest** participants stay openly editable per
 REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
 
-The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory`, `POST
-/api/v1/refinery-orders` (its `owner` override) and the per-item receiver of `POST
-/api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, through
+The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory` and the
+per-item receiver of `POST /api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, and so
+MUST `POST /api/v1/refinery-orders/users/{userId}`, which reads the target from the path. `POST
+/api/v1/refinery-orders` itself has no `owner` override any more (wave 6 of the API cut): its request
+record `RefineryOrderCreateRequest` carries no owner, so the order always belongs to the caller. The
+target is authorised through
 `InventoryAccessPolicy.canManageUserInventory(...)` (published as `BookInPolicy.mayBookInFor`) /
 `RefineryAccessPolicy.canManageUserRefineryOrders(...)`, and MUST NOT
-substitute a bare `AuthHelperService.isLogisticianOrAbove()` for it. All three did until the
-2026-08-30 audit, which made them cross-tenant writes by construction; the fourth entry point,
-`POST /api/v1/refinery-orders/users/{userId}`, had been closed in PR #808 and is the shape the other
-three now follow. `POST /api/v1/inventory` additionally refuses `personal = true` for a foreign
+substitute a bare `AuthHelperService.isLogisticianOrAbove()` for it. The three paths that took a target
+from a body did so until the 2026-08-30 audit, which made them cross-tenant writes by construction; the
+per-target refinery entry point had been closed in PR #808 and is the shape the others follow. `POST /api/v1/inventory` additionally refuses `personal = true` for a foreign
 target: the write-time stock merge (REQ-INV-026) keys on `personal` and returns the surviving row,
 so a personal on-behalf create folded the target's own private rows — amounts, notes, earmarks —
 into the response. The specified personal-for-someone-else capability lives in the refinery store
@@ -2056,20 +2058,21 @@ family decides, so a sub-family can differ from its parent.
 | `/api/v1/promotion/**` | evaluations of named members |
 | `/api/v1/roles/**`, `/api/v1/catalog/admin/**`, `/api/v1/blueprints/admin/**` | the administration of roles, of the catalogue (imports, quality tiers, sync reports) and of the default blueprints; the other administration trees sit under `users`, `terms`, `personal-*`, `hangar`, `notifications` and `connected-apps`, which are `no-store` already |
 | `/api/v1/audit/**` | **new** — who did what, by actor |
+| `/api/v1/announcements/**` (the public banner `/api/v1/announcements/current` excepted, the admin read `/api/v1/announcements/current/admin` included) | the read marker is the caller's own state; the admin read is an administration tree |
 | `/api/v1/connected-apps/**` | **new** — the member's installations and their activity |
 | `/api/v1/exchange/**` | **new** — the acting member's stock, ships, blueprints and installation |
 | `/api/v1/leitung/**` | **new** — the units the caller leads, their rosters and the caller's permissions |
 | `/api/v1/live-sync/**` | **new** — the stream names the topics accepted for this caller |
-| `/api/v1/material-exchange/**`, `/api/v1/material-requests/**` | **new** — viewer-specific `mine` / `viewerInterested`, interested handles, and the member's own releasable stock |
+| `/api/v1/material-exchange/**` (the request board `/api/v1/material-exchange/requests/**` included) | **new** — viewer-specific `mine` / `viewerInterested`, interested handles, and the member's own releasable stock |
 | `/api/v1/orders/**` | **new** — assignee and requester handles, claims, handovers, blueprint owners, viewer `canEdit` |
 | `/api/v1/org-chart/**` | **new** — named position holders and viewer-specific `canAdd…` flags |
 | `/api/v1/special-commands/*/members/**`, `/api/v1/squadrons/*/members/**` | **new** — member rosters |
 | `/api/v1/terms/**` | **new** — `/terms/status` is the caller's own acceptance |
 
-Revalidatable: `announcement`, `app`, `blueprints`, `cities`, `frequency-types`, `game-items`,
+Revalidatable: `announcements/current` (the public banner), `app`, `blueprints`, `cities`, `frequency-types`, `game-items`,
 `job-types`, `kommando-groups`, `locations`, `manufacturers`, `material-categories`,
 `material-external-aliases`, `materials`, `missions`, `org-hierarchy`, `org-units`, `outposts`,
-`pois`, `quality-tiers`, `refining-methods`, `settings`, `ship-types`, `space-stations`, `special-commands`,
+`pois`, `quality-tiers`, `refining-methods`, `settings`, the typed reads `orders/settings` and `refinery-orders/settings`, `ship-types`, `space-stations`, `special-commands`,
 `squadrons`, `star-systems`, `terminals`, `uex`, and two
 catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**` and
 `/api/v1/terms/document`. The game-item catalogue (`/api/v1/game-items/**`) and the refinery yield
@@ -2092,7 +2095,7 @@ sensitive family absent from the list loses the framework's own default `no-stor
 sensitive GET family means adding it to `NoStoreApiScopes` in the same change — which since
 2026-09-10 also takes it out of the ETag buffer, because both filters read that one list.
 
-The Materialbörse (`/api/v1/material-exchange/**`, `/api/v1/material-requests/**`) used to be
+The Materialbörse (`/api/v1/material-exchange/**`, which since wave 6 of the API cut also serves the request board formerly at `/api/v1/material-requests`) used to be
 excluded as an org-wide shared board. That was wrong for what it serves: each board row carries the
 viewer-specific `mine` and `viewerInterested` flags, and `/material-exchange/releasable-items` is
 the member's own inventory — holdings, which are `no-store` everywhere else. It is `no-store` since

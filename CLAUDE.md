@@ -304,7 +304,7 @@ every related DOM element after an AJAX update) is in [`frontend/CLAUDE.md`](fro
 
 ### API conventions
 
-Moved to [`docs/specs/api-conventions.md`](docs/specs/api-conventions.md) (`REQ-API-*`): versioned `/api/v1` paths + `@ApiDeprecation`, DTO-only boundaries with MapStruct + Jakarta validation, `@Valid` on writes, RFC 7807 `problem+json` errors, `Pageable`/`PageResponse` with whitelisted sort fields, UTC time, and SpringDoc/`openapi.json` upkeep.
+Moved to [`docs/specs/api-conventions.md`](docs/specs/api-conventions.md) (`REQ-API-*`): versioned `/api/v1` paths changed by hard cut (ADR-0234), DTO-only boundaries with MapStruct + Jakarta validation, `@Valid` on writes, RFC 7807 `problem+json` errors, `Pageable`/`PageResponse` with whitelisted sort fields, UTC time, and SpringDoc/`openapi.json` upkeep.
 
 ### Configuration
 

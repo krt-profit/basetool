@@ -141,7 +141,8 @@ class ApiCacheControlFilterTest {
         "private, no-store",
         run("GET", "/api/v1/material-exchange/offers").getHeader(CACHE_CONTROL));
     assertEquals(
-        "private, no-store", run("GET", "/api/v1/material-requests").getHeader(CACHE_CONTROL));
+        "private, no-store",
+        run("GET", "/api/v1/material-exchange/requests").getHeader(CACHE_CONTROL));
   }
 
   @Test

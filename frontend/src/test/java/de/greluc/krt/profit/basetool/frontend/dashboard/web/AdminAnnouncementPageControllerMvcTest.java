@@ -71,8 +71,9 @@ class AdminAnnouncementPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void updateAjax_withHeader_returns200AndEchoesVersion() throws Exception {
-    when(backendApiClient.put(eq("/api/v1/announcement"), any(), eq(Void.class))).thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/announcement/admin"), eq(AnnouncementDto.class)))
+    when(backendApiClient.put(eq("/api/v1/announcements/current"), any(), eq(Void.class)))
+        .thenReturn(null);
+    when(backendApiClient.get(eq("/api/v1/announcements/current/admin"), eq(AnnouncementDto.class)))
         .thenReturn(new AnnouncementDto(null, "x", null, 7L));
 
     mockMvc
@@ -90,7 +91,8 @@ class AdminAnnouncementPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteAjax_withHeader_returns200() throws Exception {
-    when(backendApiClient.delete(eq("/api/v1/announcement"), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.delete(eq("/api/v1/announcements/current"), eq(Void.class)))
+        .thenReturn(null);
 
     mockMvc
         .perform(
@@ -103,7 +105,8 @@ class AdminAnnouncementPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void update_withoutHeader_redirects() throws Exception {
-    when(backendApiClient.put(eq("/api/v1/announcement"), any(), eq(Void.class))).thenReturn(null);
+    when(backendApiClient.put(eq("/api/v1/announcements/current"), any(), eq(Void.class)))
+        .thenReturn(null);
 
     mockMvc
         .perform(post("/admin/announcement/update").with(csrf()).param("content", "x"))
@@ -119,7 +122,7 @@ class AdminAnnouncementPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void thePageRendersTheFormPattern() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/announcement/admin"), eq(AnnouncementDto.class)))
+    when(backendApiClient.get(eq("/api/v1/announcements/current/admin"), eq(AnnouncementDto.class)))
         .thenReturn(new AnnouncementDto(null, "Hallo **Welt**", null, 3L));
 
     String html =

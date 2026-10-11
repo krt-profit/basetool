@@ -1,8 +1,8 @@
 [operations]
-DELETE /api/v1/announcement | AnnouncementController#deleteAnnouncement | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-GET /api/v1/announcement | AnnouncementController#getPublicAnnouncement | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/announcement | AnnouncementController#updateAnnouncement | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-GET /api/v1/announcement/admin | AnnouncementController#getAdminAnnouncement | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/announcements/current | AnnouncementController#deleteAnnouncement | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/announcements/current | AnnouncementController#getPublicAnnouncement | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/announcements/current | AnnouncementController#updateAnnouncement | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/announcements/current/admin | AnnouncementController#getAdminAnnouncement | pre=hasRole('ADMIN') | url=/api/v1/announcements/current/admin -> hasAnyAuthority(ROLE_ADMIN)
 PUT /api/v1/announcements/{id}/read | UserController#updateReadAnnouncement | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/app/version-policy | AppVersionPolicyController#versionPolicy | pre=permitAll() | url=GET /api/v1/app/version-policy -> permitAll
 DELETE /api/v1/audit/{domain} | AuditAdminController#purgeAuditLog | pre=hasRole('ADMIN') | url=/api/v1/audit/** -> hasAnyAuthority(ROLE_ADMIN)
@@ -146,7 +146,6 @@ GET /api/v1/hangar/admin/users/{userId}/ships | HangarController#getUserShips | 
 POST /api/v1/hangar/admin/users/{userId}/ships | HangarController#addUserShip | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /api/v1/hangar/admin/users/{userId}/ships/{shipId} | HangarController#deleteUserShip | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 PUT /api/v1/hangar/admin/users/{userId}/ships/{shipId} | HangarController#updateUserShip | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/hangar/import/fleetview | HangarController#importFleetview | pre=isAuthenticated() | url=POST /api/v1/hangar/import/fleetview -> authenticated
 POST /api/v1/hangar/import/ships | HangarController#importShips | pre=isAuthenticated() | url=POST /api/v1/hangar/import/ships -> authenticated
 GET /api/v1/hangar/my-ships | HangarController#getMyShips | pre=isAuthenticated() | url=GET /api/v1/hangar/my-ships -> authenticated
 DELETE /api/v1/hangar/ships | HangarController#deleteAllMyShips | pre=hasAuthority('HANGAR_WRITE') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
@@ -211,9 +210,9 @@ GET /api/v1/material-categories/{id} | MaterialCategoryController#getById | pre=
 PUT /api/v1/material-categories/{id} | MaterialCategoryController#update | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/material-exchange/counts | MaterialExchangeController#counts | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 POST /api/v1/material-exchange/item-offers | MaterialExchangeController#releaseItem | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
-POST /api/v1/material-exchange/items/{inventoryItemId}/deactivate | MaterialExchangeController#deactivateForItem | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/material-exchange/offers | MaterialExchangeController#board | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 POST /api/v1/material-exchange/offers | MaterialExchangeController#release | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+POST /api/v1/material-exchange/offers/deactivate | MaterialExchangeController#deactivateForItem | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/material-exchange/offers/{id} | MaterialExchangeController#detail | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 POST /api/v1/material-exchange/offers/{id}/deactivate | MaterialExchangeController#deactivate | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 DELETE /api/v1/material-exchange/offers/{id}/interest | MaterialExchangeController#withdrawInterest | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
@@ -221,20 +220,20 @@ POST /api/v1/material-exchange/offers/{id}/interest | MaterialExchangeController
 PUT /api/v1/material-exchange/offers/{id}/remark | MaterialExchangeController#updateOffer | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/material-exchange/releasable-items | MaterialExchangeController#releasableItems | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/material-exchange/released-item-ids | MaterialExchangeController#releasedItemIds | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+GET /api/v1/material-exchange/requests | MaterialRequestController#board | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+POST /api/v1/material-exchange/requests | MaterialRequestController#createMaterialRequest | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+GET /api/v1/material-exchange/requests/counts | MaterialRequestController#counts | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+POST /api/v1/material-exchange/requests/item | MaterialRequestController#createItemRequest | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+GET /api/v1/material-exchange/requests/{id} | MaterialRequestController#detail | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+PUT /api/v1/material-exchange/requests/{id} | MaterialRequestController#updateRequest | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+POST /api/v1/material-exchange/requests/{id}/deactivate | MaterialRequestController#deactivate | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+DELETE /api/v1/material-exchange/requests/{id}/interest | MaterialRequestController#withdrawFulfillment | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
+POST /api/v1/material-exchange/requests/{id}/interest | MaterialRequestController#signalFulfillment | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/material-external-aliases | MaterialExternalAliasController#listAliases | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/material-external-aliases | MaterialExternalAliasController#createAlias | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/material-external-aliases/{id} | MaterialExternalAliasController#deleteAlias | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/material-external-aliases/{id} | MaterialExternalAliasController#getAlias | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PUT /api/v1/material-external-aliases/{id} | MaterialExternalAliasController#updateAlias | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-GET /api/v1/material-requests | MaterialRequestController#board | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
-POST /api/v1/material-requests | MaterialRequestController#createMaterialRequest | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
-GET /api/v1/material-requests/counts | MaterialRequestController#counts | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
-POST /api/v1/material-requests/item | MaterialRequestController#createItemRequest | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
-GET /api/v1/material-requests/{id} | MaterialRequestController#detail | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
-PUT /api/v1/material-requests/{id} | MaterialRequestController#updateRequest | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
-POST /api/v1/material-requests/{id}/deactivate | MaterialRequestController#deactivate | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
-DELETE /api/v1/material-requests/{id}/interest | MaterialRequestController#withdrawFulfillment | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
-POST /api/v1/material-requests/{id}/interest | MaterialRequestController#signalFulfillment | pre=hasRole('KRT_MEMBER') | url=anyRequest -> authenticated
 GET /api/v1/materials | MaterialController#getAllMaterials | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/materials | MaterialController#createMaterial | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/materials/job-order | MaterialController#getJobOrderMaterials | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -335,6 +334,7 @@ POST /api/v1/orders/items | JobOrderController#createItemJobOrder | pre=isAuthen
 GET /api/v1/orders/lookup | JobOrderController#lookupJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/material-demand | JobOrderController#getMaterialDemand | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/requested | JobOrderController#getRequestedJobOrders | pre=isAuthenticated() and @ownerScopeService.canViewOwnJobOrders() | url=anyRequest -> authenticated
+GET /api/v1/orders/settings | JobOrderSettingsController#settings | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id} | JobOrderController#deleteJobOrder | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/orders/{id} | JobOrderController#getJobOrderById | pre=isAuthenticated() and (@jobOrderAccessPolicy.canSeeJobOrder(#id) or @jobOrderAccessPolicy.canSeeJobOrderAsRequester(#id)) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id} | JobOrderController#updateJobOrder | pre=hasRole('LOGISTICIAN') and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
@@ -471,6 +471,7 @@ POST /api/v1/refinery-orders | RefineryOrderController#createMyRefineryOrder | p
 GET /api/v1/refinery-orders/all | RefineryOrderController#getAllRefineryOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/refinery-orders/import-extract | RefineryImportController#importExtract | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/refinery-orders/my-orders | RefineryOrderController#getMyRefineryOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/refinery-orders/settings | RefinerySettingsController#settings | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/refinery-orders/users/{userId} | RefineryOrderController#getUserRefineryOrders | pre=hasRole('LOGISTICIAN') and @refineryAccessPolicy.canViewUserRefineryOrders(#userId) | url=anyRequest -> authenticated
 POST /api/v1/refinery-orders/users/{userId} | RefineryOrderController#createUserRefineryOrder | pre=hasRole('LOGISTICIAN') and @refineryAccessPolicy.canManageUserRefineryOrders(#userId) | url=anyRequest -> authenticated
 DELETE /api/v1/refinery-orders/users/{userId}/{orderId} | RefineryOrderController#deleteUserRefineryOrder | pre=hasRole('LOGISTICIAN') and @refineryAccessPolicy.canEditRefineryOrder(#orderId) | url=anyRequest -> authenticated

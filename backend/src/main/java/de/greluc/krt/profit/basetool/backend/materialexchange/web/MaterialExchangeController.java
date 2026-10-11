@@ -183,9 +183,9 @@ public class MaterialExchangeController {
    * @param inventoryItemId the Lager row whose active offer to take off the board.
    * @return the resulting offer detail.
    */
-  @PostMapping("/items/{inventoryItemId}/deactivate")
+  @PostMapping("/offers/deactivate")
   @Operation(summary = "Deactivate the active offer for a Lager row.")
-  public MaterialExchangeOfferDto deactivateForItem(@PathVariable UUID inventoryItemId) {
+  public MaterialExchangeOfferDto deactivateForItem(@RequestParam @NotNull UUID inventoryItemId) {
     return service.deactivateForItem(inventoryItemId);
   }
 

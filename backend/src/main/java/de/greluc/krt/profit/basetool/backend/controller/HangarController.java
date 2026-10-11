@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
@@ -296,26 +295,6 @@ public class HangarController {
   @PreAuthorize("isAuthenticated()")
   @Transactional
   public FleetviewImportResponseDto importShips(
-      @AuthenticationPrincipal Jwt jwt, @RequestParam("file") @NotNull MultipartFile file) {
-    return hangarImportService.importShips(userService.getUserIdFromJwt(jwt), file);
-  }
-
-  /**
-   * Alias of {@link #importShips(Jwt, MultipartFile)} under the {@code /import/fleetview} path,
-   * with an identical response.
-   *
-   * @param jwt caller's JWT — its {@code sub} claim becomes the new rows' owner id
-   * @param file uploaded JSON file
-   * @return import summary (created / skipped / duplicate counts plus the unmatched-ship list)
-   * @deprecated use {@code /api/v1/hangar/import/ships}; the {@code Sunset} and {@code Link}
-   *     response headers carry the same hint
-   */
-  @PostMapping("/import/fleetview")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional
-  @ApiDeprecation(sunset = "2027-05-14", replacement = "/api/v1/hangar/import/ships")
-  @Deprecated(since = "2026-05-14", forRemoval = true)
-  public FleetviewImportResponseDto importFleetview(
       @AuthenticationPrincipal Jwt jwt, @RequestParam("file") @NotNull MultipartFile file) {
     return hangarImportService.importShips(userService.getUserIdFromJwt(jwt), file);
   }

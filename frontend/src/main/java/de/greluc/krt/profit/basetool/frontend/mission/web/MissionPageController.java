@@ -49,7 +49,7 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.UnitForm;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -565,9 +565,9 @@ public class MissionPageController {
   @NotNull
   private String fetchRoundingMode() {
     try {
-      SystemSettingDto setting = missionClient.refineryRoundingMode();
-      if (setting != null && setting.value() != null) {
-        return setting.value();
+      RefinerySettingsDto settings = missionClient.refinerySettings();
+      if (settings != null && settings.roundingMode() != null) {
+        return settings.roundingMode();
       }
     } catch (Exception _) {
       log.warn("Failed to fetch refinery rounding mode, using default UP");

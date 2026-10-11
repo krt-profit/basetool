@@ -24,8 +24,10 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryGoodDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderUpdateRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -112,16 +114,39 @@ public interface RefineryOrderMapper {
   RefineryOrderListDto toListDto(RefineryOrder entity);
 
   /**
-   * Builds a new {@link RefineryOrder} entity from the inbound DTO. {@code owner} is owned by the
-   * service (resolved from the JWT) and stripped here.
+   * Builds a new {@link RefineryOrder} entity from a create request. Id, version, status, owner and
+   * org unit are owned by the service and stay unset here.
+   *
+   * @param request the create request; {@code null} returns {@code null}
+   * @return a transient order with shallow id-only references
    */
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  @Mapping(target = "status", ignore = true)
   @Mapping(target = "owner", ignore = true)
   @Mapping(target = "owningOrgUnit", ignore = true)
   @Mapping(target = "storedAt", ignore = true)
   @Mapping(target = "readyNotifiedAt", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
-  RefineryOrder toEntity(RefineryOrderDto dto);
+  RefineryOrder toEntity(RefineryOrderCreateRequest request);
+
+  /**
+   * Builds the transient {@link RefineryOrder} that carries an update request's values into {@code
+   * RefineryOrderService#updateRefineryOrder}. The order is identified by the path, so no id, owner
+   * or org unit is read from the request.
+   *
+   * @param request the update request; {@code null} returns {@code null}
+   * @return a transient order holding the requested values and the last-seen version
+   */
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "owner", ignore = true)
+  @Mapping(target = "owningOrgUnit", ignore = true)
+  @Mapping(target = "storedAt", ignore = true)
+  @Mapping(target = "readyNotifiedAt", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  RefineryOrder toEntity(RefineryOrderUpdateRequest request);
 
   /**
    * Maps one inbound good. The back-reference to its order is wired by {@code RefineryOrderService}

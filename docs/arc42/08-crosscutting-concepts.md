@@ -132,7 +132,7 @@ carries it — is in [`frontend/CLAUDE.md`](../../frontend/CLAUDE.md).
 
 ## 8.5 API conventions
 
-Versioned `/api/v1` paths with `@ApiDeprecation`, DTO-only boundaries (records + MapStruct +
+Versioned `/api/v1` paths changed by hard cut (ADR-0234, no deprecation machinery), DTO-only boundaries (records + MapStruct +
 Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every error,
 `Pageable`/`PageResponse` with whitelisted sort fields and a kernel page ceiling of 1 000 (eight
 reviewed catalogue lists opt out to 100 000), UTC everywhere, and a committed

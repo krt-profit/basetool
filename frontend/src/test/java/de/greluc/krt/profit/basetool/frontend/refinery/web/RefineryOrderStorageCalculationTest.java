@@ -32,7 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemForm;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -167,8 +167,8 @@ class RefineryOrderStorageCalculationTest {
     when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
         .thenReturn(orderDto);
 
-    SystemSettingDto settingDto = new SystemSettingDto("refinery.rounding.mode", "HALF_UP", 0L);
-    when(backendApiClient.get(eq("/api/v1/settings/refinery.rounding.mode"), anyClass()))
+    RefinerySettingsDto settingDto = new RefinerySettingsDto("HALF_UP");
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/settings"), anyClass()))
         .thenReturn(settingDto);
     when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
 
@@ -239,8 +239,8 @@ class RefineryOrderStorageCalculationTest {
     when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
         .thenReturn(orderDto);
 
-    SystemSettingDto settingDto = new SystemSettingDto("refinery.rounding.mode", "HALF_UP", 0L);
-    when(backendApiClient.get(eq("/api/v1/settings/refinery.rounding.mode"), anyClass()))
+    RefinerySettingsDto settingDto = new RefinerySettingsDto("HALF_UP");
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/settings"), anyClass()))
         .thenReturn(settingDto);
     when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
 

@@ -157,7 +157,7 @@ class MissionBackendClientTest {
     backend.answerJson("[]");
     backend.answerJson("[]");
     backend.answerJson("[{\"id\":\"" + OTHER + "\"}]");
-    backend.answerJson("{\"id\":\"refinery.rounding.mode\",\"value\":\"DOWN\",\"version\":3}");
+    backend.answerJson("{\"roundingMode\":\"DOWN\"}");
 
     assertThat(client.operationReferences()).isEmpty();
     client.currentUser();
@@ -172,7 +172,7 @@ class MissionBackendClientTest {
     assertThat(client.unassignedParticipants(ID))
         .singleElement()
         .satisfies(participant -> assertThat(participant.id()).isEqualTo(OTHER));
-    assertThat(client.refineryRoundingMode().value()).isEqualTo("DOWN");
+    assertThat(client.refinerySettings().roundingMode()).isEqualTo("DOWN");
 
     backend.expect("GET", "/api/v1/operations/lookup");
     backend.expect("GET", "/api/v1/users/me");
@@ -185,7 +185,7 @@ class MissionBackendClientTest {
     backend.expect("GET", "/api/v1/inventory/allocations?missionId=" + ID);
     backend.expect("GET", "/api/v1/org-units/me/pickable");
     backend.expect("GET", M + "/participants/unassigned");
-    backend.expect("GET", "/api/v1/settings/refinery.rounding.mode");
+    backend.expect("GET", "/api/v1/refinery-orders/settings");
   }
 
   @Test

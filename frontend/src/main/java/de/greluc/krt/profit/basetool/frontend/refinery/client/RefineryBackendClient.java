@@ -30,10 +30,12 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryImportDraftDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreDto;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -148,14 +150,29 @@ public class RefineryBackendClient {
   }
 
   /**
-   * Stores a new refinery order.
+   * Stores a new refinery order owned by the caller.
    *
    * @param order the order
    * @return the stored order, or {@code null} when the backend sent no body
    */
   @Nullable
-  public RefineryOrderDto create(@NotNull RefineryOrderDto order) {
+  public RefineryOrderDto create(@NotNull RefineryOrderCreateRequest order) {
     return backendApiClient.post("/api/v1/refinery-orders", order, RefineryOrderDto.class);
+  }
+
+  /**
+   * Stores a new refinery order on behalf of another member, through the per-target path a
+   * logistician is admitted on.
+   *
+   * @param ownerId the member who will own the order
+   * @param order the order
+   * @return the stored order, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public RefineryOrderDto createFor(
+      @NotNull UUID ownerId, @NotNull RefineryOrderCreateRequest order) {
+    return backendApiClient.post(
+        "/api/v1/refinery-orders/users/{userId}", order, RefineryOrderDto.class, ownerId);
   }
 
   /**
@@ -166,7 +183,7 @@ public class RefineryBackendClient {
    * @return the stored order, or {@code null} when the backend sent no body
    */
   @Nullable
-  public RefineryOrderDto update(@NotNull UUID id, @NotNull RefineryOrderDto order) {
+  public RefineryOrderDto update(@NotNull UUID id, @NotNull RefineryOrderUpdateRequest order) {
     return backendApiClient.put("/api/v1/refinery-orders/{id}", order, RefineryOrderDto.class, id);
   }
 
@@ -306,12 +323,12 @@ public class RefineryBackendClient {
   }
 
   /**
-   * Reads the refinery rounding-mode setting.
+   * Reads the typed refinery settings.
    *
-   * @return the setting, or {@code null} when the backend sent no body
+   * @return the settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public SystemSettingDto roundingMode() {
-    return backendApiClient.get("/api/v1/settings/refinery.rounding.mode", SystemSettingDto.class);
+  public RefinerySettingsDto settings() {
+    return backendApiClient.get("/api/v1/refinery-orders/settings", RefinerySettingsDto.class);
   }
 }

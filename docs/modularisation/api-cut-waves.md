@@ -19,7 +19,7 @@
 | Frontend | one `BackendApiClient` | **typed clients per domain** (`<domain>/client/*BackendClient`): the path strings of a domain are in one class, plus a few page controllers that still hold literals |
 
 The machine-readable map is [`api-cut-map.txt`](../../backend/src/test/resources/api/api-cut-map.txt):
-`<wave> <VERB> <old path> <new path|-> <tier> <app|->`, one line per operation, 184 lines for the
+`<wave> <VERB> <old path> <new path|-> <tier> <app|->`, one line per operation, 185 lines for the
 path moves and deletions (the shape changes are in § 5). `ApiCutMapTest` (built with wave 1)
 holds the committed document to it: every line is in exactly one of its two states, and a wave that
 has landed has no old path left.
@@ -80,8 +80,8 @@ app v0.5.0 (`app-calls/18.txt`). The order is the appendix order, risk and app i
 | 3 | mission: nested finance ledger, `/slim` dropped, search folded, two dead writes deleted, mission views as filters | 36 | 29 | 29 | 19 |
 | 4 | bank: `/org-units/bank/**` to `/bank/org-units/**` | 29 | 24 | 24 | 19 |
 | 5 | job orders and game items | 7 | 3 | 3 | 19 |
-| 6 | the small rest: Materialbörse, announcement, fleetview import deleted | 14 | 9 | 9 | 19 |
-| | **Path moves and deletions** | **184** | **75** | **74** | |
+| 6 | the small rest: Materialbörse, announcement, fleetview import deleted, the Lager deactivation as a collection action | 15 | 9 | 9 | 19 |
+| | **Path moves and deletions** | **185** | **75** | **74** | |
 
 Reconciliation with the inventory (wave 1: 50 + 14 exchange + 4 quality tier = 68; waves 2 to 6:
 30/9, 36/29, 30/24, 7/3, 17/12): the inventory's 188 operations are the 184 map lines plus four
@@ -293,14 +293,17 @@ catalogue data). **App-called (3):** `JobOrderRepository`, `MaterialCollectionRe
 | `/announcement/admin` | `/announcements/current/admin` | 1 | 0 | 0 |
 | `/hangar/import/fleetview` | `deleted` | 1 | 1 | 1 |
 | `/material-requests` | `/material-exchange/requests` | 9 | 7 | 7 |
+| `/material-exchange/items/{inventoryItemId}/deactivate` | `/material-exchange/offers/deactivate` | 1 | 0 | 0 |
 
-`/material-requests/**` to `/material-exchange/requests/**` (both roots stay outside the no-store
-families as an org-wide board, REQ-SEC-031); `/announcement` to `/announcements/current` (the read
+`/material-requests/**` to `/material-exchange/requests/**` (both roots are `no-store`, REQ-SEC-031 as
+amended 2026-10-03: the board rows carry viewer-specific flags); `/announcement` to `/announcements/current` (the read
 keeps its `204` semantics, REQ-API-009); `POST /hangar/import/fleetview` is deleted (the app
 already uses `POST /hangar/import/ships`; the operation's announced sunset no longer matters under
 the hard cut) and with it the last deprecated operation: `@ApiDeprecation`, `DeprecationInterceptor`
 and their tests go. **App-called (9):** `MaterialBoardRepository` 7, `AnnouncementRepository` 1,
 `HangarRepository` 1.
+
+**Status (2026-10-11):** done on branch `claude/api-cut-w6`, on top of wave 5. The announcement and request-board controllers only changed their class mapping; the S-9 deactivation took the `offers/deactivate` path in `MaterialExchangeController` (map line 185, the one line added by this wave). `POST /hangar/import/fleetview` and the whole deprecation machinery are gone: `HangarController#importFleetview`, its URL rule, `@ApiDeprecation`, `DeprecationInterceptor`, `OpenApiDeprecationConfig`, the `interceptor` layer rule of the domain map, the web proxy's `/hangar/import/fleetview` alias and `DeprecatedBackendEndpointCallGuardTest`; the ship-list parser still reads the CCU Fleetview format through `POST /hangar/import/ships`, and the web button now says "Schiffsliste importieren". The admin read `GET /announcements/current/admin` no longer matches the `/api/v1/*/admin/**` rule, so the URL rule names it explicitly. The announcement banner is the only revalidate family under `/api/v1/announcements`. S-3 and S-4 are in (section 5). Ledger and retirement: 9 lines; the six never-frozen old paths (three announcement writes and admin read, the request count and detail, the old deactivation) answer `404`. Floors: hangar domain 15 to 14, job-order domain 39 to 40, refinery domain 14 to 15, no-store families unchanged at 31 (the request board entry was redundant under `/material-exchange/**`, the announcement admin read joined), revalidate families 29 to 31.
 
 ## 5 Shape changes the map does not carry
 
@@ -311,13 +314,13 @@ and are part of the same forced update; they are listed because the map is a lis
 | --- | --- | --- | --- | --- |
 | S-1 | 3 | `GET /missions` absorbs the search: filters and `q` replace the parameter `query` | `MissionRepository` | ledger line with the field |
 | S-2 | 4 | `PATCH /bank/accounts/{id}/balance-target` becomes `PUT` with its org-unit twin's request shape | none (the 2026-10-03 call list does not contain it) | in the cut (Q-5); done in wave 4: only the verb changes, the two request records were already field-for-field identical (`target`, `version`) |
-| S-3 | 6 | the app's `GET /settings/{key}` for the two job-order age thresholds becomes `GET /orders/settings`; `GET /refinery-orders/settings` for the rounding mode | `JobOrderRepository` | owner (Q-5) |
-| S-4 | 6 | `POST`/`PUT /refinery-orders` bind request records without `id`, `owner`, `profit`, `owningSquadron`; `status` limited on create; the owner override moves to the per-target path | `RefineryRepository` | owner (Q-5) |
+| S-3 | 6 | the app's `GET /settings/{key}` for the two job-order age thresholds becomes `GET /orders/settings`; `GET /refinery-orders/settings` for the rounding mode | `JobOrderRepository` | in the cut (Q-5); done in wave 6: the typed reads are `JobOrderSettingsController` and `RefinerySettingsController` over `SystemSettings`, the web reads them instead of the key store, `GET /settings/{key}` leaves the frozen set (ledger line, no retirement because the admin page still reads and writes through it); only the job-order read is T1, the rounding mode is not called by the app |
+| S-4 | 6 | `POST`/`PUT /refinery-orders` bind request records without `id`, `owner`, `profit`, `owningSquadron`; `status` limited on create; the owner override moves to the per-target path | `RefineryRepository` | in the cut (Q-5); done in wave 6: `RefineryOrderCreateRequest` (no `status`, `version` or owner: the service already forced `OPEN`) and `RefineryOrderUpdateRequest` (keeps `status` and `version`, which the web edit form sets), the per-target `POST`/`PUT` bind them too, `RefineryOrderDto` is only a response now; two field-level ledger lines |
 | S-5 | 3 | finance gate reads the mission from the path | none | none |
 | S-6 | 5 | one game-item reference for the catalogue read instead of two (`id`, `name`, `manufacturer`, `kind`); the embedded `GameItemReferenceDto` of the order DTOs stays | `JobOrderRepository` | done in wave 5 for the endpoint |
 | S-7 | 2 | payout and sharing columns move into their owners | none | later, no path change (D-17) |
 | S-8 | 2 | `PUT`/`DELETE /kommando-groups/{groupId}` move under `/squadrons/{squadronId}/kommando-groups/{groupId}`; the gate follows the squadron in the path | none (web-only) | in the cut (Q-8) |
-| S-9 | 6 | `POST /material-exchange/items/{inventoryItemId}/deactivate` becomes `POST /material-exchange/offers/deactivate?inventoryItemId=` | none (web-only) | in the cut (Q-8) |
+| S-9 | 6 | `POST /material-exchange/items/{inventoryItemId}/deactivate` becomes `POST /material-exchange/offers/deactivate?inventoryItemId=` | none (web-only) | in the cut (Q-8); done in wave 6, map line 185 |
 
 S-4 needs the exchange's refinery draft route to bind its own request DTO first (G-18), or the
 frozen external behaviour changes with it.

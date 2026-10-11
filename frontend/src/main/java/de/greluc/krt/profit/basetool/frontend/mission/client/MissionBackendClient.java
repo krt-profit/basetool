@@ -68,7 +68,7 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -388,13 +388,13 @@ public class MissionBackendClient {
   }
 
   /**
-   * Reads the refinery rounding-mode setting.
+   * Reads the typed refinery settings.
    *
-   * @return the setting, or {@code null} when the backend sent no body
+   * @return the settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public SystemSettingDto refineryRoundingMode() {
-    return backendApiClient.get("/api/v1/settings/refinery.rounding.mode", SystemSettingDto.class);
+  public RefinerySettingsDto refinerySettings() {
+    return backendApiClient.get("/api/v1/refinery-orders/settings", RefinerySettingsDto.class);
   }
 
   /**
