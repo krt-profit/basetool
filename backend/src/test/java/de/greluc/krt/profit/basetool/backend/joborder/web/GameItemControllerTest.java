@@ -38,6 +38,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import org.aopalliance.intercept.MethodInvocation;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +53,7 @@ import org.springframework.objenesis.ObjenesisStd;
 import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.authorization.DefaultAuthorizationManagerFactory;
 import org.springframework.security.authorization.method.PreAuthorizeAuthorizationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -74,7 +76,10 @@ class GameItemControllerTest {
 
   private static PreAuthorizeAuthorizationManager manager() {
     DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
-    handler.setRoleHierarchy(SecurityConfig.roleHierarchy());
+    DefaultAuthorizationManagerFactory<MethodInvocation> factory =
+        new DefaultAuthorizationManagerFactory<>();
+    factory.setRoleHierarchy(SecurityConfig.roleHierarchy());
+    handler.setAuthorizationManagerFactory(factory);
     PreAuthorizeAuthorizationManager manager = new PreAuthorizeAuthorizationManager();
     manager.setExpressionHandler(handler);
     return manager;
