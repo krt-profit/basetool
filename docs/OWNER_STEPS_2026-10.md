@@ -1,6 +1,6 @@
 > **Doc type:** Operator runbook, one page — **the owner runs every step; nothing here was or may be
 > executed by an agent.** Written 2026-10-10 (domain modularisation plan, D-26). **Living document:**
-> a step is struck from the table below when it is done, with the date. Last reviewed: 2026-10-10.
+> a step is struck from the table below when it is done, with the date. Last reviewed: 2026-10-11.
 
 # Owner steps, October 2026
 
@@ -18,14 +18,14 @@ linked; this page is the order, the approvals and the words to type.
 | # | Step | Where | Approval | Depends on |
 |---|------|-------|----------|------------|
 | 1 | [`release` environment, its secret, and the repository secret's deletion](#1-the-release-environment-ci-sec-16) | GitHub | owner (repository settings) | — |
-| 2 | [Deploy sudoers rule](#2-the-deploy-sudoers-rule-ops-sec-08) | testing, then production host | testing: owner's call; production: per command | — |
-| 3 | [Restore drill after the S-09 rollout](#3-the-restore-drill-s-09) | production host | per command | 2 (the drill runs as `deploy`) |
+| ~~2~~ | ~~[Deploy sudoers rule](#2-the-deploy-sudoers-rule-ops-sec-08)~~ **production done 2026-10-11**; testing is the owner's call | testing, then production host | testing: owner's call; production: per command | — |
+| ~~3~~ | ~~[Restore drill after the S-09 rollout](#3-the-restore-drill-s-09)~~ **done 2026-10-11** | production host | per command | 2 (the drill runs as `deploy`) |
 | 4 | [Keycloak: the session for steps 5–7](#4-keycloak-one-session-for-the-three-realm-steps) | production host | per command | — |
 | 5 | [Keycloak step 2: forgot password and the sender](#5-keycloak-step-2-forgot-password-and-the-realms-sender) | production realm | per command | 4 |
 | 6 | [Keycloak step 12: session windows](#6-keycloak-step-12-session-windows) | production realm | per command, after a decision | 4 |
 | 7 | [Keycloak step 11: OTP for admins](#7-keycloak-step-11-otp-for-admins--last) | production realm | per command | 4, 5, 6 |
 | 8 | [Trusted Types: enforce](#8-trusted-types-enforce) | production host | per command | a quiet week |
-| 9 | [Promote v1.14.0](#9-promote-v1140) | GitHub, production | the `production` environment's approval | 2 done or consciously not |
+| ~~9~~ | ~~[Promote v1.14.0](#9-promote-v1140)~~ **done: v1.14.0 on 2026-10-10, v1.15.0 on 2026-10-11** | GitHub, production | the `production` environment's approval | 2 done or consciously not |
 
 Nothing on this page needs a code change first, with two exceptions that are marked: step 6 changes
 one file when the owner picks the numbers, and step 9 needs the release to exist.
@@ -90,6 +90,12 @@ A key rotation updates two copies afterwards: the environment secret and the Dep
 
 ## 2. The deploy sudoers rule (OPS-SEC-08)
 
+> [!note] Production done 2026-10-11
+> The role ran on production with `--tags deploy,scripts` from a checkout of `v1.15.0` (dry run: two
+> changes, the sudoers rule and `deploy.sh`; the run: `ok=27 changed=2 failed=0`). `sudo -l -U deploy`
+> now lists the `Cmnd_Alias` of 15 sub-commands, and the first deploy tick after it was clean. Testing
+> still has the old rule; that is the owner's call.
+
 The rule admits `podman` for the `deploy` account with the 15 sub-commands the scripts use instead
 of `podman *` (#2387). Nothing changes on a host until the role runs. From the Ansible controller
 (WSL), in `ansible/`; the inventory is the owner's private one, not in the repository.
@@ -132,6 +138,12 @@ or check out the previous commit of the role and re-run it with `--tags deploy`.
 ---
 
 ## 3. The restore drill (S-09)
+
+> [!note] Done 2026-10-11
+> The weekly drill ran on Sunday 2026-10-11 05:30 UTC with the pinned image
+> (`drill image: docker.io/postgres:18-alpine@sha256:77f58511…`) and ended `RESTORE DRILL PASSED`
+> (`flyway_schema_history rows=276`, 122 backend and 101 Keycloak public tables). It ran on the host
+> scripts that equal the tag, so the S-09 proof exists without the manual run below.
 
 S-09 made `backup.sh` and `restore-drill.sh` refuse an unpinned PostgreSQL image (#2304). The weekly
 drill (`iri-restore-drill.timer`, Sundays 05:30) already runs the new code once the release is
@@ -436,6 +448,11 @@ again with the same command, `${UCTL} restart frontend.service`.
 ---
 
 ## 9. Promote v1.14.0
+
+> [!note] Done
+> v1.14.0 was promoted on 2026-10-10 (and went wrong on a stale `deploy.sh`, see ADR-0247); v1.15.0 on
+> 2026-10-11 after the host scripts were installed from its tag. The text below is kept as the record
+> of that release.
 
 **Not cut yet** — the latest release on 2026-10-10 is v1.13.7. This step is the standard promotion
 ([`deployment.md` → *Promoting to production*](deployment.md#promoting-to-production)) with the
