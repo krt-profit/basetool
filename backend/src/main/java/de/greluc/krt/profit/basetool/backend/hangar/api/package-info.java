@@ -17,7 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** The hangar module's published API: the ship-deletion observer SPI (plan §5.2, §5.3). */
+/**
+ * The hangar module's published API: the ship commands and the ship-deletion observer SPI (plan
+ * §5.2, §5.3).
+ */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.hangar.api;
 

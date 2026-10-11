@@ -17,15 +17,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
-import jakarta.validation.constraints.NotNull;
-import java.util.UUID;
+import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
+import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for the hangar "set home location" bulk action. Carries the id of the curated home
- * location to assign to every ship the calling user owns.
+ * One ship type on the squadron overview.
  *
- * @param locationId the curated home location id; required
+ * @param shipType the ship type
+ * @param count how many ships of the type the scope holds
+ * @param fittedCount how many of them are fitted
+ * @param details the ships, or {@code null} when the owner details are not requested
  */
-public record SetHomeLocationRequestDto(@NotNull UUID locationId) {}
+public record SquadronShipOverviewDto(
+    ShipTypeDto shipType,
+    long count,
+    long fittedCount,
+    @Nullable List<SquadronShipDetailDto> details) {}

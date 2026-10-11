@@ -1269,6 +1269,36 @@ as each pair is decoupled.
     inventory into `inventory.web` / `inventory.internal` once those consumers have left the
     layer packages (P4-1, §7.6), then NullAway covers it without a further change.
 
+- `hangar` — **done 2026-10-10** (P3-6).
+  1. *Characterise*: `HangarModuleContractTest` pins that creating, updating and deleting a ship
+     record `HANGAR_SHIP_CREATED`, `HANGAR_SHIP_UPDATED` and `HANGAR_SHIP_DELETED` in the
+     command's transaction, and that a member of another org unit is refused on both per-ship
+     write entry points (PUT and DELETE `/api/v1/hangar/ships/{id}`) with nothing recorded.
+  2. *Access policy out of the scope hub* (§5.4, ADR-0236): `HangarAccessPolicy` (bean
+     `hangarAccessPolicy`) holds `canSeeShip` and `canEditShip` on the kernel's `permitsOwnedRow`.
+     The differential verdict test compared the policy, the live scope hub and a restatement over
+     9 callers × 7 ships × 2 gates = 126 verdicts before the old methods went (proven able to fail:
+     dropping the owner from the edit gate) and keeps comparing against the restatement. The two
+     write gates switched; the authorization matrix changed on exactly two lines;
+     `AccessGateService` lost `ShipRepository`. Baseline **50 → 48** (`scope -> hangar` is gone).
+  3. *Command API*: `hangar.api.ShipCommands` (`addShipForClient`, `updateShip`, `deleteShip`,
+     all `MANDATORY`), implemented by `HangarShipCommands` over `HangarService`; the exchange's
+     ship write and undo call it instead of `HangarService`. Each command keeps its audit event.
+  4. *Move*: `HangarController` into `hangar.web`; `HangarService`, `HangarImportService`,
+     `FleetExportParser`, the policy and the ten hangar-only DTOs (home location, the import
+     formats and response, the squadron overview) into `hangar.internal`. NullAway takes in the
+     whole module: three findings, the two optional components of the squadron overview DTOs now
+     `@Nullable` and one map lookup that cannot miss wrapped in `Objects.requireNonNull`. The §8.1
+     idioms have no site in the hangar code (its concatenated queries splice a constant; its one
+     `Math.max` has a single bound). The model layer's join-column selection floor drops 354 → 344
+     with the ten DTOs.
+  **Corrections:** (1) `Ship`, `ShipRepository`, `ShipMapper`, `ShipDto`, `ShipRequestDto` and
+  `ShipTypeMatcher` stay in the layer packages: the exchange, the mission, the catalogue's
+  location service and the GDPR services use them. (2) The squadron-overview DTOs carried no
+  nullness; the overview has always sent `details` as `null` without the owner details and
+  `locationName` as `null` for a ship without a location, which the annotations now state. No
+  N+1 test was added: the move changes no query or fetch plan.
+
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
 | Inventory command API | Lock order (advisory lock first, ascending by key), bulk update after the loop, the `FORCE_INCREMENT` version echo | Existing concurrency and E2E tests (`MaterialCollectionDeliveredInPlaceE2eTest`), the ADR-0229 load-test cases, "only inventory writes `InventoryItem`", an audit contract per command, a 403 test per foreign entry point |
@@ -1468,7 +1498,7 @@ features only, no preview flags) stands; every proposal below uses final feature
 | **Do not adopt** Markdown documentation comments (`///`, JEP 467): Checkstyle 14.3.0 does not treat them as Javadoc; gatherers: no loop here is clearer as one | — | — | — | — |
 | **ADR-0223 corrections** — **done 2026-10-10** (the corrections were recorded in the ADR on 2026-10-02; the missing gate is `scripts/check-final-java-only.py`, REQ-OPS-043): JDK 26 does add a final library feature (JEP 517, HTTP/3 for the HTTP client); JEP 510 (KDF) is final in 25; Checkstyle already enforces the module-import and compact-source bans in `main` (not in `test`/`e2e`); there are 42 `super(…)` calls, not 34; a `--enable-preview` gate is still missing | The decision record stays authoritative | — | Review | S |
 
-**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move, `mission` with its own, and the `inventory` tree with P3-5e). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
+**Nullness** — **started 2026-10-10** (ADR-0237 *Implementation*: the backend's 18 module `api` packages are checked; seven annotations were wrong or missing; the whole `joborder`, `refinery` and `materialexchange` modules followed with the job-order move, `mission` with its own, the `inventory` tree with P3-5e and `hangar` with P3-6). Error Prone 2.50.0 with NullAway 0.14.2 runs on JDK 25 and accepts the JetBrains
 annotations by simple name; Spring Framework builds itself with the same pair. Starting with the new
 module API packages, it would turn the annotations into a checked contract and close arc42 §11.4
 ("derived nullity annotations have no gate"). Cost: a compile-time dependency, about ten javac

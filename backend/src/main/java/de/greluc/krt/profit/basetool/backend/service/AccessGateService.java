@@ -20,14 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -38,9 +35,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The {@code can*} authorization gates behind every {@code @PreAuthorize} on the org-unit-scoped
- * aggregates, evaluated against the same scope as {@link RequestScopeResolver} so per-row checks
- * match the scoped lists.
+ * The scope kernel's org-unit gates and its per-row check, which the module access policies build
+ * on, evaluated against the same scope as {@link RequestScopeResolver} so per-row checks match the
+ * scoped lists.
  *
  * <p>Invoked from SpEL through the {@link OwnerScopeService} facade. Read-only transactional.
  */
@@ -51,7 +48,6 @@ public class AccessGateService {
 
   private final RequestScopeResolver requestScopeResolver;
   private final AuthHelperService authHelper;
-  private final ShipRepository shipRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
 
   /**
@@ -158,31 +154,6 @@ public class AccessGateService {
   }
 
   /**
-   * Shared owner-escape check for the personal aggregates (REQ-ORG-011), in order.
-   *
-   * <ul>
-   *   <li>the per-user owner may always access the row ({@link #isCurrentUserOwner(User)});
-   *   <li>an ownerless row defers to {@link #canAccessOwnerlessPersonalRow(User)};
-   *   <li>otherwise {@link #canSeeSquadron(UUID)} or, with {@code edit}, {@link
-   *       #canEditSquadron(UUID)}.
-   * </ul>
-   *
-   * @param row the resolved row; empty denies access
-   * @param owner extracts the row's per-user owner
-   * @param orgUnit extracts the row's owning org unit; {@code null} marks an ownerless row
-   * @param edit {@code true} for the edit check, {@code false} for the read check
-   * @param <T> the row's entity type
-   * @return {@code true} iff the caller may access the row
-   */
-  private <T> boolean permitsRow(
-      @NotNull Optional<T> row,
-      Function<T, User> owner,
-      Function<T, OrgUnit> orgUnit,
-      boolean edit) {
-    return row.map(r -> permitsOwnedRow(owner.apply(r), orgUnit.apply(r), edit)).orElse(false);
-  }
-
-  /**
    * Checks whether the caller may access a row with the given per-user owner and owning org unit:
    * the owner escape (REQ-ORG-011), then the ownerless rule, then {@link #canSeeSquadron(UUID)} or,
    * with {@code edit}, {@link #canEditSquadron(UUID)}.
@@ -232,31 +203,5 @@ public class AccessGateService {
     return orgUnitMembershipRepository.findAllByIdUserId(targetUserId).stream()
         .map(m -> m.getId().getOrgUnitId())
         .anyMatch(unitScope);
-  }
-
-  /**
-   * Checks whether the caller may read ship {@code shipId}, applying the owner escape
-   * (REQ-ORG-011), then the ownerless rule, then {@link #canSeeSquadron(UUID)}. Unknown ids return
-   * {@code false}.
-   *
-   * @param shipId ship to inspect; never {@code null}
-   * @return {@code true} iff the caller may read the ship
-   */
-  public boolean canSeeShip(@NotNull UUID shipId) {
-    return permitsRow(
-        shipRepository.findById(shipId), Ship::getOwner, Ship::getOwningOrgUnit, false);
-  }
-
-  /**
-   * Checks whether the caller may edit ship {@code shipId}, applying the owner escape
-   * (REQ-ORG-011), then the ownerless rule, then {@link #canEditSquadron(UUID)}. Unknown ids return
-   * {@code false}.
-   *
-   * @param shipId ship to inspect; never {@code null}
-   * @return {@code true} iff the caller may edit the ship
-   */
-  public boolean canEditShip(@NotNull UUID shipId) {
-    return permitsRow(
-        shipRepository.findById(shipId), Ship::getOwner, Ship::getOwningOrgUnit, true);
   }
 }

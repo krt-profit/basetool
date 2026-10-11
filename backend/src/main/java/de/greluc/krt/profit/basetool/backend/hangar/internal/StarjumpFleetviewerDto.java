@@ -17,24 +17,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 
 /**
- * One {@code canvasItems} element of a StarJump FleetViewer JSON export; only {@code SHIP} items
- * are imported and unknown fields are ignored.
+ * Root object of a StarJump FleetViewer JSON export; unknown layout fields are ignored.
  *
- * @param itemType the canvas-item discriminator; only {@code "SHIP"} (case-insensitive) is imported
- * @param shipSlug FleetViewer's ship slug, the fallback match key against {@code ShipType.uexSlug}
- *     / {@code ShipType.scwikiSlug}
- * @param variantSlug FleetViewer's variant slug; unused
- * @param defaultText the human-readable ship name, the primary name-matcher input
+ * @param type the export discriminator (expected {@code "starjumpFleetviewer"}, case-insensitive)
+ * @param canvasItems the canvas elements, ship tiles and widgets intermixed; may be {@code null}
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record StarjumpCanvasItemDto(
-    @JsonProperty("itemType") String itemType,
-    @JsonProperty("shipSlug") String shipSlug,
-    @JsonProperty("variantSlug") String variantSlug,
-    @JsonProperty("defaultText") String defaultText) {}
+public record StarjumpFleetviewerDto(
+    @JsonProperty("type") String type,
+    @JsonProperty("canvasItems") List<StarjumpCanvasItemDto> canvasItems) {}

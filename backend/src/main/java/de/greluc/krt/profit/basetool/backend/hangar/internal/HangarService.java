@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.events.HangarNotices;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
@@ -37,13 +37,14 @@ import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipDetailDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Collections;

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 /**
  * Internal DTO for parsing a single entry from a CCU Game Fleetview JSON export.

@@ -17,19 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
-import java.util.List;
+import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
 
 /**
- * Response DTO for the Fleetview JSON import endpoint.
+ * Write payload for the hangar "set home location" bulk action. Carries the id of the curated home
+ * location to assign to every ship the calling user owns.
  *
- * <p>Returns import statistics and lists of ships that could not be processed, so the user can take
- * corrective action (e.g. run a UEX sync or rename ships manually).
+ * @param locationId the curated home location id; required
  */
-public record FleetviewImportResponseDto(
-    int importedCount,
-    int skippedCount,
-    int duplicateCount,
-    List<String> skippedShips,
-    List<String> duplicateShips) {}
+public record SetHomeLocationRequestDto(@NotNull UUID locationId) {}
