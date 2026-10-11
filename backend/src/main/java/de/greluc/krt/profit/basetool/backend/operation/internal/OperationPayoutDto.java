@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.operation.internal;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import java.math.BigDecimal;
 import java.time.Instant;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One participant's row of the operation payout breakdown.
@@ -59,5 +60,5 @@ public record OperationPayoutDto(
     BigDecimal transferFee,
     BigDecimal payoutAmount,
     boolean paidOut,
-    Instant paidOutAt,
-    String paidOutByName) {}
+    @Nullable Instant paidOutAt,
+    @Nullable String paidOutByName) {}

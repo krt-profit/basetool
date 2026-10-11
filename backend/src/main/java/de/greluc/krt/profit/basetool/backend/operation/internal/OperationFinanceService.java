@@ -24,14 +24,12 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFinanceReader;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderLine;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceGroupAggregate;
-import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -43,6 +41,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -246,7 +245,9 @@ public class OperationFinanceService {
    */
   @NotNull
   private static BigDecimal missionTotal(
-      BigDecimal incomeSum, BigDecimal expenseSum, Double refineryProfit) {
+      @Nullable BigDecimal incomeSum,
+      @Nullable BigDecimal expenseSum,
+      @Nullable Double refineryProfit) {
     BigDecimal income = incomeSum != null ? incomeSum : BigDecimal.ZERO;
     BigDecimal expense = expenseSum != null ? expenseSum : BigDecimal.ZERO;
     BigDecimal profit =

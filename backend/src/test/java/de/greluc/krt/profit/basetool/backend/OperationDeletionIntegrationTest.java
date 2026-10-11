@@ -27,7 +27,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.model.*;
+import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.*;

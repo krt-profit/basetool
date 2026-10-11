@@ -27,6 +27,7 @@ import jakarta.persistence.EntityManager;
 import java.util.HashMap;
 import java.util.Map;
 import org.jetbrains.annotations.NotNull;
+import org.mockito.ArgumentMatchers;
 
 /**
  * A mocked {@link EntityManager} for unit tests of the Lager's stock commands whose {@code
@@ -47,7 +48,7 @@ public final class ReferenceResolvingEntityManager {
     Map<Object, Object> byId = new HashMap<>();
     EntityManager entityManager = mock(EntityManager.class);
     lenient()
-        .when(entityManager.getReference(any(Class.class), any()))
+        .when(entityManager.getReference(ArgumentMatchers.<Class<Object>>any(), any()))
         .thenAnswer(
             invocation -> {
               Object id = invocation.getArgument(1);

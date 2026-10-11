@@ -115,6 +115,7 @@ basetool {
         "joborder",
         "materialexchange",
         "mission",
+        "operation",
         "refinery",
       )
       .map { "de.greluc.krt.profit.basetool.backend.$it" }

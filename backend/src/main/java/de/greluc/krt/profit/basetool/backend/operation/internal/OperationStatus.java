@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 /** Enumeration of Operation Status values. */
 public enum OperationStatus {

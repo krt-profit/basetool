@@ -1632,7 +1632,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 343);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 340);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

@@ -166,6 +166,7 @@ class DataExportEndStateTest {
     return json.replaceAll("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "<uuid>")
         .replaceAll("\\d{4}-\\d{2}-\\d{2}T[0-9:.]+Z", "<instant>")
         .replaceAll("\"display_id\" : \\d+", "\"display_id\" : <n>")
+        .replaceAll("\"job_order\" : \\d+", "\"job_order\" : <n>")
         .replace("\r\n", "\n");
   }
 

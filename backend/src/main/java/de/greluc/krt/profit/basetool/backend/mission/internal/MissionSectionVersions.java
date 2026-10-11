@@ -22,8 +22,6 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import java.util.UUID;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
@@ -41,74 +39,158 @@ public final class MissionSectionVersions {
   private MissionSectionVersions() {}
 
   /**
-   * A mission's independently-versioned edit sections. Each constant binds the getter/setter and
-   * the repository conditional-bump of one manual {@code *Version} counter on {@link Mission},
-   * letting {@link #enforceSectionVersion} and {@link #bumpSectionVersion} operate on any section
-   * without a per-section helper.
+   * A mission's independently-versioned edit sections. Each constant reads, writes and
+   * conditionally bumps one manual {@code *Version} counter on {@link Mission}, letting {@link
+   * #enforceSectionVersion} and {@link #bumpSectionVersion} operate on any section without a
+   * per-section helper.
    */
   public enum MissionSection {
     /** The mission core (name, description, status, owner-visible identity). */
-    CORE(
-        Mission::getCoreVersion,
-        Mission::setCoreVersion,
-        MissionRepository::bumpCoreVersionIfMatches),
+    CORE {
+      @Override
+      Long read(Mission mission) {
+        return mission.getCoreVersion();
+      }
+
+      @Override
+      void write(Mission mission, Long value) {
+        mission.setCoreVersion(value);
+      }
+
+      @Override
+      int bump(MissionRepository repository, UUID missionId, long expected) {
+        return repository.bumpCoreVersionIfMatches(missionId, expected);
+      }
+    },
     /** The mission schedule (planned/actual start and end times). */
-    SCHEDULE(
-        Mission::getScheduleVersion,
-        Mission::setScheduleVersion,
-        MissionRepository::bumpScheduleVersionIfMatches),
+    SCHEDULE {
+      @Override
+      Long read(Mission mission) {
+        return mission.getScheduleVersion();
+      }
+
+      @Override
+      void write(Mission mission, Long value) {
+        mission.setScheduleVersion(value);
+      }
+
+      @Override
+      int bump(MissionRepository repository, UUID missionId, long expected) {
+        return repository.bumpScheduleVersionIfMatches(missionId, expected);
+      }
+    },
     /** The mission flags (e.g. the internal/public visibility toggle). */
-    FLAGS(
-        Mission::getFlagsVersion,
-        Mission::setFlagsVersion,
-        MissionRepository::bumpFlagsVersionIfMatches),
+    FLAGS {
+      @Override
+      Long read(Mission mission) {
+        return mission.getFlagsVersion();
+      }
+
+      @Override
+      void write(Mission mission, Long value) {
+        mission.setFlagsVersion(value);
+      }
+
+      @Override
+      int bump(MissionRepository repository, UUID missionId, long expected) {
+        return repository.bumpFlagsVersionIfMatches(missionId, expected);
+      }
+    },
     /** The mission party-lead assignment. */
-    PARTY_LEAD(
-        Mission::getPartyLeadVersion,
-        Mission::setPartyLeadVersion,
-        MissionRepository::bumpPartyLeadVersionIfMatches),
+    PARTY_LEAD {
+      @Override
+      Long read(Mission mission) {
+        return mission.getPartyLeadVersion();
+      }
+
+      @Override
+      void write(Mission mission, Long value) {
+        mission.setPartyLeadVersion(value);
+      }
+
+      @Override
+      int bump(MissionRepository repository, UUID missionId, long expected) {
+        return repository.bumpPartyLeadVersionIfMatches(missionId, expected);
+      }
+    },
     /** The Ablauf steps timeline. */
-    STEPS(
-        Mission::getStepsVersion,
-        Mission::setStepsVersion,
-        MissionRepository::bumpStepsVersionIfMatches),
+    STEPS {
+      @Override
+      Long read(Mission mission) {
+        return mission.getStepsVersion();
+      }
+
+      @Override
+      void write(Mission mission, Long value) {
+        mission.setStepsVersion(value);
+      }
+
+      @Override
+      int bump(MissionRepository repository, UUID missionId, long expected) {
+        return repository.bumpStepsVersionIfMatches(missionId, expected);
+      }
+    },
     /** The mission objectives (Ziele). */
-    OBJECTIVES(
-        Mission::getObjectivesVersion,
-        Mission::setObjectivesVersion,
-        MissionRepository::bumpObjectivesVersionIfMatches),
+    OBJECTIVES {
+      @Override
+      Long read(Mission mission) {
+        return mission.getObjectivesVersion();
+      }
+
+      @Override
+      void write(Mission mission, Long value) {
+        mission.setObjectivesVersion(value);
+      }
+
+      @Override
+      int bump(MissionRepository repository, UUID missionId, long expected) {
+        return repository.bumpObjectivesVersionIfMatches(missionId, expected);
+      }
+    },
     /** The owning-org-unit assignment. */
-    OWNING_ORG_UNIT(
-        Mission::getOwningOrgUnitVersion,
-        Mission::setOwningOrgUnitVersion,
-        MissionRepository::bumpOwningOrgUnitVersionIfMatches);
+    OWNING_ORG_UNIT {
+      @Override
+      Long read(Mission mission) {
+        return mission.getOwningOrgUnitVersion();
+      }
 
-    /** Reads the raw (nullable) counter value from a mission. */
-    private final transient Function<Mission, Long> getter;
+      @Override
+      void write(Mission mission, Long value) {
+        mission.setOwningOrgUnitVersion(value);
+      }
 
-    /** Writes the counter value back onto a mission. */
-    private final transient BiConsumer<Mission, Long> setter;
-
-    /** Runs this section's atomic conditional counter bump on the repository. */
-    private final transient SectionCounterBump dbBump;
+      @Override
+      int bump(MissionRepository repository, UUID missionId, long expected) {
+        return repository.bumpOwningOrgUnitVersionIfMatches(missionId, expected);
+      }
+    };
 
     /**
-     * Binds a section to its counter accessors on {@link Mission} and its conditional bump on
-     * {@link MissionRepository}.
+     * Reads the raw (nullable) counter value from a mission.
      *
-     * @param getter reads the raw, nullable counter
-     * @param setter writes the counter back
-     * @param dbBump runs the section's conditional {@code UPDATE} and returns the affected row
-     *     count
+     * @param mission the mission to read the counter from
+     * @return the stored counter, possibly {@code null}
      */
-    MissionSection(
-        Function<Mission, Long> getter,
-        BiConsumer<Mission, Long> setter,
-        SectionCounterBump dbBump) {
-      this.getter = getter;
-      this.setter = setter;
-      this.dbBump = dbBump;
-    }
+    abstract Long read(Mission mission);
+
+    /**
+     * Writes the counter value back onto a mission.
+     *
+     * @param mission the mission to write the counter on
+     * @param value the new counter value
+     */
+    abstract void write(Mission mission, Long value);
+
+    /**
+     * Runs this section's atomic conditional counter bump: {@code UPDATE Mission … SET xVersion =
+     * xVersion + 1 WHERE id = ? AND xVersion = ?}.
+     *
+     * @param repository the mission repository
+     * @param missionId the mission id
+     * @param expected the counter value the caller echoed back
+     * @return the affected row count ({@code 1} on a match, {@code 0} on a stale echo)
+     */
+    abstract int bump(MissionRepository repository, UUID missionId, long expected);
 
     /**
      * Returns this section's counter for the mission, {@code 0L} when it is {@code null}.
@@ -117,7 +199,7 @@ public final class MissionSectionVersions {
      * @return the current section version, or {@code 0L} when the counter is null
      */
     long current(@NotNull Mission mission) {
-      Long value = getter.apply(mission);
+      Long value = read(mission);
       return value == null ? 0L : value;
     }
 
@@ -128,24 +210,8 @@ public final class MissionSectionVersions {
      * @param value the new counter value.
      */
     void set(@NotNull Mission mission, long value) {
-      setter.accept(mission, value);
+      write(mission, value);
     }
-  }
-
-  /** Runs a section's atomic conditional counter bump on the repository. */
-  @FunctionalInterface
-  private interface SectionCounterBump {
-
-    /**
-     * Executes the section's {@code UPDATE Mission … SET xVersion = xVersion + 1 WHERE id = ? AND
-     * xVersion = ?}.
-     *
-     * @param repository the mission repository
-     * @param missionId the mission id
-     * @param expected the counter value the caller echoed back
-     * @return the affected row count ({@code 1} on a match, {@code 0} on a stale echo)
-     */
-    int bump(MissionRepository repository, UUID missionId, long expected);
   }
 
   /**
@@ -169,7 +235,7 @@ public final class MissionSectionVersions {
       @NotNull MissionSection section,
       @NotNull Long expectedVersion,
       @NotNull UUID missionId) {
-    int updated = section.dbBump.bump(repository, missionId, expectedVersion);
+    int updated = section.bump(repository, missionId, expectedVersion);
     if (updated == 0) {
       throw new ObjectOptimisticLockingFailureException(Mission.class, missionId);
     }

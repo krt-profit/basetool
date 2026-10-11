@@ -22,6 +22,7 @@ tasks.named<JavaCompile>("compileJava") {
     disableWarningsInGeneratedCode.set(true)
     check("NullAway", CheckSeverity.ERROR)
     disable("StringConcatToTextBlock")
+    disable("UnrecognisedJavadocTag")
     option("NullAway:AnnotatedPackages", basetool.nullAwayPackages.map { it.joinToString(",") })
     option("NullAway:TreatGeneratedAsUnannotated", "true")
   }

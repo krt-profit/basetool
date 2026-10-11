@@ -31,15 +31,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.Operation;
-import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -261,7 +261,7 @@ class OperationModuleContractTest {
             .getContentAsString();
     Set<UUID> listed = new HashSet<>();
     for (JsonNode node : objectMapper.readTree(body)) {
-      UUID id = UUID.fromString(node.get("id").asText());
+      UUID id = UUID.fromString(node.get("id").asString());
       if (created.contains(id)) {
         listed.add(id);
       }

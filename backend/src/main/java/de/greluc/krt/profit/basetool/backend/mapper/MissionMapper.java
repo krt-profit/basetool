@@ -40,6 +40,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionObjectiveDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionStepDto;
@@ -50,6 +52,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.BeforeMapping;
 import org.mapstruct.Mapper;
@@ -64,15 +67,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 public abstract class MissionMapper {
 
   /** Projects the operation a mission belongs to from the per-transaction operation memo. */
-  private static final String OPERATION_EXPRESSION =
-      "java(mission.getOperationId() == null ? null : operationMapper.toDtoFromSummary("
-          + "missionOperationLookup.operation(mission.getOperationId())))";
+  private static final String OPERATION_EXPRESSION = "java(resolveOperation(mission))";
 
   @Autowired protected MissionViewerAccess missionViewerAccess;
 
   @Autowired protected MissionOperationLookup missionOperationLookup;
-
-  @Autowired protected OperationMapper operationMapper;
 
   /**
    * The same {@link UserMapper} the generated subclass delegates the roster's {@code UserDto}s to,
@@ -231,6 +230,23 @@ public abstract class MissionMapper {
     return null;
   }
 
+  /**
+   * Builds the operation a mission shows from the per-transaction operation memo.
+   *
+   * @param mission the mission being projected
+   * @return the embedded operation, or {@code null} for a mission without an operation or one whose
+   *     operation no longer exists
+   */
+  @Nullable
+  public MissionOperationDto resolveOperation(Mission mission) {
+    UUID operationId = mission.getOperationId();
+    if (operationId == null) {
+      return null;
+    }
+    MissionOperationSummary summary = missionOperationLookup.operation(operationId);
+    return summary == null ? null : MissionOperationDto.of(summary);
+  }
+
   /** Returns {@code true} iff the current caller may edit this mission. */
   public boolean resolveCanEdit(Mission mission) {
     if (mission == null) {
@@ -279,7 +295,7 @@ public abstract class MissionMapper {
       return List.of();
     }
     Comparator<MissionCrew> leaderFirst =
-        Comparator.comparing((MissionCrew c) -> isLeaderCrew(c) ? 0 : 1)
+        Comparator.comparingInt((MissionCrew c) -> isLeaderCrew(c) ? 0 : 1)
             .thenComparing(
                 c -> {
                   String n = resolveParticipantName(c);

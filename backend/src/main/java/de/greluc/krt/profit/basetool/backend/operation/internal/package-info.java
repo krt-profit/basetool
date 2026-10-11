@@ -18,7 +18,8 @@
  */
 
 /**
- * The operation module's internals: the services, the access policy, the payout-status entity and
- * repository, and the finance and payout DTOs (plan §5.2).
+ * The operation module's internals: the operation entity, status, repository, mapper and DTOs, the
+ * services, the access policy with its scope fragment, the payout-status entity and repository, and
+ * the finance and payout DTOs (plan §5.2).
  */
 package de.greluc.krt.profit.basetool.backend.operation.internal;

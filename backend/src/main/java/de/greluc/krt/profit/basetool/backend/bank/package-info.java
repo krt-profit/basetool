@@ -27,7 +27,7 @@
       "audit::api",
       "blueprint::api",
       "catalogue::api",
-      "hangar/hangar::api",
+      "hangar::api",
       "identity::api",
       "inventory::api",
       "joborder::api",

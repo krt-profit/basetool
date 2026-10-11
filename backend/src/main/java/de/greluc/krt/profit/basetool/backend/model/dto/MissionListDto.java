@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -40,7 +41,7 @@ public record MissionListDto(
     Instant plannedEndTime,
     Instant actualEndTime,
     Boolean isInternal,
-    OperationDto operation,
+    @Schema(ref = "#/components/schemas/OperationDto") MissionOperationDto operation,
     SquadronReferenceDto owningSquadron,
     String meetingPoint,
     long registeredCount,
