@@ -136,6 +136,10 @@ instead of reading `IngestGatewayProperties` and `KnownExchangeClients` itself (
 `ProblemResponseFactory` and `AppProblemProperties` from `platform` to `kernel`; that added no
 edge, since every module may depend on either.
 
+Since then the later phases of the plan shrank it step by step; on 2026-10-11, after plan §7.6
+P4-3 (the catalogue's `LocationService` asks the `catalogue.api.LocationUsage` SPI instead of the
+ship and refinery repositories), the file holds **36 class edges in 8 module pairs**.
+
 **Acceptance**
 
 - [x] The backend's frozen baseline equals the rule's current violations.

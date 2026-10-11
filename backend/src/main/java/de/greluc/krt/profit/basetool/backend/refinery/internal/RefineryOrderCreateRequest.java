@@ -17,8 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.NotEmpty;
@@ -26,27 +30,29 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 /**
- * Request body of a refinery-order update.
+ * Request body of a refinery-order create.
  *
- * <p>It carries no id, owner, profit or owning squadron: the order comes from the path, its owner
- * and org unit never change, and the profit is computed. A logistician acting for the owner uses
- * the per-target path.
+ * <p>It carries no id, owner, profit, owning squadron, version or status: the owner comes from the
+ * token or the path, the profit is computed, and the order always starts {@code OPEN}. {@code
+ * owningOrgUnitId} is the picker output, resolved by {@code
+ * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}; an inadmissible pick is rejected with
+ * 400 (REQ-ORG-016).
  *
  * @param location the refinery location
- * @param mission the linked mission, or {@code null} to unlink
+ * @param mission the linked mission, or {@code null}
  * @param startedAt the run's start, or {@code null} for now
  * @param durationMinutes the run's duration in minutes
  * @param expenses the refining expenses
  * @param otherExpenses further expenses
  * @param oreSales the ore sales
- * @param refiningMethod the refining method, or {@code null} to clear it
- * @param status the new status name, or {@code null} to keep the current one
- * @param goods the goods of the run, replacing the stored ones
- * @param version the last-seen version, or {@code null} to skip the optimistic-lock check
+ * @param refiningMethod the refining method, or {@code null}
+ * @param goods the goods put into the run
+ * @param owningOrgUnitId the org unit to stamp, or {@code null} for the owner's single membership
  */
-public record RefineryOrderUpdateRequest(
+public record RefineryOrderCreateRequest(
     @NotNull LocationDto location,
     MissionReferenceDto mission,
     Instant startedAt,
@@ -55,6 +61,5 @@ public record RefineryOrderUpdateRequest(
     @PositiveOrZero @DecimalMax("1000000000.0") Double otherExpenses,
     @PositiveOrZero @DecimalMax("1000000000.0") Double oreSales,
     RefiningMethodDto refiningMethod,
-    String status,
     @NotEmpty List<@Valid RefineryGoodDto> goods,
-    Long version) {}
+    UUID owningOrgUnitId) {}

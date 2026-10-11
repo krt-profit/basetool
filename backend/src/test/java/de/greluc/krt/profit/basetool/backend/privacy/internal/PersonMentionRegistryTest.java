@@ -69,7 +69,7 @@ class PersonMentionRegistryTest {
     PersonMentionSource source = () -> List.of(target("MISSION", "mission", "name"));
 
     assertThat(source.exemptColumns()).isEmpty();
-    assertThat(source.exemptButMayHoldAName()).isEmpty();
+    assertThat(source.exemptButMayHoldNames()).isEmpty();
     assertThat(source.exemptTables()).isEmpty();
   }
 

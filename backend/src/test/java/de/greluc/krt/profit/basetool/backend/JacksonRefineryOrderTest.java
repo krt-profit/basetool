@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;

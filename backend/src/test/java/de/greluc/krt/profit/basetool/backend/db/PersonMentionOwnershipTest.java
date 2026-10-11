@@ -107,7 +107,7 @@ class PersonMentionOwnershipTest {
           List<String> tables = new ArrayList<>();
           source.targets().forEach(t -> tables.add(t.table()));
           source.exemptColumns().forEach(c -> tables.add(c.substring(0, c.indexOf('.'))));
-          source.exemptButMayHoldAName().forEach(c -> tables.add(c.substring(0, c.indexOf('.'))));
+          source.exemptButMayHoldNames().forEach(c -> tables.add(c.substring(0, c.indexOf('.'))));
           tables.addAll(source.exemptTables());
           for (String table : tables) {
             String owner = owners.get(table);

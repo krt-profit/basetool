@@ -4538,8 +4538,8 @@ carry a **name somebody gave a thing**, which can be a person's: `hangar.name` (
 (`notification_rule.description`), `bankAccountGrants.account`, `bankAccountBookingGrants.account`
 and `bankApprovalLimits.account` (`bank_account.name`) and the two `orgChartPositions` name
 columns. Each is a person-name surface in
-`PersonSearchTargets` (REQ-SEC-060), which is the registry that settles the question rather than a
-per-section judgement call.
+the person-mention sources (REQ-SEC-060), whose union is the registry that settles the question
+rather than a per-section judgement call.
 
 `HandleScrubber` replaces the names of other members, case-insensitively, longest match first (or
 "Val" would leave "kyrie" behind from "Valkyrie"), in **one forward pass over the original text**,
@@ -4567,15 +4567,17 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 > `notificationRuleTargets` shipped selecting an administrator's free text unscrubbed, and a renamed
 > key would have dropped out of the scrub set while the export kept reporting success.
 >
-> **Widened 2026-09-17.** The gate asked `PersonSearchTargets.TARGETS` — the columns the
+> **Widened 2026-09-17.** The gate asked the person-mention targets (then
+> `PersonSearchTargets.TARGETS`) — the columns the
 > Personensuche *searches* — which is a different question from whether a column can hold
 > somebody's name. A column may instead be `EXEMPT_COLUMNS`, and the exemptions for technical
 > payloads rest on reachability rather than absence: `notification.params` holds the handle
 > `AccountDeletionRequestedEvent` writes into one row per administrator, and it is skipped by the
 > search because searching it returns one hit per admin inbox for the same event. So the export
 > scrubbed it while nothing required the scrub, and `notifications.params` was the one entry in
-> the whole registry whose deletion no test would have caught. `PersonSearchTargets`
-> `.EXEMPT_BUT_MAY_HOLD_A_NAME` names that class beside the reasons it is drawn from, and the gate
+> the whole registry whose deletion no test would have caught. A source's
+> `exemptButMayHoldNames()` (then `PersonSearchTargets.EXEMPT_BUT_MAY_HOLD_A_NAME`) names that class
+> beside the reasons it is drawn from, and the gate
 > asks for it too. Asking all of `EXEMPT_COLUMNS` instead would flag some forty status codes and
 > identifiers and bury the one that matters.
 
@@ -4828,16 +4830,22 @@ the casing the admin types and the casing the row happens to hold are independen
 case-sensitive match would answer "no further mentions" and nothing downstream would reveal that
 the answer was wrong.
 
-**A written registry, checked against the schema.** `PersonSearchTargets.TARGETS` names each
-searched `(area, table, column, idColumn, linkKind)`. It is a list rather than a reflection sweep
+**A written registry, checked against the schema.** Each module declares the columns of its tables
+as a `platform.api.PersonMentionSource` (2026-10-11, plan §7.6, P4 slice d): `targets()` names each
+searched `(area, table, column, idColumn, linkKind)`, and `exemptColumns()`,
+`exemptButMayHoldNames()` and `exemptTables()` name what is left out.
+`privacy.internal.PersonMentionRegistry` orders the union by area, table and column and refuses a
+column declared twice; `PersonMentionOwnershipTest` holds each source to the module that owns the
+tables it names. It is a list rather than a reflection sweep
 because "every column of type text" would include ~200 columns of catalogue data synced from UEX and
 the SC wiki — planet names, manufacturer nicknames, brochure URLs — which cannot name a member in
 any sense that matters and would bury the real hits.
 
 > [!important] The registry is gate-enforced, and that is what makes the claim true
 > `PersonSearchCoverageTest` sweeps `information_schema` for every text column of every base table
-> and **fails the build** unless each one is either searched or recorded in `EXEMPT_COLUMNS` /
-> `EXEMPT_TABLES` with a reason. So a new free-text column cannot be added silently — its author
+> and **fails the build** unless each one is either searched or recorded in a source's
+> `exemptColumns()` / `exemptTables()` — which the test reads as the union of all sources, found by
+> scanning — and fails on an exemption for a column or table that no longer exists. So a new free-text column cannot be added silently — its author
 > has to decide which it is. Without that gate, the instruction in the privacy record would go
 > quietly false the first time somebody added a notes field, and the person whose data it is would
 > have no way to know. The test also asserts that every registered column and id column still
@@ -4902,8 +4910,11 @@ aggregates.
 - [x] The search is ADMIN-only; a member, an officer and bank management are refused.
 - [x] The audit event records the term's length and never the term.
 
-**Enforced by:** `PersonSearchCoverageTest`, `AdminPersonSearchControllerSecurityTest` · **Code:**
-`privacy/internal/PersonSearchTargets`, `service/PersonSearchService`,
+**Enforced by:** `PersonSearchCoverageTest`, `PersonMentionCatalogueTest`,
+`PersonSearchEndStateTest`, `PersonMentionOwnershipTest`, `PersonMentionRegistryTest`,
+`AdminPersonSearchControllerSecurityTest` · **Code:**
+`platform/api/PersonMentionSource`, `privacy/internal/PersonMentionRegistry`, the
+`*MentionSource` classes of the modules, `service/PersonSearchService`,
 `controller/AdminPersonSearchController`, `model/dto/PersonSearchHitDto`,
 `frontend/identity/web/AdminPersonSearchPageController`, `templates/admin/person-search.html`,
 `static/js/admin-person-search.js` · **Decision:**
@@ -5024,8 +5035,18 @@ When an admin grants the member's wish, the member's handle MUST be replaced by 
 about what happened is altered — only the name goes.
 
 **Twelve columns in eight statements**, and the reason it is all of them: erasing eleven reads as a
-completed erasure while still naming the person on the twelfth. `HandleAnonymisationService.ANONYMISED_COLUMNS`
-is the authoritative list.
+completed erasure while still naming the person on the twelfth. The union of
+`HandleAnonymisationParticipant#columns()` over the registered participants is the authoritative
+list; `HandleAnonymisationCoverageTest` holds it equal to the `ANONYMISED` dispositions of
+`HandleErasureCoverage` and to the live schema.
+
+**The anonymisation is an orchestrator over participants** (plan §7.6, `platform.api`).
+`HandleAnonymisationService` normalises the spellings, runs every `HandleAnonymisationParticipant`
+inside its one transaction by position — `AuditHandleAnonymisation` (audit), `BankHandleAnonymisation`
+(bank), `JobOrderHandleAnonymisation` (job order) — writes the activity trail's
+`HANDLE_SNAPSHOTS_ANONYMISED` marker from the summed counts, and then lets each participant record
+its own marker: the bank writes the bank trail's. Each module rewrites the columns of its own
+tables.
 
 |                                   Where                                   |                         Matched by                          |
 |---------------------------------------------------------------------------|-------------------------------------------------------------|
@@ -5076,7 +5097,7 @@ installation labels and the write journal's before and after states as removed w
 > four deletion-request events did the same, so a granted erasure left rows literally
 > half-anonymised for the full 24-month retention. They carry a `null` label now.
 >
-> `HandleErasureCoverage` classifies **every** column `PersonSearchTargets` registers as a place a
+> `HandleErasureCoverage` classifies **every** column the person-mention sources register as a place a
 > person is named, and `HandleErasureCoverageTest` fails the build unless each one is anonymised
 > here, removed with the account, structurally about somebody else, or recorded as an admin's manual
 > step with a reason. The person search had that gate from the day it was written and never drifted;
@@ -5135,8 +5156,13 @@ it.
 - [x] The match on the handover columns is case-insensitive.
 - [x] Nothing is deleted: row counts, timestamps, event types, amounts and subjects are unchanged.
 
-**Enforced by:** `HandleAnonymisationServiceTest`, `HandleErasureCoverageTest` · **Code:**
-`service/HandleAnonymisationService`, `kernel/HandleAnonymisation`, `privacy/internal/HandleErasureCoverage`,
+**Enforced by:** `HandleAnonymisationEndStateTest` (real Postgres: every covered column, the rows
+that must stay, the counts and both marker rows), `HandleAnonymisationServiceTest`,
+`HandleErasureCoverageTest`, `HandleAnonymisationCoverageTest` · **Code:**
+`service/HandleAnonymisationService`, `platform/api/HandleAnonymisationParticipant`,
+`service/AuditHandleAnonymisation`, `bank/internal/BankHandleAnonymisation`,
+`joborder/internal/JobOrderHandleAnonymisation`, `kernel/HandleAnonymisation`,
+`privacy/internal/HandleErasureCoverage`,
 `repository/AuditEventRepository#anonymiseActorHandle`,
 `bank/internal/BankAuditEventRepository#anonymiseActorHandle`,
 `bank/internal/BankTransactionRepository#anonymiseCounterpartyHandle`,
@@ -5540,7 +5566,7 @@ data lands on the main profile; the Basetool never discloses the stored handle t
 `ApiVhostAnonymousSurfaceTest`, `ProfileRsiHandleMvcTest`, `MemberManagementControllerTest`,
 `ProfileRsiHandleInPlaceE2eTest` · **Code:** `V246__add_rsi_handle_to_app_user.sql`, `User`,
 `UserService#updateUserRsiHandle`, `UserRepository#existsOtherAccountWithName`, `UserController`,
-`UserAccountMergeService`, `HandleSpellings`, `PersonSearchTargets`, the
+`UserAccountMergeService`, `HandleSpellings`, the `PersonMentionSource` sources, the
 `PersonalDataExportSection` participants, `HandleErasureCoverage`, frontend `ProfileRsiHandleProxyController`, `ProfileController`,
 `MemberManagementController`, `profile.html`, `profile.js`, `member-edit.html` · **Record:**
 [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md) (A1) · **Related:**

@@ -17,9 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
+import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -46,6 +51,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.Formula;
+import org.jetbrains.annotations.Nullable;
 
 /** Refinery Order JPA entity. */
 @TenantScoped("owningOrgUnit")
@@ -60,6 +66,7 @@ public class RefineryOrder extends AbstractEntity<UUID> {
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
+  @Setter(onParam_ = @__(@Nullable))
   private UUID id;
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -74,6 +81,7 @@ public class RefineryOrder extends AbstractEntity<UUID> {
 
   /** The linked mission, or {@code null}; the mission module resolves its reference. */
   @Column(name = "mission_id")
+  @Nullable
   private UUID missionId;
 
   /**
@@ -82,13 +90,14 @@ public class RefineryOrder extends AbstractEntity<UUID> {
    */
   @Transient private boolean missionReferenceWithoutId;
 
-  private Instant startedAt;
+  @Nullable private Instant startedAt;
 
   /** When the order-ready notice was raised, or {@code null} (REQ-REFINERY-023). */
   @Column(name = "ready_notified_at")
+  @Nullable
   private Instant readyNotifiedAt;
 
-  @PositiveOrZero private Long durationMinutes;
+  @Nullable @PositiveOrZero private Long durationMinutes;
 
   /**
    * End of the run, {@code startedAt + durationMinutes}, computed by the database so the order
@@ -96,30 +105,32 @@ public class RefineryOrder extends AbstractEntity<UUID> {
    */
   @Formula("(started_at + make_interval(0, 0, 0, 0, 0, 0, duration_minutes * 60))")
   @Setter(AccessLevel.NONE)
+  @Nullable
   private Instant endsAt;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "refining_method_id")
   @ToString.Exclude
+  @Nullable
   private RefiningMethod refiningMethod;
 
   /**
    * Order costs. Must be >= 0. Optional: 0 is treated as "not set" on save and persisted as {@code
    * null}. The profit calculation treats {@code null} as 0.
    */
-  @PositiveOrZero private Double expenses;
+  @Nullable @PositiveOrZero private Double expenses;
 
   /**
    * Other costs in addition to the regular {@link #expenses}. Must be >= 0. Optional: 0 is treated
    * as "not set" on save and persisted as {@code null}.
    */
-  @PositiveOrZero private Double otherExpenses;
+  @Nullable @PositiveOrZero private Double otherExpenses;
 
   /**
    * Revenue from selling raw ores ("Ore Sales"). Must be >= 0. Optional: 0 is treated as "not set"
    * on save and persisted as {@code null}.
    */
-  @PositiveOrZero private Double oreSales;
+  @Nullable @PositiveOrZero private Double oreSales;
 
   /**
    * Computed profit/loss: oreSales - expenses - otherExpenses. May be negative. Not persisted;
@@ -142,7 +153,7 @@ public class RefineryOrder extends AbstractEntity<UUID> {
    * only by the store operation and never cleared; a stored order can be neither stored again nor
    * have its status changed by an update.
    */
-  private Instant storedAt;
+  @Nullable private Instant storedAt;
 
   @OneToMany(mappedBy = "refineryOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   @ToString.Exclude
@@ -157,5 +168,6 @@ public class RefineryOrder extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id", nullable = true)
   @ToString.Exclude
+  @Nullable
   private OrgUnit owningOrgUnit;
 }

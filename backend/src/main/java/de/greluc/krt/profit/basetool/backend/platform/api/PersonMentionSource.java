@@ -108,7 +108,7 @@ public interface PersonMentionSource {
    *
    * @return the exempt columns that may hold a name
    */
-  default @NotNull @Unmodifiable Set<String> exemptButMayHoldAName() {
+  default @NotNull @Unmodifiable Set<String> exemptButMayHoldNames() {
     return Set.of();
   }
 

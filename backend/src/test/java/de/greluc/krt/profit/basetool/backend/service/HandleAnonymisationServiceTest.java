@@ -32,9 +32,10 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditEventReposit
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRepository;
-import de.greluc.krt.profit.basetool.backend.bank.internal.BankHandleSnapshotService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankHandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransactionRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
@@ -47,16 +48,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Mockito unit tests for {@link HandleAnonymisationService}, the granted Art. 17 erasure of a
- * member's handle snapshots (REQ-SEC-062): every column in {@code ANONYMISED_COLUMNS} is reached,
+ * member's handle snapshots (REQ-SEC-062): every column the participants rewrite is reached,
  * text-matched columns run once per spelling and are skipped when no name is known, the marker
  * events follow the updates, and the payload never carries the removed name. The column set itself
  * is pinned by {@code HandleErasureCoverageTest}.
@@ -83,19 +82,23 @@ class HandleAnonymisationServiceTest {
   @Mock private AuditService auditService;
   @Mock private BankAuditService bankAuditService;
 
-  @InjectMocks private HandleAnonymisationService service;
+  private HandleAnonymisationService service;
 
   @BeforeEach
-  void wireTheBankPart() {
-    ReflectionTestUtils.setField(
-        service,
-        "bankHandleSnapshots",
-        new BankHandleSnapshotService(
-            bankAuditEventRepository,
-            bankTransactionRepository,
-            bankBookingRequestRepository,
-            bankHolderRepository,
-            bankAuditService));
+  void wireTheParticipants() {
+    service =
+        new HandleAnonymisationService(
+            List.of(
+                new JobOrderHandleAnonymisation(
+                    jobOrderRepository, jobOrderHandoverRepository, jobOrderItemHandoverRepository),
+                new BankHandleAnonymisation(
+                    bankAuditEventRepository,
+                    bankTransactionRepository,
+                    bankBookingRequestRepository,
+                    bankHolderRepository,
+                    bankAuditService),
+                new AuditHandleAnonymisation(auditEventRepository)),
+            auditService);
   }
 
   private void stubCounts(int each) {

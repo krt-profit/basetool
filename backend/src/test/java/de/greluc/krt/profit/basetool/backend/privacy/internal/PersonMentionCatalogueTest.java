@@ -124,7 +124,7 @@ class PersonMentionCatalogueTest {
                 .toList())
         .forEach(lines::add);
     add(lines, "exempt-column|", MentionSourceDeclarations.exemptColumns());
-    add(lines, "exempt-name-holder|", MentionSourceDeclarations.exemptButMayHoldAName());
+    add(lines, "exempt-name-holder|", MentionSourceDeclarations.exemptButMayHoldNames());
     add(lines, "exempt-table|", MentionSourceDeclarations.exemptTables());
     return lines;
   }

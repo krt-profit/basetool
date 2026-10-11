@@ -76,7 +76,7 @@ class DataExportScrubCoverageTest {
         .as(
             "EXEMPT_BUT_MAY_HOLD_A_NAME names the exemptions that can still contain somebody's"
                 + " name, so every entry must be an exemption")
-        .containsAll(MentionSourceDeclarations.exemptButMayHoldAName());
+        .containsAll(MentionSourceDeclarations.exemptButMayHoldNames());
   }
 
   @Test
@@ -182,7 +182,7 @@ class DataExportScrubCoverageTest {
         || tables.stream()
             .anyMatch(
                 table ->
-                    MentionSourceDeclarations.exemptButMayHoldAName()
+                    MentionSourceDeclarations.exemptButMayHoldNames()
                         .contains(table + "." + column));
   }
 }

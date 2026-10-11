@@ -158,7 +158,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ScopeSpecifications;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.BankHandleSnapshots;
 import de.greluc.krt.profit.basetool.backend.service.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
@@ -439,10 +438,10 @@ class ArchitectureTest {
           .as("exchange-domain classes other than its controllers");
 
   /**
-   * The bank-module classes that live outside the bank package (REQ-BANK-008, REQ-BANK-019): the
-   * GDPR handle-anonymisation SPI beside its caller, until the participants of plan §7.6.
+   * The bank-module classes that live outside the bank package (REQ-BANK-008, REQ-BANK-019); none
+   * since the handle anonymisation's bank part became a participant inside the bank package.
    */
-  static final Set<Class<?>> BANK_CLASSES = Set.of(BankHandleSnapshots.class);
+  static final Set<Class<?>> BANK_CLASSES = Set.of();
 
   /**
    * The org-unit side of the bank: classes that carry "Bank" in their name but belong to org-unit
@@ -1633,7 +1632,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 344);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 343);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

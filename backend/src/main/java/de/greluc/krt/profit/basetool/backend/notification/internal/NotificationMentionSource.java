@@ -53,7 +53,7 @@ public class NotificationMentionSource implements PersonMentionSource {
   }
 
   @Override
-  public @NotNull Set<String> exemptButMayHoldAName() {
+  public @NotNull Set<String> exemptButMayHoldNames() {
     return Set.of("notification.params");
   }
 }

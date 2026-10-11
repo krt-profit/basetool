@@ -85,7 +85,7 @@ public class CatalogueMentionSource implements PersonMentionSource {
   }
 
   @Override
-  public @NotNull Set<String> exemptButMayHoldAName() {
+  public @NotNull Set<String> exemptButMayHoldNames() {
     return Set.of(
         "p4k_import_job.error_message",
         "p4k_import_job.result_json",

@@ -695,7 +695,8 @@ centralised:
   return type.
 - **`repository.ScopeSpecifications`** holds one `static final String` JPQL fragment per aggregate
   (`OPERATION_SCOPE_PREDICATE`, `MISSION_SCOPE_PREDICATE`, `SHIP_SCOPE_TRIPLE`,
-  `REFINERY_ORDER_SCOPE_TRIPLE`, `INVENTORY_ITEM_SCOPE_TRIPLE`, `JOB_ORDER_SCOPE_PREDICATE`),
+  `INVENTORY_ITEM_SCOPE_TRIPLE`, `JOB_ORDER_SCOPE_PREDICATE`; the refinery's
+  `REFINERY_ORDER_SCOPE_TRIPLE` lives in `RefineryAccessPolicy` since P4-3),
   referenced from each repository's `@Query` value via compile-time constant-expression concatenation
   (JLS 15.28/4.12.4 — the same technique REQ-SEC-002a's `Roles.X` constants use inside
   `@PreAuthorize`, since an annotation value cannot invoke a method). The alias is baked into each

@@ -83,8 +83,8 @@ public final class MentionSourceDeclarations {
    *
    * @return the name-bearing exemptions of all sources
    */
-  public static @NotNull @Unmodifiable Set<String> exemptButMayHoldAName() {
-    return union(PersonMentionSource::exemptButMayHoldAName);
+  public static @NotNull @Unmodifiable Set<String> exemptButMayHoldNames() {
+    return union(PersonMentionSource::exemptButMayHoldNames);
   }
 
   /**

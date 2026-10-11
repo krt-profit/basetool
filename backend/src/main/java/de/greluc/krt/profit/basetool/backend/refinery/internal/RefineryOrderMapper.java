@@ -17,15 +17,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mapper;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryGoodDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
+import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

@@ -29,9 +29,9 @@ import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutCalculator.ParticipationBreakdown;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFigures;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -68,7 +68,7 @@ class OperationPayoutCalculatorTest {
     void incomeMinusExpensePlusRefineryProfit() {
       MissionFinanceEntry income = financeEntry(FinanceType.INCOME, new BigDecimal("1000"));
       MissionFinanceEntry expense = financeEntry(FinanceType.EXPENSE, new BigDecimal("250"));
-      RefineryOrder order = refineryOrder(500d, 100d, 50d);
+      RefineryOrderFigures order = refineryOrder(500d, 100d, 50d);
 
       BigDecimal total =
           OperationPayoutCalculator.computeTotalSum(List.of(income, expense), List.of(order));
@@ -79,7 +79,7 @@ class OperationPayoutCalculatorTest {
 
     @Test
     void refineryOrderWithNullFinancials_contributesZero() {
-      RefineryOrder order = refineryOrder(null, null, null);
+      RefineryOrderFigures order = refineryOrder(null, null, null);
       assertEquals(
           0,
           OperationPayoutCalculator.computeTotalSum(List.of(), List.of(order))
@@ -122,8 +122,7 @@ class OperationPayoutCalculatorTest {
     @Test
     void refineryCostsAreAttributedToTheOwner_salesAreNot() {
       User owner = user("owner");
-      RefineryOrder order = refineryOrder(1000d, 120d, 30d);
-      order.setOwner(owner);
+      RefineryOrderFigures order = RefineryOrderFigures.of(null, owner.getId(), 1000d, 120d, 30d);
 
       Map<String, BigDecimal> byKey =
           OperationPayoutCalculator.computePersonalExpensesByParticipant(List.of(), List.of(order));
@@ -137,7 +136,7 @@ class OperationPayoutCalculatorTest {
     @Test
     void expenseWithoutParticipant_andOrderWithoutOwner_areSkipped() {
       MissionFinanceEntry orphanExpense = financeEntry(FinanceType.EXPENSE, new BigDecimal("10"));
-      RefineryOrder ownerlessOrder = refineryOrder(0d, 5d, 0d);
+      RefineryOrderFigures ownerlessOrder = refineryOrder(0d, 5d, 0d);
 
       assertTrue(
           OperationPayoutCalculator.computePersonalExpensesByParticipant(
@@ -299,12 +298,8 @@ class OperationPayoutCalculatorTest {
     return entry;
   }
 
-  private static RefineryOrder refineryOrder(
+  private static RefineryOrderFigures refineryOrder(
       Double oreSales, Double expenses, Double otherExpenses) {
-    RefineryOrder order = new RefineryOrder();
-    order.setOreSales(oreSales);
-    order.setExpenses(expenses);
-    order.setOtherExpenses(otherExpenses);
-    return order;
+    return RefineryOrderFigures.of(null, null, oreSales, expenses, otherExpenses);
   }
 }

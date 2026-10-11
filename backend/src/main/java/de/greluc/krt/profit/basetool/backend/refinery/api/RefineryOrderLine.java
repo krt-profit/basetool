@@ -17,12 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.refinery.api;
 
-/** Enumeration of Refinery Order Status values. */
-public enum RefineryOrderStatus {
-  OPEN,
-  IN_PROGRESS,
-  COMPLETED,
-  CANCELED
-}
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * One refinery order of a mission's finance breakdown: its money and its full DTO.
+ *
+ * @param figures the order's money
+ * @param order the order's DTO
+ */
+public record RefineryOrderLine(
+    @NotNull RefineryOrderFigures figures, @NotNull RefineryOrderDto order) {}

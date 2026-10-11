@@ -17,28 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.platform.internal;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource;
-import java.util.List;
-import java.util.Set;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.stereotype.Component;
-
-/**
- * The platform's part of the person search: the columns of the schema history that can name a
- * person, and those left out (REQ-SEC-060).
- */
-@Component
-public class PlatformMentionSource implements PersonMentionSource {
-
-  @Override
-  public @NotNull List<Target> targets() {
-    return List.of();
-  }
-
-  @Override
-  public @NotNull Set<String> exemptTables() {
-    return Set.of("flyway_schema_history");
-  }
+/** Enumeration of Refinery Order Status values. */
+public enum RefineryOrderStatus {
+  OPEN,
+  IN_PROGRESS,
+  COMPLETED,
+  CANCELED
 }
