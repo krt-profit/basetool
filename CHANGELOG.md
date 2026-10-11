@@ -2,13 +2,11 @@
 
 ## [Unreleased]
 
+## [v1.15.0](https://github.com/krt-profit/basetool/releases/tag/v1.15.0) - 2026-10-11
+
 ### Added
 
 - **Deploy: veraltete Host-Skripte fallen auf.** Das Release bringt die Hashes der Host-Skripte mit (`host-scripts.sha256`); `deploy.sh` vergleicht sie bei jedem Tick (`basetool_host_scripts_drift`, Alarme `HostScriptDrift` und `HostScriptsCheckStale`) und verweigert ein Release, dessen Apply-Skripte (`deploy.sh`, `lib/`, `render-env-d.py`) auf dem Host andere sind, bevor sich etwas ändert. Notausgang: `--force` oder `IRI_REQUIRE_CURRENT_SCRIPTS=false`. Der Vergleich vor jeder Promotion ist jetzt Pflicht (`docs/deployment.md`).
-
-### Fixed
-
-- **Einsatz: Mit-Manager hinzufügen zeigte einen Fehler, obwohl es klappte.** Das Frontend las die Antwortliste des Backends als Text und warf einen Dekodierungsfehler (HTTP 500 im Browser), obwohl der Manager bereits eingetragen war; die Antwort wird jetzt verworfen.
 
 ### Changed
 
@@ -29,6 +27,10 @@
 - **Einstellungen lesen nur noch Admins.** `GET /api/v1/settings` und `GET /api/v1/settings/{key}` (der rohe Einstellungsspeicher) verlangen die Rolle ADMIN wie das Schreiben; Mitglieder und die App lesen die Schwellen und den Rundungsmodus über `GET /api/v1/orders/settings` und `GET /api/v1/refinery-orders/settings` (REQ-SEC-083).
 
 - **Einstellungsspeicher nicht zwischenspeicherbar.** Die Admin-Lesezugriffe auf `/api/v1/settings` antworten mit `Cache-Control: private, no-store`.
+
+### Fixed
+
+- **Einsatz: Mit-Manager hinzufügen zeigte einen Fehler, obwohl es klappte.** Das Frontend las die Antwortliste des Backends als Text und warf einen Dekodierungsfehler (HTTP 500 im Browser), obwohl der Manager bereits eingetragen war; die Antwort wird jetzt verworfen.
 
 ## [v1.14.0](https://github.com/krt-profit/basetool/releases/tag/v1.14.0) - 2026-10-10
 
