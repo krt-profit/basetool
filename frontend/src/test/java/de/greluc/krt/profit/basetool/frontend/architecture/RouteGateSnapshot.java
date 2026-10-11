@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.architecture;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;

@@ -162,6 +162,9 @@ public class MissionStructureService {
 
     mission.getAssignedUnits().add(missionUnit);
     missionUnitRepository.save(missionUnit);
+    if (missionUnit.getShip() != null) {
+      notificationPublisher.shipAssigned(mission, missionUnit, missionUnit.getShip());
+    }
     auditRecorder.record(
         AuditEventType.MISSION_UNIT_ADDED,
         mission.getId(),
@@ -251,6 +254,7 @@ public class MissionStructureService {
     OptimisticLock.checkOptionalClient(
         missionUnit.getVersion(), expectedVersion, MissionUnit.class, unitId);
 
+    final Ship previousShip = missionUnit.getShip();
     missionUnit.setHighValueUnit(highValueUnit);
     final UUID previousResponsible =
         missionUnit.getResponsibleUser() == null ? null : missionUnit.getResponsibleUser().getId();
@@ -305,6 +309,7 @@ public class MissionStructureService {
     }
 
     missionUnitRepository.save(missionUnit);
+    announceShipChange(mission, missionUnit, previousShip);
     auditRecorder.record(
         AuditEventType.MISSION_UNIT_UPDATED,
         mission.getId(),
@@ -312,6 +317,30 @@ public class MissionStructureService {
         null,
         AuditDetails.of("unit", unitId));
     return mission;
+  }
+
+  /**
+   * Tells the owners when a unit's ship changed (REQ-HANGAR-005): the new ship's owner hears that
+   * the ship was assigned, the former ship's owner loses the assignment notice.
+   *
+   * @param mission the managed mission
+   * @param unit the unit after the update
+   * @param previousShip the unit's ship before the update, or {@code null}
+   */
+  private void announceShipChange(
+      @NotNull Mission mission, @NotNull MissionUnit unit, @Nullable Ship previousShip) {
+    final Ship current = unit.getShip();
+    if (Objects.equals(
+        previousShip == null ? null : previousShip.getId(),
+        current == null ? null : current.getId())) {
+      return;
+    }
+    if (previousShip != null) {
+      notificationPublisher.shipUnassigned(unit.getId(), previousShip);
+    }
+    if (current != null) {
+      notificationPublisher.shipAssigned(mission, unit, current);
+    }
   }
 
   /**

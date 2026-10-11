@@ -21,14 +21,14 @@ package de.greluc.krt.profit.basetool.frontend.exchange.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.ConnectedAppMassChangeRequestDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeBulkUndoRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientStatusRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeClientUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeSettingsUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.ExchangeUndoRequestDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeRequestDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientStatusRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeSettingsUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeUndoRequestDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

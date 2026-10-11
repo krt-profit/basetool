@@ -19,14 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.personalinventory.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UexLocationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.UexLocationDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemUpdateRequest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;

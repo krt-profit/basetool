@@ -147,6 +147,12 @@ list, so the switch refuses nothing that already sits in Redis; were it to, the 
 one attribute (at most one redirect's flash values), never the login, which is held in Spring
 Security and JDK types. Mode default unchanged: `enforce`.
 
+**The move it prepared, 2026-10-10 (plan F4).** The 21 types moved into their domains' `model`
+packages and the list names them there. A flash map a session stored before that release names the
+old classes, which resolve to nothing: the read fails at type resolution, before the validator is
+asked, so the value is dropped and logged by its old name without reaching the refusal counter —
+one attribute, once per session, never the login (`FaultTolerantSessionSerializerTest`).
+
 ## Alternatives rejected
 
 - **Enforce on merge.** One wrong entry would sign members out on the next deploy, and the only way

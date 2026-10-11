@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
@@ -32,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockSoldForTarget;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryNotices;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
@@ -41,16 +43,11 @@ import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
-import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -64,8 +61,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -124,8 +119,8 @@ public class InventoryCheckoutService {
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
-  private final MissionFinanceEntryRepository missionFinanceEntryRepository;
-  private final MissionParticipantRepository missionParticipantRepository;
+  private final StockSoldForTarget stockSoldForTarget;
+  private final EarmarkTargets.Lookup earmarkTargets;
   private final StockOfferLookup stockOfferLookup;
   private final StockChangeObserver stockChangeObserver;
   private final InventoryItemMapper inventoryItemMapper;
@@ -457,19 +452,11 @@ public class InventoryCheckoutService {
     }
     BigDecimal proceeds = dto.sellAmount() != null ? dto.sellAmount() : BigDecimal.ZERO;
 
-    List<MissionFinanceEntry> entries = new ArrayList<>();
+    List<StockSoldForTarget.MissionShare> shares = new ArrayList<>();
     for (Map.Entry<UUID, Double> reduction : missionReductions.entrySet()) {
       InventoryMissionAllocation slice =
           InventoryAllocations.missionSlice(item, reduction.getKey());
-      if (slice == null || slice.getMission() == null) {
-        continue;
-      }
-      Mission mission = slice.getMission();
-      MissionParticipant participant =
-          missionParticipantRepository
-              .findByMissionIdAndUserId(mission.getId(), currentUserId)
-              .orElse(null);
-      if (participant == null) {
+      if (slice == null || slice.getMissionId() == null) {
         continue;
       }
       BigDecimal credit =
@@ -479,21 +466,12 @@ public class InventoryCheckoutService {
       if (credit.signum() <= 0) {
         continue;
       }
-      MissionFinanceEntry entry = new MissionFinanceEntry();
-      entry.setMission(mission);
-      entry.setParticipant(participant);
-      entry.setType(FinanceType.INCOME);
-      entry.setAmount(credit);
-      entry.setNote("Sale of " + dto.amount() + "x " + catalogName(item) + " at " + dto.terminal());
-      entries.add(entry);
+      shares.add(new StockSoldForTarget.MissionShare(slice.getMissionId(), credit));
     }
-
-    List<UUID> financeEntryIds = new ArrayList<>();
-    for (MissionFinanceEntry entry : entries) {
-      missionFinanceEntryRepository.save(entry);
-      financeEntryIds.add(entry.getId());
-    }
-    return financeEntryIds;
+    return stockSoldForTarget.soldForMissions(
+        currentUserId,
+        shares,
+        "Sale of " + dto.amount() + "x " + catalogName(item) + " at " + dto.terminal());
   }
 
   /**
@@ -514,17 +492,19 @@ public class InventoryCheckoutService {
     for (Map.Entry<UUID, Double> reduction : orderReductions.entrySet()) {
       InventoryJobOrderAllocation slice =
           InventoryAllocations.jobOrderSlice(source, reduction.getKey());
-      if (slice != null && slice.getJobOrder() != null) {
-        JobOrder order = slice.getJobOrder();
+      if (slice != null && slice.getJobOrderId() != null) {
         InventoryAllocations.addJobOrder(
-            target, order, reduction.getValue(), Boolean.TRUE.equals(slice.getDelivered()));
+            target,
+            slice.getJobOrderId(),
+            reduction.getValue(),
+            Boolean.TRUE.equals(slice.getDelivered()));
       }
     }
     for (Map.Entry<UUID, Double> reduction : missionReductions.entrySet()) {
       InventoryMissionAllocation slice =
           InventoryAllocations.missionSlice(source, reduction.getKey());
-      if (slice != null && slice.getMission() != null) {
-        InventoryAllocations.addMission(target, slice.getMission(), reduction.getValue());
+      if (slice != null && slice.getMissionId() != null) {
+        InventoryAllocations.addMission(target, slice.getMissionId(), reduction.getValue());
       }
     }
   }
@@ -1352,10 +1332,7 @@ public class InventoryCheckoutService {
     InventoryJobOrderAllocation slice =
         Entities.require(
             item.getJobOrderAllocations().stream()
-                .filter(
-                    a ->
-                        a.getJobOrder() != null
-                            && request.jobOrderId().equals(a.getJobOrder().getId()))
+                .filter(a -> request.jobOrderId().equals(a.getJobOrderId()))
                 .findFirst(),
             "Job-order allocation not found for this inventory item");
     slice.setDelivered(request.delivered());
@@ -1366,7 +1343,11 @@ public class InventoryCheckoutService {
         InventoryAuditLabels.label(item),
         item.getUser().getId(),
         AuditDetails.of("delivered", request.delivered())
-            .with("jobOrder", "#" + slice.getJobOrder().getDisplayId()));
+            .with(
+                "jobOrder",
+                "#"
+                    + Objects.requireNonNull(earmarkTargets.jobOrder(slice.getJobOrderId()))
+                        .displayId()));
     return inventoryItemMapper
         .toDto(saved)
         .withVersion(InventoryAllocations.forcedNextVersion(saved));

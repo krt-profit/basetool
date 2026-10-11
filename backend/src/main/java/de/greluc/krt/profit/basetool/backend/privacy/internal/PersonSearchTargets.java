@@ -269,8 +269,6 @@ public final class PersonSearchTargets {
           "deletion_request.status",
           "job_order.status",
           "job_order.type",
-          "job_order_item_material.quality_requirement",
-          "material_claim.quality_requirement",
           "quality_tier.code",
           "quality_tier.label_de",
           "quality_tier.label_en",

@@ -22,8 +22,6 @@ package de.greluc.krt.profit.basetool.backend.inventory.api;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -101,17 +99,17 @@ public final class InventoryAllocations {
    * duplicate-target guards.
    *
    * @param item the owning entry; never {@code null}
-   * @param order the earmarked job order; never {@code null}
+   * @param orderId the earmarked job order; never {@code null}
    * @param amount the SCU to earmark
    * @param delivered the initial delivered state
    * @return the created slice, already added to the entry
    */
   @NotNull
   public static InventoryJobOrderAllocation addJobOrder(
-      InventoryItem item, JobOrder order, double amount, boolean delivered) {
+      InventoryItem item, UUID orderId, double amount, boolean delivered) {
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
     slice.setInventoryItem(item);
-    slice.setJobOrder(order);
+    slice.setJobOrderId(orderId);
     slice.setAmount(amount);
     slice.setDelivered(delivered);
     item.getJobOrderAllocations().add(slice);
@@ -122,16 +120,16 @@ public final class InventoryAllocations {
    * Appends a mission slice earmarking {@code amount} of the entry.
    *
    * @param item the owning entry; never {@code null}
-   * @param mission the earmarked mission; never {@code null}
+   * @param missionId the earmarked mission; never {@code null}
    * @param amount the SCU to earmark
    * @return the created slice, already added to the entry
    */
   @NotNull
   public static InventoryMissionAllocation addMission(
-      InventoryItem item, Mission mission, double amount) {
+      InventoryItem item, UUID missionId, double amount) {
     InventoryMissionAllocation slice = new InventoryMissionAllocation();
     slice.setInventoryItem(item);
-    slice.setMission(mission);
+    slice.setMissionId(missionId);
     slice.setAmount(amount);
     item.getMissionAllocations().add(slice);
     return slice;
@@ -190,7 +188,7 @@ public final class InventoryAllocations {
    */
   public static void unionInto(InventoryItem survivor, InventoryItem victim) {
     for (InventoryJobOrderAllocation va : victim.getJobOrderAllocations()) {
-      UUID orderId = va.getJobOrder() != null ? va.getJobOrder().getId() : null;
+      UUID orderId = va.getJobOrderId();
       InventoryJobOrderAllocation existing = jobOrderSlice(survivor, orderId);
       if (existing != null) {
         existing.setAmount(existing.getAmount() + va.getAmount());
@@ -198,16 +196,16 @@ public final class InventoryAllocations {
             Boolean.TRUE.equals(existing.getDelivered()) || Boolean.TRUE.equals(va.getDelivered()));
       } else {
         addJobOrder(
-            survivor, va.getJobOrder(), va.getAmount(), Boolean.TRUE.equals(va.getDelivered()));
+            survivor, va.getJobOrderId(), va.getAmount(), Boolean.TRUE.equals(va.getDelivered()));
       }
     }
     for (InventoryMissionAllocation va : victim.getMissionAllocations()) {
-      UUID missionId = va.getMission() != null ? va.getMission().getId() : null;
+      UUID missionId = va.getMissionId();
       InventoryMissionAllocation existing = missionSlice(survivor, missionId);
       if (existing != null) {
         existing.setAmount(existing.getAmount() + va.getAmount());
       } else {
-        addMission(survivor, va.getMission(), va.getAmount());
+        addMission(survivor, va.getMissionId(), va.getAmount());
       }
     }
   }
@@ -226,7 +224,7 @@ public final class InventoryAllocations {
       return null;
     }
     return item.getJobOrderAllocations().stream()
-        .filter(a -> a.getJobOrder() != null && orderId.equals(a.getJobOrder().getId()))
+        .filter(a -> orderId.equals(a.getJobOrderId()))
         .findFirst()
         .orElse(null);
   }
@@ -245,7 +243,7 @@ public final class InventoryAllocations {
       return null;
     }
     return item.getMissionAllocations().stream()
-        .filter(a -> a.getMission() != null && missionId.equals(a.getMission().getId()))
+        .filter(a -> missionId.equals(a.getMissionId()))
         .findFirst()
         .orElse(null);
   }

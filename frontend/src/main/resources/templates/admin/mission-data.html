@@ -102,7 +102,7 @@
                                 <button th:if="${sq.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                         th:data-action="@{/admin/mission-data/squadrons/{id}/delete(id=${sq.id})}"
                                         th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                                <form th:if="${!sq.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/squadrons/{id}/activate(id=${sq.id})}" method="post" class="md-inline-form">
+                                <form th:if="${!sq.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:action="@{/admin/mission-data/squadrons/{id}/activate(id=${sq.id})}" method="post" class="md-inline-form">
                                     <button type="submit" class="btn btn-success btn-xs" th:text="#{admin.squadron.activate}">Aktivieren</button>
                                 </form>
                             </td>
@@ -181,7 +181,7 @@
                                 <button th:if="${job.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                         th:data-action="@{/admin/mission-data/job-types/{id}/delete(id=${job.id})}"
                                         th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                                <form th:if="${!job.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/job-types/{id}/activate(id=${job.id})}" method="post" class="md-inline-form">
+                                <form th:if="${!job.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:action="@{/admin/mission-data/job-types/{id}/activate(id=${job.id})}" method="post" class="md-inline-form">
                                     <button type="submit" class="btn btn-success btn-xs" th:text="#{admin.job_type.activate}">Aktivieren</button>
                                 </form>
                             </td>
@@ -250,7 +250,7 @@
                                 <button th:if="${freq.active}" type="button" class="btn btn-quiet-danger btn-icon delete-btn"
                                         th:data-action="@{/admin/mission-data/frequency-types/{id}/delete(id=${freq.id})}"
                                         th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                                <form th:if="${!freq.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:action="@{/admin/mission-data/frequency-types/{id}/activate(id=${freq.id})}" method="post" class="md-inline-form">
+                                <form th:if="${!freq.active}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:action="@{/admin/mission-data/frequency-types/{id}/activate(id=${freq.id})}" method="post" class="md-inline-form">
                                     <button type="submit" class="btn btn-success btn-xs" th:text="#{admin.job_type.activate}">Aktivieren</button>
                                 </form>
                             </td>

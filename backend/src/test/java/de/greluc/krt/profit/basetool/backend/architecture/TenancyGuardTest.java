@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.controller.InventoryItemController;
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandController;
 import de.greluc.krt.profit.basetool.backend.controller.SpecialCommandMembershipController;
 import de.greluc.krt.profit.basetool.backend.controller.UserController;
+import de.greluc.krt.profit.basetool.backend.exchange.web.ConnectedAppsController;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
@@ -207,7 +208,13 @@ class TenancyGuardTest {
       Map.of(
           new HandlerKey(UserController.class, "updateReadAnnouncement"),
           "marks an announcement read for the caller; the controller is selected only through"
-              + " UserDeletionService");
+              + " UserDeletionService",
+          new HandlerKey(ConnectedAppsController.class, "markSeen"),
+          "marks one of the caller's own installations seen; the controller is selected only"
+              + " through the undo, which restores the caller's own stock through StockCommands",
+          new HandlerKey(ConnectedAppsController.class, "disconnectInstallation"),
+          "revokes one of the caller's own installations; the controller is selected only through"
+              + " the undo, which restores the caller's own stock through StockCommands");
 
   /** The controllers the replaced simple-name whitelist covered; the marker rule must keep them. */
   private static final Set<Class<?>> LEGACY_WHITELIST =

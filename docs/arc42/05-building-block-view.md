@@ -88,7 +88,7 @@ in the layer packages.
 The domain events live in their publisher's `<module>.api.events` package (plan §5.2, §5.3); there
 is no central `event` package. Every listener runs after commit (`@TransactionalEventListener`),
 so the reaction may happen later or fail on its own, and none records an audit row for the mutation
-that published the event (REQ-AUDIT-007). Twelve modules publish today:
+that published the event (REQ-AUDIT-007). Thirteen modules publish today:
 
 | Package | Events |
 | --- | --- |
@@ -98,11 +98,12 @@ that published the event (REQ-AUDIT-007). Twelve modules publish today:
 | `bank.api.events` | `BankBookingRequestEvent` and its created, updated, confirmed, rejected, cancelled and notices-reconciled records; `BankAccountResponsibleAssignedEvent`; and `BankNotices`, the factory of the approval, grant, direct-booking and holder notices (REQ-BANK-057…060) |
 | `joborder.api.events` | `JobOrderCreatedEvent`, `JobOrderUpdatedByRequesterEvent`, `JobOrderClosedEvent`, and `JobOrderNotices`, the factory of the reassigned, finished, assignee and withdrawn-claim notices (REQ-ORDERS-041…044) |
 | `materialexchange.api.events` | `MaterialExchangeInterestRegisteredEvent`, `MaterialRequestFulfillmentSignalledEvent`, and `MarketNotices`, the factory of the offer-gone and request-withdrawn notices (REQ-MARKET-021, -022) |
-| `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent` |
-| `mission.api.events` | `MissionNotices`, the factory of the mission notices: rescheduled, cancelled, deleted, reminder, started, checked in, participant added / removed / left, never ended, end recorded, responsibility assigned (REQ-MISSION-021…027) |
+| `exchange.api.events` | `ExchangeInstallationConnectedEvent`, `ExchangeBulkUndoAppliedEvent`, and `ExchangeNotices`, the factory of the suspended, activated, update-required, capability-removed and switched-off notices (REQ-XCH-040, -041) |
+| `mission.api.events` | `MissionNotices`, the factory of the mission notices: rescheduled, cancelled, deleted, reminder, started, checked in, participant added / removed / left, never ended, end recorded, responsibility assigned (REQ-MISSION-021…027), a unit's ship assigned or unassigned (REQ-HANGAR-005) |
 | `operation.api.events` | `OperationNotices`, the factory of the payout paid out / unmarked and operation completed notices (REQ-MISSION-028, -029) |
 | `inventory.api.events` | `InventoryTransferredToUserEvent`, `InventoryTransferredFromUserEvent` and the `TransferredLot` they list (REQ-INV-055), and `InventoryNotices`, the factory of the booked-out-by-somebody-else notice (REQ-INV-056) |
 | `orgunit.api.events` | `OrgNotices`, the factory of the leadership role-mismatch and member-departed notices (REQ-ORG-029, -030) |
+| `admin.api.events` | `HangarNotices`, the factory of the hangar and blueprint notices: a deleted ship dropping out of a mission, fitted marks reset, hangar or blueprints changed by an admin (REQ-HANGAR-006…008) |
 | `refinery.api.events` | `RefineryNotices`, the factory of the order-ready, order-ready-cleared and changed-by-somebody-else notices (REQ-REFINERY-023, -024) |
 
 An event either notifies, supersedes the notices of its entity (REQ-NOTIF-018), or reconciles one notice for named members (REQ-NOTIF-023, ADR-0244). The publishing services and the listeners still sit in `service`. `OrgUnitRef` stays with the
@@ -192,23 +193,35 @@ The platform modules reach the domains only through SPIs they own and the domain
 
 ## 5.3 Level 2 — inside `frontend`
 
+The frontend is packaged by domain (plan §5.9, F4, REQ-FE-032): each of the 21 domains of the
+evidence table plus `shell` (landing, legal pages, manifest, client-error beacon, licence report)
+has up to three packages, and the kernel has eight. `DomainPackageLayoutTest` fails on a main class
+anywhere else.
+
 | Package | What lives there |
 | --- | --- |
-| `controller` | Thymeleaf page and fragment endpoints; AJAX mutation endpoints that return fragments; the domain-specific view shaping (`MissionDetailModelBuilder`, `BankDashboardViewAssembler`, …) |
+| `<domain>.web` | The domain's Thymeleaf page and fragment endpoints, AJAX mutation endpoints that return fragments, and its view shaping (`MissionDetailModelBuilder`, `BankDashboardViewAssembler`, view rows such as `RefineryListRow`); every controller lives here |
+| `<domain>.model` | The domain's hand-mirrored DTO records, marked `@DtoMirror` so the DTO contract tests find them wherever they live, its form objects and view models |
 | `<domain>.client` | One typed backend client per domain (`AuditBackendClient`, `NotificationBackendClient`, …): a thin `@Service` over `BackendApiClient` that owns its domain's backend paths, passes every runtime value as a URI-template variable and returns typed records; a controller reaches the backend only through its domain's client (plan F3, `TypedBackendClientTest`) |
-| `service` | The backend kernel — `BackendApiClient` with its catalogue cache and URI-template verbs for every verb, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe), `CatalogueCacheEviction` (the evictions a controller triggers after an admin write) — plus `ParallelPageLoader`, the ingest handoff, live-sync presence, Markdown rendering |
-| `model` | The hand-mirrored DTO records (`model.dto`) and the form objects (`model.form`) |
-| `view` | `MoneyFormat` |
-| `websocket` | `/ws/sync`, the handler and the Redis fanout |
-| `config` | WebClient, Resilience4j, Redis session, Reactor context propagation, security, the layout model |
-| `oss` | The open-source licence report |
-| `support` / `validation` / `exception` / `health` / `logging` / `metrics` | Shared helpers (`Roles` among them) and the usual Spring surface |
+| `kernel.backend` | The backend seam — `BackendApiClient` with its catalogue cache and URI-template verbs for every verb, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe), `CatalogueCacheEviction`, `WebClientConfig` with Resilience4j, the outbound relays (org unit, client IP, locale, logging), Reactor context propagation, `ParallelPageLoader`, the ingest handoff |
+| `kernel.security` | `SecurityConfig`, the access gates (role sync, terms gate), `Roles`, CSP, Trusted Types and security headers, the login and logout handlers, the monitoring and management port security |
+| `kernel.session` | `RedisSessionConfig`, `SessionTypeAllowList`, the fault-tolerant serializer and same-request repair, session metrics and cookie settings |
+| `kernel.layout` | `UsesLayoutModel`, `LayoutContextLoader` and the layout advices |
+| `kernel.web` | `GlobalExceptionHandler`, `BackendErrorResponses`, `RelayParams`, binding and string normalisation, the request contexts (correlation id, client IP, active org unit), MVC and locale configuration, the template beans `moneyFormat`, `relativeDays`, `markdown` and `handles` |
+| `kernel.livesync` | `/ws/sync`, the handler, the Redis fanout and presence |
+| `kernel.observability` | Request logging, log masking, the startup banner, metric names, tracing and observation filters |
+| `kernel.model` | `PageResponse`, `PayoutPreference`, the ingest handoff types, `BackendEnumAsString`, `DtoMirror` and the reference DTOs several domains share (`UserReferenceDto`, `SquadronReferenceDto`, `MaterialReferenceDto`, …) |
+
+The kernel still reaches into three domains in ten places, frozen by `KernelDomainReachTest` in a
+list that may only shrink (§11.9): the layout advices and loader read `orgunit.model`
+(`SquadronDto`, `OrgUnitMembershipOptionDto`), the access gates read `identity.model` (`UserDto`,
+`RegistrationStatusDto`, `TermsStatusDto`), `BackendApiClient` reads `TermsDocumentDto` and
+`QualityTierCatalog` reads `catalogue.model.QualityTierDto`.
 
 *Corrected 2026-09-29:* this table called `BackendApiClient` "the single seam" (see §4.1), placed
-view-shaping services in `service` and view models in `view`; the view shaping lives in
-`controller`, and `view` holds one class. The
-[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md) (§5.9) proposes the per-domain
-package tree that replaces this layout.
+view-shaping services in `service` and view models in `view`; the view shaping lived in
+`controller`, and `view` held one class. *Updated 2026-10-10:* every layer package is gone (plan
+F4).
 
 **One trap lives here and is worth naming in an architecture document**, because it is invisible
 from the code that suffers from it: `WebClient.exchange()` runs on a Reactor-Netty worker thread,
