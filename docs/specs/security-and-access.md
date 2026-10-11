@@ -2056,7 +2056,7 @@ family decides, so a sub-family can differ from its parent.
 | `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
 | `/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`, `/api/v1/hangar/**`, `/api/v1/refinery-orders/**` | holdings and profit figures |
 | `/api/v1/promotion/**` | evaluations of named members |
-| `/api/v1/roles/**`, `/api/v1/catalog/admin/**`, `/api/v1/blueprints/admin/**` | the administration of roles, of the catalogue (imports, quality tiers, sync reports) and of the default blueprints; the other administration trees sit under `users`, `terms`, `personal-*`, `hangar`, `notifications` and `connected-apps`, which are `no-store` already |
+| `/api/v1/roles/**`, `/api/v1/settings/**`, `/api/v1/catalog/admin/**`, `/api/v1/blueprints/admin/**` | the administration of roles, of the raw key store (ADMIN-only reads, REQ-SEC-083), of the catalogue (imports, quality tiers, sync reports) and of the default blueprints; the other administration trees sit under `users`, `terms`, `personal-*`, `hangar`, `notifications` and `connected-apps`, which are `no-store` already |
 | `/api/v1/audit/**` | **new** — who did what, by actor |
 | `/api/v1/announcements/**` (the public banner `/api/v1/announcements/current` excepted, the admin read `/api/v1/announcements/current/admin` included) | the read marker is the caller's own state; the admin read is an administration tree |
 | `/api/v1/connected-apps/**` | **new** — the member's installations and their activity |
@@ -2072,7 +2072,7 @@ family decides, so a sub-family can differ from its parent.
 Revalidatable: `announcements/current` (the public banner), `app`, `blueprints`, `cities`, `frequency-types`, `game-items`,
 `job-types`, `kommando-groups`, `locations`, `manufacturers`, `material-categories`,
 `material-external-aliases`, `materials`, `missions`, `org-hierarchy`, `org-units`, `outposts`,
-`pois`, `quality-tiers`, `refining-methods`, `settings`, the typed reads `orders/settings` and `refinery-orders/settings`, `ship-types`, `space-stations`, `special-commands`,
+`pois`, `quality-tiers`, `refining-methods`, the typed reads `orders/settings` and `refinery-orders/settings`, `ship-types`, `space-stations`, `special-commands`,
 `squadrons`, `star-systems`, `terminals`, `uex`, and two
 catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**` and
 `/api/v1/terms/document`. The game-item catalogue (`/api/v1/game-items/**`) and the refinery yield
@@ -2155,7 +2155,7 @@ answer from it identically for seventeen paths.
   names at least one mapping (`ApiCacheFamilyCoverageTest`, selection floor 572 mappings).
 - [x] Every `GET` mapping, with its path variables filled, answers its family's directive through
   the real filter chain (floor 244), and one authenticated read per `no-store` family keeps
-  `no-store` past its handler (floor 26).
+  `no-store` past its handler (floor 27).
 - [x] A planted unclassified family is reported (`PathControlInventoryTest`) and an unclassified
   `/api` path answers `no-store` (`NoStoreApiScopesTest`).
 
@@ -5755,9 +5755,12 @@ see a `403`.
 - [x] A signed-in caller holding `KRT_MEMBER`, `LOGISTICIAN`, `MISSION_MANAGER`, `OFFICER` or
   `BANK_EMPLOYEE` and not `ADMIN` is refused `403` on both reads; an admin is served.
 - [x] The authorization matrix records `pre=hasRole('ADMIN')` for both reads.
+- [x] An admin's answer to both reads is `private, no-store` without an `ETag`: the key store is an
+  administration tree (REQ-SEC-031, D-18), so `/api/v1/settings/**` is a `no-store` family; the typed
+  reads `orders/settings` and `refinery-orders/settings` stay revalidatable.
 
 **Enforced by:** `SystemSettingControllerSecurityTest`, `AuthorizationMatrixTest` ·
-**Code:** `SystemSettingController` · **Related:** REQ-SEC-052, REQ-API-009, REQ-API-023
+**Code:** `SystemSettingController` · **Related:** REQ-SEC-031, REQ-SEC-052, REQ-API-009, REQ-API-023
 
 ---
 

@@ -60119,21 +60119,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy: no-cache, must-revalidate",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -60248,21 +60239,12 @@
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy: no-cache, must-revalidate",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {

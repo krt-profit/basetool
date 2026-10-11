@@ -73,7 +73,7 @@ class ApiCacheFamilyCoverageTest {
   private static final int API_GET_FLOOR = 244;
 
   /** The number of {@code no-store} families with a {@code GET} mapping today. */
-  private static final int NO_STORE_READ_FAMILY_FLOOR = 26;
+  private static final int NO_STORE_READ_FAMILY_FLOOR = 27;
 
   /**
    * Orders mappings by fewest path variables, then by pattern, to pick a family's representative.
