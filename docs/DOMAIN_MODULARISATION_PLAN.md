@@ -1447,7 +1447,7 @@ domain stays a package.
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
 | F3 — **done 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 — **done 2026-10-10** | Package-by-domain move in one pull request; route/gate snapshot byte-identical. Released only after a release carrying F2 is in production (D-10) |
-| F5 | Templates and assets per domain (§8.2), with the page chrome as one layout fragment |
+| F5 — **layout fragment done 2026-10-11** | Templates and assets per domain (§8.2), with the page chrome as one layout fragment. The layout fragment is built (below); the per-domain template and asset layout is open |
 
 *F1 as built (2026-10-04).* `service.BackendErrorMapper` classifies every failed call into one case
 of its sealed `Outcome` (`Problem`, `Reauthentication`, `CircuitOpen`, `BulkheadFull`, `Timeout`,
@@ -1563,6 +1563,36 @@ old class names in its flash maps; they resolve to no class, so the value fails 
 before the allow-list is consulted — dropped on `basetool_session_value_dropped_total`, not refused
 on `basetool_session_type_refused_total` — once per session, never the login (deployment.md).
 
+*F5 layout fragment as built (2026-10-11).* `fragments/layout :: page` is the one place that
+composes a page: the `<html>` element, `fragments/head`, `fragments/sidebar` and `fragments/header`,
+the page's content, `fragments/toast` and the page's tail, in that order (REQ-FE-033). A page hands
+it `pageTitle`, `pageLinks`, `pageContent` and `pageTail` as `th:fragment` blocks of its own file and
+names its variant as a parameter: `pageToast`, `pageBare` (no sidebar and header: the five error
+pages, pending approval, terms acceptance) and `pageShowModal` (the hangar's body attribute). It is
+native Thymeleaf with no signature, like `modal-wrapper`; no dependency was added. 90 of the 91
+non-fragment templates were converted, in six stacked commits, 83 with the app shell and 7 without
+it; `organisation/unit-detail.html` stays, because it has no head and no chrome (it is a roster
+fragment library). The 91 templates lost 137 lines net. Before the first conversion
+`PageChromeSnapshotTest` captured the chrome of every page into a golden file (`<html>` tag, head,
+`<body>` tag and the order of chrome, content, toast and tail) by rendering each page through the
+real fragments for an administrator with the page's own markup replaced by markers
+(`ChromeNeutraliser`, which reads both the old and the new shape of a page); it stayed unchanged
+through every commit, it fails on six planted page changes and three planted layout changes, and
+`PageLayoutCompositionTest` keeps any page from calling the chrome fragments again. Corrections: the
+plan's "83 pages copy the header in five variants" counted the pages with the app shell; the head,
+sidebar, header and toast were already fragments, so what the pages copied was the skeleton — the
+`<html>` and `<body>` tags and four fragment calls, about a dozen lines each — and the "five
+variants" were really the toast (39 pages), the shell-less pages (7), one body attribute (the
+hangar), four pages that passed an empty `additionalLinks` and a cosmetic `xmlns:sec` on some
+`<html>` tags; the fan-kit band is page content, not chrome. "Chrome changes once" was already true
+of the markup; what changes once now is the composition, that is the order, the toast placement and
+the body attributes. A snapshot of the fully rendered pages was not possible, because most pages
+need a model, so the oracle pins the chrome and the position of the page's own parts, and the
+content and tail blocks were moved by script without a byte changed inside them (the 160-odd
+existing render and MVC tests of the pages are the check on that). The frontend's Spring-context
+budget rose from 21 to 22, the snapshot test's template resolver and controller being a context of
+their own (REQ-OPS-041). Open in F5: templates and assets per domain.
+
 ### 7.9 REST API track
 
 **Delivery decided 2026-10-04 (D-24):** the waves below are built and merged one by one, but ship
@@ -1625,7 +1655,7 @@ JSpecify stays out for now (ADR-0192).
 | **One read path**: `krtFetch.get`/`getJson` with re-authentication, the terms gate, refusal of redirected or non-JSON answers and `AbortController`; then forbid `fetch(` outside the transport and ban `XMLHttpRequest`. **Done 2026-10-04** (REQ-FE-031): 61 raw reads in 33 scripts plus one inline read in `members.html` migrated, `swap` reads through `get` too; ESLint bans `fetch`/`XMLHttpRequest`, and `BackgroundReadGateContractTest` pins the same for templates, which ESLint never sees | 56 raw reads behave the same way on session loss | Pickers that silently emptied now send the user to the login — the intended contract | A new E2E for a picker after session loss |
 | **Trusted Types**, report-only first through the existing `csp_violation` beacon, then enforced: two named policies, a tagged-template HTML builder, no default policy. **Done 2026-10-04 except the production switch** (ADR-0239): `krt-html` behind the `krtHtml` builder, `krt-fragment` inside `krt-fetch.js`; 42 builder sites, 26 clears and one `DOMParser` read migrated, `escape-html.js` removed; ESLint bans every sink and policy outside the two helpers; the report-only header is the default of `APP_SECURITY_TRUSTED_TYPES` (`report` / `enforce`), with the gauge `basetool_trusted_types_mode`. **The only remaining step** is switching production to `enforce`, a production configuration change the owner approves after a quiet period (`deployment.md` → *Trusted Types: report, then enforce*) | DOM-XSS becomes a browser-enforced property | Every future sink must use the helpers; under enforcement even `innerHTML = ''` throws | A violation collector in the dialog page-walk E2E (proven by a planted violation), `:frontend:testEslintBans`, `:frontend:testTrustedTypesJs`, `TrustedTypesModeTest` |
 | **CSS** — **done 2026-10-04** (ADR-0243): lint the page stylesheets with the standard config (74 by then, not 54; 66 findings fixed without visual change); a custom-property existence test (it finds an undefined token that makes the material-demand search header transparent; B-03 was already fixed in Phase −1, and the test now also reads templates and scripts); `color-mix()` for alpha variants (120 hand-written token copies replaced, `ColourTokenCopyTest`); a z-index scale (18 `--z-*` tokens with the numbers they replaced, `ZIndexScaleTest`); container queries and nesting only where a design decision asks for them (none asked) | One lint standard; tokens as the single colour source | Visual changes | `CascadeLayerOrderTest`, screenshot review; a computed-style comparison of every touched declaration against `main` |
-| **One layout fragment** carrying head, sidebar, header and toast (83 pages copy the header in five variants) — native Thymeleaf, no Layout Dialect dependency | Chrome changes once | Touches 83–90 templates | Render tests, E2E |
+| **One layout fragment** carrying head, sidebar, header and toast (83 pages copy the header in five variants) — native Thymeleaf, no Layout Dialect dependency. **Done 2026-10-11** (REQ-FE-033, §7.8): `fragments/layout :: page`, 90 templates converted, one left (no chrome); *Correction:* what the pages copied was the skeleton around fragments that already existed, and the variants are parameters | Chrome changes once | Touches 83–90 templates | `PageChromeSnapshotTest` (golden file, planted changes), `PageLayoutCompositionTest`, render tests, E2E |
 | **ES modules** only after the global-scope and inline-script work, and only behind a server-rendered import map (unversioned asset URLs are cached immutably for a year) | Explicit dependencies, lint-enforced boundaries | Import-map and nonce plumbing | Every specifier must be in the map |
 | **No bundler** | — | A compromised bundler release would be site-wide script injection the nonce CSP cannot stop; the served file would no longer be the checked file (ADR-0125) | — |
 

@@ -2672,12 +2672,14 @@ does not each boot a further full context (BLD-PERF-03, plan §7.2 step 0.6).
 - **Each application holds a budget of distinct contexts**, computed without starting any of them:
   `TestContextBudgetTest` builds the `MergedContextConfiguration` Spring's own bootstrapper builds for
   every Spring test class (`test-support`'s `TestContextKeys`), groups them, and fails above the
-  budget with the full grouping. Budgets: backend 36, frontend 21, ingest 15 (raised from 34, 19 and 13
+  budget with the full grouping. Budgets: backend 36, frontend 22, ingest 15 (raised from 34, 19 and 13
   when the Phase 0 merge chain brought in `CachedCatalogueEntityInvariantTest` and
   `RetiredOperationChainTest`, whose planted configuration classes are contexts of their own, the exchange freeze's ingest golden and route tests, and
   the frontend's backend-origin tests, which point the clients at a local server they start
   (`WebClientBackendSeamTest`, `WebClientHttp2NegotiationTest`); two other new backend tests share
-  the default context). A selection floor fails
+  the default context; the frontend went from 21 to 22 on 2026-10-11 with `PageChromeSnapshotTest`
+  (REQ-FE-033), whose planted template resolver and render controller are a context of their own).
+  A selection floor fails
   the test when it stops seeing the test classes. A budget is raised only with a reason in the PR.
 - **`LeafServiceMockSecurityTest`** runs inside the `@LeafServiceMockTest` context and fails when a
   security root reaches one of its mocks, naming the dependency chain.
