@@ -15,24 +15,24 @@
       "bank/org-unit-bank.js"
     ],
     "blueprint": [
-      "admin-blueprints.js",
-      "admin-default-blueprints.js",
-      "blueprint-overview.js"
+      "blueprint/admin-blueprints.js",
+      "blueprint/admin-default-blueprints.js",
+      "blueprint/blueprint-overview.js"
     ],
     "catalogue": [
-      "admin-material-aliases.js",
-      "admin-materials.js",
-      "admin-quality-tiers.js",
-      "locations.js",
-      "material-detail.js",
-      "materials-matrix.js",
-      "materials-profit-calculation.js",
-      "materials.js",
-      "mission-data.js",
-      "p4k-import.js",
-      "ship-data.js",
-      "sync-reports.js",
-      "uex.js"
+      "catalogue/admin-material-aliases.js",
+      "catalogue/admin-materials.js",
+      "catalogue/admin-quality-tiers.js",
+      "catalogue/locations.js",
+      "catalogue/material-detail.js",
+      "catalogue/materials-matrix.js",
+      "catalogue/materials-profit-calculation.js",
+      "catalogue/materials.js",
+      "catalogue/mission-data.js",
+      "catalogue/p4k-import.js",
+      "catalogue/ship-data.js",
+      "catalogue/sync-reports.js",
+      "catalogue/uex.js"
     ],
     "dashboard": [
       "dashboard/announcement.js",
@@ -60,16 +60,16 @@
       "terms-accept.js"
     ],
     "inventory": [
-      "inventory-admin.js",
-      "inventory-common.js",
-      "inventory-game-item.js",
-      "inventory-herkunft.js",
-      "inventory-index.js",
-      "inventory-input.js",
-      "inventory-material.js",
-      "inventory-materialboerse.js",
-      "inventory-my.js",
-      "inventory-note-modal.js"
+      "inventory/inventory-admin.js",
+      "inventory/inventory-common.js",
+      "inventory/inventory-game-item.js",
+      "inventory/inventory-herkunft.js",
+      "inventory/inventory-index.js",
+      "inventory/inventory-input.js",
+      "inventory/inventory-material.js",
+      "inventory/inventory-materialboerse.js",
+      "inventory/inventory-my.js",
+      "inventory/inventory-note-modal.js"
     ],
     "joborder": [
       "item-collection.js",
@@ -115,9 +115,9 @@
       "leitung.js"
     ],
     "materialexchange": [
-      "materialboerse-release.js",
-      "materialboerse.js",
-      "materialgesuch-modal.js"
+      "materialexchange/materialboerse-release.js",
+      "materialexchange/materialboerse.js",
+      "materialexchange/materialgesuch-modal.js"
     ],
     "mission": [
       "mission-detail-actions.js",
@@ -147,11 +147,11 @@
       "special-commands.js"
     ],
     "personalinventory": [
-      "admin-personal-blueprints-purge.js",
-      "personal-inventory-blueprints-import.js",
-      "personal-inventory-blueprints-recipe.js",
-      "personal-inventory-blueprints.js",
-      "personal-inventory.js"
+      "personalinventory/admin-personal-blueprints-purge.js",
+      "personalinventory/personal-inventory-blueprints-import.js",
+      "personalinventory/personal-inventory-blueprints-recipe.js",
+      "personalinventory/personal-inventory-blueprints.js",
+      "personalinventory/personal-inventory.js"
     ],
     "promotion": [
       "promotion-admin-rank-requirements.js",

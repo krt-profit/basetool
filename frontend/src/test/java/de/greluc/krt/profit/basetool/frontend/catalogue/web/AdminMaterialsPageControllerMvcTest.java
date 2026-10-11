@@ -56,8 +56,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Regression test for the Thymeleaf JS-inline truncation on {@code /admin/materials}: the page
- * loads the {@code static/js/admin-materials.js} module (ADR-0069) and the response ends with the
- * closing {@code </html>} tag.
+ * loads the {@code static/js/catalogue/admin-materials.js} module (ADR-0069) and the response ends
+ * with the closing {@code </html>} tag.
  */
 @SpringBootTest
 class AdminMaterialsPageControllerMvcTest {
@@ -78,8 +78,8 @@ class AdminMaterialsPageControllerMvcTest {
   }
 
   /**
-   * Asserts the rendered page loads the extracted {@code static/js/admin-materials.js} module
-   * (ADR-0069), whose tail carries the {@code 'admin-materials-update'} delegated-event
+   * Asserts the rendered page loads the extracted {@code static/js/catalogue/admin-materials.js}
+   * module (ADR-0069), whose tail carries the {@code 'admin-materials-update'} delegated-event
    * registration — proof that the bootstrap still renders fully and the Thymeleaf truncation does
    * not strike again.
    */
@@ -117,10 +117,10 @@ class AdminMaterialsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/materials"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/materials"))
+        .andExpect(view().name("catalogue/admin/materials"))
         .andExpect(content().string(containsString("id=\"materialNames-data\"")))
         .andExpect(content().string(containsString("value=\"Aluminum\"")))
-        .andExpect(content().string(containsString("src=\"/js/admin-materials.js\"")))
+        .andExpect(content().string(containsString("src=\"/js/catalogue/admin-materials.js\"")))
         .andExpect(content().string(containsString("</html>")));
   }
 

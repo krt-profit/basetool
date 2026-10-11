@@ -97,7 +97,9 @@ public class BlueprintOverviewPageController {
     model.addAttribute("overviewPage", res);
     model.addAttribute("search", trimmedSearch);
     model.addAttribute("pageSizes", PAGE_SIZES);
-    return "results".equals(fragment) ? "blueprint-overview :: results" : "blueprint-overview";
+    return "results".equals(fragment)
+        ? "blueprint/blueprint-overview :: results"
+        : "blueprint/blueprint-overview";
   }
 
   /**

@@ -70,6 +70,8 @@ public class AdminQualityTiersPageController {
       model.addAttribute("error", "admin.qualityTiers.error.load");
       model.addAttribute("tiers", List.of());
     }
-    return "results".equals(fragment) ? "admin/quality-tiers :: results" : "admin/quality-tiers";
+    return "results".equals(fragment)
+        ? "catalogue/admin/quality-tiers :: results"
+        : "catalogue/admin/quality-tiers";
   }
 }

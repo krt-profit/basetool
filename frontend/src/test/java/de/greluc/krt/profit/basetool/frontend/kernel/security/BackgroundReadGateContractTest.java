@@ -46,7 +46,7 @@ import org.junit.jupiter.api.Test;
 class BackgroundReadGateContractTest {
 
   /** The polled P4K import module. */
-  private static final String P4K_MODULE = "/static/js/p4k-import.js";
+  private static final String P4K_MODULE = "/static/js/catalogue/p4k-import.js";
 
   /** The notification bell + unread-badge module. */
   private static final String NOTIFICATIONS_MODULE = "/static/js/notification/notifications.js";

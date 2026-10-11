@@ -82,6 +82,8 @@ class AdminP4kImportPagePatternRenderTest {
             "id=\"krt-p4k-jobs-empty\" class=\"empty-state\" data-testid=\"empty-state\" hidden")
         .contains("id=\"krt-p4k-apply-panel\"")
         .contains("id=\"krt-p4k-results\"");
-    assertThat(html).contains("/css/pages/admin-p4k-import.css").contains("/js/p4k-import.js");
+    assertThat(html)
+        .contains("/css/pages/catalogue/admin-p4k-import.css")
+        .contains("/js/catalogue/p4k-import.js");
   }
 }

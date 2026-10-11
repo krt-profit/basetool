@@ -216,8 +216,8 @@ fallback), `DefaultBlueprintsE2eTest` (in-place remove, no-reload marker).
 [`DefaultBlueprintCatalog`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintCatalog.java),
 [`V157__create_default_blueprint.sql`](../../backend/src/main/resources/db/migration/V157__create_default_blueprint.sql),
 [`AdminDefaultBlueprintsPageController`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminDefaultBlueprintsPageController.java),
-[`admin/default-blueprints.html`](../../frontend/src/main/resources/templates/admin/default-blueprints.html),
-[`admin-default-blueprints.js`](../../frontend/src/main/resources/static/js/admin-default-blueprints.js),
+[`blueprint/admin/default-blueprints.html`](../../frontend/src/main/resources/templates/blueprint/admin/default-blueprints.html),
+[`admin-default-blueprints.js`](../../frontend/src/main/resources/static/js/blueprint/admin-default-blueprints.js),
 [`AdminDefaultBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminDefaultBlueprintsPageControllerMvcTest.java).
 
 ### REQ-INV-018 — Opt-in global blueprint sharing
@@ -409,7 +409,7 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 [`RefineryOrderService#pendingYieldSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/refinery/internal/RefineryOrderService.java),
 [`BlueprintCraftabilityDto`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto/BlueprintCraftabilityDto.java),
 [`PersonalInventoryBlueprintsPageController#craftability`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageController.java),
-[`personal-inventory-blueprints-recipe.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints-recipe.js).
+[`personal-inventory-blueprints-recipe.js`](../../frontend/src/main/resources/static/js/personalinventory/personal-inventory-blueprints-recipe.js).
 
 ### REQ-INV-049 — Import preview: auto-selected top suggestion, honest include checkbox
 
@@ -455,7 +455,7 @@ suggestion auto-matches on the next import.
 **Enforced by:** manual Preview verification (no JS unit-test harness in CI; the JS is lint-gated by
 eslint/prettier and the server-side apply contract — blank/unresolvable picks skipped — by
 `BlueprintImportServiceTest`) · **Code:**
-[`personal-inventory-blueprints-import.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints-import.js)
+[`personal-inventory-blueprints-import.js`](../../frontend/src/main/resources/static/js/personalinventory/personal-inventory-blueprints-import.js)
 (`renderRow`, `apply`),
 [`BlueprintImportService#applyImport`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintImportService.java)
 · **Issues:** [#824](https://github.com/krt-profit/basetool/issues/824)
@@ -504,9 +504,9 @@ implementation rather than a second bespoke one.
 (admin gate + `fragment=results` swap target), the frontend lint gates
 (`htmlhint` / `stylelint` / `eslint` / `prettier`) and `MessageBundleConsistencyTest` (DE/EN/default
 i18n) · **Code:**
-[`admin/personal-blueprints.html`](../../frontend/src/main/resources/templates/admin/personal-blueprints.html),
-[`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints.js)
-(`renderStaging`), [`personal-inventory.css`](../../frontend/src/main/resources/static/css/personal-inventory.css)
+[`blueprint/admin/personal-blueprints.html`](../../frontend/src/main/resources/templates/blueprint/admin/personal-blueprints.html),
+[`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personalinventory/personal-inventory-blueprints.js)
+(`renderStaging`), [`personal-inventory.css`](../../frontend/src/main/resources/static/css/personalinventory/personal-inventory.css)
 
 ### REQ-INV-023 — "Delete all my blueprints" one-click clear
 
@@ -549,7 +549,7 @@ caller's **entire removable owned-blueprint set** in one action, so a user who w
 [`PersonalBlueprintService#deleteAllOwn`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java),
 [`PersonalBlueprintRepository#deleteRemovableByOwnerUserId`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
 [`PersonalInventoryBlueprintsPageController#deleteAll`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageController.java),
-[`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints.js)
+[`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personalinventory/personal-inventory-blueprints.js)
 (`submitDeleteAll`).
 
 *Amended 2026-10-03 (website overhaul phase 3):* the control is the ⋯ menu item „Alle löschen …"
@@ -588,7 +588,7 @@ removable owned blueprints of **every** user at once — a maintenance/reset too
 [`PersonalBlueprintService#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java),
 [`PersonalBlueprintRepository#deleteAllRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
 [`AdminPersonalBlueprintsPageController#deleteAllUsers`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminPersonalBlueprintsPageController.java),
-[`admin-personal-blueprints-purge.js`](../../frontend/src/main/resources/static/js/admin-personal-blueprints-purge.js).
+[`admin-personal-blueprints-purge.js`](../../frontend/src/main/resources/static/js/personalinventory/admin-personal-blueprints-purge.js).
 
 ### REQ-INV-038 — SC Extractor release link beside the import
 
@@ -624,7 +624,7 @@ and search for it.
 - [ ] The link opens in a new tab and carries `rel="noopener noreferrer"`.
 - [ ] After an in-place list re-render the link is still present and unchanged.
 
-**Code links:** [`personal-inventory-blueprints.html`](../../frontend/src/main/resources/templates/personal-inventory-blueprints.html),
+**Code links:** [`blueprint/personal-inventory-blueprints.html`](../../frontend/src/main/resources/templates/blueprint/personal-inventory-blueprints.html),
 [`PersonalInventoryBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageControllerMvcTest.java).
 
 *Amended 2026-10-03 (website overhaul phase 3):* the link moved from a ghost button in the add bar

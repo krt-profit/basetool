@@ -89,7 +89,7 @@ public class AdminDefaultBlueprintsPageController {
   @GetMapping
   public String view(@NotNull Model model) {
     model.addAttribute("defaults", fetchDefaults());
-    return "admin/default-blueprints";
+    return "blueprint/admin/default-blueprints";
   }
 
   /**
@@ -105,7 +105,7 @@ public class AdminDefaultBlueprintsPageController {
   public String rows(@NotNull Model model) {
     List<DefaultBlueprintDto> defaults = blueprintClient.defaults();
     model.addAttribute("defaults", defaults == null ? List.of() : defaults);
-    return "admin/default-blueprints :: rows";
+    return "blueprint/admin/default-blueprints :: rows";
   }
 
   /**

@@ -110,7 +110,9 @@ public class AdminBlueprintsPageController {
       populateEmpty(model);
     }
     model.addAttribute("search", trimmed == null ? "" : trimmed);
-    return "results".equals(fragment) ? "admin/blueprints :: results" : "admin/blueprints";
+    return "results".equals(fragment)
+        ? "blueprint/admin/blueprints :: results"
+        : "blueprint/admin/blueprints";
   }
 
   /**

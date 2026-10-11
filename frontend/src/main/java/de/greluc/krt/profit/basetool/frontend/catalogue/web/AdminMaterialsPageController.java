@@ -118,7 +118,7 @@ public class AdminMaterialsPageController {
       log.error("Error loading materials data", e);
       model.addAttribute("error", "error.admin.materials.load");
     }
-    return "admin/materials";
+    return "catalogue/admin/materials";
   }
 
   /**

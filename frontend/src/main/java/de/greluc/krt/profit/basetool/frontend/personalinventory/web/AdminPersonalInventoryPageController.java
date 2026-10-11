@@ -112,7 +112,9 @@ public class AdminPersonalInventoryPageController {
       model.addAttribute("items", Collections.emptyList());
     }
 
-    return isFragment ? "admin/personal-inventory :: results" : "admin/personal-inventory";
+    return isFragment
+        ? "personalinventory/admin/personal-inventory :: results"
+        : "personalinventory/admin/personal-inventory";
   }
 
   /**

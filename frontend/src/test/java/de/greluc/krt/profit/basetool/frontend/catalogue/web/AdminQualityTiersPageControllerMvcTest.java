@@ -111,7 +111,7 @@ class AdminQualityTiersPageControllerMvcTest {
         .andExpect(content().string(containsString("data-tier-id=\"" + GOOD_ID + "\"")))
         .andExpect(content().string(containsString("id=\"qt-modal\"")))
         .andExpect(content().string(containsString("id=\"qt-delete-modal\"")))
-        .andExpect(content().string(containsString("/js/admin-quality-tiers.js")));
+        .andExpect(content().string(containsString("/js/catalogue/admin-quality-tiers.js")));
   }
 
   @Test

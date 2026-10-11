@@ -207,7 +207,7 @@ public class MaterialsPageController {
       model.addAttribute("materialsByKind", new TreeMap<>());
     }
 
-    return "materials";
+    return "catalogue/materials";
   }
 
   /**
@@ -241,7 +241,7 @@ public class MaterialsPageController {
       model.addAttribute("starSystems", new TreeSet<>());
       model.addAttribute("materialNames", new TreeSet<>());
     }
-    return "materials-overview";
+    return "catalogue/materials-overview";
   }
 
   /**
@@ -487,7 +487,7 @@ public class MaterialsPageController {
       model.addAttribute("terminalRows", List.of());
       model.addAttribute("priceSummary", MaterialTerminalPrices.summarize(List.of()));
     }
-    return "material-detail";
+    return "catalogue/material-detail";
   }
 
   /**

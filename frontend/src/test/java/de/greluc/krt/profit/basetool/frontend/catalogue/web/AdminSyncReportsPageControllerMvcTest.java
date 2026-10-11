@@ -107,7 +107,7 @@ class AdminSyncReportsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/sync-reports"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/sync-reports"))
+        .andExpect(view().name("catalogue/admin/sync-reports"))
         .andExpect(content().string(containsString("id=\"sync-results\"")))
         .andExpect(content().string(containsString("class=\"tab-nav sync-tabs\"")));
   }
@@ -172,7 +172,7 @@ class AdminSyncReportsPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/sync-reports/uex").param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/sync-reports :: results"))
+        .andExpect(view().name("catalogue/admin/sync-reports :: results"))
         .andExpect(content().string(containsString("FragmentEvent")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(containsString("/admin/sync-reports/uex?page=1")))

@@ -62,7 +62,7 @@ users outside the requested family.
 **Enforced by:** `PersonalBlueprintOverviewServiceTest`, `JobOrderItemBlueprintOwnersServiceTest`,
 `PersonalBlueprintRepositoryTest`, `BlueprintVariantFamilyCatalogTest` · **Code:**
 `PersonalBlueprintOverviewService`, `JobOrderItemBlueprintOwnersService`,
-`BlueprintVariantFamilyCatalog`, `frontend/src/main/resources/static/js/blueprint-overview.js` ·
+`BlueprintVariantFamilyCatalog`, `frontend/src/main/resources/static/js/blueprint/blueprint-overview.js` ·
 **Issues:** #364
 
 *Amended 2026-10-03 (website overhaul phase 3):* the „Details" button per row is gone; the owners

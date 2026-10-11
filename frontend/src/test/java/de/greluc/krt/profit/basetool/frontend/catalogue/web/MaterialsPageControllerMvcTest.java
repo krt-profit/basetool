@@ -101,7 +101,7 @@ class MaterialsPageControllerMvcTest {
     mockMvc
         .perform(get("/materials"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("src=\"/js/materials.js\"")))
+        .andExpect(content().string(containsString("src=\"/js/catalogue/materials.js\"")))
         .andExpect(content().string(containsString("data-trigger=\"materials-toggle-grouping\"")))
         .andExpect(content().string(containsString("id=\"materialsGrouped\"")))
         .andExpect(content().string(containsString("id=\"materialsFlat\"")))
@@ -195,8 +195,8 @@ class MaterialsPageControllerMvcTest {
   /**
    * The matrix-overview shell ({@code GET /materials/overview}) must render the category-grouping
    * toggle checkbox. The flat-vs-grouped switch itself is applied client-side by {@code
-   * /js/materials-matrix.js}; this test only pins that the control the script binds to is present
-   * in the shipped shell.
+   * /js/catalogue/materials-matrix.js}; this test only pins that the control the script binds to is
+   * present in the shipped shell.
    */
   @Test
   @WithMockUser
@@ -228,7 +228,7 @@ class MaterialsPageControllerMvcTest {
     mockMvc
         .perform(get("/materials/" + id))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("src=\"/js/material-detail.js\"")))
+        .andExpect(content().string(containsString("src=\"/js/catalogue/material-detail.js\"")))
         .andExpect(content().string(containsString("</body>")))
         .andExpect(content().string(containsString("</html>")))
         .andExpect(content().string(containsString("id=\"terminalFilter\"")))

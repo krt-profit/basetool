@@ -71,7 +71,7 @@ the spread and the legend.*
 `MaterialsPageControllerTest` (filtered page-walk vs cached path) · **Code:**
 `MaterialPriceRepository.findMatrixItems`, `MaterialService.getMatrixItems`,
 `MaterialController.getMaterialMatrixItems`, `MaterialsPageController.getMatrixData`,
-`static/js/materials-matrix.js` · **Issues:** —
+`static/js/catalogue/materials-matrix.js` · **Issues:** —
 
 ### REQ-UI-016 — The matrix filter selection persists per browser
 
@@ -104,7 +104,7 @@ ausgewählt"; the boolean filters also appear as removable chips.*
 
 **Enforced by:** `MaterialsOverviewFilterPersistenceE2eTest` (boolean filters + grouping survive a
 reload; multi-select subset restored where catalogue data exists) · **Code:**
-`static/js/materials-matrix.js` · **Issues:** —
+`static/js/catalogue/materials-matrix.js` · **Issues:** —
 
 ### REQ-UI-015 — The detail price list is the complete list across all pages
 
@@ -138,7 +138,7 @@ sale-price sort with the „Verkauf · Einkauf" segment.*
 **Enforced by:** `MaterialsPageControllerTest` /
 `MaterialsPageControllerMvcTest.getMaterialDetail_*` / `MaterialTerminalPricesTest` / `UexAgeTest` ·
 **Code:** `MaterialsPageController.getMaterialDetail`, `CatalogPages.fetchAll`,
-`MaterialTerminalPrices`, `UexAge`, `material-detail.html`, `static/js/material-detail.js` ·
+`MaterialTerminalPrices`, `UexAge`, `catalogue/material-detail.html`, `static/js/catalogue/material-detail.js` ·
 **Issues:** —
 
 ## Out of scope

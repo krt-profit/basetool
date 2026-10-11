@@ -108,7 +108,7 @@ public class ShipDataPageController {
       model.addAttribute("error", "error.shipdata.load");
     }
 
-    return "ship-data";
+    return "catalogue/ship-data";
   }
 
   /**

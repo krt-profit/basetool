@@ -84,7 +84,7 @@ class MaterialsPageControllerTest {
 
     String viewName = controller.listMaterials(model);
 
-    assertEquals("materials", viewName);
+    assertEquals("catalogue/materials", viewName);
     List<MaterialPriceOverviewDto> materials =
         (List<MaterialPriceOverviewDto>) model.getAttribute("materials");
     assertNotNull(materials);
@@ -105,7 +105,7 @@ class MaterialsPageControllerTest {
 
     String viewName = controller.listMaterials(model);
 
-    assertEquals("materials", viewName);
+    assertEquals("catalogue/materials", viewName);
     List<MaterialPriceOverviewDto> materials =
         (List<MaterialPriceOverviewDto>) model.getAttribute("materials");
     assertNotNull(materials);
@@ -163,7 +163,7 @@ class MaterialsPageControllerTest {
 
     String viewName = controller.getMaterialDetail(id, model);
 
-    assertEquals("material-detail", viewName);
+    assertEquals("catalogue/material-detail", viewName);
     MaterialDto material = (MaterialDto) model.getAttribute("material");
     assertNotNull(material);
     assertEquals("Gold", material.name());
@@ -236,7 +236,7 @@ class MaterialsPageControllerTest {
     when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
         .thenThrow(new RuntimeException("terminals down"));
 
-    assertEquals("materials-overview", controller.getMatrixOverview(model));
+    assertEquals("catalogue/materials-overview", controller.getMatrixOverview(model));
     assertFalse(model.getAttribute("uexAge") instanceof UexAge);
     assertFalse(model.containsAttribute("error"));
   }
@@ -254,7 +254,7 @@ class MaterialsPageControllerTest {
 
     String viewName = controller.getMaterialDetail(id, model);
 
-    assertEquals("material-detail", viewName);
+    assertEquals("catalogue/material-detail", viewName);
     assertEquals("error.material.details.load", model.getAttribute("error"));
     assertTrue(((List<MaterialPriceDto>) model.getAttribute("prices")).isEmpty());
     assertTrue(((List<MaterialTerminalPrices.Row>) model.getAttribute("terminalRows")).isEmpty());
@@ -272,7 +272,7 @@ class MaterialsPageControllerTest {
 
     String viewName = controller.getMatrixOverview(model);
 
-    assertEquals("materials-overview", viewName);
+    assertEquals("catalogue/materials-overview", viewName);
     Collection<String> systems = (Collection<String>) model.getAttribute("starSystems");
     Collection<String> materials = (Collection<String>) model.getAttribute("materialNames");
     assertNotNull(systems);
@@ -360,7 +360,7 @@ class MaterialsPageControllerTest {
 
     String viewName = controller.getMatrixOverview(model);
 
-    assertEquals("materials-overview", viewName);
+    assertEquals("catalogue/materials-overview", viewName);
     assertEquals("error.materials.matrix.load", model.getAttribute("error"));
   }
 

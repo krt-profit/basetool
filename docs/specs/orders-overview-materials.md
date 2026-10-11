@@ -77,7 +77,7 @@ material being linked. An existing (possibly orphaned) link stays visible and re
 allocation chip on the entry, so the stack-entry add picker additionally leaves out the orders the
 entry is already allocated to. This covers all three linking
 pickers: the Lager stack-entry "+ Zuordnen" allocation picker, the Lager book-in
-create form's per-row "Aufträge zuordnen" allocation picker (`inventory-input.html`), and the
+create form's per-row "Aufträge zuordnen" allocation picker (`inventory/inventory-input.html`), and the
 refinery store ("Einlagern") dialog's per-item "Auftrag" picker, which links the refined output
 material to an order that needs it. The picker filter MUST be correct
 for `ITEM` orders too — these carry no `job_order_material` rows, so every picker keys on the
@@ -133,8 +133,8 @@ two gates are parallel, not a replacement.
 `updateInventoryItem` went with `PUT /api/v1/inventory/{id}` in d03a9238b; corrected 2026-09-22),
 `JobOrderItemService.requiredMaterialIds`, `JobOrderReferenceDto.requiredMaterialIds`,
 `JobOrderQueryService.findAllActiveReference`, `JobOrderRepository.findAllActiveWithMaterials`,
-`templates/fragments/inventory-stack-entries.html`,
-`templates/inventory-input.html` / `static/js/inventory-input.js`,
+`templates/inventory/fragments/inventory-stack-entries.html`,
+`templates/inventory/inventory-input.html` / `static/js/inventory/inventory-input.js`,
 `RefineryOrderPageController.fetchActiveJobOrders`, `templates/refinery-orders-details.html`
 
 ### REQ-ORDERS-019 — Order detail surfaces orphaned linked inventory

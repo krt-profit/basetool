@@ -736,7 +736,7 @@ dispatcher for every mapping it knows and fails when a variable-free `GET` route
 in `check`, not in the stack-bound `e2e` suite) + code/design
 review for the rest · **Code:** `static/css/kernel/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
 `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
-`static/css/bank/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personal-inventory.css`
+`static/css/bank/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personalinventory/personal-inventory.css`
 (`.master-row`), `static/css/promotion-admin.css` (`.pa-sort-btn`), `static/js/kernel/sidebar.js`
 (`--krt-footer-height`).
 
@@ -850,7 +850,7 @@ instead of escaping the box.
   stuck out 10px to the right).
 
 **Enforced by:** code/design review · **Code:** `static/js/kernel/krt-searchable-select.js`,
-`static/js/inventory-admin.js`, `static/js/inventory-my.js`,
+`static/js/inventory/inventory-admin.js`, `static/js/inventory/inventory-my.js`,
 `static/css/kernel/styles.css` (`.krt-combobox__listbox`, `.krt-combobox__listbox--above`, `.assoc-pop`,
 `.assoc-pop__menge`).
 

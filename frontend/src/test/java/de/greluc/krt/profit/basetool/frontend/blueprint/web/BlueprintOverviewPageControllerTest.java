@@ -73,7 +73,7 @@ class BlueprintOverviewPageControllerTest {
     Model model = new ExtendedModelMap();
     String view = controller.view(null, null, null, null, model);
 
-    assertEquals("blueprint-overview", view);
+    assertEquals("blueprint/blueprint-overview", view);
     Object overview = model.getAttribute("overview");
     assertTrue(overview instanceof List<?> && ((List<?>) overview).size() == 1);
     assertEquals(page, model.getAttribute("overviewPage"));
@@ -112,7 +112,7 @@ class BlueprintOverviewPageControllerTest {
     Model model = new ExtendedModelMap();
     String view = controller.view(null, null, null, "results", model);
 
-    assertEquals("blueprint-overview :: results", view);
+    assertEquals("blueprint/blueprint-overview :: results", view);
     assertEquals(List.of(10, 50, 100), model.getAttribute("pageSizes"));
   }
 
@@ -124,7 +124,7 @@ class BlueprintOverviewPageControllerTest {
     Model model = new ExtendedModelMap();
     String view = controller.view(null, null, null, null, model);
 
-    assertEquals("blueprint-overview", view);
+    assertEquals("blueprint/blueprint-overview", view);
     assertEquals("error.blueprintOverview.load", model.getAttribute("error"));
     assertTrue(((List<?>) model.getAttribute("overview")).isEmpty());
   }

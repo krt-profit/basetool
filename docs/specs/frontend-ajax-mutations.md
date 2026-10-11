@@ -630,13 +630,13 @@ swap with no navigation request). **Issues:** the epic children
 `krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `kernel/fragments/pagination.html`,
 `mission-detail.html`,
 `orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`, `datetime-splitter.js`,
-`hangar/hangar.html`, `ship-data.html`, `personal-inventory.html`, `personal-inventory-blueprints.html`,
+`hangar/hangar.html`, `catalogue/ship-data.html`, `personalinventory/personal-inventory.html`, `blueprint/personal-inventory-blueprints.html`,
 `personal-inventory*.js`, `bank.js`, `bank/bank-account-detail.html`, `bank/bank-manage.html`,
 `bank/bank-grants.html`, `promotion-admin-topics.html`, `promotion-admin-rank-requirements.html`,
 `promotion-manage.html`, `orgchart/org-chart.html`, `members.html`, `member-edit.html`, `profile.html`,
 `dashboard/index.html`, and the #582 admin pages — `announcement.html`, `sync-reports.html`, `locations.html`,
-`materials.html`, `material-aliases.html`, `settings/admin-settings.html`, `uex.html`,
-`fragments/admin-uex.html`, `mission-data.html`, `special-commands.html`,
+`catalogue/materials.html`, `material-aliases.html`, `settings/admin-settings.html`, `uex.html`,
+`catalogue/fragments/admin-uex.html`, `mission-data.html`, `special-commands.html`,
 `special-command-detail.html`, `p4k-import.js` — over `JobOrderPageController`,
 `RefineryOrderPageController`, `HangarPageController`, `ShipDataPageController`,
 `PersonalInventoryPageController`, `PersonalInventoryBlueprintsPageController`, `BankPageController`,
@@ -1670,7 +1670,7 @@ ARIA ids, no native select left to re-enhance).
 
 **Bespoke pickers with a browse-everything mode.** One picker predates the `krt-searchable-select`
 standard and stays bespoke: the personal-inventory (Mein Inventar) **UEX location typeahead**
-(`static/js/personal-inventory.js` → `/personal-inventory/uex-search` →
+(`static/js/personalinventory/personal-inventory.js` → `/personal-inventory/uex-search` →
 `GET /api/v1/uex/locations/search`). It searches server-side like the converted pickers — typing
 narrows the query and every UEX city / space station stays reachable — **but** it also renders on
 empty-query focus, a "browse everything" mode that returns up to the backend clamp (2000 rows). In

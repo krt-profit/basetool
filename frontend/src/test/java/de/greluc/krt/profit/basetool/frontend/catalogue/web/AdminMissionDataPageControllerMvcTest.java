@@ -127,7 +127,7 @@ class AdminMissionDataPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/mission-data"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/mission-data"))
+        .andExpect(view().name("catalogue/admin/mission-data"))
         .andExpect(content().string(containsString("id=\"squadrons-results\"")))
         .andExpect(content().string(containsString("id=\"jobtypes-results\"")))
         .andExpect(content().string(containsString("id=\"freqtypes-results\"")));
@@ -235,7 +235,7 @@ class AdminMissionDataPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/mission-data").param("fragment", "squadrons-results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/mission-data :: squadrons-results"))
+        .andExpect(view().name("catalogue/admin/mission-data :: squadrons-results"))
         .andExpect(content().string(containsString("Frag SQ")))
         .andExpect(content().string(not(containsString("id=\"squadrons-results\""))))
         .andExpect(content().string(not(containsString("id=\"jobtypes-results\""))))
@@ -252,7 +252,7 @@ class AdminMissionDataPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/mission-data").param("fragment", "jobtypes-results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/mission-data :: jobtypes-results"))
+        .andExpect(view().name("catalogue/admin/mission-data :: jobtypes-results"))
         .andExpect(content().string(containsString("Frag JT")))
         .andExpect(content().string(not(containsString("id=\"jobtypes-results\""))))
         .andExpect(content().string(not(containsString("id=\"squadrons-results\""))))
@@ -268,7 +268,7 @@ class AdminMissionDataPageControllerMvcTest {
     mockMvc
         .perform(get("/admin/mission-data").param("fragment", "freqtypes-results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/mission-data :: freqtypes-results"))
+        .andExpect(view().name("catalogue/admin/mission-data :: freqtypes-results"))
         .andExpect(content().string(containsString("Frag FT")))
         .andExpect(content().string(containsString("class=\"draggable-row")))
         .andExpect(content().string(not(containsString("id=\"freqtypes-results\""))))

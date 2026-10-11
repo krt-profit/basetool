@@ -100,6 +100,6 @@ public class ProfitCalculationPageController {
       model.addAttribute("error", "error.profit_calculation.load");
     }
 
-    return "materials-profit-calculation";
+    return "catalogue/materials-profit-calculation";
   }
 }

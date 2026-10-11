@@ -97,7 +97,7 @@ class BlueprintOverviewPageControllerMvcTest {
     mockMvc
         .perform(get("/blueprint-overview").param("page", "1"))
         .andExpect(status().isOk())
-        .andExpect(view().name("blueprint-overview"))
+        .andExpect(view().name("blueprint/blueprint-overview"))
         .andExpect(content().string(containsString("/blueprint-overview?page=0&amp;size=50")))
         .andExpect(content().string(containsString("/blueprint-overview?page=2&amp;size=50")))
         .andExpect(content().string(containsString("/blueprint-overview?page=0&amp;size=10")))

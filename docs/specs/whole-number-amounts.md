@@ -130,8 +130,8 @@ non-material whole-number rule shared with the order counts above.
 **Enforced by:** `PersonalInventoryItemRequestValidationTest` (`quantityBelowOneShouldBeRejected`).
 **Code:** `backend/.../model/dto/PersonalInventoryItem{Create,Update}Request`,
 `backend/.../model/PersonalInventoryItem` (`quantity` is `Integer`),
-`static/js/personal-inventory.js`, `templates/personal-inventory.html`,
-`templates/admin/personal-inventory.html`, `frontend/.../personalinventory/model/PersonalInventoryForm`.
+`static/js/personalinventory/personal-inventory.js`, `templates/personalinventory/personal-inventory.html`,
+`templates/personalinventory/admin/personal-inventory.html`, `frontend/.../personalinventory/model/PersonalInventoryForm`.
 **Issues:** PR #465.
 
 ## Out of scope
