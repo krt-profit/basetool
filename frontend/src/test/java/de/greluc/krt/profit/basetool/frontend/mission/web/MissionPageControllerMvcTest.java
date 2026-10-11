@@ -1267,7 +1267,7 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.post(
             eq("/api/v1/missions/{missionUuid}/managers/{userUuid}/slim"),
             eq(null),
-            eq(String.class),
+            eq(Void.class),
             eq(missionId),
             eq(userId)))
         .thenThrow(

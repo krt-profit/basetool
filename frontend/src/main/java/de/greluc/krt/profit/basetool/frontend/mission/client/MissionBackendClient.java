@@ -638,7 +638,7 @@ public class MissionBackendClient {
   }
 
   /**
-   * Adds a co-manager to a mission.
+   * Adds a co-manager to a mission; the backend's manager-list answer is discarded.
    *
    * @param missionId the mission
    * @param userId the new co-manager
@@ -647,7 +647,7 @@ public class MissionBackendClient {
     backendApiClient.post(
         "/api/v1/missions/{missionUuid}/managers/{userUuid}/slim",
         null,
-        String.class,
+        Void.class,
         missionId,
         userId);
   }
