@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
     <title th:text="#{admin.defaultBlueprints.title}">Admin: Standard-Blueprints</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/personal-inventory.css}">
@@ -8,10 +8,7 @@
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <main>
     <th:block th:replace="~{fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.masterdata', titleText=#{nav.admin.defaultBlueprints},
         count=${defaults != null ? #lists.size(defaults) : null}, countId='krt-dbp-count', countFor='krt-dbp-list-host')}"></th:block>
@@ -94,8 +91,8 @@
         </div>
     </th:block>
 </th:block>
-
-<th:block th:replace="~{fragments/toast :: toast}" />
+</th:block>
+<th:block th:fragment="pageTail">
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     window.krtDefaultBlueprints = {
         searchUrl: /*[[@{/admin/default-blueprints/search}]]*/ '/admin/default-blueprints/search',
@@ -117,5 +114,6 @@
     };
 </script>
 <script th:src="@{/js/admin-default-blueprints.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>

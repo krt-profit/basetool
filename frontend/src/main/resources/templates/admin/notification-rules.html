@@ -1,16 +1,13 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
     <title th:text="#{admin.notificationRules.title} + ' - ' + ${appTitle}">Notification rules - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/pages/admin-notification-rules.css}">
     </th:block>
 </head>
 <body>
-<th:block th:replace="~{fragments/sidebar :: sidebar}" />
-
-<th:block th:replace="~{fragments/header :: header}" />
-
+<th:block th:fragment="pageContent">
 <main>
     <span id="rule-i18n" hidden
           th:attr="data-confirm-delete-title=#{admin.notificationRules.confirmDelete.title},data-confirm-delete-body=#{admin.notificationRules.confirmDelete.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-saved=#{admin.notificationRules.success.saved},data-deleted=#{admin.notificationRules.success.deleted},data-error=#{notification.error.title},data-unknown-value=#{admin.notificationRules.selector.unknown}"></span>
@@ -180,5 +177,6 @@
 </main>
 
 <script th:src="@{/js/notification-rules.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>
