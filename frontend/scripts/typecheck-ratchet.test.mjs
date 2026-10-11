@@ -23,6 +23,8 @@
  */
 
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
     CHECKED_FILES_FLOOR,
@@ -55,7 +57,7 @@ const TSCONFIG = {
 };
 
 /**
- * A small valid tree: `alpha` is migrated, `beta` is not.
+ * A small valid tree: `alpha` and `beta` are both migrated and fully checked.
  *
  * @returns {Parameters<typeof evaluate>[0]} a tree the ratchet accepts
  */
@@ -64,15 +66,15 @@ function validTree() {
         scripts: new Map([
             ['a-one.js', CHECKED],
             ['a-two.js', CHECKED],
-            ['b-one.js', UNCHECKED],
+            ['b-one.js', CHECKED],
         ]),
         manifest: {
             domains: { alpha: ['a-one.js', 'a-two.js'], beta: ['b-one.js'] },
-            migrated: ['alpha'],
+            migrated: ['alpha', 'beta'],
         },
         tsconfig: structuredClone(TSCONFIG),
         migratedFloor: ['alpha'],
-        checkedFloor: 2,
+        checkedFloor: 3,
     };
 }
 
@@ -132,13 +134,14 @@ test('a listed file that does not exist fails', () => {
 
 test('dropping a domain from the migrated list fails', () => {
     const violations = violationsAfter((t) => {
-        t.manifest.migrated = [];
+        t.manifest.migrated = ['beta'];
     });
     assert.ok(violations.some((v) => /alpha was migrated and left the "migrated" list/.test(v)));
+    assert.ok(violations.some((v) => /alpha is a domain but is not migrated/.test(v)));
 });
 
-test('migrating a domain that holds an unchecked file fails', () => {
-    const violations = violationsAfter((t) => t.manifest.migrated.push('beta'));
+test('an unchecked file in the second migrated domain fails', () => {
+    const violations = violationsAfter((t) => t.scripts.set('b-one.js', UNCHECKED));
     assert.ok(violations.some((v) => /b-one\.js is in the migrated domain beta/.test(v)));
 });
 
@@ -147,18 +150,73 @@ test('migrating a domain that is not declared fails', () => {
     assert.ok(violations.some((v) => /names ghost, which is not a domain/.test(v)));
 });
 
-test('growing the migrated list with a fully checked domain passes', () => {
+test('a new domain that is not migrated fails, checked or not', () => {
+    for (const source of [CHECKED, UNCHECKED]) {
+        const violations = violationsAfter((t) => {
+            t.scripts.set('g-one.js', source);
+            t.manifest.domains.gamma = ['g-one.js'];
+        });
+        assert.ok(
+            violations.some((v) => /gamma is a domain but is not migrated/.test(v)),
+            source,
+        );
+    }
+});
+
+test('a new domain that is migrated and fully checked passes', () => {
     const violations = violationsAfter((t) => {
-        t.scripts.set('b-one.js', CHECKED);
-        t.manifest.migrated.push('beta');
+        t.scripts.set('g-one.js', CHECKED);
+        t.manifest.domains.gamma = ['g-one.js'];
+        t.manifest.migrated.push('gamma');
+        t.checkedFloor = 4;
     });
     assert.deepEqual(violations, []);
 });
 
-test('removing a pragma from an unmigrated file below the floor fails', () => {
+test('a script in a subfolder must be in a domain', () => {
+    const violations = violationsAfter((t) => t.scripts.set('sub/deep.js', CHECKED));
+    assert.ok(violations.some((v) => /sub\/deep\.js belongs to no domain/.test(v)));
+});
+
+test('an unchecked script of a subfolder in a domain fails', () => {
     const violations = violationsAfter((t) => {
-        t.scripts.set('a-one.js', CHECKED);
-        t.checkedFloor = 3;
+        t.scripts.set('sub/deep.js', UNCHECKED);
+        t.manifest.domains.beta.push('sub/deep.js');
+    });
+    assert.ok(violations.some((v) => /sub\/deep\.js is in the migrated domain beta/.test(v)));
+});
+
+test('a checked script of a subfolder in a domain passes', () => {
+    const violations = violationsAfter((t) => {
+        t.scripts.set('sub/deep.js', CHECKED);
+        t.manifest.domains.beta.push('sub/deep.js');
+    });
+    assert.deepEqual(violations, []);
+});
+
+test('loadTree reads subfolders and skips vendor', () => {
+    const root = mkdtempSync(`${tmpdir()}/ratchet-`);
+    try {
+        const js = `${root}/src/main/resources/static/js`;
+        mkdirSync(`${js}/sub/deeper`, { recursive: true });
+        mkdirSync(`${js}/vendor`, { recursive: true });
+        writeFileSync(`${js}/top.js`, CHECKED);
+        writeFileSync(`${js}/sub/mid.js`, CHECKED);
+        writeFileSync(`${js}/sub/deeper/low.js`, UNCHECKED);
+        writeFileSync(`${js}/vendor/lib.js`, UNCHECKED);
+        writeFileSync(`${js}/sub/readme.txt`, 'x');
+        writeFileSync(`${root}/typecheck-ratchet.json`, '{"domains":{},"migrated":[]}');
+        writeFileSync(`${root}/tsconfig.json`, '{}');
+        const { scripts } = loadTree(`${root}/`);
+        assert.deepEqual([...scripts.keys()].sort(), ['sub/deeper/low.js', 'sub/mid.js', 'top.js']);
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('removing a pragma below the checked floor fails', () => {
+    const violations = violationsAfter((t) => {
+        t.scripts.set('a-one.js', UNCHECKED);
     });
     assert.ok(violations.some((v) => /fewer than the floor of 3/.test(v)));
 });
@@ -166,7 +224,7 @@ test('removing a pragma from an unmigrated file below the floor fails', () => {
 test('a suppression comment fails', () => {
     for (const pragma of ['@ts-nocheck', '@ts-ignore', '@ts-expect-error']) {
         const violations = violationsAfter((t) =>
-            t.scripts.set('b-one.js', `${UNCHECKED}// ${pragma}\n`),
+            t.scripts.set('b-one.js', `${CHECKED}// ${pragma}\n`),
         );
         assert.ok(
             violations.some((v) => /b-one\.js suppresses the type check/.test(v)),

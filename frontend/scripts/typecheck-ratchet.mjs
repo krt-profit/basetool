@@ -18,12 +18,14 @@
  */
 
 /**
- * The type-check ratchet (REQ-FE-018, ADR-0125): every script under static/js belongs to exactly one
- * domain of typecheck-ratchet.json, and a domain listed under "migrated" holds only files that opt
- * into the type check. The set of migrated domains and the number of checked files may only grow.
+ * The type-check ratchet (REQ-FE-018, ADR-0125): every script under static/js, subfolders included,
+ * belongs to exactly one domain of typecheck-ratchet.json, every domain is migrated, and a migrated
+ * domain holds only files that opt into the type check. The set of migrated domains and the number
+ * of checked files may only grow.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** The migrated domains that may never leave the manifest's "migrated" list. */
@@ -56,6 +58,7 @@ export const MIGRATED_FLOOR = [
 export const CHECKED_FILES_FLOOR = 124;
 
 const ALLOWED_EXCLUDES = ['src/main/resources/static/js/vendor/**', 'node_modules', 'build'];
+const EXCLUDED_DIRECTORIES = ['vendor/', 'node_modules/'];
 const SUPPRESSION = /@ts-(?:nocheck|ignore|expect-error)\b/;
 const DOMAIN_NAME = /^[a-z][a-z0-9-]*$/;
 
@@ -141,6 +144,11 @@ export function evaluate({ scripts, manifest, tsconfig, migratedFloor, checkedFl
             violations.push(`${domain} was migrated and left the "migrated" list`);
         }
     }
+    for (const domain of Object.keys(manifest.domains)) {
+        if (!migrated.has(domain)) {
+            violations.push(`${domain} is a domain but is not migrated; every domain must be`);
+        }
+    }
     for (const domain of migrated) {
         for (const file of manifest.domains[domain] ?? []) {
             const source = scripts.get(file);
@@ -196,10 +204,16 @@ export function evaluate({ scripts, manifest, tsconfig, migratedFloor, checkedFl
 export function loadTree(root) {
     const jsDir = `${root}src/main/resources/static/js/`;
     const scripts = new Map();
-    for (const entry of readdirSync(jsDir, { withFileTypes: true })) {
-        if (entry.isFile() && entry.name.endsWith('.js')) {
-            scripts.set(entry.name, readFileSync(`${jsDir}${entry.name}`, 'utf8'));
+    for (const entry of readdirSync(jsDir, { withFileTypes: true, recursive: true })) {
+        if (!entry.isFile() || !entry.name.endsWith('.js')) {
+            continue;
         }
+        const absolute = join(entry.parentPath, entry.name);
+        const script = relative(jsDir, absolute).replaceAll('\\', '/');
+        if (EXCLUDED_DIRECTORIES.some((directory) => script.startsWith(directory))) {
+            continue;
+        }
+        scripts.set(script, readFileSync(absolute, 'utf8'));
     }
     const manifest = JSON.parse(readFileSync(`${root}typecheck-ratchet.json`, 'utf8'));
     const tsconfig = JSON.parse(readFileSync(`${root}tsconfig.json`, 'utf8'));

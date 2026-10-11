@@ -30,7 +30,7 @@ the how-to behind that rule.
 | `:frontend:testKrtFetchReadJs` | Node | the read path `krtFetch.get` / `getJson` (REQ-FE-031) |
 | `:frontend:testEslintBans` | Node + ESLint API | the transport, baseline and Trusted Types sink bans fire on planted sources |
 | `:frontend:testTrustedTypesJs` | Node | the `krtHtml` builder and the two Trusted Types policies (ADR-0239) |
-| `:frontend:testTypecheckRatchet` | Node | every script is listed in a domain of `typecheck-ratchet.json`; a migrated domain holds only `// @ts-check` scripts; the migrated list and the checked-file count never fall (REQ-FE-018) |
+| `:frontend:testTypecheckRatchet` | Node | every script (subfolders too) is listed in a domain of `typecheck-ratchet.json`; every domain is migrated and holds only `// @ts-check` scripts; the migrated list and the checked-file count never fall (REQ-FE-018) |
 
 Before pushing, run the whole sweep and get it to **zero findings**:
 

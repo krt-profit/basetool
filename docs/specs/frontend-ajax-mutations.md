@@ -1806,9 +1806,10 @@ sequencing lives in [`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLA
 
 **The ratchet per domain.** `frontend/typecheck-ratchet.json` assigns every script of `static/js`
 to exactly one domain (the frontend's domains of the modularisation plan §5.9, plus `kernel` for the
-shared infrastructure) and lists the domains that are **migrated**. A migrated domain holds only
-scripts that opt in, so a new script of such a domain that skips the pragma fails the build, and
-the list of migrated domains only grows. `:frontend:testTypecheckRatchet` (in `check`;
+shared infrastructure; subfolders of `static/js` are scanned too, `vendor/` excepted) and lists the
+domains that are **migrated**. **Every domain of the manifest must be migrated**, so the manifest
+cannot hold an unchecked domain; a migrated domain holds only scripts that opt in, so a new script
+that skips the pragma fails the build, and the list of migrated domains only grows. `:frontend:testTypecheckRatchet` (in `check`;
 `scripts/typecheck-ratchet.mjs`, proven on planted trees by `typecheck-ratchet.test.mjs`) fails on
 a script that belongs to no domain, on a domain dropped from the list (`MIGRATED_FLOOR`), on a
 number of checked scripts below `CHECKED_FILES_FLOOR`, on a suppression pragma, and on a

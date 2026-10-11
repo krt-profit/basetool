@@ -1566,17 +1566,21 @@ on `basetool_session_type_refused_total` — once per session, never the login (
 *F5 type-check ratchet as built (2026-10-11).* Design: `frontend/typecheck-ratchet.json` assigns
 every script of `static/js` to exactly one domain — the 21 frontend domains of §5.9 that have
 scripts (`audit` … `settings`) plus `kernel` for the shared infrastructure, 22 names in all — and
-lists the domains that are *migrated*. A migrated domain holds only scripts whose leading comments
-carry `// @ts-check`. `frontend/scripts/typecheck-ratchet.mjs` is the guard and
+lists the domains that are *migrated*. Every domain of the manifest must be migrated (a new domain
+cannot enter unchecked), and a migrated domain holds only scripts whose leading comments carry
+`// @ts-check`; the scan includes subfolders of `static/js`, `vendor/` excepted. `frontend/scripts/typecheck-ratchet.mjs` is the guard and
 `typecheck-ratchet.test.mjs` its test, wired as `:frontend:testTypecheckRatchet` into `check` (zero
 dependencies, like `testTrustedTypesJs`). It fails on: a script in no domain, in two, or a listed
 script that does not exist; an unchecked script in a migrated domain; a domain dropped from the
 migrated list (`MIGRATED_FLOOR`, which only grows); fewer checked scripts than
 `CHECKED_FILES_FLOOR`; `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error` anywhere; a `tsconfig.json`
 that excludes anything beyond vendor, `node_modules` and `build`, that stops including the scripts,
-or that loses `strict`. The test proves each rule on planted trees (17 cases, among them an
-unchecked file in a migrated domain, a stray file, a dropped domain, each suppression pragma) and
-runs the real tree. Numbers: before, 113 scripts, 65 checked (58 %), 48 unchecked, 3 domains
+or that loses `strict`. The test proves each rule on planted trees (among them an unchecked
+file in a migrated domain, a stray file, a stray file in a subfolder, a new unmigrated domain, a
+dropped domain, each suppression pragma) and runs the real tree. *Review corrections (same day):*
+the first version scanned only the top level of `static/js` although `tsconfig.json` includes
+`static/js/**`, so a script in a subfolder escaped every rule, and a new domain missing from
+`"migrated"` passed; both are closed and tested. Numbers: before, 113 scripts, 65 checked (58 %), 48 unchecked, 3 domains
 (`exchange`, `leadership`, `notification`) fully checked; after, 124 scripts, 124 checked, all 22
 domains migrated. The 48 scripts carried 2,393 type errors under `checkJs` (the three giants 538,
 221 and 185 of them); all are fixed by casts at the query, `@type`/`@param` JSDoc, and null guards,

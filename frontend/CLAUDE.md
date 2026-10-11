@@ -253,11 +253,12 @@ debt rather than anything TS 7 introduced.
   there is no partial state. Prefer opting in any file you substantially touch. No script carries
   `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`.
 - **The ratchet per domain** (`frontend/typecheck-ratchet.json`, `:frontend:testTypecheckRatchet`):
-  every script of `static/js` is listed under exactly one domain, so **a new script must be added
-  to its domain's list** or the build fails. A domain under `"migrated"` holds only checked scripts:
-  a new script there needs `// @ts-check` from its first commit. To migrate a domain, bring its
-  last unchecked scripts to green, add the domain to `"migrated"` and to `MIGRATED_FLOOR` (and raise
-  `CHECKED_FILES_FLOOR`) in `scripts/typecheck-ratchet.mjs`; the list and the floors never shrink.
+  every script of `static/js` (subfolders included, `vendor/` excepted) is listed under exactly one
+  domain, so **a new script must be added to its domain's list** or the build fails. **Every domain
+  is migrated** (`"migrated"` equals the domain list): a new script needs `// @ts-check` from its
+  first commit, and a new domain is added to `"domains"`, to `"migrated"` and to `MIGRATED_FLOOR`
+  (raise `CHECKED_FILES_FLOOR` too) in `scripts/typecheck-ratchet.mjs`; the list and the floors never
+  shrink.
   A script that is too large to check is split first at top-level statement boundaries into parts
   loaded by consecutive `defer` tags in the original order, the first part keeping the file name.
 - **Declare shared contracts in the same change.** A new `window.krt*` API, a new custom DOM event

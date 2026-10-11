@@ -138,8 +138,8 @@ and we will not convert the sources to TypeScript.**
 ## Amendment 2026-10-11 — the opt-in ratchets per domain
 
 Per-file opt-in stays the mechanism; it now has a floor. `frontend/typecheck-ratchet.json` assigns
-every script to one domain and lists the migrated domains, in which every script must carry
-`// @ts-check`. `:frontend:testTypecheckRatchet` fails when a migrated domain gets an unchecked
+every script (subfolders included) to one domain and lists the migrated domains; every domain must
+be migrated, and every script of a domain must carry `// @ts-check`. `:frontend:testTypecheckRatchet` fails when a migrated domain gets an unchecked
 script, when a domain leaves the migrated list or the checked-script count falls, when a script
 belongs to no domain, when any script suppresses the check, or when `tsconfig.json` hides scripts
 (REQ-FE-018). All 124 scripts were checked on that day (65 of 113 before), after the three largest
