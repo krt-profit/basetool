@@ -781,7 +781,7 @@ class ArchitectureTest {
 
   @Test
   void toOneAssociationsAreDeclaredLazy() {
-    assertFieldFloor("toOneAssociationsAreDeclaredLazy", TO_ONE_ASSOCIATIONS, 147);
+    assertFieldFloor("toOneAssociationsAreDeclaredLazy", TO_ONE_ASSOCIATIONS, 146);
     toOneAssociationsAreDeclaredLazyRule().check(CLASSES);
   }
 

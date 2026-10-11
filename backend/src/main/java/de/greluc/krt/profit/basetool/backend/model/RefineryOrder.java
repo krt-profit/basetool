@@ -72,10 +72,9 @@ public class RefineryOrder extends AbstractEntity<UUID> {
   @ToString.Exclude
   private Location location;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "mission_id")
-  @ToString.Exclude
-  private Mission mission;
+  /** The linked mission, or {@code null}; the mission module resolves its reference. */
+  @Column(name = "mission_id")
+  private UUID missionId;
 
   private Instant startedAt;
 

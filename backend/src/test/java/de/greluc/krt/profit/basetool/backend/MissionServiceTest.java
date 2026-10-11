@@ -119,6 +119,7 @@ class MissionServiceTest {
             null,
             null,
             null,
+            null,
             userService,
             ownerScopeService,
             authHelperService,

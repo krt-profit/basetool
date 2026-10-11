@@ -21,11 +21,11 @@ package de.greluc.krt.profit.basetool.backend.operation.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.OperationMapper;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.operation.internal.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceService;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationFinanceSummaryDto;

@@ -66,7 +66,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Verifies against real Postgres that the refinery's order reads issue the same number of SQL
  * statements whether a member's orders are linked to a few or to many missions (REQ-DATA-003, plan
- * §7.5 P3-8a), and that each order still carries its mission's reference: the missions come in per
+ * §7.5 P3-8b), and that each order still carries its mission's reference: the missions come in per
  * page, never per order.
  */
 @SpringBootTest
@@ -212,7 +212,7 @@ class RefineryOrderReadNoNPlusOneTest {
       order.setStartedAt(Instant.now().minusSeconds(i));
       order.setDurationMinutes(60L);
       order.setExpenses(100.0);
-      order.setMission(mission);
+      order.setMissionId(mission.getId());
       order = refineryOrderRepository.save(order);
       missions.add(mission.getId());
       orders.add(order.getId());

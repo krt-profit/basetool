@@ -34,10 +34,5 @@ identity -> scope: UserService -> OwnerScopeService
 mission -> operation: MissionDto -> OperationDto
 mission -> operation: MissionListDto -> OperationDto
 mission -> operation: MissionMapper -> OperationMapper
-mission -> refinery: Mission -> RefineryOrder
-mission -> refinery: MissionFinanceEntryService -> RefineryOrder
-mission -> refinery: MissionFinanceEntryService -> RefineryOrderRepository
-mission -> refinery: MissionFinanceSummaryDto -> RefineryOrderDto
-mission -> refinery: MissionService -> RefineryOrder
 notification -> orgunit: OrgUnitRef -> OrgUnitKind
 orgunit -> inventory: OrgUnitMembershipService -> InventoryOrgUnitReconciler

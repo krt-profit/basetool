@@ -84,6 +84,19 @@ public interface MissionRepository
       @Param("cutoff") Instant cutoff);
 
   /**
+   * Projects the given missions to their reference DTOs in one read, whatever the caller's scope.
+   *
+   * @param ids the mission ids
+   * @return the existing missions' references, in no particular order
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto(m.id, m.name,
+      m.status, m.plannedStartTime) FROM Mission m WHERE m.id IN :ids
+      """)
+  List<MissionReferenceDto> findReferencesByIdIn(@Param("ids") Collection<UUID> ids);
+
+  /**
    * Loads a mission by id with its {@code participants} and their to-one associations fetched.
    *
    * <p>{@code assignedUnits} stays lazy to avoid a cartesian product; it batch-loads on first

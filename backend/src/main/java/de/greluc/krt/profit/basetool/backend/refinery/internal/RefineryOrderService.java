@@ -354,10 +354,10 @@ public class RefineryOrderService implements CraftabilityYieldSource {
       throw new BadRequestException("error.refinery_order.location_required");
     }
 
-    if (order.getMission() != null && order.getMission().getId() != null) {
-      order.setMission(resolveMissionForOwner(order.getMission().getId(), user));
+    if (order.getMissionId() != null) {
+      order.setMissionId(resolveMissionForOwner(order.getMissionId(), user));
     } else {
-      order.setMission(null);
+      order.setMissionId(null);
     }
 
     if (order.getRefiningMethod() != null && order.getRefiningMethod().getId() != null) {
@@ -400,12 +400,12 @@ public class RefineryOrderService implements CraftabilityYieldSource {
    *
    * @param missionId the requested mission
    * @param owner the order's owner; {@code null} can never be linked
-   * @return the managed mission
+   * @return the id of the existing mission
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no mission has
    *     that id
    * @throws MissionParticipantRequiredException when the owner is not a participant of the mission
    */
-  private Mission resolveMissionForOwner(@NotNull UUID missionId, @Nullable User owner) {
+  private UUID resolveMissionForOwner(@NotNull UUID missionId, @Nullable User owner) {
     Mission mission =
         Entities.require(missionRepository.findById(missionId), "error.mission.not_found");
     if (owner == null
@@ -415,7 +415,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
             .isEmpty()) {
       throw new MissionParticipantRequiredException();
     }
-    return mission;
+    return mission.getId();
   }
 
   @Contract("null -> null")
@@ -469,15 +469,13 @@ public class RefineryOrderService implements CraftabilityYieldSource {
       validateLocationHasRefinery(order.getLocation());
     }
 
-    Mission requestedMission = details.getMission();
-    UUID requestedMissionId = requestedMission != null ? requestedMission.getId() : null;
+    UUID requestedMissionId = details.getMissionId();
     if (requestedMissionId != null) {
-      Mission currentMission = order.getMission();
-      if (currentMission == null || !requestedMissionId.equals(currentMission.getId())) {
-        order.setMission(resolveMissionForOwner(requestedMissionId, order.getOwner()));
+      if (!requestedMissionId.equals(order.getMissionId())) {
+        order.setMissionId(resolveMissionForOwner(requestedMissionId, order.getOwner()));
       }
-    } else if (requestedMission == null) {
-      order.setMission(null);
+    } else {
+      order.setMissionId(null);
     }
 
     if (details.getRefiningMethod() != null && details.getRefiningMethod().getId() != null) {
@@ -722,7 +720,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
           personal,
           jobOrder != null ? jobOrder.getId() : null,
           jobOrder != null ? jobOrder.getDisplayId() : null,
-          order.getMission() != null ? order.getMission().getId() : null);
+          order.getMissionId());
       bookedOnto.add(assignee.getId());
 
       updateGoodOutputQuantity(order, itemDto);

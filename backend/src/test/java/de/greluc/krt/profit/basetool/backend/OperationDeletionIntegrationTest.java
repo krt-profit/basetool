@@ -139,7 +139,7 @@ class OperationDeletionIntegrationTest {
     RefineryOrder order = new RefineryOrder();
     order.setOwner(adminUser);
     order.setLocation(location);
-    order.setMission(mission);
+    order.setMissionId(mission.getId());
     order.setDurationMinutes(60L);
     order.setExpenses(100.0);
     order = refineryOrderRepository.save(order);
@@ -189,9 +189,9 @@ class OperationDeletionIntegrationTest {
 
     RefineryOrder survivedOrder = refineryOrderRepository.findById(orderId).orElseThrow();
     assertNotNull(
-        survivedOrder.getMission(),
+        survivedOrder.getMissionId(),
         "refinery order must keep its mission link when the operation is deleted");
-    assertEquals(missionId, survivedOrder.getMission().getId());
+    assertEquals(missionId, survivedOrder.getMissionId());
 
     MissionFinanceEntry survivedFinance =
         missionFinanceEntryRepository.findById(financeEntryId).orElseThrow();

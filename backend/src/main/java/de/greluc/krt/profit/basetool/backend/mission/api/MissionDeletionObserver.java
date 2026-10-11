@@ -17,16 +17,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.mission.api;
 
-import java.math.BigDecimal;
-import java.util.List;
+import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
-/** Data transfer record carrying Mission Finance Summary payload. */
-public record MissionFinanceSummaryDto(
-    UUID missionId,
-    String missionName,
-    BigDecimal totalSum,
-    List<MissionFinanceEntryDto> entries,
-    List<RefineryOrderDto> refineryOrders) {}
+/**
+ * Reacts to a mission being deleted, inside the transaction that deletes it (plan §5.3);
+ * implemented by the refinery module, whose orders may be linked to the mission. Every
+ * implementation joins the caller's transaction ({@code MANDATORY}).
+ */
+@ObserverSpi
+public interface MissionDeletionObserver {
+
+  /**
+   * A mission is about to be deleted; whatever references it lets go of it first.
+   *
+   * @param missionId the mission to be deleted
+   * @return the number of references released
+   */
+  int beforeMissionDelete(@NotNull UUID missionId);
+}

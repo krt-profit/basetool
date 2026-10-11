@@ -484,13 +484,10 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void missionLookupFails_throwsNotFound() {
       stubUserAndLocation();
-      Mission missionRef = new Mission();
-      missionRef.setId(MISSION_ID);
-
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.empty());
 
       RefineryOrder incoming = freshOrderWithLocation();
-      incoming.setMission(missionRef);
+      incoming.setMissionId(MISSION_ID);
 
       assertThrows(
           NotFoundException.class, () -> service.createRefineryOrder(OWNER_ID, incoming, null));
@@ -506,13 +503,11 @@ class RefineryOrderServiceLifecycleTest {
           .thenReturn(Optional.of(new MissionParticipant()));
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      Mission missionRef = new Mission();
-      missionRef.setId(MISSION_ID);
       RefineryOrder incoming = freshOrderWithLocation();
-      incoming.setMission(missionRef);
+      incoming.setMissionId(MISSION_ID);
 
       RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming, null);
-      assertSame(mission, result.getMission());
+      assertEquals(MISSION_ID, result.getMissionId());
     }
 
     @Test
@@ -524,10 +519,8 @@ class RefineryOrderServiceLifecycleTest {
       when(missionParticipantRepository.findByMissionIdAndUserId(MISSION_ID, OWNER_ID))
           .thenReturn(Optional.empty());
 
-      Mission missionRef = new Mission();
-      missionRef.setId(MISSION_ID);
       RefineryOrder incoming = freshOrderWithLocation();
-      incoming.setMission(missionRef);
+      incoming.setMissionId(MISSION_ID);
 
       MissionParticipantRequiredException ex =
           assertThrows(
@@ -543,10 +536,10 @@ class RefineryOrderServiceLifecycleTest {
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       RefineryOrder incoming = freshOrderWithLocation();
-      incoming.setMission(null);
+      incoming.setMissionId(null);
 
       RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming, null);
-      assertNull(result.getMission());
+      assertNull(result.getMissionId());
     }
 
     @Test
@@ -976,15 +969,15 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void missionExplicitlySetToNull_clearsExistingMission() {
       RefineryOrder existing = newSavedOrder();
-      existing.setMission(new Mission());
+      existing.setMissionId(MISSION_ID);
       when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       RefineryOrder incoming = new RefineryOrder();
-      incoming.setMission(null);
+      incoming.setMissionId(null);
 
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
-      assertNull(existing.getMission());
+      assertNull(existing.getMissionId());
       verifyNoInteractions(missionParticipantRepository);
     }
 
@@ -999,13 +992,11 @@ class RefineryOrderServiceLifecycleTest {
           .thenReturn(Optional.of(new MissionParticipant()));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
-      Mission missionRef = new Mission();
-      missionRef.setId(MISSION_ID);
       RefineryOrder incoming = new RefineryOrder();
-      incoming.setMission(missionRef);
+      incoming.setMissionId(MISSION_ID);
 
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
-      assertSame(mission, existing.getMission());
+      assertEquals(MISSION_ID, existing.getMissionId());
     }
 
     @Test
@@ -1018,35 +1009,29 @@ class RefineryOrderServiceLifecycleTest {
       when(missionParticipantRepository.findByMissionIdAndUserId(MISSION_ID, OWNER_ID))
           .thenReturn(Optional.empty());
 
-      Mission missionRef = new Mission();
-      missionRef.setId(MISSION_ID);
       RefineryOrder incoming = new RefineryOrder();
-      incoming.setMission(missionRef);
+      incoming.setMissionId(MISSION_ID);
 
       assertThrows(
           MissionParticipantRequiredException.class,
           () -> service.updateRefineryOrder(OTHER_USER_ID, ORDER_ID, incoming, true));
-      assertNull(existing.getMission());
+      assertNull(existing.getMissionId());
       verify(refineryOrderRepository, never()).save(any());
     }
 
     @Test
     void missionUnchanged_isNotRechecked() {
       RefineryOrder existing = newSavedOrder();
-      Mission linked = new Mission();
-      linked.setId(MISSION_ID);
-      existing.setMission(linked);
+      existing.setMissionId(MISSION_ID);
       when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
-      Mission missionRef = new Mission();
-      missionRef.setId(MISSION_ID);
       RefineryOrder incoming = new RefineryOrder();
-      incoming.setMission(missionRef);
+      incoming.setMissionId(MISSION_ID);
 
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
 
-      assertSame(linked, existing.getMission());
+      assertEquals(MISSION_ID, existing.getMissionId());
       verifyNoInteractions(missionParticipantRepository);
       verify(missionRepository, never()).findById(any());
     }

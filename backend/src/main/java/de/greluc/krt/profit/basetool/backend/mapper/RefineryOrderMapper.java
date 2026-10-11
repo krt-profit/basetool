@@ -19,10 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
@@ -31,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderUpdateReques
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -43,7 +40,8 @@ import org.mapstruct.Mapping;
       MaterialMapper.class,
       SquadronMapper.class,
       LocationMapper.class,
-      RefiningMethodMapper.class
+      RefiningMethodMapper.class,
+      RefineryOrderMissionLookup.class
     })
 public interface RefineryOrderMapper {
   /**
@@ -54,6 +52,7 @@ public interface RefineryOrderMapper {
    * @return the refinery-order DTO
    */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
+  @Mapping(target = "mission", source = "missionId")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "owningOrgUnitId", ignore = true)
   RefineryOrderDto toDto(RefineryOrder entity);
@@ -110,6 +109,7 @@ public interface RefineryOrderMapper {
    * owning org unit as {@code owningSquadron}.
    */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
+  @Mapping(target = "mission", source = "missionId")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   RefineryOrderListDto toListDto(RefineryOrder entity);
 
@@ -124,6 +124,7 @@ public interface RefineryOrderMapper {
   @Mapping(target = "version", ignore = true)
   @Mapping(target = "status", ignore = true)
   @Mapping(target = "owner", ignore = true)
+  @Mapping(target = "missionId", source = "mission.id")
   @Mapping(target = "owningOrgUnit", ignore = true)
   @Mapping(target = "storedAt", ignore = true)
   @Mapping(target = "readyNotifiedAt", ignore = true)
@@ -141,6 +142,7 @@ public interface RefineryOrderMapper {
    */
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "owner", ignore = true)
+  @Mapping(target = "missionId", source = "mission.id")
   @Mapping(target = "owningOrgUnit", ignore = true)
   @Mapping(target = "storedAt", ignore = true)
   @Mapping(target = "readyNotifiedAt", ignore = true)
@@ -197,20 +199,5 @@ public interface RefineryOrderMapper {
         good.outputQuantity(),
         good.quality(),
         bonus);
-  }
-
-  /**
-   * MapStruct default that resolves an incoming {@link MissionReferenceDto} to a JPA stub Mission
-   * carrying only the id — {@code RefineryOrderService} reads nothing else and re-resolves the
-   * managed mission by that id.
-   */
-  @Nullable
-  default Mission missionReferenceToMission(MissionReferenceDto dto) {
-    if (dto == null) {
-      return null;
-    }
-    Mission mission = new Mission();
-    mission.setId(dto.id());
-    return mission;
   }
 }
