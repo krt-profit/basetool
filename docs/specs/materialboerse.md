@@ -55,7 +55,7 @@ REQ-MARKET-015…020.
 Every `ACTIVE` offer is visible to every real member (`KRT_MEMBER`) regardless of the offer's owning
 org unit — the board is a single org-wide marketplace, not staffel-scoped. An authenticated account
 below member does **not** see the board (both the `/materialboerse` page and the
-`/api/v1/material-exchange` / `/api/v1/material-requests` APIs are gated on `KRT_MEMBER`). The board shows per offer: material, quality (0–1000), quantity in
+`/api/v1/material-exchange` / `/api/v1/material-exchange/requests` APIs are gated on `KRT_MEMBER`). The board shows per offer: material, quality (0–1000), quantity in
 the material's own unit (SCU for bulk materials, Stück/piece for `PIECE` materials — never a
 hardcoded SCU), the anbieter (username) followed by their org-unit affiliation badges, when it was
 released, and the interessenten count.
@@ -496,7 +496,7 @@ anbieten" picker (which lists the caller's game-item rows alongside their materi
 **Mein-Lager Items view**, whose item leaf carries the same per-row "Für Börse freigeben" toggle as
 the material leaf (REQ-MARKET-002) — the item sibling of the material Lager checkbox. Both post the
 same `release` (the backend detects the game-item row and creates the `ITEM` offer); un-checking the
-toggle deactivates the row's active offer (`/items/{inventoryItemId}/deactivate`). The item leaf's
+toggle deactivates the row's active offer (`POST /api/v1/material-exchange/offers/deactivate?inventoryItemId=`). The item leaf's
 checked / "Auf Börse" state comes from the batch `released-item-ids` lookup, which is kind-agnostic
 (it keys on the inventory row, not its catalog kind). The toggle is **owner-only** and lives on the
 personal Lager only — the global (`/inventory/all`) item view has none, exactly as the material leaf.

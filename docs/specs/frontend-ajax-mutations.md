@@ -2350,9 +2350,10 @@ this rule is what notices.
   line and the error metric, must equal the request its lambda builds.
 - **The selection cannot shrink unnoticed:** at least 611 resolved call sites and seven probe
   templates.
-- `DeprecatedBackendEndpointCallGuardTest` reads the same scan, so it sees `execute(…)` sites too.
-  The one deprecated operation still relayed, `POST /api/v1/hangar/import/fleetview` (sunset
-  2027-05-14), is named in its list of reviewed relays.
+- No operation of the document is deprecated any more (the last one, `POST
+  /api/v1/hangar/import/fleetview`, was deleted in wave 6 of the API cut), so the guard that read
+  `deprecated: true` out of the document went with it; `BackendCallExistenceTest` still fails on a
+  call to a path or verb the backend does not serve.
 
 **Acceptance**
 
@@ -2363,7 +2364,7 @@ this rule is what notices.
   `PUT`/`DELETE /api/v1/personal-inventory/admin/{id}`, which the backend never served (it serves
   `…/items/{id}`); both now call the backend's paths.
 
-**Enforced by:** `BackendCallExistenceTest`, `DeprecatedBackendEndpointCallGuardTest`,
+**Enforced by:** `BackendCallExistenceTest`,
 `AdminPersonalInventoryPageControllerMvcTest` · **Code:** `contract/BackendCallScanner`,
 `contract/BackendOperations` (tests) · **Related:** REQ-FE-015, REQ-API-001, ADR-0032
 

@@ -969,9 +969,9 @@ because of real bugs that shipped. The short version:
 
 ### API conventions
 
-- Versioned URI paths `/api/v1/...`; breaking changes → `/api/v2/...`
-  plus `@ApiDeprecation(sunset=..., replacement=...)` on the retired
-  endpoint.
+- Versioned URI paths `/api/v1/...`; a breaking change is a hard cut
+  (ADR-0234): the operation moves in place and the declared-break
+  ledger names it (REQ-API-001, REQ-API-017).
 - **DTOs only at boundaries.** Never expose JPA entities. DTOs are
   records with Jakarta validation annotations on write fields.
 - `@Valid` on every `@RequestBody` for POST / PUT / PATCH.
