@@ -23,7 +23,8 @@ twice, and the second one can be forgotten.
 **Mitigated, not solved.** `FrontendDtoContractTest` diffs the mirrors against `openapi.json`, and
 `GeneratedDtoAgreementTest` compares them field by field against the models generated from the same
 document, and `DtoMirrorConsistencyTest` pairs every mirror with its backend record wherever it
-lives in the backend source tree (REQ-OPS-038). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
+lives in the backend source tree (REQ-OPS-038); all of them select the mirrors by their
+`@DtoMirror` marker, not by a package (REQ-FE-032). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
 and until it happens the duplication is real.
 
 ## 11.3 The knowledge base cannot be gated by this repository's CI
@@ -133,6 +134,17 @@ Three guards stand against it, and their division of labour is the point:
 
 **Remove this entry** if podman ever gains a way to pin the forwarder's source address explicitly;
 until then the risk is bounded, named and watched, which is the most this layer allows.
+
+## 11.5d The host scripts can be older than the release — mitigated 2026-10-11
+
+The operational scripts reach a host only through the Ansible role, so a host can apply a release with
+older scripts than it was built with. That is how the v1.14.0 promotion failed on 2026-10-10. Since
+ADR-0247 the config bundle carries the scripts' hashes and `deploy.sh` compares them (§7.5,
+`REQ-OPS-045`). Two gaps remain, both accepted: **a host whose `deploy.sh` lacks the check cannot
+police itself** — its first install comes through the role, and until then the mandatory comparison in
+`docs/deployment.md` and the absent-metric alert `HostScriptsCheckStale` are the protection; and
+**the role's units, drop-ins, logrotate and tmpfiles files outside `/var/iri/code/scripts` are not
+hashed**. Extending `scripts/host-scripts.list` with their installed paths closes the second.
 
 ## 11.6 Open follow-ups from the cutover
 
@@ -384,3 +396,8 @@ of its job-order edges); its move into module packages waits for Phase 4, becaus
 still consume its API; then `hangar` with the sixth module access policy and its ship
 commands; and the blueprint's first part, which ended its `blueprint -> inventory` and
 `identity -> blueprint` edges. The baseline is at 45 class edges.
+The frontend is packaged by domain since 2026-10-10 (plan F4, REQ-FE-032): its controllers, mirrors
+and forms live in `<domain>.web` and `<domain>.model` beside the typed clients, the kernel in the
+eight `kernel.*` packages. The cross-domain references between domains are page composition and no
+frontend rule bounds them yet; the kernel's ten reaches into `orgunit`, `identity` and `catalogue`
+(§5.3) are frozen by `KernelDomainReachTest` and may only shrink.

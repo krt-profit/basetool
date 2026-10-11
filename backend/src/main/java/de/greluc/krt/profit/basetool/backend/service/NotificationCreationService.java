@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -52,6 +54,7 @@ public class NotificationCreationService {
   private final NotificationRepository notificationRepository;
   private final NotificationParamsCodec notificationParamsCodec;
   private final NotificationMuteService notificationMuteService;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Deletes the notifications the event supersedes (REQ-NOTIF-018), then writes one notification
@@ -100,6 +103,7 @@ public class NotificationCreationService {
       }
     }
     notificationRepository.saveAll(toCreate);
+    recordCreated(toCreate);
     log.info(
         "Created {} notification(s) for event {} entity {}",
         toCreate.size(),
@@ -112,6 +116,21 @@ public class NotificationCreationService {
       bySignal.computeIfAbsent(signal, _ -> new HashSet<>()).addAll(entry.getValue());
     }
     return bySignal;
+  }
+
+  private void recordCreated(@NotNull List<Notification> created) {
+    Map<NotificationType, Integer> byType = new LinkedHashMap<>();
+    for (Notification notification : created) {
+      byType.merge(notification.getType(), 1, Integer::sum);
+    }
+    byType.forEach(
+        (type, count) ->
+            meterRegistry
+                .counter(
+                    MetricNames.NOTIFICATION_CREATED,
+                    MetricNames.TAG_NOTIFICATION_TYPE,
+                    type.name())
+                .increment(count));
   }
 
   /**
@@ -189,6 +208,7 @@ public class NotificationCreationService {
     }
     if (!toCreate.isEmpty()) {
       notificationRepository.saveAll(toCreate);
+      recordCreated(toCreate);
       log.info(
           "Reconcile of {} {} created {} notification(s) on event {}",
           event.entityType(),

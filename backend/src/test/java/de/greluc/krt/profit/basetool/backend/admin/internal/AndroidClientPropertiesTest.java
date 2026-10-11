@@ -57,8 +57,11 @@ class AndroidClientPropertiesTest {
   private static final String RELEASES =
       "https://github.com/krt-profit/basetool-android/releases/latest";
 
-  /** The floor and newest build committed with this release. */
-  private static final int COMMITTED_CODE = 17;
+  /** The floor committed with this release. */
+  private static final int COMMITTED_FLOOR = 17;
+
+  /** The newest published build committed with this release. */
+  private static final int COMMITTED_LATEST = 18;
 
   /** Enables the record under test. */
   @Configuration(proxyBeanMethods = false)
@@ -122,8 +125,8 @@ class AndroidClientPropertiesTest {
         .run(
             context -> {
               AndroidClientProperties policy = context.getBean(AndroidClientProperties.class);
-              assertThat(policy.minimumVersionCode()).isEqualTo(COMMITTED_CODE);
-              assertThat(policy.latestVersionCode()).isEqualTo(COMMITTED_CODE);
+              assertThat(policy.minimumVersionCode()).isEqualTo(COMMITTED_FLOOR);
+              assertThat(policy.latestVersionCode()).isEqualTo(COMMITTED_LATEST);
               assertThat(policy.releasesUrl()).isEqualTo(RELEASES);
               assertThat(policy.minimumVersionCodeOverridden()).isFalse();
               assertThat(policy.latestVersionCodeOverridden()).isFalse();
@@ -138,8 +141,8 @@ class AndroidClientPropertiesTest {
         .run(
             context -> {
               AndroidClientProperties policy = context.getBean(AndroidClientProperties.class);
-              assertThat(policy.minimumVersionCode()).isEqualTo(COMMITTED_CODE);
-              assertThat(policy.latestVersionCode()).isEqualTo(COMMITTED_CODE);
+              assertThat(policy.minimumVersionCode()).isEqualTo(COMMITTED_FLOOR);
+              assertThat(policy.latestVersionCode()).isEqualTo(COMMITTED_LATEST);
               assertThat(policy.releasesUrl()).isEqualTo(RELEASES);
             });
   }
@@ -170,7 +173,7 @@ class AndroidClientPropertiesTest {
               AndroidClientProperties policy = context.getBean(AndroidClientProperties.class);
               assertThat(policy.minimumVersionCode()).isEqualTo(18);
               assertThat(policy.minimumVersionCodeOverridden()).isTrue();
-              assertThat(policy.latestVersionCode()).isEqualTo(COMMITTED_CODE);
+              assertThat(policy.latestVersionCode()).isEqualTo(COMMITTED_LATEST);
               assertThat(policy.latestVersionCodeOverridden()).isFalse();
               assertThat(policy.releasesUrl()).isEqualTo("https://example.org/releases");
               assertThat(policy.releasesUrlOverridden()).isTrue();
@@ -199,8 +202,8 @@ class AndroidClientPropertiesTest {
             context -> {
               assertThat(context).hasNotFailed();
               AndroidClientProperties policy = context.getBean(AndroidClientProperties.class);
-              assertThat(policy.minimumVersionCode()).isEqualTo(COMMITTED_CODE);
-              assertThat(policy.latestVersionCode()).isEqualTo(COMMITTED_CODE);
+              assertThat(policy.minimumVersionCode()).isEqualTo(COMMITTED_FLOOR);
+              assertThat(policy.latestVersionCode()).isEqualTo(COMMITTED_LATEST);
               assertThat(policy.releasesUrl()).isEqualTo(RELEASES);
               assertThat(policy.minimumVersionCodeOverridden()).isFalse();
               assertThat(policy.releasesUrlOverridden()).isFalse();

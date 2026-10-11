@@ -72,3 +72,4 @@ ansible/collections/
 ansible/gpg/
 ansible/.ansible/
 /versions.properties
+/docker/config/host-scripts.sha256

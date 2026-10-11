@@ -1,0 +1,173 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.bank.web;
+
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankDashboardAccountDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankDashboardDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.hamcrest.Matchers;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Renders the bank dashboard ({@code /bank}) to pin the account-name live filter (REQ-BANK-046),
+ * the view-option checkboxes (REQ-BANK-016), the Kontobewegung CTA and modal (REQ-BANK-023), and
+ * the role gating of the filter and the three-month report.
+ */
+@SpringBootTest
+class BankDashboardFilterMvcTest {
+
+  @Autowired private WebApplicationContext context;
+
+  private MockMvc mockMvc;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  private static BankDashboardAccountDto account(String accountNo, String name) {
+    return new BankDashboardAccountDto(
+        UUID.randomUUID(),
+        accountNo,
+        name,
+        "ORG_UNIT",
+        "ACTIVE",
+        new BigDecimal("1000"),
+        BigDecimal.ZERO,
+        List.of(),
+        null,
+        null,
+        null);
+  }
+
+  /** One active account, so the dashboard's direct-booking Kontobewegung CTA + modal render. */
+  private static BankAccountDto activeAccount() {
+    return new BankAccountDto(
+        UUID.randomUUID(),
+        "KB-0001",
+        "Staffel IRIDIUM",
+        "ORG_UNIT",
+        "ACTIVE",
+        null,
+        null,
+        new BigDecimal("1000"),
+        null,
+        null,
+        null,
+        0L,
+        Instant.parse("2026-01-01T00:00:00Z"));
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_MANAGEMENT")
+  void dashboard_managementUser_rendersFilterViewCheckboxesAndMovementCta() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
+        .thenReturn(
+            new BankDashboardDto(
+                true,
+                List.of(account("KB-0001", "Staffel IRIDIUM"), account("KB-0002", "KRT")),
+                null));
+    when(backendApiClient.get(startsWith("/api/v1/bank/accounts"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(activeAccount()), 0, 500, 1, 1, List.of()));
+
+    mockMvc
+        .perform(get("/bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter\"")))
+        .andExpect(content().string(Matchers.containsString("data-bank-acc-filter")))
+        .andExpect(content().string(Matchers.containsString("data-bank-view-toggles")))
+        .andExpect(content().string(Matchers.containsString("data-bank-view-layout")))
+        .andExpect(content().string(Matchers.containsString("data-bank-view-group")))
+        .andExpect(
+            content().string(Matchers.containsString("data-filter-scope=\"#bank-grid-results\"")))
+        .andExpect(
+            content()
+                .string(Matchers.containsString("data-filter-empty=\"#bank-acc-filter-empty\"")))
+        .andExpect(
+            content().string(Matchers.containsString("data-filter-name=\"Staffel IRIDIUM\"")))
+        .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter-empty\"")))
+        .andExpect(content().string(Matchers.containsString("bank-movement-open")))
+        .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
+        .andExpect(content().string(Matchers.containsString("bank-report-download")))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("bank-manage-link"))))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("bank-grants-link"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void dashboard_employeeUser_seesFilterButNotManagementActions() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
+        .thenReturn(
+            new BankDashboardDto(false, List.of(account("KB-0001", "Staffel IRIDIUM")), null));
+
+    mockMvc
+        .perform(get("/bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter\"")))
+        .andExpect(
+            content().string(Matchers.containsString("data-filter-name=\"Staffel IRIDIUM\"")))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("bank-report-download"))))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("bank-manage-link"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void dashboard_noCards_omitsFilterBox() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
+        .thenReturn(new BankDashboardDto(false, List.of(), null));
+
+    mockMvc
+        .perform(get("/bank"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("id=\"bank-acc-filter\""))))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("id=\"bank-acc-filter-empty\""))))
+        .andExpect(content().string(Matchers.containsString("bank-dashboard-empty")));
+  }
+}
