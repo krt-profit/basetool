@@ -75,7 +75,6 @@ class LiftedRoleGatesTest {
             "getMissionInventory",
             "getAllGroupedInventory",
             "getAllStackEntries",
-            "getItemCatalog",
             "createInventoryItem",
             "bulkCheckout",
             "bulkChangeOrgUnit",

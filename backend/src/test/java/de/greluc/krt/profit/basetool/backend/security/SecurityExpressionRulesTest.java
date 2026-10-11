@@ -56,7 +56,7 @@ import org.springframework.stereotype.Component;
 class SecurityExpressionRulesTest {
 
   /** Declared security expressions on 2026-10-02; fewer means the scan lost its subject. */
-  private static final int EXPRESSION_FLOOR = 439;
+  private static final int EXPRESSION_FLOOR = 438;
 
   /**
    * Bean references per security bean. A count below its floor means a gate lost a bean check; a

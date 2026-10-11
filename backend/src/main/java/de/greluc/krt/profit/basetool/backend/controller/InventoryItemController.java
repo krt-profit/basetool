@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BulkStolenMarkResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryCatalog;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
@@ -45,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryAggregationService;
-import de.greluc.krt.profit.basetool.backend.service.InventoryItemCatalogService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryStolenMarkService;
@@ -142,7 +140,6 @@ public class InventoryItemController {
   private final InventoryOrgUnitChangeService inventoryOrgUnitChangeService;
   private final InventoryStolenMarkService inventoryStolenMarkService;
   private final InventoryAggregationService inventoryAggregationService;
-  private final InventoryItemCatalogService inventoryItemCatalogService;
   private final UserService userService;
   private final AuthHelperService authHelperService;
 
@@ -598,37 +595,6 @@ public class InventoryItemController {
             stolen,
             owningOrgUnitId,
             stackEntriesPageRequest(page, size));
-    return PageResponse.of(p);
-  }
-
-  /**
-   * Paged picker of the game items bookable as Lager item stock: the output of at least one active
-   * blueprint (REQ-INV-029).
-   *
-   * @param q optional case-insensitive item-name filter
-   * @param page zero-based page index
-   * @param size page size
-   * @param sort sort spec (whitelist: {@code name}, {@code id}; the default appends {@code id} as a
-   *     tiebreaker)
-   * @return paged bookable game-item references
-   */
-  @GetMapping("/item-catalog")
-  @PreAuthorize(INVENTORY_ACCESS)
-  @Operation(
-      summary = "List bookable game items",
-      description =
-          "Returns a paginated list of game items that can be booked as Lager item stock (output"
-              + " of at least one active blueprint).")
-  @Transactional(readOnly = true)
-  public PageResponse<InventoryGameItemReferenceDto> getItemCatalog(
-      @RequestParam(required = false) String q,
-      @RequestParam(required = false, defaultValue = "0") int page,
-      @RequestParam(required = false, defaultValue = "20") int size,
-      @RequestParam(required = false, defaultValue = "name,asc;id,asc") String sort) {
-    Pageable pageable =
-        PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
-    Page<InventoryGameItemReferenceDto> p =
-        inventoryItemCatalogService.findBookableItems(q, pageable);
     return PageResponse.of(p);
   }
 

@@ -163,7 +163,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   @Query(
       value =
           """
-          SELECT gi FROM de.greluc.krt.profit.basetool.backend.model.GameItem gi WHERE EXISTS
+          SELECT gi FROM de.greluc.krt.profit.basetool.backend.model.GameItem gi LEFT JOIN FETCH gi.manufacturer WHERE EXISTS
           (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi AND
           b.scwikiDeletedAt IS NULL AND i.kind =
           de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE

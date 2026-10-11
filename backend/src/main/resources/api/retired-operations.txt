@@ -29,6 +29,9 @@ DELETE /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim
 PUT /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim
 DELETE /api/v1/missions/{id}/units/{unitId}/slim
 PUT /api/v1/missions/{id}/units/{unitId}/slim
+GET /api/v1/orders/item-catalog
+GET /api/v1/orders/item-catalog/{gameItemId}/blueprints
+DELETE /api/v1/orders/{jobOrderId}/inventory/{inventoryItemId}/unlink
 GET /api/v1/org-units/bank/accounts/{id}
 DELETE /api/v1/org-units/bank/accounts/{id}/approval-limit/all-members
 PUT /api/v1/org-units/bank/accounts/{id}/approval-limit/all-members

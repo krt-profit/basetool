@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -125,23 +124,6 @@ public class RefineryOrderController {
     RefineryOrder order = refineryOrderService.getRefineryOrder(id);
     return mapper.toDto(
         order, refineryOrderService.getYieldBonusByMaterialForLocation(order.getLocation()));
-  }
-
-  /**
-   * Returns the UEX-derived refinery yield bonus/malus per input material for a refinery location,
-   * as a {@code materialId → percent} map (positive = bonus, negative = malus, {@code 0} =
-   * baseline).
-   *
-   * <p>An unknown or {@code null} location returns an empty map, not 404.
-   *
-   * @param locationId the chosen refinery location
-   * @return per-material yield bonus map
-   */
-  @GetMapping("/locations/{locationId}/yields")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public Map<UUID, Integer> getYieldsForLocation(@PathVariable @NotNull UUID locationId) {
-    return refineryOrderService.getYieldBonusByMaterialForLocationId(locationId);
   }
 
   /**

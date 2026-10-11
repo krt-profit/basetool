@@ -57,7 +57,7 @@ class StreamAwareShallowEtagHeaderFilterTest {
       strings = {
         "/api/v1/missions",
         "/api/v1/materials/matrix",
-        "/api/v1/orders/item-catalog",
+        "/api/v1/game-items",
         "/api/v1/terms/document",
         "/api/v1/job-types",
         "/"

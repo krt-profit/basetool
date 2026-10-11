@@ -162,8 +162,8 @@ T1 GET /api/v1/operations/{id}/payouts
 T1 PUT /api/v1/operations/{id}/payouts/paid-out
 T1 GET /api/v1/orders
 T1 POST /api/v1/orders
-T1 GET /api/v1/orders/item-catalog
-T1 GET /api/v1/orders/item-catalog/{gameItemId}/blueprints
+T1 GET /api/v1/game-items
+T1 GET /api/v1/game-items/{gameItemId}/blueprints
 T1 POST /api/v1/orders/items
 T1 GET /api/v1/orders/lookup
 T1 GET /api/v1/orders/material-demand
@@ -184,7 +184,7 @@ T1 PUT /api/v1/orders/{id}/status
 T1 GET /api/v1/orders/{jobOrderId}/claims
 T1 POST /api/v1/orders/{jobOrderId}/claims
 T1 DELETE /api/v1/orders/{jobOrderId}/claims/{claimId}
-T1 DELETE /api/v1/orders/{jobOrderId}/inventory/{inventoryItemId}/unlink
+T1 DELETE /api/v1/orders/{id}/allocations/{inventoryItemId}
 T1 GET /api/v1/orders/{jobOrderId}/item-stock
 T1 GET /api/v1/orders/{jobOrderId}/material-collection
 T1 DELETE /api/v1/orders/{jobOrderId}/materials/{materialId}
