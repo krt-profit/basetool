@@ -1615,8 +1615,8 @@ game items, bank accounts) keep the 50-row default and rely on the hint. The mar
 values are registered in `krt-catalog-search.js`: `remote-materials`,
 `remote-materials-joborder` (orders lines), `remote-materials-raw` (refinery inputs),
 `remote-locations`, and `remote-game-items` (the inventory item mode's bookable-item picker — the
-one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated backend
-`/api/v1/inventory/item-catalog`, REQ-INV-029). Each marker carries its kind-specific default
+one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated (full set) backend
+`/api/v1/game-items`, REQ-INV-029). Each marker carries its kind-specific default
 placeholder / no-results wording via the `krtComboboxI18n.kinds` map (REQ-FE-011) — the material and
 location pickers say "Material/Ort suchen oder wählen…", never the user-picker text.
 Server-rendered edit/redisplay states seed exactly

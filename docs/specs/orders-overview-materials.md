@@ -160,7 +160,7 @@ detail view.
 **Enforced by:** `JobOrderServiceTest`
 (`getOrphanedLinkedInventoryReturnsOnlyLinksWhoseMaterialIsNotRequired`) · **Code:**
 `JobOrderQueryService.getOrphanedLinkedInventory`, `JobOrderController` `GET
-/api/v1/orders/{id}/inventory/orphaned`, `JobOrderPageController.viewOrderDetail`,
+/api/v1/orders/{id}/allocations/orphaned`, `JobOrderPageController.viewOrderDetail`,
 `templates/orders-detail.html`
 
 ### REQ-ORDERS-020 — Order list is paginated server-side

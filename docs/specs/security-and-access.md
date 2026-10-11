@@ -2066,13 +2066,16 @@ family decides, so a sub-family can differ from its parent.
 | `/api/v1/special-commands/*/members/**`, `/api/v1/squadrons/*/members/**` | **new** — member rosters |
 | `/api/v1/terms/**` | **new** — `/terms/status` is the caller's own acceptance |
 
-Revalidatable: `announcement`, `app`, `blueprints`, `cities`, `frequency-types`, `job-types`,
-`kommando-groups`, `locations`, `manufacturers`, `material-categories`,
+Revalidatable: `announcement`, `app`, `blueprints`, `cities`, `frequency-types`, `game-items`,
+`job-types`, `kommando-groups`, `locations`, `manufacturers`, `material-categories`,
 `material-external-aliases`, `materials`, `missions`, `org-hierarchy`, `org-units`, `outposts`,
 `pois`, `quality-tiers`, `refining-methods`, `settings`, `ship-types`, `space-stations`, `special-commands`,
-`squadrons`, `star-systems`, `terminals`, `uex`, and three
-catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**`,
-`/api/v1/orders/item-catalog/**` and `/api/v1/terms/document`.
+`squadrons`, `star-systems`, `terminals`, `uex`, and two
+catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**` and
+`/api/v1/terms/document`. The game-item catalogue (`/api/v1/game-items/**`) and the refinery yield
+matrix of a location (`/api/v1/locations/*/refinery-yields/**`) are catalogue data and revalidate;
+before wave 5 of the API cut the Lager twin of the catalogue and the yield matrix sat in `no-store`
+families (`/api/v1/inventory/**`, `/api/v1/refinery-orders/**`).
 
 **One bank family, two audiences.** `/api/v1/bank/**` covers the bank-employee surface and the
 member-facing account a shipped client actually reads at `/api/v1/bank/org-units/**` (it lay at
@@ -4098,14 +4101,18 @@ refusal on the mission list. A fixture that models an impossible account shape p
 about a cohort that does not exist. That is the structural half of this requirement, and it is why
 the roster sync had to be fixed in the same change:
 
-**The member-surface role gates sit on the handlers, not only in the URL rules.** The thirteen
+**The member-surface role gates sit on the handlers, not only in the URL rules.** The twelve
 squadron-wide `InventoryItemController` handlers (the aggregated, material, game-item, `/all`,
-mission, grouped, stack-entries and item-catalog reads, `POST /` and the four `bulk-*` writes) carry
+mission, grouped and stack-entries reads, `POST /` and the four `bulk-*` writes) carry
 `@PreAuthorize(INVENTORY_ACCESS)` — ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER — and
 `HangarController`'s squadron overview and home-location bulk edit carry `@PreAuthorize(HANGAR_ACCESS)`
 — `HANGAR_READ`, `HANGAR_WRITE` or `ROLE_ADMIN`. Both repeat the `SecurityConfig` URL rule, which
 stays as defence in depth, so a later path move cannot drop the gate silently.
 `LiftedRoleGatesTest` evaluates each annotation on its own with the real role hierarchy.
+The game-item catalogue read, formerly the thirteenth (`GET /api/v1/inventory/item-catalog`), is `GET /api/v1/game-items`
+(`GameItemController`, wave 5 of the API cut): its annotation keeps the four roles for the full bookable set and
+lets any login through only for `orderable=true`, the subset the job-order create form read before. No `SecurityConfig` rule
+covers the path, so the annotation is the only gate; `GameItemControllerTest` evaluates both branches.
 
 > [!warning] The composite-blind sync was the precondition, not a detail
 > `KeycloakService` indexes **directly-assigned** realm roles (`GET /roles/{name}/users`). A member
