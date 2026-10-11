@@ -1061,7 +1061,7 @@ as each pair is decoupled.
   `mission -> refinery` association and the `MissionFinanceContributor` SPI), where
   `RefineryOrder.mission` becomes an id. So the policy does not own the refinery's JPQL scope
   fragment yet either. *(P3-8b, 2026-10-11: the association and the SPI are done; two imports still
-  block the move, now tracked as P4-3.)* (2) No command API: no other module writes a refinery order. The
+  block the move, now tracked as P4-3; done 2026-10-11, §7.6.)* (2) No command API: no other module writes a refinery order. The
   store still creates Lager rows itself (write family 2 of the evidence appendix); that write
   becomes a call of the Lager's `StockCommands` with P3-5.
 - `joborder` — **done 2026-10-10.**
@@ -1469,6 +1469,7 @@ as each pair is decoupled.
   and the operation's three finance classes need no inversion for the cycle, and
   `REFINERY_ORDER_SCOPE_TRIPLE` is package-private to `repository` (it becomes the policy's
   fragment with the move), so `RefineryAccessPolicy` does not own the JPQL scope fragment yet.
+  *(P4-3, 2026-10-11: the move is done and the policy owns the fragment, §7.6.)*
   (3) The `Operation` entity, `OperationStatus`, `OperationRepository`, `OperationMapper` and the
   operation DTOs still do not move. The refinery half is gone, but the probe still finds the three
   edges of P3-8a plus one: `MissionDto` and `MissionListDto` (`model`) and `MissionMapper`
@@ -1633,19 +1634,95 @@ repository then move together, with that participant; NullAway already covers th
 P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
 The five published interfaces already cover every foreign caller, so the move touches no
 other module; the §8.1 idioms go with it.
-**P4-3 — move the refinery's entities into `refinery.internal` / `refinery.api`** (carried from
-P3-8b, §7.5). It waits for the two imports the probe names: `LocationService`'s in-use check of
-`RefineryOrderRepository` (a catalogue-owned usage SPI, as for the hangar's ships) and
-`UserDeletionService`'s owner reassignment (the GDPR `UserReassignmentParticipant`). The move then
-takes `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`, the repository with
-`RefineryMissionProfitAggregate`, `RefineryOrderMapper`, the three order DTOs and the two request
-DTOs together, publishes the order DTOs and a finance view of the orders through `refinery.api` for
-`OperationFinanceService`, `OperationPayoutCalculator` and `OperationPayoutService`, and lets
-`RefineryAccessPolicy` own `REFINERY_ORDER_SCOPE_TRIPLE`.
+**P4-3 — the refinery's entities move into `refinery.internal` / `refinery.api` — done
+2026-10-11** (carried from P3-8b, §7.5).
+1. *Characterise*: `LocationDeleteInUseIntegrationTest` (real Postgres) pins the in-use check of a
+   location delete: an unused location is deleted; one a ship references is refused with the ships'
+   message, one a refinery order references with the orders' message, and one both reference with
+   the ships' message first. Green on `c042014ee` before the change, and proven able to fail:
+   swapping the two checks turns two of the four red. The refinery side was already pinned by
+   `RefineryAccessPolicyDifferentialTest`, `RefineryOrderRepositoryScopedTest`,
+   `RefineryOrderRepositoryListFilterTest`, `RefineryOrderReadNoNPlusOneTest`,
+   `RefineryOrderMissionReferenceContractTest` and `RefineryMissionLinkContractTest`, which reads
+   the operation's finance views against the database; they stayed green unchanged in behaviour.
+2. *Inversion*: `catalogue.api.LocationUsage` (`position()`, `users()`, `isUsed(locationId)`), a
+   read SPI the catalogue owns and every module whose rows point at a location implements:
+   `hangar.internal.ShipLocationUsage` (position 10) and `refinery.internal.RefineryLocationUsage`
+   (position 20), both `MANDATORY` in the delete's transaction. `LocationService.deleteLocation`
+   asks the registered usages in position order and the first one that reports the location in use
+   names the refusal: `Cannot delete location: It is currently used by one or more <users>.` — the
+   two messages, their order and the `EntityInUseException` (409) are byte-identical.
+3. *Probe* (not a guess): a class-dependency graph over the compiled `main` classes, ArchUnit-imported,
+   nested and generated classes folded onto their source type, one node per first package segment,
+   the twelve types reassigned to `refinery`. Before the SPI exactly one edge closed a cycle,
+   `LocationService -> RefineryOrderRepository` (`service ↔ refinery`, which also put `hangar` and
+   `mission` into the strongly connected set); with it taken out the set was empty. The second edge
+   of P3-8b, `UserDeletionService -> RefineryOrderRepository`, was already gone with P4 slice a
+   (`RefineryOwnerReassignment`), so no GDPR participant was needed here. The refinery slice's
+   predecessors after the move are `exchange` (the extract and draft records of `refinery.api`),
+   `operation` (below) and `task` (`BusinessMetricsCollector`, which is `app` and reads the
+   repository and the status the way it reads `bank.internal` and `materialexchange.internal`).
+4. *Move*: `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`, `RefineryOrderRepository` with
+   `RefineryMissionProfitAggregate`, `RefineryOrderMapper` with `RefineryOrderMissionLookup` and
+   the two request records go to `refinery.internal`; `RefineryOrderDto`, `RefineryGoodDto` and
+   `RefineryOrderListDto` go to `refinery.api` (`RefineryImportDraftDto` embeds the first two).
+   `REFINERY_ORDER_SCOPE_TRIPLE` left `ScopeSpecifications` and is now a package-private constant of
+   `RefineryAccessPolicy`, spliced into the four scoped queries of the repository with the same
+   text; `RefineryAccessPolicyDifferentialTest` is unchanged.
+5. *Finance view*: the operation module ranks above the refinery, so its three finance classes read
+   the orders through the refinery-owned `refinery.api.RefineryOrderFinanceReader`
+   (`linesOfMissions`, `linesOfMission`, `figuresOfMissions`, `profitByMission`), implemented by
+   `refinery.internal.RefineryOrderFinanceReads` with the same repository calls and the same
+   mapper as before, in the caller's transaction. A `RefineryOrderFigures` record (mission, owner
+   id and the three amounts, an absent amount as zero) replaces the entity in
+   `OperationPayoutCalculator`, and a `RefineryOrderLine` pairs the figures with the order's DTO for
+   the two finance views; the payout path takes the figures only, so it builds no DTO and costs no
+   statement more. `OperationFinanceService` and `OperationPayoutService` no longer name a refinery
+   entity, repository or mapper.
+6. *NullAway*: the `refinery` tree is checked, so the moved types are now covered. The entity's
+   nullable columns, the DTO components the draft and the mapper leave out, the repository's search
+   pattern and the id setter's parameter (a new order is persisted without an id) carry
+   `@Nullable`; the generated MapStruct implementation is the first one inside a checked tree, so
+   the compile gets `NullAway:TreatGeneratedAsUnannotated`.
+7. *Gates*: the architecture test's model-code floor drops 344 → 343 (the DTOs, the request records
+   and the status left the model tree), the domain map lost the class rule of
+   `RefineryMissionProfitAggregate` and the name rule `^(Refinery|ImportIssue|ImportSuggestion)`,
+   which now assign no class (the package rule takes them all). The tests of the moved types moved
+   into the matching packages of the test tree.
+Baseline **38 → 36** (`catalogue -> hangar: LocationService -> ShipRepository`,
+`catalogue -> refinery: LocationService -> RefineryOrderRepository`); the file holds 36 lines in 8
+module pairs. P4 slice a recorded "43 → 43", but the file at `c042014ee` already held 38 lines.
+**Corrections:** (1) Only the first of the two imports of P3-8b was left; the second went with P4
+slice a. (2) The usage SPI removed a second baseline edge nobody had asked for: the hangar's ship
+check was the same kind of import. (3) The delete has no deactivate counterpart: `hidden` is a flag
+the update sets without a check, so only the delete asks. (4) Four tables point at `location`:
+`ship`, `refinery_order`, `inventory_item` and `material_price`. Only the first two are checked
+today, so deleting a location that a Lager row or a price references fails at the foreign key; that
+behaviour is unchanged and is not an omission to fix here. `inventory` (P4-1) and the catalogue
+itself can implement `LocationUsage` when someone decides the refusal should name them; the SPI
+fits both without a change. (5) `RefineryOrderStatus` and the request records stay internal: only
+`BusinessMetricsCollector`, which sits in `app`, and the controller of the same module read them. (6)
+`RefineryOrderDto` keeps its `@NotNull` on `location` and `goods`; `location` also carries
+`@Nullable` because the import draft leaves it unset when the screenshot names no known location.
 **P4-4 — move the operation's entity, repository, mapper and DTOs into `operation.internal` /
-`operation.api`** (carried from P3-8b, §7.5), once the mission DTOs stop embedding `OperationDto`
-(the REST DTO separation of §5.2): `MissionDto`, `MissionListDto`, `MissionMapper` and
-`MissionPeerRedactor` are the four classes that close the cycle today.
+`operation.api`** (carried from P3-8b, §7.5) — **still blocked, checked 2026-10-11 after P4-3, not
+started.** The probe above, run with the seven operation types (`Operation`, `OperationStatus`,
+`OperationRepository`, `OperationMapper`, `OperationDto`, `OperationReferenceDto`,
+`OperationCreateDto`) reassigned to `operation`, finds exactly three class edges that enter the
+operation from inside the cycle: `MissionDto -> OperationDto` and `MissionListDto -> OperationDto`
+(both embed `OperationDto operation`) and `MissionMapper -> OperationMapper` (it builds that field
+from the summary the operation implements). Those are the three edges of the baseline's
+`mission -> operation` lines; `MissionPeerRedactor` no longer reads `OperationDto`, so the plan's
+"four classes" is three. The only other class that reads the operation's types is
+`BusinessMetricsCollector`, which sits outside the cycle in `app`. The operation's own outgoing
+edges (`admin`, `mapper`, `model`, `notification`, `repository`, `service`, and `refinery` through
+`refinery.api` only) leave the cycle and need no inversion.
+What blocks the move is the wire shape, not a missing inversion: the mission DTOs embed the
+operation's full DTO, so `model -> operation` would meet `operation -> model` (`Mission`, `User`,
+`OrgUnit`) in a package cycle, and the mission (rank 9) reaching `operation.api` (rank 11) would stay
+a frozen upward edge. It becomes feasible when the REST DTO separation (§5.2) gives the mission a
+DTO of its own for the embedded operation, which changes the OpenAPI schema name unless the new
+record keeps `OperationDto`'s name and fields.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 

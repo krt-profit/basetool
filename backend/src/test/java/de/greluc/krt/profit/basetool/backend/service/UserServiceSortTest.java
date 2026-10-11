@@ -44,7 +44,6 @@ class UserServiceSortTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private ShipRepository shipRepository;
-  @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;

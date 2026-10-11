@@ -30,13 +30,13 @@ import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.operation.api.events.OperationNotices;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFigures;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFinanceReader;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.math.BigDecimal;
@@ -100,7 +100,7 @@ public class OperationPayoutService {
 
   private final OperationRepository operationRepository;
   private final MissionFinanceEntryRepository financeEntryRepository;
-  private final RefineryOrderRepository refineryOrderRepository;
+  private final RefineryOrderFinanceReader refineryOrderFinanceReader;
   private final OperationPayoutStatusRepository payoutStatusRepository;
   private final UserService userService;
   private final OperationAccessPolicy operationAccessPolicy;
@@ -144,8 +144,8 @@ public class OperationPayoutService {
     List<UUID> missionIds = operation.getMissions().stream().map(Mission::getId).toList();
     List<MissionFinanceEntry> allEntries =
         missionIds.isEmpty() ? List.of() : financeEntryRepository.findAllByMissionIdIn(missionIds);
-    List<RefineryOrder> allOrders =
-        missionIds.isEmpty() ? List.of() : refineryOrderRepository.findByMissionIdIn(missionIds);
+    List<RefineryOrderFigures> allOrders =
+        missionIds.isEmpty() ? List.of() : refineryOrderFinanceReader.figuresOfMissions(missionIds);
 
     BigDecimal totalSum = OperationPayoutCalculator.computeTotalSum(allEntries, allOrders);
     Map<String, BigDecimal> personalExpensesByKey =

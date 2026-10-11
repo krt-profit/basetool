@@ -43,11 +43,11 @@ import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFigures;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFinanceReader;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -77,7 +77,7 @@ class OperationPayoutServiceTest {
 
   @Mock private OperationRepository operationRepository;
   @Mock private MissionFinanceEntryRepository financeEntryRepository;
-  @Mock private RefineryOrderRepository refineryOrderRepository;
+  @Mock private RefineryOrderFinanceReader refineryOrderFinanceReader;
   @Mock private OperationPayoutStatusRepository payoutStatusRepository;
   @Mock private UserService userService;
   @Mock private OperationAccessPolicy operationAccessPolicy;
@@ -629,13 +629,8 @@ class OperationPayoutServiceTest {
       addUserParticipantWithUser(m, bob, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
       stubOperation(Set.of(m));
 
-      RefineryOrder order = new RefineryOrder();
-      order.setId(UUID.randomUUID());
-      order.setOwner(alice);
-      order.setMissionId(m.getId());
-      order.setOreSales(2000d);
-      order.setExpenses(500d);
-      order.setOtherExpenses(200d);
+      RefineryOrderFigures order =
+          RefineryOrderFigures.of(m.getId(), alice.getId(), 2000d, 500d, 200d);
       stubFinances(List.of(), List.of(order));
 
       List<OperationPayoutDto> result = operationPayoutService.getOperationPayouts(OPERATION_ID);
@@ -731,13 +726,8 @@ class OperationPayoutServiceTest {
       addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
       stubOperation(Set.of(m));
 
-      RefineryOrder order = new RefineryOrder();
-      order.setId(UUID.randomUUID());
-      order.setOwner(alice);
-      order.setMissionId(m.getId());
-      order.setOreSales(1000d);
-      order.setExpenses(null);
-      order.setOtherExpenses(null);
+      RefineryOrderFigures order =
+          RefineryOrderFigures.of(m.getId(), alice.getId(), 1000d, null, null);
       stubFinances(List.of(), List.of(order));
 
       List<OperationPayoutDto> result = operationPayoutService.getOperationPayouts(OPERATION_ID);
@@ -1012,9 +1002,10 @@ class OperationPayoutServiceTest {
           .thenReturn(Optional.of(op));
     }
 
-    private void stubFinances(List<MissionFinanceEntry> entries, List<RefineryOrder> orders) {
+    private void stubFinances(
+        List<MissionFinanceEntry> entries, List<RefineryOrderFigures> orders) {
       when(financeEntryRepository.findAllByMissionIdIn(any())).thenReturn(entries);
-      when(refineryOrderRepository.findByMissionIdIn(any())).thenReturn(orders);
+      when(refineryOrderFinanceReader.figuresOfMissions(any())).thenReturn(orders);
     }
 
     private Mission newMission(Instant actualStart, Instant actualEnd) {

@@ -17,8 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.NotEmpty;
@@ -26,18 +30,27 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 /**
- * Refinery order payload.
+ * Request body of a refinery-order update.
  *
- * <p>{@code owningOrgUnitId} is the picker output on create, resolved by {@code
- * OwnerScopeService.resolveOrgUnitForPickerOutputNullable} for all four org-unit kinds; an
- * inadmissible pick is rejected with 400 (REQ-ORG-016).
+ * <p>It carries no id, owner, profit or owning squadron: the order comes from the path, its owner
+ * and org unit never change, and the profit is computed. A logistician acting for the owner uses
+ * the per-target path.
+ *
+ * @param location the refinery location
+ * @param mission the linked mission, or {@code null} to unlink
+ * @param startedAt the run's start, or {@code null} for now
+ * @param durationMinutes the run's duration in minutes
+ * @param expenses the refining expenses
+ * @param otherExpenses further expenses
+ * @param oreSales the ore sales
+ * @param refiningMethod the refining method, or {@code null} to clear it
+ * @param status the new status name, or {@code null} to keep the current one
+ * @param goods the goods of the run, replacing the stored ones
+ * @param version the last-seen version, or {@code null} to skip the optimistic-lock check
  */
-public record RefineryOrderDto(
-    UUID id,
-    UserReferenceDto owner,
+public record RefineryOrderUpdateRequest(
     @NotNull LocationDto location,
     MissionReferenceDto mission,
     Instant startedAt,
@@ -45,10 +58,7 @@ public record RefineryOrderDto(
     @PositiveOrZero @DecimalMax("1000000000.0") Double expenses,
     @PositiveOrZero @DecimalMax("1000000000.0") Double otherExpenses,
     @PositiveOrZero @DecimalMax("1000000000.0") Double oreSales,
-    Double profit,
     RefiningMethodDto refiningMethod,
     String status,
     @NotEmpty List<@Valid RefineryGoodDto> goods,
-    SquadronReferenceDto owningSquadron,
-    Long version,
-    UUID owningOrgUnitId) {}
+    Long version) {}

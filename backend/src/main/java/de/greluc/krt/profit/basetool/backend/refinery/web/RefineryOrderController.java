@@ -20,16 +20,16 @@
 package de.greluc.krt.profit.basetool.backend.refinery.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.mapper.RefineryOrderMapper;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderCreateRequest;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderMapper;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;

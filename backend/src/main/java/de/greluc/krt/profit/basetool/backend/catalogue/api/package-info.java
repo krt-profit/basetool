@@ -19,7 +19,7 @@
 
 /**
  * The catalogue module's published API: the quantity-type rounding the job-order, blueprint and
- * exchange paths share (plan §5.2).
+ * exchange paths share, the job-type designation observer and the location usage SPI (plan §5.2).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.catalogue.api;

@@ -17,10 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.repository;
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import java.time.Instant;
 import java.util.Collection;
@@ -28,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -138,7 +137,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   @Query(
       "SELECT r FROM RefineryOrder r WHERE r.missionId = :missionId AND "
-          + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
+          + RefineryAccessPolicy.REFINERY_ORDER_SCOPE_TRIPLE)
   List<RefineryOrder> findByMissionIdScoped(
       @Param("missionId") UUID missionId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -162,7 +161,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    */
   @Query(
       """
-      select new de.greluc.krt.profit.basetool.backend.repository.RefineryMissionProfitAggregate(
+      select new de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryMissionProfitAggregate(
       r.missionId,
       sum(coalesce(r.oreSales, 0.0) - coalesce(r.expenses, 0.0)
       - coalesce(r.otherExpenses, 0.0)))
@@ -197,7 +196,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       @Param("statuses") Collection<RefineryOrderStatus> statuses,
       @Param("readyOnly") boolean readyOnly,
       @Param("now") Instant now,
-      @Param("pattern") String pattern,
+      @Param("pattern") @Nullable String pattern,
       Pageable pageable);
 
   /**
@@ -221,12 +220,12 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       "SELECT r FROM RefineryOrder r WHERE "
           + LIST_FILTER
           + " AND "
-          + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
+          + RefineryAccessPolicy.REFINERY_ORDER_SCOPE_TRIPLE)
   Page<RefineryOrder> findFilteredScoped(
       @Param("statuses") Collection<RefineryOrderStatus> statuses,
       @Param("readyOnly") boolean readyOnly,
       @Param("now") Instant now,
-      @Param("pattern") String pattern,
+      @Param("pattern") @Nullable String pattern,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
@@ -252,7 +251,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   @Query(
       "SELECT r FROM RefineryOrder r WHERE r.owner.id = :ownerId AND "
-          + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
+          + RefineryAccessPolicy.REFINERY_ORDER_SCOPE_TRIPLE)
   Page<RefineryOrder> findByOwnerIdScoped(
       @Param("ownerId") UUID ownerId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -300,7 +299,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * cross-squadron escape clause like Mission's {@code is_internal = false}.
    */
   @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
-  @Query("SELECT r FROM RefineryOrder r WHERE " + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
+  @Query("SELECT r FROM RefineryOrder r WHERE " + RefineryAccessPolicy.REFINERY_ORDER_SCOPE_TRIPLE)
   Page<RefineryOrder> findAllScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
@@ -340,8 +339,8 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @Query(
       """
       SELECT o.id FROM RefineryOrder o
-      WHERE o.status IN (de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.OPEN,
-                         de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.IN_PROGRESS)
+      WHERE o.status IN (de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN,
+                         de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.IN_PROGRESS)
         AND o.storedAt IS NULL AND o.readyNotifiedAt IS NULL
         AND o.endsAt IS NOT NULL AND o.endsAt > :notBefore AND o.endsAt <= :now
       ORDER BY o.endsAt, o.id
