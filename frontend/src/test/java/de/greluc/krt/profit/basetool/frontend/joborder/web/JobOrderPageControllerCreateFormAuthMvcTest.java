@@ -91,7 +91,7 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
     mockMvc
         .perform(get("/orders/create"))
         .andExpect(status().isOk())
-        .andExpect(view().name("orders-create"));
+        .andExpect(view().name("joborder/orders-create"));
 
     verify(backendApiClient).getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
   }
@@ -128,7 +128,7 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
     mockMvc
         .perform(get("/orders/create"))
         .andExpect(status().isOk())
-        .andExpect(view().name("orders-create"))
+        .andExpect(view().name("joborder/orders-create"))
         .andExpect(content().string(Matchers.containsString("Combat SK")))
         .andExpect(content().string(Matchers.containsString("Profit Staffel")));
 

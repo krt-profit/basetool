@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{orders.create.title} + ' - ' + ${appTitle}">Neuer Auftrag - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<link rel="stylesheet" th:href="@{/css/pages/orders-create.css}">
+<link rel="stylesheet" th:href="@{/css/pages/joborder/orders-create.css}">
     </th:block>
 </head>
 <body>
@@ -42,8 +42,8 @@
                     <div th:if="${#lists.isEmpty(responsibleOptions)}" class="alert alert-danger" role="alert"
                          th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</div>
                     <div class="form-grid">
-                        <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
-                        <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
+                        <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
+                        <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
                         <div class="form-group">
                             <label for="handle" th:text="#{orders.create.handle}">Handle Ansprechpartner</label>
                             <input type="text" id="handle" th:field="*{handle}" autocomplete="off" required>
@@ -85,7 +85,7 @@
                             <div class="form-group">
                                 <select th:field="*{materials[__${stat.index}__].minQuality}" th:title="#{orders.create.minQuality.hint}"
                                         th:attr="aria-label=#{orders.create.minQuality}">
-                                    <th:block th:replace="~{fragments/quality-tier :: floorOptions(${qualityTiers}, ${jobOrderForm.materials[__${stat.index}__].minQuality})}"></th:block>
+                                    <th:block th:replace="~{joborder/fragments/quality-tier :: floorOptions(${qualityTiers}, ${jobOrderForm.materials[__${stat.index}__].minQuality})}"></th:block>
                                 </select>
                             </div>
                             <button type="button" class="btn btn-ghost btn-icon material-row__remove" data-trigger="orders-remove-material"
@@ -129,8 +129,8 @@
                     <div th:if="${#lists.isEmpty(responsibleOptions)}" class="alert alert-danger" role="alert"
                          th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</div>
                     <div class="form-grid">
-                        <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('item-responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderItemForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
-                        <div th:replace="~{fragments/orgunit-select :: orgUnitSelect('item-requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderItemForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
+                        <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('item-responsibleOrgUnitId', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderItemForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
+                        <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('item-requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderItemForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
                         <div class="form-group">
                             <label for="item-handle" th:text="#{orders.create.handle}">Handle Ansprechpartner</label>
                             <input type="text" id="item-handle" th:field="*{handle}" autocomplete="off" required>
@@ -187,11 +187,11 @@
     </th:block>
 
     <select id="minquality-options-template" hidden>
-        <th:block th:replace="~{fragments/quality-tier :: floorOptionsSelected(${qualityTiers}, ${qualityTiers.?[active() and minQuality() == 650].isEmpty() ? null : 650})}"></th:block>
+        <th:block th:replace="~{joborder/fragments/quality-tier :: floorOptionsSelected(${qualityTiers}, ${qualityTiers.?[active() and minQuality() == 650].isEmpty() ? null : 650})}"></th:block>
     </select>
 
     <select id="item-quality-options-template" hidden>
-        <th:block th:replace="~{fragments/quality-tier :: codeOptions(${qualityTiers})}"></th:block>
+        <th:block th:replace="~{joborder/fragments/quality-tier :: codeOptions(${qualityTiers})}"></th:block>
     </select>
 
     <select id="item-options-template" hidden>
@@ -238,7 +238,7 @@
     const MSG_CREATE_FAILED = /*[[#{error.joborder.create.failed}]]*/ 'Create failed.';
     const MSG_UPDATE_FAILED = /*[[#{error.joborder.update.failed}]]*/ 'Update failed.';
 </script>
-<script th:src="@{/js/orders-create.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/joborder/orders-create.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

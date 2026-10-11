@@ -132,7 +132,9 @@ class PromotionAdminRankRequirementsPageMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-trigger=\"ar-open-create\"")))
         .andExpect(
-            content().string(containsString("src=\"/js/promotion-admin-rank-requirements.js\"")))
+            content()
+                .string(
+                    containsString("src=\"/js/promotion/promotion-admin-rank-requirements.js\"")))
         .andExpect(
             content()
                 .string(containsString("var AR_CATEGORIES_BY_TOPIC = {\"" + topicId + "\":[")));

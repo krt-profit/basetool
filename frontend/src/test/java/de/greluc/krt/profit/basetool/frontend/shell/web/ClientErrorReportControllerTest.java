@@ -106,7 +106,7 @@ class ClientErrorReportControllerTest {
         controller.report(
             new ClientErrorReport(
                 "Cannot read properties of null",
-                "https://app/js/missions.js",
+                "https://app/js/mission/missions.js",
                 42,
                 7,
                 MetricNames.CLIENT_ERROR_SCRIPT_ERROR));

@@ -417,7 +417,7 @@ message key and one URL.
 - [x] After an in-place import re-render the link is still present and unchanged.
 
 **Enforced by:** `RefineryOrderCreateImportRenderTest#createPage_rendersScExtractorReleaseLink_besideTheImportButton`
-· **Code:** [`refinery-orders-create.html`](../../frontend/src/main/resources/templates/refinery-orders-create.html)
+· **Code:** [`refinery/refinery-orders-create.html`](../../frontend/src/main/resources/templates/refinery/refinery-orders-create.html)
 
 ## Traceability
 

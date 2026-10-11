@@ -762,7 +762,7 @@ the grant.** Production still showed "Fehler beim Laden" after rotation was turn
 Keycloak event was a different one: `REFRESH_TOKEN_ERROR error="invalid_request" reason="Invalid
 scopes: all"` (and `"Invalid scopes: mine"`), surfacing in the frontend as
 `ClientAuthorizationException [invalid_scope]` out of `RefreshTokenOAuth2AuthorizedClientProvider`.
-The values `all` / `mine` are the job-orders **"Staffel" filter** (`orders-index.html`, radio
+The values `all` / `mine` are the job-orders **"Staffel" filter** (`joborder/orders-index.html`, radio
 buttons `name="scope"` `value="mine|all"` — "Eigene Staffel" / "Alle Staffeln"), not OAuth scopes.
 The cause is a Spring footgun: `DefaultOAuth2AuthorizedClientManager`'s default
 `contextAttributesMapper` copies a request parameter literally named `scope` into
@@ -3091,7 +3091,7 @@ the caller.
   flash-attribute re-render after a validation error.
 
 **Enforced by:** `RefineryOrderServiceTest` · **Code:** `RefineryOrderService#storeRefineryOrder`,
-`RefineryOrderPageController#viewOrderDetail`, `refinery-orders-details.html` · **Mirrors:**
+`RefineryOrderPageController#viewOrderDetail`, `refinery/refinery-orders-details.html` · **Mirrors:**
 `InventoryItemService#createInventoryItem`
 
 ### REQ-SEC-040 — Guest redaction MUST reach every nested user, not only the participants

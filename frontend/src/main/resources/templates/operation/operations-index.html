@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{operations.title} + ' - ' + ${appTitle}">Operations - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <link rel="stylesheet" th:href="@{/css/pages/operations-index.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/operation/operations-index.css}">
     </th:block>
 </head>
 <body>
@@ -167,8 +167,8 @@
         conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
 </script>
-<script th:src="@{/js/operations-index.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/operations.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/operation/operations-index.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/operation/operations.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

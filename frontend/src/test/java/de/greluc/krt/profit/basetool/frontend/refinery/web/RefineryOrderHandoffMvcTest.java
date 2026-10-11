@@ -117,7 +117,7 @@ class RefineryOrderHandoffMvcTest {
                 .param("handoff", "tQfTskHGirAhVIpYj8BiDP876m0")
                 .with(oidcLogin().idToken(token -> token.subject(SUB.toString()))))
         .andExpect(status().isOk())
-        .andExpect(view().name("refinery-orders-create"))
+        .andExpect(view().name("refinery/refinery-orders-create"))
         .andExpect(model().attribute("pendingHandoffId", "tQfTskHGirAhVIpYj8BiDP876m0"))
         .andExpect(model().attributeDoesNotExist("importErrorKey"));
 
@@ -141,7 +141,7 @@ class RefineryOrderHandoffMvcTest {
                 .with(oidcLogin().idToken(token -> token.subject(SUB.toString())))
                 .with(csrf()))
         .andExpect(status().isOk())
-        .andExpect(view().name("refinery-orders-create :: refineryImportFormBody"))
+        .andExpect(view().name("refinery/refinery-orders-create :: refineryImportFormBody"))
         .andExpect(model().attribute("importErrorKey", "ingest.handoff.notFound"))
         .andExpect(content().string(containsString("data-testid=\"refinery-import-error\"")));
 
@@ -175,7 +175,7 @@ class RefineryOrderHandoffMvcTest {
                 .with(oidcLogin().idToken(token -> token.subject(SUB.toString())))
                 .with(csrf()))
         .andExpect(status().isOk())
-        .andExpect(view().name("refinery-orders-create :: refineryImportFormBody"))
+        .andExpect(view().name("refinery/refinery-orders-create :: refineryImportFormBody"))
         .andExpect(model().attribute("importGoodsTotal", 2))
         .andExpect(model().attributeDoesNotExist("importErrorKey"))
         .andExpect(content().string(containsString("data-testid=\"refinery-import-banner\"")));

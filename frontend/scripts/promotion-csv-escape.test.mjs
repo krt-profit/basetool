@@ -28,7 +28,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const SOURCE = readFileSync(
-    fileURLToPath(new URL('../src/main/resources/static/js/promotion-manage.js', import.meta.url)),
+    fileURLToPath(
+        new URL('../src/main/resources/static/js/promotion/promotion-manage.js', import.meta.url),
+    ),
     'utf8',
 );
 

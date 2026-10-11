@@ -56,7 +56,7 @@ progress column, because its rows carry no collection-progress fields
 **Enforced by:** `JobOrderListRenderTest` (frontend render),
 `JobOrderServiceTest` (UpdateItemJobOrderTests — aggregated stock enrichment) · **Code:**
 `JobOrderStockProjectionService.enrichAggregatedWithClaims`, `JobOrderItemService.aggregateMaterials`,
-`AggregatedMaterialDto.currentStock`, `templates/orders-index.html` · **Issues:** #595
+`AggregatedMaterialDto.currentStock`, `templates/joborder/orders-index.html` · **Issues:** #595
 
 ### REQ-ORDERS-018 — Inventory may only be linked to an order that requires its material
 
@@ -135,7 +135,7 @@ two gates are parallel, not a replacement.
 `JobOrderQueryService.findAllActiveReference`, `JobOrderRepository.findAllActiveWithMaterials`,
 `templates/inventory/fragments/inventory-stack-entries.html`,
 `templates/inventory/inventory-input.html` / `static/js/inventory/inventory-input.js`,
-`RefineryOrderPageController.fetchActiveJobOrders`, `templates/refinery-orders-details.html`
+`RefineryOrderPageController.fetchActiveJobOrders`, `templates/refinery/refinery-orders-details.html`
 
 ### REQ-ORDERS-019 — Order detail surfaces orphaned linked inventory
 
@@ -161,7 +161,7 @@ detail view.
 (`getOrphanedLinkedInventoryReturnsOnlyLinksWhoseMaterialIsNotRequired`) · **Code:**
 `JobOrderQueryService.getOrphanedLinkedInventory`, `JobOrderController` `GET
 /api/v1/orders/{id}/allocations/orphaned`, `JobOrderPageController.viewOrderDetail`,
-`templates/orders-detail.html`
+`templates/joborder/orders-detail.html`
 
 ### REQ-ORDERS-020 — Order list is paginated server-side
 
@@ -190,7 +190,7 @@ live **inside** the `ordersResults` AJAX-swap fragment so a filter change re-ren
 - [ ] A `?size=` outside {50,100,200} falls back to 100; a negative `?page=` clamps to 0.
 
 **Enforced by:** `JobOrderPaginationMvcTest`, `JobOrderPageStatusFilterTest` (fetch URL) · **Code:**
-`JobOrderPageController.viewOrders` / `buildPaginationBaseUrl`, `templates/orders-index.html`,
+`JobOrderPageController.viewOrders` / `buildPaginationBaseUrl`, `templates/joborder/orders-index.html`,
 `templates/kernel/fragments/pagination.html` · **Issues:** #2 (performance audit)
 
 ### REQ-ORDERS-022 — Overview surfaces the responsible (processing) org unit
@@ -219,7 +219,7 @@ backend change is needed and the order-list endpoint gains no query; the badge r
   distinct.
 
 **Enforced by:** `JobOrderListRenderTest` (frontend render — responsible-badge assertion) ·
-**Code:** `templates/orders-index.html`, `JobOrderDto.responsibleOrgUnit`,
+**Code:** `templates/joborder/orders-index.html`, `JobOrderDto.responsibleOrgUnit`,
 `.order-responsible-label` (`styles.css`), `orders.index.responsible` (i18n) · **Issues:** #1188
 
 ### REQ-ORDERS-027 — Overview: collapsible material sublist + status & squadron filters
@@ -283,7 +283,7 @@ swap.
 threading), `JobOrderPageStatusFilterTest` (status query-param validation + no status cookie),
 `JobOrderControllerTest` (`getAllJobOrders_forwardsSquadronIdFilter`),
 `JobOrderServiceAssigneeAndListTest` / `JobOrderScopeQueryIntegrationTest` (scoped multi-squadron
-query) · **Code:** `templates/orders-index.html`, `static/js/orders-index.js`,
+query) · **Code:** `templates/joborder/orders-index.html`, `static/js/joborder/orders-index.js`,
 `JobOrderPageController.viewOrders` / `fetchActiveSquadrons` / `buildPaginationBaseUrl`,
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
 `JobOrderRepository.findScopedJobOrders`
@@ -319,7 +319,7 @@ explicit `scope` query parameter wins.
 **Enforced by:** `OrdersListPatternRenderTest`, `JobOrderControllerTest`
 (`getAllJobOrders_forwardsToProcessFlag`), `JobOrderServiceAssigneeAndListTest` (`toProcess_*`),
 `JobOrderScopeQueryIntegrationTest` (`processingFilter_*`), `JobOrderToProcessMvcTest` · **Code:**
-`JobOrderPageController.viewOrders`, `orders-index.html`, `static/js/orders-index.js`,
+`JobOrderPageController.viewOrders`, `joborder/orders-index.html`, `static/js/joborder/orders-index.js`,
 `JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
 `JobOrderRepository.findScopedJobOrders` · **Related:** REQ-ORDERS-023, REQ-ORDERS-027, REQ-UI-027
 

@@ -144,7 +144,8 @@ class OrdersDetailPatternRenderTest {
         .containsPattern("<dialog[^>]*id=\"handover-modal\"")
         .contains("data-testid=\"order-handover-submit\"");
 
-    try (InputStream template = getClass().getResourceAsStream("/templates/orders-detail.html")) {
+    try (InputStream template =
+        getClass().getResourceAsStream("/templates/joborder/orders-detail.html")) {
       assertThat(template).isNotNull();
       assertThat(new String(template.readAllBytes(), StandardCharsets.UTF_8))
           .as("the template carries no migrated krtm class")

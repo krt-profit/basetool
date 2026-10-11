@@ -250,9 +250,9 @@ public class JobOrderPageController {
     model.addAttribute("ageYellowDays", yellowDays);
     model.addAttribute("ageRedDays", redDays);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
-      return "orders-index :: ordersResults";
+      return "joborder/orders-index :: ordersResults";
     }
-    return "orders-index";
+    return "joborder/orders-index";
   }
 
   /**
@@ -315,7 +315,9 @@ public class JobOrderPageController {
       @RequestParam(required = false) String fragment) {
     boolean requesterView = !canViewJobOrders && canViewOwnJobOrders;
     if (!canViewJobOrders && !canViewOwnJobOrders) {
-      return fragment != null ? "orders-detail :: fragmentError" : "redirect:/orders/create";
+      return fragment != null
+          ? "joborder/orders-detail :: fragmentError"
+          : "redirect:/orders/create";
     }
     model.addAttribute("requesterView", requesterView);
     try {
@@ -459,27 +461,27 @@ public class JobOrderPageController {
       log.error("Failed to fetch order", e);
       log.error("Failed to load job order", e);
       if (fragment != null) {
-        return "orders-detail :: fragmentError";
+        return "joborder/orders-detail :: fragmentError";
       }
       model.addAttribute("error", "error.joborder.load.details");
       return "redirect:/orders";
     }
     if (fragment != null) {
       return switch (fragment.toLowerCase(Locale.ROOT)) {
-        case "materials" -> "orders-detail :: materialsSection";
-        case "aggregated" -> "orders-detail :: aggregatedSection";
-        case "header" -> "orders-detail :: orderHeader";
-        case "kpi" -> "orders-detail :: kpiSection";
-        case "handovers" -> "orders-detail :: materialHandoverSection";
-        case "items" -> "orders-detail :: itemsSection";
-        case "item-handovers" -> "orders-detail :: itemHandoverSection";
-        case "item-handover-lines" -> "orders-detail :: itemHandoverLines";
-        case "blueprint-owners" -> "orders-detail :: blueprintOwnersSection";
-        case "assignees" -> "orders-detail :: assigneesSection";
-        default -> "orders-detail";
+        case "materials" -> "joborder/orders-detail :: materialsSection";
+        case "aggregated" -> "joborder/orders-detail :: aggregatedSection";
+        case "header" -> "joborder/orders-detail :: orderHeader";
+        case "kpi" -> "joborder/orders-detail :: kpiSection";
+        case "handovers" -> "joborder/orders-detail :: materialHandoverSection";
+        case "items" -> "joborder/orders-detail :: itemsSection";
+        case "item-handovers" -> "joborder/orders-detail :: itemHandoverSection";
+        case "item-handover-lines" -> "joborder/orders-detail :: itemHandoverLines";
+        case "blueprint-owners" -> "joborder/orders-detail :: blueprintOwnersSection";
+        case "assignees" -> "joborder/orders-detail :: assigneesSection";
+        default -> "joborder/orders-detail";
       };
     }
-    return "orders-detail";
+    return "joborder/orders-detail";
   }
 
   /**
@@ -517,7 +519,7 @@ public class JobOrderPageController {
     model.addAttribute("squadrons", fetchSquadrons());
     model.addAttribute("qualityTiers", qualityTierCatalog.all());
     addOwnerPickerOptions(model);
-    return "orders-create";
+    return "joborder/orders-create";
   }
 
   /**
@@ -574,7 +576,7 @@ public class JobOrderPageController {
     model.addAttribute("squadrons", fetchSquadrons());
     model.addAttribute("qualityTiers", qualityTierCatalog.all());
     addOwnerPickerOptions(model);
-    return "orders-create";
+    return "joborder/orders-create";
   }
 
   /**

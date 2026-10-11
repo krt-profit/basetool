@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{promotion.my.title} + ' - ' + ${appTitle}">Meine Bewertungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-    <link rel="stylesheet" th:href="@{/css/pages/promotion-my-evaluations.css}">
+    <link rel="stylesheet" th:href="@{/css/pages/promotion/promotion-my-evaluations.css}">
     </th:block>
 </head>
 <body>
@@ -184,7 +184,7 @@
 </main>
 </th:block>
 <th:block th:fragment="pageTail">
-<script th:src="@{/js/promotion-my-evaluations.js}" defer th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
+<script th:src="@{/js/promotion/promotion-my-evaluations.js}" defer th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
 </th:block>
 </body>
 </html>

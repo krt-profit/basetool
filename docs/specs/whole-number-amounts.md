@@ -71,7 +71,7 @@ amount.
 200 + the rendered `data-amount`). **Code:** `backend/.../model/dto/MissionFinanceEntry{Create,Update}Dto`
 (`@WholeNumber`, `@DecimalMin`, `@DecimalMax`), `frontend/.../mission/model/MissionFinanceEntryForm`
 (`@WholeNumber`), `backend/.../validation/WholeNumber` + `frontend/.../kernel/web/WholeNumber`,
-`frontend/.../kernel/web/MoneyFormat`, `templates/mission-detail.html`, `templates/operation-detail.html`.
+`frontend/.../kernel/web/MoneyFormat`, `templates/mission/mission-detail.html`, `templates/operation/operation-detail.html`.
 **Issues:** PR #465.
 
 ### REQ-ORDERS-001 — Item-order piece counts: positive whole numbers
@@ -88,7 +88,7 @@ blank or `≤ 0` before calling the backend; `CreateJobOrderItemLineDto.amount` 
 
 **Enforced by:** `JobOrderItemServiceTest`, `JobOrderPageControllerItemEditMvcTest`. **Code:**
 `backend/.../model/dto/CreateJobOrderItemLineDto`, `backend/.../model/JobOrderItem` (`amount` is
-`Integer`), `templates/orders-create.html`, `JobOrderWriteController` (line filter). **Issues:** PR #465.
+`Integer`), `templates/joborder/orders-create.html`, `JobOrderWriteController` (line filter). **Issues:** PR #465.
 
 ### REQ-ORDERS-002 — Item-handover counts: positive whole numbers
 
@@ -106,7 +106,7 @@ over-delivery beyond the outstanding amount.
 **Enforced by:** `JobOrderItemHandoverServiceTest`. **Code:**
 `backend/.../joborder/internal/JobOrderItemHandoverEntryCreateDto`,
 `backend/.../model/JobOrderItemHandoverEntry` (`amount` is `Integer`),
-`templates/orders-detail.html`, `JobOrderWriteController#createItemHandover`. **Issues:** PR #465.
+`templates/joborder/orders-detail.html`, `JobOrderWriteController#createItemHandover`. **Issues:** PR #465.
 
 ### REQ-INV-045 — Personal-inventory quantity: positive whole numbers
 

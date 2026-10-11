@@ -734,7 +734,9 @@ val testPromotionCsvEscape =
     script.set(layout.projectDirectory.file("scripts/promotion-csv-escape.test.mjs").asFile)
     ignoreExitValue.set(false)
     inputs.file(layout.projectDirectory.file("scripts/promotion-csv-escape.test.mjs"))
-    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/promotion-manage.js"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/promotion/promotion-manage.js")
+    )
     outputs.upToDateWhen { false }
   }
 

@@ -149,7 +149,8 @@ class OrdersCreateFormPatternRenderTest {
         .containsPattern("id=\"comment-count\"[^>]*>0 / 1000<")
         .contains("id=\"minquality-options-template\" hidden");
 
-    try (InputStream template = getClass().getResourceAsStream("/templates/orders-create.html")) {
+    try (InputStream template =
+        getClass().getResourceAsStream("/templates/joborder/orders-create.html")) {
       assertThat(template).isNotNull();
       assertThat(new String(template.readAllBytes(), StandardCharsets.UTF_8))
           .as("the template carries no migrated krtm class")

@@ -89,8 +89,9 @@ class PromotionAdminDialogsRenderWithTheirScriptMvcTest {
    */
   @ParameterizedTest
   @CsvSource({
-    "/promotion/admin/topics, /js/promotion-admin-topics.js, modal-create-topic",
-    "/promotion/admin/rank-requirements, /js/promotion-admin-rank-requirements.js, modal-create"
+    "/promotion/admin/topics, /js/promotion/promotion-admin-topics.js, modal-create-topic",
+    "/promotion/admin/rank-requirements, /js/promotion/promotion-admin-rank-requirements.js,"
+        + " modal-create"
   })
   @WithMockUser(roles = "ADMIN")
   void allSquadronsViewRendersNoDialogAndNoScript(String path, String script, String dialog)
@@ -115,8 +116,9 @@ class PromotionAdminDialogsRenderWithTheirScriptMvcTest {
    */
   @ParameterizedTest
   @CsvSource({
-    "/promotion/admin/topics, /js/promotion-admin-topics.js, modal-create-topic",
-    "/promotion/admin/rank-requirements, /js/promotion-admin-rank-requirements.js, modal-create"
+    "/promotion/admin/topics, /js/promotion/promotion-admin-topics.js, modal-create-topic",
+    "/promotion/admin/rank-requirements, /js/promotion/promotion-admin-rank-requirements.js,"
+        + " modal-create"
   })
   @WithMockUser(roles = "ADMIN")
   void pinnedSquadronRendersDialogsTogetherWithTheScript(String path, String script, String dialog)

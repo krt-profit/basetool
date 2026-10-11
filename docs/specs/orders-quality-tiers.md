@@ -64,7 +64,7 @@ item-order material requirements (`job_order_item_material`) and material claims
 **Enforced by:** `QualityTierServiceTest`, `V261QualityTierMigrationTest`,
 `MaterialClaimServiceTest`, `JobOrderServiceTest`, `JobOrderItemServiceTest`,
 `ExternalContractTest` · **Code:** `QualityTier`, `QualityTierService`, `QualityTierController`,
-`AdminQualityTierController`, V261–V264, `fragments/quality-tier.html`, `QualityTierCatalog`
+`AdminQualityTierController`, V261–V264, `joborder/fragments/quality-tier.html`, `QualityTierCatalog`
 
 ### REQ-ORDERS-037 — Linked stock counts toward exactly one quality bucket
 
@@ -109,7 +109,7 @@ lists under each bucket only the rows it counts, with their counted share.
 `ExchangeDemandParityTest`, `JobOrderMaterialStockRowQueryDataTest` · **Code:**
 `QualityBucketAllocator`, `JobOrderStockProjectionService.OrderLinkedStockIndex#bookedFor`,
 `JobOrderStockProjectionService#attributionFor`, `JobOrderMaterialDemandService`,
-`JobOrderQueryService`, `ExchangeDemandService`, `static/js/orders-detail.js`
+`JobOrderQueryService`, `ExchangeDemandService`, `static/js/joborder/orders-detail.js`
 (`_loadStockAttribution`)
 
 ### REQ-ORDERS-038 — The member chooses which tier a handover counts toward
@@ -147,7 +147,7 @@ and only suggests one. Each position of a **material** handover MAY name a tier 
 
 **Enforced by:** `JobOrderHandoverQualityTierTest`, `JobOrderHandoverServiceTest`, the handover
 integration tests · **Code:** `JobOrderHandoverService#bookAgainstLines`,
-`JobOrderHandoverItemCreateDto`, `static/js/orders-detail.js` (`_refreshHandoverTierChoice`,
+`JobOrderHandoverItemCreateDto`, `static/js/joborder/orders-detail.js` (`_refreshHandoverTierChoice`,
 `_loadHandoverTierSuggestions`)
 
 ### REQ-ORDERS-039 — A production run consumes only stock that meets the line's tier
@@ -168,7 +168,7 @@ written.
 - [x] The dialog disables below-floor entries and pre-fills lowest qualifying grade first.
 
 **Enforced by:** `JobOrderItemProductionServiceTest` · **Code:**
-`JobOrderItemProductionService#bookProduction`, `static/js/orders-detail.js` (`_prodPrefill`,
+`JobOrderItemProductionService#bookProduction`, `static/js/joborder/orders-detail.js` (`_prodPrefill`,
 `_prodLoadHigherAttribution`)
 
 ## The superseded columns

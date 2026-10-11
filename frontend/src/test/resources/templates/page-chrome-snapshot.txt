@@ -115,7 +115,7 @@ catalogue/admin/material-aliases.html body <body>
 catalogue/admin/material-aliases.html parts chrome:1e932c1674d72a5e x-content
 catalogue/admin/materials.html html <html lang="de">
 catalogue/admin/materials.html head-fixed 08d6bee55c3b4da6
-catalogue/admin/materials.html head-own <title>Materialien verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/promotion-admin.css"><link rel="stylesheet" href="/css/pages/catalogue/admin-materials.css">
+catalogue/admin/materials.html head-own <title>Materialien verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/promotion/promotion-admin.css"><link rel="stylesheet" href="/css/pages/catalogue/admin-materials.css">
 catalogue/admin/materials.html body <body>
 catalogue/admin/materials.html parts chrome:1e932c1674d72a5e x-content
 catalogue/admin/mission-data.html html <html lang="de">
@@ -258,16 +258,36 @@ inventory/inventory-my.html head-fixed 08d6bee55c3b4da6
 inventory/inventory-my.html head-own <title>Mein Lager - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/materialexchange/materialboerse.css"/><link rel="stylesheet" href="/css/inventory/inventory-lager.css"><link rel="stylesheet" href="/css/pages/inventory/inventory-my.css">
 inventory/inventory-my.html body <body>
 inventory/inventory-my.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-item-collection.html html <html lang="de">
-item-collection.html head-fixed 08d6bee55c3b4da6
-item-collection.html head-own <title>Itemsammelübersicht - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/item-collection.css">
-item-collection.html body <body>
-item-collection.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df
-material-collection.html html <html lang="de">
-material-collection.html head-fixed 08d6bee55c3b4da6
-material-collection.html head-own <title>Materialsammelübersicht - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/material-collection.css">
-material-collection.html body <body>
-material-collection.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df
+joborder/item-collection.html html <html lang="de">
+joborder/item-collection.html head-fixed 08d6bee55c3b4da6
+joborder/item-collection.html head-own <title>Itemsammelübersicht - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/joborder/item-collection.css">
+joborder/item-collection.html body <body>
+joborder/item-collection.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df
+joborder/material-collection.html html <html lang="de">
+joborder/material-collection.html head-fixed 08d6bee55c3b4da6
+joborder/material-collection.html head-own <title>Materialsammelübersicht - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/joborder/material-collection.css">
+joborder/material-collection.html body <body>
+joborder/material-collection.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df
+joborder/orders-create.html html <html lang="de">
+joborder/orders-create.html head-fixed 08d6bee55c3b4da6
+joborder/orders-create.html head-own <title>Neuer Auftrag - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/joborder/orders-create.css">
+joborder/orders-create.html body <body>
+joborder/orders-create.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+joborder/orders-detail.html html <html lang="de">
+joborder/orders-detail.html head-fixed 08d6bee55c3b4da6
+joborder/orders-detail.html head-own <title>Auftragsdetails - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/joborder/orders-detail.css">
+joborder/orders-detail.html body <body>
+joborder/orders-detail.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+joborder/orders-index.html html <html lang="de">
+joborder/orders-index.html head-fixed 08d6bee55c3b4da6
+joborder/orders-index.html head-own <title>Auftragsverwaltung</title><link rel="stylesheet" href="/css/pages/joborder/orders-index.css">
+joborder/orders-index.html body <body>
+joborder/orders-index.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+joborder/orders-material-demand.html html <html lang="de">
+joborder/orders-material-demand.html head-fixed 08d6bee55c3b4da6
+joborder/orders-material-demand.html head-own <title>Materialbedarf - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/joborder/orders-material-demand.css">
+joborder/orders-material-demand.html body <body>
+joborder/orders-material-demand.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df
 materialexchange/materialboerse.html html <html lang="de">
 materialexchange/materialboerse.html head-fixed 08d6bee55c3b4da6
 materialexchange/materialboerse.html head-own <title>Materialbörse - Profit Basetool – Alle Staffeln</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/materialexchange/materialboerse.css"/><link rel="stylesheet" href="/css/pages/materialexchange/materialboerse.css"/>
@@ -283,16 +303,16 @@ members.html head-fixed 08d6bee55c3b4da6
 members.html head-own <title>Mitgliederverwaltung - Profit Basetool – Alle Staffeln</title>
 members.html body <body>
 members.html parts chrome:1e932c1674d72a5e x-content
-mission-detail.html html <html lang="de">
-mission-detail.html head-fixed 08d6bee55c3b4da6
-mission-detail.html head-own <title>Einsatzverwaltung - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/mission-detail.css">
-mission-detail.html body <body>
-mission-detail.html parts chrome:1e932c1674d72a5e x-content
-missions.html html <html lang="de">
-missions.html head-fixed 08d6bee55c3b4da6
-missions.html head-own <title>Einsatzverwaltung - Profit Basetool – Alle Staffeln</title>
-missions.html body <body>
-missions.html parts chrome:1e932c1674d72a5e x-content
+mission/mission-detail.html html <html lang="de">
+mission/mission-detail.html head-fixed 08d6bee55c3b4da6
+mission/mission-detail.html head-own <title>Einsatzverwaltung - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/mission/mission-detail.css">
+mission/mission-detail.html body <body>
+mission/mission-detail.html parts chrome:1e932c1674d72a5e x-content
+mission/missions.html html <html lang="de">
+mission/missions.html head-fixed 08d6bee55c3b4da6
+mission/missions.html head-own <title>Einsatzverwaltung - Profit Basetool – Alle Staffeln</title>
+mission/missions.html body <body>
+mission/missions.html parts chrome:1e932c1674d72a5e x-content
 notification/admin/notification-rules.html html <html lang="de">
 notification/admin/notification-rules.html head-fixed 08d6bee55c3b4da6
 notification/admin/notification-rules.html head-own <title>Benachrichtigungsregeln - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/notification/admin-notification-rules.css">
@@ -303,36 +323,16 @@ notification/notifications.html head-fixed 08d6bee55c3b4da6
 notification/notifications.html head-own <title>Benachrichtigungen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/notification/notifications.css">
 notification/notifications.html body <body>
 notification/notifications.html parts chrome:1e932c1674d72a5e x-content
-operation-detail.html html <html lang="de">
-operation-detail.html head-fixed 08d6bee55c3b4da6
-operation-detail.html head-own <title>Details - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/operation-detail.css">
-operation-detail.html body <body>
-operation-detail.html parts chrome:1e932c1674d72a5e x-content
-operations-index.html html <html lang="de">
-operations-index.html head-fixed 08d6bee55c3b4da6
-operations-index.html head-own <title>Operationen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/operations-index.css">
-operations-index.html body <body>
-operations-index.html parts chrome:1e932c1674d72a5e x-content
-orders-create.html html <html lang="de">
-orders-create.html head-fixed 08d6bee55c3b4da6
-orders-create.html head-own <title>Neuer Auftrag - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/orders-create.css">
-orders-create.html body <body>
-orders-create.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-orders-detail.html html <html lang="de">
-orders-detail.html head-fixed 08d6bee55c3b4da6
-orders-detail.html head-own <title>Auftragsdetails - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/orders-detail.css">
-orders-detail.html body <body>
-orders-detail.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-orders-index.html html <html lang="de">
-orders-index.html head-fixed 08d6bee55c3b4da6
-orders-index.html head-own <title>Auftragsverwaltung</title><link rel="stylesheet" href="/css/pages/orders-index.css">
-orders-index.html body <body>
-orders-index.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-orders-material-demand.html html <html lang="de">
-orders-material-demand.html head-fixed 08d6bee55c3b4da6
-orders-material-demand.html head-own <title>Materialbedarf - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/orders-material-demand.css">
-orders-material-demand.html body <body>
-orders-material-demand.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df
+operation/operation-detail.html html <html lang="de">
+operation/operation-detail.html head-fixed 08d6bee55c3b4da6
+operation/operation-detail.html head-own <title>Details - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/operation/operation-detail.css">
+operation/operation-detail.html body <body>
+operation/operation-detail.html parts chrome:1e932c1674d72a5e x-content
+operation/operations-index.html html <html lang="de">
+operation/operations-index.html head-fixed 08d6bee55c3b4da6
+operation/operations-index.html head-own <title>Operationen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/operation/operations-index.css">
+operation/operations-index.html body <body>
+operation/operations-index.html parts chrome:1e932c1674d72a5e x-content
 organisation/leitung.html html <html lang="de">
 organisation/leitung.html head-fixed 08d6bee55c3b4da6
 organisation/leitung.html head-own <title>Leitung - Profit Basetool – Alle Staffeln</title><meta name="_csrf" content="T"/><meta name="_csrf_header" content="T"/><link rel="stylesheet" href="/css/organisation-unit-detail.css"/><link rel="stylesheet" href="/css/leitung.css"/>
@@ -368,46 +368,46 @@ profile.html head-fixed 08d6bee55c3b4da6
 profile.html head-own <title>Benutzerprofil - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/profile.css">
 profile.html body <body>
 profile.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-promotion-admin-rank-requirements.html html <html lang="de">
-promotion-admin-rank-requirements.html head-fixed 08d6bee55c3b4da6
-promotion-admin-rank-requirements.html head-own <title>Rangvoraussetzungen verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/promotion-admin.css"><link rel="stylesheet" href="/css/pages/promotion-admin-rank-requirements.css">
-promotion-admin-rank-requirements.html body <body>
-promotion-admin-rank-requirements.html parts chrome:1e932c1674d72a5e x-content
-promotion-admin-topics.html html <html lang="de">
-promotion-admin-topics.html head-fixed 08d6bee55c3b4da6
-promotion-admin-topics.html head-own <title>Themenbereiche verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/promotion-admin.css"><link rel="stylesheet" href="/css/pages/promotion-admin-topics.css">
-promotion-admin-topics.html body <body>
-promotion-admin-topics.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-promotion-manage.html html <html lang="de">
-promotion-manage.html head-fixed 08d6bee55c3b4da6
-promotion-manage.html head-own <title>Bewertungsverwaltung - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/promotion-manage.css">
-promotion-manage.html body <body>
-promotion-manage.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-promotion-my-evaluations.html html <html lang="de">
-promotion-my-evaluations.html head-fixed 08d6bee55c3b4da6
-promotion-my-evaluations.html head-own <title>Meine Bewertungen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/promotion-my-evaluations.css">
-promotion-my-evaluations.html body <body>
-promotion-my-evaluations.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-promotion-overview.html html <html lang="de">
-promotion-overview.html head-fixed 08d6bee55c3b4da6
-promotion-overview.html head-own <title>Beförderungssystem - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/promotion-overview.css">
-promotion-overview.html body <body>
-promotion-overview.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df
-refinery-orders-create.html html <html lang="de">
-refinery-orders-create.html head-fixed 08d6bee55c3b4da6
-refinery-orders-create.html head-own <title>Neuer Raffinerieauftrag - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/refinery-order-form.css"><link rel="stylesheet" href="/css/pages/refinery-orders-create.css"><script src="/js/refinery-yield-badge.js" defer nonce="N"></script>
-refinery-orders-create.html body <body>
-refinery-orders-create.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-refinery-orders-details.html html <html lang="de">
-refinery-orders-details.html head-fixed 08d6bee55c3b4da6
-refinery-orders-details.html head-own <title>Raffinerieauftrag Details - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/refinery-order-form.css"><link rel="stylesheet" href="/css/pages/refinery-orders-details.css"><script src="/js/refinery-yield-badge.js" defer nonce="N"></script>
-refinery-orders-details.html body <body>
-refinery-orders-details.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
-refinery-orders-index.html html <html lang="de">
-refinery-orders-index.html head-fixed 08d6bee55c3b4da6
-refinery-orders-index.html head-own <title>Raffinerie - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/refinery-orders-index.css">
-refinery-orders-index.html body <body>
-refinery-orders-index.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+promotion/promotion-admin-rank-requirements.html html <html lang="de">
+promotion/promotion-admin-rank-requirements.html head-fixed 08d6bee55c3b4da6
+promotion/promotion-admin-rank-requirements.html head-own <title>Rangvoraussetzungen verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/promotion/promotion-admin.css"><link rel="stylesheet" href="/css/pages/promotion/promotion-admin-rank-requirements.css">
+promotion/promotion-admin-rank-requirements.html body <body>
+promotion/promotion-admin-rank-requirements.html parts chrome:1e932c1674d72a5e x-content
+promotion/promotion-admin-topics.html html <html lang="de">
+promotion/promotion-admin-topics.html head-fixed 08d6bee55c3b4da6
+promotion/promotion-admin-topics.html head-own <title>Themenbereiche verwalten - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/promotion/promotion-admin.css"><link rel="stylesheet" href="/css/pages/promotion/promotion-admin-topics.css">
+promotion/promotion-admin-topics.html body <body>
+promotion/promotion-admin-topics.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+promotion/promotion-manage.html html <html lang="de">
+promotion/promotion-manage.html head-fixed 08d6bee55c3b4da6
+promotion/promotion-manage.html head-own <title>Bewertungsverwaltung - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/promotion/promotion-manage.css">
+promotion/promotion-manage.html body <body>
+promotion/promotion-manage.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+promotion/promotion-my-evaluations.html html <html lang="de">
+promotion/promotion-my-evaluations.html head-fixed 08d6bee55c3b4da6
+promotion/promotion-my-evaluations.html head-own <title>Meine Bewertungen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/promotion/promotion-my-evaluations.css">
+promotion/promotion-my-evaluations.html body <body>
+promotion/promotion-my-evaluations.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+promotion/promotion-overview.html html <html lang="de">
+promotion/promotion-overview.html head-fixed 08d6bee55c3b4da6
+promotion/promotion-overview.html head-own <title>Beförderungssystem - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/promotion/promotion-overview.css">
+promotion/promotion-overview.html body <body>
+promotion/promotion-overview.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df
+refinery/refinery-orders-create.html html <html lang="de">
+refinery/refinery-orders-create.html head-fixed 08d6bee55c3b4da6
+refinery/refinery-orders-create.html head-own <title>Neuer Raffinerieauftrag - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/refinery/refinery-order-form.css"><link rel="stylesheet" href="/css/pages/refinery/refinery-orders-create.css"><script src="/js/refinery/refinery-yield-badge.js" defer nonce="N"></script>
+refinery/refinery-orders-create.html body <body>
+refinery/refinery-orders-create.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+refinery/refinery-orders-details.html html <html lang="de">
+refinery/refinery-orders-details.html head-fixed 08d6bee55c3b4da6
+refinery/refinery-orders-details.html head-own <title>Raffinerieauftrag Details - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/refinery/refinery-order-form.css"><link rel="stylesheet" href="/css/pages/refinery/refinery-orders-details.css"><script src="/js/refinery/refinery-yield-badge.js" defer nonce="N"></script>
+refinery/refinery-orders-details.html body <body>
+refinery/refinery-orders-details.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
+refinery/refinery-orders-index.html html <html lang="de">
+refinery/refinery-orders-index.html head-fixed 08d6bee55c3b4da6
+refinery/refinery-orders-index.html head-own <title>Raffinerie - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/refinery/refinery-orders-index.css">
+refinery/refinery-orders-index.html body <body>
+refinery/refinery-orders-index.html parts chrome:1e932c1674d72a5e x-content toast:08a1a6282f2ac5df x-tail
 settings/admin-settings.html html <html lang="de">
 settings/admin-settings.html head-fixed 08d6bee55c3b4da6
 settings/admin-settings.html head-own <title>Systemeinstellungen - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/settings/admin-settings.css">

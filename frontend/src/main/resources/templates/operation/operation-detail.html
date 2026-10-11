@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{operation.details} + ' - ' + ${appTitle}">Operation Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <link rel="stylesheet" th:href="@{/css/pages/operation-detail.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/operation/operation-detail.css}">
     </th:block>
 </head>
 <body>
@@ -426,7 +426,7 @@
     const MSG_PAYOUT_PAID_UNSET_LOCKED = /*[[#{operation.payout.paid.unset.locked}]]*/ 'Nur Offiziere und Admins koennen den Bezahlt-Status zuruecksetzen.';
     const OPS_FINANCE_DETAIL_ERROR = /*[[#{operation.finance.detail.error}]]*/ 'Details konnten nicht geladen werden.';
 </script>
-<script th:src="@{/js/operation-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/operation/operation-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

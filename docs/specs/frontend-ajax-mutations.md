@@ -628,12 +628,12 @@ for an unknown fragment name), and `AdminMissionDataCrudE2eTest` (the three incl
 swap with no navigation request). **Issues:** the epic children
 (#572) through (#591), most recently (#580), (#581) and (#582), the last child. **Code:**
 `krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `kernel/fragments/pagination.html`,
-`mission-detail.html`,
-`orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`, `datetime-splitter.js`,
+`mission/mission-detail.html`,
+`joborder/orders-index.html`, `joborder/orders-detail.html`, `refinery/refinery-orders-create.html`, `datetime-splitter.js`,
 `hangar/hangar.html`, `catalogue/ship-data.html`, `personalinventory/personal-inventory.html`, `blueprint/personal-inventory-blueprints.html`,
 `personal-inventory*.js`, `bank.js`, `bank/bank-account-detail.html`, `bank/bank-manage.html`,
-`bank/bank-grants.html`, `promotion-admin-topics.html`, `promotion-admin-rank-requirements.html`,
-`promotion-manage.html`, `orgchart/org-chart.html`, `members.html`, `member-edit.html`, `profile.html`,
+`bank/bank-grants.html`, `promotion/promotion-admin-topics.html`, `promotion/promotion-admin-rank-requirements.html`,
+`promotion/promotion-manage.html`, `orgchart/org-chart.html`, `members.html`, `member-edit.html`, `profile.html`,
 `dashboard/index.html`, and the #582 admin pages — `announcement.html`, `sync-reports.html`, `locations.html`,
 `catalogue/materials.html`, `material-aliases.html`, `settings/admin-settings.html`, `uex.html`,
 `catalogue/fragments/admin-uex.html`, `mission-data.html`, `special-commands.html`,
@@ -680,8 +680,8 @@ submit helper can surface them inline.
 - [ ] With JavaScript disabled the classic form still `POST→redirect`s (the twin is header-gated).
 
 **Enforced by:** create/refinery navigate-after-AJAX MVC tests (`X-Requested-With` twins return
-`{targetUrl}` / `400`) · **Issues:** #575 · **Code:** `orders-create.html`, `refinery-orders-create.html`,
-`refinery-orders-details.html`, `JobOrderPageController`, `RefineryOrderPageController` (`*Ajax`
+`{targetUrl}` / `400`) · **Issues:** #575 · **Code:** `joborder/orders-create.html`, `refinery/refinery-orders-create.html`,
+`refinery/refinery-orders-details.html`, `JobOrderPageController`, `RefineryOrderPageController` (`*Ajax`
 twins, `propagateBackendError`).
 
 ### REQ-FE-007 — In-place form save with a `{field: message}` validation contract
@@ -726,7 +726,7 @@ to the same instant rather than failing and nulling it. A broken round-trip sile
 **Enforced by:** `MissionCoreEditAjaxControllerTest` (four-version re-read, microsecond zoneless
 schedule-time round-trip, 422 field map, 409 problem+json, fallback routing) +
 `MissionCoreEditInPlaceE2eTest` (in-place save, double-save no-409, inline validation). **Code:**
-`mission-detail.html`, `MissionWriteController` (`updateMissionAjax`, `applyMissionUpdate`,
+`mission/mission-detail.html`, `MissionWriteController` (`updateMissionAjax`, `applyMissionUpdate`,
 `parseToInstant`), `MissionPageController` (`formatInstant`). **Issues:** #589.
 
 ### REQ-FE-008 — A bfcache history-restore renders fresh server state
@@ -942,7 +942,7 @@ allocation-chip propagation + no-reload assertion, #1307) · **Code:** `LiveSync
 `mission-presence.js` (adapter: `sendChanged` / `krt:mission-changed` / `krt:mission-resync`),
 `krt-live-sync.js` (shared receiver factory), `mission-detail.js` (`krtRefreshMissionSection`
 broadcast + receiver config — its container map derived from the `MISSION_SECTIONS` seam map — with
-flush-time busy re-check + finance-badge `krt:swapped` listener), `mission-detail.html`
+flush-time busy re-check + finance-badge `krt:swapped` listener), `mission/mission-detail.html`
 (`overviewSection` fragment), `MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031,
 ADR-0069, ADR-0094
 
@@ -1214,7 +1214,7 @@ both.
 
 **Enforced by:** `MissionCoreEditAjaxControllerTest` (dirty-flag-gated PATCH fan-out) + e2e · **Code:**
 `MissionForm` (`dirtyCore` / `dirtySchedule` / `dirtyFlags`), `MissionWriteController`
-(`applyMissionUpdate`), `mission-detail.html` (hidden dirty inputs), `mission-detail.js` (section
+(`applyMissionUpdate`), `mission/mission-detail.html` (hidden dirty inputs), `mission-detail.js` (section
 snapshot + `markDirtySections`) · **Issue:** #1136
 
 ### REQ-FE-015 — Tool-wide live peer sync over topic rooms on one multiplexed WebSocket

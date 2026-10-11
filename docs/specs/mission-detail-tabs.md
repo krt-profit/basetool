@@ -280,7 +280,7 @@ Two crew-board writes that REQ-MISSION-007 assumed already lock-safe were not, a
 **Enforced by:** `MissionServicePayoutTest` (repeated check-in preserves `startTime`),
 `MissionServiceCrewTest` (unit/crew version-mismatch 409, matching-version success). **Code:**
 `MissionParticipantService#checkIn`, `MissionStructureService#updateMissionUnit`/`#updateCrewInShip`,
-`MissionUnitDto` / `MissionCrewDto` / `UpdateUnitRequest` / `UpdateCrewRequest`, `mission-detail.html`,
+`MissionUnitDto` / `MissionCrewDto` / `UpdateUnitRequest` / `UpdateCrewRequest`, `mission/mission-detail.html`,
 `mission-detail.js`. **Issues:** #1134, #1131 (epic #1109).
 
 ### REQ-MISSION-017 — DB-enforced mission section-lock counters and row-version decoupling
@@ -671,7 +671,7 @@ bump, no re-fetch, id-only / kind-only audit) + `MissionServiceTest` /
 **Code:** backend `CreateMissionRequest` (nested `NewObjective` / `NewStep`),
 `MissionService.createMission` / `MissionTimelineService.addObjectiveAtCreate` / `addStepAtCreate`;
 frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
-`MissionWriteController.createMission`, `mission-detail.html` (create sections + sticky actions),
+`MissionWriteController.createMission`, `mission/mission-detail.html` (create sections + sticky actions),
 `mission-detail.js` (create-form editor module).
 
 ### REQ-MISSION-020 — Manager-only add-by-id for the app

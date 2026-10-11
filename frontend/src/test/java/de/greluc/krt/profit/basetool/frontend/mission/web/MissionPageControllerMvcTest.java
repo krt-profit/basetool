@@ -186,7 +186,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail"))
+        .andExpect(view().name("mission/mission-detail"))
         .andExpect(content().string(containsString("mission-head-sticky")))
         .andExpect(content().string(containsString("facts-bar")))
         .andExpect(content().string(containsString("role=\"tablist\"")))
@@ -768,13 +768,13 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(containsString("data-end-time=\"2026-02-10T11:45:00Z\"")))
         .andExpect(content().string(not(containsString("data-start-time-formatted=\"\""))))
         .andExpect(content().string(not(containsString("data-end-time-formatted=\"\""))))
-        .andExpect(content().string(containsString("src=\"/js/mission-detail.js\"")));
+        .andExpect(content().string(containsString("src=\"/js/mission/mission-detail.js\"")));
     assertThat(missionDetailModuleSource()).contains("krtSyncDatetimeSplitGroup");
   }
 
   /**
-   * Reads the mission-detail page script ({@code static/js/mission-detail.js} and its parts) from
-   * the classpath, for script-content assertions.
+   * Reads the mission-detail page script ({@code static/js/mission/mission-detail.js} and its
+   * parts) from the classpath, for script-content assertions.
    *
    * @return the UTF-8 source of all parts, concatenated in load order
    * @throws IOException if a classpath resource cannot be read
@@ -789,7 +789,8 @@ class MissionPageControllerMvcTest {
             "mission-detail-actions.js",
             "mission-detail-tabs.js")) {
       try (var in =
-          new org.springframework.core.io.ClassPathResource("static/js/" + part).getInputStream()) {
+          new org.springframework.core.io.ClassPathResource("static/js/mission/" + part)
+              .getInputStream()) {
         source.append(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
       }
     }
@@ -874,7 +875,7 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(containsString("data-utc=\"" + expectedEndsAtMillis + "\"")))
         .andExpect(content().string(containsString("class=\"refinery-endsat-local\"")))
         .andExpect(content().string(containsString("10.02.2026 11:00 UTC")))
-        .andExpect(content().string(containsString("src=\"/js/mission-detail.js\"")));
+        .andExpect(content().string(containsString("src=\"/js/mission/mission-detail.js\"")));
     assertThat(missionDetailModuleSource()).contains("krtFormatLocalDateTime");
   }
 
@@ -2597,7 +2598,7 @@ class MissionPageControllerMvcTest {
                                     .subject(UUID.randomUUID().toString())
                                     .claim("preferred_username", "officer1"))))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail"))
+        .andExpect(view().name("mission/mission-detail"))
         .andExpect(content().string(containsString("data-amount=\"1235\"")));
   }
 
@@ -2696,7 +2697,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail"))
+        .andExpect(view().name("mission/mission-detail"))
         .andExpect(content().string(containsString("data-unit-id=\"" + unitId + "\"")))
         .andExpect(
             content().string(containsString("data-participant-id=\"" + participantId + "\"")))
@@ -2821,7 +2822,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "crew-board"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: crewBoard"))
+        .andExpect(view().name("mission/mission-detail :: crewBoard"))
         .andExpect(content().string(containsString("id=\"board-pool\"")))
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"pane-fin\""))));
@@ -2839,7 +2840,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "finance"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: financeSection"))
+        .andExpect(view().name("mission/mission-detail :: financeSection"))
         .andExpect(content().string(containsString("id=\"finance-count-meta\"")))
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"pane-crew\""))));
@@ -2857,7 +2858,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "mgmt"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: mgmtPanels"))
+        .andExpect(view().name("mission/mission-detail :: mgmtPanels"))
         .andExpect(content().string(containsString("new-manager-id")))
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"board-pool\""))));
@@ -2875,7 +2876,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "steps-editor"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: stepsEditor"))
+        .andExpect(view().name("mission/mission-detail :: stepsEditor"))
         .andExpect(content().string(containsString("id=\"mission-step-list\"")))
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"pane-fin\""))));
@@ -2893,7 +2894,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "objectives-editor"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: objectivesEditor"))
+        .andExpect(view().name("mission/mission-detail :: objectivesEditor"))
         .andExpect(content().string(containsString("id=\"mission-objective-list\"")))
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"pane-fin\""))));
@@ -2911,7 +2912,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "frequencies-editor"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: frequenciesEditor"))
+        .andExpect(view().name("mission/mission-detail :: frequenciesEditor"))
         .andExpect(content().string(containsString("id=\"mission-custom-freq-list\"")))
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"pane-fin\""))));
@@ -2930,7 +2931,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "organisation"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: organisationPanel"))
+        .andExpect(view().name("mission/mission-detail :: organisationPanel"))
         .andExpect(content().string(containsString("id=\"party-lead-display\"")))
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"mission-custom-freq-list\""))));
@@ -2946,7 +2947,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "organisation"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: fragmentError"))
+        .andExpect(view().name("mission/mission-detail :: fragmentError"))
         .andExpect(content().string(not(containsString("mission-head-sticky"))));
   }
 
@@ -2960,7 +2961,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "crew-board"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: fragmentError"))
+        .andExpect(view().name("mission/mission-detail :: fragmentError"))
         .andExpect(content().string(containsString("role=\"alert\"")))
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"board-pool\""))));
@@ -3004,7 +3005,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "crew-board"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: crewBoard"));
+        .andExpect(view().name("mission/mission-detail :: crewBoard"));
 
     verifyNoFinanceReads(missionId);
     verifyNoUserLookupRead();
@@ -3022,7 +3023,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "overview"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: overviewSection"));
+        .andExpect(view().name("mission/mission-detail :: overviewSection"));
 
     verifyNoFinanceReads(missionId);
     verifyNoUserLookupRead();
@@ -3043,7 +3044,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "finance"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: financeSection"));
+        .andExpect(view().name("mission/mission-detail :: financeSection"));
 
     verify(backendApiClient)
         .get(
@@ -3083,7 +3084,7 @@ class MissionPageControllerMvcTest {
                     .param("fragment", "finance")
                     .header("Accept-Language", "de"))
             .andExpect(status().isOk())
-            .andExpect(view().name("mission-detail :: financeSection"))
+            .andExpect(view().name("mission/mission-detail :: financeSection"))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -3120,7 +3121,7 @@ class MissionPageControllerMvcTest {
                 .param("fragment", "finance")
                 .header("Accept-Language", "de"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: financeSection"))
+        .andExpect(view().name("mission/mission-detail :: financeSection"))
         .andExpect(content().string(containsString("Titanium")))
         .andExpect(content().string(not(containsString("data-testid=\"stolen-chip\""))));
   }
@@ -3183,7 +3184,7 @@ class MissionPageControllerMvcTest {
     mockMvc
         .perform(get("/missions/" + missionId).param("fragment", "mgmt"))
         .andExpect(status().isOk())
-        .andExpect(view().name("mission-detail :: mgmtPanels"));
+        .andExpect(view().name("mission/mission-detail :: mgmtPanels"));
 
     verifyNoUserLookupRead();
     verifyNoFinanceReads(missionId);

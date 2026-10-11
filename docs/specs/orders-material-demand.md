@@ -192,8 +192,8 @@ count, hide-covered, the material filter and its search, and the sort cycle) ·
 `QualityBucketAllocator`, `QualityTierCatalog`,
 `MaterialDemandOverviewDto` / `MaterialDemandGroupDto` / `MaterialDemandRowDto` /
 `MaterialDemandOrderShareDto`, `JobOrderMaterialDemandPageController`,
-`templates/orders-material-demand.html`, `templates/fragments/material-amount.html`,
-`static/js/orders-material-demand.js`,
+`templates/joborder/orders-material-demand.html`, `templates/joborder/fragments/material-amount.html`,
+`static/js/joborder/orders-material-demand.js`,
 `kernel/fragments/sidebar.html`, `LiveSyncTopicClass.ORDERS_QUEUE` · **Issues:** #1522
 
 ## Out of scope

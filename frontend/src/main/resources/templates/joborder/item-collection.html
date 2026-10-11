@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{item.collection.title} + ' - ' + ${appTitle}">Itemsammelübersicht - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<link rel="stylesheet" th:href="@{/css/pages/item-collection.css}">
+<link rel="stylesheet" th:href="@{/css/pages/joborder/item-collection.css}">
     </th:block>
 </head>
 <body>
@@ -108,7 +108,7 @@
     const MSG_ERROR_GENERIC   = /*[[#{item.collection.toast.error}]]*/ 'Fehler beim Speichern.';
     window.orderId = /*[[${jobOrderId}]]*/ null;
 </script>
-<script th:src="@{/js/item-collection.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/joborder/item-collection.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

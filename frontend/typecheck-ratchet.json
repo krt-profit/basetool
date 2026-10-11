@@ -72,18 +72,18 @@
       "inventory/inventory-note-modal.js"
     ],
     "joborder": [
-      "item-collection.js",
-      "material-collection.js",
-      "orders-create.js",
-      "orders-detail-claims.js",
-      "orders-detail-edit.js",
-      "orders-detail-events.js",
-      "orders-detail-production.js",
-      "orders-detail-reports.js",
-      "orders-detail.js",
-      "orders-index-reorder.js",
-      "orders-index.js",
-      "orders-material-demand.js"
+      "joborder/item-collection.js",
+      "joborder/material-collection.js",
+      "joborder/orders-create.js",
+      "joborder/orders-detail-claims.js",
+      "joborder/orders-detail-edit.js",
+      "joborder/orders-detail-events.js",
+      "joborder/orders-detail-production.js",
+      "joborder/orders-detail-reports.js",
+      "joborder/orders-detail.js",
+      "joborder/orders-index-reorder.js",
+      "joborder/orders-index.js",
+      "joborder/orders-material-demand.js"
     ],
     "kernel": [
       "kernel/autocomplete.js",
@@ -120,13 +120,13 @@
       "materialexchange/materialgesuch-modal.js"
     ],
     "mission": [
-      "mission-detail-actions.js",
-      "mission-detail-modals.js",
-      "mission-detail-participants.js",
-      "mission-detail-tabs.js",
-      "mission-detail.js",
-      "mission-presence.js",
-      "missions.js"
+      "mission/mission-detail-actions.js",
+      "mission/mission-detail-modals.js",
+      "mission/mission-detail-participants.js",
+      "mission/mission-detail-tabs.js",
+      "mission/mission-detail.js",
+      "mission/mission-presence.js",
+      "mission/missions.js"
     ],
     "notification": [
       "notification/notification-rules.js",
@@ -134,9 +134,9 @@
       "notification/notifications.js"
     ],
     "operation": [
-      "operation-detail.js",
-      "operations-index.js",
-      "operations.js"
+      "operation/operation-detail.js",
+      "operation/operations-index.js",
+      "operation/operations.js"
     ],
     "orgchart": [
       "orgchart/org-chart.js"
@@ -154,16 +154,16 @@
       "personalinventory/personal-inventory.js"
     ],
     "promotion": [
-      "promotion-admin-rank-requirements.js",
-      "promotion-admin-topics.js",
-      "promotion-manage.js",
-      "promotion-my-evaluations.js"
+      "promotion/promotion-admin-rank-requirements.js",
+      "promotion/promotion-admin-topics.js",
+      "promotion/promotion-manage.js",
+      "promotion/promotion-my-evaluations.js"
     ],
     "refinery": [
-      "refinery-orders-create.js",
-      "refinery-orders-details.js",
-      "refinery-orders-index.js",
-      "refinery-yield-badge.js"
+      "refinery/refinery-orders-create.js",
+      "refinery/refinery-orders-details.js",
+      "refinery/refinery-orders-index.js",
+      "refinery/refinery-yield-badge.js"
     ],
     "settings": [
       "settings/admin-settings.js"

@@ -160,7 +160,7 @@ class RefineryOrderCreateImportRenderTest {
                 .flashAttr("importGoodsTotal", 4)
                 .flashAttr("importRowsSkipped", 1))
         .andExpect(status().isOk())
-        .andExpect(view().name("refinery-orders-create"))
+        .andExpect(view().name("refinery/refinery-orders-create"))
         .andExpect(content().string(containsString("data-testid=\"refinery-import-banner\"")))
         .andExpect(content().string(containsString("inputMaterialId_0")))
         .andExpect(content().string(containsString("inputMaterialId_1")))
@@ -173,7 +173,7 @@ class RefineryOrderCreateImportRenderTest {
         .andExpect(content().string(containsString("data-testid=\"refinery-import-button\"")))
         .andExpect(
             content().string(containsString("<form id=\"refineryImportForm\" class=\"no-track\"")))
-        .andExpect(content().string(containsString("/js/refinery-orders-create.js")))
+        .andExpect(content().string(containsString("/js/refinery/refinery-orders-create.js")))
         .andExpect(content().string(containsString("</html>")));
   }
 
@@ -182,7 +182,7 @@ class RefineryOrderCreateImportRenderTest {
     mockMvc
         .perform(get("/refinery-orders/create").with(oidcLogin()))
         .andExpect(status().isOk())
-        .andExpect(view().name("refinery-orders-create"))
+        .andExpect(view().name("refinery/refinery-orders-create"))
         .andExpect(content().string(containsString("data-testid=\"refinery-extractor-link\"")))
         .andExpect(
             content()
@@ -265,7 +265,7 @@ class RefineryOrderCreateImportRenderTest {
     mockMvc
         .perform(get("/refinery-orders/create").with(oidcLogin()))
         .andExpect(status().isOk())
-        .andExpect(view().name("refinery-orders-create"))
+        .andExpect(view().name("refinery/refinery-orders-create"))
         .andExpect(model().attribute("seedUserNames", anEmptyMap()))
         .andExpect(model().attribute("materials", hasSize(2)));
   }

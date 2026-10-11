@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{missions.title} + ' - ' + ${appTitle}">Mission Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-    <link rel="stylesheet" th:href="@{/css/pages/mission-detail.css}">
+    <link rel="stylesheet" th:href="@{/css/pages/mission/mission-detail.css}">
     </th:block>
 </head>
 <body>
@@ -1593,12 +1593,12 @@
     window.missionOperationId =
         /*[[${mission?.operation?.id?.toString()}]]*/ null;
 </script>
-<script th:src="@{/js/mission-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/mission-detail-modals.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/mission-detail-participants.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/mission-detail-actions.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/mission-detail-tabs.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/mission-presence.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/mission/mission-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/mission/mission-detail-modals.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/mission/mission-detail-participants.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/mission/mission-detail-actions.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/mission/mission-detail-tabs.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/mission/mission-presence.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:if="${!isNew and authUserId != null}" th:attr="nonce=${cspNonce}" th:inline="javascript">
     window.MISSION_PRESENCE_I18N = {
         'mission.presence.editing.solo': /*[[#{mission.presence.editing.solo}]]*/ 'currently editing:',

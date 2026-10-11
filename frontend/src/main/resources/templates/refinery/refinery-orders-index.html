@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{refineryorder.index.title} + ' - ' + ${appTitle}">Raffinerie - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <link rel="stylesheet" th:href="@{/css/pages/refinery-orders-index.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/refinery/refinery-orders-index.css}">
     </th:block>
 </head>
 <body>
@@ -102,7 +102,7 @@
 </main>
 </th:block>
 <th:block th:fragment="pageTail">
-<script th:src="@{/js/refinery-orders-index.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/refinery/refinery-orders-index.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

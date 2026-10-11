@@ -331,7 +331,7 @@ declares no signature; a call names what it needs: `modalId` and `titleKey` (req
 `data-trigger="open-modal-display"` and **close with the single standardized trigger
 `data-trigger="close-modal-display"` + `data-modal-id`** (common-handlers.js), which the wrapper puts
 on every ✕ that has no page handler. The older `data-modal-dismiss` convention survives only on
-footer buttons of the `mission-detail.html` dialogs (handled by `krt-modal.js`); new dialogs never
+footer buttons of the `mission/mission-detail.html` dialogs (handled by `krt-modal.js`); new dialogs never
 use it. The overlay's hidden default comes from
 the **global** `.krt-modal-overlay { display:none }` in `styles.css` (loaded on every page;
 `bank.css` duplicates it as defense-in-depth), so the fragment injects no inline style. A modal is
@@ -563,8 +563,8 @@ space for a footer that is not there.
 measured sweep of the touch classes found both:
 
 - **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in the page stylesheet of
-  `mission-detail.html` (an inline `<style>` block until FE-PERF-02, now
-  `css/pages/mission-detail.css`; `operation-detail.html` stopped using it on 2026-10-03), and three
+  `mission/mission-detail.html` (an inline `<style>` block until FE-PERF-02, now
+  `css/pages/mission/mission-detail.css`; `operation/operation-detail.html` stopped using it on 2026-10-03), and three
   of its instances are *form* actions — „Ziel hinzufügen", „Schritt hinzufügen" and „Frequenz
   hinzufügen" in the mission's edit mode (the create form's own add buttons are plain `.btn`). The
   rule above is
@@ -737,7 +737,7 @@ in `check`, not in the stack-bound `e2e` suite) + code/design
 review for the rest · **Code:** `static/css/kernel/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
 `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
 `static/css/bank/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personalinventory/personal-inventory.css`
-(`.master-row`), `static/css/promotion-admin.css` (`.pa-sort-btn`), `static/js/kernel/sidebar.js`
+(`.master-row`), `static/css/promotion/promotion-admin.css` (`.pa-sort-btn`), `static/js/kernel/sidebar.js`
 (`--krt-footer-height`).
 
 > **Until 2026-09-13 the two touch classes had no automated coverage at all** — this requirement

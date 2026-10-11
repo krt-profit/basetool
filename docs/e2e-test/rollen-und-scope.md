@@ -37,7 +37,7 @@ Die Gates verbatim: Einsatz `isAuthenticated() and @authHelperService.isMemberOr
 
 ## Control-Gating je Rolle (`RolePermissionsE2eTest`)
 
-Die Rollen-Matrix oben prüft im Browser [`RolePermissionsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RolePermissionsE2eTest.java) (`@Tag("e2e")`) an einem geseedeten MATERIAL-Auftrag auf `orders-detail.html`. Drei Nutzer — `test-member`, `test-officer`, `test-admin` — melden sich je in einem eigenen Browser-Kontext an und öffnen denselben Auftrag:
+Die Rollen-Matrix oben prüft im Browser [`RolePermissionsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RolePermissionsE2eTest.java) (`@Tag("e2e")`) an einem geseedeten MATERIAL-Auftrag auf `joborder/orders-detail.html`. Drei Nutzer — `test-member`, `test-officer`, `test-admin` — melden sich je in einem eigenen Browser-Kontext an und öffnen denselben Auftrag:
 
 | Control (`sec:authorize`)                                          | KRT Member | Officer | Admin |
 |--------------------------------------------------------------------|------------|---------|-------|

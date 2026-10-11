@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{orders.detail.title} + ' - ' + ${appTitle}">Auftrag Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <link rel="stylesheet" th:href="@{/css/pages/orders-detail.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/joborder/orders-detail.css}">
     </th:block>
 </head>
 <body>
@@ -208,7 +208,7 @@
                >
                 <td th:text="${mat.material.name}"></td>
                 <td>
-                    <th:block th:replace="~{fragments/quality-tier :: badge(${mat.qualityTier})}"></th:block>
+                    <th:block th:replace="~{joborder/fragments/quality-tier :: badge(${mat.qualityTier})}"></th:block>
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.amount}" th:switch="${mat.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
@@ -426,7 +426,7 @@
                >
                 <td th:text="${agg.material != null ? agg.material.name() : '-'}"></td>
                 <td>
-                    <th:block th:replace="~{fragments/quality-tier :: badge(${agg.qualityTier})}"></th:block>
+                    <th:block th:replace="~{joborder/fragments/quality-tier :: badge(${agg.qualityTier})}"></th:block>
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.aggregated.amount}" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                     <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(agg.totalQuantity, 1)} #{material.quantity.piece}|"></span>
@@ -833,7 +833,7 @@
                     <div>
                         <label th:text="#{orders.material.minQuality}" class="form-label-sm">Min. Qualität</label>
                         <select class="w-full" th:field="*{materials[__${stat.index}__].minQuality}">
-                            <th:block th:replace="~{fragments/quality-tier :: floorOptions(${qualityTiers}, ${jobOrderForm.materials[__${stat.index}__].minQuality})}"></th:block>
+                            <th:block th:replace="~{joborder/fragments/quality-tier :: floorOptions(${qualityTiers}, ${jobOrderForm.materials[__${stat.index}__].minQuality})}"></th:block>
                         </select>
                     </div>
                     <div>
@@ -861,7 +861,7 @@
                     <div>
                         <label th:text="#{orders.material.minQuality}" class="form-label-sm">Min. Qualität</label>
                         <select class="w-full" name="materials[0].minQuality">
-                            <th:block th:replace="~{fragments/quality-tier :: floorOptionsSelected(${qualityTiers}, ${qualityTiers.?[active() and minQuality() == 650].isEmpty() ? null : 650})}"></th:block>
+                            <th:block th:replace="~{joborder/fragments/quality-tier :: floorOptionsSelected(${qualityTiers}, ${qualityTiers.?[active() and minQuality() == 650].isEmpty() ? null : 650})}"></th:block>
                         </select>
                     </div>
                     <div>
@@ -1247,12 +1247,12 @@
     const KRT_ORDER_LIVESYNC_UPDATES = /*[[#{livesync.updates_available}]]*/ 'Aktualisierungen verf\u00fcgbar';
     const KRT_ORDER_SECTION_REFRESH_ERROR = /*[[#{orders.section.refresh.error}]]*/ 'Der Abschnitt konnte nicht aktualisiert werden. Bitte Seite neu laden.';
 </script>
-<script th:src="@{/js/orders-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/orders-detail-edit.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/orders-detail-claims.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/orders-detail-reports.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/orders-detail-production.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/orders-detail-events.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/joborder/orders-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/joborder/orders-detail-edit.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/joborder/orders-detail-claims.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/joborder/orders-detail-reports.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/joborder/orders-detail-production.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/joborder/orders-detail-events.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

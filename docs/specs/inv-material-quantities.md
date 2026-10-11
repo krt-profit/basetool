@@ -52,7 +52,7 @@ hint unconditionally — the refinery store dialog previously showed it on PIECE
 gated to SCU rows only) + web-asset linting (ESLint / HTMLHint / Prettier). _Server_ — see
 [REQ-INV-003](#req-inv-003--server-side-enforcement--scu-scale-storage). **Code:**
 `frontend/.../static/js/kernel/scu-decimal-input.js`, `kernel/fragments/head.html` (`window.krtScuI18n`),
-`kernel/fragments/scu-hint.html`, `refinery-orders-details.html`. **Issues:** PR #465.
+`kernel/fragments/scu-hint.html`, `refinery/refinery-orders-details.html`. **Issues:** PR #465.
 
 ### REQ-INV-043 — PIECE amounts: positive whole numbers only
 

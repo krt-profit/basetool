@@ -46,7 +46,7 @@ class PickerSearchLimitsParityTest {
   private static final String HEAD_FRAGMENT = "/templates/kernel/fragments/head.html";
 
   /** The mission page script part carrying the user autocompletes' render cap. */
-  private static final String MISSION_MODULE = "/static/js/mission-detail-participants.js";
+  private static final String MISSION_MODULE = "/static/js/mission/mission-detail-participants.js";
 
   /** Matches the {@code USER_SEARCH_RENDER_CAP} declaration in the mission page module. */
   private static final Pattern MISSION_USER_CAP =

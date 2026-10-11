@@ -95,7 +95,7 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
     mockMvc
         .perform(get("/orders/create"))
         .andExpect(status().isOk())
-        .andExpect(view().name("orders-create"))
+        .andExpect(view().name("joborder/orders-create"))
         .andExpect(
             content()
                 .string(
@@ -155,7 +155,7 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
     mockMvc
         .perform(get("/orders/create"))
         .andExpect(status().isOk())
-        .andExpect(view().name("orders-create"))
+        .andExpect(view().name("joborder/orders-create"))
         .andExpect(content().string(Matchers.containsString("Profit Spezialkommando")))
         .andExpect(content().string(Matchers.containsString("Bereich Profit XYZ")))
         .andExpect(content().string(Matchers.containsString("Kartellleitung XYZ")));

@@ -905,7 +905,7 @@ already known at storage time.
 `RefineryStorePersonalMarkerTest` · **Code:** `RefineryOrderService#storeRefineryOrder`,
 `RefineryOrderStoreItemDto`, `RefineryOrderWriteController#storeOrder` / `#storeOrderAjax` /
 `#storePersonalWithJobOrder`, `RefineryOrderStoreItemForm`,
-`templates/refinery-orders-details.html`, `static/js/refinery-orders-details.js` · **Issues:** — ·
+`templates/refinery/refinery-orders-details.html`, `static/js/refinery/refinery-orders-details.js` · **Issues:** — ·
 **ADR:** —
 
 ### REQ-INV-036 — "Markierte umbuchen": the bulk bar moves the whole selection, skipping already-at-target rows

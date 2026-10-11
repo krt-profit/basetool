@@ -3,7 +3,7 @@
 <head>
     <title th:text="#{material.collection.title} + ' - ' + ${appTitle}">Materialsammelübersicht - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<link rel="stylesheet" th:href="@{/css/pages/material-collection.css}">
+<link rel="stylesheet" th:href="@{/css/pages/joborder/material-collection.css}">
     </th:block>
 </head>
 <body>
@@ -110,7 +110,7 @@
     const MSG_ERROR_GENERIC   = /*[[#{material.collection.toast.error}]]*/ 'Fehler beim Speichern.';
     window.orderId = /*[[${jobOrderId}]]*/ null;
 </script>
-<script th:src="@{/js/material-collection.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/joborder/material-collection.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

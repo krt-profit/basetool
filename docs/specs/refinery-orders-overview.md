@@ -88,7 +88,7 @@ params), the `onlyMine` toggle and the search `q` — and the pagination control
 `RefineryOrderListViewResolutionTest`, `RefineryOrderDurationTest` (`testViewOrders_*`),
 `RefineryOrderRepositoryListFilterTest`, `RefineryOrderControllerTest` (`ListFilterTests`),
 `RefineryOrderServiceLifecycleTest` · **Code:** `RefineryOrderPageController.viewOrders` /
-`segmentQuery` / `orderPageUri` / `buildPaginationBaseUrl`, `templates/refinery-orders-index.html`,
+`segmentQuery` / `orderPageUri` / `buildPaginationBaseUrl`, `templates/refinery/refinery-orders-index.html`,
 `templates/kernel/fragments/pagination.html`, `RefineryOrderController` (`/all`, `/my-orders`),
 `RefineryOrderService.getAllRefineryOrders` / `getMyRefineryOrders`,
 `RefineryOrderRepository.findFilteredScoped` / `findOwnedFiltered` / `LIST_FILTER` · **Issues:** #2
