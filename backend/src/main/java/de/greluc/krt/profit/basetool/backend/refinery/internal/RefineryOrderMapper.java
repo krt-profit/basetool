@@ -1,0 +1,209 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
+
+import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
+import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+/** MapStruct mapper between Refinery Order entities and DTOs. */
+@Mapper(
+    config = CentralMapperConfig.class,
+    uses = {
+      UserMapper.class,
+      MaterialMapper.class,
+      SquadronMapper.class,
+      LocationMapper.class,
+      RefiningMethodMapper.class,
+      RefineryOrderMissionLookup.class
+    })
+public interface RefineryOrderMapper {
+  /**
+   * Maps a {@link RefineryOrder} to its full DTO, deriving {@code profit} via {@link
+   * #computeProfit} and publishing the owning org unit as {@code owningSquadron}.
+   *
+   * @param entity the entity to project; {@code null} returns {@code null}
+   * @return the refinery-order DTO
+   */
+  @Mapping(target = "profit", expression = "java(computeProfit(entity))")
+  @Mapping(target = "mission", source = "missionId")
+  @Mapping(target = "owningSquadron", source = "owningOrgUnit")
+  @Mapping(target = "owningOrgUnitId", ignore = true)
+  RefineryOrderDto toDto(RefineryOrder entity);
+
+  /**
+   * Maps one good of an order. {@code yieldBonusPercent} is a UEX enrichment the entity does not
+   * carry; {@link #toDto(RefineryOrder, Map)} fills it afterwards, so it is {@code null} here.
+   *
+   * @param good the good to project; {@code null} returns {@code null}.
+   * @return the good's DTO without its yield bonus.
+   */
+  @Mapping(target = "yieldBonusPercent", ignore = true)
+  RefineryGoodDto toDto(RefineryGood good);
+
+  /**
+   * Maps a refinery order like {@link #toDto(RefineryOrder)} and fills {@code yieldBonusPercent} on
+   * each good whose input material is in the map; others stay {@code null}.
+   *
+   * @param entity the refinery order, may be {@code null}
+   * @param yieldByMaterialId per-material yield bonus in percent
+   * @return the enriched DTO, or {@code null} when {@code entity} is {@code null}
+   */
+  default RefineryOrderDto toDto(RefineryOrder entity, Map<UUID, Integer> yieldByMaterialId) {
+    RefineryOrderDto base = toDto(entity);
+    if (base == null
+        || base.goods() == null
+        || yieldByMaterialId == null
+        || yieldByMaterialId.isEmpty()) {
+      return base;
+    }
+    List<RefineryGoodDto> enriched =
+        base.goods().stream().map(g -> applyYield(g, yieldByMaterialId)).toList();
+    return new RefineryOrderDto(
+        base.id(),
+        base.owner(),
+        base.location(),
+        base.mission(),
+        base.startedAt(),
+        base.durationMinutes(),
+        base.expenses(),
+        base.otherExpenses(),
+        base.oreSales(),
+        base.profit(),
+        base.refiningMethod(),
+        base.status(),
+        enriched,
+        base.owningSquadron(),
+        base.version(),
+        base.owningOrgUnitId());
+  }
+
+  /**
+   * Maps a {@link RefineryOrder} to its slim list-row DTO, with the same profit computation and the
+   * owning org unit as {@code owningSquadron}.
+   */
+  @Mapping(target = "profit", expression = "java(computeProfit(entity))")
+  @Mapping(target = "mission", source = "missionId")
+  @Mapping(target = "owningSquadron", source = "owningOrgUnit")
+  RefineryOrderListDto toListDto(RefineryOrder entity);
+
+  /**
+   * Builds a new {@link RefineryOrder} entity from a create request. Id, version, status, owner and
+   * org unit are owned by the service and stay unset here.
+   *
+   * @param request the create request; {@code null} returns {@code null}
+   * @return a transient order with shallow id-only references
+   */
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  @Mapping(target = "status", ignore = true)
+  @Mapping(target = "owner", ignore = true)
+  @Mapping(target = "missionId", source = "mission.id")
+  @Mapping(target = "missionReferenceWithoutId", ignore = true)
+  @Mapping(target = "owningOrgUnit", ignore = true)
+  @Mapping(target = "storedAt", ignore = true)
+  @Mapping(target = "readyNotifiedAt", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  RefineryOrder toEntity(RefineryOrderCreateRequest request);
+
+  /**
+   * Builds the transient {@link RefineryOrder} that carries an update request's values into {@code
+   * RefineryOrderService#updateRefineryOrder}. The order is identified by the path, so no id, owner
+   * or org unit is read from the request.
+   *
+   * @param request the update request; {@code null} returns {@code null}
+   * @return a transient order holding the requested values and the last-seen version
+   */
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "owner", ignore = true)
+  @Mapping(target = "missionId", source = "mission.id")
+  @Mapping(
+      target = "missionReferenceWithoutId",
+      expression = "java(request.mission() != null && request.mission().id() == null)")
+  @Mapping(target = "owningOrgUnit", ignore = true)
+  @Mapping(target = "storedAt", ignore = true)
+  @Mapping(target = "readyNotifiedAt", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  RefineryOrder toEntity(RefineryOrderUpdateRequest request);
+
+  /**
+   * Maps one inbound good. The back-reference to its order is wired by {@code RefineryOrderService}
+   * when it attaches the goods; version and timestamps belong to the persistence provider.
+   *
+   * @param dto the inbound good; {@code null} returns {@code null}.
+   * @return a transient good without its order.
+   */
+  @Mapping(target = "refineryOrder", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  RefineryGood toEntity(RefineryGoodDto dto);
+
+  /**
+   * Computes profit as {@code oreSales − expenses − otherExpenses}, treating {@code null} values as
+   * 0.
+   */
+  default Double computeProfit(RefineryOrder entity) {
+    if (entity == null) {
+      return 0d;
+    }
+    double sales = entity.getOreSales() != null ? entity.getOreSales() : 0d;
+    double costs = entity.getExpenses() != null ? entity.getExpenses() : 0d;
+    double other = entity.getOtherExpenses() != null ? entity.getOtherExpenses() : 0d;
+    return sales - costs - other;
+  }
+
+  /**
+   * Returns a copy of {@code good} with {@code yieldBonusPercent} set from {@code
+   * yieldByMaterialId} when a row for the input material exists; the original DTO when the lookup
+   * misses or {@code inputMaterial} is null. Records are immutable, hence the copy.
+   */
+  private static RefineryGoodDto applyYield(
+      RefineryGoodDto good, Map<UUID, Integer> yieldByMaterialId) {
+    if (good == null || good.inputMaterial() == null || good.inputMaterial().id() == null) {
+      return good;
+    }
+    Integer bonus = yieldByMaterialId.get(good.inputMaterial().id());
+    if (bonus == null) {
+      return good;
+    }
+    return new RefineryGoodDto(
+        good.id(),
+        good.inputMaterial(),
+        good.inputQuantity(),
+        good.outputMaterial(),
+        good.outputQuantity(),
+        good.quality(),
+        bonus);
+  }
+}

@@ -23,8 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceContribution;
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

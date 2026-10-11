@@ -159,7 +159,8 @@ literally half-anonymised for the full 24-month retention.
 > `bank_audit_event.details` were removed again (a self-service display name as the needle could
 > rewrite unrelated rows, e.g. the amount annotations of the whole financial trail); a name inside
 > those payloads is now an admin's manual step via the Personensuche. The anonymised set is
-> **twelve columns in eight statements** — `HandleAnonymisationService.ANONYMISED_COLUMNS` is the
+> **twelve columns in eight statements** — the union of `HandleAnonymisationParticipant#columns()`
+> (since 2026-10-11 the `HandleAnonymisationService.ANONYMISED_COLUMNS` constant is gone) is the
 > authoritative list and [REQ-SEC-062](../specs/security-and-access.md#req-sec-062--a-granted-art-17-request-anonymises-the-surviving-handle-snapshots)
 > the current statement of it.
 

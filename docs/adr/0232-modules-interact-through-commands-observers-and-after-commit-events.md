@@ -84,6 +84,33 @@ or personal data; events belong to their publishers' `api.events` packages.
   orchestrator's direct repository calls, `MemberEvaluationErasure`, `PersonalInventoryErasure`
   and `StockChangeObserver.beforeUserPurge`; the deletion audit rows stay in
   `UserDeletionService`. See plan §7.6.
+- **2026-10-11, GDPR participants, slice b (handle anonymisation).** `HandleAnonymisationParticipant`
+  is owned by `platform.api` for the same reason (audit is rank 1). It is an `@ObserverSpi`; three
+  implementations (audit, bank, job order) replace the orchestrator's direct repository calls and
+  `service.BankHandleSnapshots`. The activity trail's marker row stays in
+  `HandleAnonymisationService`; a participant records its own marker afterwards, which keeps the
+  bank trail's. See plan §7.6.
+- **2026-10-11, GDPR participants, slice c (export).** `PersonalDataExportSection` is owned by
+  `platform.api` for the same reason and is a plain declaration SPI, not an `@ObserverSpi`: a
+  participant returns `Section` records (position, key, legal basis, statement, scrubbed and
+  exempted columns) and runs nothing. Sixteen implementations, one per owning module, replace
+  `DataExportSections`; the reading order is a global `position` on each section, because a
+  module's sections are not contiguous in it. `privacy.internal.PersonalDataExportRegistry`
+  orders them and refuses a duplicate key or position. See plan §7.6.
+- **2026-10-11, GDPR participants, slice d (person mentions).** `PersonMentionSource` is owned
+  by `platform.api` and is a plain declaration SPI like the export's: `targets()` and three
+  default exemption sets. Twenty-one implementations, one per module that owns a text column
+  (and the platform's for Flyway's schema history), replace `PersonSearchTargets`;
+  `privacy.internal.PersonMentionRegistry` orders the union and refuses a column declared
+  twice. See plan §7.6.
+
+- **2026-10-11, GDPR participants, slice e (account merge).** `UserReassignmentParticipant` is
+  owned by `platform.api` for the same reason. It is an `@ObserverSpi`; eighteen implementations in
+  seventeen modules replace the two lists of `UserAccountMergeService`: each declares the columns
+  that follow the member, with their unique-key remainder, and those that stay with the act. The
+  statements of the merge run in one engine, `platform.api.OwnedRowsMover`, and the bank refuses
+  two ledgers through the SPI's `assertMergeable`. The `USER_MERGED` audit row stays in the
+  orchestrator. See plan §7.6.
 
 ## Alternatives considered
 

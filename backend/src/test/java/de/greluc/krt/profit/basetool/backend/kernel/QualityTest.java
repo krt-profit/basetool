@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.kernel;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierWriteDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefineryGoodDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;

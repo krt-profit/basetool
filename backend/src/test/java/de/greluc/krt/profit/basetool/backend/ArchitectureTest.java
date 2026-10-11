@@ -150,17 +150,14 @@ import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageL
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.platform.internal.RequestBodyLimitProperties;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ScopeSpecifications;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.BankHandleSnapshots;
 import de.greluc.krt.profit.basetool.backend.service.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
@@ -335,7 +332,6 @@ class ArchitectureTest {
           ClientAttribution.class,
           ClientDirectory.class,
           ConnectedAppsProperties.class,
-          DataExportSections.class,
           ExchangeChangeRetentionProperties.class,
           ExchangeClientDirectory.class,
           ExchangeConnectionRetentionProperties.class,
@@ -366,7 +362,6 @@ class ArchitectureTest {
           OrgUnitLabels.class,
           PartialRoleScopeProperties.class,
           Permissions.class,
-          PersonSearchTargets.class,
           ProblemResponseFactory.class,
           Quality.class,
           QuantityTypeRounding.class,
@@ -443,10 +438,10 @@ class ArchitectureTest {
           .as("exchange-domain classes other than its controllers");
 
   /**
-   * The bank-module classes that live outside the bank package (REQ-BANK-008, REQ-BANK-019): the
-   * GDPR handle-anonymisation SPI beside its caller, until the participants of plan §7.6.
+   * The bank-module classes that live outside the bank package (REQ-BANK-008, REQ-BANK-019); none
+   * since the handle anonymisation's bank part became a participant inside the bank package.
    */
-  static final Set<Class<?>> BANK_CLASSES = Set.of(BankHandleSnapshots.class);
+  static final Set<Class<?>> BANK_CLASSES = Set.of();
 
   /**
    * The org-unit side of the bank: classes that carry "Bank" in their name but belong to org-unit
@@ -1078,7 +1073,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 63);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 61);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);
@@ -1637,7 +1632,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 344);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 343);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service.pdf;
 
 import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
 import de.greluc.krt.profit.basetool.backend.service.DataExportService.DataExport;
 import de.greluc.krt.profit.basetool.backend.service.DataExportService.ExportSection;
 import java.awt.Color;
@@ -111,7 +111,7 @@ public final class DataExportPdfFormat {
         KrtPdfSupport.addTableCell(
             inventory,
             label.apply(
-                DataExportSections.ART_15_20.equals(section.legalBasis())
+                LegalBasis.ART_15_20.name().equals(section.legalBasis())
                     ? "pdf.export.basis.art1520"
                     : "pdf.export.basis.art15"),
             bg,

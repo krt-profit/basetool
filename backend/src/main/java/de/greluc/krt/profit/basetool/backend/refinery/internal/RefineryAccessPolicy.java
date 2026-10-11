@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +40,19 @@ public class RefineryAccessPolicy {
 
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "refineryAccessPolicy";
+
+  /**
+   * The org-unit scope predicate of the order queries (alias {@code r}, REQ-ORG-003): the plain
+   * triple, since the refinery is strict-staffel and has no visibility escape.
+   */
+  static final String REFINERY_ORDER_SCOPE_TRIPLE =
+      """
+      (
+        :isAdminAllScope = true
+        OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)
+        OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)
+       )
+      """;
 
   private final OwnerScopeService ownerScopeService;
   private final RefineryOrderRepository refineryOrderRepository;

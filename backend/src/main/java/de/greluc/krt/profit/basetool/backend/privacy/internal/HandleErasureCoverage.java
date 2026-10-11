@@ -27,10 +27,10 @@ import org.jetbrains.annotations.NotNull;
  * Registers what happens to each place a person is named when that person's Art. 17 erasure is
  * granted (REQ-SEC-062).
  *
- * <p>{@code HandleErasureCoverageTest} requires every {@link PersonSearchTargets} column to have a
- * disposition here, and cross-checks {@link Disposition#ANONYMISED} against {@code
- * HandleAnonymisationService.ANONYMISED_COLUMNS}. Prose columns are {@link
- * Disposition#REVIEWED_BY_HAND}.
+ * <p>{@code HandleErasureCoverageTest} requires every column the person search declares to have a
+ * disposition here, and {@code HandleAnonymisationCoverageTest} cross-checks {@link
+ * Disposition#ANONYMISED} against the columns of the registered {@code
+ * HandleAnonymisationParticipant}s. Prose columns are {@link Disposition#REVIEWED_BY_HAND}.
  */
 public final class HandleErasureCoverage {
 
@@ -39,7 +39,10 @@ public final class HandleErasureCoverage {
 
   /** What becomes of one column's contents when an erasure is granted. */
   public enum Disposition {
-    /** Rewritten to {@link HandleAnonymisation#SENTINEL} by {@code HandleAnonymisationService}. */
+    /**
+     * Rewritten to {@link HandleAnonymisation#SENTINEL} by a {@code
+     * HandleAnonymisationParticipant}.
+     */
     ANONYMISED,
     /** The row itself goes when the account does — a purge or a cascading foreign key. */
     REMOVED_WITH_THE_ACCOUNT,
@@ -77,7 +80,7 @@ public final class HandleErasureCoverage {
     return Map.entry(column, new Coverage(Disposition.REVIEWED_BY_HAND, reason));
   }
 
-  /** Keyed {@code table.column}, exactly as {@link PersonSearchTargets} spells it. */
+  /** Keyed {@code table.column}, exactly as the person-mention sources spell it. */
   public static final Map<String, Coverage> COVERAGE =
       Map.ofEntries(
           anonymised(

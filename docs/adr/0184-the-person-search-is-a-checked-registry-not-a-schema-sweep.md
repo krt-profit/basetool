@@ -122,6 +122,14 @@ and a link where the row has a page. Rectification happens on the record's own s
 - The page needs no JavaScript to work — the GET form is the fallback — which matters for a screen
   used while answering a legal request under a deadline.
 
+## Implementation note — 2026-10-11
+
+`PersonSearchTargets`, named throughout this ADR, no longer exists: each module declares the
+columns of its tables, and the ones it leaves out, as a `platform.api.PersonMentionSource`
+(plan §7.6, P4 slice d), and `privacy.internal.PersonMentionRegistry` orders the union. The
+decision is unchanged: a written registry, with the schema sweep that holds it complete reading
+the union of the sources.
+
 ## Alternatives considered
 
 - **Only the five surfaces the handover plan enumerated** (`guest_name`, handover recipient,

@@ -27,6 +27,8 @@ import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryMissionProfitAggregate;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;

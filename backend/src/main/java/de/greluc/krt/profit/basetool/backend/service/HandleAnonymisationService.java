@@ -22,14 +22,14 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.HandleAnonymisationParticipant;
+import de.greluc.krt.profit.basetool.backend.platform.api.HandleAnonymisationParticipant.Rewritten;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -43,41 +43,18 @@ import org.springframework.transaction.annotation.Transactional;
  * Erases a member's surviving handle snapshots on a granted Art. 17 request (REQ-SEC-062); never
  * automatic.
  *
- * <p>Rewrites the columns in {@link #ANONYMISED_COLUMNS} in one act, each by id match or
- * whole-value comparison against every spelling of the member's name, never by substring. No row is
- * removed and no other fact changes. Both audit trails receive a {@code
- * HANDLE_SNAPSHOTS_ANONYMISED} marker with per-table row counts, never the handle.
+ * <p>Runs the registered {@link HandleAnonymisationParticipant}s, each rewriting the columns of its
+ * module in one act, each by id match or whole-value comparison against every spelling of the
+ * member's name, never by substring. No row is removed and no other fact changes. Both audit trails
+ * receive a {@code HANDLE_SNAPSHOTS_ANONYMISED} marker with per-table row counts, never the handle.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class HandleAnonymisationService {
 
-  private final AuditEventRepository auditEventRepository;
-  private final JobOrderHandoverRepository jobOrderHandoverRepository;
-  private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
-  private final JobOrderRepository jobOrderRepository;
+  private final List<HandleAnonymisationParticipant> participants;
   private final AuditRecorder auditRecorder;
-  private final BankHandleSnapshots bankHandleSnapshots;
-
-  /**
-   * Exactly the columns this service rewrites, as {@code table.column}; read by {@code
-   * HandleErasureCoverageTest}.
-   */
-  public static final List<String> ANONYMISED_COLUMNS =
-      List.of(
-          "audit_event.actor_handle",
-          "audit_event.subject_label",
-          "bank_audit_event.actor_handle",
-          "bank_transaction.counterparty_handle",
-          "bank_booking_request.requester_handle",
-          "bank_booking_request.decider_handle",
-          "bank_booking_request.counterparty_handle",
-          "bank_booking_request.owner_approval_granted_by_handle",
-          "bank_holder.handle",
-          "job_order.handle",
-          "job_order_handover.recipient_handle",
-          "job_order_item_handover.recipient_handle");
 
   /**
    * The per-table row counts one anonymisation rewrote.
@@ -119,8 +96,8 @@ public class HandleAnonymisationService {
   }
 
   /**
-   * Erases the member's handle snapshots everywhere they survive a deletion and records the two
-   * marker events, in one transaction.
+   * Erases the member's handle snapshots everywhere they survive a deletion and records the marker
+   * events, in one transaction.
    *
    * <p>Must be called before the account is deleted, while the id-matched foreign keys still point
    * at it.
@@ -133,61 +110,64 @@ public class HandleAnonymisationService {
   @Transactional
   public @NotNull AnonymisationResult anonymise(
       @NotNull UUID userId, @Nullable Collection<String> spellings) {
-    String sentinel = HandleAnonymisation.SENTINEL;
-    Set<String> names = usableSpellings(spellings);
+    List<String> names = List.copyOf(usableSpellings(spellings));
+    List<HandleAnonymisationParticipant> ordered = inRunOrder();
 
-    int activityAudit = auditEventRepository.anonymiseActorHandle(userId, sentinel);
-    BankHandleSnapshots.Counts bank = bankHandleSnapshots.anonymiseHandles(userId, sentinel);
-    int bankAudit = bank.bankAudit();
-    int bankTransactions = bank.bankTransactions();
-    int bookingRequests = bank.bookingRequests();
-    int bankHolders = bank.bankHolders();
-
-    int jobOrders = 0;
-    int materialHandovers = 0;
-    int itemHandovers = 0;
-    for (String name : names) {
-      activityAudit += auditEventRepository.anonymiseSubjectLabel(name, sentinel);
-      jobOrders += jobOrderRepository.anonymiseHandle(name, sentinel);
-      materialHandovers += jobOrderHandoverRepository.anonymiseRecipientHandle(name, sentinel);
-      itemHandovers += jobOrderItemHandoverRepository.anonymiseRecipientHandle(name, sentinel);
+    Map<Rewritten, Integer> rewritten = new EnumMap<>(Rewritten.class);
+    for (HandleAnonymisationParticipant participant : ordered) {
+      participant
+          .anonymise(userId, names)
+          .forEach((table, rows) -> rewritten.merge(table, rows, Integer::sum));
     }
 
     AnonymisationResult result =
         new AnonymisationResult(
-            activityAudit,
-            bankAudit,
-            bankTransactions,
-            bookingRequests,
-            bankHolders,
-            jobOrders,
-            materialHandovers,
-            itemHandovers);
+            rewritten.getOrDefault(Rewritten.ACTIVITY_AUDIT, 0),
+            rewritten.getOrDefault(Rewritten.BANK_AUDIT, 0),
+            rewritten.getOrDefault(Rewritten.BANK_TRANSACTIONS, 0),
+            rewritten.getOrDefault(Rewritten.BOOKING_REQUESTS, 0),
+            rewritten.getOrDefault(Rewritten.BANK_HOLDERS, 0),
+            rewritten.getOrDefault(Rewritten.JOB_ORDERS, 0),
+            rewritten.getOrDefault(Rewritten.MATERIAL_HANDOVERS, 0),
+            rewritten.getOrDefault(Rewritten.ITEM_HANDOVERS, 0));
 
     auditRecorder.record(
         AuditEventType.HANDLE_SNAPSHOTS_ANONYMISED,
         userId,
         null,
         userId,
-        AuditDetails.of("activityAudit", activityAudit)
-            .with("bankAudit", bankAudit)
-            .with("bankTransactions", bankTransactions)
-            .with("bookingRequests", bookingRequests)
-            .with("bankHolders", bankHolders)
-            .with("jobOrders", jobOrders)
-            .with("materialHandovers", materialHandovers)
-            .with("itemHandovers", itemHandovers)
+        AuditDetails.of("activityAudit", result.activityAudit())
+            .with("bankAudit", result.bankAudit())
+            .with("bankTransactions", result.bankTransactions())
+            .with("bookingRequests", result.bookingRequests())
+            .with("bankHolders", result.bankHolders())
+            .with("jobOrders", result.jobOrders())
+            .with("materialHandovers", result.materialHandovers())
+            .with("itemHandovers", result.itemHandovers())
             .with("spellings", names.size()));
 
-    bankHandleSnapshots.recordAnonymised(userId, bank);
+    for (HandleAnonymisationParticipant participant : ordered) {
+      participant.recordAnonymised(userId, rewritten);
+    }
 
     log.info(
         "Anonymised handle snapshots for user {}: {} row(s) across {} column(s), {} spelling(s)",
         userId,
         result.total(),
-        ANONYMISED_COLUMNS.size(),
+        ordered.stream().mapToInt(participant -> participant.columns().size()).sum(),
         names.size());
     return result;
+  }
+
+  /**
+   * Returns the participants in the order they run, by position.
+   *
+   * @return the participants, earliest first
+   */
+  public @NotNull List<HandleAnonymisationParticipant> inRunOrder() {
+    return participants.stream()
+        .sorted(Comparator.comparingInt(HandleAnonymisationParticipant::position))
+        .toList();
   }
 
   /**

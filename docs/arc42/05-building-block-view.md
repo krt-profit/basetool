@@ -194,11 +194,15 @@ holds its orders. What an order shows of its mission comes from the mission modu
 page of orders costs one statement for its missions whatever its size. What the mission's finance
 totals take from the orders comes through the mission-owned `MissionFinanceContributor`, which
 `RefineryMissionFinance` implements, and deleting a mission releases its orders through the mission's
-`MissionDeletionObserver` (`MANDATORY`). The operation's finance views keep reading the orders
-through the refinery's repository and mapper, since the operation ranks above the refinery;
-`MissionFinanceSummaryDto` lives in `operation.internal` for that reason. The refinery's entities,
-repository, mapper and DTOs stay in the layer packages until `LocationService` and
-`UserDeletionService` stop importing `RefineryOrderRepository` (plan §7.5, P4-3).
+`MissionDeletionObserver` (`MANDATORY`). Since P4-3 the refinery's entities, repository, mapper
+and request records sit in `refinery.internal` and the order DTOs in `refinery.api`. The
+operation, which ranks above the refinery, reads the orders for its finance and payout views
+through the refinery-owned `refinery.api.RefineryOrderFinanceReader` (the orders' figures and DTOs,
+and the profit per mission), implemented by `RefineryOrderFinanceReads` with the repository and
+mapper it always used; `MissionFinanceSummaryDto` lives in `operation.internal`. The catalogue asks
+whether a location is in use through its own `catalogue.api.LocationUsage`, which the hangar (ships)
+and the refinery (orders) implement, so it names neither repository. `RefineryAccessPolicy` owns
+the JPQL scope fragment of the order queries.
 
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
@@ -213,7 +217,12 @@ The platform modules reach the domains only through SPIs they own and the domain
 | `livesync.api.LiveSyncTopicAuthorizer` | whether the caller may join a room, through the owning module's read gate; one implementation per kind, checked at startup | mission, operation, joborder, refinery, bank (`OrgUnitBankLiveSyncTopicAuthorizer`); the member and self rooms stay with livesync |
 | `service.ActiveOrgUnitProvider` (platform) | the org unit for the `orgUnitId` MDC field | scope (`ScopeActiveOrgUnitProvider`) |
 | `platform.api.ClientDirectory` | whether a client id is a configured ingest gateway or a registered exchange client, for the bounded client label | exchange (`ExchangeClientDirectory`) |
+| `platform.api.UserReassignmentParticipant` | a module's part of the admin account merge: the member-referencing columns it holds, those that follow the member (with their unique-key remainder) and those that stay with the act; it can refuse the merge, and the rows it moves feed the `USER_MERGED` audit row in participant order | inventory, hangar, refinery, personalinventory, blueprint, orgunit (two), orgchart, mission, joborder, materialexchange, bank, notification, promotion, exchange; audit, operation, identity declare staying columns only |
+| `catalogue.api.LocationUsage` | whether any row of a module still references a location, so the catalogue refuses to delete it; the first usage by position that says yes names the refusal | hangar (`ShipLocationUsage`), refinery (`RefineryLocationUsage`) |
 | `platform.api.UserErasureParticipant` | a module's part of the account deletion: its rows removed, reassigned to the fallback admin or unlinked, by phase (`DELETE`, `REASSIGN`, `UNLINK`) and position, inside the deletion's one transaction; the counts it returns feed the deletion's audit rows | materialexchange, inventory, hangar, personalinventory, blueprint, notification, promotion (`DELETE`); mission, refinery (`REASSIGN`); mission, joborder (`UNLINK`) |
+| `platform.api.HandleAnonymisationParticipant` | a module's part of the granted Art. 17 handle anonymisation: the handle snapshots of its tables replaced by the sentinel, by position, inside the anonymisation's one transaction; the counts it returns feed the marker rows, and a participant records its own marker | audit (`AuditHandleAnonymisation`), bank (`BankHandleAnonymisation`), joborder (`JobOrderHandleAnonymisation`) |
+| `platform.api.PersonalDataExportSection` | a module's part of the Art. 15 / Art. 20 data export: the `Section` records (position, key, legal basis, statement, scrubbed and exempted columns) that select the member's own rows; `PersonalDataExportRegistry` (privacy) orders them by position and `DataExportService` runs them | identity, orgunit, orgchart, promotion, inventory, hangar, exchange, personalinventory, blueprint, notification, mission, refinery, joborder, materialexchange, bank, audit (`*ExportSections`) |
+| `platform.api.PersonMentionSource` | a module's part of the admin person search: the text columns of its tables that can name a person (`Target`: area, table, column, id column, link kind) and the ones it exempts; `PersonMentionRegistry` (privacy) orders the union and `PersonSearchService` builds its one statement from it | every module that owns a text column (`*MentionSource`), and the platform's `SchemaHistoryMentionSource` |
 
 ## 5.3 Level 2 — inside `frontend`
 
