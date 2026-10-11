@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global AR_CATEGORIES_BY_TOPIC, MSG_SAVED, MSG_DELETED, MSG_ERROR, MSG_CONFLICT, MSG_INVALID_STEP, MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_DELETE_GROUP_TITLE, MSG_DELETE_GROUP_MSG, MSG_GROUP_DELETED, MSG_OK, MSG_CANCEL, MSG_REFRESH_FAILED */
 
 function toastSuccess(msg) {
@@ -24,6 +26,16 @@ function toastSuccess(msg) {
 }
 function toastError(msg) {
     if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
+}
+
+/**
+ * Looks up a form control of the page's modals; the template always renders them.
+ *
+ * @param {string} id the control's element id
+ * @returns {HTMLInputElement} the control (an input, select or textarea; only `value` is used)
+ */
+function arControl(id) {
+    return /** @type {HTMLInputElement} */ (document.getElementById(id));
 }
 
 function closeModal(id) {
@@ -117,13 +129,13 @@ function apiCall(url, method, body) {
 function openCreateModal(btn) {
     const presetFrom = btn ? parseInt(btn.getAttribute('data-ar-from') || '', 10) : NaN;
     const from = Number.isFinite(presetFrom) ? presetFrom : 20;
-    document.getElementById('cr-from').value = from;
-    document.getElementById('cr-to').value = from - 1;
-    document.getElementById('cr-topic').value = (btn && btn.getAttribute('data-ar-topic-id')) || '';
+    arControl('cr-from').value = String(from);
+    arControl('cr-to').value = String(from - 1);
+    arControl('cr-topic').value = (btn && btn.getAttribute('data-ar-topic-id')) || '';
     rebuildCategoryDropdown(document.getElementById('cr-topic'));
-    document.getElementById('cr-level').value = 'LEVEL_A';
-    document.getElementById('cr-count').value = 1;
-    document.getElementById('cr-desc').value = '';
+    arControl('cr-level').value = 'LEVEL_A';
+    arControl('cr-count').value = '1';
+    arControl('cr-desc').value = '';
     openModal('modal-create');
 }
 
@@ -133,10 +145,12 @@ function showMatrixCell(btn) {
     const topicId = btn.getAttribute('data-ar-topic-id') || '';
     const group = document.getElementById(`ar-group-${from}-${to}`);
     if (!group) return;
-    const rows = Array.from(group.querySelectorAll('tr[data-ar-req-id]')).filter((row) => {
+    const rows = Array.from(
+        /** @type {NodeListOf<HTMLElement>} */ (group.querySelectorAll('tr[data-ar-req-id]')),
+    ).filter((row) => {
         return (row.getAttribute('data-ar-topic') || '') === topicId;
     });
-    const filter = document.getElementById('ar-filter');
+    const filter = /** @type {HTMLInputElement | null} */ (document.getElementById('ar-filter'));
     if (
         filter &&
         filter.value &&
@@ -156,24 +170,24 @@ function showMatrixCell(btn) {
 }
 
 function openEditModal(btn) {
-    document.getElementById('er-id').value = btn.getAttribute('data-ar-id');
-    document.getElementById('er-version').value = btn.getAttribute('data-ar-version');
-    document.getElementById('er-from').value = btn.getAttribute('data-ar-from');
-    document.getElementById('er-to').value = btn.getAttribute('data-ar-to');
+    arControl('er-id').value = btn.getAttribute('data-ar-id') ?? '';
+    arControl('er-version').value = btn.getAttribute('data-ar-version') ?? '';
+    arControl('er-from').value = btn.getAttribute('data-ar-from') ?? '';
+    arControl('er-to').value = btn.getAttribute('data-ar-to') ?? '';
     const topicId = btn.getAttribute('data-ar-topic-id') || '';
-    document.getElementById('er-topic').value = topicId;
+    arControl('er-topic').value = topicId;
     rebuildCategoryDropdown(document.getElementById('er-topic'));
-    document.getElementById('er-category').value = btn.getAttribute('data-ar-category-id') || '';
-    document.getElementById('er-level').value = btn.getAttribute('data-ar-level');
-    document.getElementById('er-count').value = btn.getAttribute('data-ar-count');
-    document.getElementById('er-desc').value = btn.getAttribute('data-ar-description') || '';
+    arControl('er-category').value = btn.getAttribute('data-ar-category-id') || '';
+    arControl('er-level').value = btn.getAttribute('data-ar-level') ?? '';
+    arControl('er-count').value = btn.getAttribute('data-ar-count') ?? '';
+    arControl('er-desc').value = btn.getAttribute('data-ar-description') || '';
     syncToRank(document.getElementById('er-from'));
     openModal('modal-edit');
 }
 
 function submitCreate() {
-    const from = parseInt(document.getElementById('cr-from').value, 10);
-    const to = parseInt(document.getElementById('cr-to').value, 10);
+    const from = parseInt(arControl('cr-from').value, 10);
+    const to = parseInt(arControl('cr-to').value, 10);
     if (!isValidSingleStep(from, to)) {
         toastError(MSG_INVALID_STEP);
         return;
@@ -181,11 +195,11 @@ function submitCreate() {
     const body = {
         fromRank: from,
         toRank: to,
-        topicId: document.getElementById('cr-topic').value || null,
-        categoryId: document.getElementById('cr-category').value || null,
-        minimumLevel: document.getElementById('cr-level').value,
-        requiredCount: parseInt(document.getElementById('cr-count').value, 10),
-        description: document.getElementById('cr-desc').value || null,
+        topicId: arControl('cr-topic').value || null,
+        categoryId: arControl('cr-category').value || null,
+        minimumLevel: arControl('cr-level').value,
+        requiredCount: parseInt(arControl('cr-count').value, 10),
+        description: arControl('cr-desc').value || null,
     };
     apiCall('/api/proxy/promotion/rank-requirements', 'POST', body).then((data) => {
         if (!data) return;
@@ -196,22 +210,22 @@ function submitCreate() {
 }
 
 function submitEdit() {
-    const id = document.getElementById('er-id').value;
-    const from = parseInt(document.getElementById('er-from').value, 10);
-    const to = parseInt(document.getElementById('er-to').value, 10);
+    const id = arControl('er-id').value;
+    const from = parseInt(arControl('er-from').value, 10);
+    const to = parseInt(arControl('er-to').value, 10);
     if (!isValidSingleStep(from, to)) {
         toastError(MSG_INVALID_STEP);
         return;
     }
     const body = {
-        version: parseInt(document.getElementById('er-version').value, 10),
+        version: parseInt(arControl('er-version').value, 10),
         fromRank: from,
         toRank: to,
-        topicId: document.getElementById('er-topic').value || null,
-        categoryId: document.getElementById('er-category').value || null,
-        minimumLevel: document.getElementById('er-level').value,
-        requiredCount: parseInt(document.getElementById('er-count').value, 10),
-        description: document.getElementById('er-desc').value || null,
+        topicId: arControl('er-topic').value || null,
+        categoryId: arControl('er-category').value || null,
+        minimumLevel: arControl('er-level').value,
+        requiredCount: parseInt(arControl('er-count').value, 10),
+        description: arControl('er-desc').value || null,
     };
     apiCall(`/api/proxy/promotion/rank-requirements/${id}`, 'PUT', body).then((data) => {
         if (!data) return;
@@ -273,15 +287,19 @@ function confirmAndDeleteGroup(fromRank, toRank) {
 }
 
 function applyFilter() {
-    const input = document.getElementById('ar-filter');
+    const input = /** @type {HTMLInputElement | null} */ (document.getElementById('ar-filter'));
     const query = (input ? input.value : '').trim().toLowerCase();
-    const groups = document.querySelectorAll('.rank-group');
+    const groups = /** @type {NodeListOf<HTMLElement>} */ (
+        document.querySelectorAll('.rank-group')
+    );
     let anyVisible = false;
     groups.forEach((group) => {
         const fromRank = group.getAttribute('data-ar-from-rank') || '';
         const toRank = group.getAttribute('data-ar-to-rank') || '';
         const rankKey = `${fromRank}->${toRank}`;
-        const rows = group.querySelectorAll('tr[data-ar-search]');
+        const rows = /** @type {NodeListOf<HTMLElement>} */ (
+            group.querySelectorAll('tr[data-ar-search]')
+        );
         let groupVisible = 0;
         rows.forEach((row) => {
             const text = row.getAttribute('data-ar-search') || '';
@@ -316,8 +334,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         window.krtEvents.on('click', 'ar-delete-group', (btn) => {
             confirmAndDeleteGroup(
-                parseInt(btn.getAttribute('data-ar-from-rank'), 10),
-                parseInt(btn.getAttribute('data-ar-to-rank'), 10),
+                parseInt(btn.getAttribute('data-ar-from-rank') ?? '', 10),
+                parseInt(btn.getAttribute('data-ar-to-rank') ?? '', 10),
             );
         });
         window.krtEvents.on('click', 'ar-close-create', () => {

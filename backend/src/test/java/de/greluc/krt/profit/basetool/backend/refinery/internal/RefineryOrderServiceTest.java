@@ -781,7 +781,7 @@ class RefineryOrderServiceTest {
       de.greluc.krt.profit.basetool.backend.model.Mission mission =
           new de.greluc.krt.profit.basetool.backend.model.Mission();
       mission.setId(UUID.randomUUID());
-      order.setMission(mission);
+      order.setMissionId(mission.getId());
       stubLookupsForSingleItem();
 
       refineryOrderService.storeRefineryOrder(

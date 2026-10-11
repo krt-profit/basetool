@@ -75,7 +75,6 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       attributePaths = {
         "owner",
         "location",
-        "mission",
         "refiningMethod",
         "goods",
         "goods.inputMaterial",
@@ -112,14 +111,20 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * Derived Spring-Data query - returns entities matching {@code MissionId}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   List<RefineryOrder> findByMissionId(UUID missionId);
+
+  /**
+   * Derived Spring-Data query - returns the orders linked to the mission without fetching any
+   * association, for callers that only change the link.
+   */
+  List<RefineryOrder> findAllByMissionId(UUID missionId);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code MissionIdAndOwnerId}. Eagerly
    * fetches the configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   List<RefineryOrder> findByMissionIdAndOwnerId(UUID missionId, UUID ownerId);
 
   /**
@@ -130,9 +135,9 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * <p>Refinery is strict-staffel, so an order of a foreign org unit is never returned, even when
    * the mission itself is public.
    */
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   @Query(
-      "SELECT r FROM RefineryOrder r WHERE r.mission.id = :missionId AND "
+      "SELECT r FROM RefineryOrder r WHERE r.missionId = :missionId AND "
           + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
   List<RefineryOrder> findByMissionIdScoped(
       @Param("missionId") UUID missionId,
@@ -144,7 +149,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * Derived Spring-Data query - returns entities matching {@code MissionIdIn}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   List<RefineryOrder> findByMissionIdIn(List<UUID> missionIds);
 
   /**
@@ -158,10 +163,10 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @Query(
       """
       select new de.greluc.krt.profit.basetool.backend.repository.RefineryMissionProfitAggregate(
-      r.mission.id,
+      r.missionId,
       sum(coalesce(r.oreSales, 0.0) - coalesce(r.expenses, 0.0)
       - coalesce(r.otherExpenses, 0.0)))
-      from RefineryOrder r where r.mission.id in :missionIds group by r.mission.id
+      from RefineryOrder r where r.missionId in :missionIds group by r.missionId
       """)
   List<RefineryMissionProfitAggregate> aggregateProfitByMissionIds(
       @Param("missionIds") List<UUID> missionIds);
@@ -170,7 +175,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * Derived Spring-Data query - returns entities matching {@code OwnerId}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   List<RefineryOrder> findByOwnerId(UUID ownerId);
 
   /**
@@ -185,7 +190,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * @param pageable the page request; sortable by entity attributes, {@code endsAt} included
    * @return the matching page, each order once
    */
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   @Query("SELECT r FROM RefineryOrder r WHERE r.owner.id = :ownerId AND " + LIST_FILTER)
   Page<RefineryOrder> findOwnedFiltered(
       @Param("ownerId") UUID ownerId,
@@ -211,7 +216,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * @param pageable the page request; sortable by entity attributes, {@code endsAt} included
    * @return the matching in-scope page, each order once
    */
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   @Query(
       "SELECT r FROM RefineryOrder r WHERE "
           + LIST_FILTER
@@ -244,7 +249,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * @param pageable the page request
    * @return the in-scope page of the target user's refinery orders
    */
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   @Query(
       "SELECT r FROM RefineryOrder r WHERE r.owner.id = :ownerId AND "
           + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
@@ -277,7 +282,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * Derived Spring-Data query - returns entities matching {@code StatusIn}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   Page<RefineryOrder> findByStatusIn(List<RefineryOrderStatus> statuses, Pageable pageable);
 
   /**
@@ -285,7 +290,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * configured relations via {@code @EntityGraph}.
    */
   @Override
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   Page<RefineryOrder> findAll(Pageable pageable);
 
   /**
@@ -294,7 +299,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * {@code null} (admin "all squadrons" mode). Refinery is a strict-staffel aggregate - there is no
    * cross-squadron escape clause like Mission's {@code is_internal = false}.
    */
-  @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owner", "location", "refiningMethod", "owningOrgUnit"})
   @Query("SELECT r FROM RefineryOrder r WHERE " + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
   Page<RefineryOrder> findAllScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -303,12 +308,12 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       Pageable pageable);
 
   /**
-   * Bulk-clears the {@code mission} reference on every refinery order tied to one of the given
-   * missions so the orders survive a mission delete as unassigned (see CLAUDE.md "Operation delete
-   * keeps missions intact" rule for the broader pattern).
+   * Bulk-clears the mission link on every refinery order tied to one of the given missions so the
+   * orders survive a mission delete as unassigned (see CLAUDE.md "Operation delete keeps missions
+   * intact" rule for the broader pattern).
    */
   @Modifying
-  @Query("UPDATE RefineryOrder r SET r.mission = null WHERE r.mission.id IN :missionIds")
+  @Query("UPDATE RefineryOrder r SET r.missionId = null WHERE r.missionId IN :missionIds")
   void unlinkMissions(@Param("missionIds") List<UUID> missionIds);
 
   /**

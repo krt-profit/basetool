@@ -201,7 +201,7 @@ declare const MSG_UPDATE_FAILED: string;
 /** Injected by the page bootstrap (declared in orders-create.html). */
 declare const SCU_HINT_TEXT: string;
 /** Injected by the page bootstrap (declared in orders-create.html). */
-declare const materialIndex: number;
+declare let materialIndex: number;
 
 /** Injected by the page bootstrap (declared in orders-create.html). */
 declare const MSG_MATERIAL_INVALID: string;
@@ -345,7 +345,17 @@ declare const scuHintText: string;
 declare const MSG_DELETE_TITLE: string;
 
 /** Injected by the page bootstrap (declared in orders-index.html). */
-declare const KRT_ORDERS_REORDER_I18N: KrtI18nDict;
+declare const KRT_ORDERS_REORDER_I18N: {
+    success: string;
+    error: string;
+    conflict: {
+        title: string;
+        detail: string;
+        reloadLabel: string;
+        reloadQuestion: string;
+        dismissLabel: string;
+    };
+};
 
 /** Injected by the page bootstrap (declared in orders-index.html). */
 declare const KRT_ORDERS_AGE_RED: number;
@@ -365,7 +375,10 @@ declare const KRT_DEMAND_SECTION_REFRESH_ERROR: string;
 declare const OC_I18N: KrtI18nDict;
 
 /** Injected by the page bootstrap (declared in promotion-admin-rank-requirements.html). */
-declare const AR_CATEGORIES_BY_TOPIC: KrtI18nDict;
+declare const AR_CATEGORIES_BY_TOPIC: Record<
+    string,
+    Array<Required<Pick<ApiDto<'PromotionCategoryResponse'>, 'id' | 'name'>>>
+>;
 /** Injected by the page bootstrap (declared in promotion-admin-rank-requirements.html). */
 declare const MSG_DELETE_GROUP_MSG: string;
 /** Injected by the page bootstrap (declared in promotion-admin-rank-requirements.html). */

@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceGroupAggregate;
@@ -98,8 +97,8 @@ public class OperationFinanceService {
 
     Map<UUID, List<RefineryOrder>> refineryOrdersByMission =
         allRefineryOrders.stream()
-            .filter(order -> order.getMission() != null)
-            .collect(Collectors.groupingBy(order -> order.getMission().getId()));
+            .filter(order -> order.getMissionId() != null)
+            .collect(Collectors.groupingBy(RefineryOrder::getMissionId));
 
     BigDecimal operationTotalSum = BigDecimal.ZERO;
     List<MissionFinanceSummaryDto> missionSummaries = new ArrayList<>();

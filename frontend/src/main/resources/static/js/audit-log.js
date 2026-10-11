@@ -1,18 +1,23 @@
+// @ts-check
+
 (function () {
     'use strict';
 
-    const form = document.getElementById('audit-filter-form');
+    const form = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('audit-filter-form')
+    );
     const resultsContainer = document.getElementById('audit-results');
     const resetLink = document.getElementById('audit-filter-reset');
 
     if (form && resultsContainer && window.krtFetch) {
+        /** @type {number | null} */
         let debounceTimer = null;
 
         const buildUrl = function () {
             const data = new FormData(form);
             const params = new URLSearchParams();
             for (const [key, value] of data.entries()) {
-                if (value !== '') params.append(key, value);
+                if (value !== '') params.append(key, /** @type {string} */ (value));
             }
             const query = params.toString();
             return `/admin/audit-log${query ? `?${query}` : ''}`;
@@ -27,7 +32,7 @@
         };
 
         const onFilterChange = function () {
-            clearTimeout(debounceTimer);
+            clearTimeout(debounceTimer ?? undefined);
             debounceTimer = setTimeout(() => {
                 loadResults();
             }, 300);
@@ -35,7 +40,7 @@
 
         form.addEventListener('submit', (event) => {
             event.preventDefault();
-            clearTimeout(debounceTimer);
+            clearTimeout(debounceTimer ?? undefined);
             loadResults();
         });
 
@@ -70,7 +75,7 @@
             const data = new FormData(form);
             const params = new URLSearchParams();
             for (const [key, value] of data.entries()) {
-                if (value !== '') params.append(key, value);
+                if (value !== '') params.append(key, /** @type {string} */ (value));
             }
             const query = params.toString();
             if (query) url += `?${query}`;
@@ -79,8 +84,12 @@
     };
 
     const EVENT_FILTER_PREF_KEY = 'admin_audit_filter';
-    const eventSelect = document.getElementById('audit-event');
-    const domainField = form ? form.querySelector('input[name="domain"]') : null;
+    const eventSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('audit-event')
+    );
+    const domainField = /** @type {HTMLInputElement | null} */ (
+        form ? form.querySelector('input[name="domain"]') : null
+    );
     const activeDomain = domainField ? domainField.value : '';
 
     const readEventFilterPrefs = function () {
@@ -95,6 +104,9 @@
 
     const persistEventType = function () {
         try {
+            if (!eventSelect) {
+                return;
+            }
             const prefs = readEventFilterPrefs();
             if (eventSelect.value) {
                 prefs[activeDomain] = eventSelect.value;
@@ -184,14 +196,18 @@
     };
 
     document.addEventListener('submit', (event) => {
-        const frm = event.target.closest('form.audit-download-form');
+        const frm = /** @type {HTMLFormElement | null} */ (
+            /** @type {Element} */ (event.target).closest('form.audit-download-form')
+        );
         if (!frm) {
             return;
         }
         event.preventDefault();
         clearErrors(frm);
-        const from = frm.querySelector('input[name="from"]');
-        const to = frm.querySelector('input[name="to"]');
+        const from = /** @type {HTMLInputElement | null} */ (
+            frm.querySelector('input[name="from"]')
+        );
+        const to = /** @type {HTMLInputElement | null} */ (frm.querySelector('input[name="to"]'));
         const required = frm.getAttribute('data-period-required') || '';
         const downloadError = frm.getAttribute('data-download-error') || required;
         let valid = true;
@@ -208,9 +224,11 @@
         }
         const json = event.submitter && event.submitter.getAttribute('data-format') === 'json';
         const endpoint = frm.getAttribute('data-endpoint');
+        const fromValue = /** @type {HTMLInputElement} */ (from).value;
+        const toValue = /** @type {HTMLInputElement} */ (to).value;
         const url = `${json ? `${endpoint}.json` : endpoint}?from=${encodeURIComponent(
-            from.value,
-        )}&to=${encodeURIComponent(to.value)}`;
+            fromValue,
+        )}&to=${encodeURIComponent(toValue)}`;
         const baseName = frm.getAttribute('data-filename') || 'audit.pdf';
         const filename = json ? baseName.replace(/\.pdf$/, '.json') : baseName;
         downloadBlob(url, filename, () => {
@@ -219,7 +237,9 @@
     });
 
     document.addEventListener('submit', (event) => {
-        const frm = event.target.closest('form.audit-purge-form');
+        const frm = /** @type {HTMLFormElement | null} */ (
+            /** @type {Element} */ (event.target).closest('form.audit-purge-form')
+        );
         if (!frm) {
             return;
         }
@@ -229,7 +249,9 @@
         if (successSlot) {
             successSlot.textContent = '';
         }
-        const before = frm.querySelector('input[name="before"]');
+        const before = /** @type {HTMLInputElement | null} */ (
+            frm.querySelector('input[name="before"]')
+        );
         const required = frm.getAttribute('data-period-required') || '';
         const deleteError = frm.getAttribute('data-delete-error') || required;
         if (!before || !before.value) {

@@ -92,7 +92,7 @@ class OperationFinanceServiceTest {
             .build();
 
     RefineryOrder ro1 = new RefineryOrder();
-    ro1.setMission(msn1);
+    ro1.setMissionId(msn1.getId());
     ro1.setExpenses(50.0);
 
     MissionFinanceEntry e3 =
@@ -138,17 +138,17 @@ class OperationFinanceServiceTest {
     operation.setMissions(Set.of(msn));
 
     RefineryOrder profitOrder = new RefineryOrder();
-    profitOrder.setMission(msn);
+    profitOrder.setMissionId(msn.getId());
     profitOrder.setExpenses(100.0);
     profitOrder.setOreSales(450.0);
 
     RefineryOrder lossOrder = new RefineryOrder();
-    lossOrder.setMission(msn);
+    lossOrder.setMissionId(msn.getId());
     lossOrder.setExpenses(200.0);
     lossOrder.setOreSales(50.0);
 
     RefineryOrder legacyOrder = new RefineryOrder();
-    legacyOrder.setMission(msn);
+    legacyOrder.setMissionId(msn.getId());
     legacyOrder.setExpenses(25.0);
     legacyOrder.setOreSales(null);
 

@@ -17,32 +17,51 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global krtAutocomplete, shipDataI18n, shipDataConflict, shipDataResetUrl */
 
 document.addEventListener('DOMContentLoaded', () => {
-    const shipTypesData = document.getElementById('shipTypeNames-data');
+    const shipTypesData = /** @type {HTMLDataListElement | null} */ (
+        document.getElementById('shipTypeNames-data')
+    );
     const shipTypeNames = shipTypesData
         ? Array.from(shipTypesData.options).map((o) => {
               return o.value;
           })
         : [];
-    const mfgData = document.getElementById('mfgNames-data');
+    const mfgData = /** @type {HTMLDataListElement | null} */ (
+        document.getElementById('mfgNames-data')
+    );
     const mfgNames = mfgData
         ? Array.from(mfgData.options).map((o) => {
               return o.value;
           })
         : [];
 
-    const inpShipTypes = document.getElementById('filterShipTypes');
+    const inpShipTypes = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('filterShipTypes')
+    );
     if (inpShipTypes) krtAutocomplete(inpShipTypes, shipTypeNames);
 
-    const inpMfgs = document.getElementById('filterManufacturers');
+    const inpMfgs = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('filterManufacturers')
+    );
     if (inpMfgs) krtAutocomplete(inpMfgs, mfgNames);
 });
 
+/**
+ * Hides every table row whose first cell does not contain the query, case-insensitively.
+ *
+ * @param {string} tableId id of the table to filter
+ * @param {string} query the text to look for
+ */
 function filterTable(tableId, query) {
     const filter = query.toUpperCase();
     const table = document.getElementById(tableId);
+    if (!table) {
+        return;
+    }
     const tr = table.getElementsByTagName('tr');
     for (let i = 1; i < tr.length; i++) {
         const td = tr[i].getElementsByTagName('td')[0];
@@ -57,6 +76,11 @@ function filterTable(tableId, query) {
     }
 }
 
+/**
+ * Closes a modal overlay after discarding the unsaved-changes guard.
+ *
+ * @param {string | null} id the overlay id
+ */
 function closeModal(id) {
     if (typeof window.resetUnsavedChanges === 'function') {
         window.resetUnsavedChanges();
@@ -68,9 +92,9 @@ window.filterTable = filterTable;
 
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.krt-modal-overlay').forEach((m) => {
-        m.addEventListener('click', function (e) {
-            if (e.target === this) {
-                window.krtModal.close(this);
+        m.addEventListener('click', (e) => {
+            if (e.target === m) {
+                window.krtModal.close(m);
             }
         });
     });
@@ -90,14 +114,18 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     const conflict = shipDataConflict;
 
     document.addEventListener('submit', (e) => {
-        const form = e.target;
+        const form = /** @type {HTMLFormElement} */ (e.target);
         if (!form.classList || !form.classList.contains('js-visibility-toggle')) {
             return;
         }
         e.preventDefault();
-        const hiddenInput = form.querySelector('input[name="hidden"]');
+        const hiddenInput = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="hidden"]')
+        );
         const desired = hiddenInput ? hiddenInput.value === 'true' : true;
-        const btn = form.querySelector('button[type="submit"]');
+        const btn = /** @type {HTMLButtonElement | null} */ (
+            form.querySelector('button[type="submit"]')
+        );
         if (btn) {
             btn.disabled = true;
         }
@@ -133,7 +161,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             });
     });
 
-    window.krtEvents.on('click', 'shipdata-reset', (el) => {
+    window.krtEvents.on('click', 'shipdata-reset', (target) => {
+        const el = /** @type {HTMLButtonElement} */ (target);
         el.disabled = true;
         window.krtFetch
             .write({

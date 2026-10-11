@@ -1,19 +1,31 @@
+// @ts-check
+
 (function () {
     'use strict';
 
     document.addEventListener('input', (event) => {
-        const input = event.target.closest('input[data-confirm-token][data-confirm-submit]');
+        const input = /** @type {HTMLInputElement | null} */ (
+            /** @type {Element} */ (event.target).closest(
+                'input[data-confirm-token][data-confirm-submit]',
+            )
+        );
         if (!input) {
             return;
         }
-        const submit = document.getElementById(input.getAttribute('data-confirm-submit'));
+        const submit = /** @type {HTMLButtonElement | null} */ (
+            document.getElementById(
+                /** @type {string} */ (input.getAttribute('data-confirm-submit')),
+            )
+        );
         if (submit) {
             submit.disabled = input.value !== input.getAttribute('data-confirm-token');
         }
     });
 
     document.addEventListener('submit', (event) => {
-        const form = event.target.closest('form[data-bp-purge]');
+        const form = /** @type {HTMLFormElement | null} */ (
+            /** @type {Element} */ (event.target).closest('form[data-bp-purge]')
+        );
         if (!form) {
             return;
         }
@@ -22,8 +34,12 @@
             form.submit();
             return;
         }
-        const confirmInput = form.querySelector('input[name="confirm"]');
-        const submitBtn = form.querySelector('button[type="submit"]');
+        const confirmInput = /** @type {HTMLInputElement | null} */ (
+            form.querySelector('input[name="confirm"]')
+        );
+        const submitBtn = /** @type {HTMLButtonElement | null} */ (
+            form.querySelector('button[type="submit"]')
+        );
         if (submitBtn) {
             submitBtn.disabled = true;
         }
@@ -39,9 +55,11 @@
                         window.showFrontendSuccessToast(String(tpl).replace('{0}', count));
                     }
                     const overlay = form.closest('.krt-modal-overlay');
-                    const closeBtn = overlay
-                        ? overlay.querySelector('[data-trigger="close-modal-display"]')
-                        : null;
+                    const closeBtn = /** @type {HTMLElement | null} */ (
+                        overlay
+                            ? overlay.querySelector('[data-trigger="close-modal-display"]')
+                            : null
+                    );
                     if (closeBtn) {
                         closeBtn.click();
                     }

@@ -110,6 +110,7 @@ class MissionServiceSectionPatchTest {
             missionOwnershipRepository,
             null,
             null,
+            null,
             ownerScopeService,
             null,
             auditService,

@@ -47,6 +47,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @SpringBootTest
 @Transactional
@@ -163,6 +164,20 @@ class RefineryOrderTest {
     orgUnitMembershipRepository.save(m);
   }
 
+  /**
+   * Serialises an order the way a client sends it: the linked mission as a reference object, not as
+   * the entity's id column.
+   */
+  private String payload(RefineryOrder order) {
+    ObjectNode node = (ObjectNode) objectMapper.valueToTree(order);
+    UUID missionId = order.getMissionId();
+    node.remove("missionId");
+    if (missionId != null) {
+      node.putObject("mission").put("id", missionId.toString());
+    }
+    return node.toString();
+  }
+
   @Test
   void testUserCreateAndManageRefineryOrder() throws Exception {
     RefineryOrder order = new RefineryOrder();
@@ -172,7 +187,7 @@ class RefineryOrderTest {
     order.setDurationMinutes(120L);
     order.setRefiningMethod(dinyx);
     order.setExpenses(500.00);
-    order.setMission(mission);
+    order.setMissionId(mission.getId());
 
     Set<RefineryGood> goods = new HashSet<>();
     RefineryGood good1 = new RefineryGood();
@@ -199,7 +214,7 @@ class RefineryOrderTest {
                                 new SimpleGrantedAuthority("REFINERY_READ"),
                                 new SimpleGrantedAuthority("REFINERY_WRITE")))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(order)))
+                    .content(payload(order)))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -213,7 +228,7 @@ class RefineryOrderTest {
     assertEquals("ARC-L1", saved.getLocation().getName());
     assertEquals(1, saved.getGoods().size());
     assertEquals("Quantanium", saved.getGoods().iterator().next().getInputMaterial().getName());
-    assertEquals(mission.getId(), saved.getMission().getId());
+    assertEquals(mission.getId(), saved.getMissionId());
 
     RefineryOrder updatePayload = new RefineryOrder();
     updatePayload.setId(saved.getId());
@@ -222,7 +237,7 @@ class RefineryOrderTest {
     updatePayload.setStartedAt(saved.getStartedAt());
     updatePayload.setDurationMinutes(saved.getDurationMinutes());
     updatePayload.setExpenses(saved.getExpenses());
-    updatePayload.setMission(saved.getMission());
+    updatePayload.setMissionId(saved.getMissionId());
     updatePayload.setOwner(saved.getOwner());
     updatePayload.setOwningOrgUnit(saved.getOwningOrgUnit());
     updatePayload.setRefiningMethod(ferron);
@@ -248,7 +263,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updatePayload)))
+                .content(payload(updatePayload)))
         .andExpect(status().isOk());
 
     RefineryOrder updated = refineryOrderRepository.findById(saved.getId()).orElseThrow();
@@ -284,7 +299,7 @@ class RefineryOrderTest {
     order.setStartedAt(Instant.now());
     order.setDurationMinutes(120L);
     order.setRefiningMethod(dinyx);
-    order.setMission(mission);
+    order.setMissionId(mission.getId());
     RefineryGood good = new RefineryGood();
     good.setInputMaterial(quantanium);
     good.setInputQuantity(32);
@@ -306,7 +321,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(order)))
+                .content(payload(order)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("MISSION_PARTICIPANT_REQUIRED"));
 
@@ -345,7 +360,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
                             new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(order)))
+                .content(payload(order)))
         .andExpect(status().isOk());
 
     RefineryOrder updated = refineryOrderRepository.findById(order.getId()).orElseThrow();
@@ -407,7 +422,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(order)))
+                .content(payload(order)))
         .andExpect(status().isForbidden());
 
     mockMvc
@@ -424,7 +439,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(order)))
+                .content(payload(order)))
         .andExpect(status().isForbidden());
   }
 
@@ -465,7 +480,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(order)))
+                .content(payload(order)))
         .andExpect(status().isBadRequest());
   }
 
@@ -478,7 +493,7 @@ class RefineryOrderTest {
     order.setDurationMinutes(120L);
     order.setRefiningMethod(dinyx);
     order.setExpenses(500.00);
-    order.setMission(null);
+    order.setMissionId(null);
 
     Set<RefineryGood> goods = new HashSet<>();
     RefineryGood good1 = new RefineryGood();
@@ -505,7 +520,7 @@ class RefineryOrderTest {
                                 new SimpleGrantedAuthority("REFINERY_READ"),
                                 new SimpleGrantedAuthority("REFINERY_WRITE")))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(order)))
+                    .content(payload(order)))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -515,7 +530,7 @@ class RefineryOrderTest {
     UUID savedId = UUID.fromString(jsonResponse.get("id").asString());
     RefineryOrder saved = refineryOrderRepository.findById(savedId).orElseThrow();
     assertNotNull(saved.getId());
-    assertNull(saved.getMission());
+    assertNull(saved.getMissionId());
   }
 
   @Test

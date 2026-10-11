@@ -1,14 +1,46 @@
+// @ts-check
+
 (function () {
     'use strict';
 
     const HEARTBEAT_MS = 60000;
     const SECTION_SELECTOR = '[data-panel-key]';
 
+    /**
+     * The mutable state of one presence channel, as the prototype methods see it.
+     *
+     * @typedef {object} MissionPresenceSelf
+     * @property {string} missionId the mission the channel belongs to
+     * @property {string} topic the live-sync room, `mission:<id>`
+     * @property {string | null} currentUserId the viewer, whose own focus is not indicated
+     * @property {{ unsubscribe(): void } | null} subscription the live-sync subscription
+     * @property {number | null} heartbeatTimer the interval handle while a section is focused
+     * @property {string | null} activeSection the focused section key, if any
+     * @property {Record<string, KrtPresenceEditor[]>} lastState the latest editors per section
+     * @property {(ev: FocusEvent) => void} _onFocusIn bound focusin listener
+     * @property {(ev: FocusEvent) => void} _onFocusOut bound focusout listener
+     * @property {() => void} _onVisibility bound visibilitychange listener
+     * @property {() => void} _tick bound heartbeat tick
+     */
+
+    /**
+     * Looks up a presence tooltip label.
+     *
+     * @param {string} key the message key
+     * @returns {string} the localized label
+     */
     function i18n(key) {
         const dict = window.MISSION_PRESENCE_I18N || {};
         return window.krtI18nText(dict[key], `MISSION_PRESENCE_I18N[${key}]`);
     }
 
+    /**
+     * Presence channel of one mission page.
+     *
+     * @this {MissionPresenceSelf}
+     * @param {string} missionId the mission to track
+     * @param {string | null | undefined} currentUserId the viewer's user id
+     */
     function MissionPresence(missionId, currentUserId) {
         this.missionId = missionId;
         this.topic = `mission:${missionId}`;
@@ -157,7 +189,7 @@
             const key = panel.getAttribute('data-panel-key');
             const header = panel.querySelector('.col-header') || panel;
             let indicator = header.querySelector('.krt-presence-indicator');
-            const editors = (state[key] || []).filter((e) => {
+            const editors = (state[String(key)] || []).filter((e) => {
                 return !self.currentUserId || e.userId !== self.currentUserId;
             });
             if (editors.length === 0) {

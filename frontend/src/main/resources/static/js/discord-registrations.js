@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global DISCORD_MSG */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -26,22 +28,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const body = document.getElementById('registrationsBody');
     const rejectedBody = document.getElementById('rejectedBody');
     const modal = document.getElementById('reject-modal');
-    const reasonInput = document.getElementById('reject-reason');
+    const reasonInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('reject-reason')
+    );
     const linkModal = document.getElementById('link-modal');
     const mergeModal = document.getElementById('merge-modal');
     const reopenModal = document.getElementById('reopen-modal');
-    const reopenReasonInput = document.getElementById('reopen-reason');
+    const reopenReasonInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('reopen-reason')
+    );
+    /** @type {Element | null} */
     let rejectTarget = null;
+    /** @type {Element | null} */
     let linkTarget = null;
+    /** @type {Element | null} */
     let mergeTarget = null;
+    /** @type {Element | null} */
     let reopenTarget = null;
 
+    /** @returns {HTMLInputElement | null} the combobox host of the link dialog */
     function linkPicker() {
-        return document.getElementById('link-target');
+        return /** @type {HTMLInputElement | null} */ (document.getElementById('link-target'));
     }
 
+    /** @returns {HTMLInputElement | null} the combobox host of the merge dialog */
     function mergePicker() {
-        return document.getElementById('merge-source');
+        return /** @type {HTMLInputElement | null} */ (document.getElementById('merge-source'));
     }
 
     function syncList(tbody, tableId, emptyId, countKey) {
@@ -319,8 +331,8 @@ document.addEventListener('DOMContentLoaded', () => {
         reopenTarget = null;
     }
 
-    body.addEventListener('click', (event) => {
-        const btn = event.target.closest('button[data-action]');
+    /** @type {HTMLElement} */ (body).addEventListener('click', (event) => {
+        const btn = /** @type {Element} */ (event.target).closest('button[data-action]');
         if (!btn) {
             return;
         }
@@ -342,7 +354,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (rejectedBody) {
         rejectedBody.addEventListener('click', (event) => {
-            const btn = event.target.closest('button[data-action="reopen"]');
+            const btn = /** @type {Element} */ (event.target).closest(
+                'button[data-action="reopen"]',
+            );
             if (!btn) {
                 return;
             }
@@ -369,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const reason = reasonInput ? reasonInput.value.trim() : '';
             window.krtFetch.write({
                 method: 'POST',
-                url: `/admin/discord-registrations/${encodeURIComponent(id)}/reject`,
+                url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/reject`,
                 payload: {
                     reason: reason === '' ? null : reason,
                     version: version == null ? null : Number(version),
@@ -411,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const version = row.getAttribute('data-version');
             window.krtFetch.write({
                 method: 'POST',
-                url: `/admin/discord-registrations/${encodeURIComponent(id)}/link`,
+                url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/link`,
                 payload: {
                     targetUserId,
                     version: version == null ? null : Number(version),
@@ -453,7 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const version = row.getAttribute('data-version');
             window.krtFetch.write({
                 method: 'POST',
-                url: `/admin/discord-registrations/${encodeURIComponent(id)}/merge`,
+                url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/merge`,
                 payload: {
                     sourceUserId,
                     version: version == null ? null : Number(version),
@@ -489,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const reason = reopenReasonInput ? reopenReasonInput.value.trim() : '';
             window.krtFetch.write({
                 method: 'POST',
-                url: `/admin/discord-registrations/${encodeURIComponent(id)}/reopen`,
+                url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/reopen`,
                 payload: {
                     reason: reason === '' ? null : reason,
                     version: version == null ? null : Number(version),
@@ -521,7 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.key !== 'Escape') {
             return;
         }
-        if (window.getComputedStyle(modal).display === 'flex') {
+        if (window.getComputedStyle(/** @type {HTMLElement} */ (modal)).display === 'flex') {
             closeReject();
         } else if (linkModal && window.getComputedStyle(linkModal).display === 'flex') {
             closeLink();

@@ -405,12 +405,32 @@ interface KrtEventsApi {
     _queuedRegistrations?: Array<[string, string, (element: HTMLElement, event: Event) => void]>;
 }
 
+/** The callbacks a topic subscription may register with `krtLiveSync.subscribe`. */
+interface KrtLiveSyncHandlers {
+    /** Runs when the relay acknowledged the subscription, on every (re)subscribe. */
+    onSubscribed?: () => void;
+    /** Runs when a re-subscribe followed a lost connection, so local state must be re-fetched. */
+    onResync?: () => void;
+    /** Runs with the section keys a peer changed. */
+    onChanged?: (sections: string[]) => void;
+    /** Runs with the section-keyed map of peers currently editing. */
+    onPresence?: (sections: Record<string, KrtPresenceEditor[]>) => void;
+}
+
+/** One peer shown as editing a section in a presence message. */
+interface KrtPresenceEditor {
+    /** The peer's user id. */
+    userId?: string;
+    /** The peer's display name. */
+    displayName?: string;
+}
+
 /** The live multi-user sync channel installed by `krt-live-sync.js` (ADR-0092). */
 interface KrtLiveSyncApi {
     /** Builds a receiver that applies inbound peer changes to the local DOM. */
     createReceiver(config: unknown): unknown;
     /** Subscribes to a topic room and returns the subscription handle. */
-    subscribe(topic: string, handler: (message: any) => void): unknown;
+    subscribe(topic: string, handlers: KrtLiveSyncHandlers): { unsubscribe(): void };
     /**
      * Broadcasts that one or more sections changed, so peers re-render them; the relay drops keys
      * outside the topic's whitelist. Needs no subscription to the room (ADR-0094).
@@ -757,24 +777,36 @@ interface Window {
     krtNav?: KrtNavApi;
     krtPalette?: KrtPaletteApi;
     /** Alias of `krtModal.open` for the mission page. */
-    krtModalOpen?: (overlay: HTMLElement | null) => void;
-    krtModalClose?: (overlay: HTMLElement | null) => void;
+    krtModalOpen: (overlay: Element | null) => void;
+    krtModalClose: (overlay: Element | null) => void;
     openModal?: (...args: any[]) => void;
 
     krtEnhanceComboboxes?: (root: ParentNode) => void;
-    krtLocalizeDates?: (root: ParentNode) => void;
+    krtLocalizeDates: (root?: ParentNode | null) => void;
     krtInitDatetimeSplitGroup?: (root: ParentNode) => void;
     krtSyncDatetimeSplitGroup?: (root: ParentNode) => void;
-    krtSearchableSelect?: unknown;
+    krtSearchableSelect?: (select: HTMLSelectElement, config: Record<string, unknown>) => unknown;
     krtComboboxRemoteSources?: Record<string, unknown>;
-    krtSegSet?: (...args: any[]) => void;
+    krtSegSet: (targetId: string, value: string) => void;
 
     krtComboboxI18n?: KrtComboboxI18n;
     krtProfileI18n?: KrtI18nDict;
+    /** Validation messages of the SCU / piece amount fields, from `fragments/head.html`. */
+    krtScuI18n?: KrtI18nDict;
     /** Labels of the Materialbörse page, from `materialboerse.html`. */
     materialboerseI18n?: Record<string, any>;
     /** Labels of the release dialog, from `fragments/materialboerse-modal.html`. */
     materialboerseModalI18n?: Record<string, any>;
+    /** Labels of the Mein-Lager release checkbox, from `inventory-my.html`. */
+    materialboerseInventoryI18n?: Record<string, any>;
+    /** Labels of the Herkunft picker, from `inventory-my.html` and `inventory-admin.html`. */
+    herkunftI18n?: Record<string, any>;
+    /** Toast, title and conflict labels of the personal inventory pages, from `personal-inventory.html`. */
+    krtPersonalInventoryI18n?: KrtI18nDict;
+    /** Endpoints of the personal inventory pages, from `personal-inventory.html`. */
+    krtPersonalInventoryEndpoints?: Record<string, string>;
+    /** Labels of the personal blueprint pages, from `personal-inventory-blueprints.html`. */
+    krtBlueprintsI18n?: KrtI18nDict;
     /** Labels of the request side of the Materialbörse page, from `materialboerse.html`. */
     materialgesuchI18n?: Record<string, any>;
     /** Labels of the request dialog, from `fragments/materialgesuch-modal.html`. */
@@ -808,9 +840,9 @@ interface Window {
 
     /**
      * Returns `url` when it is a same-origin absolute path, otherwise `fallback` (null when
-     * omitted). Installed by `safe-url.js`.
+     * omitted). Installed by `safe-url.js` from the layout head, so every page has it.
      */
-    safeSameOriginUrl?: {
+    safeSameOriginUrl: {
         (url: unknown): string | null;
         <T>(url: unknown, fallback: T): string | T;
     };
@@ -847,7 +879,7 @@ interface Window {
      * unguarded at parse time.
      */
     krtRefineryYield: KrtRefineryYieldApi;
-    krtOpenEditCrewModal?: (...args: any[]) => void;
+    krtOpenEditCrewModal?: (source: Element) => void;
     krtOperationsReload?: (...args: any[]) => void;
     krtRefreshOrdersQueue?: (...args: any[]) => void;
     /**
@@ -856,24 +888,57 @@ interface Window {
      */
     krtRefreshMembersResults?: () => void;
 
-    krtMissionWrite?: KrtSectionWriter['write'];
-    krtRefreshMissionSection?: KrtSectionWriter['refresh'];
-    krtNotifyMissionChanged?: KrtSectionWriter['notify'];
+    krtMissionWrite: KrtSectionWriter['write'];
+    krtRefreshMissionSection: KrtSectionWriter['refresh'];
+    krtNotifyMissionChanged: KrtSectionWriter['notify'];
     MissionPresence?: unknown;
     /** The viewer's user id on a saved mission, which starts the presence channel; else absent. */
     missionPresenceUserId?: string | null;
+    /** The id of the saved mission on mission-detail.html; absent on a new mission. */
+    missionId?: string | null;
+    /** Tooltip labels of the presence indicator, from `mission-detail.html`. */
+    MISSION_PRESENCE_I18N?: KrtI18nDict;
+    /** The running presence channel of the mission page; absent before `DOMContentLoaded`. */
+    missionPresence?: { sendChanged(sections: string[]): void };
+    /** Whether the viewer may edit the mission; set by `mission-detail.html`. */
+    missionCanEdit?: boolean;
+    /** The id of the mission's parent operation, or null when it has none; from `mission-detail.html`. */
+    missionOperationId?: string | null;
+    /** Section toast, conflict and refresh labels of the mission page, from `mission-detail.html`. */
+    MISSION_SUBRES_I18N?: KrtI18nDict;
+    /** Delete-confirmation texts of the mission page, keyed by sub-section. */
+    MISSION_DELETE_I18N?: KrtI18nDict;
+    /** Unsaved-changes dialog labels of the mission page tabs. */
+    MISSION_TAB_I18N?: KrtI18nDict;
+    /** Live-sync pill label of the mission page. */
+    MISSION_LIVESYNC_I18N?: KrtI18nDict;
+    /** Default title of a new mission step and its delete confirmation. */
+    MISSION_STEP_I18N?: KrtI18nDict;
+    /** Default title of a new mission objective and its delete confirmation. */
+    MISSION_OBJECTIVE_I18N?: KrtI18nDict;
+    /** Dialog titles and delete confirmation of the custom-frequency form. */
+    MISSION_CUSTOM_FREQ_I18N?: KrtI18nDict;
+    /** Toast text of a failed actual-time save, from `mission-detail.html`. */
+    MSG_MISSION_ACTUAL_TIME_ERROR?: string;
 
     krtRefreshOrderSection?: (...args: any[]) => void;
     krtNotifyOrderChanged?: (...args: any[]) => void;
     krtNotifyInventoryChanged?: (...args: any[]) => void;
     opRefreshSection?: (...args: any[]) => void;
     opNotifyChanged?: (...args: any[]) => void;
+    /** The id of the operation on operation-detail.html, keying its live-sync room and section URLs. */
+    operationId?: string | null;
 
     /**
      * The id of the refinery order on refinery-orders-details.html, keying its live-sync room and
      * section refreshes; absent on every other page.
      */
     refineryOrderId?: string | null;
+    /**
+     * The id of the job order on orders-detail.html, item-collection.html and
+     * material-collection.html, keying their live-sync room; absent on every other page.
+     */
+    orderId?: string | null;
     __unsavedChangesInitialized?: boolean;
     __ordersDragging?: boolean;
     resetUnsavedChanges?: () => void;

@@ -17,8 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_PRODUCTION_COUNTED_HIGHER, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ORDER_HANDOVER_I18N */
+// @ts-check
 
+/* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, showFrontendErrorToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_HANDOVER_I18N */
+/* exported openHandoverModal, addHandoverItemRow, validateHandoverAmounts, updateHandoverIndexes */
+
+/** @type {any[]} */
+// eslint-disable-next-line prefer-const
 let cachedInventoryItems = [];
 let isInventoryCached = false;
 /** @type {Map<string, string>} */
@@ -104,11 +109,71 @@ function _publishOrdersQueue() {
     }
 }
 
+/**
+ * Reads the value of a form control by element id.
+ *
+ * @param {string} id the control's element id
+ * @returns {string} the control's value, or an empty string when it is missing or empty
+ */
+function _odFieldValue(id) {
+    const field = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+        document.getElementById(id)
+    );
+    return (field && field.value) || '';
+}
+
+/**
+ * Looks up an element the page always renders.
+ *
+ * @param {string} id the element id
+ * @returns {HTMLElement} the element; dereferencing it throws when the page lacks it
+ */
+function _odElementById(id) {
+    return /** @type {HTMLElement} */ (document.getElementById(id));
+}
+
+/**
+ * Looks up a form control the page always renders.
+ *
+ * @param {string} id the control's element id
+ * @returns {HTMLInputElement | HTMLSelectElement} the control; dereferencing it throws when the
+ *     page lacks it
+ */
+function _odControlById(id) {
+    return /** @type {HTMLInputElement | HTMLSelectElement} */ (document.getElementById(id));
+}
+
+/**
+ * Finds the version input of the order edit modal.
+ *
+ * @returns {HTMLInputElement | null} the input, or null when the page has none
+ */
+function _odEditVersionInput() {
+    return /** @type {HTMLInputElement | null} */ (
+        document.querySelector('#edit-modal input[name="version"]')
+    );
+}
+
+/**
+ * @typedef {{targetId: string | null, amount: number}} OdMissionReduction
+ * @typedef {{inventoryItemId: string, amount: number, missionReductions: OdMissionReduction[] | null, qualityRequirement: string | null}} OdHandoverItem
+ */
+
+/**
+ * Collects the material handover form into the request body.
+ *
+ * @returns {{handoverTime: string, recipientHandle: string, recipientSquadron: string, items: OdHandoverItem[]}} the body
+ */
 function _serializeHandoverForm() {
+    /** @type {OdHandoverItem[]} */
     const items = [];
     document.querySelectorAll('#handover-items-container .handover-item-row').forEach((row) => {
-        const sel = row.querySelector('select[name$=".inventoryItemId"]');
-        const amtInput = row.querySelector('input[name$=".amount"]');
+        const sel = /** @type {HTMLSelectElement | null} */ (
+            row.querySelector('select[name$=".inventoryItemId"]')
+        );
+        const amtInput = /** @type {HTMLInputElement | null} */ (
+            row.querySelector('input[name$=".amount"]')
+        );
         const inventoryItemId = sel ? sel.value : '';
         const amount =
             amtInput && window.krtScuInput
@@ -133,40 +198,71 @@ function _serializeHandoverForm() {
         });
     });
     return {
-        handoverTime: (document.getElementById('handoverTime') || {}).value || '',
-        recipientHandle: (document.getElementById('recipientHandle') || {}).value || '',
-        recipientSquadron: (document.getElementById('recipientSquadron') || {}).value || '',
+        handoverTime: _odFieldValue('handoverTime'),
+        recipientHandle: _odFieldValue('recipientHandle'),
+        recipientSquadron: _odFieldValue('recipientSquadron'),
         items,
     };
 }
 
+/**
+ * Collects the item handover form into the request body.
+ *
+ * @returns {{handoverTime: string, recipientHandle: string, entries: Array<{jobOrderItemId: string, amount: number}>}} the body
+ */
 function _serializeItemHandoverForm() {
+    /** @type {Array<{jobOrderItemId: string, amount: number}>} */
     const entries = [];
     document.querySelectorAll('#item-handover-modal .item-handover-line').forEach((line) => {
-        const idInput = line.querySelector('input[name$=".jobOrderItemId"]');
-        const amtInput = line.querySelector('input[name$=".amount"]');
+        const idInput = /** @type {HTMLInputElement | null} */ (
+            line.querySelector('input[name$=".jobOrderItemId"]')
+        );
+        const amtInput = /** @type {HTMLInputElement | null} */ (
+            line.querySelector('input[name$=".amount"]')
+        );
         const jobOrderItemId = idInput ? idInput.value : '';
         const amount = amtInput ? parseInt(amtInput.value, 10) : NaN;
         if (!jobOrderItemId || !(amount > 0)) return;
         entries.push({ jobOrderItemId, amount });
     });
     return {
-        handoverTime: (document.getElementById('itemHandoverTime') || {}).value || '',
-        recipientHandle: (document.getElementById('itemRecipientHandle') || {}).value || '',
+        handoverTime: _odFieldValue('itemHandoverTime'),
+        recipientHandle: _odFieldValue('itemRecipientHandle'),
         entries,
     };
 }
 
+/**
+ * Reads how much of an inventory entry is earmarked for the current order.
+ *
+ * @param {any} inv the inventory entry, or null
+ * @returns {number} the order's slice of the entry, 0 when there is none
+ */
 function orderSliceAmount(inv) {
     if (!inv || !Array.isArray(inv.jobOrderAllocations)) return 0;
-    const slice = inv.jobOrderAllocations.find((a) => a.jobOrderId === window.orderId);
+    const slice = inv.jobOrderAllocations.find(
+        (/** @type {any} */ a) => a.jobOrderId === window.orderId,
+    );
     return slice && typeof slice.amount === 'number' ? slice.amount : 0;
 }
 
+/**
+ * Formats an amount for display: whole for pieces, three decimals for SCU.
+ *
+ * @param {number} n the amount
+ * @param {boolean} isPiece whether the material is counted in pieces
+ * @returns {string} the formatted amount
+ */
 function _handoverFmtAmount(n, isPiece) {
     return isPiece ? String(Math.round(n)) : Number(n).toFixed(3);
 }
 
+/**
+ * Tells whether the inventory entry chosen in a handover row is counted in pieces.
+ *
+ * @param {Element} row the handover row
+ * @returns {boolean} true for a piece material
+ */
 function _handoverRowIsPiece(row) {
     const sel = row.querySelector('select');
     const inv = sel ? cachedInventoryItems.find((i) => i.id === sel.value) : null;
@@ -318,13 +414,15 @@ async function openHandoverModal() {
  * @returns {string} the filled-in text
  */
 function fillPlaceholders(template, values) {
-    return values.reduce((text, value, i) => {
+    return values.reduce((/** @type {string} */ text, value, i) => {
         return text.split(`{${i}}`).join(value == null ? '' : String(value));
     }, template);
 }
 
+/** Appends a handover row with the inventory entry, amount and tier controls. */
 function addHandoverItemRow() {
     const container = document.getElementById('handover-items-container');
+    if (!container) return;
     const index = container.children.length;
 
     const row = document.createElement('div');
@@ -381,12 +479,14 @@ function addHandoverItemRow() {
         `,
     );
     const sel = row.querySelector('select');
-    const amtInput = row.querySelector('input[data-scu-decimal]');
+    const amtInput = /** @type {HTMLInputElement | null} */ (
+        row.querySelector('input[data-scu-decimal]')
+    );
     if (sel && amtInput) {
         sel.addEventListener('change', () => {
             const inv = cachedInventoryItems.find((i) => i.id === sel.value);
             if (inv) {
-                amtInput.max = orderSliceAmount(inv);
+                amtInput.max = String(orderSliceAmount(inv));
             } else {
                 amtInput.removeAttribute('max');
             }
@@ -417,9 +517,17 @@ function addHandoverItemRow() {
     container.appendChild(row);
 }
 
+/**
+ * Shows or hides the mission-origin split of a handover row, depending on whether the handed
+ * amount exceeds what the entry holds outside missions.
+ *
+ * @param {Element} row the handover row
+ */
 function _refreshHandoverMissionPicker(row) {
     const sel = row.querySelector('select');
-    const amtInput = row.querySelector('input[data-scu-decimal]');
+    const amtInput = /** @type {HTMLInputElement | null} */ (
+        row.querySelector('input[data-scu-decimal]')
+    );
     const inv = sel ? cachedInventoryItems.find((i) => i.id === sel.value) : null;
     const missions = inv && Array.isArray(inv.missionAllocations) ? inv.missionAllocations : [];
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
@@ -428,7 +536,9 @@ function _refreshHandoverMissionPicker(row) {
         amtInput && window.krtScuInput ? window.krtScuInput.parse(amtInput.value) : Number.NaN;
     const ambiguous = missions.length >= 2 && isFinite(handed) && handed > missionRest + 0.0005;
 
-    let holder = row.querySelector('[data-role="mission-herkunft"]');
+    let holder = /** @type {HTMLElement | null} */ (
+        row.querySelector('[data-role="mission-herkunft"]')
+    );
     if (!ambiguous) {
         if (holder) holder.remove();
         return;
@@ -491,10 +601,17 @@ function _refreshHandoverMissionPicker(row) {
     _updateHandoverMissionRest(row);
 }
 
+/**
+ * Refreshes the chip showing how much of the handed amount is still unassigned to missions.
+ *
+ * @param {Element} row the handover row
+ */
 function _updateHandoverMissionRest(row) {
     const holder = row.querySelector('[data-role="mission-herkunft"]');
     const sel = row.querySelector('select');
-    const amtInput = row.querySelector('input[data-scu-decimal]');
+    const amtInput = /** @type {HTMLInputElement | null} */ (
+        row.querySelector('input[data-scu-decimal]')
+    );
     if (!holder || !sel || !amtInput) return;
     const inv = cachedInventoryItems.find((i) => i.id === sel.value);
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
@@ -503,8 +620,8 @@ function _updateHandoverMissionRest(row) {
         ? window.krtScuInput.parse(amtInput.value)
         : parseFloat(amtInput.value);
     let assigned = 0;
-    holder.querySelectorAll('[data-mission-input]').forEach((inp) => {
-        const v = parseFloat(inp.value);
+    holder.querySelectorAll('[data-mission-input]').forEach((el) => {
+        const v = parseFloat(/** @type {HTMLInputElement} */ (el).value);
         if (!isNaN(v) && v > 0) assigned += v;
     });
     const restEl = holder.querySelector('[data-mission-rest]');
@@ -522,12 +639,20 @@ function _updateHandoverMissionRest(row) {
           );
 }
 
+/**
+ * Reads the per-mission amounts the user assigned in a handover row.
+ *
+ * @param {Element} row the handover row
+ * @returns {OdMissionReduction[] | null} the positive reductions, or null when there are none
+ */
 function _collectHandoverMissionReductions(row) {
     const holder = row.querySelector('[data-role="mission-herkunft"]');
     if (!holder) return null;
     const isPiece = _handoverRowIsPiece(row);
+    /** @type {OdMissionReduction[]} */
     const list = [];
-    holder.querySelectorAll('[data-mission-input]').forEach((inp) => {
+    holder.querySelectorAll('[data-mission-input]').forEach((el) => {
+        const inp = /** @type {HTMLInputElement} */ (el);
         const v = parseFloat(inp.value);
         if (!isNaN(v) && v > 0) {
             list.push({
@@ -539,16 +664,24 @@ function _collectHandoverMissionReductions(row) {
     return list.length > 0 ? list : null;
 }
 
+/**
+ * Checks every handover row against the order's slice and mission split, toasting the first
+ * violation.
+ *
+ * @returns {boolean} true when all rows are valid
+ */
 function validateHandoverAmounts() {
     const rows = document.querySelectorAll('#handover-items-container .handover-item-row');
     for (const row of rows) {
         const sel = row.querySelector('select');
-        const inp = row.querySelector('input[data-scu-decimal]');
+        const inp = /** @type {HTMLInputElement | null} */ (
+            row.querySelector('input[data-scu-decimal]')
+        );
         if (!sel || !sel.value || !inp || !inp.value) continue;
         const inv = cachedInventoryItems.find((i) => i.id === sel.value);
         if (!inv) continue;
         const isPiece = !!(inv.material && inv.material.quantityType === 'PIECE');
-        const entered = window.krtScuInput.parse(inp.value);
+        const entered = /** @type {KrtScuInputApi} */ (window.krtScuInput).parse(inp.value);
         const sliceMax = orderSliceAmount(inv);
         if (entered > sliceMax) {
             const available = _handoverFmtAmount(sliceMax, isPiece);
@@ -565,7 +698,8 @@ function validateHandoverAmounts() {
             const missionRest = typeof inv.missionRest === 'number' ? inv.missionRest : 0;
             let assigned = 0;
             let overSlice = false;
-            holder.querySelectorAll('[data-mission-input]').forEach((inp2) => {
+            holder.querySelectorAll('[data-mission-input]').forEach((el) => {
+                const inp2 = /** @type {HTMLInputElement} */ (el);
                 const v = parseFloat(inp2.value) || 0;
                 const cap = parseFloat(inp2.max) || 0;
                 if (v > cap + 1e-6) overSlice = true;
@@ -595,2056 +729,3 @@ function updateHandoverIndexes() {
         if (input) input.name = `items[${index}].amount`;
     });
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    const handoverForm = document.getElementById('handover-form');
-    if (handoverForm) {
-        handoverForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!validateHandoverAmounts()) return;
-            const orderId = handoverForm.getAttribute('data-order-id');
-            if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
-                handoverForm.submit();
-                return;
-            }
-            const payload = _serializeHandoverForm();
-            if (!payload.items.length) {
-                showFrontendErrorToast(MSG_HANDOVER_NOITEMS);
-                return;
-            }
-            await krtOrderWrite({
-                method: 'POST',
-                url: `/orders/${orderId}/handovers`,
-                payload,
-                toast: false,
-                errorMessage: MSG_HANDOVER_FAILED,
-                onSuccess(order) {
-                    const editVer = document.querySelector('#edit-modal input[name="version"]');
-                    if (editVer && order && order.version != null) editVer.value = order.version;
-                    const modal = document.getElementById('handover-modal');
-                    if (modal) window.krtModal.close(modal);
-                    isInventoryCached = false;
-                    cachedInventoryItems = [];
-                    handoverTierSuggestion = new Map();
-                    const itemsContainer = document.getElementById('handover-items-container');
-                    if (itemsContainer) itemsContainer.replaceChildren();
-                    showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
-                    _refreshMaterialsSection(orderId);
-                    _swapOrderSection(orderId, 'order-handovers-results', 'handovers');
-                    _swapOrderSection(orderId, 'order-header-results', 'header');
-                    if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
-                        _publishOrdersQueue();
-                    }
-                },
-            });
-        });
-    }
-    const itemHandoverForm = document.getElementById('item-handover-form');
-    if (itemHandoverForm) {
-        itemHandoverForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!validateItemHandoverForm()) return;
-            const orderId = itemHandoverForm.getAttribute('data-order-id');
-            if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
-                itemHandoverForm.submit();
-                return;
-            }
-            const payload = _serializeItemHandoverForm();
-            if (!payload.entries.length) {
-                showFrontendErrorToast(MSG_HANDOVER_NOITEMS);
-                return;
-            }
-            await krtOrderWrite({
-                method: 'POST',
-                url: `/orders/${orderId}/item-handovers`,
-                payload,
-                toast: false,
-                errorMessage: MSG_HANDOVER_FAILED,
-                onSuccess(order) {
-                    const editVer = document.querySelector('#edit-modal input[name="version"]');
-                    if (editVer && order && order.version != null) editVer.value = order.version;
-                    const modal = document.getElementById('item-handover-modal');
-                    if (modal) window.krtModal.close(modal);
-                    showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
-                    _swapOrderSection(orderId, 'order-items-results', 'items');
-                    _swapOrderSection(orderId, 'order-item-handovers-results', 'item-handovers');
-                    _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
-                    _swapOrderSection(orderId, 'order-header-results', 'header');
-                    _swapOrderSection(orderId, 'order-kpi-results', 'kpi');
-                    if (
-                        window.krtLiveSync &&
-                        typeof window.krtLiveSync.sendChanged === 'function'
-                    ) {
-                        window.krtLiveSync.sendChanged('inventory', ['stock']);
-                    }
-                    if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
-                        _publishOrdersQueue();
-                    }
-                },
-            });
-        });
-    }
-});
-
-function localizeOrderDates(root) {
-    const scope = root || document;
-    const now = new Date();
-    scope.querySelectorAll('.od-created-date[data-utc]').forEach((el) => {
-        const utcDateStr = el.getAttribute('data-utc');
-        if (!utcDateStr) return;
-        const date = new Date(utcDateStr);
-        if (!isNaN(date)) {
-            el.textContent = date.toLocaleDateString();
-        }
-    });
-    scope.querySelectorAll('.od-elapsed-days[data-utc]').forEach((el) => {
-        const utcDateStr = el.getAttribute('data-utc');
-        if (!utcDateStr) return;
-        const date = new Date(utcDateStr);
-        if (isNaN(date)) return;
-        const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-        el.textContent = diffDays > 0 ? diffDays : 0;
-        const targetEl = el.closest('.od-elapsed-cell') || el;
-        if (diffDays >= ORDER_AGE_RED) {
-            targetEl.classList.add('text-danger');
-        } else if (diffDays >= ORDER_AGE_YELLOW) {
-            targetEl.classList.add('text-warning');
-        }
-    });
-    scope.querySelectorAll('.handover-time-span').forEach((el) => {
-        const utcDateStr = el.getAttribute('data-utc');
-        if (utcDateStr) {
-            const dateObj = new Date(utcDateStr);
-            if (!isNaN(dateObj)) {
-                el.textContent = dateObj.toLocaleString([], {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                });
-            }
-        }
-    });
-}
-document.addEventListener('krt:swapped', (e) => {
-    localizeOrderDates(e && e.detail ? e.detail.container : document);
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    localizeOrderDates(document);
-
-    const materialsContainer = document.getElementById('materials-container');
-    const addMaterialBtn = document.getElementById('add-material-btn');
-    if (addMaterialBtn && materialsContainer) {
-        function refreshEditMaterialUnit(row) {
-            if (!row) {
-                return;
-            }
-            const sel = row.querySelector('[data-role="material-select"]');
-            const amountInput = row.querySelector('[data-role="material-amount"]');
-            const unitSpan = row.querySelector('[data-role="amount-unit"]');
-            const hint = row.querySelector('.scu-hint');
-            if (!sel || !amountInput) {
-                return;
-            }
-            let qt = sel.dataset.quantityType || '';
-            if (!qt && sel.tagName === 'SELECT') {
-                const opt = sel.selectedOptions && sel.selectedOptions[0];
-                qt = (opt && opt.getAttribute('data-quantity-type')) || '';
-            }
-            if (qt === 'PIECE') {
-                amountInput.setAttribute('step', '1');
-                amountInput.setAttribute('min', '1');
-                if (unitSpan) unitSpan.textContent = `(${MSG_UNIT_PIECE})`;
-                if (hint) hint.classList.add('is-hidden');
-            } else if (qt === 'SCU') {
-                amountInput.setAttribute('step', '0.001');
-                amountInput.setAttribute('min', '0.001');
-                if (unitSpan) unitSpan.textContent = `(${MSG_UNIT_SCU})`;
-                if (hint) hint.classList.remove('is-hidden');
-            } else {
-                amountInput.setAttribute('step', '0.001');
-                amountInput.setAttribute('min', '0.001');
-                if (unitSpan) unitSpan.textContent = '';
-                if (hint) hint.classList.add('is-hidden');
-            }
-        }
-
-        addMaterialBtn.addEventListener('click', () => {
-            const nextIndex = materialsContainer.querySelectorAll('.material-row').length;
-            const rowTemplate = document.getElementById('edit-material-row-template');
-            if (!rowTemplate) {
-                return;
-            }
-            const fragment = rowTemplate.content.cloneNode(true);
-            fragment.querySelectorAll('select, input').forEach((field) => {
-                const name = field.getAttribute('name');
-                if (name) {
-                    field.setAttribute('name', name.replace(/\[\d+\]/, `[${nextIndex}]`));
-                }
-            });
-            materialsContainer.appendChild(fragment);
-            const newRow = materialsContainer.lastElementChild;
-            if (window.krtEnhanceComboboxes) {
-                window.krtEnhanceComboboxes(newRow);
-            }
-            refreshEditMaterialUnit(newRow);
-        });
-
-        materialsContainer.addEventListener('change', (e) => {
-            if (e.target && e.target.matches && e.target.matches('[data-role="material-select"]')) {
-                refreshEditMaterialUnit(e.target.closest('.material-row'));
-            }
-        });
-        materialsContainer.querySelectorAll('.material-row').forEach(refreshEditMaterialUnit);
-
-        materialsContainer.addEventListener('click', (e) => {
-            const removeBtn = e.target.closest && e.target.closest('.remove-material-btn');
-            if (removeBtn) {
-                const row = removeBtn.closest('.material-row');
-                if (materialsContainer.querySelectorAll('.material-row').length > 1) {
-                    window.krtModal.open(document.getElementById('material-delete-confirm-modal'));
-                    window.materialRowToDelete = row;
-                } else {
-                    showFrontendErrorToast(ORDER_HANDOVER_I18N.keepOneMaterial);
-                }
-            }
-        });
-
-        window.confirmRemoveMaterial = function () {
-            if (window.materialRowToDelete) {
-                window.materialRowToDelete.remove();
-                reindexMaterials();
-                window.materialRowToDelete = null;
-            }
-            window.krtModal.close(document.getElementById('material-delete-confirm-modal'));
-        };
-
-        function reindexMaterials() {
-            const rows = materialsContainer.querySelectorAll('.material-row');
-            rows.forEach((row, index) => {
-                const inputs = row.querySelectorAll('input, select');
-                inputs.forEach((input) => {
-                    const name = input.getAttribute('name');
-                    if (name) {
-                        input.setAttribute('name', name.replace(/\[\d+\]/, `[${index}]`));
-                        if (input.getAttribute('id')) {
-                            input.setAttribute(
-                                'id',
-                                input.getAttribute('id').replace(/\d+/, index),
-                            );
-                        }
-                    }
-                });
-            });
-        }
-    }
-});
-
-function krtOrderWrite(opts) {
-    return window.krtFetch.write(
-        Object.assign({}, opts, {
-            serialize: opts.serialize || 'order',
-            conflict: {
-                title: ORDER_CONFLICT.title,
-                reloadLabel: ORDER_CONFLICT.reload,
-                reloadQuestion: ORDER_CONFLICT.reloadQuestion,
-                dismissLabel: ORDER_CONFLICT.dismiss,
-                reloadDetailFallback: ORDER_CONFLICT.detail,
-            },
-        }),
-    );
-}
-
-(function () {
-    const form = document.getElementById('delete-order-form');
-    if (!form) return;
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const orderId = form.getAttribute('data-order-id');
-        if (!orderId || typeof window.showKrtConfirm !== 'function' || !window.krtFetch) {
-            form.submit();
-            return;
-        }
-        const ok = await window.showKrtConfirm(
-            MSG_DELETE_TITLE,
-            MSG_DELETE_MESSAGE,
-            MSG_DELETE_CONFIRM,
-            MSG_DELETE_CANCEL,
-        );
-        if (!ok) return;
-        const res = await krtOrderWrite({
-            method: 'DELETE',
-            url: `/orders/${orderId}`,
-            toast: false,
-            errorMessage: MSG_DELETE_ERROR,
-        });
-        if (res.ok) {
-            _publishOrdersQueue();
-            window.location.assign('/orders');
-        }
-    });
-})();
-
-function _serializeEditForm() {
-    const materials = [];
-    document.querySelectorAll('#materials-container .material-row').forEach((row) => {
-        const matSel = row.querySelector('[name$=".materialId"]');
-        const qualSel = row.querySelector('[name$=".minQuality"]');
-        const amtInput = row.querySelector('[name$=".amount"]');
-        const materialId = matSel ? matSel.value : '';
-        const amount =
-            amtInput && window.krtScuInput
-                ? window.krtScuInput.parse(amtInput.value)
-                : amtInput
-                  ? parseFloat(amtInput.value)
-                  : NaN;
-        if (!materialId || !(amount > 0)) return;
-        materials.push({
-            materialId,
-            minQuality: qualSel && qualSel.value ? parseInt(qualSel.value, 10) : null,
-            amount,
-        });
-    });
-    const versionInput = document.querySelector('#edit-modal input[name="version"]');
-    return {
-        requestingOrgUnitId: (document.getElementById('requestingOrgUnitId') || {}).value || null,
-        handle: (document.getElementById('handle') || {}).value || '',
-        comment: (document.getElementById('edit-comment') || {}).value || '',
-        version: versionInput ? parseInt(versionInput.value, 10) : null,
-        materials,
-    };
-}
-(function () {
-    const form = document.getElementById('edit-order-form');
-    if (!form) return;
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const orderId = form.getAttribute('data-order-id');
-        if (!orderId || !window.krtFetch) {
-            form.submit();
-            return;
-        }
-        const payload = _serializeEditForm();
-        if (!payload.materials.length) {
-            showFrontendErrorToast(MSG_MATERIAL_INVALID);
-            return;
-        }
-        const requesterView = form.getAttribute('data-requester-view') === 'true';
-        const updateUrl = requesterView
-            ? `/orders/${orderId}/requested-update`
-            : `/orders/${orderId}/update`;
-        await krtOrderWrite({
-            method: 'POST',
-            url: updateUrl,
-            payload,
-            toast: false,
-            errorMessage: MSG_UPDATE_ERROR,
-            onSuccess(dto) {
-                const editVer = document.querySelector('#edit-modal input[name="version"]');
-                if (editVer && dto && dto.version != null) editVer.value = dto.version;
-                const modal = document.getElementById('edit-modal');
-                if (modal) window.krtModal.close(modal);
-                showFrontendSuccessToast(MSG_UPDATE_SUCCESS);
-                _swapOrderSection(orderId, 'order-header-results', 'header');
-                _refreshMaterialsSection(orderId);
-                _publishOrdersQueue();
-            },
-        });
-    });
-})();
-
-function _refreshMaterialsSection(orderId, broadcastOpts) {
-    if (window.krtRefreshOrderSection) {
-        return window.krtRefreshOrderSection(['materials', 'aggregated', 'kpi'], broadcastOpts);
-    }
-    orderId ||= window.orderId || (document.getElementById('claim-order-id') || {}).value;
-    const mat = document.getElementById('order-materials-results');
-    const agg = document.getElementById('order-aggregated-results');
-    const container = mat || agg;
-    if (!orderId || !container || !window.krtFetch || !window.krtFetch.swap)
-        return Promise.resolve(false);
-    return window.krtFetch.swap({
-        url: `/orders/${orderId}`,
-        container,
-        fragmentValue: mat ? 'materials' : 'aggregated',
-        history: false,
-        preserveScroll: true,
-    });
-}
-
-function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
-    if (window.krtRefreshOrderSection) {
-        return window.krtRefreshOrderSection(fragmentValue, broadcastOpts);
-    }
-    const c = document.getElementById(containerId);
-    if (!c || !orderId || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
-    return window.krtFetch.swap({
-        url: `/orders/${orderId}`,
-        container: c,
-        fragmentValue,
-        history: false,
-        preserveScroll: true,
-    });
-}
-
-async function unlinkInventoryItem(btn) {
-    const orderId = btn.getAttribute('data-order-id');
-    const invId = btn.getAttribute('data-inventory-item-id');
-    if (!orderId || !invId) return;
-    await krtOrderWrite({
-        method: 'DELETE',
-        url: `/orders/${orderId}/inventory/${invId}/unlink/ajax`,
-        toast: false,
-        errorMessage: MSG_INVENTORY_UNLINK_ERROR,
-        onSuccess(data) {
-            if (data && data.version != null) {
-                const sel = document.getElementById('status-select');
-                if (sel) sel.dataset.version = data.version;
-                const editVer = document.querySelector('#edit-modal input[name="version"]');
-                if (editVer) editVer.value = data.version;
-            }
-            showFrontendSuccessToast(MSG_INVENTORY_UNLINK_SUCCESS);
-            _refreshMaterialsSection(orderId);
-        },
-    });
-}
-
-function _openClaimModal(opts) {
-    document.getElementById('claim-material-id').value = opts.materialId || '';
-    document.getElementById('claim-quality').value = opts.quality || '';
-    document.getElementById('claim-id').value = opts.claimId || '';
-    const sel = document.getElementById('claim-squadron');
-    const amountInput = document.getElementById('claim-amount');
-    const open = parseFloat(opts.open || '0') || 0;
-    const qualityLabel = opts.qualityLabel || opts.quality || '';
-    document.getElementById('claim-modal-bucket').textContent =
-        `${opts.materialName || ''} — ${qualityLabel}`;
-    if (opts.edit) {
-        document.getElementById('claim-modal-title').textContent = MSG_CLAIM_TITLE_EDIT;
-        sel.value = opts.squadronId || '';
-        sel.disabled = true;
-        amountInput.value = opts.amount || '';
-        const maxEdit = open + (parseFloat(opts.amount || '0') || 0);
-        document.getElementById('claim-max').value = maxEdit;
-        document.getElementById('claim-open-hint').textContent = `${MSG_CLAIM_MAX_HINT} ${maxEdit}`;
-        document.getElementById('claim-withdraw-btn').hidden = false;
-    } else {
-        document.getElementById('claim-modal-title').textContent = MSG_CLAIM_TITLE_ADD;
-        sel.value = '';
-        sel.disabled = false;
-        amountInput.value = '';
-        document.getElementById('claim-max').value = open;
-        document.getElementById('claim-open-hint').textContent = `${MSG_CLAIM_MAX_HINT} ${open}`;
-        document.getElementById('claim-withdraw-btn').hidden = true;
-    }
-    const claimScuHint = document.getElementById('claim-scu-hint');
-    if (claimScuHint) claimScuHint.classList.toggle('is-hidden', opts.quantityType === 'PIECE');
-    window.krtModal.open(document.getElementById('claim-modal'));
-}
-
-function openClaimCreate(el) {
-    _openClaimModal({
-        materialId: el.dataset.materialId,
-        quality: el.dataset.quality,
-        qualityLabel: el.dataset.qualityLabel,
-        materialName: el.dataset.materialName,
-        quantityType: el.dataset.quantityType,
-        open: el.dataset.open,
-        edit: false,
-    });
-}
-
-function openClaimEdit(el) {
-    _openClaimModal({
-        materialId: el.dataset.materialId,
-        quality: el.dataset.quality,
-        qualityLabel: el.dataset.qualityLabel,
-        materialName: el.dataset.materialName,
-        quantityType: el.dataset.quantityType,
-        open: el.dataset.open,
-        claimId: el.dataset.claimId,
-        squadronId: el.dataset.squadronId,
-        amount: el.dataset.amount,
-        edit: true,
-    });
-}
-
-function submitClaim() {
-    const orderId = document.getElementById('claim-order-id').value;
-    const materialId = document.getElementById('claim-material-id').value;
-    const quality = document.getElementById('claim-quality').value;
-    const squadronId = document.getElementById('claim-squadron').value;
-    const amount = window.krtScuInput.parse(document.getElementById('claim-amount').value);
-    const max = parseFloat(document.getElementById('claim-max').value);
-    if (!squadronId) {
-        showFrontendErrorToast(MSG_CLAIM_VALIDATION_SQUADRON);
-        return;
-    }
-    if (!(amount > 0)) {
-        showFrontendErrorToast(MSG_CLAIM_VALIDATION_AMOUNT);
-        return;
-    }
-    if (amount > max + 1e-9) {
-        showFrontendErrorToast(MSG_CLAIM_VALIDATION_OVERCLAIM);
-        return;
-    }
-    krtOrderWrite({
-        method: 'POST',
-        url: `/orders/${orderId}/claims`,
-        payload: {
-            materialId,
-            qualityRequirement: quality,
-            claimingOrgUnitId: squadronId,
-            amount,
-        },
-        toast: false,
-        errorMessage: MSG_CLAIM_ERROR,
-        onSuccess() {
-            window.krtModal.close(document.getElementById('claim-modal'));
-            showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
-            _refreshMaterialsSection();
-        },
-    });
-}
-
-function withdrawClaimAction() {
-    const orderId = document.getElementById('claim-order-id').value;
-    const claimId = document.getElementById('claim-id').value;
-    if (!claimId) {
-        return;
-    }
-    krtOrderWrite({
-        method: 'POST',
-        url: `/orders/${orderId}/claims/${claimId}/withdraw`,
-        toast: false,
-        errorMessage: MSG_CLAIM_ERROR,
-        onSuccess() {
-            window.krtModal.close(document.getElementById('claim-modal'));
-            showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS);
-            _refreshMaterialsSection();
-        },
-    });
-}
-
-let _pendingStatus = null;
-let _previousStatus = null;
-
-function _knownStatus(selectElement) {
-    return (
-        selectElement.dataset.savedStatus ||
-        (selectElement.querySelector('option[selected]') || {}).value ||
-        selectElement.options[0].value
-    );
-}
-
-function updateStatus(selectElement) {
-    const newStatus = selectElement.value;
-    if (newStatus === 'COMPLETED' || newStatus === 'REJECTED') {
-        _pendingStatus = newStatus;
-        _previousStatus = _knownStatus(selectElement);
-        window.krtModal.open(document.getElementById('status-warning-modal'));
-    } else {
-        _doStatusUpdate(selectElement.dataset.orderId, newStatus, selectElement);
-    }
-}
-
-function cancelStatusChange() {
-    window.krtModal.close(document.getElementById('status-warning-modal'));
-    const sel = document.getElementById('status-select');
-    if (sel && _previousStatus) {
-        sel.value = _previousStatus;
-    }
-    _pendingStatus = null;
-    _previousStatus = null;
-}
-
-function confirmStatusChange() {
-    window.krtModal.close(document.getElementById('status-warning-modal'));
-    const sel = document.getElementById('status-select');
-    if (!sel || !_pendingStatus) return;
-    _doStatusUpdate(sel.dataset.orderId, _pendingStatus, sel);
-    _pendingStatus = null;
-    _previousStatus = null;
-}
-
-function _orderVersion() {
-    const sel = document.getElementById('status-select');
-    if (sel && sel.dataset.version != null && sel.dataset.version !== '') {
-        return parseInt(sel.dataset.version, 10);
-    }
-    const editVer = document.querySelector('#edit-modal input[name="version"]');
-    return editVer && editVer.value ? parseInt(editVer.value, 10) : null;
-}
-
-function _doStatusUpdate(orderId, status, selectElement) {
-    const savedStatus = selectElement ? _knownStatus(selectElement) : null;
-    krtOrderWrite({
-        method: 'POST',
-        url: `/orders/${orderId}/status`,
-        payload() {
-            return { status, version: _orderVersion() };
-        },
-        toast: false,
-        errorMessage: MSG_STATUS_ERROR,
-        onSuccess(data) {
-            if (data && data.version != null && selectElement) {
-                selectElement.dataset.version = data.version;
-                const editVer = document.querySelector('#edit-modal input[name="version"]');
-                if (editVer) editVer.value = data.version;
-            }
-            if (selectElement) selectElement.dataset.savedStatus = status;
-            _swapOrderSection(orderId, 'order-header-results', 'header');
-            if (status === 'COMPLETED' || status === 'REJECTED') {
-                document.querySelectorAll('.inventory-details-row').forEach((r) => {
-                    r.remove();
-                });
-                _refreshMaterialsSection(orderId);
-            }
-            _publishOrdersQueue();
-            showFrontendSuccessToast(MSG_STATUS_SUCCESS);
-        },
-    }).then((res) => {
-        if (selectElement && (!res || !res.ok)) {
-            selectElement.value = savedStatus;
-        }
-    });
-}
-
-function _toggleBlueprintCounting(checkbox) {
-    const orderId = checkbox.getAttribute('data-order-id');
-    const desired = checkbox.checked;
-    if (!orderId || !window.krtFetch) {
-        return;
-    }
-    checkbox.disabled = true;
-    krtOrderWrite({
-        method: 'POST',
-        url: `/orders/${orderId}/blueprint-variant-counting`,
-        payload() {
-            return { countBlueprintsWithVariants: desired, version: _orderVersion() };
-        },
-        toast: false,
-        errorMessage: MSG_BP_COUNTING_ERROR,
-        onSuccess(data) {
-            if (data && data.version != null) {
-                const sel = document.getElementById('status-select');
-                if (sel) sel.dataset.version = data.version;
-                const editVer = document.querySelector('#edit-modal input[name="version"]');
-                if (editVer) editVer.value = data.version;
-            }
-            showFrontendSuccessToast(MSG_BP_COUNTING_SUCCESS);
-            _swapOrderSection(orderId, 'blueprint-owners-section', 'blueprint-owners');
-        },
-    }).then((res) => {
-        checkbox.disabled = false;
-        if (!res || !res.ok) {
-            checkbox.checked = !desired;
-        }
-    });
-}
-
-async function downloadHandoverReport(btn) {
-    const orderId = btn.getAttribute('data-order-id');
-    const handoverId = btn.getAttribute('data-handover-id');
-    const handoverTimeRaw = btn.getAttribute('data-handover-time');
-    const orderNumberRaw =
-        document.getElementById('order-display-id')?.getAttribute('data-order-number') ||
-        document.getElementById('order-display-id')?.textContent?.trim() ||
-        `#${orderId}`;
-    const orderNumber = orderNumberRaw.replace(/^#/, '');
-    let dateStr = '';
-    let timeStr = '';
-    if (handoverTimeRaw) {
-        const d = new Date(handoverTimeRaw);
-        dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-            d.getDate(),
-        ).padStart(2, '0')}`;
-        timeStr = `${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}`;
-    }
-    const filename = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
-        orderNumber,
-        dateStr,
-        timeStr,
-    ]);
-    try {
-        const userTimeZone =
-            Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
-        const downloadHeaders = {};
-        if (userTimeZone) {
-            downloadHeaders['X-User-Time-Zone'] = userTimeZone;
-        }
-        const response = await window.krtFetch.get(
-            `/api/v1/orders/${orderId}/handovers/${handoverId}/report`,
-            { headers: downloadHeaders },
-        );
-        if (!response || !response.ok) {
-            showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
-            return;
-        }
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        a.download = filename;
-        window.krtModal.layerRoot().appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    } catch {
-        showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
-    }
-}
-
-async function downloadItemHandoverReport(btn) {
-    const orderId = btn.getAttribute('data-order-id');
-    const handoverId = btn.getAttribute('data-handover-id');
-    const handoverTimeRaw = btn.getAttribute('data-handover-time');
-    const orderNumberRaw =
-        document.getElementById('order-display-id')?.getAttribute('data-order-number') ||
-        document.getElementById('order-display-id')?.textContent?.trim() ||
-        `#${orderId}`;
-    const orderNumber = orderNumberRaw.replace(/^#/, '');
-    let dateStr = '';
-    let timeStr = '';
-    if (handoverTimeRaw) {
-        const d = new Date(handoverTimeRaw);
-        dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-            d.getDate(),
-        ).padStart(2, '0')}`;
-        timeStr = `${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}`;
-    }
-    const filename = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
-        orderNumber,
-        dateStr,
-        timeStr,
-    ]);
-    try {
-        const userTimeZone =
-            Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
-        const downloadHeaders = {};
-        if (userTimeZone) {
-            downloadHeaders['X-User-Time-Zone'] = userTimeZone;
-        }
-        const response = await window.krtFetch.get(
-            `/api/v1/orders/${orderId}/item-handovers/${handoverId}/report`,
-            { headers: downloadHeaders },
-        );
-        if (!response || !response.ok) {
-            showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
-            return;
-        }
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        a.download = filename;
-        window.krtModal.layerRoot().appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    } catch {
-        showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
-    }
-}
-
-function validateItemHandoverForm() {
-    const inputs = document.querySelectorAll('#item-handover-modal input[type="number"]');
-    for (const inp of inputs) {
-        const val = parseInt(inp.value, 10);
-        if (!isNaN(val) && val > 0) {
-            return true;
-        }
-    }
-    showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_ITEMS);
-    return false;
-}
-
-async function previewHandoverReport(btn) {
-    const orderId = btn.getAttribute('data-order-id');
-    const orderNumber =
-        document.getElementById('order-display-id')?.getAttribute('data-order-number') ||
-        document.getElementById('order-display-id')?.textContent?.trim() ||
-        `#${orderId}`;
-    const datePart = document.querySelector('#handover-modal .date-part')?.value;
-    const timePart = document.querySelector('#handover-modal .time-part')?.value;
-    const recipientHandle = document.getElementById('recipientHandle')?.value?.trim();
-    const itemRows = document.querySelectorAll('#handover-items-container .handover-item-row');
-    const hasValidItem = Array.from(itemRows).some((row) => {
-        const sel = row.querySelector('select');
-        const inp = row.querySelector('input[type="number"]');
-        return sel && sel.value && inp && inp.value;
-    });
-    if (!datePart) {
-        showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
-        return;
-    }
-    if (!timePart) {
-        showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_TIME);
-        return;
-    }
-    if (!recipientHandle) {
-        showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_HANDLE);
-        return;
-    }
-    if (!hasValidItem) {
-        showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_ITEMS);
-        return;
-    }
-    if (!validateHandoverAmounts()) {
-        return;
-    }
-    const items = [];
-    document.querySelectorAll('.handover-item-row').forEach((row) => {
-        const select = row.querySelector('select');
-        const amountInput = row.querySelector('input[type="number"]');
-        if (select && select.value && amountInput && amountInput.value) {
-            const invId = select.value;
-            const inv = cachedInventoryItems.find((i) => i.id === invId);
-            if (inv) {
-                items.push({
-                    materialName: inv.material ? inv.material.name : '-',
-                    locationName: inv.location ? inv.location.name : null,
-                    amount: parseFloat(amountInput.value),
-                    quality: inv.quality,
-                    quantityType: inv.material ? inv.material.quantityType : null,
-                });
-            }
-        }
-    });
-    let handoverTimeIso;
-    try {
-        const localDateStr = `${datePart}T${timePart}`;
-        const localDate = new Date(localDateStr);
-        if (isNaN(localDate.getTime())) {
-            showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
-            return;
-        }
-        handoverTimeIso = localDateStr;
-    } catch {
-        showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
-        return;
-    }
-    const payload = {
-        jobOrderNumber: orderNumber,
-        handoverTime: handoverTimeIso,
-        recipientHandle,
-        items,
-    };
-    if (!window.krtFetch) return;
-    const result = await window.krtFetch.write({
-        method: 'POST',
-        url: `/api/v1/orders/${encodeURIComponent(orderId)}/handovers/report/preview`,
-        payload,
-        accept: 'application/pdf, application/problem+json',
-        responseType: 'blob',
-        toast: false,
-        errorMessage: MSG_HANDOVER_REPORT_ERROR,
-        onError() {
-            showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
-            return true;
-        },
-    });
-    if (!result.ok || !(result.body instanceof Blob)) {
-        if (result.ok) showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
-        return;
-    }
-    try {
-        const blob = result.body;
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        const previewOrderNumberRaw =
-            document.getElementById('order-display-id')?.getAttribute('data-order-number') ||
-            document.getElementById('order-display-id')?.textContent?.trim() ||
-            `#${orderId}`;
-        const previewOrderNumber = previewOrderNumberRaw.replace(/^#/, '');
-        const previewDate = datePart;
-        const previewTime = timePart ? timePart.replace(':', '-') : '';
-        a.download = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
-            previewOrderNumber,
-            previewDate,
-            previewTime,
-        ]);
-        window.krtModal.layerRoot().appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    } catch {
-        showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
-    }
-}
-
-/**
- * Loads how much of each linked row counts toward the given quality bucket (REQ-ORDERS-037).
- *
- * @param {string | null} orderId the order
- * @param {string | null} materialId the material
- * @param {string | null} tierId the bucket's quality tier; without one, nothing is filtered
- * @returns {Promise<{here: Map<string, number>, unattributed: Set<string>} | null>} the rows
- *     counted toward the bucket with their amounts and the rows no bucket accepts, or null
- */
-async function _loadStockAttribution(orderId, materialId, tierId) {
-    if (!tierId || !orderId || !materialId) return null;
-    try {
-        const list = await window.krtFetch.getJson(
-            `/orders/${orderId}/materials/${materialId}/attribution`,
-        );
-        /** @type {Map<string, number>} */
-        const here = new Map();
-        /** @type {Set<string>} */
-        const unattributed = new Set();
-        for (const entry of list) {
-            if (entry.qualityTierId === tierId) {
-                here.set(
-                    entry.inventoryItemId,
-                    (here.get(entry.inventoryItemId) || 0) + entry.amount,
-                );
-            } else if (entry.qualityTierId == null) {
-                unattributed.add(entry.inventoryItemId);
-            }
-        }
-        return { here, unattributed };
-    } catch (_e) {
-        return null;
-    }
-}
-
-async function toggleInventory(row) {
-    const orderId = row.getAttribute('data-order-id');
-    const materialId = row.getAttribute('data-material-id');
-    const amountType = row.getAttribute('data-amount-type');
-
-    const nextRow = row.nextElementSibling;
-    if (nextRow && nextRow.classList.contains('inventory-details-row')) {
-        nextRow.remove();
-        return;
-    }
-
-    const detailsRow = document.createElement('tr');
-    detailsRow.classList.add('inventory-details-row');
-    krtHtml.set(
-        detailsRow,
-        krtHtml`
-            <td colspan="5" class="od-inv-cell">
-                <div class="od-inv-note">${MSG_LOADING_INVENTORY}</div>
-            </td>
-        `,
-    );
-    row.parentNode.insertBefore(detailsRow, row.nextSibling);
-
-    try {
-        const allItems = await window.krtFetch.getJson(
-            `/orders/${orderId}/materials/${materialId}/inventory`,
-        );
-        const attribution = await _loadStockAttribution(
-            orderId,
-            materialId,
-            row.getAttribute('data-quality-tier-id'),
-        );
-        const items = attribution
-            ? allItems.filter(
-                  (/** @type {any} */ it) =>
-                      attribution.here.has(it.id) || attribution.unattributed.has(it.id),
-              )
-            : allItems;
-
-        if (items.length === 0) {
-            krtHtml.set(
-                detailsRow,
-                krtHtml`
-                    <td colspan="5" class="od-inv-cell">
-                        <div class="od-inv-note">${MSG_EMPTY_INVENTORY}</div>
-                    </td>
-                `,
-            );
-            return;
-        }
-
-        const unlinkColHeader = IS_LOGISTICIAN ? krtHtml`<th class="od-inv-th"></th>` : '';
-        const subColspan = IS_LOGISTICIAN ? 7 : 6;
-
-        const rows = items.map((/** @type {any} */ item) => {
-            const ownerName = item.user ? item.user.effectiveName : '-';
-            const locationName = item.location ? item.location.name : '-';
-            /** @type {KrtHtml[]} */
-            const chips = [];
-            if (item.stolen) {
-                chips.push(
-                    krtHtml` <span class="chip chip--danger chip-xs" data-testid="stolen-chip">${MSG_STOLEN}</span>`,
-                );
-            }
-            const quality = item.quality !== null ? item.quality : '-';
-            const unit = amountType ? amountType : '';
-            const counted = attribution ? attribution.here.get(item.id) : undefined;
-            const total = item.amount !== null ? item.amount.toFixed(3) : '0.000';
-            let quantity = `${total} ${unit}`;
-            if (counted !== undefined && Math.abs(counted - (item.amount || 0)) > 0.0005) {
-                quantity = MSG_INVENTORY_PART_OF.replace(
-                    '{0}',
-                    `${counted.toFixed(3)} ${unit}`,
-                ).replace('{1}', `${total} ${unit}`);
-            }
-            if (attribution && counted === undefined && attribution.unattributed.has(item.id)) {
-                chips.push(
-                    krtHtml` <span class="chip chip-xs" data-testid="below-floor-chip">${MSG_INVENTORY_BELOW_FLOOR}</span>`,
-                );
-            }
-            const itemSquadron = item.owningSquadron || null;
-            const itemSquadronId = itemSquadron ? itemSquadron.id : null;
-            const itemSquadronShorthand = itemSquadron ? itemSquadron.shorthand : null;
-            const itemSquadronName = itemSquadron ? itemSquadron.name : '';
-            const isForeignSquadron =
-                itemSquadronId !== null &&
-                ORDER_REQUESTING_SQUADRON_ID !== null &&
-                itemSquadronId !== ORDER_REQUESTING_SQUADRON_ID;
-            const rowClass = isForeignSquadron ? 'inventory-row-foreign-jobOrder' : '';
-            const squadronBadgeClass = isForeignSquadron
-                ? 'squadron-badge squadron-badge-foreign'
-                : 'squadron-badge';
-            const squadronCell = itemSquadronShorthand
-                ? krtHtml`<span class="${squadronBadgeClass}" title="${itemSquadronName}">${itemSquadronShorthand}</span>`
-                : krtHtml`<span class="squadron-badge squadron-badge-muted">&mdash;</span>`;
-            const unlinkCell = IS_LOGISTICIAN
-                ? krtHtml`
-                                        <td data-trigger="stop-propagation">
-                                            <button type="button" class="btn btn-quiet-danger od-inv-unlink-btn"
-                                                    data-trigger="od-unlink-inventory"
-                                                    data-order-id="${orderId}"
-                                                    data-inventory-item-id="${item.id}"
-                                                    title="${MSG_INVENTORY_UNLINK_TOOLTIP}">&times;</button>
-                                        </td>`
-                : '';
-
-            return krtHtml`
-                                    <tr class="${rowClass}">
-                                        <td>${ownerName}</td>
-                                        <td>${squadronCell}</td>
-                                        <td>${locationName}${chips}</td>
-                                        <td>${quality}</td>
-                                        <td>${quantity}</td>
-                                        ${unlinkCell}
-                                    </tr>
-                `;
-        });
-
-        krtHtml.set(
-            detailsRow,
-            krtHtml`
-                <td colspan="${subColspan}" class="p-0">
-                    <div class="od-inv-panel">
-                        <div class="table-responsive">
-                            <table class="data-table od-inv-table">
-                                <thead>
-                                    <tr>
-                                        <th class="od-inv-th">${MSG_OWNER}</th>
-                                        <th class="od-inv-th">${MSG_SQUADRON}</th>
-                                        <th class="od-inv-th">${MSG_LOCATION}</th>
-                                        <th class="od-inv-th">${MSG_QUALITY}</th>
-                                        <th class="od-inv-th">${MSG_QUANTITY}</th>
-                                        ${unlinkColHeader}
-                                    </tr>
-                                </thead>
-                                <tbody>
-            ${rows}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </td>
-            `,
-        );
-    } catch (error) {
-        console.error('Error fetching inventory items:', error);
-        krtHtml.set(
-            detailsRow,
-            krtHtml`
-                <td colspan="5" class="od-inv-cell">
-                    <div class="text-danger">${window.krtI18nText(MSG_INVENTORY_LOAD_ERROR, 'MSG_INVENTORY_LOAD_ERROR')}</div>
-                </td>
-            `,
-        );
-    }
-}
-
-(function () {
-    const nav = document.querySelector('.tab-nav[role="tablist"]');
-    if (!nav) {
-        return;
-    }
-    const tabs = Array.prototype.slice.call(nav.querySelectorAll('.tab[data-tab]'));
-    if (tabs.length === 0) {
-        return;
-    }
-    const storeKey = 'orders-detail-tab';
-
-    /**
-     * Lists the tabs the order shows; a tab without content and without an action stays hidden.
-     *
-     * @returns {HTMLElement[]} the visible tabs in order
-     */
-    function visibleTabs() {
-        return tabs.filter((t) => {
-            return !t.hidden;
-        });
-    }
-
-    /**
-     * Lists the keys of the visible tabs.
-     *
-     * @returns {string[]} the tab keys
-     */
-    function validKeysNow() {
-        return visibleTabs().map((t) => {
-            return t.getAttribute('data-tab');
-        });
-    }
-
-    function apply(key) {
-        tabs.forEach((t) => {
-            const on = t.getAttribute('data-tab') === key;
-            t.classList.toggle('active', on);
-            t.setAttribute('aria-selected', String(on));
-            t.tabIndex = on ? 0 : -1;
-        });
-        document.querySelectorAll('.tab-panes .tab-pane').forEach((p) => {
-            p.classList.toggle('on', p.id === `pane-${key}`);
-        });
-        try {
-            localStorage.setItem(storeKey, key);
-        } catch (_e) {}
-    }
-
-    function resolveInitial(useStore) {
-        const validKeys = validKeysNow();
-        const q = new URLSearchParams(window.location.search).get('tab');
-        if (q && validKeys.indexOf(q) >= 0) {
-            return q;
-        }
-        const h = (window.location.hash.match(/tab=([\w-]+)/) || [])[1];
-        if (h && validKeys.indexOf(h) >= 0) {
-            return h;
-        }
-        if (useStore) {
-            try {
-                const s = localStorage.getItem(storeKey);
-                if (s && validKeys.indexOf(s) >= 0) {
-                    return s;
-                }
-            } catch (_e) {}
-        }
-        return validKeys[0];
-    }
-
-    function show(key, push) {
-        if (validKeysNow().indexOf(key) < 0) {
-            return;
-        }
-        apply(key);
-        if (push) {
-            const url = new URL(window.location);
-            url.searchParams.set('tab', key);
-            url.hash = '';
-            history.pushState({ tab: key }, '', url);
-        }
-    }
-
-    tabs.forEach((t) => {
-        t.addEventListener('click', () => {
-            show(t.getAttribute('data-tab'), true);
-        });
-    });
-    nav.addEventListener('keydown', (e) => {
-        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') {
-            return;
-        }
-        const shown = visibleTabs();
-        const i = shown.indexOf(/** @type {HTMLElement} */ (document.activeElement));
-        if (i < 0) {
-            return;
-        }
-        e.preventDefault();
-        const next = shown[(i + (e.key === 'ArrowRight' ? 1 : shown.length - 1)) % shown.length];
-        next.focus();
-        show(next.getAttribute('data-tab'), true);
-    });
-    document.addEventListener('krt:swapped', (ev) => {
-        const container = ev && ev.detail && ev.detail.container;
-        if (!container || typeof container.querySelectorAll !== 'function') {
-            return;
-        }
-        const metas = Array.prototype.slice.call(container.querySelectorAll('[data-od-tab-count]'));
-        metas.forEach((meta) => {
-            const key = meta.getAttribute('data-od-tab-count');
-            const count = parseInt((meta.textContent || '0').trim(), 10) || 0;
-            const tab = document.getElementById(`tab-${key}`);
-            if (!tab) {
-                return;
-            }
-            const badge = tab.querySelector('.tab-count');
-            if (badge) {
-                badge.textContent = String(count);
-            }
-            if (count > 0 && tab.hidden) {
-                tab.hidden = false;
-            } else if (count === 0 && !tab.hidden && tab.hasAttribute('data-od-hide-empty')) {
-                const wasActive = tab.classList.contains('active');
-                tab.hidden = true;
-                if (wasActive && visibleTabs().length > 0) {
-                    show(visibleTabs()[0].getAttribute('data-tab'), false);
-                }
-            }
-        });
-    });
-    window.addEventListener('popstate', () => {
-        apply(resolveInitial(false));
-    });
-    apply(resolveInitial(true));
-})();
-
-document.addEventListener('krt:swapped', (ev) => {
-    const container = ev && ev.detail && ev.detail.container;
-    if (!container || container.id !== 'order-header-results') {
-        return;
-    }
-    const meta = document.getElementById('order-head-meta');
-    const badge = document.getElementById('order-status-badge');
-    if (!meta || !badge) {
-        return;
-    }
-    const statusClass = meta.getAttribute('data-status-class') || '';
-    Array.prototype.slice.call(badge.classList).forEach((cls) => {
-        if (cls.indexOf('status-') === 0 && cls !== 'status-badge') {
-            badge.classList.remove(cls);
-        }
-    });
-    if (statusClass) {
-        badge.classList.add(statusClass);
-    }
-    badge.textContent = meta.getAttribute('data-status-label') || badge.textContent;
-});
-
-let _prodMaterials = [];
-let _prodContext = null;
-
-function _prodRound3(x) {
-    return Math.round(x * 1000) / 1000;
-}
-
-function _prodRoundForType(x, quantityType) {
-    return quantityType === 'PIECE' ? Math.round(x) : _prodRound3(x);
-}
-
-function _prodFmtNum(x, quantityType) {
-    return quantityType === 'PIECE' ? String(Math.round(x)) : _prodRound3(x).toFixed(3);
-}
-
-function _prodFmtQty(x, quantityType) {
-    return quantityType === 'PIECE'
-        ? `${String(Math.round(x))} ${PRODUCTION_I18N.unitPiece}`
-        : `${_prodRound3(x).toFixed(3)} ${PRODUCTION_I18N.unitScu}`;
-}
-
-function _prodDemand(mat, k) {
-    const lineAmount = _prodContext && _prodContext.lineAmount ? _prodContext.lineAmount : 1;
-    return mat.requiredTotals.reduce((sum, rt) => {
-        return sum + _prodRoundForType((rt * k) / lineAmount, mat.quantityType);
-    }, 0);
-}
-
-function _odToggleDemandRow(control) {
-    if (!control) {
-        return;
-    }
-    const expanded = control.getAttribute('aria-expanded') === 'true';
-    control.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-    const id = control.getAttribute('aria-controls');
-    const target = id ? document.getElementById(id) : null;
-    if (target) {
-        target.hidden = expanded;
-    }
-}
-
-function openProductionModal(button) {
-    const orderId = button.getAttribute('data-order-id');
-    const itemId = button.getAttribute('data-item-id');
-    const itemName = button.getAttribute('data-item-name') || '';
-    const lineAmount = parseInt(button.getAttribute('data-amount'), 10) || 0;
-    const manufactured = parseInt(button.getAttribute('data-manufactured'), 10) || 0;
-    const version = button.getAttribute('data-version');
-    const remaining = Math.max(0, lineAmount - manufactured);
-
-    _prodContext = { orderId, itemId, lineAmount, manufactured, version, remaining };
-    _prodMaterials = [];
-
-    const title = document.getElementById('production-modal-title');
-    if (title) {
-        title.textContent = `${PRODUCTION_I18N.record} — ${itemName}`;
-    }
-
-    const amtInput = document.getElementById('production-amount');
-    if (amtInput) {
-        amtInput.max = remaining;
-        amtInput.value = remaining > 0 ? 1 : 0;
-        amtInput.oninput = _prodReconcile;
-    }
-    const hint = document.getElementById('production-remaining-hint');
-    if (hint) {
-        hint.textContent = `${PRODUCTION_I18N.remaining}: ${remaining} (${manufactured} / ${
-            lineAmount
-        } ${PRODUCTION_I18N.alreadyMade})`;
-    }
-
-    const container = document.getElementById('production-materials');
-    if (container) {
-        container.replaceChildren();
-    }
-
-    _prodResetBookIn();
-
-    window.krtModal.open('production-modal');
-
-    const row = button.closest('tr');
-    const demandLis = row ? row.querySelectorAll('.od-production-demand li') : [];
-    const byMaterialId = new Map();
-    demandLis.forEach((li) => {
-        const materialId = li.getAttribute('data-material-id');
-        if (!materialId) {
-            return;
-        }
-        const requiredTotal = parseFloat(li.getAttribute('data-required-total')) || 0;
-        const floor = parseInt(li.getAttribute('data-quality-floor') || '0', 10) || 0;
-        const existing = byMaterialId.get(materialId);
-        if (existing) {
-            existing.requiredTotals.push(requiredTotal);
-            if (floor > existing.floor) {
-                existing.floor = floor;
-                existing.qualityLabel = li.getAttribute('data-quality-label') || '';
-            }
-            return;
-        }
-        byMaterialId.set(materialId, {
-            materialId,
-            materialName: li.getAttribute('data-material-name') || '',
-            quantityType: li.getAttribute('data-quantity-type') || 'SCU',
-            requiredTotals: [requiredTotal],
-            floor,
-            qualityLabel: li.getAttribute('data-quality-label') || '',
-            entries: [],
-        });
-    });
-    byMaterialId.forEach((mat) => {
-        _prodMaterials.push(mat);
-        const card = document.createElement('div');
-        card.className = 'card card--inset mb-1';
-        card.setAttribute('data-prod-material', mat.materialId);
-        krtHtml.set(
-            card,
-            krtHtml`<div class="card-head"><h3 class="card-title">${
-                mat.materialName
-            }</h3><span class="chip chip--muted" data-prod-chip></span></div><label class="od-prod-skip" title="${
-                PRODUCTION_I18N.skipHint
-            }"><input type="checkbox" data-prod-skip> ${
-                PRODUCTION_I18N.skipLabel
-            }</label><div data-prod-entries><p class="text-muted">${
-                PRODUCTION_I18N.loadingStock
-            }</p></div>`,
-        );
-        const title = card.querySelector('.card-title');
-        if (mat.floor > 0 && title) {
-            const badge = document.createElement('span');
-            badge.className = 'quality-badge quality-good';
-            badge.textContent = mat.qualityLabel;
-            title.append(' ', badge);
-        }
-        if (container) {
-            container.appendChild(card);
-        }
-        const skipCb = card.querySelector('[data-prod-skip]');
-        if (skipCb) {
-            skipCb.addEventListener('change', _prodReconcile);
-        }
-        Promise.all([
-            window.krtFetch
-                .getJson(`/orders/${orderId}/materials/${mat.materialId}/inventory`)
-                .catch(() => []),
-            _prodLoadHigherAttribution(orderId, mat),
-        ])
-            .then((results) => {
-                const items = results[0];
-                mat.countedHigher = results[1];
-                mat.entries = (items || [])
-                    .map((it) => {
-                        const alloc = (it.jobOrderAllocations || []).find((a) => {
-                            return a.jobOrderId === orderId;
-                        });
-                        const slice = alloc && alloc.amount != null ? alloc.amount : 0;
-                        return {
-                            inventoryItemId: it.id,
-                            ownerName: it.user ? it.user.effectiveName : '-',
-                            location: it.location ? it.location.name : '-',
-                            stolen: it.stolen === true,
-                            quality: it.quality != null ? it.quality : '-',
-                            slice,
-                            stock: it.amount != null ? it.amount : 0,
-                            version: it.version,
-                        };
-                    })
-                    .filter((e) => {
-                        return e.slice > 0;
-                    })
-                    .map((e) => {
-                        const q = typeof e.quality === 'number' ? e.quality : 0;
-                        return Object.assign(e, { belowFloor: q < mat.floor });
-                    })
-                    .sort((a, b) => {
-                        if (a.belowFloor !== b.belowFloor) return a.belowFloor ? 1 : -1;
-                        const qa = typeof a.quality === 'number' ? a.quality : 0;
-                        const qb = typeof b.quality === 'number' ? b.quality : 0;
-                        return qa - qb;
-                    });
-                _renderProdMaterialEntries(card, mat);
-                _prodPrefill(card, mat);
-                _prodReconcile();
-            })
-            .catch(() => {
-                _renderProdMaterialEntries(card, mat);
-                _prodReconcile();
-            });
-    });
-    _prodReconcile();
-}
-
-function _renderProdMaterialEntries(card, mat) {
-    const entriesEl = card.querySelector('[data-prod-entries]');
-    if (!entriesEl) {
-        return;
-    }
-    if (mat.entries.length === 0) {
-        krtHtml.set(entriesEl, krtHtml`<p class="text-muted">${PRODUCTION_I18N.noStock}</p>`);
-        return;
-    }
-    const html = mat.entries.map((e, idx) => {
-        const cap = Math.min(e.slice, e.stock);
-        /** @type {KrtHtml[]} */
-        const chips = [];
-        if (e.stolen) {
-            chips.push(krtHtml` <span class="chip chip--danger chip-xs">${MSG_STOLEN}</span>`);
-        }
-        const higher = mat.countedHigher ? mat.countedHigher.get(e.inventoryItemId) : null;
-        if (higher && !e.belowFloor) {
-            chips.push(
-                krtHtml` <span class="chip chip--warning chip-xs" data-testid="prod-counted-higher">${MSG_PRODUCTION_COUNTED_HIGHER.replace(
-                    '{0}',
-                    higher,
-                )}</span>`,
-            );
-        }
-        if (e.belowFloor) {
-            chips.push(
-                krtHtml` <span class="chip chip-xs" data-testid="prod-below-floor">${MSG_INVENTORY_BELOW_FLOOR}</span>`,
-            );
-        }
-        return krtHtml`<div class="od-prod-entry"><div class="od-prod-src">${e.ownerName} · ${String(
-            e.location,
-        )}${chips} <small>${MSG_QUALITY} ${String(e.quality)} · ${PRODUCTION_I18N.available} ${_prodFmtQty(
-            cap,
-            mat.quantityType,
-        )}</small></div><input type="number" min="0" step="${
-            mat.quantityType === 'PIECE' ? '1' : 'any'
-        }" value="0" data-prod-alloc data-prod-idx="${idx}"></div>`;
-    });
-    krtHtml.set(entriesEl, html);
-    entriesEl.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
-        const entry = mat.entries[Number(inp.getAttribute('data-prod-idx'))];
-        if (entry && entry.belowFloor) {
-            inp.disabled = true;
-            inp.setAttribute('data-below-floor', 'true');
-        }
-        inp.addEventListener('input', _prodReconcile);
-    });
-}
-
-/**
- * Finds the linked rows of a material the quality-bucket allocation currently counts toward a
- * tier with a higher floor than this line needs, so consuming them here is flagged (REQ-ORDERS-039).
- *
- * @param {string | null} orderId the order
- * @param {any} mat the material with its floor
- * @returns {Promise<Map<string, string>>} row id to the label of the higher tier
- */
-async function _prodLoadHigherAttribution(orderId, mat) {
-    /** @type {Map<string, string>} */
-    const higher = new Map();
-    /** @type {Map<string, {floor: number, label: string}>} */
-    const tiers = new Map();
-    document.querySelectorAll('.aggregated-material-row').forEach((el) => {
-        const row = /** @type {HTMLElement} */ (el);
-        if (row.dataset.materialId !== mat.materialId || !row.dataset.qualityTierId) return;
-        tiers.set(row.dataset.qualityTierId, {
-            floor: parseInt(row.dataset.qualityFloor || '0', 10) || 0,
-            label: row.dataset.qualityLabel || '',
-        });
-    });
-    if (tiers.size < 2 || !orderId) return higher;
-    try {
-        const entries = await window.krtFetch.getJson(
-            `/orders/${orderId}/materials/${mat.materialId}/attribution`,
-        );
-        for (const entry of entries) {
-            const tier = tiers.get(entry.qualityTierId);
-            if (tier && tier.floor > mat.floor && entry.amount > 0) {
-                higher.set(entry.inventoryItemId, tier.label);
-            }
-        }
-    } catch (_e) {
-        return higher;
-    }
-    return higher;
-}
-
-/**
- * Pre-fills a material's consumption with the lowest qualifying grades first, up to the demand of
- * the current amount; the member may change every figure (REQ-ORDERS-039).
- *
- * @param {Element} card the material card
- * @param {any} mat the material with its sorted entries
- */
-function _prodPrefill(card, mat) {
-    const amtInput = /** @type {HTMLInputElement | null} */ (
-        document.getElementById('production-amount')
-    );
-    const k = parseInt(amtInput ? amtInput.value : '0', 10);
-    if (!isFinite(k) || k < 1) return;
-    let left = _prodDemand(mat, k);
-    card.querySelectorAll('[data-prod-alloc]').forEach((el) => {
-        const inp = /** @type {HTMLInputElement} */ (el);
-        const e = mat.entries[parseInt(inp.getAttribute('data-prod-idx') || '0', 10)];
-        if (!e || e.belowFloor || left <= 1e-4) return;
-        const cap = Math.min(e.slice, e.stock);
-        const take = Math.min(left, cap);
-        inp.value = String(mat.quantityType === 'PIECE' ? Math.floor(take) : _prodRound3(take));
-        left -= parseFloat(inp.value) || 0;
-    });
-}
-
-function _prodActingUserId() {
-    const form = document.getElementById('production-form');
-    return form ? form.getAttribute('data-acting-user-id') || '' : '';
-}
-
-function _prodActingUserName() {
-    const form = document.getElementById('production-form');
-    return form ? form.getAttribute('data-acting-user-name') || '' : '';
-}
-
-function _prodSetPicker(id, value, label) {
-    const el = document.getElementById(id);
-    if (!el) {
-        return;
-    }
-    if (el.krtCombobox) {
-        el.krtCombobox.setValue(value || '', label);
-    } else {
-        el.value = value || '';
-    }
-}
-
-function _prodResetBookIn() {
-    _prodSetPicker('production-location', '');
-    _prodSetPicker('production-owner', _prodActingUserId(), _prodActingUserName());
-    const personalCb = document.getElementById('production-personal');
-    if (personalCb) {
-        personalCb.checked = false;
-        personalCb.disabled = false;
-    }
-    const allocateCb = document.getElementById('production-allocate');
-    if (allocateCb) {
-        allocateCb.checked = true;
-        allocateCb.disabled = false;
-    }
-    _prodRefreshOrgUnitPicker();
-}
-
-function _prodSyncPersonalAllocate() {
-    const personalCb = document.getElementById('production-personal');
-    const allocateCb = document.getElementById('production-allocate');
-    if (!allocateCb) {
-        return;
-    }
-    const personal = !!(personalCb && personalCb.checked);
-    allocateCb.disabled = personal;
-    allocateCb.checked = !personal;
-}
-
-function _prodSyncPersonalForOwner() {
-    const personalCb = document.getElementById('production-personal');
-    if (!personalCb) {
-        return;
-    }
-    const ownerEl = document.getElementById('production-owner');
-    const ownerId = (ownerEl && ownerEl.value) || '';
-    const onBehalf = ownerId !== '' && ownerId !== _prodActingUserId();
-    personalCb.disabled = onBehalf;
-    if (onBehalf && personalCb.checked) {
-        personalCb.checked = false;
-        _prodSyncPersonalAllocate();
-    }
-}
-
-function _prodRefreshOrgUnitPicker() {
-    const wrapper = document.getElementById('production-orgunit-wrapper');
-    const select = document.getElementById('production-orgunit');
-    const ownerEl = document.getElementById('production-owner');
-    if (!wrapper || !select) {
-        return;
-    }
-    const ownerId = (ownerEl && ownerEl.value) || _prodActingUserId();
-    select.replaceChildren();
-    if (!ownerId) {
-        wrapper.hidden = true;
-        return;
-    }
-    window.krtFetch
-        .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
-        .then((memberships) => {
-            if (!Array.isArray(memberships) || memberships.length < 1) {
-                wrapper.hidden = true;
-                return;
-            }
-            memberships.forEach((opt) => {
-                const o = document.createElement('option');
-                o.value = opt.orgUnitId;
-                o.textContent = opt.orgUnitName;
-                select.appendChild(o);
-            });
-            const form = document.getElementById('production-form');
-            const responsibleId = form
-                ? form.getAttribute('data-responsible-org-unit-id') || ''
-                : '';
-            if (
-                responsibleId &&
-                memberships.some((m) => {
-                    return m.orgUnitId === responsibleId;
-                })
-            ) {
-                select.value = responsibleId;
-            }
-            wrapper.hidden = false;
-        })
-        .catch(() => {
-            wrapper.hidden = true;
-        });
-}
-
-function _prodCollectBookIn() {
-    const locEl = document.getElementById('production-location');
-    const ownerEl = document.getElementById('production-owner');
-    const orgUnitWrapper = document.getElementById('production-orgunit-wrapper');
-    const orgUnitEl = document.getElementById('production-orgunit');
-    const personalCb = document.getElementById('production-personal');
-    const allocateCb = document.getElementById('production-allocate');
-    const personal = !!(personalCb && personalCb.checked);
-    return {
-        locationId: (locEl && locEl.value) || null,
-        ownerUserId: (ownerEl && ownerEl.value) || null,
-        owningOrgUnitId:
-            orgUnitWrapper && !orgUnitWrapper.hidden && orgUnitEl && orgUnitEl.value
-                ? orgUnitEl.value
-                : null,
-        personal,
-        allocateToOrder: personal ? false : !!(allocateCb && allocateCb.checked),
-    };
-}
-
-function _prodReconcile() {
-    if (!_prodContext) {
-        return;
-    }
-    const amtInput = document.getElementById('production-amount');
-    let k = parseInt(amtInput ? amtInput.value : '0', 10);
-    if (!isFinite(k) || k < 1) {
-        k = 0;
-    }
-    let allCovered = k >= 1 && k <= _prodContext.remaining;
-    _prodMaterials.forEach((mat) => {
-        const card = document.querySelector(`[data-prod-material="${mat.materialId}"]`);
-        if (!card) {
-            return;
-        }
-        const skipCb = card.querySelector('[data-prod-skip]');
-        const skipped = !!(skipCb && skipCb.checked);
-        const chip = card.querySelector('[data-prod-chip]');
-        card.classList.toggle('od-prod-skipped', skipped);
-        card.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
-            inp.disabled = skipped || inp.getAttribute('data-below-floor') === 'true';
-        });
-        if (skipped) {
-            if (chip) {
-                chip.textContent = PRODUCTION_I18N.skipped;
-                chip.className = 'chip chip--muted';
-            }
-            return;
-        }
-        const demand = _prodDemand(mat, k);
-        let assigned = 0;
-        card.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
-            assigned += _prodRoundForType(parseFloat(inp.value) || 0, mat.quantityType);
-        });
-        assigned = mat.quantityType === 'PIECE' ? Math.round(assigned) : _prodRound3(assigned);
-        const rest = _prodRound3(demand - assigned);
-        if (chip) {
-            chip.textContent = PRODUCTION_I18N.reconcile
-                .replace('{0}', _prodFmtNum(demand, mat.quantityType))
-                .replace('{1}', _prodFmtNum(assigned, mat.quantityType))
-                .replace('{2}', _prodFmtNum(rest, mat.quantityType));
-            chip.className = `chip ${
-                Math.abs(rest) < 1e-4 ? 'chip--success' : rest < 0 ? 'chip--danger' : 'chip--muted'
-            }`;
-        }
-        if (Math.abs(rest) >= 1e-4) {
-            allCovered = false;
-        }
-    });
-    const locEl = document.getElementById('production-location');
-    if (!locEl || !locEl.value) {
-        allCovered = false;
-    }
-    const bookBtn = document.getElementById('production-book-btn');
-    if (bookBtn) {
-        bookBtn.disabled = !allCovered;
-    }
-}
-
-function bookProduction() {
-    if (!_prodContext) {
-        return;
-    }
-    const amtInput = document.getElementById('production-amount');
-    const k = parseInt(amtInput ? amtInput.value : '0', 10);
-    if (!isFinite(k) || k < 1 || k > _prodContext.remaining) {
-        showFrontendErrorToast(PRODUCTION_I18N.allocError);
-        return;
-    }
-    const consumption = [];
-    const skippedMaterialIds = [];
-    let ok = true;
-    _prodMaterials.forEach((mat) => {
-        const card = document.querySelector(`[data-prod-material="${mat.materialId}"]`);
-        const skipCb = card ? card.querySelector('[data-prod-skip]') : null;
-        if (skipCb && skipCb.checked) {
-            skippedMaterialIds.push(mat.materialId);
-            return;
-        }
-        const demand = _prodDemand(mat, k);
-        let assigned = 0;
-        if (card) {
-            card.querySelectorAll('[data-prod-alloc]').forEach((inp) => {
-                const v = _prodRoundForType(parseFloat(inp.value) || 0, mat.quantityType);
-                if (v > 0) {
-                    const idx = parseInt(inp.getAttribute('data-prod-idx'), 10);
-                    const entry = mat.entries[idx];
-                    if (entry) {
-                        consumption.push({
-                            inventoryItemId: entry.inventoryItemId,
-                            materialId: mat.materialId,
-                            amount: v,
-                            version: entry.version,
-                        });
-                        assigned += v;
-                    }
-                }
-            });
-        }
-        assigned = mat.quantityType === 'PIECE' ? Math.round(assigned) : _prodRound3(assigned);
-        if (Math.abs(demand - assigned) >= 1e-4) {
-            ok = false;
-        }
-    });
-    if (!ok) {
-        showFrontendErrorToast(PRODUCTION_I18N.allocError);
-        return;
-    }
-    const bookIn = _prodCollectBookIn();
-    if (!bookIn.locationId) {
-        showFrontendErrorToast(PRODUCTION_I18N.bookInLocationRequired);
-        return;
-    }
-
-    krtOrderWrite({
-        method: 'POST',
-        url: `/orders/${_prodContext.orderId}/items/${_prodContext.itemId}/production`,
-        payload: {
-            amount: k,
-            version: _prodContext.version ? parseInt(_prodContext.version, 10) : null,
-            consumption,
-            skippedMaterialIds,
-            bookIn,
-        },
-        toast: false,
-        errorMessage: PRODUCTION_I18N.allocError,
-        onSuccess() {
-            window.krtModal.close('production-modal');
-            showFrontendSuccessToast(PRODUCTION_I18N.booked);
-            if (window.krtRefreshOrderSection) {
-                window.krtRefreshOrderSection([
-                    'items',
-                    'aggregated',
-                    'header',
-                    'kpi',
-                    'item-handovers',
-                    'item-handover-lines',
-                ]);
-            }
-            if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-                window.krtLiveSync.sendChanged('inventory', ['stock']);
-            }
-        },
-    });
-}
-
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('change', 'od-update-status', (el) => {
-        updateStatus(el);
-    });
-    window.krtEvents.on('change', 'od-toggle-bp-counting', (el) => {
-        _toggleBlueprintCounting(el);
-    });
-    window.krtEvents.on('click', 'od-toggle-inventory', (el, ev) => {
-        if (
-            ev &&
-            ev.target &&
-            typeof ev.target.closest === 'function' &&
-            ev.target.closest('[data-claim-control], [data-trigger="od-unlink-inventory"]')
-        ) {
-            return;
-        }
-        toggleInventory(el);
-    });
-    window.krtEvents.on('click', 'od-unlink-inventory', (el) => {
-        unlinkInventoryItem(el);
-    });
-    window.krtEvents.on('click', 'claim-add', (el) => {
-        openClaimCreate(el);
-    });
-    window.krtEvents.on('click', 'claim-edit', (el) => {
-        openClaimEdit(el);
-    });
-    window.krtEvents.on('click', 'claim-submit', () => {
-        submitClaim();
-    });
-    window.krtEvents.on('click', 'claim-withdraw', () => {
-        withdrawClaimAction();
-    });
-    window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
-    window.krtEvents.on('click', 'od-open-production', openProductionModal);
-    window.krtEvents.on('click', 'od-book-production', bookProduction);
-    window.krtEvents.on('change', 'od-production-bookin-changed', () => {
-        _prodReconcile();
-    });
-    window.krtEvents.on('change', 'od-production-owner-changed', () => {
-        _prodSyncPersonalForOwner();
-        _prodRefreshOrgUnitPicker();
-    });
-    window.krtEvents.on('change', 'od-production-personal-toggle', () => {
-        _prodSyncPersonalAllocate();
-    });
-    window.krtEvents.on('click', 'od-toggle-demand', _odToggleDemandRow);
-    window.krtEvents.on('click', 'od-download-report', (el) => {
-        downloadHandoverReport(el);
-    });
-    window.krtEvents.on('click', 'od-download-item-report', (el) => {
-        downloadItemHandoverReport(el);
-    });
-    window.krtEvents.on('click', 'od-cancel-status', cancelStatusChange);
-    window.krtEvents.on('click', 'od-confirm-status', confirmStatusChange);
-    window.krtEvents.on('click', 'od-confirm-remove-material', () => {
-        if (typeof window.confirmRemoveMaterial === 'function') window.confirmRemoveMaterial();
-    });
-    window.krtEvents.on('click', 'od-add-handover-item', addHandoverItemRow);
-    window.krtEvents.on('click', 'od-preview-handover', (el) => {
-        previewHandoverReport(el);
-    });
-    window.krtEvents.on('click', 'od-remove-handover-row', (el) => {
-        const row = el.parentElement && el.parentElement.parentElement;
-        if (row) row.remove();
-        updateHandoverIndexes();
-    });
-    window.krtEvents.on('submit', 'od-disable-submit', (el) => {
-        const btn = el.querySelector('button[type=submit]');
-        if (btn) btn.disabled = true;
-    });
-}
-
-(function () {
-    function oaOrderId() {
-        const sec = document.getElementById('assignees-section');
-        return sec ? sec.getAttribute('data-order-id') : null;
-    }
-
-    const OA_CONFLICT = {
-        title: ORDER_CONFLICT.title,
-        reloadLabel: ORDER_CONFLICT.reload,
-        reloadQuestion: ORDER_CONFLICT.reloadQuestion,
-        dismissLabel: ORDER_CONFLICT.dismiss,
-        reloadDetailFallback: I18N_NOTE_CONFLICT,
-    };
-
-    /**
-     * Sends one assignee mutation through krtFetch (REQ-FE-002) and swaps the returned
-     * #assignees-section fragment in place.
-     *
-     * @param {string} method the HTTP method
-     * @param {string} url the endpoint
-     * @param {{ json?: object, form?: URLSearchParams, successMsg?: string, errorMsg?: string }} [opts]
-     *     `json` is sent as the JSON body, `form` as an urlencoded body; neither sends no body
-     * @returns {Promise<boolean>} true when the mutation succeeded and the section was re-rendered
-     */
-    async function oaSend(method, url, opts) {
-        opts ||= {};
-        if (!window.krtFetch) return false;
-        const errorMsg = opts.errorMsg || I18N_NOTE_ERROR;
-        const common = {
-            method,
-            url,
-            accept: 'text/html',
-            toast: false,
-            errorMessage: errorMsg,
-            onSuccess(html) {
-                const sec = document.getElementById('assignees-section');
-                if (sec && typeof html === 'string') {
-                    window.krtFetch.replaceWithTrustedHtml(sec, html);
-                    document.dispatchEvent(
-                        new CustomEvent('krt:swapped', {
-                            detail: { container: document.getElementById('assignees-section') },
-                        }),
-                    );
-                }
-                if (opts.successMsg) showFrontendSuccessToast(opts.successMsg);
-                if (window.krtNotifyOrderChanged) {
-                    window.krtNotifyOrderChanged(['assignees']);
-                }
-            },
-            onError(status, _body, response) {
-                if (status === 409) {
-                    window.krtFetch.handleProblem(
-                        response,
-                        { code: 'OPTIMISTIC_LOCK', detail: I18N_NOTE_CONFLICT },
-                        { conflict: OA_CONFLICT },
-                    );
-                } else if (status === 403) {
-                    showFrontendErrorToast(I18N_NOTE_FORBIDDEN);
-                } else {
-                    showFrontendErrorToast(errorMsg);
-                }
-                return true;
-            },
-        };
-        const result =
-            opts.form !== undefined
-                ? await window.krtFetch.submitForm(Object.assign(common, { formData: opts.form }))
-                : await window.krtFetch.write(Object.assign(common, { payload: opts.json }));
-        return result.ok;
-    }
-
-    function oaUpdateCounter() {
-        const ta = document.getElementById('assignee-note-text');
-        const counter = document.getElementById('assignee-note-counter');
-        if (ta && counter) counter.textContent = `${ta.value.length} / 500`;
-    }
-
-    function oaAdd(userId) {
-        const orderId = oaOrderId();
-        if (!userId || !orderId) return;
-        oaSend('POST', `/orders/${orderId}/assignees`, {
-            form: new URLSearchParams({ userId }),
-            successMsg: I18N_ADDED,
-            errorMsg: I18N_ADD_ERROR,
-        });
-    }
-
-    function oaRemove(el) {
-        const userId = el.getAttribute('data-user-id');
-        const orderId = oaOrderId();
-        if (!userId || !orderId) return;
-        oaSend('DELETE', `/orders/${orderId}/assignees/${userId}`, {
-            successMsg: I18N_REMOVED,
-            errorMsg: I18N_REMOVE_ERROR,
-        });
-    }
-
-    function oaOpenNote(el) {
-        const userId = el.getAttribute('data-user-id');
-        const userName = el.getAttribute('data-user-name') || '';
-        const note = el.getAttribute('data-note') || '';
-        const version = el.getAttribute('data-version') || '';
-        document.getElementById('assignee-note-user-id').value = userId;
-        document.getElementById('assignee-note-version').value = version;
-        const ta = document.getElementById('assignee-note-text');
-        ta.value = note;
-        document.getElementById('assignee-note-for').textContent = I18N_NOTE_FOR.replace(
-            '{0}',
-            userName,
-        );
-        oaUpdateCounter();
-        window.krtModal.open(document.getElementById('assignee-note-modal'));
-        ta.focus();
-    }
-
-    function oaSaveNote() {
-        const userId = document.getElementById('assignee-note-user-id').value;
-        const version = document.getElementById('assignee-note-version').value;
-        const note = document.getElementById('assignee-note-text').value;
-        const orderId = oaOrderId();
-        if (!userId || !orderId) return;
-        const payload = { note, version: version ? parseInt(version, 10) : null };
-        oaSend('PUT', `/orders/${orderId}/assignees/${userId}/note`, {
-            json: payload,
-            successMsg: I18N_NOTE_SAVED,
-        }).then((ok) => {
-            if (ok) window.krtModal.close(document.getElementById('assignee-note-modal'));
-        });
-    }
-
-    function oaDeleteNote(el) {
-        const userId = el.getAttribute('data-user-id');
-        const version = el.getAttribute('data-version') || '';
-        const orderId = oaOrderId();
-        if (!userId || !orderId) return;
-        const q = version ? `?version=${encodeURIComponent(version)}` : '';
-        oaSend('DELETE', `/orders/${orderId}/assignees/${userId}/note${q}`, {
-            successMsg: I18N_NOTE_DELETED,
-        });
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const ta = document.getElementById('assignee-note-text');
-        if (ta) ta.addEventListener('input', oaUpdateCounter);
-    });
-
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'oa-add-me', (el) => {
-            oaAdd(el.getAttribute('data-user-id'));
-        });
-        window.krtEvents.on('click', 'oa-add-user', () => {
-            const sel = document.getElementById('assignee-add-select');
-            if (sel && sel.value) oaAdd(sel.value);
-        });
-        window.krtEvents.on('click', 'oa-remove-assignee', (el) => {
-            oaRemove(el);
-        });
-        window.krtEvents.on('click', 'oa-edit-note', (el) => {
-            oaOpenNote(el);
-        });
-        window.krtEvents.on('click', 'oa-save-note', () => {
-            oaSaveNote();
-        });
-        window.krtEvents.on('click', 'oa-delete-note', (el) => {
-            oaDeleteNote(el);
-        });
-    }
-})();

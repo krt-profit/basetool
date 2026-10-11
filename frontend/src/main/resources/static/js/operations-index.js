@@ -17,10 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global OPS_MSG */
 
 function openDeleteModal(id) {
-    const deleteForm = document.getElementById('delete-operation-form');
+    const deleteForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('delete-operation-form')
+    );
+    if (!deleteForm) return;
     deleteForm.action = window.safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
     window.krtModal.open(document.getElementById('delete-operation-modal'));
 }
@@ -53,21 +58,33 @@ function reloadOperationsList() {
 (function () {
     if (!window.krtFetch) return;
 
-    const createForm = document.getElementById('create-operation-form');
+    const createForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('create-operation-form')
+    );
     if (createForm) {
         createForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            const owner = createForm.querySelector('[name="owningOrgUnitId"]');
-            const submitBtn = createForm.querySelector('button[type="submit"]');
+            const owner = /** @type {HTMLInputElement | null} */ (
+                createForm.querySelector('[name="owningOrgUnitId"]')
+            );
+            const submitBtn = /** @type {HTMLButtonElement | null} */ (
+                createForm.querySelector('button[type="submit"]')
+            );
             if (submitBtn) submitBtn.disabled = true;
             window.krtFetch
                 .write({
                     method: 'POST',
-                    url: createForm.getAttribute('action'),
+                    url: /** @type {string} */ (createForm.getAttribute('action')),
                     payload: {
-                        name: createForm.querySelector('[name="name"]').value,
-                        description: createForm.querySelector('[name="description"]').value,
-                        status: createForm.querySelector('[name="status"]').value,
+                        name: /** @type {HTMLInputElement} */ (
+                            createForm.querySelector('[name="name"]')
+                        ).value,
+                        description: /** @type {HTMLTextAreaElement} */ (
+                            createForm.querySelector('[name="description"]')
+                        ).value,
+                        status: /** @type {HTMLSelectElement} */ (
+                            createForm.querySelector('[name="status"]')
+                        ).value,
                         owningOrgUnitId: owner && owner.value ? owner.value : null,
                     },
                     successMessage: OPS_MSG.createSuccess,
@@ -85,11 +102,15 @@ function reloadOperationsList() {
         });
     }
 
-    const deleteForm = document.getElementById('delete-operation-form');
+    const deleteForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('delete-operation-form')
+    );
     if (deleteForm) {
         deleteForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            const submitBtn = deleteForm.querySelector('button[type="submit"]');
+            const submitBtn = /** @type {HTMLButtonElement | null} */ (
+                deleteForm.querySelector('button[type="submit"]')
+            );
             if (submitBtn) submitBtn.disabled = true;
             window.krtFetch
                 .write({

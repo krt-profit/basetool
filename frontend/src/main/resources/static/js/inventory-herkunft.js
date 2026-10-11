@@ -17,20 +17,55 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 (function () {
     'use strict';
+
+    /**
+     * @typedef {object} HerkunftTag
+     * @property {string} targetId the job-order / mission id
+     * @property {number} allocated the amount earmarked for it
+     * @property {string} name its display name
+     */
+
+    /**
+     * @typedef {object} HerkunftDim
+     * @property {string} field 'JOB_ORDER' or 'MISSION'
+     * @property {number} entryAmount the entry's amount
+     * @property {boolean} isPiece whether the material is counted in whole pieces
+     * @property {number} sumAllocated the amount covered by tags
+     * @property {HerkunftTag[]} tags the dimension's earmark tags
+     */
+
+    /**
+     * @typedef {object} HerkunftDimState
+     * @property {number} restDim the unassigned rest of the entry
+     * @property {number} assigned the sum of the tag inputs
+     * @property {number} fromRest the part of the deduction taken from the rest
+     * @property {number} minRequired the least that has to come from the tags
+     * @property {boolean} tagOver whether a tag input exceeds its slice
+     * @property {boolean} overAssigned whether the tags exceed the deduction
+     * @property {boolean} underAssigned whether the rest cannot cover the remainder
+     * @property {boolean} valid whether the plan is submittable
+     * @property {boolean} hasDeducted whether a positive deduction is entered
+     * @property {number} target the rounded deduction
+     */
+
+    /** @typedef {Record<string, string>} HerkunftStrings */
 
     const EPS = 1e-6;
 
     const REST_EPS = 0.0005;
 
+    /** @type {Record<string, {itemId: string, dims: HerkunftDim[]}>} */
     const registry = {};
 
     /**
      * The localized picker strings from the page global `herkunftI18n`. A missing string renders as
      * its key name and is reported via window.krtI18nText.
      *
-     * @returns {object} the active string bundle
+     * @returns {HerkunftStrings} the active string bundle
      */
     function i18n() {
         const d = window.herkunftI18n || {};
@@ -67,6 +102,7 @@
         if (!section) {
             return false;
         }
+        /** @type {HTMLElement | null} */
         let el = section;
         while (el) {
             if (el.hidden || (el.style && el.style.display === 'none')) {
@@ -143,7 +179,11 @@
         if (!section) {
             return NaN;
         }
-        const el = document.getElementById(section.getAttribute('data-herkunft-amount-id'));
+        const el = /** @type {HTMLInputElement | null} */ (
+            document.getElementById(
+                /** @type {string} */ (section.getAttribute('data-herkunft-amount-id')),
+            )
+        );
         return el ? parseAmount(el.value) : NaN;
     }
 
@@ -159,12 +199,16 @@
         if (!section || !section.hasAttribute('data-herkunft-sell-amount-id')) {
             return null;
         }
-        const sellRadio = document.querySelector('input[name="type"][value="SELL"]');
+        const sellRadio = /** @type {HTMLInputElement | null} */ (
+            document.querySelector('input[name="type"][value="SELL"]')
+        );
         if (!sellRadio || !sellRadio.checked) {
             return null;
         }
-        const sellEl = document.getElementById(
-            section.getAttribute('data-herkunft-sell-amount-id'),
+        const sellEl = /** @type {HTMLInputElement | null} */ (
+            document.getElementById(
+                /** @type {string} */ (section.getAttribute('data-herkunft-sell-amount-id')),
+            )
         );
         const sellAmount = sellEl ? parseFloat(sellEl.value) : NaN;
         if (!isFinite(sellAmount) || sellAmount <= 0) {
@@ -178,15 +222,17 @@
      *
      * @param {HTMLElement} leaf the source entry's leaf row
      * @param {string} field the dimension ('JOB_ORDER' / 'MISSION')
-     * @returns {object|null} the dimension descriptor, or null when the row has no such split
+     * @returns {HerkunftDim|null} the dimension descriptor, or null when the row has no such split
      */
     function readDimension(leaf, field) {
         const split = leaf.querySelector(`.assoc-split[data-assoc-field="${field}"]`);
         if (!split) {
             return null;
         }
-        const entryAmount = parseFloat(split.getAttribute('data-amount')) || 0;
+        const entryAmount =
+            parseFloat(/** @type {string} */ (split.getAttribute('data-amount'))) || 0;
         const isPiece = split.getAttribute('data-piece') === 'true';
+        /** @type {HerkunftTag[]} */
         const tags = [];
         let sumAllocated = 0;
         split.querySelectorAll('[data-assoc-chip]').forEach((chip) => {
@@ -194,9 +240,10 @@
             if (!targetId) {
                 return;
             }
-            const allocated = parseFloat(chip.getAttribute('data-amount')) || 0;
+            const allocated =
+                parseFloat(/** @type {string} */ (chip.getAttribute('data-amount'))) || 0;
             const nameEl = chip.querySelector('span:not(.assoc-chip__amt)');
-            const name = nameEl ? nameEl.textContent.trim() : targetId;
+            const name = nameEl ? /** @type {string} */ (nameEl.textContent).trim() : targetId;
             tags.push({ targetId, allocated, name });
             sumAllocated += allocated;
         });
@@ -213,7 +260,7 @@
      * Reports whether a dimension leaves no choice: exactly one tag and no unassigned rest, so the
      * whole deduction comes from that tag. Such a dimension is prefilled and locked.
      *
-     * @param {object} dim the dimension descriptor from readDimension
+     * @param {HerkunftDim} dim the dimension descriptor from readDimension
      * @returns {boolean} true when the single tag has to absorb the whole deduction
      */
     function isDetermined(dim) {
@@ -248,7 +295,7 @@
      * determined dimension gets a locked input and an explanatory note.
      *
      * @param {string} prefix the modal prefix
-     * @param {object} dim the dimension descriptor from readDimension
+     * @param {HerkunftDim} dim the dimension descriptor from readDimension
      * @returns {HTMLElement} the dimension block
      */
     function buildDimBlock(prefix, dim) {
@@ -320,7 +367,7 @@
 
         if (
             dim.field === 'MISSION' &&
-            sectionOf(prefix).hasAttribute('data-herkunft-sell-amount-id')
+            sectionOf(prefix)?.hasAttribute('data-herkunft-sell-amount-id')
         ) {
             const proceeds = document.createElement('div');
             proceeds.className = 'herkunft-proceeds';
@@ -337,7 +384,7 @@
      * fails validation.
      *
      * @param {HTMLElement} section the picker section
-     * @param {object} dim the dimension descriptor
+     * @param {HerkunftDim} dim the dimension descriptor
      * @param {number} deducted the current deducted amount
      */
     function syncDetermined(section, dim, deducted) {
@@ -360,9 +407,9 @@
      * same rules the backend enforces.
      *
      * @param {HTMLElement} section the picker section
-     * @param {object} dim the dimension descriptor
+     * @param {HerkunftDim} dim the dimension descriptor
      * @param {number} deducted the current deducted amount
-     * @returns {object} the dimension state (assigned, fromRest, minRequired, validity flags)
+     * @returns {HerkunftDimState} the dimension state (assigned, fromRest, minRequired, validity flags)
      */
     function dimState(section, dim, deducted) {
         const restDim = roundAmount(dim.entryAmount - dim.sumAllocated, dim.isPiece);
@@ -409,13 +456,15 @@
      * Refreshes one dimension's rest chip, warning and proceeds hint from its computed state.
      *
      * @param {HTMLElement} section the picker section
-     * @param {object} dim the dimension descriptor
-     * @param {object} state the dimension state from dimState
-     * @param {object} strings the active i18n bundle
+     * @param {HerkunftDim} dim the dimension descriptor
+     * @param {HerkunftDimState} state the dimension state from dimState
+     * @param {HerkunftStrings} strings the active i18n bundle
      * @param {{sellAmount: number}|null} sell the SELL context, or null
      */
     function updateDimUi(section, dim, state, strings, sell) {
-        const block = section.querySelector(`[data-herkunft-dim="${dim.field}"]`);
+        const block = /** @type {HTMLElement | null} */ (
+            section.querySelector(`[data-herkunft-dim="${dim.field}"]`)
+        );
         if (!block) {
             return;
         }
@@ -432,7 +481,9 @@
             const shown = Math.max(0, state.fromRest);
             restEl.textContent = strings.rest.replace('{0}', fmtAmount(shown, dim.isPiece));
         }
-        const warnEl = block.querySelector('[data-herkunft-warn]');
+        const warnEl = /** @type {HTMLElement | null} */ (
+            block.querySelector('[data-herkunft-warn]')
+        );
         if (warnEl) {
             if (
                 state.hasDeducted &&
@@ -456,13 +507,15 @@
      * its share of the sale amount, the unassigned remainder goes to the personal account.
      *
      * @param {HTMLElement} block the mission dimension block
-     * @param {object} dim the dimension descriptor
-     * @param {object} state the dimension state
+     * @param {HerkunftDim} dim the dimension descriptor
+     * @param {HerkunftDimState} state the dimension state
      * @param {{sellAmount: number}|null} sell the SELL context, or null
-     * @param {object} strings the active i18n bundle
+     * @param {HerkunftStrings} strings the active i18n bundle
      */
     function updateProceeds(block, dim, state, sell, strings) {
-        const el = block.querySelector('[data-herkunft-proceeds]');
+        const el = /** @type {HTMLElement | null} */ (
+            block.querySelector('[data-herkunft-proceeds]')
+        );
         if (!el) {
             return;
         }
@@ -515,9 +568,13 @@
     function recompute(prefix) {
         const section = sectionOf(prefix);
         const ctx = registry[prefix];
-        const submitBtn = section
-            ? document.getElementById(section.getAttribute('data-herkunft-submit-id'))
-            : null;
+        const submitBtn = /** @type {HTMLButtonElement | null} */ (
+            section
+                ? document.getElementById(
+                      /** @type {string} */ (section.getAttribute('data-herkunft-submit-id')),
+                  )
+                : null
+        );
         if (!section || !ctx || ctx.dims.length === 0 || !isActive(section)) {
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -558,9 +615,10 @@
         if (body) {
             body.textContent = '';
         }
-        const leaf = itemId
-            ? document.querySelector(`.tree-row--leaf[data-item-id="${itemId}"]`)
-            : null;
+        const leaf = /** @type {HTMLElement | null} */ (
+            itemId ? document.querySelector(`.tree-row--leaf[data-item-id="${itemId}"]`) : null
+        );
+        /** @type {HerkunftDim[]} */
         const dims = [];
         if (leaf) {
             ['JOB_ORDER', 'MISSION'].forEach((field) => {
@@ -591,16 +649,18 @@
      * rest first.
      *
      * @param {string} prefix the modal prefix
-     * @returns {{jobOrderReductions: Array|null, missionReductions: Array|null}} the plan
+     * @returns {ReturnType<KrtHerkunftApi['collect']>} the plan
      */
     function collect(prefix) {
         const section = sectionOf(prefix);
         const ctx = registry[prefix];
+        /** @type {ReturnType<KrtHerkunftApi['collect']>} */
         const out = { jobOrderReductions: null, missionReductions: null };
         if (!section || !ctx || ctx.dims.length === 0 || !isActive(section)) {
             return out;
         }
         ctx.dims.forEach((dim) => {
+            /** @type {KrtHerkunftReduction[]} */
             const list = [];
             dim.tags.forEach((tag) => {
                 const input = tagInput(section, dim.field, tag.targetId);

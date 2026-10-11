@@ -1,3 +1,5 @@
+// @ts-check
+
 const MISSIONS_SECTIONS = {
     list: { container: '#missions-results', fragmentValue: 'results' },
 };
@@ -5,13 +7,16 @@ const MISSIONS_SECTIONS = {
 (function () {
     'use strict';
 
-    const form = document.getElementById('missions-filter-form');
+    const form = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('missions-filter-form')
+    );
     const resultsContainer = document.getElementById('missions-results');
     const loadingIndicator = document.getElementById('missions-loading-indicator');
     const resetBtn = document.getElementById('missions-filter-reset');
 
     if (!resultsContainer || !window.krtFetch) return;
 
+    /** @type {number | null} */
     let debounceTimer = null;
 
     function buildQueryString() {
@@ -19,7 +24,7 @@ const MISSIONS_SECTIONS = {
         const data = new FormData(form);
         const params = new URLSearchParams();
         for (const [key, value] of data.entries()) {
-            if (value !== '') params.append(key, value);
+            if (value !== '') params.append(key, String(value));
         }
         return params.toString();
     }
@@ -48,7 +53,7 @@ const MISSIONS_SECTIONS = {
     if (!form) return;
 
     function onFilterChange() {
-        clearTimeout(debounceTimer);
+        clearTimeout(debounceTimer ?? undefined);
         debounceTimer = setTimeout(() => {
             loadResults(true);
         }, 300);
@@ -57,12 +62,18 @@ const MISSIONS_SECTIONS = {
     const FILTER_PREF_KEY = 'missions_filter';
     const PERIODS = ['UPCOMING', 'PAST', 'ALL'];
 
+    const periodForm = form;
+
     function periodInputs() {
-        return form.querySelectorAll('input[name="period"]');
+        return /** @type {NodeListOf<HTMLInputElement>} */ (
+            periodForm.querySelectorAll('input[name="period"]')
+        );
     }
 
     function currentPeriod() {
-        const checked = form.querySelector('input[name="period"]:checked');
+        const checked = /** @type {HTMLInputElement | null} */ (
+            periodForm.querySelector('input[name="period"]:checked')
+        );
         return checked ? checked.value : 'UPCOMING';
     }
 
@@ -122,8 +133,10 @@ const MISSIONS_SECTIONS = {
 
     if (resetBtn) {
         resetBtn.addEventListener('click', () => {
-            form.querySelectorAll(
-                'input[type="search"], input[type="text"], input[type="hidden"], input[type="date"], input[type="time"]',
+            /** @type {NodeListOf<HTMLInputElement>} */ (
+                form.querySelectorAll(
+                    'input[type="search"], input[type="text"], input[type="hidden"], input[type="date"], input[type="time"]',
+                )
             ).forEach((el) => {
                 el.value = '';
             });

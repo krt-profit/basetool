@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 (function () {
     'use strict';
 
@@ -35,6 +37,7 @@
     const form = document.getElementById('mb-filter-form');
     let selectedId = readSelectedId();
     let selectedRequestId = readSelectedRequestId();
+    /** @type {number | null} */
     let searchTimer = null;
 
     function fmt(template, value) {
@@ -52,7 +55,9 @@
     }
 
     function val(selector) {
-        const el = document.querySelector(selector);
+        const el = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            document.querySelector(selector)
+        );
         return el ? el.value.trim() : '';
     }
 
@@ -72,7 +77,9 @@
      * @returns {string} `mein` for the caller's own entries, `alle` for every entry
      */
     function activeTab() {
-        const checked = form ? form.querySelector('input[name="scope"]:checked') : null;
+        const checked = /** @type {HTMLInputElement | null} */ (
+            form ? form.querySelector('input[name="scope"]:checked') : null
+        );
         return checked && checked.value === 'mine' ? 'mein' : 'alle';
     }
 
@@ -86,7 +93,9 @@
             return;
         }
         const wanted = tab === 'mein' ? 'mine' : 'all';
-        form.querySelectorAll('input[name="scope"]').forEach((radio) => {
+        /** @type {NodeListOf<HTMLInputElement>} */ (
+            form.querySelectorAll('input[name="scope"]')
+        ).forEach((radio) => {
             radio.checked = radio.value === wanted;
         });
     }
@@ -193,7 +202,9 @@
     }
 
     function setIfDifferent(selector, value) {
-        const el = document.querySelector(selector);
+        const el = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
+            document.querySelector(selector)
+        );
         const next = value == null ? '' : String(value);
         if (!el || el.value.trim() === next) {
             return false;
@@ -506,6 +517,9 @@
     }
 
     function deactivateOffer(id) {
+        if (!window.showKrtConfirm) {
+            return;
+        }
         window
             .showKrtConfirm(
                 i18n.deactivateConfirmTitle,
@@ -556,6 +570,9 @@
     }
 
     function deactivateRequest(id) {
+        if (!window.showKrtConfirm) {
+            return;
+        }
         window
             .showKrtConfirm(
                 gi18n.deactivateConfirmTitle,
@@ -659,16 +676,17 @@
     }
 
     document.addEventListener('click', (e) => {
+        const target = /** @type {Element} */ (e.target);
         let el;
-        if ((el = e.target.closest('[data-mb-mode]'))) {
+        if ((el = target.closest('[data-mb-mode]'))) {
             switchMode(el.getAttribute('data-mb-mode') === 'requests' ? 'requests' : 'offers');
             return;
         }
-        if (e.target.closest('[data-mb-reset]') || e.target.closest('[data-mg-reset]')) {
+        if (target.closest('[data-mb-reset]') || target.closest('[data-mg-reset]')) {
             resetFilters();
             return;
         }
-        if (e.target.closest('[data-mb-deselect]') || e.target.closest('[data-mg-deselect]')) {
+        if (target.closest('[data-mb-deselect]') || target.closest('[data-mg-deselect]')) {
             const md = document.querySelector('.mb-md');
             if (md) {
                 md.classList.remove('has-sel');
@@ -676,26 +694,26 @@
             return;
         }
         if (
-            (el = e.target.closest('[data-mb-interest]')) ||
-            (el = e.target.closest('[data-mb-deactivate]')) ||
-            (el = e.target.closest('[data-mb-edit]')) ||
-            (el = e.target.closest('[data-mb-open-release]')) ||
-            (el = e.target.closest('[data-mb-open-item]'))
+            (el = target.closest('[data-mb-interest]')) ||
+            (el = target.closest('[data-mb-deactivate]')) ||
+            (el = target.closest('[data-mb-edit]')) ||
+            (el = target.closest('[data-mb-open-release]')) ||
+            (el = target.closest('[data-mb-open-item]'))
         ) {
             handleAction(el);
             return;
         }
         if (
-            (el = e.target.closest('[data-mg-interest]')) ||
-            (el = e.target.closest('[data-mg-deactivate]')) ||
-            (el = e.target.closest('[data-mg-edit]')) ||
-            (el = e.target.closest('[data-mg-open-request]')) ||
-            (el = e.target.closest('[data-mg-open-item-request]'))
+            (el = target.closest('[data-mg-interest]')) ||
+            (el = target.closest('[data-mg-deactivate]')) ||
+            (el = target.closest('[data-mg-edit]')) ||
+            (el = target.closest('[data-mg-open-request]')) ||
+            (el = target.closest('[data-mg-open-item-request]'))
         ) {
             handleRequestAction(el);
             return;
         }
-        if ((el = e.target.closest('[data-mb-select]'))) {
+        if ((el = target.closest('[data-mb-select]'))) {
             selectedId = el.getAttribute('data-offer-id');
             markActiveRow(selectedId);
             const mdSel = document.querySelector('.mb-md');
@@ -705,7 +723,7 @@
             swapDetail(selectedId);
             return;
         }
-        if ((el = e.target.closest('[data-mg-select]'))) {
+        if ((el = target.closest('[data-mg-select]'))) {
             selectedRequestId = el.getAttribute('data-request-id');
             markActiveRequestRow(selectedRequestId);
             const mdSel = document.querySelector('.mb-md');
@@ -717,17 +735,19 @@
     });
 
     document.addEventListener('input', (e) => {
-        if (e.target.matches('#mb-search, [data-mb-minquality], [data-mb-minamount]')) {
+        const target = /** @type {Element} */ (e.target);
+        if (target.matches('#mb-search, [data-mb-minquality], [data-mb-minamount]')) {
             persistFilters();
             debouncedList();
         }
     });
 
     document.addEventListener('change', (e) => {
-        if (e.target.matches('[data-mb-sort], [data-mb-exclude-stolen]')) {
+        const target = /** @type {Element} */ (e.target);
+        if (target.matches('[data-mb-sort], [data-mb-exclude-stolen]')) {
             persistFilters();
             swapList();
-        } else if (e.target.matches('#mb-filter-form input[name="scope"]')) {
+        } else if (target.matches('#mb-filter-form input[name="scope"]')) {
             clearSelection();
             updateCounts();
             persistFilters();
@@ -748,6 +768,7 @@
         });
     }
 
+    /** @type {number | null} */
     let peerTimer = null;
     function onPeerChanged(sections) {
         const secs = Array.isArray(sections) ? sections : [];

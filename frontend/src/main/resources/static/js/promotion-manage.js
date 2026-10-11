@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global MSG_SAVED, MSG_ERROR, MSG_CONFLICT, MSG_LAST_EVAL, MSG_BULK_CONFIRM_TITLE, MSG_BULK_CONFIRM_MSG, MSG_BULK_NEED_CAT, MSG_BULK_NEED_LEVEL, MSG_CSV_NAME, MSG_CSV_HEADER_MEMBER, MSG_CSV_HEADER_RANK, MSG_CSV_HEADER_ELIG, MSG_CSV_HEADER_LAST, SORT_LABELS, STORAGE_KEY_COLLAPSED, STORAGE_KEY_SORT, STORAGE_KEY_FILTERS, MSG_REFRESH_FAILED */
 
 function pmPutEvaluation(url, payload) {
@@ -252,9 +254,15 @@ function pmCollapseAllTopics() {
 }
 
 function pmGetFilterState() {
-    const search = document.getElementById('pm-member-search');
-    const elig = document.getElementById('pm-filter-eligible');
-    const noEval = document.getElementById('pm-filter-no-eval');
+    const search = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('pm-member-search')
+    );
+    const elig = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('pm-filter-eligible')
+    );
+    const noEval = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('pm-filter-no-eval')
+    );
     return {
         search: ((search && search.value) || '').trim().toLowerCase(),
         eligibleOnly: !!(elig && elig.checked),
@@ -278,8 +286,12 @@ function pmRestoreFilters() {
         const raw = localStorage.getItem(STORAGE_KEY_FILTERS);
         if (!raw) return;
         const f = JSON.parse(raw);
-        const elig = document.getElementById('pm-filter-eligible');
-        const noEval = document.getElementById('pm-filter-no-eval');
+        const elig = /** @type {HTMLInputElement | null} */ (
+            document.getElementById('pm-filter-eligible')
+        );
+        const noEval = /** @type {HTMLInputElement | null} */ (
+            document.getElementById('pm-filter-no-eval')
+        );
         if (elig && typeof f.eligibleOnly === 'boolean') elig.checked = f.eligibleOnly;
         if (noEval && typeof f.noEvalOnly === 'boolean') noEval.checked = f.noEvalOnly;
     } catch {}
@@ -378,7 +390,9 @@ function pmRefreshBulkPanel() {
         panel.hidden = count === 0;
         panel.classList.toggle('visible', count > 0);
     }
-    const selectAll = document.getElementById('pm-select-all');
+    const selectAll = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('pm-select-all')
+    );
     if (selectAll) {
         const visible = document.querySelectorAll(
             '.pm-matrix tbody tr[data-pm-username]:not(.pm-row-hidden)',
@@ -404,7 +418,7 @@ function pmOnSelectAll(checkbox) {
     );
     visible.forEach((row) => {
         row.classList.toggle('pm-row-selected', checkbox.checked);
-        const cb = row.querySelector('.pm-row-checkbox');
+        const cb = /** @type {HTMLInputElement | null} */ (row.querySelector('.pm-row-checkbox'));
         if (cb) cb.checked = checkbox.checked;
     });
     pmRefreshBulkPanel();
@@ -412,10 +426,12 @@ function pmOnSelectAll(checkbox) {
 function pmClearSelection() {
     document.querySelectorAll('.pm-matrix tbody tr.pm-row-selected').forEach((r) => {
         r.classList.remove('pm-row-selected');
-        const cb = r.querySelector('.pm-row-checkbox');
+        const cb = /** @type {HTMLInputElement | null} */ (r.querySelector('.pm-row-checkbox'));
         if (cb) cb.checked = false;
     });
-    const selectAll = document.getElementById('pm-select-all');
+    const selectAll = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('pm-select-all')
+    );
     if (selectAll) {
         selectAll.checked = false;
         selectAll.indeterminate = false;
@@ -424,8 +440,12 @@ function pmClearSelection() {
 }
 
 function pmBulkApply() {
-    const catSel = document.getElementById('pm-bulk-category');
-    const lvlSel = document.getElementById('pm-bulk-level');
+    const catSel = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('pm-bulk-category')
+    );
+    const lvlSel = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('pm-bulk-level')
+    );
     const categoryId = catSel ? catSel.value : '';
     const level = lvlSel ? lvlSel.value : '';
     if (!categoryId) {
@@ -443,6 +463,7 @@ function pmBulkApply() {
     const rows = pmGetSelectedRows();
     if (rows.length === 0) return;
 
+    if (!catSel || !lvlSel) return;
     const levelLabel = lvlSel.options[lvlSel.selectedIndex].textContent.trim();
     const catLabel = catSel.options[catSel.selectedIndex].textContent.trim();
     const msg = MSG_BULK_CONFIRM_MSG.replace('{level}', levelLabel)
@@ -459,8 +480,10 @@ function pmBulkApply() {
         const apiLevel = level === '__NONE__' ? '' : level;
         rows.forEach((row) => {
             const userId = row.getAttribute('data-pm-user-id');
-            const select = document.querySelector(
-                `.level-select[data-user-id="${userId}"][data-category-id="${categoryId}"]`,
+            const select = /** @type {HTMLSelectElement | null} */ (
+                document.querySelector(
+                    `.level-select[data-user-id="${userId}"][data-category-id="${categoryId}"]`,
+                )
             );
             if (!select) return;
             select.value = apiLevel;
@@ -557,7 +580,9 @@ function pmExportCsv() {
 
         const cells = [username, rank, eligText, lastEval];
         catIds.forEach((catId) => {
-            const select = row.querySelector(`.level-select[data-category-id="${catId}"]`);
+            const select = /** @type {HTMLSelectElement | null} */ (
+                row.querySelector(`.level-select[data-category-id="${catId}"]`)
+            );
             cells.push(select ? pmLevelLabel(select.value) : '');
         });
         lines.push(cells.map(pmCsvEscape).join(','));

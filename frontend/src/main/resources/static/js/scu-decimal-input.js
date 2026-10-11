@@ -1,3 +1,5 @@
+// @ts-check
+
 (function (root) {
     'use strict';
 
@@ -55,7 +57,7 @@
      * Rounds a canonical, non-negative dot string half up to three decimals on the digit string and
      * strips trailing zeros. Values with at most three decimals are returned unchanged.
      *
-     * @param {string} s a canonical dot string from {@link normalize}
+     * @param {string} s a canonical dot string from `normalize`
      * @returns {string} the value rounded to three decimals
      */
     function round(s) {
@@ -88,7 +90,7 @@
      * Reduces a canonical dot string to a non-negative integer string, dropping any fractional part
      * and leading zeros ("007" -> "7", "12.9" -> "12").
      *
-     * @param {string} s a canonical dot string from {@link normalize}
+     * @param {string} s a canonical dot string from `normalize`
      * @returns {string} the integer string, or "" when there is no number
      */
     function toInteger(s) {
@@ -101,7 +103,7 @@
     }
 
     /**
-     * Parses a user-entered amount via {@link normalize}, accepting "." and "," as the decimal
+     * Parses a user-entered amount via `normalize`, accepting "." and "," as the decimal
      * separator.
      *
      * @param {*} raw the raw field value
@@ -178,7 +180,7 @@
      * @param {Event} e the input event
      */
     function onInput(e) {
-        const el = e.target;
+        const el = /** @type {HTMLInputElement} */ (e.target);
         if (!el || typeof el.matches !== 'function' || !el.matches(SELECTOR)) {
             return;
         }
@@ -205,7 +207,7 @@
      * @param {Event} e the change event
      */
     function onCommit(e) {
-        const el = e.target;
+        const el = /** @type {HTMLInputElement} */ (e.target);
         if (!el || typeof el.matches !== 'function' || !el.matches(SELECTOR)) {
             return;
         }
@@ -220,18 +222,20 @@
      * @param {Event} e the submit event
      */
     function canonicaliseForm(e) {
-        const form = e.target;
+        const form = /** @type {HTMLFormElement} */ (e.target);
         if (!form || typeof form.querySelectorAll !== 'function') {
             return;
         }
         let blocked = false;
-        form.querySelectorAll(SELECTOR).forEach((el) => {
-            el.value = canonicalValue(el);
-            validate(el);
-            if (!el.checkValidity()) {
-                blocked = true;
-            }
-        });
+        /** @type {NodeListOf<HTMLInputElement>} */ (form.querySelectorAll(SELECTOR)).forEach(
+            (el) => {
+                el.value = canonicalValue(el);
+                validate(el);
+                if (!el.checkValidity()) {
+                    blocked = true;
+                }
+            },
+        );
         if (blocked) {
             e.preventDefault();
             if (typeof form.reportValidity === 'function') {

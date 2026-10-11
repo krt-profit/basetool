@@ -1,3 +1,5 @@
+// @ts-check
+
 /* exported krtAutocomplete */
 /**
  * Initialize a custom autocomplete on an input element.
@@ -13,7 +15,7 @@ function krtAutocomplete(inp, dataSource, options = {}) {
     a.setAttribute('id', `${inp.id}-autocomplete-list`);
     a.setAttribute('class', 'autocomplete-items');
 
-    const parent = inp.parentNode;
+    const parent = /** @type {HTMLElement} */ (inp.parentNode);
     if (window.getComputedStyle(parent).position === 'static') {
         parent.style.position = 'relative';
     }
@@ -47,8 +49,8 @@ function krtAutocomplete(inp, dataSource, options = {}) {
     });
 
     inp.addEventListener('keydown', (e) => {
-        let x = document.getElementById(`${inp.id}-autocomplete-list`);
-        if (x) x = x.getElementsByTagName('div');
+        const list = document.getElementById(`${inp.id}-autocomplete-list`);
+        const x = list ? list.getElementsByTagName('div') : null;
         if (e.keyCode === 40) {
             currentFocus++;
             addActive(x);

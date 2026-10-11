@@ -17,8 +17,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global KRT_ORDERS_REORDER_I18N */
 
+/**
+ * Moves a job order to a priority slot, refreshes the queue and toasts the outcome.
+ *
+ * @param {string | undefined} orderId the id of the dragged job order
+ * @param {string} targetPriority the priority of the neighbouring order it takes over
+ */
 async function persistOrderReorder(orderId, targetPriority) {
     const container = document.getElementById('orders-results');
     let res = { ok: false };
@@ -57,19 +65,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('orders-results');
     if (!container) return;
 
+    /** @type {HTMLTableRowElement | null} */
     let draggedRow = null;
     let oldIndex = -1;
 
+    /**
+     * @param {Event} e a drag event inside the queue
+     * @returns {HTMLTableRowElement | null} the draggable row under the event target
+     */
+    const rowOf = (e) =>
+        /** @type {HTMLTableRowElement | null} */ (
+            /** @type {Element} */ (e.target).closest('tr.draggable-row')
+        );
+
+    const queueRows = () =>
+        /** @type {HTMLTableRowElement[]} */ (
+            Array.from(container.querySelectorAll('tr.draggable-row'))
+        );
+
     container.addEventListener('dragstart', (e) => {
-        draggedRow = e.target.closest('tr.draggable-row');
+        draggedRow = rowOf(e);
         if (!draggedRow) return;
 
         window.__ordersDragging = true;
         draggedRow.style.opacity = '0.5';
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', draggedRow.dataset.id);
+        if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedRow.dataset.id ?? '');
+        }
 
-        const rows = Array.from(container.querySelectorAll('tr.draggable-row'));
+        const rows = queueRows();
         oldIndex = rows.indexOf(draggedRow);
     });
 
@@ -83,10 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     container.addEventListener('dragover', (e) => {
         e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
 
-        const targetRow = e.target.closest('tr.draggable-row');
-        if (!targetRow || targetRow === draggedRow) return;
+        const targetRow = rowOf(e);
+        if (!targetRow || !draggedRow || targetRow === draggedRow) return;
 
         const bounding = targetRow.getBoundingClientRect();
         const offset = bounding.y + bounding.height / 2;
@@ -102,12 +127,13 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         if (!draggedRow || oldIndex === -1) return;
 
-        const rows = Array.from(container.querySelectorAll('tr.draggable-row'));
+        const rows = queueRows();
         const newIndex = rows.indexOf(draggedRow);
 
         if (newIndex === oldIndex) return;
 
-        let targetPriority = null;
+        /** @type {string | undefined} */
+        let targetPriority;
         if (newIndex > oldIndex) {
             targetPriority = rows[newIndex - 1].dataset.priority;
         } else if (newIndex < oldIndex) {

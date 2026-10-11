@@ -261,12 +261,6 @@ public class Mission extends AbstractEntity<UUID> {
   @OptimisticLock(excluded = true)
   private Set<Mission> subMissions = new HashSet<>();
 
-  @OneToMany(mappedBy = "mission")
-  @OrderBy("startedAt DESC")
-  @JsonIgnore
-  @OptimisticLock(excluded = true)
-  private Set<RefineryOrder> refineryOrders = new LinkedHashSet<>();
-
   @Column(name = "operation_id")
   @OptimisticLock(excluded = true)
   private UUID operationId;

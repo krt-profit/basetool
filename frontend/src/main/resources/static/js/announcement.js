@@ -17,15 +17,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global ANNOUNCE_MSG, ANNOUNCE_CONFLICT */
 
 document.addEventListener('DOMContentLoaded', () => {
     const deleteModal = document.getElementById('delete-confirm-modal');
-    const triggerDeleteBtn = document.getElementById('trigger-delete-confirm');
-    const closeDeleteBtns = document.querySelectorAll('.close-delete-modal');
-    const updateForm = document.getElementById('announcement-update-form');
-    const deleteForm = document.getElementById('announcement-delete-form');
-    const contentField = document.getElementById('info-edit-content');
+    const triggerDeleteBtn = /** @type {HTMLButtonElement | null} */ (
+        document.getElementById('trigger-delete-confirm')
+    );
+    const closeDeleteBtns = /** @type {NodeListOf<HTMLElement>} */ (
+        document.querySelectorAll('.close-delete-modal')
+    );
+    const updateForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('announcement-update-form')
+    );
+    const deleteForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('announcement-delete-form')
+    );
+    const contentField = /** @type {HTMLTextAreaElement | null} */ (
+        document.getElementById('info-edit-content')
+    );
     const counter = document.getElementById('info-edit-counter');
 
     /** Writes the textarea's current character count into the counter under it. */
@@ -71,11 +83,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateForm.submit();
                 return;
             }
-            const versionInput = updateForm.querySelector('input[name="version"]');
-            const contentInput = updateForm.querySelector('textarea[name="content"]');
+            const versionInput = /** @type {HTMLInputElement | null} */ (
+                updateForm.querySelector('input[name="version"]')
+            );
+            const contentInput = /** @type {HTMLTextAreaElement | null} */ (
+                updateForm.querySelector('textarea[name="content"]')
+            );
             window.krtFetch.write({
                 method: 'POST',
-                url: updateForm.getAttribute('action'),
+                url: updateForm.getAttribute('action') || '',
                 payload: {
                     content: contentInput ? contentInput.value : '',
                     version:
@@ -104,14 +120,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             window.krtFetch.write({
                 method: 'POST',
-                url: deleteForm.getAttribute('action'),
+                url: deleteForm.getAttribute('action') || '',
                 successMessage: ANNOUNCE_MSG.deleteSuccess,
                 errorMessage: ANNOUNCE_MSG.deleteError,
                 conflict: ANNOUNCE_CONFLICT,
                 onSuccess() {
                     if (updateForm) {
-                        const versionInput = updateForm.querySelector('input[name="version"]');
-                        const contentInput = updateForm.querySelector('textarea[name="content"]');
+                        const versionInput = /** @type {HTMLInputElement | null} */ (
+                            updateForm.querySelector('input[name="version"]')
+                        );
+                        const contentInput = /** @type {HTMLTextAreaElement | null} */ (
+                            updateForm.querySelector('textarea[name="content"]')
+                        );
                         if (contentInput) contentInput.value = '';
                         if (versionInput) versionInput.value = '0';
                     }

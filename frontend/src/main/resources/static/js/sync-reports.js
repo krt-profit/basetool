@@ -17,6 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /* global SYNC_MSG */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -24,9 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
         window.krtFetch.bindSwap({ container: '#sync-results', history: true });
     }
 
-    const form = document.getElementById('purge-form');
-    const daysInput = document.getElementById('purge-days');
-    const sourceInput = form ? form.querySelector('input[name="source"]') : null;
+    const form = /** @type {HTMLFormElement | null} */ (document.getElementById('purge-form'));
+    const daysInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('purge-days')
+    );
+    const sourceInput = /** @type {HTMLInputElement | null} */ (
+        form ? form.querySelector('input[name="source"]') : null
+    );
     const modal = document.getElementById('purge-confirm-modal');
     const trigger = document.getElementById('purge-trigger');
     const cancelBtn = document.getElementById('purge-cancel');
@@ -37,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
+    const purgeForm = form;
+    const purgeDays = daysInput;
     const template = messageEl ? messageEl.getAttribute('data-template') || '' : '';
 
     function closeModal() {
@@ -45,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderMessage() {
         if (messageEl && template) {
-            messageEl.textContent = template.replace('{0}', daysInput.value);
+            messageEl.textContent = template.replace('{0}', purgeDays.value);
         }
     }
 
@@ -60,18 +68,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function purge() {
-        if (!daysInput.checkValidity()) {
-            daysInput.reportValidity();
+        if (!purgeDays.checkValidity()) {
+            purgeDays.reportValidity();
             return;
         }
         if (!window.krtFetch) {
-            form.submit();
+            purgeForm.submit();
             return;
         }
         closeModal();
         const sourceValue = sourceInput ? sourceInput.value : '';
         const url = `/admin/sync-reports/delete-old?days=${encodeURIComponent(
-            daysInput.value,
+            purgeDays.value,
         )}&source=${encodeURIComponent(sourceValue)}`;
         window.krtFetch.write({
             method: 'POST',

@@ -1055,7 +1055,8 @@ as each pair is decoupled.
   `UserDeletionService` use them, so a move closes a package cycle. They move with P3-8 (the
   `mission -> refinery` association and the `MissionFinanceContributor` SPI), where
   `RefineryOrder.mission` becomes an id. So the policy does not own the refinery's JPQL scope
-  fragment yet either. (2) No command API: no other module writes a refinery order. The
+  fragment yet either. *(P3-8b, 2026-10-11: the association and the SPI are done; two imports still
+  block the move, now tracked as P4-3.)* (2) No command API: no other module writes a refinery order. The
   store still creates Lager rows itself (write family 2 of the evidence appendix); that write
   becomes a call of the Lager's `StockCommands` with P3-5.
 - `joborder` — **done 2026-10-10.**
@@ -1399,7 +1400,84 @@ as each pair is decoupled.
   (`mapper`) would close `model.dto ⇄ operation` and `mapper ⇄ operation` cycles, and
   `BusinessMetricsCollector` (`task`) reads the repository. They move once (2) is done. The refinery
   association (`Mission.refineryOrders`, `RefineryOrder.mission`, the `MissionFinanceContributor` SPI)
-  is the other half of P3-8 and still blocks the refinery's entities, repository and mapper.
+  is the other half of P3-8 and still blocks the refinery's entities, repository and mapper (done
+  as P3-8b below).
+
+- `refinery` ⇄ `mission` — **P3-8b done 2026-10-11, without the move.** `RefineryOrder.mission` becomes
+  `RefineryOrder.missionId` (the same `mission_id` column and foreign key, no migration) and the
+  inverse `Mission.refineryOrders` is dropped, the fifth and sixth of the eight business
+  associations of §5.6 turned into ids; only `Operation.missions`, kept as a read-only view, and
+  `MissionUnit.ship` remain.
+  1. *Characterise*: `RefineryOrderReadNoNPlusOneTest` (added before the change, green on the
+     unchanged code) pins that the my-orders page and an order's detail issue a bounded number of
+     statements whether a member's orders belong to 3 or to 25 missions, and that every row carries
+     its mission's reference. `RefineryMissionLinkContractTest` (also green on the unchanged code,
+     since it reads and writes the link through SQL) pins the mission's finance totals with a linked
+     order, the three operation finance views embedding the order with its mission reference, and
+     that deleting a mission keeps the order, clears its link and moves its row version.
+  2. *Read API* (§5.3): what an order shows of its mission comes from `mission.api.MissionReferences`
+     (the refinery sits above the mission, so this is a plain call down, not an inversion),
+     implemented by `mission.internal.MissionReferenceReader` with one projection query
+     (`MissionRepository.findReferencesByIdIn`), through the per-transaction memo
+     `refinery.internal.RefineryOrderMissionCache` (`mapper.RefineryOrderMissionLookup`): its first
+     miss loads every mission the orders of the persistence context are linked to, so a page costs
+     one statement whatever its size. `RefineryOrderMapper` builds the embedded
+     `MissionReferenceDto` through the lookup. The create and update paths keep their checks
+     (`MissionRepository.findById`, the participant requirement) and write the id. The my-orders page
+     reads 3 statements for 3 and for 25 orders (it was 2: the mission was a join fetch of the page
+     query); proven able to fail: without the context scan it is 27 against 5.
+  3. *Finance SPI* (§5.3): `mission.api.MissionFinanceContributor` (`contributionTo`) returns the
+     profit, the expense sum and the expense-line count other modules add to a mission's totals
+     (`MissionFinanceContribution`); `refinery.internal.RefineryMissionFinance` implements it over
+     the same `findByMissionId` read and the same arithmetic as before (a zero profit adds nothing, an
+     order is an expense line when its expenses are positive). `MissionFinanceEntryService` asks it
+     instead of reading `RefineryOrderRepository`; `RefineryMissionFinanceTest` carries the
+     arithmetic cases that were in `MissionFinanceEntryServiceTest`.
+  4. *Observer* (§5.3): deleting a mission calls `mission.api.MissionDeletionObserver`
+     (`@ObserverSpi`, `MANDATORY`), implemented by `refinery.internal.MissionRefineryOrderRelease`,
+     which loads the linked orders and clears their link as entities, so each order's row version and
+     update timestamp move exactly as when `Mission.refineryOrders` was walked. No audit row, as before.
+  5. *Types*: `MissionFinanceSummaryDto` moves from `model.dto` to `operation.internal`. Only
+     `OperationFinanceService` builds it and `OperationFinanceDto` and `OperationController` carry it,
+     and the name rule `^Mission` had filed it under the mission module although it embeds
+     `RefineryOrderDto`. The OpenAPI schema keeps its name.
+  Baseline **43 → 38** (`Mission -> RefineryOrder`, `MissionService -> RefineryOrder`,
+  `MissionFinanceEntryService -> RefineryOrder` and `-> RefineryOrderRepository`,
+  `MissionFinanceSummaryDto -> RefineryOrderDto`); the architecture test's to-one association floor
+  drops 147 → 146.
+  **Corrections:** (1) The finance SPI serves the mission module only. The operation module
+  (rank 11) sits above the refinery (rank 10), so `OperationFinanceService`,
+  `OperationPayoutCalculator` and `OperationPayoutService` keep reading orders through the repository
+  and mapper without an inversion; they go behind a `refinery.api` view in the same step as the
+  entity move (P4-3), because they are three of its consumers. (2) The twelve refinery types of the
+  layer packages do not move, and the probe (a class-dependency graph over the compiled `main`
+  classes with the twelve reassigned to `refinery`) names exactly two imports that close a package
+  cycle: `LocationService -> RefineryOrderRepository` (`existsByLocationId`, the in-use check of a
+  location delete) and `UserDeletionService -> RefineryOrderRepository` (`updateOwner`, the GDPR
+  reassignment), both `service -> refinery` against the refinery's own `refinery -> service`
+  (`OwnerScopeService`, `UserService`, `ScopePredicate`). With those two edges taken out the probe
+  finds no cycle for `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`,
+  `RefineryOrderRepository` with `RefineryMissionProfitAggregate`, `RefineryOrderMapper`,
+  `RefineryOrderDto`, `RefineryGoodDto`, `RefineryOrderListDto`, the create and update requests and
+  the lookup. Inverting the first is the catalogue's job and the second a GDPR participant
+  (`UserReassignmentParticipant`, §7.6), so neither belongs here. `BusinessMetricsCollector` (`app`)
+  and the operation's three finance classes need no inversion for the cycle, and
+  `REFINERY_ORDER_SCOPE_TRIPLE` is package-private to `repository` (it becomes the policy's
+  fragment with the move), so `RefineryAccessPolicy` does not own the JPQL scope fragment yet.
+  (3) The `Operation` entity, `OperationStatus`, `OperationRepository`, `OperationMapper` and the
+  operation DTOs still do not move. The refinery half is gone, but the probe still finds the three
+  edges of P3-8a plus one: `MissionDto` and `MissionListDto` (`model`) and `MissionMapper`
+  (`mapper`, with its generated implementation) embed `OperationDto` and `OperationMapper`, and
+  `MissionPeerRedactor` (`mission.internal`) reads `OperationDto`. They move once the mission DTOs
+  stop embedding the operation's DTO (§5.2). Tracked as P4-4 (§7.6). (4) The six cases of a request's
+  mission reference keep their behaviour. On create, an absent reference and one without an id
+  leave the order unlinked, and one with an id links it after the participant check. On update, an
+  absent reference unlinks, one without an id leaves the link as it was, and one with an id
+  re-links. Because `RefineryOrder` holds only the id now, the update mapping marks the transient
+  order with the `@Transient` flag `missionReferenceWithoutId` and the service reads it.
+  `RefineryOrderMissionReferenceContractTest` pins all six, green on `afbeb41ef` first. (5) The list read costs one statement more than
+  before, as the mission left the page query's join fetch for the read API above; the count
+  stays flat in the page size, which is what REQ-DATA-003 asks.
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1431,6 +1509,19 @@ repository then move together; NullAway already covers the `inventory` tree.
 P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
 The five published interfaces already cover every foreign caller, so the move touches no
 other module; the §8.1 idioms go with it.
+**P4-3 — move the refinery's entities into `refinery.internal` / `refinery.api`** (carried from
+P3-8b, §7.5). It waits for the two imports the probe names: `LocationService`'s in-use check of
+`RefineryOrderRepository` (a catalogue-owned usage SPI, as for the hangar's ships) and
+`UserDeletionService`'s owner reassignment (the GDPR `UserReassignmentParticipant`). The move then
+takes `RefineryOrder`, `RefineryGood`, `RefineryOrderStatus`, the repository with
+`RefineryMissionProfitAggregate`, `RefineryOrderMapper`, the three order DTOs and the two request
+DTOs together, publishes the order DTOs and a finance view of the orders through `refinery.api` for
+`OperationFinanceService`, `OperationPayoutCalculator` and `OperationPayoutService`, and lets
+`RefineryAccessPolicy` own `REFINERY_ORDER_SCOPE_TRIPLE`.
+**P4-4 — move the operation's entity, repository, mapper and DTOs into `operation.internal` /
+`operation.api`** (carried from P3-8b, §7.5), once the mission DTOs stop embedding `OperationDto`
+(the REST DTO separation of §5.2): `MissionDto`, `MissionListDto`, `MissionMapper` and
+`MissionPeerRedactor` are the four classes that close the cycle today.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
@@ -1447,7 +1538,7 @@ domain stays a package.
 | F2 — **done 2026-10-04** | Exact session allow-list in its own release (D-10): `SessionTypeAllowList.SESSION_BOUND_TYPES`, 21 exact names; the `…frontend.model.` prefix is gone, `SessionBoundTypeClosureTest` holds the list equal to the derived set in both directions. Corrections: the list lives in the security class, not in the G-16 golden file (`session-bound-types.txt` is deleted, so `-PupdateSnapshots` can no longer widen the allow-list); the admitted application classes fall from 325 to 21, not "about 20" of "about eleven" forms — the 21 are 10 flashed forms and DTOs with their nested types and enums |
 | F3 — **done 2026-10-05** | Typed client per domain, small domains first (audit, notification, settings, dashboard, exchange, orgchart), then the large four; untyped `Map` relays typed in the same step |
 | F4 — **done 2026-10-10** | Package-by-domain move in one pull request; route/gate snapshot byte-identical. Released only after a release carrying F2 is in production (D-10) |
-| F5 — **layout fragment done 2026-10-11** | Templates and assets per domain (§8.2), with the page chrome as one layout fragment. The layout fragment is built (below); the per-domain template and asset layout is open |
+| F5 — **started 2026-10-11** | Templates and assets per domain (§8.2), with the page chrome as one layout fragment. Done so far: the type-check ratchet and the layout fragment (both below). Open: the per-domain template and asset layout, and the ES modules, with which `bank.js` is split (owner decision 2026-10-11) |
 
 *F1 as built (2026-10-04).* `service.BackendErrorMapper` classifies every failed call into one case
 of its sealed `Outcome` (`Problem`, `Reauthentication`, `CircuitOpen`, `BulkheadFull`, `Timeout`,
@@ -1563,6 +1654,46 @@ old class names in its flash maps; they resolve to no class, so the value fails 
 before the allow-list is consulted — dropped on `basetool_session_value_dropped_total`, not refused
 on `basetool_session_type_refused_total` — once per session, never the login (deployment.md).
 
+*F5 type-check ratchet as built (2026-10-11).* Design: `frontend/typecheck-ratchet.json` assigns
+every script of `static/js` to exactly one domain — the 21 frontend domains of §5.9 that have
+scripts (`audit` … `settings`) plus `kernel` for the shared infrastructure, 22 names in all — and
+lists the domains that are *migrated*. Every domain of the manifest must be migrated (a new domain
+cannot enter unchecked), and a migrated domain holds only scripts whose leading comments carry
+`// @ts-check`; the scan includes subfolders of `static/js`, `vendor/` excepted. `frontend/scripts/typecheck-ratchet.mjs` is the guard and
+`typecheck-ratchet.test.mjs` its test, wired as `:frontend:testTypecheckRatchet` into `check` (zero
+dependencies, like `testTrustedTypesJs`). It fails on: a script in no domain, in two, or a listed
+script that does not exist; an unchecked script in a migrated domain; a domain dropped from the
+migrated list (`MIGRATED_FLOOR`, which only grows); fewer checked scripts than
+`CHECKED_FILES_FLOOR`; `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error` anywhere; a `tsconfig.json`
+that excludes anything beyond vendor, `node_modules` and `build`, that stops including the scripts,
+or that loses `strict`. The test proves each rule on planted trees (among them an unchecked
+file in a migrated domain, a stray file, a stray file in a subfolder, a new unmigrated domain, a
+dropped domain, each suppression pragma) and runs the real tree. *Review corrections (same day):*
+the first version scanned only the top level of `static/js` although `tsconfig.json` includes
+`static/js/**`, so a script in a subfolder escaped every rule, and a new domain missing from
+`"migrated"` passed; both are closed and tested. Numbers: before, 113 scripts, 65 checked (58 %), 48 unchecked, 3 domains
+(`exchange`, `leadership`, `notification`) fully checked; after, 124 scripts, 124 checked, all 22
+domains migrated. The 48 scripts carried 2,393 type errors under `checkJs` (the three giants 538,
+221 and 185 of them); all are fixed by casts at the query, `@type`/`@param` JSDoc, and null guards,
+with no `any` element handle and no suppression. `types/*.d.ts` gained the `Window` members the
+scripts read, `KrtLiveSyncHandlers` and corrected bootstrap dictionaries; `safeSameOriginUrl` became
+non-optional because `head.html` loads it on every page.
+*The three giants* were split first, as byte-exact cuts at top-level statement boundaries (each
+proven by concatenating the parts against `git show` of the original) into parts that load by
+consecutive `defer` tags in the original order, the first part keeping the file name:
+`mission-detail.js` (3,283 lines) into 5 parts of 541 to 918 lines, `orders-detail.js`
+(2,650) into 6 parts of 293 to 944 lines, `bank.js` (2,211) into 3 parts, loaded by all nine bank
+pages. Corrections: **there are no domain folders yet** — the 113 scripts sat in one flat folder, and
+moving them would rewrite 113 template references and ~35 tests that F5's template track is
+changing at the same time, so the "folder" of the ratchet is the manifest's domain name today and
+the asset move turns each name into a folder (the keys are chosen to be the folder names). `bank.js`
+keeps 2,081 of its lines in one immediately invoked function whose sections call each other (modal
+priming, previews, movement rows); cutting inside it would have meant a shared object and about 60
+rewritten call sites, a refactor and not a split, so only its four trailing immediately invoked functions left it —
+the 20 % claim holds for the folder, not for that file. The owner decided on 2026-10-11 to leave the rest of `bank.js` as it is and to split it with the ES-module step, behind the import map, where its sections get explicit imports instead of a shared object. Every part lives in its domain, so the
+parts of a giant add to the domain's list in the same change. A load-time throw in one part now
+skips only the rest of that part, not the rest of the former file.
+
 *F5 layout fragment as built (2026-10-11).* `fragments/layout :: page` is the one place that
 composes a page: the `<html>` element, `fragments/head`, `fragments/sidebar` and `fragments/header`,
 the page's content, `fragments/toast` and the page's tail, in that order (REQ-FE-033). A page hands
@@ -1650,7 +1781,7 @@ JSpecify stays out for now (ADR-0192).
 | --- | --- | --- | --- |
 | **Document the browser baseline — decided: "Baseline 2025", ES2025** (D-16). **Done 2026-10-04**: TypeScript 7.0.2 accepts the `ES2025` lib (proven by a planted checked file), `tsconfig.json` and `eslint.config.mjs` are at 2025, the floor is in `ui-design-system.md` and REQ-FE-018, and ESLint rejects the three ES2025 APIs above the floor, which the `ES2025` lib declares. The features already shipped imply Chrome 105, Firefox 121, Safari 16.4; the decided floor is at least Chrome 122, Firefox 131, Safari/iOS 18.4 (iterator helpers; `Promise.try`, `RegExp.escape` and `Float16Array` need newer releases), which brings Set methods, iterator helpers, popover and same-document view transitions. Raise the type check's `lib`/`target` and ESLint's `ecmaVersion` from 2023 to 2025 once TypeScript 7 is proven to accept the `ES2025` lib; write the floor into `ui-design-system.md` and REQ-FE-018 | Every other modern-feature decision needs this answer; today a newer API in an unchecked file passes every gate | Members who cannot update iOS to 18.4 or later lose functions; the rejected alternative was "Baseline widely available" (ES2024, Safari 17.4) | `typecheckJs`, `lintJs`, the E2E browser matrix |
 | **ESLint core autofix rules** — **done 2026-10-04**: all five are errors for the browser and Node scripts, autofix applied (1,345 arrow callbacks, 723 template literals, 9 logical assignments, 1 `Object.hasOwn`; 5 `parseInt` radixes and 3 `||=` by hand); `?.`/`??` stay a by-hand change in `@ts-check` files (`prefer-template` for 664 concatenations, `prefer-arrow-callback`, `prefer-object-has-own`, `radix`, `logical-assignment-operators`); `?.`/`??` by hand while a file opts into `@ts-check` (the semantics differ for falsy values) | Consistent modern code with no new dependency | About 1,800 sites; conflicts with in-flight branches | `lintJs`, `typecheckJs`, E2E |
-| **Type-check ratchet per domain folder**; the three largest scripts (mission detail, bank, order detail — 20 % of all JavaScript) split before they are checked | Null safety reaches the files that change most | Cast churn in DOM-heavy code | A folder is "migrated" only when fully checked |
+| **Type-check ratchet per domain folder** — **done 2026-10-11** (§7.8, F5; 124 of 124 scripts checked, 22 of 22 domains migrated; the domain is a manifest name until the asset move makes it a folder); the three largest scripts (mission detail, bank, order detail — 20 % of all JavaScript) split before they are checked (mission detail into 5 parts, order detail into 6, bank into 3 with its first function still 2,081 lines) | Null safety reaches the files that change most | Cast churn in DOM-heavy code | A folder is "migrated" only when fully checked; `:frontend:testTypecheckRatchet`, proven on planted trees |
 | **Finish ADR-0069**: the 70 inline script blocks (1,860 lines, never linted) move into modules; one page puts eleven `[[#{…}]]` markers into a script without `th:inline` (a likely i18n defect). **Done 2026-10-04** (ADR-0069 amendment): on that day 67 blocks with 1,645 lines remained, 55 of them already pure data bootstraps; the eleven blocks with code moved into their modules (one new, `org-unit-bank.js`), five empty error-page blocks were deleted. Every inline script is now a `th:inline="javascript"` bootstrap of literals, checked against a grammar by `InlineScriptDataOnlyTest` (planted fixture, floors of 100 templates / 55 blocks); the head's `krtEvents` stub is its one listed exception. *Correction:* the eleven-marker defect had already been fixed (B-04); what was still broken was the `'[[#{…}]]'` form inside inlined string literals on the mission-data and special-commands admin pages, which rendered the texts in quotes — fixed by the move | Lintable, checkable code | Timing of inline versus module code | `InlineScriptLoadOrderTest`, `InlineScriptDataOnlyTest`, E2E |
 | **One read path**: `krtFetch.get`/`getJson` with re-authentication, the terms gate, refusal of redirected or non-JSON answers and `AbortController`; then forbid `fetch(` outside the transport and ban `XMLHttpRequest`. **Done 2026-10-04** (REQ-FE-031): 61 raw reads in 33 scripts plus one inline read in `members.html` migrated, `swap` reads through `get` too; ESLint bans `fetch`/`XMLHttpRequest`, and `BackgroundReadGateContractTest` pins the same for templates, which ESLint never sees | 56 raw reads behave the same way on session loss | Pickers that silently emptied now send the user to the login — the intended contract | A new E2E for a picker after session loss |
 | **Trusted Types**, report-only first through the existing `csp_violation` beacon, then enforced: two named policies, a tagged-template HTML builder, no default policy. **Done 2026-10-04 except the production switch** (ADR-0239): `krt-html` behind the `krtHtml` builder, `krt-fragment` inside `krt-fetch.js`; 42 builder sites, 26 clears and one `DOMParser` read migrated, `escape-html.js` removed; ESLint bans every sink and policy outside the two helpers; the report-only header is the default of `APP_SECURITY_TRUSTED_TYPES` (`report` / `enforce`), with the gauge `basetool_trusted_types_mode`. **The only remaining step** is switching production to `enforce`, a production configuration change the owner approves after a quiet period (`deployment.md` → *Trusted Types: report, then enforce*) | DOM-XSS becomes a browser-enforced property | Every future sink must use the helpers; under enforcement even `innerHTML = ''` throws | A violation collector in the dialog page-walk E2E (proven by a planted violation), `:frontend:testEslintBans`, `:frontend:testTrustedTypesJs`, `TrustedTypesModeTest` |
