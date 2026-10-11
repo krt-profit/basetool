@@ -153,7 +153,7 @@ class InventoryMergeGroupDataTest {
     offerRepository.save(
         MaterialExchangeOffer.builder()
             .kind(MaterialExchangeOfferKind.MATERIAL)
-            .inventoryItem(offerBacked)
+            .inventoryItemId(offerBacked.getId())
             .owner(user)
             .owningOrgUnit(orgUnit)
             .offeredAmount(3.0)
@@ -226,7 +226,7 @@ class InventoryMergeGroupDataTest {
     offerRepository.save(
         MaterialExchangeOffer.builder()
             .kind(MaterialExchangeOfferKind.MATERIAL)
-            .inventoryItem(offerBacked)
+            .inventoryItemId(offerBacked.getId())
             .owner(user)
             .owningOrgUnit(orgUnit)
             .offeredAmount(4.0)

@@ -50,11 +50,11 @@ import org.jetbrains.annotations.Nullable;
  *
  * <ul>
  *   <li>A {@link MaterialExchangeOfferKind#MATERIAL} offer overlays an {@link InventoryItem},
- *       reading material and quality live from {@link #inventoryItem} and offering {@link
+ *       reading material and quality live from {@link #inventoryItemId} and offering {@link
  *       #offeredAmount}; the item's location is never exposed (REQ-MARKET-004).
  *   <li>A {@link MaterialExchangeOfferKind#ITEM} offer names a craftable item by {@link
- *       #itemProductKey} with {@link #itemQuantity}; it is free-stated (no {@link #inventoryItem})
- *       or stock-backed, capped by the Lager row's stock (REQ-MARKET-014).
+ *       #itemProductKey} with {@link #itemQuantity}; it is free-stated (no {@link
+ *       #inventoryItemId}) or stock-backed, capped by the Lager row's stock (REQ-MARKET-014).
  * </ul>
  *
  * <p>Offers are signal-only; interest lives in {@link MaterialExchangeInterest}. At most one active
@@ -75,7 +75,7 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
   private UUID id;
 
   /**
-   * The offer kind, deciding whether {@link #inventoryItem} or {@link #itemProductKey}/{@link
+   * The offer kind, deciding whether {@link #inventoryItemId} or {@link #itemProductKey}/{@link
    * #itemName}/{@link #itemQuantity} is populated; a DB {@code CHECK} enforces the exclusivity.
    */
   @Enumerated(EnumType.STRING)
@@ -83,13 +83,12 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
   private MaterialExchangeOfferKind kind;
 
   /**
-   * The Lager row backing this offer: set for a material offer and a stock-backed item offer,
-   * {@code null} for a free-stated item offer. Its location is never read; deleting the row
+   * The id of the Lager row backing this offer: set for a material offer and a stock-backed item
+   * offer, {@code null} for a free-stated item offer. Its location is never read; deleting the row
    * cascades to the offer.
    */
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "inventory_item_id")
-  private InventoryItem inventoryItem;
+  @Column(name = "inventory_item_id")
+  private UUID inventoryItemId;
 
   /**
    * The normalized blueprint {@code product_key} of an item offer ({@code null} for a material
@@ -114,8 +113,8 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
   private Integer itemQuantity;
 
   /**
-   * The offering player (the Anbieter) — denormalised from {@code inventoryItem.user} at release.
-   * The owner's handle is shown to everyone on the board ("von {Spieler}"); it is the interessenten
+   * The offering player (the Anbieter) — denormalised from the Lager row's user at release. The
+   * owner's handle is shown to everyone on the board ("von {Spieler}"); it is the interessenten
    * names that stay owner-only, not the anbieter.
    */
   @ManyToOne(optional = false, fetch = FetchType.LAZY)
@@ -171,7 +170,7 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
         + ", kind="
         + kind
         + ", inventoryItemId="
-        + (inventoryItem != null ? inventoryItem.getId() : null)
+        + inventoryItemId
         + ", itemProductKey="
         + itemProductKey
         + ", itemQuantity="

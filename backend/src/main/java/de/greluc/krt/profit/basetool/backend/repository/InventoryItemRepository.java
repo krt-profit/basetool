@@ -995,7 +995,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       i.personal = :personal AND i.stolen = :stolen AND
       ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
       :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
-      o.inventoryItem = i) ORDER BY i.createdAt ASC, i.id ASC
+      o.inventoryItemId = i.id) ORDER BY i.createdAt ASC, i.id ASC
       """)
   List<InventoryItem> findMergeGroupForUpdate(
       @Param("userId") UUID userId,
@@ -1056,7 +1056,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       i.personal = :personal AND i.stolen = :stolen AND
       ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
       :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
-      o.inventoryItem = i)
+      o.inventoryItemId = i.id)
       """)
   long countMergeCandidates(
       @Param("userId") UUID userId,
@@ -1359,4 +1359,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
      */
     double getAmount();
   }
+
+  /**
+   * Loads the given Lager rows with their material in one read, for a page of Materialbörse offers.
+   *
+   * @param ids the rows
+   * @return the existing rows
+   */
+  @EntityGraph(attributePaths = {"material"})
+  List<InventoryItem> findWithMaterialByIdIn(Collection<UUID> ids);
 }

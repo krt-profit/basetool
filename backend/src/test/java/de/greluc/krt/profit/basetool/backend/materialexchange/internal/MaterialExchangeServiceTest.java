@@ -63,7 +63,11 @@ import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -111,6 +115,7 @@ class MaterialExchangeServiceTest {
   private final UUID offerId = UUID.randomUUID();
   private User owner;
   private MaterialExchangeOffer offer;
+  private final Map<UUID, InventoryItem> rows = new HashMap<>();
 
   /** Builds a fresh owner + active offer fixture before each test. */
   @BeforeEach
@@ -132,6 +137,17 @@ class MaterialExchangeServiceTest {
     Material material = material("Agricium");
     InventoryItem item = item(owner, material, 796, 340.0);
     offer = offer(offerId, item, owner);
+    lenient()
+        .when(inventoryItemRepository.findById(any()))
+        .thenAnswer(call -> Optional.ofNullable(rows.get(call.<UUID>getArgument(0))));
+    lenient()
+        .when(inventoryItemRepository.findWithMaterialByIdIn(any()))
+        .thenAnswer(
+            call ->
+                call.<Collection<UUID>>getArgument(0).stream()
+                    .map(rows::get)
+                    .filter(Objects::nonNull)
+                    .toList());
     lenient()
         .when(userMapper.toReferenceDto(any()))
         .thenReturn(new UserReferenceDto(ownerId, "Anbieter", "Anbieter", "Anbieter", null));
@@ -235,10 +251,10 @@ class MaterialExchangeServiceTest {
   /** Releasing an item the caller does not own is forbidden. */
   @Test
   void release_notItemOwner_forbidden() {
-    UUID itemId = offer.getInventoryItem().getId();
+    UUID itemId = rows.get(offer.getInventoryItemId()).getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(inventoryItemRepository.findById(itemId))
-        .thenReturn(Optional.of(offer.getInventoryItem()));
+        .thenReturn(Optional.of(rows.get(offer.getInventoryItemId())));
 
     assertThatThrownBy(
             () ->
@@ -255,10 +271,10 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void release_partialAmount_storesOfferedAmountAndExposesAvailableToOwner() {
-    UUID itemId = offer.getInventoryItem().getId();
+    UUID itemId = rows.get(offer.getInventoryItemId()).getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(inventoryItemRepository.findById(itemId))
-        .thenReturn(Optional.of(offer.getInventoryItem()));
+        .thenReturn(Optional.of(rows.get(offer.getInventoryItemId())));
     when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
         .thenReturn(Optional.empty());
     when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -277,10 +293,10 @@ class MaterialExchangeServiceTest {
   /** Offering more than the item's current stock is rejected (400) and persists nothing. */
   @Test
   void release_amountExceedsStock_badRequest() {
-    UUID itemId = offer.getInventoryItem().getId();
+    UUID itemId = rows.get(offer.getInventoryItemId()).getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(inventoryItemRepository.findById(itemId))
-        .thenReturn(Optional.of(offer.getInventoryItem()));
+        .thenReturn(Optional.of(rows.get(offer.getInventoryItemId())));
 
     assertThatThrownBy(
             () -> service.release(new MaterialExchangeReleaseRequest(itemId, 999.0, "zu viel")))
@@ -366,7 +382,7 @@ class MaterialExchangeServiceTest {
   @Test
   void updateOffer_changesOfferedAmountAndRemark() {
     offer.setVersion(3L);
-    offer.getInventoryItem().setAmount(340.0);
+    rows.get(offer.getInventoryItemId()).setAmount(340.0);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
     when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -384,7 +400,7 @@ class MaterialExchangeServiceTest {
   @Test
   void updateOffer_amountExceedsStock_badRequest() {
     offer.setVersion(1L);
-    offer.getInventoryItem().setAmount(50.0);
+    rows.get(offer.getInventoryItemId()).setAmount(50.0);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
 
@@ -417,7 +433,7 @@ class MaterialExchangeServiceTest {
   @Test
   void detail_offeredAmountClampedToCurrentStock() {
     offer.setOfferedAmount(340.0);
-    offer.getInventoryItem().setAmount(60.0);
+    rows.get(offer.getInventoryItemId()).setAmount(60.0);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
 
@@ -499,7 +515,7 @@ class MaterialExchangeServiceTest {
     verify(offerRepository).saveAndFlush(captor.capture());
     MaterialExchangeOffer saved = captor.getValue();
     assertThat(saved.getKind()).isEqualTo(MaterialExchangeOfferKind.ITEM);
-    assertThat(saved.getInventoryItem()).as("item offer has no Lager row").isNull();
+    assertThat(saved.getInventoryItemId()).as("item offer has no Lager row").isNull();
     assertThat(saved.getItemProductKey()).isEqualTo("venture helmet");
     assertThat(saved.getItemName()).isEqualTo("Venture Helmet");
     assertThat(saved.getItemQuantity()).isEqualTo(5);
@@ -570,7 +586,7 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void release_existingActiveOffer_updatesInPlaceAndFlagsReRelease() {
-    InventoryItem item = offer.getInventoryItem();
+    InventoryItem item = rows.get(offer.getInventoryItemId());
     UUID itemId = item.getId();
     Instant past = Instant.now().minusSeconds(3600);
     offer.setReleasedAt(past);
@@ -719,7 +735,7 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void deactivateForItem_noActiveOffer_notFound() {
-    UUID itemId = offer.getInventoryItem().getId();
+    UUID itemId = rows.get(offer.getInventoryItemId()).getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
         .thenReturn(Optional.empty());
@@ -755,7 +771,9 @@ class MaterialExchangeServiceTest {
     verify(offerRepository).saveAndFlush(captor.capture());
     MaterialExchangeOffer saved = captor.getValue();
     assertThat(saved.getKind()).isEqualTo(MaterialExchangeOfferKind.ITEM);
-    assertThat(saved.getInventoryItem()).as("stock-backed: bound to the Lager row").isSameAs(row);
+    assertThat(saved.getInventoryItemId())
+        .as("stock-backed: bound to the Lager row")
+        .isEqualTo(row.getId());
     assertThat(saved.getItemProductKey()).isEqualTo("quantum drive");
     assertThat(saved.getItemName()).isEqualTo("Quantum Drive");
     assertThat(saved.getItemQuantity()).isEqualTo(5);
@@ -980,11 +998,12 @@ class MaterialExchangeServiceTest {
     return item;
   }
 
-  private static MaterialExchangeOffer offer(UUID id, InventoryItem item, User owner) {
+  private MaterialExchangeOffer offer(UUID id, InventoryItem item, User owner) {
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
     offer.setId(id);
     offer.setKind(MaterialExchangeOfferKind.MATERIAL);
-    offer.setInventoryItem(item);
+    offer.setInventoryItemId(item.getId());
+    rows.put(item.getId(), item);
     offer.setOwner(owner);
     offer.setOfferedAmount(item.getAmount());
     offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
@@ -1010,12 +1029,13 @@ class MaterialExchangeServiceTest {
     return item;
   }
 
-  private static MaterialExchangeOffer stockBackedItemOffer(
+  private MaterialExchangeOffer stockBackedItemOffer(
       UUID id, InventoryItem row, User owner, int quantity) {
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
     offer.setId(id);
     offer.setKind(MaterialExchangeOfferKind.ITEM);
-    offer.setInventoryItem(row);
+    offer.setInventoryItemId(row.getId());
+    rows.put(row.getId(), row);
     offer.setOwner(owner);
     offer.setItemProductKey("prod-key");
     offer.setItemName(row.getGameItem().getName());
