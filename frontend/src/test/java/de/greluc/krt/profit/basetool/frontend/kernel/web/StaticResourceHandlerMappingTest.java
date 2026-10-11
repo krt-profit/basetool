@@ -30,10 +30,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.AssetReferences;
 import java.io.IOException;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -216,5 +218,31 @@ class StaticResourceHandlerMappingTest {
     assertTrue(
         CONTENT_HASHED.matcher(resolved).matches(),
         () -> path + " must resolve to a content-hashed URL, got " + resolved);
+  }
+
+  /**
+   * Every script, stylesheet, font and image a template links resolves to a content-hashed URL
+   * through {@link ResourceUrlProvider}, and that URL is served (REQ-FE-034).
+   *
+   * @throws Exception if a request cannot be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void everyAssetATemplateLinksIsServedAtItsContentHashedUrl() throws Exception {
+    Set<String> urls =
+        AssetReferences.inTemplates(AssetReferences.MAIN_RESOURCES.resolve("templates")).stream()
+            .map(AssetReferences.Reference::url)
+            .collect(Collectors.toCollection(TreeSet::new));
+    assertTrue(
+        urls.size() >= 200, () -> "selection floor: distinct asset links, got " + urls.size());
+
+    for (String url : urls) {
+      String resolved = resourceUrlProvider.getForLookupPath(url);
+      assertNotNull(resolved, () -> url + " must resolve through a resource handler");
+      assertTrue(
+          CONTENT_HASHED.matcher(resolved).matches(),
+          () -> url + " must resolve to a content-hashed URL, got " + resolved);
+      mockMvc.perform(get(resolved)).andExpect(status().isOk());
+    }
   }
 }
