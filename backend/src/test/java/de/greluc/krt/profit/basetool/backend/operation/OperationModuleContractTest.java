@@ -261,7 +261,7 @@ class OperationModuleContractTest {
             .getContentAsString();
     Set<UUID> listed = new HashSet<>();
     for (JsonNode node : objectMapper.readTree(body)) {
-      UUID id = UUID.fromString(node.get("id").asText());
+      UUID id = UUID.fromString(node.get("id").asString());
       if (created.contains(id)) {
         listed.add(id);
       }

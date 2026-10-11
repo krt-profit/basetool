@@ -412,16 +412,6 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Whether the membership is a Bereichsleitung or OL seat ({@link MembershipRole#isAreaOrOl()}).
-   *
-   * @param m the membership row to classify; never {@code null}.
-   * @return {@code true} iff the membership is a Bereichsleitung or OL seat.
-   */
-  private static boolean isAreaOrOlSeat(@NotNull OrgUnitMembership m) {
-    return m.getRole().isAreaOrOl();
-  }
-
-  /**
    * Whether the caller holds an {@code OL_MEMBER} seat. Pure membership check without an admin
    * short-circuit (REQ-BANK-037).
    *

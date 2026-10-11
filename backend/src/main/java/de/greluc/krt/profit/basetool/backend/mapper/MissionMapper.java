@@ -279,7 +279,7 @@ public abstract class MissionMapper {
       return List.of();
     }
     Comparator<MissionCrew> leaderFirst =
-        Comparator.comparing((MissionCrew c) -> isLeaderCrew(c) ? 0 : 1)
+        Comparator.comparingInt((MissionCrew c) -> isLeaderCrew(c) ? 0 : 1)
             .thenComparing(
                 c -> {
                   String n = resolveParticipantName(c);

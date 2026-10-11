@@ -1279,7 +1279,7 @@ public class MissionService implements MissionCommands {
 
   /**
    * Removes a co-manager. The owner cannot be removed via this method — use {@link
-   * #setMissionOwner} to transfer ownership first.
+   * #updateMissionOwner} to transfer ownership first.
    */
   @Transactional
   public Mission removeManager(@NotNull UUID missionId, @NotNull UUID userId) {

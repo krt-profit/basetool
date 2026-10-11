@@ -54,6 +54,7 @@ public abstract class AbstractEntity<K extends Serializable> implements Persista
   }
 
   @Override
+  @SuppressWarnings("EqualsGetClass")
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -62,12 +63,12 @@ public abstract class AbstractEntity<K extends Serializable> implements Persista
       return false;
     }
     Class<?> otherEffectiveClass =
-        o instanceof HibernateProxy
-            ? ((HibernateProxy) o).getHibernateLazyInitializer().getPersistentClass()
+        o instanceof HibernateProxy otherProxy
+            ? otherProxy.getHibernateLazyInitializer().getPersistentClass()
             : o.getClass();
     Class<?> thisEffectiveClass =
-        this instanceof HibernateProxy
-            ? ((HibernateProxy) this).getHibernateLazyInitializer().getPersistentClass()
+        this instanceof HibernateProxy thisProxy
+            ? thisProxy.getHibernateLazyInitializer().getPersistentClass()
             : this.getClass();
     if (thisEffectiveClass != otherEffectiveClass) {
       return false;
@@ -78,8 +79,8 @@ public abstract class AbstractEntity<K extends Serializable> implements Persista
 
   @Override
   public int hashCode() {
-    return this instanceof HibernateProxy
-        ? ((HibernateProxy) this).getHibernateLazyInitializer().getPersistentClass().hashCode()
+    return this instanceof HibernateProxy proxy
+        ? proxy.getHibernateLazyInitializer().getPersistentClass().hashCode()
         : getClass().hashCode();
   }
 }
