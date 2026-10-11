@@ -208,8 +208,10 @@ class UserDeletionEndStateTest {
                 stayerRows.refineryOrders.get(0)))
         .containsExactly(stayerId);
 
-    assertThat(auditRows(leaverId, before))
-        .containsExactly(
+    assertAuditRowsInOrder(
+        leaverId,
+        before,
+        List.of(
             "MARKET_OFFER_REMOVED|kind=MATERIAL reason=user-deletion",
             "INVENTORY_PURGED_ON_USER_DELETION|reason=user-deletion inventoryRows=2 ships=3"
                 + " fromUser="
@@ -222,7 +224,7 @@ class UserDeletionEndStateTest {
                 + newOwner,
             "USER_DELETED|inventoryRows=2 ships=3 personalInventory=1 blueprints=2 notifications=3"
                 + " ruleSelectors=1 evaluations=1 refineryOrdersReassignedTo="
-                + newOwner);
+                + newOwner));
   }
 
   @Test
@@ -238,11 +240,13 @@ class UserDeletionEndStateTest {
     entityManager.flush();
 
     UUID adminId = lastAdminTarget(leaver.getId());
-    assertThat(auditRows(leaver.getId(), before))
-        .containsExactly(
+    assertAuditRowsInOrder(
+        leaver.getId(),
+        before,
+        List.of(
             "USER_DELETED|inventoryRows=0 ships=0 personalInventory=0 blueprints=0"
                 + " notifications=0 ruleSelectors=0 evaluations=0 refineryOrdersReassignedTo="
-                + adminId);
+                + adminId));
   }
 
   private UUID lastAdminTarget(UUID deleted) {
@@ -262,18 +266,38 @@ class UserDeletionEndStateTest {
     return rows == null ? 0 : rows;
   }
 
-  private List<String> auditRows(UUID target, Instant since) {
-    return jdbc.queryForList(
-        """
-        SELECT event_type || '|' || coalesce(details, '')
-        FROM audit_event
-        WHERE target_user_id = ? AND occurred_at >= to_timestamp(? / 1000.0)
-        ORDER BY occurred_at, id
-        """,
-        String.class,
-        target,
-        since.toEpochMilli());
+  /**
+   * Asserts that the target's audit rows are exactly the expected ones and that no row precedes one
+   * the expected order puts first. Rows of one transaction can share a microsecond, and their
+   * relative order is then the random id's, so only rows with different instants are ordered.
+   */
+  private void assertAuditRowsInOrder(UUID target, Instant since, List<String> expected) {
+    List<AuditRow> rows =
+        jdbc.query(
+            """
+            SELECT occurred_at, event_type || '|' || coalesce(details, '') AS text
+            FROM audit_event
+            WHERE target_user_id = ? AND occurred_at >= to_timestamp(? / 1000.0)
+            ORDER BY occurred_at, id
+            """,
+            (rs, _) ->
+                new AuditRow(rs.getTimestamp("occurred_at").toInstant(), rs.getString("text")),
+            target,
+            since.toEpochMilli());
+    assertThat(rows.stream().map(AuditRow::text).toList())
+        .containsExactlyInAnyOrderElementsOf(expected);
+    for (int earlier = 0; earlier < rows.size(); earlier++) {
+      for (int later = earlier + 1; later < rows.size(); later++) {
+        if (rows.get(earlier).at().isBefore(rows.get(later).at())) {
+          assertThat(expected.indexOf(rows.get(earlier).text()))
+              .as("%s was recorded before %s", rows.get(earlier).text(), rows.get(later).text())
+              .isLessThan(expected.indexOf(rows.get(later).text()));
+        }
+      }
+    }
   }
+
+  private record AuditRow(Instant at, String text) {}
 
   private User admin(String tag) {
     Role adminRole =
