@@ -232,7 +232,7 @@ class ExchangeBulkUndoControllerTest {
 
     mockMvc
         .perform(
-            get("/api/v1/admin/exchange-clients/" + registryId + "/undo/installations")
+            get("/api/v1/connected-apps/admin/clients/" + registryId + "/undo/installations")
                 .param("since", hourAgo().toString())
                 .with(asAdmin()))
         .andExpect(status().isOk())
@@ -287,7 +287,7 @@ class ExchangeBulkUndoControllerTest {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/exchange-clients/" + registryId + "/undo")
+            post("/api/v1/connected-apps/admin/clients/" + registryId + "/undo")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"since\":\"" + hourAgo() + "\"}")
                 .with(asAdmin()))
@@ -313,7 +313,7 @@ class ExchangeBulkUndoControllerTest {
   void onlyAnAdminMayUndoForEveryoneAndTheSpanMustNotStartInTheFuture() throws Exception {
     mockMvc
         .perform(
-            post("/api/v1/admin/exchange-clients/" + registryId + "/undo/preview")
+            post("/api/v1/connected-apps/admin/clients/" + registryId + "/undo/preview")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"since\":\"" + hourAgo() + "\"}")
                 .with(
@@ -329,7 +329,7 @@ class ExchangeBulkUndoControllerTest {
 
   private ResultActions preview(@NotNull String json) throws Exception {
     return mockMvc.perform(
-        post("/api/v1/admin/exchange-clients/" + registryId + "/undo/preview")
+        post("/api/v1/connected-apps/admin/clients/" + registryId + "/undo/preview")
             .contentType(MediaType.APPLICATION_JSON)
             .content(json)
             .with(asAdmin()));
@@ -346,7 +346,7 @@ class ExchangeBulkUndoControllerTest {
     String body =
         mockMvc
             .perform(
-                post("/api/v1/admin/exchange-clients/" + registryId + "/undo")
+                post("/api/v1/connected-apps/admin/clients/" + registryId + "/undo")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(json)
                     .with(asAdmin()))
@@ -369,7 +369,7 @@ class ExchangeBulkUndoControllerTest {
     while (System.nanoTime() < deadline) {
       String body =
           mockMvc
-              .perform(get("/api/v1/admin/exchange-undo-runs/" + runId).with(asAdmin()))
+              .perform(get("/api/v1/connected-apps/admin/undo-runs/" + runId).with(asAdmin()))
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()

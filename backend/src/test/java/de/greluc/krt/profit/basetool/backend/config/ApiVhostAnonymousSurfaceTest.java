@@ -117,7 +117,7 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousMembershipsWithUnauthorized() throws Exception {
-    mockMvc.perform(get("/api/v1/users/me/memberships")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/org-units/me/memberships")).andExpect(status().isUnauthorized());
   }
 
   /**
@@ -133,9 +133,9 @@ class ApiVhostAnonymousSurfaceTest {
         "/api/v1/inventory/all/grouped",
         "/api/v1/orders",
         "/api/v1/orders/00000000-0000-4000-8000-00000000cafe",
-        "/api/v1/org-units/bank/balances",
-        "/api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe",
-        "/api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/transactions"
+        "/api/v1/bank/org-units/balances",
+        "/api/v1/bank/org-units/accounts/00000000-0000-4000-8000-00000000cafe",
+        "/api/v1/bank/org-units/accounts/00000000-0000-4000-8000-00000000cafe/transactions"
       })
   @WithAnonymousUser
   void shouldRefuseAnonymousRemainingPhaseTwoReadsWithUnauthorized(String path) throws Exception {
@@ -164,7 +164,7 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousAnnouncementWithUnauthorized() throws Exception {
-    mockMvc.perform(get("/api/v1/announcement")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/announcements/current")).andExpect(status().isUnauthorized());
   }
 
   /**
@@ -295,7 +295,7 @@ class ApiVhostAnonymousSurfaceTest {
       strings = {
         "/api/v1/material-exchange/offers",
         "/api/v1/material-exchange/releasable-items",
-        "/api/v1/material-requests"
+        "/api/v1/material-exchange/requests"
       })
   @WithAnonymousUser
   void shouldRefuseAnonymousBoardReadsWithUnauthorized(String path) throws Exception {
@@ -496,18 +496,16 @@ class ApiVhostAnonymousSurfaceTest {
   void shouldRefuseAnonymousParticipationWritesOnAnAbsentRow() throws Exception {
     String participant =
         "/api/v1/missions/" + ABSENT_OPERATION + "/participants/" + ABSENT_OPERATION;
+    mockMvc.perform(delete(participant).with(csrf())).andExpect(status().isUnauthorized());
     mockMvc
-        .perform(delete(participant + "/slim").with(csrf()))
+        .perform(post(participant + "/check-in").with(csrf()))
         .andExpect(status().isUnauthorized());
     mockMvc
-        .perform(post(participant + "/check-in/slim").with(csrf()))
-        .andExpect(status().isUnauthorized());
-    mockMvc
-        .perform(post(participant + "/check-out/slim").with(csrf()))
+        .perform(post(participant + "/check-out").with(csrf()))
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            put(participant + "/payout-preference/slim")
+            put(participant + "/payout-preference")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"preference\":\"PAYOUT\"}"))
@@ -524,7 +522,7 @@ class ApiVhostAnonymousSurfaceTest {
   void shouldRefuseAnonymousFinanceWritesWithUnauthorized() throws Exception {
     mockMvc
         .perform(
-            post("/api/v1/finance-entries")
+            post("/api/v1/missions/" + ABSENT_OPERATION + "/finance-entries")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -536,13 +534,15 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            put("/api/v1/finance-entries/" + ABSENT_OPERATION)
+            put("/api/v1/missions/" + ABSENT_OPERATION + "/finance-entries/" + ABSENT_OPERATION)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"type\":\"INCOME\",\"amount\":1,\"version\":0}"))
         .andExpect(status().isUnauthorized());
     mockMvc
-        .perform(delete("/api/v1/finance-entries/" + ABSENT_OPERATION).with(csrf()))
+        .perform(
+            delete("/api/v1/missions/" + ABSENT_OPERATION + "/finance-entries/" + ABSENT_OPERATION)
+                .with(csrf()))
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
@@ -561,7 +561,7 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousAccountSettingsWithUnauthorized() throws Exception {
-    String account = "/api/v1/org-units/bank/accounts/" + ABSENT_OPERATION;
+    String account = "/api/v1/bank/org-units/accounts/" + ABSENT_OPERATION;
     mockMvc.perform(get(account + "/settings")).andExpect(status().isUnauthorized());
     mockMvc
         .perform(
@@ -655,14 +655,13 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The blueprint, Fleetview-import and settings paths: the settings read answers anonymously with
-   * the two job-order age thresholds, everything else is refused without a token.
+   * The blueprint, ship-import and settings paths: every one is refused without a token.
    *
    * @throws Exception if the request could not be performed
    */
   @Test
   @WithAnonymousUser
-  void shouldRefuseAnonymousBlueprintAndFleetImports() throws Exception {
+  void shouldRefuseAnonymousBlueprintAndShipImports() throws Exception {
     mockMvc
         .perform(get("/api/v1/personal-blueprints/overview"))
         .andExpect(status().isUnauthorized());
@@ -691,7 +690,7 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            multipart("/api/v1/hangar/import/fleetview")
+            multipart("/api/v1/hangar/import/ships")
                 .file(new MockMultipartFile("file", "x.json", "application/json", new byte[] {123}))
                 .with(csrf()))
         .andExpect(status().isUnauthorized());
@@ -708,6 +707,8 @@ class ApiVhostAnonymousSurfaceTest {
     mockMvc
         .perform(get("/api/v1/settings/job_order.age_red_days"))
         .andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/orders/settings")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/refinery-orders/settings")).andExpect(status().isUnauthorized());
   }
 
   /**
@@ -744,7 +745,7 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            post("/api/v1/material-requests/item")
+            post("/api/v1/material-exchange/requests/item")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -758,7 +759,7 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            put("/api/v1/material-requests/" + ABSENT_MISSION)
+            put("/api/v1/material-exchange/requests/" + ABSENT_MISSION)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -792,19 +793,19 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            post(mission + "/participants/by-id/slim")
+            post(mission + "/participants/by-id")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"" + ABSENT_OPERATION + "\"}"))
         .andExpect(status().isUnauthorized());
     for (String leaf :
         new String[] {
-          "/units/slim",
-          "/units/" + ABSENT_OPERATION + "/crew/slim",
-          "/frequencies/custom/slim",
-          "/managers/" + ABSENT_OPERATION + "/slim",
-          "/steps/slim",
-          "/objectives/slim"
+          "/units",
+          "/units/" + ABSENT_OPERATION + "/crew",
+          "/frequencies/custom",
+          "/managers/" + ABSENT_OPERATION,
+          "/steps",
+          "/objectives"
         }) {
       mockMvc
           .perform(
@@ -816,12 +817,12 @@ class ApiVhostAnonymousSurfaceTest {
     }
     for (String leaf :
         new String[] {
-          "/units/" + ABSENT_OPERATION + "/slim",
-          "/units/" + ABSENT_OPERATION + "/crew/" + ABSENT_OPERATION + "/slim",
-          "/steps/" + ABSENT_OPERATION + "/slim",
-          "/objectives/" + ABSENT_OPERATION + "/slim",
-          "/steps/reorder/slim",
-          "/objectives/reorder/slim"
+          "/units/" + ABSENT_OPERATION,
+          "/units/" + ABSENT_OPERATION + "/crew/" + ABSENT_OPERATION,
+          "/steps/" + ABSENT_OPERATION,
+          "/objectives/" + ABSENT_OPERATION,
+          "/steps/reorder",
+          "/objectives/reorder"
         }) {
       mockMvc
           .perform(
@@ -833,17 +834,17 @@ class ApiVhostAnonymousSurfaceTest {
     }
     for (String leaf :
         new String[] {
-          "/units/" + ABSENT_OPERATION + "/slim",
-          "/frequencies/" + ABSENT_OPERATION + "/slim",
-          "/managers/" + ABSENT_OPERATION + "/slim",
-          "/steps/" + ABSENT_OPERATION + "/slim",
-          "/objectives/" + ABSENT_OPERATION + "/slim"
+          "/units/" + ABSENT_OPERATION,
+          "/frequencies/" + ABSENT_OPERATION,
+          "/managers/" + ABSENT_OPERATION,
+          "/steps/" + ABSENT_OPERATION,
+          "/objectives/" + ABSENT_OPERATION
         }) {
       mockMvc.perform(delete(mission + leaf).with(csrf())).andExpect(status().isUnauthorized());
     }
     mockMvc
         .perform(
-            patch(mission + "/steps/" + ABSENT_OPERATION + "/done/slim")
+            patch(mission + "/steps/" + ABSENT_OPERATION + "/done")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"done\":true}"))
@@ -1018,18 +1019,20 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousMemberPreferenceReadsAndWritesWithUnauthorized() throws Exception {
-    mockMvc.perform(get("/api/v1/users/me/payout-preference")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/missions/me/payout-preference"))
+        .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            put("/api/v1/users/me/payout-preference")
+            put("/api/v1/missions/me/payout-preference")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"preference\":\"PAYOUT\",\"version\":0}"))
         .andExpect(status().isUnauthorized());
-    mockMvc.perform(get("/api/v1/users/me/blueprint-sharing")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/blueprints/me/sharing")).andExpect(status().isUnauthorized());
     mockMvc
         .perform(
-            put("/api/v1/users/me/blueprint-sharing")
+            put("/api/v1/blueprints/me/sharing")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"shareBlueprintsGlobally\":true,\"version\":0}"))
@@ -1043,7 +1046,7 @@ class ApiVhostAnonymousSurfaceTest {
                 .content("{\"rsiHandle\":\"Some_Handle\",\"version\":0}"))
         .andExpect(status().isUnauthorized());
     mockMvc
-        .perform(put("/api/v1/users/me/read-announcement/" + ABSENT_OPERATION).with(csrf()))
+        .perform(put("/api/v1/announcements/" + ABSENT_OPERATION + "/read").with(csrf()))
         .andExpect(status().isUnauthorized());
   }
 
@@ -1055,7 +1058,7 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousApprovalLimitWritesWithUnauthorized() throws Exception {
-    String stem = "/api/v1/org-units/bank/accounts/" + ABSENT_OPERATION + "/approval-limit/";
+    String stem = "/api/v1/bank/org-units/accounts/" + ABSENT_OPERATION + "/approval-limit/";
     for (String leaf :
         new String[] {
           "all-members", "area-members", "role/KOMMANDOLEITER", "user/" + ABSENT_OPERATION
@@ -1135,7 +1138,7 @@ class ApiVhostAnonymousSurfaceTest {
     String order = "/api/v1/orders/" + ABSENT_OPERATION;
     mockMvc.perform(get(order + "/material-collection")).andExpect(status().isUnauthorized());
     mockMvc
-        .perform(delete(order + "/inventory/" + ABSENT_OPERATION + "/unlink").with(csrf()))
+        .perform(delete(order + "/allocations/" + ABSENT_OPERATION).with(csrf()))
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(delete(order + "/materials/" + ABSENT_OPERATION).with(csrf()))
@@ -1155,8 +1158,7 @@ class ApiVhostAnonymousSurfaceTest {
                         + "/units/"
                         + ABSENT_OPERATION
                         + "/crew/"
-                        + ABSENT_OPERATION
-                        + "/slim")
+                        + ABSENT_OPERATION)
                 .with(csrf()))
         .andExpect(status().isUnauthorized());
   }

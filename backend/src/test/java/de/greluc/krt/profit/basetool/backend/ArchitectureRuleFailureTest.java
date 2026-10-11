@@ -45,7 +45,6 @@ import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureSettin
 import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureSettingsDto;
 import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureSquadron;
 import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureTopic;
-import de.greluc.krt.profit.basetool.architecture.fixtures.mission.FixtureUpdateRequest;
 import de.greluc.krt.profit.basetool.architecture.fixtures.modules.orders.service.OrderService;
 import de.greluc.krt.profit.basetool.architecture.fixtures.profit.MissionLedgerFixture;
 import de.greluc.krt.profit.basetool.architecture.fixtures.scope.OrgScopeFixture;
@@ -332,8 +331,7 @@ class ArchitectureRuleFailureTest {
   void missionRulesFail() {
     assertReports(
         ArchitectureTest.missionWriteRequestDtosRule(
-            ArchitectureTest.classesIn(Set.of(FixtureCreateRequest.class)),
-            FixtureUpdateRequest.class),
+            ArchitectureTest.classesIn(Set.of(FixtureCreateRequest.class))),
         MISSION,
         "`id`");
     assertReports(
@@ -389,6 +387,16 @@ class ArchitectureRuleFailureTest {
             SanctionedBridge.class),
         BANK,
         "RogueBridge");
+    assertReports(
+        ArchitectureTest.orgUnitBankControllersAreOnTheOrgUnitSideRule(
+            ArchitectureTest.ORG_UNIT_BANK_CONTROLLERS, ArchitectureTest.ORG_UNIT_BANK_SIDE),
+        BANK,
+        "FixtureOrgUnitBankController");
+    assertReports(
+        ArchitectureTest.orgUnitBankControllersRelayOnlyToTheSeamRule(
+            ArchitectureTest.ORG_UNIT_BANK_CONTROLLERS, ArchitectureTest.bankDomain(fixturesRoot)),
+        BANK,
+        "FixtureStaffService");
     ArchRule insertOnly =
         ArchitectureTest.bankLedgerRepositoriesMustStayInsertOnlyRule(
             ArchitectureTest.ledgerMethods(Set.of(FixtureLedgerRepository.class), Set.of()),
@@ -402,6 +410,17 @@ class ArchitectureRuleFailureTest {
                 (JavaClass c) -> c.getSimpleName().contains("Bank"))),
         importPackageOf(FixtureBankThing.class),
         "FixtureBankThing");
+  }
+
+  @Test
+  void theOrgUnitBankSelectionFollowsTheMappingPrefix() {
+    assertThat(
+            BANK.stream()
+                .filter(c -> ArchitectureTest.ORG_UNIT_BANK_CONTROLLERS.test(c))
+                .map(JavaClass::getSimpleName))
+        .containsExactly("FixtureOrgUnitBankController");
+    assertThat(ArchitectureTest.countClasses(BANK, ArchitectureTest.ORG_UNIT_BANK_CONTROLLERS))
+        .isEqualTo(1);
   }
 
   @Test

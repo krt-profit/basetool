@@ -130,8 +130,7 @@ A **by-id aggregate load must never fetch-join two sibling collections.** `@Enti
 that graphs two `@OneToMany`s produces a `|childA| × |childB|` cartesian result — every parent scalar
 (including any TEXT column) repeated across the row product. Graph at most one collection and let the
 other batch-load under `hibernate.default_batch_fetch_size` (`MissionRepository.findById` graphs only
-`participants`; `assignedUnits` batch-loads — #1138). The full-replace load
-(`findByIdForFullReplace`) follows the same rule since 2026-09-22 (BE-PERF-03).
+`participants`; `assignedUnits` batch-loads — #1138).
 
 **A paged query fetches no collection** (BE-PERF-02, 2026-09-22). Its rows are the page; any
 `@OneToMany` / `@ManyToMany` the mapper reads batch-loads under `default_batch_fetch_size`. The paged
@@ -347,7 +346,7 @@ controllers that cache the identical catalogue, so it is fetched at most once pe
 URI string — the `getCached(String, …)` overloads were removed. Each constant pins its exact request URI
 and its invalidation domain; the cache key is the constant's `name()`. This makes the unsafe state
 **unrepresentable**: a per-principal URI (`/api/v1/users/me`, `/api/v1/me/capabilities`,
-`/api/v1/me/active-org-unit`, `/api/v1/me/org-units`) cannot be cached because no constant names it, and adding one is a
+`/api/v1/org-units/me/active`, `/api/v1/org-units/me/switchable`) cannot be cached because no constant names it, and adding one is a
 reviewable, spec-gated act. Every `CachedCatalog` is verified global (no `sub` / role /
 `X-Active-Org-Unit-Id` / redaction variance). Each constant also declares its **fetch mode**: a
 paged catalogue consumed as "the whole list" is marked `Fetch.PAGE_WALK` and assembled complete by
@@ -384,9 +383,12 @@ Invariants that must hold:
   more stale than the last mutation. Squadron lifecycle changes (`AdminMissionDataPageController` coarse;
   `SquadronAdminProxyController` precise `evict(SQUADRON, ORG_UNIT)`) evict, so the squadron catalogue is
   cacheable.
-- **The same rule enrols the job-order age thresholds.** `GET /api/v1/settings/job_order.age_yellow_days`
-  and `…age_red_days` are global, slow-changing settings read through `getCached` on the orders list and
-  detail renders (`JobOrderPageController`). Their sole writer is `AdminSettingsPageController`, which
+- **The same rule enrols the job-order age thresholds.** `GET /api/v1/orders/settings` (`ageYellowDays`,
+  `ageRedDays`, one cached entry `SETTINGS_JOB_ORDER`) holds two global, slow-changing settings read
+  through `getCached` on the orders list and detail renders (`JobOrderPageController`). The typed read
+  replaced the two reads of `GET /api/v1/settings/{key}` in wave 6 of the API cut; that key store stays
+  the admin page's read and write path (`SettingsBackendClient`), with the optimistic-lock versions;
+  both of its reads are ADMIN-only (REQ-SEC-083). Their sole writer is `AdminSettingsPageController`, which
   calls the coarse `clearStaticDataCache()` on every save — on **both** the classic redirect handler and the
   AJAX twin, in a `finally` around the per-setting PUTs so even a **partial save** (an early setting PUT
   lands, a later one throws) still drops the cache rather than stranding the persisted threshold until
@@ -397,7 +399,7 @@ Invariants that must hold:
   SK's name / shorthand / active / profit-eligible fields feed the cached org-unit pickers below.
   Member-roster mutations (add / remove / flags / lead) change none of those fields, so they deliberately
   do **not** evict. The admin switcher no longer reads an SK catalogue at all: since ADR-0151 it asks the
-  per-principal `GET /api/v1/me/org-units`, which is never cached.
+  per-principal `GET /api/v1/org-units/me/switchable`, which is never cached.
 - **The active-org-unit owner pickers (`/api/v1/org-units/active`, `/api/v1/org-units/active-all-kinds`)
   are cached.** Both return a **global** catalogue (all active org units, no per-principal / per-active-
   org-unit-header / redaction variance — the endpoints do no scope filtering), so the URI-keyed cache is
@@ -422,7 +424,7 @@ Invariants that must hold:
   a concurrent read could re-cache pre-apply data is bounded by the domain TTL and the action is rare and
   admin-only.
 - **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`,
-  `/api/v1/me/active-org-unit`, `/api/v1/me/org-units` and `/api/v1/me/layout` share a URI across users; a URI-keyed cache would cross-contaminate
+  `/api/v1/org-units/me/active`, `/api/v1/org-units/me/switchable` and `/api/v1/me/layout` share a URI across users; a URI-keyed cache would cross-contaminate
   them, so they remain plain `get(...)`.
 - **The eviction guarantee holds only under single-instance deployment (CACHE-DIST-01).** Caffeine is
   per-JVM: both the frontend catalogue caches and the backend master-data caches evict only the local
@@ -438,7 +440,7 @@ Invariants that must hold:
   the topology is single-instance.
 
 **Acceptance** (`OrgUnitContextAdviceTest`): `availableSquadrons()` routes the squadron catalogue
-through `getCached`, never a plain `get`; the switcher asks `/api/v1/me/org-units` and touches neither
+through `getCached`, never a plain `get`; the switcher asks `/api/v1/org-units/me/switchable` and touches neither
 the squadron nor the SpecialCommand catalogue. (`AdminSpecialCommandsPageControllerMvcTest`,
 `SpecialCommandAdminProxyControllerTest`): every SK lifecycle mutation — create / update / delete /
 activate (classic and AJAX) and the profit-eligible flip — evicts `SQUADRON` and `ORG_UNIT`, while a

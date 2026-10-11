@@ -116,14 +116,12 @@ final class EdgeAdmission {
    */
   private static final Map<String, Shape> NAMED_SHAPES =
       Map.of(
+          "enabled",
+          BOOLEAN_SHAPE,
           "roleCode",
           new Shape("[A-Za-z0-9_-]{1,64}", List.of("LOGISTICIAN")),
           "type",
-          new Shape("[A-Z][A-Z0-9_]{1,63}", List.of("JOB_ORDER_CREATED")),
-          "key",
-          new Shape(
-              "(job_order\\.age_yellow_days|job_order\\.age_red_days)",
-              List.of("job_order.age_yellow_days", "job_order.age_red_days")));
+          new Shape("[A-Z][A-Z0-9_]{1,63}", List.of("JOB_ORDER_CREATED")));
 
   /** A literal path segment: no character a regular expression would read as syntax but a dot. */
   private static final Pattern LITERAL_SEGMENT = Pattern.compile("[A-Za-z0-9_~.-]+");
@@ -150,14 +148,13 @@ final class EdgeAdmission {
           refused("GET", "/api/v1/terms/admin"),
           refused("GET", "/api/v1/terms/admin/pending-count"),
           refused("GET", "/api/v1/terms/a-path-not-built-yet"),
-          refused("GET", "/api/v1/admin/terms"),
+          refused("GET", "/api/v1/terms/admin"),
           refused("HEAD", "/api/v1/terms/document"),
           refused("HEAD", "/api/v1/app/version-policy"),
           refused("POST", "/api/v1/app/version-policy"),
           refused("GET", "/api/v1/exchange/me/blueprints"),
           refused("GET", "/api/v1/connected-apps"),
           refused("GET", "/api/v1/definitely-not-allow-listed"),
-          refused("GET", "/api/v1/missions"),
           refused("POST", "/api/v1/missions"),
           refused("POST", "/api/v1/users"),
           refused("GET", "/api/v1/operations"),
@@ -170,16 +167,16 @@ final class EdgeAdmission {
           refused("POST", "/api/v1/refinery-orders/import-extract"),
           refused("POST", "/api/v1/missions/" + SAMPLE_UUID + "/participants"),
           refused("POST", "/api/v1/missions/" + SAMPLE_UUID + "/participants/slim"),
-          refused("GET", "/api/v1/hangar/users/" + SAMPLE_UUID + "/ships"),
+          refused("GET", "/api/v1/hangar/admin/users/" + SAMPLE_UUID + "/ships"),
           refused("GET", "/api/v1/bank/accounts/" + SAMPLE_UUID + "/balance-series"),
           refused("GET", "/api/v1/bank/admin/audit"),
           refused("POST", "/api/v1/bank/admin/wipe-reset"),
           refused("PATCH", "/api/v1/bank/accounts/" + SAMPLE_UUID + "/approval-tiers"),
           refused("POST", "/api/v1/inventory/all"),
-          refused("GET", "/api/v1/settings/job_order.age_green_days"),
+          refused("GET", "/api/v1/settings/job_order.age_yellow_days"),
           refused(
               "PUT",
-              "/api/v1/org-units/bank/accounts/" + SAMPLE_UUID + "/visibility/all-members/maybe"),
+              "/api/v1/bank/org-units/accounts/" + SAMPLE_UUID + "/visibility/all-members/maybe"),
           refused("GET", "/api/v2/ping"),
           refused("GET", "/actuator/health"));
 

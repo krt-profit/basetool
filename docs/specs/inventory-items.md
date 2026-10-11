@@ -23,9 +23,9 @@ An `InventoryItem` row references **exactly one** catalog entry: a `Material` (w
 **positive whole-unit** amounts, follow the PIECE auto-merge rule of REQ-INV-026, and
 their stack identity is `user · gameItem · location · personal · owningOrgUnit` (no
 quality dimension). Only items that are the output of ≥ 1 active blueprint are bookable:
-the Lager item picker (`GET /api/v1/inventory/item-catalog`, `InventoryItemCatalogService`)
+the Lager item picker (`GET /api/v1/game-items`, `InventoryItemCatalogService`)
 offers only those (the catalog predicate is deliberately a superset of the order picker's
-RESOURCE-ingredient requirement); the create path itself does not re-check it. Tenancy, owner escape, audit and append-only
+RESOURCE-ingredient requirement, which the same read serves with `orderable=true`); the create path itself does not re-check it. Tenancy, owner escape, audit and append-only
 semantics are identical to material rows.
 
 **Acceptance**

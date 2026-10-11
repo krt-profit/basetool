@@ -151,7 +151,7 @@ class OrgUnitBankLimitsDisplayMvcTest {
     PageResponse<BankBookingDto> bookings =
         new PageResponse<>(List.of(booking), 0, 20, 1L, 1, List.of());
 
-    String detailUri = "/api/v1/org-units/bank/accounts/{id}";
+    String detailUri = "/api/v1/bank/org-units/accounts/{id}";
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class), eq(accountId)))
         .thenReturn(detail);

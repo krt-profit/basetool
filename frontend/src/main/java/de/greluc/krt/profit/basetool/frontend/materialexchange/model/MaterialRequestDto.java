@@ -30,8 +30,9 @@ import java.util.UUID;
 
 /**
  * Frontend view of a Materialbörse request (Gesuch), deserialized from the backend {@code
- * /api/v1/material-requests} responses. Mirrors the backend DTO field-for-field; {@link #kind} and
- * {@link #status} are decoded from the backend enum names via {@link BackendEnumAsString}. Carries
+ * /api/v1/material-exchange/requests} responses. Mirrors the backend DTO field-for-field; {@link
+ * #kind} and {@link #status} are decoded from the backend enum names via {@link
+ * BackendEnumAsString}. Carries
  * the raw {@link #remark} Markdown, which the template renders server-side through the {@code
  * @markdown} bean into a {@code .markdown-content} block. {@link #interestedHandles} is
  * {@code null} for a non-owner viewer (anonymity, REQ-MARKET-019).

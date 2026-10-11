@@ -78,10 +78,10 @@ public class CatalogueBackendClient {
   private static final String MATERIAL_ALIASES = "/api/v1/material-external-aliases";
 
   /** The admin quality-tier collection. */
-  private static final String QUALITY_TIERS = "/api/v1/admin/quality-tiers";
+  private static final String QUALITY_TIERS = "/api/v1/catalog/admin/quality-tiers";
 
   /** The P4K import-job collection. */
-  private static final String JOBS_URI = "/api/v1/admin/import/p4k/jobs";
+  private static final String JOBS_URI = "/api/v1/catalog/admin/import/p4k/jobs";
 
   /** The page size of the sync-report listing. */
   private static final int SYNC_REPORT_PAGE_SIZE = 100;
@@ -746,7 +746,7 @@ public class CatalogueBackendClient {
   @Nullable
   public PageResponse<SyncReportDto> syncReportPage(int page, @Nullable String source) {
     UriComponentsBuilder uriBuilder =
-        UriComponentsBuilder.fromPath("/api/v1/sync-reports")
+        UriComponentsBuilder.fromPath("/api/v1/catalog/admin/sync-reports")
             .queryParam("page", page)
             .queryParam("size", SYNC_REPORT_PAGE_SIZE);
     if (source != null) {
@@ -766,7 +766,8 @@ public class CatalogueBackendClient {
   @Nullable
   public SyncReportPurgeResultDto purgeSyncReports(@Nullable String source, int days) {
     UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/sync-reports").queryParam("olderThanDays", days);
+        UriComponentsBuilder.fromPath("/api/v1/catalog/admin/sync-reports")
+            .queryParam("olderThanDays", days);
     if (source != null) {
       uri.queryParam("source", source);
     }

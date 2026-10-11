@@ -81,8 +81,8 @@ class MaterialExchangeBackendClientTest {
         "GET",
         "/api/v1/material-exchange/offers" + filters + "&excludeStolen=true&q=Agricium%20Erz");
     backend.expect("GET", "/api/v1/material-exchange/offers?tab=alle&size=200");
-    backend.expect("GET", "/api/v1/material-requests" + filters + "&q=Agricium%20Erz");
-    backend.expect("GET", "/api/v1/material-requests?tab=alle&size=200");
+    backend.expect("GET", "/api/v1/material-exchange/requests" + filters + "&q=Agricium%20Erz");
+    backend.expect("GET", "/api/v1/material-exchange/requests?tab=alle&size=200");
   }
 
   @Test
@@ -99,8 +99,8 @@ class MaterialExchangeBackendClientTest {
 
     backend.expect("GET", "/api/v1/material-exchange/offers/" + ID);
     backend.expect("GET", "/api/v1/material-exchange/counts");
-    backend.expect("GET", "/api/v1/material-requests/" + ID);
-    backend.expect("GET", "/api/v1/material-requests/counts");
+    backend.expect("GET", "/api/v1/material-exchange/requests/" + ID);
+    backend.expect("GET", "/api/v1/material-exchange/requests/counts");
   }
 
   @Test
@@ -154,7 +154,8 @@ class MaterialExchangeBackendClientTest {
         "/api/v1/material-exchange/offers/" + ID + "/remark",
         "{\"offeredAmount\":120.0,\"remark\":\"neu\",\"version\":0}");
     backend.expect("POST", "/api/v1/material-exchange/offers/" + ID + "/deactivate", null);
-    backend.expect("POST", "/api/v1/material-exchange/items/" + ITEM + "/deactivate", null);
+    backend.expect(
+        "POST", "/api/v1/material-exchange/offers/deactivate?inventoryItemId=" + ITEM, null);
     backend.expect("POST", "/api/v1/material-exchange/offers/" + ID + "/interest", null);
     backend.expect("DELETE", "/api/v1/material-exchange/offers/" + ID + "/interest", null);
   }
@@ -174,20 +175,20 @@ class MaterialExchangeBackendClientTest {
 
     backend.expect(
         "POST",
-        "/api/v1/material-requests",
+        "/api/v1/material-exchange/requests",
         "{\"materialId\":\""
             + MATERIAL
             + "\",\"minQuality\":600,\"requestedAmount\":12.5,\"remark\":\"Dringend\"}");
     backend.expect(
         "POST",
-        "/api/v1/material-requests/item",
+        "/api/v1/material-exchange/requests/item",
         "{\"productKey\":\"gladius\",\"minQuality\":null,\"quantity\":1,\"remark\":null}");
     backend.expect(
         "PUT",
-        "/api/v1/material-requests/" + ID,
+        "/api/v1/material-exchange/requests/" + ID,
         "{\"desiredAmount\":5.0,\"minQuality\":null,\"remark\":\"\",\"version\":2}");
-    backend.expect("POST", "/api/v1/material-requests/" + ID + "/deactivate", null);
-    backend.expect("POST", "/api/v1/material-requests/" + ID + "/interest", null);
-    backend.expect("DELETE", "/api/v1/material-requests/" + ID + "/interest", null);
+    backend.expect("POST", "/api/v1/material-exchange/requests/" + ID + "/deactivate", null);
+    backend.expect("POST", "/api/v1/material-exchange/requests/" + ID + "/interest", null);
+    backend.expect("DELETE", "/api/v1/material-exchange/requests/" + ID + "/interest", null);
   }
 }

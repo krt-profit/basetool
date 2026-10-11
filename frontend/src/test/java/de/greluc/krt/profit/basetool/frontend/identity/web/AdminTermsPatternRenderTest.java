@@ -73,8 +73,8 @@ class AdminTermsPatternRenderTest {
   private @NotNull String render(
       @NotNull PageResponse<TermsAcceptanceStatusDto> rows, @NotNull String query)
       throws Exception {
-    when(backendApiClient.get(startsWith("/api/v1/admin/terms?"), anyTypeRef())).thenReturn(rows);
-    when(backendApiClient.get(eq("/api/v1/admin/terms/pending-count"), anyClass()))
+    when(backendApiClient.get(startsWith("/api/v1/terms/admin?"), anyTypeRef())).thenReturn(rows);
+    when(backendApiClient.get(eq("/api/v1/terms/admin/pending-count"), anyClass()))
         .thenReturn(new PendingCountDto(3, "v1"));
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     return mockMvc

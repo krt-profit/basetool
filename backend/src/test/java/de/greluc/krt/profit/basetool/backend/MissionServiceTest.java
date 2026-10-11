@@ -39,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificatio
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
@@ -357,111 +356,27 @@ class MissionServiceTest {
             query, start, end, status, null, null, false, null, Set.of(), false, pageable);
   }
 
+  /**
+   * The folded list reaches the repository with the same arguments whether the status filter is
+   * absent, empty or the four statuses the former unfiltered list named explicitly.
+   */
   @Test
-  void updateMission_ShouldSetActualStartTime_WhenStatusChangesToActive() {
-    UUID id = UUID.randomUUID();
-    Mission existing = new Mission();
-    existing.setId(id);
-    existing.setStatus("PLANNED");
-    existing.setActualStartTime(null);
-    existing.setVersion(0L);
+  void searchMissions_nullEmptyAndExplicitFourStatuses_reachTheRepositoryIdentically() {
+    List<String> allFour = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
+    Pageable pageable = PageRequest.of(0, 20);
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(missionRepository.searchMissions(
+            null, null, null, allFour, null, null, false, null, Set.of(), false, pageable))
+        .thenReturn(Page.empty());
 
-    UpdateMissionRequest details =
-        new UpdateMissionRequest(
-            "Test", null, null, "ACTIVE", null, null, null, null, null, null, null, 0L, null);
+    missionService.searchMissions(null, null, null, null, null, null, pageable);
+    missionService.searchMissions(null, null, null, List.of(), null, null, pageable);
+    missionService.searchMissions(null, null, null, allFour, null, null, pageable);
 
-    when(missionRepository.findByIdForFullReplace(id)).thenReturn(Optional.of(existing));
-    when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
-
-    Mission updated = missionService.updateMission(id, details);
-
-    assertNotNull(updated.getActualStartTime());
-  }
-
-  @Test
-  void updateMission_ShouldUseProvidedActualStartTime() {
-    UUID id = UUID.randomUUID();
-    Mission existing = new Mission();
-    existing.setId(id);
-    existing.setStatus("PLANNED");
-    existing.setVersion(0L);
-
-    Instant manualStart = Instant.now().minus(1, ChronoUnit.HOURS);
-    UpdateMissionRequest details =
-        new UpdateMissionRequest(
-            "Test",
-            null,
-            null,
-            "ACTIVE",
-            null,
-            null,
-            null,
-            manualStart,
-            null,
-            null,
-            null,
-            0L,
-            null);
-
-    when(missionRepository.findByIdForFullReplace(id)).thenReturn(Optional.of(existing));
-    when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
-
-    Mission updated = missionService.updateMission(id, details);
-
-    assertEquals(manualStart, updated.getActualStartTime());
-  }
-
-  @Test
-  void updateMission_ShouldNotSetActualStartTime_WhenStatusIsActiveButAlreadyActive() {
-    UUID id = UUID.randomUUID();
-    Mission existing = new Mission();
-    existing.setId(id);
-    existing.setStatus("ACTIVE");
-    existing.setActualStartTime(null);
-    existing.setVersion(0L);
-
-    UpdateMissionRequest details =
-        new UpdateMissionRequest(
-            "Test", null, null, "ACTIVE", null, null, null, null, null, null, null, 0L, null);
-
-    when(missionRepository.findByIdForFullReplace(id)).thenReturn(Optional.of(existing));
-    when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
-
-    Mission updated = missionService.updateMission(id, details);
-
-    assertNull(updated.getActualStartTime());
-  }
-
-  @Test
-  void updateMission_ShouldUpdateCalendarLink() {
-    UUID id = UUID.randomUUID();
-    Mission existing = new Mission();
-    existing.setId(id);
-    existing.setCalendarLink("old-link");
-    existing.setVersion(0L);
-
-    UpdateMissionRequest details =
-        new UpdateMissionRequest(
-            "Test",
-            null,
-            "new-link",
-            "PLANNED",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            0L,
-            null);
-
-    when(missionRepository.findByIdForFullReplace(id)).thenReturn(Optional.of(existing));
-    when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
-
-    Mission updated = missionService.updateMission(id, details);
-
-    assertEquals("new-link", updated.getCalendarLink());
+    verify(missionRepository, times(3))
+        .searchMissions(
+            null, null, null, allFour, null, null, false, null, Set.of(), false, pageable);
   }
 
   @Test

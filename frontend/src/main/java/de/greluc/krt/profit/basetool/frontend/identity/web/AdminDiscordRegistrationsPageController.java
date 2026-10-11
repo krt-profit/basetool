@@ -50,7 +50,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * Admin-only queue page for Discord registration approvals: lists pending registrations and
- * approves, rejects, links or merges them in place via {@code /api/v1/admin/registrations}.
+ * approves, rejects, links or merges them in place via {@code /api/v1/users/admin/registrations}.
  *
  * <p>Approval grants no Basetool roles. Rejected registrations are listed too and can be reopened
  * (REQ-SEC-034).

@@ -369,7 +369,7 @@ The frontend hand-mirrors the backend's DTOs as its own records (no shared modul
 ### API conventions
 
 - **Errors** — RFC 7807 Problem Details (`application/problem+json`) with `type`/`title`/`status`/`detail`/`instance`; validation errors add a field→message `errors` object.
-- **Versioning** — semantic versioning via URI paths (`/api/v1/...`); deprecated endpoints emit `Deprecation`/`Sunset`/`Link` headers.
+- **Versioning** — semantic versioning via URI paths (`/api/v1/...`); a breaking change is a hard cut with a forced app update (ADR-0234), not a deprecation window.
 - **Pagination & sorting** — list endpoints take Spring's `Pageable` and return a `PageResponse`; sort fields are whitelisted in the service layer (never passed straight to `Sort`).
 - **Time** — stored and processed as UTC `Instant`/`OffsetDateTime`; timezone conversion happens in the display layer only.
 

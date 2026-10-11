@@ -84,7 +84,7 @@ public class OrgUnitBackendClient {
    */
   @Nullable
   public List<OrgUnitNodeDto> orgUnitNodes() {
-    return backendApiClient.get("/api/v1/org-hierarchy/org-units", NODE_LIST);
+    return backendApiClient.get("/api/v1/org-units", NODE_LIST);
   }
 
   /**
@@ -95,7 +95,7 @@ public class OrgUnitBackendClient {
    */
   @Nullable
   public BereichDto createBereich(@Nullable BereichCreateRequest request) {
-    return backendApiClient.post("/api/v1/org-hierarchy/bereiche", request, BereichDto.class);
+    return backendApiClient.post("/api/v1/org-units/bereiche", request, BereichDto.class);
   }
 
   /**
@@ -108,7 +108,7 @@ public class OrgUnitBackendClient {
   public OrganisationsleitungDto createOrganisationsleitung(
       @Nullable OrganisationsleitungCreateRequest request) {
     return backendApiClient.post(
-        "/api/v1/org-hierarchy/organisationsleitung", request, OrganisationsleitungDto.class);
+        "/api/v1/org-units/organisationsleitung", request, OrganisationsleitungDto.class);
   }
 
   /**
@@ -122,7 +122,7 @@ public class OrgUnitBackendClient {
   public OrgUnitParentResponse setParent(
       @NotNull UUID id, @Nullable OrgUnitParentUpdateRequest request) {
     return backendApiClient.patch(
-        "/api/v1/org-hierarchy/org-units/{id}/parent", request, OrgUnitParentResponse.class, id);
+        "/api/v1/org-units/{id}/parent", request, OrgUnitParentResponse.class, id);
   }
 
   /**

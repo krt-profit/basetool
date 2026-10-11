@@ -99,7 +99,7 @@ class LeadershipBackendClientTest {
             new OrgUnitMembershipDto(
                 USER, "Pilot", SK, OrgUnitKind.SPECIAL_COMMAND, false, false, true, null, 4L));
 
-    backend.expect("GET", "/api/v1/leitung/view");
+    backend.expect("GET", "/api/v1/org-chart/leadership");
     backend.expect("GET", "/api/v1/org-chart");
     backend.expect("GET", "/api/v1/special-commands/" + SK + "/members");
   }
@@ -125,8 +125,8 @@ class LeadershipBackendClientTest {
     client.removeSquadronRank(SQUADRON, USER, 4L);
     KommandoGroupDto created =
         client.createKommandoGroup(SQUADRON, new CreateKommandoGroupRequest("Alpha"));
-    client.updateKommandoGroup(GROUP, new UpdateKommandoGroupRequest("Alpha", 1, 1L));
-    client.deleteKommandoGroup(GROUP);
+    client.updateKommandoGroup(SQUADRON, GROUP, new UpdateKommandoGroupRequest("Alpha", 1, 1L));
+    client.deleteKommandoGroup(SQUADRON, GROUP);
 
     assertThat(assigned.version()).isEqualTo(4L);
     assertThat(created).isEqualTo(new KommandoGroupDto(GROUP, SQUADRON, "Alpha", 1, 2L));
@@ -139,9 +139,9 @@ class LeadershipBackendClientTest {
         "POST", "/api/v1/squadrons/" + SQUADRON + "/kommando-groups", "{\"name\":\"Alpha\"}");
     backend.expect(
         "PUT",
-        "/api/v1/kommando-groups/" + GROUP,
+        "/api/v1/squadrons/" + SQUADRON + "/kommando-groups/" + GROUP,
         "{\"name\":\"Alpha\",\"sortIndex\":1,\"version\":1}");
-    backend.expect("DELETE", "/api/v1/kommando-groups/" + GROUP, null);
+    backend.expect("DELETE", "/api/v1/squadrons/" + SQUADRON + "/kommando-groups/" + GROUP, null);
   }
 
   @Test
@@ -177,22 +177,21 @@ class LeadershipBackendClientTest {
     assertThat(olMember).isEqualTo(new OlMemberResponse(OL, USER, true, 1L));
     backend.expect(
         "POST",
-        "/api/v1/org-hierarchy/bereiche/" + BEREICH + "/members",
+        "/api/v1/org-units/bereiche/" + BEREICH + "/members",
         "{\"userId\":\"" + USER + "\",\"role\":\"KOORDINATOR\"}");
-    backend.expect(
-        "DELETE", "/api/v1/org-hierarchy/bereiche/" + BEREICH + "/members/" + USER, null);
+    backend.expect("DELETE", "/api/v1/org-units/bereiche/" + BEREICH + "/members/" + USER, null);
     backend.expect(
         "POST",
-        "/api/v1/org-hierarchy/organisationsleitung/" + OL + "/members",
+        "/api/v1/org-units/organisationsleitung/" + OL + "/members",
         "{\"userId\":\"" + USER + "\"}");
     backend.expect(
-        "DELETE", "/api/v1/org-hierarchy/organisationsleitung/" + OL + "/members/" + USER, null);
+        "DELETE", "/api/v1/org-units/organisationsleitung/" + OL + "/members/" + USER, null);
     backend.expect(
         "PUT",
-        "/api/v1/org-hierarchy/organisationsleitung/" + OL + "/grand-admiral",
+        "/api/v1/org-units/organisationsleitung/" + OL + "/grand-admiral",
         "{\"userId\":\"" + USER + "\",\"displayName\":null}");
     backend.expect(
-        "DELETE", "/api/v1/org-hierarchy/organisationsleitung/" + OL + "/grand-admiral", null);
+        "DELETE", "/api/v1/org-units/organisationsleitung/" + OL + "/grand-admiral", null);
   }
 
   @Test

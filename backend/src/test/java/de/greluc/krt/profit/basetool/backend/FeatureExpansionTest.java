@@ -269,7 +269,7 @@ class FeatureExpansionTest {
     String response =
         mockMvc
             .perform(
-                post("/api/v1/finance-entries")
+                post("/api/v1/missions/{missionId}/finance-entries", mission.getId())
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(normalUser.getId().toString()))
@@ -289,7 +289,10 @@ class FeatureExpansionTest {
 
     mockMvc
         .perform(
-            delete("/api/v1/finance-entries/" + entryDto.id())
+            delete(
+                    "/api/v1/missions/{missionId}/finance-entries/{entryId}",
+                    mission.getId(),
+                    entryDto.id())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(normalUser.getId().toString()))
@@ -333,7 +336,7 @@ class FeatureExpansionTest {
     String response =
         mockMvc
             .perform(
-                post("/api/v1/finance-entries")
+                post("/api/v1/missions/{missionId}/finance-entries", mission.getId())
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(otherUser.getId().toString()))
@@ -351,7 +354,10 @@ class FeatureExpansionTest {
 
     mockMvc
         .perform(
-            delete("/api/v1/finance-entries/" + entryDto.id())
+            delete(
+                    "/api/v1/missions/{missionId}/finance-entries/{entryId}",
+                    mission.getId(),
+                    entryDto.id())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(normalUser.getId().toString()))

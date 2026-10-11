@@ -522,7 +522,7 @@ public final class BackendSeeder {
             + locationId
             + "\",\"hidden\":false,\"homeLocation\":false}"
             + missionJson
-            + ",\"status\":\"OPEN\",\"goods\":[{\"inputMaterial\":{\"id\":\""
+            + ",\"goods\":[{\"inputMaterial\":{\"id\":\""
             + inputMaterialId
             + "\"},\"inputQuantity\":100,\"outputQuantity\":100,\"quality\":750}]"
             + owningJson
@@ -559,7 +559,7 @@ public final class BackendSeeder {
     String body =
         "{\"location\":{\"id\":\""
             + locationId
-            + "\",\"hidden\":false,\"homeLocation\":false},\"status\":\"OPEN\",\"goods\":"
+            + "\",\"hidden\":false,\"homeLocation\":false},\"goods\":"
             + goodsJson
             + owningJson
             + "}";
@@ -611,9 +611,7 @@ public final class BackendSeeder {
       String inputMaterialId,
       long version) {
     String body =
-        "{\"id\":\""
-            + orderId
-            + "\",\"location\":{\"id\":\""
+        "{\"location\":{\"id\":\""
             + locationId
             + "\",\"hidden\":false,\"homeLocation\":false},\"status\":\"IN_PROGRESS\","
             + "\"goods\":[{\"inputMaterial\":{\"id\":\""
@@ -985,7 +983,7 @@ public final class BackendSeeder {
 
   /**
    * Raises a {@code PENDING} deposit booking request via {@code POST
-   * /api/v1/org-units/bank/requests} and returns its id (REQ-BANK-042).
+   * /api/v1/bank/org-units/requests} and returns its id (REQ-BANK-042).
    *
    * @param username the requester's Keycloak username
    * @param password the password
@@ -1002,7 +1000,7 @@ public final class BackendSeeder {
             + amount
             + ",\"note\":\"e2e live-sync\"}";
     return JsonParser.parseString(
-            postBody(username, password, "/api/v1/org-units/bank/requests", body))
+            postBody(username, password, "/api/v1/bank/org-units/requests", body))
         .getAsJsonObject()
         .get("id")
         .getAsString();
@@ -1131,7 +1129,7 @@ public final class BackendSeeder {
 
   /**
    * Finds the caller's own {@code PENDING} booking request on the given account with the given
-   * amount, from {@code GET /api/v1/org-units/bank/requests}.
+   * amount, from {@code GET /api/v1/bank/org-units/requests}.
    *
    * @param username the requesting officer/lead's Keycloak username
    * @param password the password
@@ -1154,7 +1152,7 @@ public final class BackendSeeder {
 
   /**
    * Reads the status of one of the caller's own booking requests from {@code GET
-   * /api/v1/org-units/bank/requests}.
+   * /api/v1/bank/org-units/requests}.
    *
    * @param username the requesting officer/lead's Keycloak username
    * @param password the password
@@ -1179,7 +1177,7 @@ public final class BackendSeeder {
    * @return the caller's requests
    */
   private JsonArray ownBookingRequests(String username, String password) {
-    return JsonParser.parseString(getBody(username, password, "/api/v1/org-units/bank/requests"))
+    return JsonParser.parseString(getBody(username, password, "/api/v1/bank/org-units/requests"))
         .getAsJsonArray();
   }
 
@@ -1507,10 +1505,7 @@ public final class BackendSeeder {
       int amount) {
     JsonArray blueprints =
         JsonParser.parseString(
-                getBody(
-                    username,
-                    password,
-                    "/api/v1/orders/item-catalog/" + gameItemId + "/blueprints"))
+                getBody(username, password, "/api/v1/game-items/" + gameItemId + "/blueprints"))
             .getAsJsonArray();
     if (blueprints.isEmpty()) {
       throw new IllegalStateException(
@@ -1591,26 +1586,27 @@ public final class BackendSeeder {
 
   /**
    * Adds an external participant with no account to a mission via {@code POST
-   * /api/v1/missions/{id}/participants/add}.
+   * /api/v1/missions/{id}/participants}.
    *
    * @param username the Keycloak username of the mission's creator
    * @param password the Keycloak password
    * @param missionId the mission to add the participant to
    * @param externalName the external participant's name; must not match any registered user's name
-   * @return the mission id echoed back by the endpoint's {@code MissionDto} response
+   * @return the mission id, unchanged
    */
   public String addExternalParticipant(
       String username, String password, String missionId, String externalName) {
-    return seedEntity(
+    postBody(
         username,
         password,
-        "/api/v1/missions/" + missionId + "/participants/add",
+        "/api/v1/missions/" + missionId + "/participants",
         "{\"guestName\":\"" + externalName + "\"}");
+    return missionId;
   }
 
   /**
    * Registers an existing app user as a mission participant via {@code POST
-   * /api/v1/missions/{id}/participants/slim}.
+   * /api/v1/missions/{id}/participants}.
    *
    * @param username the Keycloak username of the mission's manager (its creator)
    * @param password the Keycloak password
@@ -1623,13 +1619,13 @@ public final class BackendSeeder {
     postBody(
         username,
         password,
-        "/api/v1/missions/" + missionId + "/participants/slim",
+        "/api/v1/missions/" + missionId + "/participants",
         "{\"userId\":\"" + userId + "\"}");
     return missionId;
   }
 
   /**
-   * Adds a unit to a mission via {@code POST /api/v1/missions/{id}/units/slim} with an explicit
+   * Adds a unit to a mission via {@code POST /api/v1/missions/{id}/units} with an explicit
    * responsible person, so the crew board renders the responsible chip and the unit-edit modal
    * pre-selects it. Only a registered participant (see {@link #addRegisteredParticipant}) is
    * offered in the modal's responsible picker, so the {@code responsibleUserId} must already be a
@@ -1640,14 +1636,14 @@ public final class BackendSeeder {
    * @param missionId the mission to add the unit to
    * @param name the unit's display name (its single mandatory field)
    * @param responsibleUserId the {@code app_user} id pinned as the unit's responsible person
-   * @return the mission id, unchanged — the slim endpoint answers with the unit list
+   * @return the mission id, unchanged — the endpoint answers with the unit list
    */
   public String addUnitWithResponsible(
       String username, String password, String missionId, String name, String responsibleUserId) {
     postBody(
         username,
         password,
-        "/api/v1/missions/" + missionId + "/units/slim",
+        "/api/v1/missions/" + missionId + "/units",
         "{\"name\":\"" + name + "\",\"responsibleUserId\":\"" + responsibleUserId + "\"}");
     return missionId;
   }
@@ -1808,8 +1804,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Creates a {@code BEREICH} OrgUnit via {@code POST /api/v1/org-hierarchy/bereiche} and returns
-   * its id (REQ-ORG-014).
+   * Creates a {@code BEREICH} OrgUnit via {@code POST /api/v1/org-units/bereiche} and returns its
+   * id (REQ-ORG-014).
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -1822,14 +1818,13 @@ public final class BackendSeeder {
     return seedEntity(
         adminUser,
         adminPassword,
-        "/api/v1/org-hierarchy/bereiche",
+        "/api/v1/org-units/bereiche",
         "{\"name\":\"" + name + "\",\"shorthand\":\"" + shorthand + "\"}");
   }
 
   /**
-   * Grants a user a Bereichsleitung role via {@code POST
-   * /api/v1/org-hierarchy/bereiche/{id}/members} (REQ-ORG-017). The user must hold no Staffel
-   * membership.
+   * Grants a user a Bereichsleitung role via {@code POST /api/v1/org-units/bereiche/{id}/members}
+   * (REQ-ORG-017). The user must hold no Staffel membership.
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -1843,7 +1838,7 @@ public final class BackendSeeder {
     postBody(
         adminUser,
         adminPassword,
-        "/api/v1/org-hierarchy/bereiche/" + bereichId + "/members",
+        "/api/v1/org-units/bereiche/" + bereichId + "/members",
         "{\"userId\":\"" + userId + "\",\"role\":\"" + role + "\"}");
   }
 
@@ -2265,8 +2260,8 @@ public final class BackendSeeder {
 
   /**
    * Assigns {@code targetUserId} to a Staffel with the given role flags via {@code PATCH
-   * /api/v1/users/{id}/memberships} (REQ-ORG-017). The sent Staffel set is authoritative;
-   * idempotent.
+   * /api/v1/org-units/members/{id}/memberships} (REQ-ORG-017). The sent Staffel set is
+   * authoritative; idempotent.
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -2292,7 +2287,7 @@ public final class BackendSeeder {
               + ",\"isMissionManager\":"
               + isMissionManager
               + "}]}";
-      int status = patch(token, "/api/v1/users/" + targetUserId + "/memberships", body);
+      int status = patch(token, "/api/v1/org-units/members/" + targetUserId + "/memberships", body);
       if (status < 200 || status >= 300) {
         throw new IllegalStateException(
             "Staffel membership assignment PATCH failed: HTTP " + status);
@@ -2471,8 +2466,8 @@ public final class BackendSeeder {
 
   /**
    * Assigns the IRIDIUM Staffel to the user via the membership-delta reconcile ({@code PATCH
-   * /api/v1/users/{id}/memberships}) and returns the HTTP status. The reconcile is declarative and
-   * carries no user-row version, so there is no optimistic-lock 409 to react to.
+   * /api/v1/org-units/members/{id}/memberships}) and returns the HTTP status. The reconcile is
+   * declarative and carries no user-row version, so there is no optimistic-lock 409 to react to.
    *
    * @param token bearer token
    * @param userId the app_user id to assign
@@ -2483,7 +2478,8 @@ public final class BackendSeeder {
     String body = "{\"staffeln\":[{\"squadronId\":\"" + IRIDIUM_SQUADRON_ID + "\"}]}";
     HttpRequest request =
         HttpRequest.newBuilder(
-                URI.create(BACKEND_BASE_URL + "/api/v1/users/" + userId + "/memberships"))
+                URI.create(
+                    BACKEND_BASE_URL + "/api/v1/org-units/members/" + userId + "/memberships"))
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .method("PATCH", HttpRequest.BodyPublishers.ofString(body))

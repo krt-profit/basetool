@@ -109,7 +109,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
     PageResponse<PersonalInventoryItemDto> items =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
     when(backendApiClient.get(
-            contains("/api/v1/admin/personal-inventory/"), anyTypeRef(), any(Object[].class)))
+            contains("/api/v1/personal-inventory/admin/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(items);
 
     mockMvc
@@ -139,7 +139,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
         new PersonalInventoryItemDto(
             UUID.randomUUID(), "Kiste", "n", 7, null, "Lorville", 3, 0L, null, null);
     when(backendApiClient.get(
-            contains("/api/v1/admin/personal-inventory/"), anyTypeRef(), any(Object[].class)))
+            contains("/api/v1/personal-inventory/admin/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(item), 0, 50, 51L, 2, List.of()));
 
     String html =
@@ -232,7 +232,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
       throws Exception {
     UUID userSub = UUID.randomUUID();
     when(backendApiClient.get(
-            contains("/api/v1/admin/personal-inventory/"), anyTypeRef(), any(Object[].class)))
+            contains("/api/v1/personal-inventory/admin/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     mockMvc
@@ -257,7 +257,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
     UUID userSub = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     when(backendApiClient.get(
-            contains("/api/v1/admin/personal-inventory/"), anyTypeRef(), any(Object[].class)))
+            contains("/api/v1/personal-inventory/admin/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     mockMvc
@@ -300,7 +300,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
 
     verify(backendApiClient)
         .put(
-            eq("/api/v1/admin/personal-inventory/items/{id}"),
+            eq("/api/v1/personal-inventory/admin/items/{id}"),
             any(),
             eq(PersonalInventoryItemDto.class),
             eq(itemId));
@@ -319,6 +319,6 @@ class AdminPersonalInventoryPageControllerMvcTest {
         .andExpect(status().is3xxRedirection());
 
     verify(backendApiClient)
-        .delete(eq("/api/v1/admin/personal-inventory/items/{id}"), eq(Void.class), eq(itemId));
+        .delete(eq("/api/v1/personal-inventory/admin/items/{id}"), eq(Void.class), eq(itemId));
   }
 }

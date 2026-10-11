@@ -103,7 +103,7 @@ class AdminNotificationRulePageControllerMvcTest {
             null,
             null,
             List.of());
-    when(backendApiClient.get(contains("/api/v1/notification-rules"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/notifications/admin/rules"), anyTypeRef()))
         .thenReturn(List.of(bankRule, futureRule));
   }
 
@@ -214,7 +214,7 @@ class AdminNotificationRulePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void aBackendOutageRendersTheFailureInsideTheFragment() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/notification-rules"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/notifications/admin/rules"), anyTypeRef()))
         .thenThrow(new BackendServiceException("backend down", null, 503));
 
     mockMvc
@@ -323,7 +323,7 @@ class AdminNotificationRulePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void anEmptyRuleListRendersTheEmptyState() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/notification-rules"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/notifications/admin/rules"), anyTypeRef()))
         .thenReturn(List.of());
 
     mockMvc

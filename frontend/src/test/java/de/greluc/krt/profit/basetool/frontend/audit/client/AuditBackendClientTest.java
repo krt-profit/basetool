@@ -104,7 +104,7 @@ class AuditBackendClientTest {
 
     assertThat(client.exchangeClients()).isEmpty();
 
-    backend.expect("GET", "/api/v1/admin/exchange-clients");
+    backend.expect("GET", "/api/v1/connected-apps/admin/clients");
   }
 
   @Test

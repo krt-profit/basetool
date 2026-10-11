@@ -135,10 +135,9 @@ class ProfileControllerTest {
         .thenReturn(
             user(7, "From-Backend", "Backend-DN", 4L, LocalDate.of(2024, 1, 15), squadrons));
     when(backendApiClient.get(
-            "/api/v1/users/me/payout-preference", MyPayoutPreferenceResponse.class))
+            "/api/v1/missions/me/payout-preference", MyPayoutPreferenceResponse.class))
         .thenReturn(new MyPayoutPreferenceResponse("DONATE", 4L));
-    when(backendApiClient.get(
-            "/api/v1/users/me/blueprint-sharing", MyBlueprintSharingResponse.class))
+    when(backendApiClient.get("/api/v1/blueprints/me/sharing", MyBlueprintSharingResponse.class))
         .thenReturn(new MyBlueprintSharingResponse(true, 4L));
 
     Model model = new ConcurrentModel();
@@ -479,7 +478,7 @@ class ProfileControllerTest {
     assertEquals("redirect:/profile", view);
     verify(backendApiClient)
         .put(
-            "/api/v1/users/me/payout-preference",
+            "/api/v1/missions/me/payout-preference",
             new MyPayoutPreferenceRequest("DONATE", 2L),
             Void.class);
     verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
@@ -495,7 +494,7 @@ class ProfileControllerTest {
     org.mockito.Mockito.doReturn("concurrency-conflict").when(conflict).getProblemType();
     doThrow(conflict)
         .when(backendApiClient)
-        .put(eq("/api/v1/users/me/payout-preference"), any(), eq(Void.class));
+        .put(eq("/api/v1/missions/me/payout-preference"), any(), eq(Void.class));
 
     ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
     String view =
@@ -555,7 +554,7 @@ class ProfileControllerTest {
     assertEquals("DONATE", body.get("defaultPayoutPreference"));
     verify(backendApiClient)
         .put(
-            "/api/v1/users/me/payout-preference",
+            "/api/v1/missions/me/payout-preference",
             new MyPayoutPreferenceRequest("DONATE", 6L),
             Void.class);
   }
@@ -570,7 +569,7 @@ class ProfileControllerTest {
     org.mockito.Mockito.doReturn("concurrency-conflict").when(conflict).getProblemType();
     doThrow(conflict)
         .when(backendApiClient)
-        .put(eq("/api/v1/users/me/payout-preference"), any(), eq(Void.class));
+        .put(eq("/api/v1/missions/me/payout-preference"), any(), eq(Void.class));
     when(messageSource.getMessage(any(), any(), any(), any())).thenReturn("conflict-message");
 
     ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
@@ -610,10 +609,7 @@ class ProfileControllerTest {
 
     assertEquals("redirect:/profile", view);
     verify(backendApiClient)
-        .put(
-            "/api/v1/users/me/blueprint-sharing",
-            new MyBlueprintSharingRequest(true, 2L),
-            Void.class);
+        .put("/api/v1/blueprints/me/sharing", new MyBlueprintSharingRequest(true, 2L), Void.class);
     verify(redirectAttributes).addFlashAttribute("successToast", "notification.success.save");
   }
 
@@ -632,10 +628,7 @@ class ProfileControllerTest {
     assertEquals(9L, body.get("version"));
     assertEquals(true, body.get("shareBlueprintsGlobally"));
     verify(backendApiClient)
-        .put(
-            "/api/v1/users/me/blueprint-sharing",
-            new MyBlueprintSharingRequest(true, 8L),
-            Void.class);
+        .put("/api/v1/blueprints/me/sharing", new MyBlueprintSharingRequest(true, 8L), Void.class);
   }
 
   @Test
@@ -648,7 +641,7 @@ class ProfileControllerTest {
     org.mockito.Mockito.doReturn("concurrency-conflict").when(conflict).getProblemType();
     doThrow(conflict)
         .when(backendApiClient)
-        .put(eq("/api/v1/users/me/blueprint-sharing"), any(), eq(Void.class));
+        .put(eq("/api/v1/blueprints/me/sharing"), any(), eq(Void.class));
     when(messageSource.getMessage(any(), any(), any(), any())).thenReturn("conflict-message");
 
     ProfileBlueprintSharingForm form = new ProfileBlueprintSharingForm(false, 1L);

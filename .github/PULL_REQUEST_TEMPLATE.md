@@ -75,7 +75,7 @@ don't use "tests pass" as a stand-in.
 
 ### API & Database (if affected)
 
-- [ ] New REST endpoints under `/api/v1/...`; breaking changes produce `/api/v2/...` plus `@ApiDeprecation(sunset=..., replacement=...)` on the old endpoint.
+- [ ] New REST endpoints under `/api/v1/...`; a breaking change of a frozen operation is a hard cut named in `declared-breaks.txt` (ADR-0234).
 - [ ] Every new/changed `@RestController` endpoint carries `@PreAuthorize` and complete SpringDoc annotations (`@Operation` with summary/description, `@ApiResponses` with domain descriptions per status code).
 - [ ] DTOs (records) at the controller boundary, MapStruct mapper for Entity<->DTO — **no JPA entities** in the response.
 - [ ] `@Valid` on every `@RequestBody` (POST/PUT/PATCH); write DTOs carry Jakarta validation annotations.

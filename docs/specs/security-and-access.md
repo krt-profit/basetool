@@ -20,7 +20,7 @@ read/write is isolated to the calling user unless the caller is privileged.
 > ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-083** (corrected 2026-10-03: REQ-SEC-073…080 went to the
+> allocated. The next free id is **REQ-SEC-084** (corrected 2026-10-03: REQ-SEC-073…080 went to the
 > Phase 0 guard packages of the modularisation plan) — re-check `origin/main` and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
@@ -388,15 +388,17 @@ does so by delegating its management branch to `canManageMission` rather than sh
 bare `ROLE_MISSION_MANAGER` authority. (Unlinked **guest** participants stay openly editable per
 REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
 
-The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory`, `POST
-/api/v1/refinery-orders` (its `owner` override) and the per-item receiver of `POST
-/api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, through
+The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory` and the
+per-item receiver of `POST /api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, and so
+MUST `POST /api/v1/refinery-orders/users/{userId}`, which reads the target from the path. `POST
+/api/v1/refinery-orders` itself has no `owner` override any more (wave 6 of the API cut): its request
+record `RefineryOrderCreateRequest` carries no owner, so the order always belongs to the caller. The
+target is authorised through
 `InventoryAccessPolicy.canManageUserInventory(...)` (published as `BookInPolicy.mayBookInFor`) /
 `RefineryAccessPolicy.canManageUserRefineryOrders(...)`, and MUST NOT
-substitute a bare `AuthHelperService.isLogisticianOrAbove()` for it. All three did until the
-2026-08-30 audit, which made them cross-tenant writes by construction; the fourth entry point,
-`POST /api/v1/refinery-orders/users/{userId}`, had been closed in PR #808 and is the shape the other
-three now follow. `POST /api/v1/inventory` additionally refuses `personal = true` for a foreign
+substitute a bare `AuthHelperService.isLogisticianOrAbove()` for it. The three paths that took a target
+from a body did so until the 2026-08-30 audit, which made them cross-tenant writes by construction; the
+per-target refinery entry point had been closed in PR #808 and is the shape the others follow. `POST /api/v1/inventory` additionally refuses `personal = true` for a foreign
 target: the write-time stock merge (REQ-INV-026) keys on `personal` and returns the surviving row,
 so a personal on-behalf create folded the target's own private rows — amounts, notes, earmarks —
 into the response. The specified personal-for-someone-else capability lives in the refinery store
@@ -1206,7 +1208,7 @@ with the token. **Migration:** V177, undone by `V239`. **Security audit:** findi
 
 > **Renumbered 2026-09-22:** this requirement was `REQ-SEC-019` until 2026-09-22; that id also named the Discord-link indicator in member management in [`discord-integration.md`](discord-integration.md), which keeps it.
 
-`MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/finance-entries/{entryId}`) gates on
+`MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/missions/{missionId}/finance-entries/{entryId}`) gates on
 `MissionSecurityService.canEditFinanceEntry`. `ROLE_OFFICER` is a flat, cross-squadron realm
 authority, so — like every other mission write (`canManageMission`, `canManageManagers`,
 `canChangeOwner`, hardened under audit AUTHZ-1) — an officer may edit/delete a finance entry only when
@@ -2048,39 +2050,43 @@ family decides, so a sub-family can differ from its parent.
 
 | `no-store` | What makes it sensitive |
 | --- | --- |
-| `/api/v1/bank/**`, `/api/v1/org-units/bank/**` | bank ledgers, balances and holder handles |
+| `/api/v1/bank/**` (the org-unit slice `/api/v1/bank/org-units/**` included) | bank ledgers, balances and holder handles |
 | `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
-| `/api/v1/notifications/**` | one member's feed, including the SSE stream |
-| `/api/v1/finance-entries/**`, `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
+| `/api/v1/notifications/**` | one member's feed, including the SSE stream, and the recipient rules, whose selector can name an individual member |
+| `/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**` | ledgers and payouts |
 | `/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`, `/api/v1/hangar/**`, `/api/v1/refinery-orders/**` | holdings and profit figures |
 | `/api/v1/promotion/**` | evaluations of named members |
-| `/api/v1/admin/**` | **new** — person search, registrations, exports, deletion requests, a member's holdings |
+| `/api/v1/roles/**`, `/api/v1/settings/**`, `/api/v1/catalog/admin/**`, `/api/v1/blueprints/admin/**` | the administration of roles, of the raw key store (ADMIN-only reads, REQ-SEC-083), of the catalogue (imports, quality tiers, sync reports) and of the default blueprints; the other administration trees sit under `users`, `terms`, `personal-*`, `hangar`, `notifications` and `connected-apps`, which are `no-store` already |
 | `/api/v1/audit/**` | **new** — who did what, by actor |
+| `/api/v1/announcements/**` (the public banner `/api/v1/announcements/current` excepted, the admin read `/api/v1/announcements/current/admin` included) | the read marker is the caller's own state; the admin read is an administration tree |
 | `/api/v1/connected-apps/**` | **new** — the member's installations and their activity |
 | `/api/v1/exchange/**` | **new** — the acting member's stock, ships, blueprints and installation |
 | `/api/v1/leitung/**` | **new** — the units the caller leads, their rosters and the caller's permissions |
 | `/api/v1/live-sync/**` | **new** — the stream names the topics accepted for this caller |
-| `/api/v1/material-exchange/**`, `/api/v1/material-requests/**` | **new** — viewer-specific `mine` / `viewerInterested`, interested handles, and the member's own releasable stock |
-| `/api/v1/notification-rules/**` | **new** — a selector can name an individual member |
+| `/api/v1/material-exchange/**` (the request board `/api/v1/material-exchange/requests/**` included) | **new** — viewer-specific `mine` / `viewerInterested`, interested handles, and the member's own releasable stock |
 | `/api/v1/orders/**` | **new** — assignee and requester handles, claims, handovers, blueprint owners, viewer `canEdit` |
 | `/api/v1/org-chart/**` | **new** — named position holders and viewer-specific `canAdd…` flags |
 | `/api/v1/special-commands/*/members/**`, `/api/v1/squadrons/*/members/**` | **new** — member rosters |
 | `/api/v1/terms/**` | **new** — `/terms/status` is the caller's own acceptance |
 
-Revalidatable: `announcement`, `app`, `blueprints`, `cities`, `frequency-types`, `job-types`,
-`kommando-groups`, `locations`, `manufacturers`, `material-categories`,
+Revalidatable: `announcements/current` (the public banner), `app`, `blueprints`, `cities`, `frequency-types`, `game-items`,
+`job-types`, `kommando-groups`, `locations`, `manufacturers`, `material-categories`,
 `material-external-aliases`, `materials`, `missions`, `org-hierarchy`, `org-units`, `outposts`,
-`pois`, `quality-tiers`, `refining-methods`, `settings`, `ship-types`, `space-stations`, `special-commands`,
-`squadrons`, `star-systems`, `sync-reports`, `system` (v1 and v2), `terminals`, `uex`, and three
-catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**`,
-`/api/v1/orders/item-catalog/**` and `/api/v1/terms/document`.
+`pois`, `quality-tiers`, `refining-methods`, the typed reads `orders/settings` and `refinery-orders/settings`, `ship-types`, `space-stations`, `special-commands`,
+`squadrons`, `star-systems`, `terminals`, `uex`, and two
+catalogue sub-families inside a `no-store` parent: `/api/v1/exchange/catalog/**` and
+`/api/v1/terms/document`. The game-item catalogue (`/api/v1/game-items/**`) and the refinery yield
+matrix of a location (`/api/v1/locations/*/refinery-yields/**`) are catalogue data and revalidate;
+before wave 5 of the API cut the Lager twin of the catalogue and the yield matrix sat in `no-store`
+families (`/api/v1/inventory/**`, `/api/v1/refinery-orders/**`).
 
-**Both bank spellings, because they are different surfaces.** `/api/v1/bank/**` is the
-bank-employee one; the member-facing account a shipped client actually reads lives under
-`/api/v1/org-units/bank/**`, and its transaction rows carry a `holderHandle`. Listing only the
-former — as this requirement originally did — left the member bank ledger, along with the mission
-finance reads, the personal holdings and the refinery profit figures, on the storable directive:
-exactly the families the public API vhost added, and exactly the data the rule exists for.
+**One bank family, two audiences.** `/api/v1/bank/**` covers the bank-employee surface and the
+member-facing account a shipped client actually reads at `/api/v1/bank/org-units/**` (it lay at
+`/api/v1/org-units/bank/**`, a family of its own, until wave 4 of the API cut), and its transaction
+rows carry a `holderHandle`. Listing only the employee half — as this requirement originally did —
+left the member bank ledger, along with the mission finance reads, the personal holdings and the
+refinery profit figures, on the storable directive: exactly the families the public API vhost
+added, and exactly the data the rule exists for.
 
 **A missing family is actively downgraded, not merely un-opted-in.** `ApiCacheControlFilter` runs at
 `HIGHEST_PRECEDENCE + 20`, ahead of the Spring Security chain, and sets `Cache-Control` before
@@ -2089,7 +2095,7 @@ sensitive family absent from the list loses the framework's own default `no-stor
 sensitive GET family means adding it to `NoStoreApiScopes` in the same change — which since
 2026-09-10 also takes it out of the ETag buffer, because both filters read that one list.
 
-The Materialbörse (`/api/v1/material-exchange/**`, `/api/v1/material-requests/**`) used to be
+The Materialbörse (`/api/v1/material-exchange/**`, which since wave 6 of the API cut also serves the request board formerly at `/api/v1/material-requests`) used to be
 excluded as an org-wide shared board. That was wrong for what it serves: each board row carries the
 viewer-specific `mine` and `viewerInterested` flags, and `/material-exchange/releasable-items` is
 the member's own inventory — holdings, which are `no-store` everywhere else. It is `no-store` since
@@ -2149,7 +2155,7 @@ answer from it identically for seventeen paths.
   names at least one mapping (`ApiCacheFamilyCoverageTest`, selection floor 572 mappings).
 - [x] Every `GET` mapping, with its path variables filled, answers its family's directive through
   the real filter chain (floor 244), and one authenticated read per `no-store` family keeps
-  `no-store` past its handler (floor 26).
+  `no-store` past its handler (floor 27).
 - [x] A planted unclassified family is reported (`PathControlInventoryTest`) and an unclassified
   `/api` path answers `no-store` (`NoStoreApiScopesTest`).
 
@@ -3147,7 +3153,7 @@ one.
 
 The gate had been bare `isAuthenticated()`, which the *detail* endpoint compensated for by nulling
 the description in `cleanupOutsiderMissionForGuest`. The list and search projections run through no
-redactor, so a `GUEST` token read on `GET /api/v1/missions/search` — an operation in the frozen
+redactor, so a `GUEST` token read on `GET /api/v1/missions` — an operation in the frozen
 external contract, reachable over the public API vhost — returned the planning notes the detail
 endpoint deliberately withheld from the very same caller. Gating at the single source fixes both
 projections instead of bolting a second redactor onto the list path. Anonymous callers were
@@ -3156,7 +3162,7 @@ invisible from the anonymous surface.
 
 **Acceptance**
 
-- [x] ~~A role-less `GUEST` token gets `description == null` from `/api/v1/missions/search` and from
+- [x] ~~A role-less `GUEST` token gets `description == null` from `/api/v1/missions` and from
   the mission detail alike.~~ Such a token is refused before the mapper runs (REQ-SEC-053); the
   gate itself is unchanged and still pinned.
 - [x] A member still receives the description on both.
@@ -3166,7 +3172,7 @@ invisible from the anonymous surface.
 
 ### REQ-SEC-042 — Booking into a mission ledger is a write, and is gated like one
 
-`POST /api/v1/finance-entries` MUST be authorized by `MissionSecurityService#canCreateFinanceEntry`:
+`POST /api/v1/missions/{missionId}/finance-entries` MUST be authorized by `MissionSecurityService#canCreateFinanceEntry`:
 a caller who may manage the mission (ADMIN; an OFFICER / MISSION_MANAGER whose owning-OrgUnit scope
 covers it; the owner or a co-manager) may book for any of its participants, and every other member
 may book **only against their own participant row** on that mission.
@@ -3279,7 +3285,7 @@ always *wrong*, only unsafe because nobody chose it. Left without a remedy, a me
 with two accounts has their data stranded on the one they can no longer reach, and the admin has
 nothing to do about it.
 
-`UserAccountMergeService`, reached at `POST /api/v1/admin/registrations/{id}/merge` (ADMIN only),
+`UserAccountMergeService`, reached at `POST /api/v1/users/admin/registrations/{id}/merge` (ADMIN only),
 is that remedy. The registration in the path is the account that **survives**; the body names the
 older account to empty.
 
@@ -3395,7 +3401,7 @@ layer directly.
 
 ### REQ-SEC-048 — One endpoint answers which org units a caller may pin
 
-`GET /api/v1/me/org-units` returns every active org unit an **admin** may pin, and for **everyone
+`GET /api/v1/org-units/me/switchable` returns every active org unit an **admin** may pin, and for **everyone
 else** the units they belong to plus the ones a Bereich or OL seat reaches (`OrgUnitCascadeService`,
 REQ-ORG-015 — a materialised id set, never an admin-all marker). All four kinds in both branches,
 ordered top-down: OL → Bereich → Staffel → SK, then by name.
@@ -4098,14 +4104,18 @@ refusal on the mission list. A fixture that models an impossible account shape p
 about a cohort that does not exist. That is the structural half of this requirement, and it is why
 the roster sync had to be fixed in the same change:
 
-**The member-surface role gates sit on the handlers, not only in the URL rules.** The thirteen
+**The member-surface role gates sit on the handlers, not only in the URL rules.** The twelve
 squadron-wide `InventoryItemController` handlers (the aggregated, material, game-item, `/all`,
-mission, grouped, stack-entries and item-catalog reads, `POST /` and the four `bulk-*` writes) carry
+mission, grouped and stack-entries reads, `POST /` and the four `bulk-*` writes) carry
 `@PreAuthorize(INVENTORY_ACCESS)` — ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER — and
 `HangarController`'s squadron overview and home-location bulk edit carry `@PreAuthorize(HANGAR_ACCESS)`
 — `HANGAR_READ`, `HANGAR_WRITE` or `ROLE_ADMIN`. Both repeat the `SecurityConfig` URL rule, which
 stays as defence in depth, so a later path move cannot drop the gate silently.
 `LiftedRoleGatesTest` evaluates each annotation on its own with the real role hierarchy.
+The game-item catalogue read, formerly the thirteenth (`GET /api/v1/inventory/item-catalog`), is `GET /api/v1/game-items`
+(`GameItemController`, wave 5 of the API cut): its annotation keeps the four roles for the full bookable set and
+lets any login through only for `orderable=true`, the subset the job-order create form read before. No `SecurityConfig` rule
+covers the path, so the annotation is the only gate; `GameItemControllerTest` evaluates both branches.
 
 > [!warning] The composite-blind sync was the precondition, not a detail
 > `KeycloakService` indexes **directly-assigned** realm roles (`GET /roles/{name}/users`). A member
@@ -5725,6 +5735,32 @@ dry run by default, with a rollback file, never deleting.
 **Code:** `scripts/harden-keycloak-realm.py`, `scripts/keycloak/session-windows.json`,
 `scripts/keycloak/hardening_probe.py` · **Related:** REQ-SEC-052, REQ-SEC-053, ADR-0159, ADR-0202,
 [`OWNER_STEPS_2026-10.md`](../OWNER_STEPS_2026-10.md)
+
+---
+
+### REQ-SEC-083 — The generic settings key store is read by ADMIN only
+
+`GET /api/v1/settings` and `GET /api/v1/settings/{key}` expose the raw `system_setting` rows with
+their optimistic-lock versions. They carry `hasRole('ADMIN')`, like the write `PUT
+/api/v1/settings/{key}` (owner decision of 2026-10-11, wave 6 of the API cut). The reads were
+member-readable only because the Android app took the two job-order age thresholds from them;
+app 19 reads the typed `GET /api/v1/orders/settings` instead, the web reads the typed
+`GET /api/v1/orders/settings` and `GET /api/v1/refinery-orders/settings`, and the admin page is the
+one reader left of the store (`SettingsBackendClient`). The two typed reads stay
+`isAuthenticated()`. An app below build 19 meets the update wall (REQ-API-020) before it could
+see a `403`.
+
+**Acceptance**
+
+- [x] A signed-in caller holding `KRT_MEMBER`, `LOGISTICIAN`, `MISSION_MANAGER`, `OFFICER` or
+  `BANK_EMPLOYEE` and not `ADMIN` is refused `403` on both reads; an admin is served.
+- [x] The authorization matrix records `pre=hasRole('ADMIN')` for both reads.
+- [x] An admin's answer to both reads is `private, no-store` without an `ETag`: the key store is an
+  administration tree (REQ-SEC-031, D-18), so `/api/v1/settings/**` is a `no-store` family; the typed
+  reads `orders/settings` and `refinery-orders/settings` stay revalidatable.
+
+**Enforced by:** `SystemSettingControllerSecurityTest`, `AuthorizationMatrixTest` ·
+**Code:** `SystemSettingController` · **Related:** REQ-SEC-031, REQ-SEC-052, REQ-API-009, REQ-API-023
 
 ---
 

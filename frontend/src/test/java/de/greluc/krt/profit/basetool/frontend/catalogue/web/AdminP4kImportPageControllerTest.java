@@ -118,7 +118,7 @@ class AdminP4kImportPageControllerTest {
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
     assertEquals("POST", req.getMethod());
-    assertEquals("/api/v1/admin/import/p4k/jobs", req.getPath());
+    assertEquals("/api/v1/catalog/admin/import/p4k/jobs", req.getPath());
     assertTrue(req.getHeader("Content-Type").startsWith(MediaType.MULTIPART_FORM_DATA_VALUE));
     assertTrue(req.getBody().readUtf8().contains("filename=\"p4k.json\""));
   }
@@ -145,7 +145,7 @@ class AdminP4kImportPageControllerTest {
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
     assertEquals("GET", req.getMethod());
-    assertEquals("/api/v1/admin/import/p4k/jobs", req.getPath());
+    assertEquals("/api/v1/catalog/admin/import/p4k/jobs", req.getPath());
   }
 
   @Test
@@ -165,7 +165,7 @@ class AdminP4kImportPageControllerTest {
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
     assertEquals("GET", req.getMethod());
-    assertEquals("/api/v1/admin/import/p4k/jobs/" + id, req.getPath());
+    assertEquals("/api/v1/catalog/admin/import/p4k/jobs/" + id, req.getPath());
   }
 
   @Test
@@ -186,7 +186,8 @@ class AdminP4kImportPageControllerTest {
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
     assertEquals("POST", req.getMethod());
-    assertEquals("/api/v1/admin/import/p4k/jobs/" + id + "/apply?seedNew=true", req.getPath());
+    assertEquals(
+        "/api/v1/catalog/admin/import/p4k/jobs/" + id + "/apply?seedNew=true", req.getPath());
 
     verify(backendApiClient)
         .evict(

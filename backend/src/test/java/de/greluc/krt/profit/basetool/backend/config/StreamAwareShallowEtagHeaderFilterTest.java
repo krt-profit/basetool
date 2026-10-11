@@ -55,9 +55,9 @@ class StreamAwareShallowEtagHeaderFilterTest {
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "/api/v1/missions/search",
+        "/api/v1/missions",
         "/api/v1/materials/matrix",
-        "/api/v1/orders/item-catalog",
+        "/api/v1/game-items",
         "/api/v1/terms/document",
         "/api/v1/job-types",
         "/"
@@ -73,11 +73,11 @@ class StreamAwareShallowEtagHeaderFilterTest {
         "/api/v1/notifications",
         "/api/v1/notifications/unread-count",
         "/api/v1/bank/accounts",
-        "/api/v1/org-units/bank/transactions",
+        "/api/v1/bank/org-units/transactions",
         "/api/v1/users/me",
         "/api/v1/me/capabilities",
         "/api/v1/hangar/ships",
-        "/api/v1/inventory/mission/00000000-0000-4000-8000-000000000000",
+        "/api/v1/inventory/allocations",
         "/api/v1/missions/00000000-0000-4000-8000-000000000000/finance-entries",
         "/api/v1/personal-inventory",
         "/api/v1/refinery-orders/all",
@@ -122,10 +122,10 @@ class StreamAwareShallowEtagHeaderFilterTest {
       strings = {
         "/api/v1/notifications",
         "/api/v1/bank/accounts",
-        "/api/v1/org-units/bank/transactions",
+        "/api/v1/bank/org-units/transactions",
         "/api/v1/users/me",
         "/api/v1/me/capabilities",
-        "/api/v1/finance-entries",
+        "/api/v1/missions/{missionId}/finance-entries",
         "/api/v1/operations",
         "/api/v1/hangar/ships",
         "/api/v1/inventory",
@@ -134,7 +134,7 @@ class StreamAwareShallowEtagHeaderFilterTest {
         "/api/v1/refinery-orders/all",
         "/api/v1/promotion/eligibility",
         "/api/v1/missions/00000000-0000-4000-8000-000000000000/finance-entries",
-        "/api/v1/missions/search",
+        "/api/v1/missions",
         "/api/v1/materials/matrix",
         "/api/v1/job-types"
       })
@@ -192,7 +192,7 @@ class StreamAwareShallowEtagHeaderFilterTest {
   @Test
   @DisplayName("a filtered response still gets its ETag, so the fix costs nothing elsewhere")
   void filteringStillProducesAnEtag() throws Exception {
-    MockHttpServletRequest request = get("/api/v1/missions/search");
+    MockHttpServletRequest request = get("/api/v1/missions");
     MockHttpServletResponse response = new MockHttpServletResponse();
     FilterChain chain =
         (req, res) -> {

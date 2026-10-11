@@ -180,8 +180,8 @@ app:
   android:
     version-policy:
       release:
-        minimum-version-code: 17
-        latest-version-code: 18
+        minimum-version-code: 19
+        latest-version-code: 19
         releases-url: https://github.com/krt-profit/basetool-android/releases/latest
       emergency-override:
         minimum-version-code: ${APP_ANDROID_MINIMUM_VERSION_CODE_OVERRIDE:}
@@ -227,7 +227,7 @@ app:
       - name: finance-entry-create
         methods: [POST]
         paths:
-          - /api/v1/finance-entries
+          - /api/v1/missions/*/finance-entries
         capacity: 200
         refillTokens: 200
         refillPeriod: 1m

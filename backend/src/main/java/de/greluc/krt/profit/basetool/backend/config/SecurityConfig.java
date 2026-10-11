@@ -389,16 +389,14 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/app/version-policy")
                     .permitAll()
+                    .requestMatchers(
+                        "/api/v1/*/admin/**",
+                        "/api/v1/announcements/current/admin",
+                        "/api/v1/roles",
+                        "/api/v1/roles/**")
+                    .hasRole(Roles.ADMIN)
                     .requestMatchers("/api/v1/users/search", "/api/v1/users/search/references")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
-                    .requestMatchers(
-                        "/api/v1/users/search-bank", "/api/v1/users/search-bank/references")
-                    .hasAnyRole(
-                        Roles.ADMIN,
-                        Roles.OFFICER,
-                        Roles.KRT_MEMBER,
-                        Roles.BANK_MANAGEMENT,
-                        Roles.BANK_EMPLOYEE)
                     .requestMatchers("/api/v1/users/lookup")
                     .hasAnyRole(
                         Roles.ADMIN,
@@ -414,8 +412,6 @@ public class SecurityConfig {
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
                     .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
                     .hasRole(Roles.ADMIN)
-                    .requestMatchers(HttpMethod.GET, "/api/v1/users/*/memberships")
-                    .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE)
                     .requestMatchers("/api/v1/users/**")
                     .hasRole(Roles.ADMIN)
                     .requestMatchers(HttpMethod.GET, "/api/v1/hangar/my-ships")
@@ -427,8 +423,6 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/hangar/ships/*")
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/hangar/import/ships")
-                    .authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/hangar/import/fleetview")
                     .authenticated()
                     .requestMatchers("/api/v1/hangar/**")
                     .hasAnyAuthority(
@@ -444,10 +438,6 @@ public class SecurityConfig {
                     .authenticated()
                     .requestMatchers("/api/v1/uex/locations/**")
                     .authenticated()
-                    .requestMatchers("/api/v1/admin/**")
-                    .hasRole(Roles.ADMIN)
-                    .requestMatchers("/api/v1/bank/admin/**")
-                    .hasRole(Roles.ADMIN)
                     .requestMatchers("/api/v1/audit/**")
                     .hasRole(Roles.ADMIN)
                     .anyRequest()

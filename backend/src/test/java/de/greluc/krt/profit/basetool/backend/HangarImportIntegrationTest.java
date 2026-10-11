@@ -118,7 +118,7 @@ class HangarImportIntegrationTest {
     String response =
         mockMvc
             .perform(
-                multipart("/api/v1/hangar/import/fleetview")
+                multipart("/api/v1/hangar/import/ships")
                     .file(file)
                     .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
             .andExpect(status().isOk())
@@ -147,7 +147,7 @@ class HangarImportIntegrationTest {
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
 
     mockMvc
-        .perform(multipart("/api/v1/hangar/import/fleetview").file(file))
+        .perform(multipart("/api/v1/hangar/import/ships").file(file))
         .andExpect(status().isUnauthorized());
   }
 
@@ -158,7 +158,7 @@ class HangarImportIntegrationTest {
 
     mockMvc
         .perform(
-            multipart("/api/v1/hangar/import/fleetview")
+            multipart("/api/v1/hangar/import/ships")
                 .file(emptyFile)
                 .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
         .andExpect(status().isBadRequest());
@@ -175,7 +175,7 @@ class HangarImportIntegrationTest {
 
     mockMvc
         .perform(
-            multipart("/api/v1/hangar/import/fleetview")
+            multipart("/api/v1/hangar/import/ships")
                 .file(file)
                 .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
         .andExpect(status().isBadRequest());
@@ -201,7 +201,7 @@ class HangarImportIntegrationTest {
     String response =
         mockMvc
             .perform(
-                multipart("/api/v1/hangar/import/fleetview")
+                multipart("/api/v1/hangar/import/ships")
                     .file(file)
                     .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
             .andExpect(status().isOk())
@@ -240,7 +240,7 @@ class HangarImportIntegrationTest {
     String response =
         mockMvc
             .perform(
-                multipart("/api/v1/hangar/import/fleetview")
+                multipart("/api/v1/hangar/import/ships")
                     .file(file)
                     .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
             .andExpect(status().isOk())
@@ -269,7 +269,7 @@ class HangarImportIntegrationTest {
     String response =
         mockMvc
             .perform(
-                multipart("/api/v1/hangar/import/fleetview")
+                multipart("/api/v1/hangar/import/ships")
                     .file(file)
                     .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
             .andExpect(status().isOk())
@@ -295,7 +295,7 @@ class HangarImportIntegrationTest {
 
     mockMvc
         .perform(
-            multipart("/api/v1/hangar/import/fleetview")
+            multipart("/api/v1/hangar/import/ships")
                 .file(file)
                 .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
         .andExpect(status().isOk());

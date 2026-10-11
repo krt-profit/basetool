@@ -45,7 +45,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class DashboardBackendClient {
 
   /** The backend's announcement endpoint. */
-  private static final String ANNOUNCEMENT = "/api/v1/announcement";
+  private static final String ANNOUNCEMENT = "/api/v1/announcements/current";
 
   private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_PAGE =
       new ParameterizedTypeReference<>() {};
@@ -67,7 +67,7 @@ public class DashboardBackendClient {
   public PageResponse<MissionListDto> upcomingMissions(
       @NotNull Instant start, @NotNull Instant end) {
     String uri =
-        UriComponentsBuilder.fromPath("/api/v1/missions/search")
+        UriComponentsBuilder.fromPath("/api/v1/missions")
             .queryParam("start", start)
             .queryParam("end", end)
             .queryParam("sort", "plannedStartTime,asc")
@@ -97,7 +97,7 @@ public class DashboardBackendClient {
    */
   @Nullable
   public List<UUID> myOrgUnitIds() {
-    return backendApiClient.get("/api/v1/users/me/org-unit-ids", UUID_LIST);
+    return backendApiClient.get("/api/v1/org-units/me/ids", UUID_LIST);
   }
 
   /**
@@ -116,7 +116,7 @@ public class DashboardBackendClient {
    * @param id the announcement
    */
   public void markAnnouncementRead(@NotNull UUID id) {
-    backendApiClient.put("/api/v1/users/me/read-announcement/{id}", null, Void.class, id);
+    backendApiClient.put("/api/v1/announcements/{id}/read", null, Void.class, id);
   }
 
   /**

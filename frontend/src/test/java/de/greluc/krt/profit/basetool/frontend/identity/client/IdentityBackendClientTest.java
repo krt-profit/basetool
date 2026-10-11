@@ -87,8 +87,8 @@ class IdentityBackendClientTest {
     assertThat(client.registrationStatus().approvalStatus()).isEqualTo("PENDING");
 
     backend.expect("GET", "/api/v1/users/me");
-    backend.expect("GET", "/api/v1/users/me/payout-preference");
-    backend.expect("GET", "/api/v1/users/me/blueprint-sharing");
+    backend.expect("GET", "/api/v1/missions/me/payout-preference");
+    backend.expect("GET", "/api/v1/blueprints/me/sharing");
     backend.expect("GET", "/api/v1/users/me/rsi-handle");
     backend.expect("GET", "/api/v1/users/me/deletion-request");
     backend.expect("GET", "/api/v1/users/me/registration-status");
@@ -114,11 +114,11 @@ class IdentityBackendClientTest {
         "/api/v1/users/me/description",
         "{\"description\":\"Hallo\",\"displayName\":\"Valk\",\"version\":7}");
     backend.expect(
-        "PUT", "/api/v1/users/me/payout-preference", "{\"preference\":\"DONATE\",\"version\":7}");
-    backend.expect(
         "PUT",
-        "/api/v1/users/me/blueprint-sharing",
-        "{\"shareBlueprintsGlobally\":true,\"version\":7}");
+        "/api/v1/missions/me/payout-preference",
+        "{\"preference\":\"DONATE\",\"version\":7}");
+    backend.expect(
+        "PUT", "/api/v1/blueprints/me/sharing", "{\"shareBlueprintsGlobally\":true,\"version\":7}");
     backend.expect(
         "PUT", "/api/v1/users/me/rsi-handle", "{\"rsiHandle\":\"Valk_RSI\",\"version\":7}");
     backend.expect(
@@ -154,8 +154,8 @@ class IdentityBackendClientTest {
 
     backend.expect("GET", "/api/v1/users/me/export");
     backend.expect("GET", "/api/v1/users/me/export/pdf");
-    backend.expect("GET", "/api/v1/admin/users/" + USER + "/export/pdf");
-    backend.expect("GET", "/api/v1/admin/users/" + USER + "/export");
+    backend.expect("GET", "/api/v1/users/admin/" + USER + "/export/pdf");
+    backend.expect("GET", "/api/v1/users/admin/" + USER + "/export");
   }
 
   @Test
@@ -177,7 +177,7 @@ class IdentityBackendClientTest {
     backend.expect("GET", "/api/v1/users/search?size=1000&sort=username,asc&query=ali");
     backend.expect("GET", "/api/v1/users/search/references?size=51&sort=username,asc&query=");
     backend.expect(
-        "GET", "/api/v1/users/search-bank/references?size=51&sort=username,asc&query=ali");
+        "GET", "/api/v1/bank/members/search/references?size=51&sort=username,asc&query=ali");
   }
 
   @Test
@@ -196,9 +196,9 @@ class IdentityBackendClientTest {
 
     backend.expect("GET", "/api/v1/users/" + USER);
     backend.expect("GET", "/api/v1/users/" + USER + "/rsi-handle");
-    backend.expect("GET", "/api/v1/users/" + USER + "/memberships");
-    backend.expect("GET", "/api/v1/users/" + USER + "/memberships?allKinds=true");
-    backend.expect("GET", "/api/v1/users/" + USER + "/memberships/detail");
+    backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships");
+    backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships?allKinds=true");
+    backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships/detail");
   }
 
   @Test
@@ -226,7 +226,7 @@ class IdentityBackendClientTest {
             + "\"joinDate\":null}");
     backend.expect(
         "PATCH",
-        "/api/v1/users/" + USER + "/memberships",
+        "/api/v1/org-units/members/" + USER + "/memberships",
         "{\"staffeln\":[{\"squadronId\":\""
             + SQUADRON
             + "\",\"isLogistician\":true,\"isMissionManager\":null}],\"specialCommands\":null}");
@@ -254,7 +254,7 @@ class IdentityBackendClientTest {
     client.mergeRegistration(USER, new MergeAccountRequest(OTHER, 4L));
     client.linkRegistration(USER, new LinkRegistrationRequest(OTHER, 5L));
 
-    String base = "/api/v1/admin/registrations";
+    String base = "/api/v1/users/admin/registrations";
     backend.expect("GET", base);
     backend.expect("GET", base + "?status=REJECTED");
     backend.expect("POST", base + "/" + USER + "/approve", "{\"version\":1}");
@@ -272,7 +272,7 @@ class IdentityBackendClientTest {
 
     client.approveRegistration(USER, null);
 
-    backend.expect("POST", "/api/v1/admin/registrations/" + USER + "/approve", null);
+    backend.expect("POST", "/api/v1/users/admin/registrations/" + USER + "/approve", null);
   }
 
   @Test
@@ -287,16 +287,16 @@ class IdentityBackendClientTest {
     client.executeDeletionRequest(OTHER, new DecideDeletionRequestRequest(true, null, null));
     assertThat(client.personSearch("Mueller").truncated()).isFalse();
 
-    backend.expect("GET", "/api/v1/admin/deletion-requests");
+    backend.expect("GET", "/api/v1/users/admin/deletion-requests");
     backend.expect(
         "POST",
-        "/api/v1/admin/deletion-requests/" + OTHER + "/decline",
+        "/api/v1/users/admin/deletion-requests/" + OTHER + "/decline",
         "{\"grantHistoryErasure\":false,\"note\":\"Reason.\",\"version\":3}");
     backend.expect(
         "POST",
-        "/api/v1/admin/deletion-requests/" + OTHER + "/execute",
+        "/api/v1/users/admin/deletion-requests/" + OTHER + "/execute",
         "{\"grantHistoryErasure\":true,\"note\":null,\"version\":null}");
-    backend.expect("GET", "/api/v1/admin/person-search?q=Mueller");
+    backend.expect("GET", "/api/v1/users/admin/person-search?q=Mueller");
   }
 
   @Test
@@ -319,7 +319,7 @@ class IdentityBackendClientTest {
     backend.expect("GET", "/api/v1/terms/document");
     backend.expect("GET", "/api/v1/terms/status");
     backend.expect("POST", "/api/v1/terms/acceptance", null);
-    backend.expect("GET", "/api/v1/admin/terms?filter=PENDING&page=2&size=25&sort=username,asc");
-    backend.expect("GET", "/api/v1/admin/terms/pending-count");
+    backend.expect("GET", "/api/v1/terms/admin?filter=PENDING&page=2&size=25&sort=username,asc");
+    backend.expect("GET", "/api/v1/terms/admin/pending-count");
   }
 }

@@ -69,7 +69,7 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `task` | Scheduled jobs |
 | `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), through its external builder that refuses non-external addresses (REQ-SEC-081); the primary builder is `KeycloakService`'s |
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
-| `filter` / `interceptor` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
+| `filter` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
 
 These layer packages are being cut into domain modules (the
 [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md), §5.1). Until a class has moved, the

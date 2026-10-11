@@ -21,18 +21,13 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.RoleMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.RoleDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.service.RoleService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
-import java.time.LocalDate;
 import java.util.Set;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -48,27 +43,25 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the global admin pages — role permissions and arbitrary-user attribute edits.
- * ADMIN-only at the class level.
+ * REST surface for the role administration: the role list, the permission set and the description
+ * of a role. ADMIN-only at the class level.
  */
 @RestController
-@RequestMapping("/api/v1/admin")
+@RequestMapping("/api/v1/roles")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Transactional
 public class AdminController {
 
   private final RoleService roleService;
-  private final UserService userService;
   private final RoleMapper roleMapper;
-  private final UserMapper userMapper;
 
   /**
    * Returns paged role list with whitelist-enforced sort.
    *
    * @return paged role list with whitelist-enforced sort
    */
-  @GetMapping("/roles")
+  @GetMapping
   public PageResponse<RoleDto> getAllRoles(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
@@ -87,7 +80,7 @@ public class AdminController {
    * @param permissions new permission set
    * @return the persisted role DTO
    */
-  @PutMapping("/roles/{name}/permissions")
+  @PutMapping("/{name}/permissions")
   public RoleDto updatePermissions(
       @PathVariable @NotNull String name, @RequestBody @Valid @NotNull Set<String> permissions) {
     return roleMapper.toDto(roleService.updatePermissions(name, permissions));
@@ -100,43 +93,9 @@ public class AdminController {
    * @param description new description text
    * @return the persisted role DTO
    */
-  @PutMapping("/roles/{name}/description")
+  @PutMapping("/{name}/description")
   public RoleDto updateRoleDescription(
       @PathVariable @NotNull String name, @RequestBody @Valid @NotNull String description) {
     return roleMapper.toDto(roleService.updateRoleDescription(name, description));
   }
-
-  /**
-   * Admin override of a user's editable attributes (rank, description, displayName, joinDate),
-   * optimistically locked so concurrent admin edits surface as 409.
-   *
-   * @param id user id
-   * @param request the new attributes and the echoed version, sent as a body to keep them out of
-   *     access logs
-   * @return the persisted user DTO
-   */
-  @PutMapping("/users/{id}/attributes")
-  public UserDto updateUserAttributes(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @Valid @NotNull AdminUserAttributesRequest request) {
-    return userMapper.toDto(
-        userService.updateUserAttributes(
-            id,
-            request.rank(),
-            request.description(),
-            request.displayName(),
-            request.version(),
-            request.joinDate()));
-  }
-
-  /**
-   * Body for {@code PUT /api/v1/admin/users/{id}/attributes}, carrying the four user-controlled
-   * values in a validated body rather than the query string.
-   */
-  public record AdminUserAttributesRequest(
-      Integer rank,
-      String description,
-      String displayName,
-      @jakarta.validation.constraints.NotNull Long version,
-      LocalDate joinDate) {}
 }

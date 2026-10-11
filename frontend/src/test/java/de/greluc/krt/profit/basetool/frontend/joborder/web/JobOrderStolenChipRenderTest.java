@@ -92,7 +92,7 @@ class JobOrderStolenChipRenderTest {
     UUID orderId = UUID.randomUUID();
     stubOrder(materialOrder(orderId, List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/orders/{id}/inventory/orphaned"), anyTypeRef(), eq(orderId)))
+            eq("/api/v1/orders/{id}/allocations/orphaned"), anyTypeRef(), eq(orderId)))
         .thenReturn(List.of(inventory("Titanium", false), inventory("Quantanium", true)));
 
     String html = render(orderId);
@@ -140,7 +140,7 @@ class JobOrderStolenChipRenderTest {
             orderId,
             List.of(handover(orderId, List.of(handoverItem(material("Titanium"), false))))));
     when(backendApiClient.get(
-            eq("/api/v1/orders/{id}/inventory/orphaned"), anyTypeRef(), eq(orderId)))
+            eq("/api/v1/orders/{id}/allocations/orphaned"), anyTypeRef(), eq(orderId)))
         .thenReturn(List.of(inventory("Laranite", false)));
 
     String html = render(orderId);

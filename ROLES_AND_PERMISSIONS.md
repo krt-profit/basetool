@@ -423,13 +423,13 @@ Every hangar mutation in this table — by the owner, by an admin on another mem
 | Function (gate)                                                                                     | Member | Log. | MM | Officer | Admin |
 |:----------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Export **own** data, JSON + PDF (`/api/v1/users/me/export`, `isAuthenticated()`)                    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Export **another member's** data (`/api/v1/admin/users/{id}/export`, `hasRole('ADMIN')`)            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Export **another member's** data (`/api/v1/users/admin/{id}/export`, `hasRole('ADMIN')`)            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Raise / withdraw **own** erasure request (`/api/v1/users/me/deletion-request`, `isAuthenticated()`) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Read the erasure-request queue (`/api/v1/admin/deletion-requests`, `hasRole('ADMIN')`)              |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Read the erasure-request queue (`/api/v1/users/admin/deletion-requests`, `hasRole('ADMIN')`)              |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Refuse an erasure request, with a mandatory reason (`…/decline`, `hasRole('ADMIN')`)                |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Carry out an erasure request — deletes the account **and** the Keycloak login (`…/execute`)         |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Grant the Art. 17 wish: anonymise the surviving handle snapshots (`grantHistoryErasure`)            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Personensuche across every free-text surface (`/api/v1/admin/person-search`, `hasRole('ADMIN')`)    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Personensuche across every free-text surface (`/api/v1/users/admin/person-search`, `hasRole('ADMIN')`)    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 **Why the self-service rows are open to every member and still safe:** those endpoints take **no
 user id**. The subject is derived from the token, so there is no parameter with which one member
@@ -525,7 +525,7 @@ Notes are visible to everyone who sees the job order.
 order-ownership check: naming anybody but yourself requires
 `canManageUserInventory(<receiver>)` of the inventory access policy — admin, self, or a **shared editable org
 unit** with that receiver — and any other value is refused with `403` (REQ-SEC-039). The Einbuchen
-path (`POST /api/v1/inventory`) and the `owner` override of `POST /api/v1/refinery-orders` carry the
+path (`POST /api/v1/inventory`) and the owner-on-behalf create `POST /api/v1/refinery-orders/users/{userId}` (which replaced the `owner` override of `POST /api/v1/refinery-orders` in wave 6 of the API cut) carry the
 same gate. **Amended 2026-08-30:** all three previously accepted the flat `ROLE_LOGISTICIAN`, which
 is the OR-union over every membership and carries no org unit, so a logistician of any Staffel could
 write into any other Staffel's member ledger (REQ-SEC-005). The store dialog therefore shows the
@@ -696,7 +696,7 @@ service layer via the active Staffel context
 | SK lifecycle (create/rename/delete/activate, `profit-eligible`) (`hasRole('ADMIN')`)                                                                                |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Read SK member list** & **manage members** (add/remove/flags) (`@specialCommandSecurityService.canManageMembers` — applies also to the plain `GET /{id}/members`) |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
 | Appoint / clear the SK **lead** (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN') or canAppointSkLead`)                                         |   ❌    |  ❌   | ❌  |   ❌⁴    |   ✅   |
-| Org structure: create Bereiche + the OL, set parent edges, list all org units (`/api/v1/org-hierarchy/**` reads + structure writes, `/admin/org-structure`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Org structure: create Bereiche + the OL, set parent edges, list all org units (`/api/v1/org-units/**` reads + structure writes, `/admin/org-structure`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read the org chart (`GET /api/v1/org-chart`, `/org-chart`)                                                                                                          |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Edit the org chart — free-text holders and structure only; account seats mirror the ranks (`/api/v1/org-chart/positions/**`, `hasRole('ADMIN')`, REQ-ROLE-006) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
@@ -724,14 +724,14 @@ mirrored onto the org chart in the same transaction (REQ-ROLE-006).
 
 | Function (endpoint)                                                                                                   | Staffelleiter (own Staffel) | Bereichsleiter (own Bereich) | OL member | Admin |
 |:----------------------------------------------------------------------------------------------------------------------|:---------------------------:|:----------------------------:|:---------:|:-----:|
-| Open the Leitung page (`/organisation/leitung`, frontend `ADMIN_OR_OFFICER`; view `GET /api/v1/leitung/view`)       |             ✅¹              |              ✅¹              |    ✅¹     |   ✅   |
+| Open the Leitung page (`/organisation/leitung`, frontend `ADMIN_OR_OFFICER`; view `GET /api/v1/org-chart/leadership`)       |             ✅¹              |              ✅¹              |    ✅¹     |   ✅   |
 | Assign / clear Kommandoleiter, Stv., Ensign (`PUT`/`DELETE /api/v1/squadrons/{id}/ranks/{userId}`)                  |              ✅              |              ❌               |     ❌     |   ✅   |
 | Create / rename / delete a Kommandogruppe (≤ 4 per Staffel) (`/api/v1/squadrons/{id}/kommando-groups`, `/api/v1/kommando-groups/{id}`) |              ✅              |              ❌               |     ❌     |   ✅   |
 | Assign / clear the **Staffelleiter** of a child Staffel (same endpoints)                                            |              ❌              |              ✅               |     ❌     |   ✅   |
 | Appoint / clear the **SK lead** of a child SK (`PATCH /api/v1/special-commands/{id}/members/{uid}/lead`)           |              ❌              |              ✅               |     ❌     |   ✅   |
-| Add / remove Bereichskoordinator, Bereichsoperator (`POST`/`DELETE /api/v1/org-hierarchy/bereiche/{id}/members`)    |              ❌              |              ✅               |     ❌     |   ✅   |
+| Add / remove Bereichskoordinator, Bereichsoperator (`POST`/`DELETE /api/v1/org-units/bereiche/{id}/members`)    |              ❌              |              ✅               |     ❌     |   ✅   |
 | Add / remove a **Bereichsleiter** (same endpoints)                                                                  |              ❌              |              ❌               |    ✅²     |   ✅   |
-| Add / remove **OL members**; designate / vacate the **Grand Admiral** (`/api/v1/org-hierarchy/organisationsleitung/{id}/members`, `…/grand-admiral`) |              ❌              |              ❌               |     ❌     |   ✅   |
+| Add / remove **OL members**; designate / vacate the **Grand Admiral** (`/api/v1/org-units/organisationsleitung/{id}/members`, `…/grand-admiral`) |              ❌              |              ❌               |     ❌     |   ✅   |
 | Set, change or clear **one's own** rank on any of the endpoints above (`targetsAnotherUser`)                        |              ❌              |              ❌               |     ❌     |   ✅   |
 | See in the Leitung view                                                                                               |       own Staffel only       | own Bereich + its Staffeln and SKs |  every unit | every unit |
 
@@ -746,23 +746,24 @@ OL seat (REQ-ROLE-005) does not count.
 
 | Function (gate)                                                                                                                                                                                                                            | Member | Log. | MM | Officer | Admin |
 |:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
-| **Member**-readable master data (materials, locations, ship types, manufacturers, star systems, refining methods, frequency/job types, Staffeln, system settings) — anonymous until REQ-SEC-052                                            |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Member**-readable master data (materials, locations, ship types, manufacturers, star systems, refining methods, frequency/job types, Staffeln) — anonymous until REQ-SEC-052                                            |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Member-readable master data that always was (terminals, material categories)                                                                                                                                                               |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Admin-only** master data – also to read (cities, space stations, outposts, POIs, material aliases, blueprints) (`hasRole('ADMIN')`)                                                                                                      |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Write** master data (create/change/delete/visibility/overrides) (`hasRole('ADMIN')`)                                                                                                                                                     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | UEX location typeahead / blueprint product search (`isAuthenticated()`)                                                                                                                                                                    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Read** announcement (`GET /announcement`, `isAuthenticated()`)                                                                                                                                                                           |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Write/delete** announcement (incl. raw read view `GET /announcement/admin`) (`hasRole('ADMIN')`)                                                                                                                                         |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| **Read** announcement (`GET /announcements/current`, `isAuthenticated()`)                                                                                                                                                                           |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Write/delete** announcement (incl. raw read view `GET /announcements/current/admin`) (`hasRole('ADMIN')`)                                                                                                                                         |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read/clean up sync reports (`hasRole('ADMIN')`)                                                                                                                                                                                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read **audit logs** (Bank/Lager/Aufträge/Raffinerie/Mein Inventar/Missionen/Operationen/Rollen/Beförderung/Materialbörse/Hangar/Blueprints/Verbundene Anwendungen) + time-range PDF/JSON + retention cleanup (`/admin/audit-log`, `/api/v1/audit/**`, URL **and** method gate `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Read system settings (`GET /settings`, `GET /settings/{key}`, `hasRole('ADMIN')`; members read the typed `GET /orders/settings` and `GET /refinery-orders/settings`)                                                                       |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Write system setting (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                                                                                           |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Role/permission management, member attributes/rank, Staffel memberships + flags, Keycloak roster sync now (`/api/v1/admin/**`, `/api/v1/users/*/...`, `POST /api/v1/users/sync`, `/members`, `hasRole('ADMIN')`)                          |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Discord registration queue — approve / reject / reopen / link / merge (`/api/v1/admin/registrations/**`, `/admin/discord-registrations`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Discord registration queue — approve / reject / reopen / link / merge (`/api/v1/users/admin/registrations/**`, `/admin/discord-registrations`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Own exchange connections — list them with their installations and recent activity, mark new installations seen, disconnect a client or one installation, undo a client's writes, confirm or discard a change set the mass-change guard held back (`/api/v1/connected-apps/**`, REQ-XCH-008/-021/-022/-032); only from the member's own web session, never the app or the gateway; the web pages are *Persönlich → Verbundene Anwendungen* (`/connected-apps`) and its confirmation page (`/connected-apps/confirm`) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read the anonymous open demand of one's **own** units through an approved connected application (`GET /exchange/v1/me/org-demand` → `/api/v1/exchange/me/org-demand`, capability `exchange.demand.read`, REQ-XCH-018) — every member who gave that consent and passes `canViewJobOrders` (else empty lists with `reason: NOT_PERMITTED`; an `ADMIN` role does not open it on the exchange); only units the member belongs to, never ones they merely oversee or administer; no requester, assignee, order or free text |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Exchange client registry and the global exchange switch (`/api/v1/admin/exchange-clients/**`, `/api/v1/admin/exchange-settings`, REQ-XCH-003) — register, edit, suspend and activate approved clients (third-party programs and the SC Extractor), see each client's connected members and last activity (`…/exchange-clients/usage`); audited as „Verbundene Anwendungen“; the web page is *Administration → Verbundene Anwendungen* (`/admin/exchange-clients`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Undo one exchange client's writes for **every** member since a chosen time — after a malicious or faulty release (`/api/v1/admin/exchange-clients/{id}/undo`, `…/undo/preview`, `…/undo/installations`, `/api/v1/admin/exchange-undo-runs/**`, REQ-XCH-034): suspends the client through the registry first, then undoes member by member in the background with the member's undo semantics, optionally limited to one installation or resource; lists the runs and what they left alone, notifies each affected member; audited as „Verbundene Anwendungen“; on the same web page (*Administration → Verbundene Anwendungen*) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| Terms-of-Use acceptance overview (`/api/v1/admin/terms/**`, `/admin/terms`), notification rules (`/api/v1/notification-rules/**`), default blueprints (`/api/v1/admin/default-blueprints/**`), quality tiers (`/api/v1/admin/quality-tiers/**`, `/admin/quality-tiers`, REQ-ORDERS-036), P4K game-data import (`/api/v1/admin/import/p4k/**`), UEX data (`/admin/uex-data`) — all `hasRole('ADMIN')` |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Exchange client registry and the global exchange switch (`/api/v1/connected-apps/admin/clients/**`, `/api/v1/connected-apps/admin/settings`, REQ-XCH-003) — register, edit, suspend and activate approved clients (third-party programs and the SC Extractor), see each client's connected members and last activity (`…/exchange-clients/usage`); audited as „Verbundene Anwendungen“; the web page is *Administration → Verbundene Anwendungen* (`/admin/exchange-clients`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Undo one exchange client's writes for **every** member since a chosen time — after a malicious or faulty release (`/api/v1/connected-apps/admin/clients/{id}/undo`, `…/undo/preview`, `…/undo/installations`, `/api/v1/connected-apps/admin/undo-runs/**`, REQ-XCH-034): suspends the client through the registry first, then undoes member by member in the background with the member's undo semantics, optionally limited to one installation or resource; lists the runs and what they left alone, notifies each affected member; audited as „Verbundene Anwendungen“; on the same web page (*Administration → Verbundene Anwendungen*) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Terms-of-Use acceptance overview (`/api/v1/terms/admin/**`, `/admin/terms`), notification rules (`/api/v1/notifications/admin/rules/**`), default blueprints (`/api/v1/blueprints/admin/defaults/**`), quality tiers (`/api/v1/catalog/admin/quality-tiers/**`, `/admin/quality-tiers`, REQ-ORDERS-036), P4K game-data import (`/api/v1/catalog/admin/import/p4k/**`), UEX data (`/admin/uex-data`) — all `hasRole('ADMIN')` |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Hard-delete a user account** (`DELETE /api/v1/users/{id}`, `hasRole('ADMIN')`) — irreversible, and only for an account already gone from Keycloak                                                                                        |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Consolidate a duplicate account** (`POST /api/v1/users/{id}/consolidate`, `hasRole('ADMIN')`) — the path names the account dissolved, the body the one kept                                                                              |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read a member's RSI handle, read-only on the member page (`GET /api/v1/users/{id}/rsi-handle`, `hasRole('ADMIN')`, REQ-SEC-072) — no other role and no shared DTO carries it |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
@@ -849,8 +850,8 @@ softening the independence from REQ-BANK-008: `BankSecurityService` and the
 ledger stay 100 % OrgUnit-blind. The entire OrgUnit logic lives in exactly
 one seam deliberately **not** named with `Bank`, `OrgUnitBankAccessService`
 (ADR-0020), which is the only one allowed to connect `OwnerScopeService` and the bank
-(ArchUnit-pinned). This surface lies **outside** the bank URL/role space
-under `/api/v1/org-units/bank/**` and needs **no** bank role. „Off./Lead" =
+(ArchUnit-pinned). This surface lies at `/api/v1/bank/org-units/**`, beside the
+bank-employee one, and needs **no** bank role. „Off./Lead" =
 officer of one's own Staffel or lead of one's own Spezialkommando (oversight scope
 `currentOversightScope()`); a plain member still sees nothing.
 
@@ -862,8 +863,8 @@ officer of one's own Staffel or lead of one's own Spezialkommando (oversight sco
 
 | Function (gate)                                                                                                                | Member | Off./Lead | Bank Empl. | Bank Mgmt. | Admin |
 |:-------------------------------------------------------------------------------------------------------------------------------|:------:|:---------:|:----------:|:----------:|:-----:|
-| View **only the balance** of one's own OrgUnit account (`GET /api/v1/org-units/bank/balances`, oversight scope)                |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
-| Create a deposit/withdrawal **request** / view one's own requests / withdraw one's own request (`/org-units/bank/requests/**`) |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
+| View **only the balance** of one's own OrgUnit account (`GET /api/v1/bank/org-units/balances`, oversight scope)                |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
+| Create a deposit/withdrawal **request** / view one's own requests / withdraw one's own request (`/bank/org-units/requests/**`) |   ❌    |     ✅     |    (✅)*    |    (✅)*    |   ✅   |
 | **Confirm** a request (books it, records holders) / **reject** it (`/api/v1/bank/requests/**`, `BANK_EMPLOYEE` + account flag) |   ❌    |     ❌     | ✅ per flag |     ✅      |   ✅   |
 
 \* Bank Empl./Bank Management reach the officer endpoints only as far as the oversight
@@ -916,9 +917,9 @@ decides per account what is visible.
 
 | Function (gate)                                                                                                |  Member (if granted)  | Responsible | Bank Empl. (access) | Admin |
 |:---------------------------------------------------------------------------------------------------------------|:---------------------:|:-----------:|:-------------------:|:-----:|
-| View balance + read-only detail + account statement (`/api/v1/org-units/bank/accounts/{id}`, holders redacted) | ✅ (as far as visible) |      ✅      |    ✅ (bank page)    |   ✅   |
-| Configure visibility (`/api/v1/org-units/bank/accounts/{id}/visibility/**`)                                    |           ❌           |      ✅      |         ❌ †         |   ✅   |
-| Set/remove balance target (`…/balance-target` org-unit or `/api/v1/bank/accounts/{id}/balance-target`)         |           ❌           |      ✅      |     ✅ (access)      |   ✅   |
+| View balance + read-only detail + account statement (`/api/v1/bank/org-units/accounts/{id}`, holders redacted) | ✅ (as far as visible) |      ✅      |    ✅ (bank page)    |   ✅   |
+| Configure visibility (`/api/v1/bank/org-units/accounts/{id}/visibility/**`)                                    |           ❌           |      ✅      |         ❌ †         |   ✅   |
+| Set/remove balance target (`PUT …/balance-target`, org-unit or `/api/v1/bank/accounts/{id}/balance-target`)         |           ❌           |      ✅      |     ✅ (access)      |   ✅   |
 
 † Configuring **Sonderkonto** visibility is restricted to **OL members or Bank Management**
 (REQ-BANK-035/-037, `canConfigureVisibility`) — **not** a plain Bank Empl. (the column
@@ -1100,7 +1101,7 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
    functional `MembershipRole` of §2.)
 4. **Logistician/Mission-Manager flags** are maintained by admins **per Staffel** on the
    member-edit page: the (up to two) Staffel slots, each with their own
-   flags, feed into the membership delta `PATCH /api/v1/users/{id}/memberships`
+   flags, feed into the membership delta `PATCH /api/v1/org-units/members/{id}/memberships`
    and are reconciled in a single transaction (REQ-ORG-017). The old toggle endpoints
    `UserController#patchLogistician` / `#patchMissionManager` and the member-list switches
    were removed. For an SK, the SK-Lead still sets the flags via `canManageMembers`.

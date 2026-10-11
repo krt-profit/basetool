@@ -17,11 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.architecture.fixtures.mission;
+package de.greluc.krt.profit.basetool.frontend.joborder.model;
+
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
 /**
- * A write request that may carry its optimistic-lock token.
+ * Frontend mirror of the backend {@code JobOrderSettingsDto}; must match it field for field.
  *
- * @param version the version
+ * @param ageYellowDays days after which an open order turns yellow
+ * @param ageRedDays days after which an open order turns red
  */
-public record FixtureUpdateRequest(Long version) {}
+@DtoMirror
+public record JobOrderSettingsDto(int ageYellowDays, int ageRedDays) {}

@@ -56,7 +56,7 @@ import org.springframework.web.bind.annotation.RestController;
  * /{userId}}) instead of from the JWT.
  */
 @RestController
-@RequestMapping("/api/v1/admin/personal-inventory")
+@RequestMapping("/api/v1/personal-inventory/admin")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(

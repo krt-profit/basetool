@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.web;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryUpdateDto;
@@ -142,17 +143,22 @@ public class MissionFinanceEntryController {
    * (REQ-SEC-042): a mission manager in scope books for anyone on the mission, a plain member only
    * for their own participant row.
    *
+   * @param missionId the mission the entry is booked on; the payload's mission must agree
    * @param dto create payload
    * @return the persisted entry, with nested participant PII stripped
+   * @throws BadRequestException if the payload names another mission than the path
    */
-  @PostMapping("/finance-entries")
+  @PostMapping("/missions/{missionId}/finance-entries")
   @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canCreateFinanceEntry(#dto.missionId(),"
+          + " and @missionSecurityService.canCreateFinanceEntry(#missionId,"
           + " #dto.participantId(), authentication)")
   public MissionFinanceEntryDto createFinanceEntry(
-      @RequestBody @Valid MissionFinanceEntryCreateDto dto) {
+      @PathVariable UUID missionId, @RequestBody @Valid MissionFinanceEntryCreateDto dto) {
+    if (!missionId.equals(dto.missionId())) {
+      throw new BadRequestException("The entry names another mission than the request path");
+    }
     return redactParticipantPii(financeEntryService.createEntry(dto));
   }
 
@@ -160,27 +166,31 @@ public class MissionFinanceEntryController {
    * Updates an entry; the service checks owner-vs-admin, and the response has nested participant
    * PII stripped via {@link #redactParticipantPii}.
    *
+   * @param missionId the mission the entry belongs to; another mission's entry is not found
    * @param entryId entry id
    * @param dto update payload (carries the expected version)
    * @return the persisted entry, with nested participant PII stripped
    */
-  @PutMapping("/finance-entries/{entryId}")
+  @PutMapping("/missions/{missionId}/finance-entries/{entryId}")
   @PreAuthorize("isAuthenticated()")
   public MissionFinanceEntryDto updateFinanceEntry(
-      @PathVariable UUID entryId, @RequestBody @Valid MissionFinanceEntryUpdateDto dto) {
-    return redactParticipantPii(financeEntryService.updateEntry(entryId, dto));
+      @PathVariable UUID missionId,
+      @PathVariable UUID entryId,
+      @RequestBody @Valid MissionFinanceEntryUpdateDto dto) {
+    return redactParticipantPii(financeEntryService.updateEntry(missionId, entryId, dto));
   }
 
   /**
    * Deletes an entry. Service-layer {@code @PreAuthorize} checks owner-vs-admin.
    *
+   * @param missionId the mission the entry belongs to; another mission's entry is not found
    * @param entryId entry id
    */
-  @DeleteMapping("/finance-entries/{entryId}")
+  @DeleteMapping("/missions/{missionId}/finance-entries/{entryId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("isAuthenticated()")
-  public void deleteFinanceEntry(@PathVariable UUID entryId) {
-    financeEntryService.deleteEntry(entryId);
+  public void deleteFinanceEntry(@PathVariable UUID missionId, @PathVariable UUID entryId) {
+    financeEntryService.deleteEntry(missionId, entryId);
   }
 
   /**

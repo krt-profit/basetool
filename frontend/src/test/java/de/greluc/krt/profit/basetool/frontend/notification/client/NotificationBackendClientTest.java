@@ -90,11 +90,11 @@ class NotificationBackendClientTest {
     client.updateRule(ID, null);
     client.deleteRule(ID);
 
-    backend.expect("GET", "/api/v1/notification-rules");
-    backend.expect("GET", "/api/v1/notification-rules/" + ID);
-    backend.expect("POST", "/api/v1/notification-rules", null);
-    backend.expect("PUT", "/api/v1/notification-rules/" + ID, null);
-    backend.expect("DELETE", "/api/v1/notification-rules/" + ID, null);
+    backend.expect("GET", "/api/v1/notifications/admin/rules");
+    backend.expect("GET", "/api/v1/notifications/admin/rules/" + ID);
+    backend.expect("POST", "/api/v1/notifications/admin/rules", null);
+    backend.expect("PUT", "/api/v1/notifications/admin/rules/" + ID, null);
+    backend.expect("DELETE", "/api/v1/notifications/admin/rules/" + ID, null);
   }
 
   @Test
@@ -108,7 +108,7 @@ class NotificationBackendClientTest {
 
     backend.expect(
         "POST",
-        "/api/v1/notification-rules",
+        "/api/v1/notifications/admin/rules",
         "{\"eventType\":\"JOB_ORDER_CREATED\",\"notificationType\":\"JOB_ORDER_CREATED\","
             + "\"description\":\"Leads\",\"enabled\":true,\"excludeActor\":false,\"version\":2,"
             + "\"selectors\":[]}");

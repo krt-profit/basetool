@@ -94,4 +94,37 @@ class InventoryItemCatalogServiceTest {
 
     verify(blueprintRepository).findItemsWithActiveBlueprint("50\\%\\_x", pageable);
   }
+
+  @Test
+  void findOrderableItems_projectsRepositoryPageThroughTheMapperAndNeverTouchesTheBookableQuery() {
+    GameItem scope = new GameItem();
+    scope.setId(UUID.randomUUID());
+    scope.setName("Cirrus Scope");
+    Pageable pageable = PageRequest.of(0, 20);
+    Page<GameItem> page = new PageImpl<>(List.of(scope), pageable, 1);
+    InventoryGameItemReferenceDto ref =
+        new InventoryGameItemReferenceDto(scope.getId(), "Cirrus Scope", "Behring", "WEAPON");
+    when(blueprintRepository.findOrderableItems("Cirrus", pageable)).thenReturn(page);
+    when(inventoryItemMapper.gameItemToReferenceDto(scope)).thenReturn(ref);
+
+    Page<InventoryGameItemReferenceDto> result = service.findOrderableItems(" Cirrus ", pageable);
+
+    assertThat(result.getContent()).containsExactly(ref);
+    verify(blueprintRepository, org.mockito.Mockito.never())
+        .findItemsWithActiveBlueprint(org.mockito.ArgumentMatchers.anyString(), eq(pageable));
+  }
+
+  @Test
+  void findOrderableItems_escapesLikeMetacharactersAndBindsEmptyForBlank() {
+    Pageable pageable = PageRequest.of(0, 20);
+    when(blueprintRepository.findOrderableItems("50\\%\\_x", pageable))
+        .thenReturn(Page.empty(pageable));
+    when(blueprintRepository.findOrderableItems("", pageable)).thenReturn(Page.empty(pageable));
+
+    service.findOrderableItems(" 50%_x ", pageable);
+    service.findOrderableItems(null, pageable);
+
+    verify(blueprintRepository).findOrderableItems("50\\%\\_x", pageable);
+    verify(blueprintRepository).findOrderableItems("", pageable);
+  }
 }

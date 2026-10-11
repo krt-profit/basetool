@@ -55,7 +55,7 @@ import org.springframework.web.context.WebApplicationContext;
 @Transactional
 class SyncReportControllerTest {
 
-  private static final String BASE = "/api/v1/sync-reports";
+  private static final String BASE = "/api/v1/catalog/admin/sync-reports";
 
   @Autowired private WebApplicationContext context;
 

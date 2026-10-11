@@ -34,7 +34,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderUpdateRequest;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,7 +94,8 @@ class RefineryOrderDurationTest {
                     "Location",
                     org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/create"))));
 
-    ArgumentCaptor<RefineryOrderDto> captor = ArgumentCaptor.forClass(RefineryOrderDto.class);
+    ArgumentCaptor<RefineryOrderCreateRequest> captor =
+        ArgumentCaptor.forClass(RefineryOrderCreateRequest.class);
     verify(backendApiClient)
         .post(eq("/api/v1/refinery-orders"), captor.capture(), eq(RefineryOrderDto.class));
 
@@ -165,7 +168,8 @@ class RefineryOrderDurationTest {
                 .with(oauth2Login().authorities(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"))))
         .andExpect(status().is3xxRedirection());
 
-    ArgumentCaptor<RefineryOrderDto> captor = ArgumentCaptor.forClass(RefineryOrderDto.class);
+    ArgumentCaptor<RefineryOrderUpdateRequest> captor =
+        ArgumentCaptor.forClass(RefineryOrderUpdateRequest.class);
     verify(backendApiClient)
         .put(
             eq("/api/v1/refinery-orders/{id}"),
@@ -334,7 +338,8 @@ class RefineryOrderDurationTest {
                     "Location",
                     org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/create"))));
 
-    ArgumentCaptor<RefineryOrderDto> captor = ArgumentCaptor.forClass(RefineryOrderDto.class);
+    ArgumentCaptor<RefineryOrderCreateRequest> captor =
+        ArgumentCaptor.forClass(RefineryOrderCreateRequest.class);
     verify(backendApiClient)
         .post(eq("/api/v1/refinery-orders"), captor.capture(), eq(RefineryOrderDto.class));
     assertEquals(0L, captor.getValue().durationMinutes());

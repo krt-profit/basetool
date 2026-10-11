@@ -65,7 +65,7 @@ import org.springframework.web.multipart.MultipartFile;
  * </ul>
  */
 @RestController
-@RequestMapping("/api/v1/admin/import/p4k")
+@RequestMapping("/api/v1/catalog/admin/import/p4k")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(

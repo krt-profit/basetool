@@ -157,7 +157,7 @@ class JobOrderModuleContractTest {
             order + "/item-stock",
             order + "/material-collection",
             order + "/claims",
-            order + "/inventory/orphaned",
+            order + "/allocations/orphaned",
             order + "/item-blueprint-owners")) {
       mockMvc.perform(get(path).with(reader)).andExpect(status().isForbidden());
     }

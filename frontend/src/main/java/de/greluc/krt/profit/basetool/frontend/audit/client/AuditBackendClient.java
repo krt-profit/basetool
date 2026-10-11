@@ -114,7 +114,7 @@ public class AuditBackendClient {
    */
   @Nullable
   public List<ExchangeClientDto> exchangeClients() {
-    return backendApiClient.get("/api/v1/admin/exchange-clients", EXCHANGE_CLIENT_LIST);
+    return backendApiClient.get("/api/v1/connected-apps/admin/clients", EXCHANGE_CLIENT_LIST);
   }
 
   /**

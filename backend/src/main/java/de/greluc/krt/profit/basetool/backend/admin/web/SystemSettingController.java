@@ -35,11 +35,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface over the {@code system_setting} key-value store: public reads, ADMIN/OFFICER writes
- * with an optimistic-lock version.
+ * REST surface over the {@code system_setting} key-value store: reads and writes are ADMIN-only,
+ * writes carry an optimistic-lock version (REQ-SEC-083).
  *
- * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
- * gate still wins (REQ-SEC-052).
+ * <p>The class-level {@code isAuthenticated()} gate is the floor; every method narrows it to ADMIN.
+ * Members read the two job-order age thresholds and the refinery rounding mode through their typed
+ * endpoints, never through this store.
  */
 @RestController
 @RequestMapping("/api/v1/settings")
@@ -55,6 +56,7 @@ public class SystemSettingController {
    * @return every system setting as a DTO
    */
   @GetMapping
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public List<SystemSettingDto> getAllSettings() {
     return systemSettingService.getAllSettings();
   }
@@ -66,6 +68,7 @@ public class SystemSettingController {
    * @return the setting DTO
    */
   @GetMapping("/{key}")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SystemSettingDto getSetting(@PathVariable String key) {
     return systemSettingService.getSetting(key);
   }

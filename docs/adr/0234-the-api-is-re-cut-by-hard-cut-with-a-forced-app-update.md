@@ -81,6 +81,9 @@ same `.env`, so the old backend walls old apps while new apps find their paths g
   floor, the `APP_UPDATE_REQUIRED` answer and the app's re-read.
 - A health-gate rollback of a T1 wave is itself a hard cut in the other direction for members who
   already updated; a defect found after the floor rose is better fixed forward.
+- Implementation: the waves are built on the integration branch `claude/api-cut` and ship together (D-24); the web-only wave
+  moved every administration tree to `/api/v1/<root>/admin/**` behind one ADMIN rule (REQ-API-023). The wave plan is
+  [api-cut-waves.md](../modularisation/api-cut-waves.md).
 - Left open inside D-11: a static policy file served by the edge while the backend restarts, only if
   the app's re-read proves insufficient.
 

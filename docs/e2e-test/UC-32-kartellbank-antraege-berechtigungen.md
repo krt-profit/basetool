@@ -45,7 +45,7 @@ Ein Officer beantragt eine Buchung für seine Einheit; Bankmitarbeiter entscheid
 
 ### Sichtbarkeitsmatrix der Konten-Verantwortung (`OrgUnitBankVisibilityMatrixE2eTest`)
 
-10. Per API als jeweiliger Nutzer: Sonderkonto-Auto-Sicht, Drill-in-Endpunkte (`/api/v1/org-units/bank/…`), Freigaben der Arten `USER`, `GLOBAL_ROLE` und `ALL_MEMBERS` (vom Admin gesetzt), Saldo-Ziel und Sichtbarkeits-Konfiguration.
+10. Per API als jeweiliger Nutzer: Sonderkonto-Auto-Sicht, Drill-in-Endpunkte (`/api/v1/bank/org-units/…`), Freigaben der Arten `USER`, `GLOBAL_ROLE` und `ALL_MEMBERS` (vom Admin gesetzt), Saldo-Ziel und Sichtbarkeits-Konfiguration.
 11. In der UI: der Bereichsleiter öffnet den Drill-in eines gebuchten Sonderkontos.
 
 ## Erwartetes Ergebnis

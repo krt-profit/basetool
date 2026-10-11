@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
 > **Owner area:** REFINERY · **Related ADRs:** none
 
 # Refinery-order overview list
@@ -233,6 +233,26 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
 `RefineryOrderServiceTest` · **Code:** `RefineryOrderService.updateRefineryOrder` /
 `storeRefineryOrder`
 
+### Write requests and settings (wave 6 of the API cut)
+
+`POST /api/v1/refinery-orders` binds `RefineryOrderCreateRequest` and `PUT /api/v1/refinery-orders/{id}`
+(and the per-target `POST /users/{userId}` and `PUT /users/{userId}/{orderId}`) bind
+`RefineryOrderUpdateRequest`; neither carries an `id`, `owner`, `profit` or `owningSquadron`, so none of
+them is a writable read field. The create request has no `status` and no `version` either: the order
+starts `OPEN`, unstored. The update request keeps `status` (the edit form sets it) and `version`, and
+an owner or org unit never changes on an update. A logistician who orders for another member posts to
+`POST /api/v1/refinery-orders/users/{userId}`, whose gate reads the member from the path
+(`canManageUserRefineryOrders`, REQ-SEC-005); the web create form picks that path when the owner it
+shows differs from the signed-in member. The read DTO `RefineryOrderDto` is unchanged.
+
+`GET /api/v1/refinery-orders/settings` answers the refinery rounding mode that converts units to SCU
+(`roundingMode`, a `java.math.RoundingMode` name, default `UP`) to every authenticated caller. The
+web reads it instead of `GET /api/v1/settings/refinery.rounding.mode`; the admin page keeps reading and writing the
+value through `/api/v1/settings/{key}`, which only ADMIN may read (REQ-SEC-083).
+
+**Enforced by:** `RefineryOrderControllerTest` (`CreateMyRefineryOrderTests`, `UpdateRequestShapeTests`),
+`RefineryOrderMapperTest`, `RefinerySettingsServiceTest`, `SmallRestPathCutTest` · **Code:**
+`RefineryOrderCreateRequest`, `RefineryOrderUpdateRequest`, `RefinerySettingsController`
 ## Out of scope
 
 - The order **detail**, **create**, **store**, **cancel** and screenshot-**import** flows — covered

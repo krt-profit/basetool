@@ -65,6 +65,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -189,15 +190,16 @@ public class BankAccountController {
   }
 
   /**
-   * Sets or clears an account's balance target (REQ-BANK-036). Gated to bank staff with access to
-   * the account ({@code canSee}); the org-unit responsible holder uses the org-unit endpoint.
+   * Sets or clears an account's balance target (REQ-BANK-036) with full-replacement semantics.
+   * Gated to bank staff with access to the account ({@code canSee}); the org-unit responsible
+   * holder uses the org-unit endpoint.
    *
    * @param id the account
    * @param request the new target (or {@code null} to clear) plus the echoed version
    * @return the updated account
    */
   @Operation(summary = "Set or clear a bank account's balance target (bank staff with access)")
-  @PatchMapping("/{id}/balance-target")
+  @PutMapping("/{id}/balance-target")
   @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
   @Transactional
   public BankAccountDto setBalanceTarget(

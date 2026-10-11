@@ -19,31 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
-import de.greluc.krt.profit.basetool.backend.interceptor.DeprecationInterceptor;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserArgumentResolver;
 import de.greluc.krt.profit.basetool.backend.web.UserZoneArgumentResolver;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Registers the {@link DeprecationInterceptor}, which emits the {@code Deprecation}/{@code
- * Sunset}/{@code Link} headers on deprecated endpoints, and the {@link CurrentUserArgumentResolver}
- * and {@link UserZoneArgumentResolver} behind {@code @CurrentUserId} and {@code @UserZone}.
+ * Registers the {@link CurrentUserArgumentResolver} and {@link UserZoneArgumentResolver} behind
+ * {@code @CurrentUserId} and {@code @UserZone}.
  */
 @Configuration
-@RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {
-
-  private final DeprecationInterceptor deprecationInterceptor;
-
-  @Override
-  public void addInterceptors(InterceptorRegistry registry) {
-    registry.addInterceptor(deprecationInterceptor);
-  }
 
   /**
    * Registers the JWT-subject and user-time-zone argument resolvers so their annotations resolve on

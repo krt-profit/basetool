@@ -117,11 +117,10 @@ class OperationBackendClientTest {
     assertThat(client.payouts(ID)).isNotNull();
     assertThat(client.missionFinance(ID, MISSION)).isNotNull();
 
-    backend.expect("GET", "/api/v1/users/me/pickable-org-units");
+    backend.expect("GET", "/api/v1/org-units/me/pickable");
     backend.expect("GET", O);
     backend.expect(
-        "GET",
-        "/api/v1/missions/search?operationId=" + ID + "&page=2&size=10&sort=plannedStartTime,asc");
+        "GET", "/api/v1/missions?operationId=" + ID + "&page=2&size=10&sort=plannedStartTime,asc");
     backend.expect("GET", O + "/finance-summary");
     backend.expect("GET", O + "/payouts");
     backend.expect("GET", O + "/finances/" + MISSION);

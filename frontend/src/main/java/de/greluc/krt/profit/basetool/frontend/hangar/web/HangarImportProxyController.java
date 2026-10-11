@@ -49,7 +49,8 @@ import org.springframework.web.server.ResponseStatusException;
  * FleetViewer) to {@code POST /api/v1/hangar/import/ships}, which detects the format.
  *
  * <p>Uploads above {@link #MAX_IMPORT_BYTES} are refused with {@code 413} unread; accepted ones are
- * streamed. {@code /hangar/import/fleetview} is a deprecated alias.
+ * streamed through {@link HangarBackendClient}, which maps a backend failure like any other backend
+ * call.
  */
 @RestController
 @RequestMapping("/hangar/import")
@@ -83,35 +84,6 @@ public class HangarImportProxyController {
   @PostMapping(value = "/ships", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Object> importShips(@RequestParam("file") @NotNull MultipartFile file) {
-    return forwardImport(file, false);
-  }
-
-  /**
-   * Deprecated alias of {@link #importShips(MultipartFile)} for the Fleetview-only path.
-   *
-   * @param file the uploaded JSON file
-   * @return the backend's {@link FleetviewImportResponseDto}, or a {@code 413} JSON body when the
-   *     upload exceeds {@link #MAX_IMPORT_BYTES}
-   * @deprecated use {@code POST /hangar/import/ships}.
-   */
-  @PostMapping(value = "/fleetview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  @PreAuthorize("isAuthenticated()")
-  @Deprecated(since = "2026-05-14", forRemoval = true)
-  public ResponseEntity<Object> importFleetview(@RequestParam("file") @NotNull MultipartFile file) {
-    return forwardImport(file, true);
-  }
-
-  /**
-   * Forwards a multipart upload to the backend: refuses one above {@link #MAX_IMPORT_BYTES} unread,
-   * streams an accepted one through {@link HangarBackendClient}, which maps a backend failure like
-   * any other backend call.
-   *
-   * @param file uploaded multipart file
-   * @param fleetviewOnly whether to use the backend's deprecated Fleetview-only path
-   * @return the backend's import result, or the {@code 413} refusal
-   */
-  private @NotNull ResponseEntity<Object> forwardImport(
-      @NotNull MultipartFile file, boolean fleetviewOnly) {
     if (file.getSize() > MAX_IMPORT_BYTES) {
       log.warn(
           "Hangar import proxy: upload of {} bytes refused, the cap is {} bytes",
@@ -130,12 +102,7 @@ public class HangarImportProxyController {
         file.getOriginalFilename() != null ? file.getOriginalFilename() : FALLBACK_FILENAME;
 
     StreamedUpload upload = new StreamedUpload(file, originalFilename);
-    FleetviewImportResponseDto result =
-        withBackendStatus(
-            () ->
-                fleetviewOnly
-                    ? hangarClient.importFleetview(upload)
-                    : hangarClient.importShips(upload));
+    FleetviewImportResponseDto result = withBackendStatus(() -> hangarClient.importShips(upload));
 
     return ResponseEntity.ok(result);
   }

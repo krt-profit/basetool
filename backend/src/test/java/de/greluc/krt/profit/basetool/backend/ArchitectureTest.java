@@ -123,7 +123,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipant
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -411,6 +410,9 @@ class ArchitectureTest {
   /** Classes of the exchange domain: a package segment named {@code exchange}. */
   static final DescribedPredicate<JavaClass> EXCHANGE_DOMAIN = inDomain("exchange");
 
+  /** The class-level path prefix of the org-unit-facing bank surface (REQ-BANK-021). */
+  static final String ORG_UNIT_BANK_PREFIX = "/api/v1/bank/org-units";
+
   /** The class-level path prefix of the frozen exchange relay surface (REQ-XCH-036). */
   static final String EXCHANGE_RELAY_PREFIX = "/api/v1/exchange/";
 
@@ -558,8 +560,7 @@ class ArchitectureTest {
   static final Set<Class<?>> SQUADRON_ID_COLUMN_GRANDFATHERED = Set.of(User.class);
 
   /** Mission write requests that must not carry server-managed components. */
-  static final Set<Class<?>> MISSION_WRITE_REQUESTS =
-      Set.of(CreateMissionRequest.class, UpdateMissionRequest.class);
+  static final Set<Class<?>> MISSION_WRITE_REQUESTS = Set.of(CreateMissionRequest.class);
 
   /** The bank ledger repositories, insert-only (REQ-BANK-004). */
   static final Set<Class<?>> LEDGER_REPOSITORIES =
@@ -761,7 +762,7 @@ class ArchitectureTest {
   @Test
   void controllerMethodsShouldNotReturnJpaEntities() {
     DescribedPredicate<JavaMethod> selection = publicMethodsOf(CONTROLLER_CODE);
-    assertMethodFloor("controllerMethodsShouldNotReturnJpaEntities", selection, 721);
+    assertMethodFloor("controllerMethodsShouldNotReturnJpaEntities", selection, 708);
     controllerMethodsShouldNotReturnJpaEntitiesRule(selection).check(CLASSES);
   }
 
@@ -1273,7 +1274,7 @@ class ArchitectureTest {
   void controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers() {
     DescribedPredicate<JavaMethod> selection = publicMethodsOf(CONTROLLER_CODE);
     assertMethodFloor(
-        "controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers", selection, 721);
+        "controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers", selection, 708);
     controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappersRule(selection).check(CLASSES);
   }
 
@@ -1389,7 +1390,7 @@ class ArchitectureTest {
   @Test
   void peerReadableMissionEndpointsMustRedactPii() {
     DescribedPredicate<JavaMethod> selection = peerReadableEndpoints(MISSION_PII_CARRYING_DTOS);
-    assertMethodFloor("peerReadableMissionEndpointsMustRedactPii", selection, 22);
+    assertMethodFloor("peerReadableMissionEndpointsMustRedactPii", selection, 20);
     peerReadableMissionEndpointsMustRedactPiiRule(selection, MISSION_PII_CARRYING_DTOS)
         .check(CLASSES);
   }
@@ -1425,12 +1426,11 @@ class ArchitectureTest {
   @Test
   void missionWriteRequestDtosMustNotCarryServerManagedFields() {
     DescribedPredicate<JavaClass> selection = classesIn(MISSION_WRITE_REQUESTS);
-    assertClassFloor("missionWriteRequestDtosMustNotCarryServerManagedFields", selection, 2);
-    missionWriteRequestDtosRule(selection, UpdateMissionRequest.class).check(CLASSES);
+    assertClassFloor("missionWriteRequestDtosMustNotCarryServerManagedFields", selection, 1);
+    missionWriteRequestDtosRule(selection).check(CLASSES);
   }
 
-  static ArchRule missionWriteRequestDtosRule(
-      DescribedPredicate<JavaClass> selection, Class<?> updateRequest) {
+  static ArchRule missionWriteRequestDtosRule(DescribedPredicate<JavaClass> selection) {
     return classes()
         .that(selection)
         .should(
@@ -1439,12 +1439,10 @@ class ArchitectureTest {
                     + " …)") {
               @Override
               public void check(JavaClass clazz, ConditionEvents events) {
-                boolean isUpdateDto = clazz.isEquivalentTo(updateRequest);
                 clazz.getFields().stream()
                     .filter(f -> !f.getModifiers().contains(JavaModifier.STATIC))
                     .map(JavaField::getName)
                     .filter(FORBIDDEN_MISSION_REQUEST_COMPONENTS::contains)
-                    .filter(name -> !(isUpdateDto && "version".equals(name)))
                     .forEach(
                         name ->
                             events.add(
@@ -1842,6 +1840,71 @@ class ArchitectureTest {
         bridgesOrgUnitScopeAndTheBank(OwnerScopeService.class, BANK_DOMAIN);
     assertClassFloor("orgUnitAwareBankSeamIsContainedToOneClass", selection, 1);
     orgUnitAwareBankSeamRule(selection, OrgUnitBankAccessService.class).check(CLASSES);
+  }
+
+  /**
+   * The controllers that serve the org-unit-facing bank surface: web controllers whose class-level
+   * mapping lies under {@link #ORG_UNIT_BANK_PREFIX}, whichever package holds them.
+   */
+  static final DescribedPredicate<JavaClass> ORG_UNIT_BANK_CONTROLLERS =
+      DescribedPredicate.describe(
+          "org-unit bank controllers (class mapping under " + ORG_UNIT_BANK_PREFIX + ")",
+          c ->
+              WEB_CONTROLLERS.test(c)
+                  && c.tryGetAnnotationOfType(RequestMapping.class)
+                      .map(
+                          mapping ->
+                              Stream.concat(
+                                      Arrays.stream(mapping.value()), Arrays.stream(mapping.path()))
+                                  .anyMatch(path -> path.startsWith(ORG_UNIT_BANK_PREFIX)))
+                      .orElse(false));
+
+  /**
+   * The org-unit-facing bank surface is served by controllers registered on the org-unit side that
+   * reach the bank only through the seam (REQ-BANK-008, REQ-BANK-021, ADR-0020).
+   */
+  @Test
+  void theOrgUnitBankPrefixIsServedBySeamControllersOnly() {
+    assertClassFloor(
+        "theOrgUnitBankPrefixIsServedBySeamControllersOnly", ORG_UNIT_BANK_CONTROLLERS, 1);
+    orgUnitBankControllersAreOnTheOrgUnitSideRule(ORG_UNIT_BANK_CONTROLLERS, ORG_UNIT_BANK_SIDE)
+        .check(CLASSES);
+    orgUnitBankControllersRelayOnlyToTheSeamRule(ORG_UNIT_BANK_CONTROLLERS, BANK_DOMAIN)
+        .check(CLASSES);
+  }
+
+  static ArchRule orgUnitBankControllersAreOnTheOrgUnitSideRule(
+      DescribedPredicate<JavaClass> controllers, Set<Class<?>> orgUnitSide) {
+    return classes()
+        .that(controllers)
+        .should(
+            new ArchCondition<JavaClass>("be registered on the org-unit side of the bank") {
+              @Override
+              public void check(JavaClass javaClass, ConditionEvents events) {
+                if (orgUnitSide.stream().noneMatch(javaClass::isEquivalentTo)) {
+                  events.add(
+                      SimpleConditionEvent.violated(
+                          javaClass,
+                          javaClass.getName()
+                              + " serves the org-unit bank prefix but is not in"
+                              + " ORG_UNIT_BANK_SIDE."));
+                }
+              }
+            })
+        .because(
+            "a controller under the org-unit bank prefix is registered on the org-unit side, so the"
+                + " bank rules classify it (REQ-BANK-008)");
+  }
+
+  static ArchRule orgUnitBankControllersRelayOnlyToTheSeamRule(
+      DescribedPredicate<JavaClass> controllers, DescribedPredicate<JavaClass> bank) {
+    return noClasses()
+        .that(controllers)
+        .should()
+        .dependOnClassesThat(SERVICES.and(bank).as("a bank-domain service"))
+        .because(
+            "the org-unit bank surface is decided in OrgUnitBankAccessService alone; a bank-domain"
+                + " service behind it would skip the scoping (ADR-0020)");
   }
 
   /**

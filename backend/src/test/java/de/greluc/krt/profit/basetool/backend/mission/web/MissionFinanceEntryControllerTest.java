@@ -23,9 +23,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryUpdateDto;
@@ -207,34 +209,52 @@ class MissionFinanceEntryControllerTest {
     MissionFinanceEntryDto created = entry(missionId, FinanceType.INCOME, new BigDecimal("500.00"));
     when(service.createEntry(request)).thenReturn(created);
 
-    MissionFinanceEntryDto result = controller.createFinanceEntry(request);
+    MissionFinanceEntryDto result = controller.createFinanceEntry(missionId, request);
 
     assertThat(result).isSameAs(created);
     verify(service).createEntry(request);
   }
 
   @Test
+  void createFinanceEntry_bodyNamingAnotherMission_isRejected() {
+    UUID pathMissionId = UUID.randomUUID();
+    MissionFinanceEntryCreateDto request =
+        new MissionFinanceEntryCreateDto(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "note",
+            FinanceType.INCOME,
+            new BigDecimal("500.00"));
+
+    assertThatThrownBy(() -> controller.createFinanceEntry(pathMissionId, request))
+        .isInstanceOf(BadRequestException.class);
+    verify(service, never()).createEntry(any());
+  }
+
+  @Test
   void updateFinanceEntry_forwardsBothPathAndBodyToService() {
+    UUID missionId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
     MissionFinanceEntryUpdateDto request =
         new MissionFinanceEntryUpdateDto(
             "updated note", FinanceType.EXPENSE, new BigDecimal("999.99"), 3L);
     MissionFinanceEntryDto updated =
         entry(UUID.randomUUID(), FinanceType.EXPENSE, new BigDecimal("999.99"));
-    when(service.updateEntry(entryId, request)).thenReturn(updated);
+    when(service.updateEntry(missionId, entryId, request)).thenReturn(updated);
 
-    MissionFinanceEntryDto result = controller.updateFinanceEntry(entryId, request);
+    MissionFinanceEntryDto result = controller.updateFinanceEntry(missionId, entryId, request);
 
     assertThat(result).isSameAs(updated);
-    verify(service).updateEntry(entryId, request);
+    verify(service).updateEntry(missionId, entryId, request);
   }
 
   @Test
   void deleteFinanceEntry_delegatesToService() {
+    UUID missionId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
 
-    controller.deleteFinanceEntry(entryId);
+    controller.deleteFinanceEntry(missionId, entryId);
 
-    verify(service).deleteEntry(entryId);
+    verify(service).deleteEntry(missionId, entryId);
   }
 }

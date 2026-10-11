@@ -121,7 +121,7 @@ public class OperationBackendClient {
    */
   @Nullable
   public List<OrgUnitMembershipOptionDto> pickableOrgUnits() {
-    return backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
+    return backendApiClient.get("/api/v1/org-units/me/pickable", PICKABLE_ORG_UNIT_LIST_TYPE);
   }
 
   /**
@@ -147,8 +147,7 @@ public class OperationBackendClient {
   public PageResponse<MissionListDto> missions(
       @NotNull UUID id, @Nullable Integer page, @Nullable Integer size) {
     return backendApiClient.get(
-        "/api/v1/missions/search?operationId={id}&page={page}&size={size}"
-            + "&sort=plannedStartTime,asc",
+        "/api/v1/missions?operationId={id}&page={page}&size={size}" + "&sort=plannedStartTime,asc",
         MISSION_PAGE_TYPE,
         id,
         page,

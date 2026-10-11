@@ -31,9 +31,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service behind the Lager item-catalog picker (REQ-INV-029): lists game items bookable as
- * Lager item stock, i.e. the output of at least one active blueprint ({@link
- * BlueprintRepository#findItemsWithActiveBlueprint(String, Pageable)}).
+ * Read service behind the game-item catalogue {@code GET /api/v1/game-items} (REQ-INV-029): lists
+ * the game items bookable as Lager item stock, i.e. the output of at least one active blueprint
+ * ({@link BlueprintRepository#findItemsWithActiveBlueprint(String, Pageable)}), or the narrower set
+ * orderable as job-order item lines ({@link BlueprintRepository#findOrderableItems(String,
+ * Pageable)}).
  */
 @Service
 @RequiredArgsConstructor
@@ -54,9 +56,35 @@ public class InventoryItemCatalogService {
   @NotNull
   public Page<InventoryGameItemReferenceDto> findBookableItems(
       String search, @NotNull Pageable pageable) {
-    String q = search != null && !search.isBlank() ? LikePatterns.escape(search.strip()) : "";
     return blueprintRepository
-        .findItemsWithActiveBlueprint(q, pageable)
+        .findItemsWithActiveBlueprint(likeTerm(search), pageable)
         .map(inventoryItemMapper::gameItemToReferenceDto);
+  }
+
+  /**
+   * Pages the game items orderable as job-order item lines (output of an active blueprint with at
+   * least one resolved resource ingredient), optionally filtered by name.
+   *
+   * @param search case-insensitive name substring, or {@code null}/blank for no filter
+   * @param pageable page request (whitelisted {@code name} / {@code id} sort)
+   * @return a page of orderable game-item references; never {@code null}
+   */
+  @NotNull
+  public Page<InventoryGameItemReferenceDto> findOrderableItems(
+      String search, @NotNull Pageable pageable) {
+    return blueprintRepository
+        .findOrderableItems(likeTerm(search), pageable)
+        .map(inventoryItemMapper::gameItemToReferenceDto);
+  }
+
+  /**
+   * Turns a user search term into the escaped LIKE operand, {@code ""} for no filter.
+   *
+   * @param search the raw term, or {@code null}
+   * @return the escaped, stripped term
+   */
+  @NotNull
+  private static String likeTerm(String search) {
+    return search != null && !search.isBlank() ? LikePatterns.escape(search.strip()) : "";
   }
 }

@@ -44,7 +44,7 @@ import org.springframework.util.ClassUtils;
 class SecurityExpressionBeanResolutionTest {
 
   /** Bean references on 2026-10-02; fewer means the scan lost its subject. */
-  private static final int REFERENCE_FLOOR = 166;
+  private static final int REFERENCE_FLOOR = 163;
 
   @Autowired private ApplicationContext applicationContext;
 

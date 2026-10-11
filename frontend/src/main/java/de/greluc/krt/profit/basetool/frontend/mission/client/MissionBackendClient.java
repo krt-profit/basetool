@@ -68,7 +68,7 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -183,10 +183,10 @@ public class MissionBackendClient {
    */
   @Nullable
   public PageResponse<MissionListDto> searchMissions(@NotNull MissionSearch search) {
-    StringBuilder uri = new StringBuilder("/api/v1/missions/search?");
+    StringBuilder uri = new StringBuilder("/api/v1/missions?");
     List<Object> uriVariables = new ArrayList<>();
     if (search.query() != null && !search.query().isBlank()) {
-      uri.append("query={query}&");
+      uri.append("q={q}&");
       uriVariables.add(search.query());
     }
     if (search.start() != null) {
@@ -350,7 +350,7 @@ public class MissionBackendClient {
    */
   @Nullable
   public List<RefineryOrderListDto> refineryOrders(@NotNull UUID id) {
-    return backendApiClient.get("/api/v1/refinery-orders/mission/{id}", REFINERY_ORDER_LIST, id);
+    return backendApiClient.get("/api/v1/refinery-orders?missionId={id}", REFINERY_ORDER_LIST, id);
   }
 
   /**
@@ -361,7 +361,8 @@ public class MissionBackendClient {
    */
   @Nullable
   public List<InventoryItemDto> inventory(@NotNull UUID id) {
-    return backendApiClient.get("/api/v1/inventory/mission/{id}", INVENTORY_ITEM_LIST, id);
+    return backendApiClient.get(
+        "/api/v1/inventory/allocations?missionId={id}", INVENTORY_ITEM_LIST, id);
   }
 
   /**
@@ -371,8 +372,7 @@ public class MissionBackendClient {
    */
   @Nullable
   public List<OrgUnitMembershipOptionDto> pickableOrgUnits() {
-    return backendApiClient.get(
-        "/api/v1/users/me/pickable-org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+    return backendApiClient.get("/api/v1/org-units/me/pickable", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
   }
 
   /**
@@ -388,13 +388,13 @@ public class MissionBackendClient {
   }
 
   /**
-   * Reads the refinery rounding-mode setting.
+   * Reads the typed refinery settings.
    *
-   * @return the setting, or {@code null} when the backend sent no body
+   * @return the settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public SystemSettingDto refineryRoundingMode() {
-    return backendApiClient.get("/api/v1/settings/refinery.rounding.mode", SystemSettingDto.class);
+  public RefinerySettingsDto refinerySettings() {
+    return backendApiClient.get("/api/v1/refinery-orders/settings", RefinerySettingsDto.class);
   }
 
   /**
@@ -404,7 +404,7 @@ public class MissionBackendClient {
    * @param request the participant
    */
   public void addParticipant(@NotNull UUID id, @NotNull AddExternalParticipantRequest request) {
-    backendApiClient.post("/api/v1/missions/{id}/participants/add", request, Void.class, id);
+    backendApiClient.post("/api/v1/missions/{id}/participants", request, Void.class, id);
   }
 
   /**
@@ -419,7 +419,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull AddExternalParticipantRequest request) {
     return listOf(
         backendApiClient.post(
-            "/api/v1/missions/{id}/participants/slim", request, MissionParticipantDto[].class, id));
+            "/api/v1/missions/{id}/participants", request, MissionParticipantDto[].class, id));
   }
 
   /**
@@ -432,7 +432,7 @@ public class MissionBackendClient {
   public void updateParticipant(
       @NotNull UUID id, @NotNull UUID participantId, @NotNull UpdateParticipantRequest request) {
     backendApiClient.put(
-        "/api/v1/missions/{id}/participants/{participantId}/slim",
+        "/api/v1/missions/{id}/participants/{participantId}",
         request,
         Void.class,
         id,
@@ -451,7 +451,7 @@ public class MissionBackendClient {
   public MissionParticipantDto updateParticipantJson(
       @NotNull UUID id, @NotNull UUID participantId, @NotNull UpdateParticipantRequest request) {
     return backendApiClient.put(
-        "/api/v1/missions/{id}/participants/{participantId}/slim",
+        "/api/v1/missions/{id}/participants/{participantId}",
         request,
         MissionParticipantDto.class,
         id,
@@ -466,7 +466,7 @@ public class MissionBackendClient {
    */
   public void deleteParticipant(@NotNull UUID id, @NotNull UUID participantId) {
     backendApiClient.delete(
-        "/api/v1/missions/{id}/participants/{participantId}/slim", Void.class, id, participantId);
+        "/api/v1/missions/{id}/participants/{participantId}", Void.class, id, participantId);
   }
 
   /**
@@ -477,7 +477,7 @@ public class MissionBackendClient {
    */
   public void checkInParticipant(@NotNull UUID id, @NotNull UUID participantId) {
     backendApiClient.post(
-        "/api/v1/missions/{id}/participants/{participantId}/check-in/slim",
+        "/api/v1/missions/{id}/participants/{participantId}/check-in",
         null,
         Void.class,
         id,
@@ -495,7 +495,7 @@ public class MissionBackendClient {
   public MissionParticipantDto checkInParticipantJson(
       @NotNull UUID id, @NotNull UUID participantId) {
     return backendApiClient.post(
-        "/api/v1/missions/{id}/participants/{participantId}/check-in/slim",
+        "/api/v1/missions/{id}/participants/{participantId}/check-in",
         null,
         MissionParticipantDto.class,
         id,
@@ -510,7 +510,7 @@ public class MissionBackendClient {
    */
   public void checkOutParticipant(@NotNull UUID id, @NotNull UUID participantId) {
     backendApiClient.post(
-        "/api/v1/missions/{id}/participants/{participantId}/check-out/slim",
+        "/api/v1/missions/{id}/participants/{participantId}/check-out",
         null,
         Void.class,
         id,
@@ -528,7 +528,7 @@ public class MissionBackendClient {
   public MissionParticipantDto checkOutParticipantJson(
       @NotNull UUID id, @NotNull UUID participantId) {
     return backendApiClient.post(
-        "/api/v1/missions/{id}/participants/{participantId}/check-out/slim",
+        "/api/v1/missions/{id}/participants/{participantId}/check-out",
         null,
         MissionParticipantDto.class,
         id,
@@ -549,7 +549,7 @@ public class MissionBackendClient {
       @NotNull UUID participantId,
       @Nullable UpdatePayoutPreferenceRequest request) {
     return backendApiClient.put(
-        "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim",
+        "/api/v1/missions/{id}/participants/{participantId}/payout-preference",
         request,
         MissionParticipantDto.class,
         id,
@@ -645,7 +645,7 @@ public class MissionBackendClient {
    */
   public void addManager(@NotNull UUID missionId, @NotNull UUID userId) {
     backendApiClient.post(
-        "/api/v1/missions/{missionUuid}/managers/{userUuid}/slim",
+        "/api/v1/missions/{missionUuid}/managers/{userUuid}",
         null,
         Void.class,
         missionId,
@@ -660,7 +660,7 @@ public class MissionBackendClient {
    */
   public void removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
     backendApiClient.delete(
-        "/api/v1/missions/{missionUuid}/managers/{userUuid}/slim", Void.class, missionId, userId);
+        "/api/v1/missions/{missionUuid}/managers/{userUuid}", Void.class, missionId, userId);
   }
 
   /**
@@ -670,7 +670,7 @@ public class MissionBackendClient {
    * @param request the unit
    */
   public void addUnit(@NotNull UUID id, @NotNull AddUnitRequest request) {
-    backendApiClient.post("/api/v1/missions/{id}/units/slim", request, Void.class, id);
+    backendApiClient.post("/api/v1/missions/{id}/units", request, Void.class, id);
   }
 
   /**
@@ -683,8 +683,7 @@ public class MissionBackendClient {
   @Nullable
   public List<MissionUnitDto> addUnitJson(@NotNull UUID id, @NotNull AddUnitRequest request) {
     return listOf(
-        backendApiClient.post(
-            "/api/v1/missions/{id}/units/slim", request, MissionUnitDto[].class, id));
+        backendApiClient.post("/api/v1/missions/{id}/units", request, MissionUnitDto[].class, id));
   }
 
   /**
@@ -696,8 +695,7 @@ public class MissionBackendClient {
    */
   public void updateUnit(
       @NotNull UUID id, @NotNull UUID unitId, @NotNull UpdateUnitRequest request) {
-    backendApiClient.put(
-        "/api/v1/missions/{id}/units/{unitId}/slim", request, Void.class, id, unitId);
+    backendApiClient.put("/api/v1/missions/{id}/units/{unitId}", request, Void.class, id, unitId);
   }
 
   /**
@@ -712,7 +710,7 @@ public class MissionBackendClient {
   public MissionUnitDto updateUnitJson(
       @NotNull UUID id, @NotNull UUID unitId, @NotNull UpdateUnitRequest request) {
     return backendApiClient.put(
-        "/api/v1/missions/{id}/units/{unitId}/slim", request, MissionUnitDto.class, id, unitId);
+        "/api/v1/missions/{id}/units/{unitId}", request, MissionUnitDto.class, id, unitId);
   }
 
   /**
@@ -722,7 +720,7 @@ public class MissionBackendClient {
    * @param unitId the unit
    */
   public void deleteUnit(@NotNull UUID id, @NotNull UUID unitId) {
-    backendApiClient.delete("/api/v1/missions/{id}/units/{unitId}/slim", Void.class, id, unitId);
+    backendApiClient.delete("/api/v1/missions/{id}/units/{unitId}", Void.class, id, unitId);
   }
 
   /**
@@ -734,7 +732,7 @@ public class MissionBackendClient {
    */
   public void addCrew(@NotNull UUID id, @NotNull UUID unitId, @NotNull AddCrewRequest request) {
     backendApiClient.post(
-        "/api/v1/missions/{id}/units/{unitId}/crew/slim", request, Void.class, id, unitId);
+        "/api/v1/missions/{id}/units/{unitId}/crew", request, Void.class, id, unitId);
   }
 
   /**
@@ -750,7 +748,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull UUID unitId, @NotNull AddCrewRequest request) {
     return listOf(
         backendApiClient.post(
-            "/api/v1/missions/{id}/units/{unitId}/crew/slim",
+            "/api/v1/missions/{id}/units/{unitId}/crew",
             request,
             MissionCrewDto[].class,
             id,
@@ -771,7 +769,7 @@ public class MissionBackendClient {
       @NotNull UUID crewId,
       @NotNull UpdateCrewRequest request) {
     backendApiClient.put(
-        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
+        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}",
         request,
         Void.class,
         id,
@@ -795,7 +793,7 @@ public class MissionBackendClient {
       @NotNull UUID crewId,
       @NotNull UpdateCrewRequest request) {
     return backendApiClient.put(
-        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
+        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}",
         request,
         MissionCrewDto.class,
         id,
@@ -812,7 +810,7 @@ public class MissionBackendClient {
    */
   public void deleteCrew(@NotNull UUID id, @NotNull UUID unitId, @NotNull UUID crewId) {
     backendApiClient.delete(
-        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim", Void.class, id, unitId, crewId);
+        "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", Void.class, id, unitId, crewId);
   }
 
   /**
@@ -822,7 +820,7 @@ public class MissionBackendClient {
    * @param request the frequency type and value
    */
   public void putFrequency(@NotNull UUID id, @NotNull AddFrequencyRequest request) {
-    backendApiClient.post("/api/v1/missions/{id}/frequencies/slim", request, Void.class, id);
+    backendApiClient.post("/api/v1/missions/{id}/frequencies", request, Void.class, id);
   }
 
   /**
@@ -837,7 +835,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull AddFrequencyRequest request) {
     return listOf(
         backendApiClient.post(
-            "/api/v1/missions/{id}/frequencies/slim", request, MissionFrequencyDto[].class, id));
+            "/api/v1/missions/{id}/frequencies", request, MissionFrequencyDto[].class, id));
   }
 
   /**
@@ -848,7 +846,7 @@ public class MissionBackendClient {
    */
   public void deleteFrequency(@NotNull UUID id, @NotNull UUID frequencyId) {
     backendApiClient.delete(
-        "/api/v1/missions/{id}/frequencies/{frequencyId}/slim", Void.class, id, frequencyId);
+        "/api/v1/missions/{id}/frequencies/{frequencyId}", Void.class, id, frequencyId);
   }
 
   /**
@@ -863,10 +861,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull AddCustomFrequencyRequest request) {
     return listOf(
         backendApiClient.post(
-            "/api/v1/missions/{id}/frequencies/custom/slim",
-            request,
-            MissionFrequencyDto[].class,
-            id));
+            "/api/v1/missions/{id}/frequencies/custom", request, MissionFrequencyDto[].class, id));
   }
 
   /**
@@ -882,7 +877,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull UUID frequencyId, @NotNull UpdateCustomFrequencyRequest request) {
     return listOf(
         backendApiClient.put(
-            "/api/v1/missions/{id}/frequencies/custom/{frequencyId}/slim",
+            "/api/v1/missions/{id}/frequencies/custom/{frequencyId}",
             request,
             MissionFrequencyDto[].class,
             id,
@@ -899,8 +894,7 @@ public class MissionBackendClient {
   @Nullable
   public List<MissionStepDto> addStep(@NotNull UUID id, @NotNull AddMissionStepRequest request) {
     return listOf(
-        backendApiClient.post(
-            "/api/v1/missions/{id}/steps/slim", request, MissionStepDto[].class, id));
+        backendApiClient.post("/api/v1/missions/{id}/steps", request, MissionStepDto[].class, id));
   }
 
   /**
@@ -916,11 +910,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull UUID stepId, @NotNull UpdateMissionStepRequest request) {
     return listOf(
         backendApiClient.put(
-            "/api/v1/missions/{id}/steps/{stepId}/slim",
-            request,
-            MissionStepDto[].class,
-            id,
-            stepId));
+            "/api/v1/missions/{id}/steps/{stepId}", request, MissionStepDto[].class, id, stepId));
   }
 
   /**
@@ -936,7 +926,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull UUID stepId, @NotNull Long stepsVersion) {
     return listOf(
         backendApiClient.delete(
-            "/api/v1/missions/{id}/steps/{stepId}/slim?stepsVersion={stepsVersion}",
+            "/api/v1/missions/{id}/steps/{stepId}?stepsVersion={stepsVersion}",
             MissionStepDto[].class,
             id,
             stepId,
@@ -955,7 +945,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull ReorderMissionStepsRequest request) {
     return listOf(
         backendApiClient.put(
-            "/api/v1/missions/{id}/steps/reorder/slim", request, MissionStepDto[].class, id));
+            "/api/v1/missions/{id}/steps/reorder", request, MissionStepDto[].class, id));
   }
 
   /**
@@ -971,7 +961,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull UUID stepId, @NotNull ToggleMissionStepRequest request) {
     return listOf(
         backendApiClient.patch(
-            "/api/v1/missions/{id}/steps/{stepId}/done/slim",
+            "/api/v1/missions/{id}/steps/{stepId}/done",
             request,
             MissionStepDto[].class,
             id,
@@ -990,7 +980,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull AddMissionObjectiveRequest request) {
     return listOf(
         backendApiClient.post(
-            "/api/v1/missions/{id}/objectives/slim", request, MissionObjectiveDto[].class, id));
+            "/api/v1/missions/{id}/objectives", request, MissionObjectiveDto[].class, id));
   }
 
   /**
@@ -1006,7 +996,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull UUID objectiveId, @NotNull UpdateMissionObjectiveRequest request) {
     return listOf(
         backendApiClient.put(
-            "/api/v1/missions/{id}/objectives/{objectiveId}/slim",
+            "/api/v1/missions/{id}/objectives/{objectiveId}",
             request,
             MissionObjectiveDto[].class,
             id,
@@ -1026,7 +1016,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull UUID objectiveId, @NotNull Long objectivesVersion) {
     return listOf(
         backendApiClient.delete(
-            "/api/v1/missions/{id}/objectives/{objectiveId}/slim?objectivesVersion={version}",
+            "/api/v1/missions/{id}/objectives/{objectiveId}?objectivesVersion={version}",
             MissionObjectiveDto[].class,
             id,
             objectiveId,
@@ -1045,10 +1035,7 @@ public class MissionBackendClient {
       @NotNull UUID id, @NotNull ReorderMissionObjectivesRequest request) {
     return listOf(
         backendApiClient.put(
-            "/api/v1/missions/{id}/objectives/reorder/slim",
-            request,
-            MissionObjectiveDto[].class,
-            id));
+            "/api/v1/missions/{id}/objectives/reorder", request, MissionObjectiveDto[].class, id));
   }
 
   /**
@@ -1057,7 +1044,8 @@ public class MissionBackendClient {
    * @param request the entry, carrying its mission
    */
   public void addFinanceEntry(@NotNull MissionFinanceEntryCreateDto request) {
-    backendApiClient.post("/api/v1/finance-entries", request, Void.class);
+    backendApiClient.post(
+        "/api/v1/missions/{missionId}/finance-entries", request, Void.class, request.missionId());
   }
 
   /**
@@ -1068,41 +1056,62 @@ public class MissionBackendClient {
    */
   @Nullable
   public MissionFinanceEntryDto addFinanceEntryJson(@NotNull MissionFinanceEntryCreateDto request) {
-    return backendApiClient.post("/api/v1/finance-entries", request, MissionFinanceEntryDto.class);
+    return backendApiClient.post(
+        "/api/v1/missions/{missionId}/finance-entries",
+        request,
+        MissionFinanceEntryDto.class,
+        request.missionId());
   }
 
   /**
    * Edits a finance entry.
    *
+   * @param missionId the mission the entry belongs to
    * @param entryId the entry
    * @param request the entry fields, carrying the optimistic-lock version
    */
   public void updateFinanceEntry(
-      @NotNull UUID entryId, @NotNull MissionFinanceEntryUpdateDto request) {
-    backendApiClient.put("/api/v1/finance-entries/{entryId}", request, Void.class, entryId);
+      @NotNull UUID missionId,
+      @NotNull UUID entryId,
+      @NotNull MissionFinanceEntryUpdateDto request) {
+    backendApiClient.put(
+        "/api/v1/missions/{missionId}/finance-entries/{entryId}",
+        request,
+        Void.class,
+        missionId,
+        entryId);
   }
 
   /**
    * Edits a finance entry and answers the updated entry.
    *
+   * @param missionId the mission the entry belongs to
    * @param entryId the entry
    * @param request the entry fields, carrying the optimistic-lock version
    * @return the entry, or {@code null} when the backend sent no body
    */
   @Nullable
   public MissionFinanceEntryDto updateFinanceEntryJson(
-      @NotNull UUID entryId, @NotNull MissionFinanceEntryUpdateDto request) {
+      @NotNull UUID missionId,
+      @NotNull UUID entryId,
+      @NotNull MissionFinanceEntryUpdateDto request) {
     return backendApiClient.put(
-        "/api/v1/finance-entries/{entryId}", request, MissionFinanceEntryDto.class, entryId);
+        "/api/v1/missions/{missionId}/finance-entries/{entryId}",
+        request,
+        MissionFinanceEntryDto.class,
+        missionId,
+        entryId);
   }
 
   /**
    * Deletes a finance entry.
    *
+   * @param missionId the mission the entry belongs to
    * @param entryId the entry
    */
-  public void deleteFinanceEntry(@NotNull UUID entryId) {
-    backendApiClient.delete("/api/v1/finance-entries/{entryId}", Void.class, entryId);
+  public void deleteFinanceEntry(@NotNull UUID missionId, @NotNull UUID entryId) {
+    backendApiClient.delete(
+        "/api/v1/missions/{missionId}/finance-entries/{entryId}", Void.class, missionId, entryId);
   }
 
   /**

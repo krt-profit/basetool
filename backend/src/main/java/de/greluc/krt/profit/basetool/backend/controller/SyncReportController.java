@@ -51,7 +51,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Results are always newest-first, so no sort parameter is exposed.
  */
 @RestController
-@RequestMapping("/api/v1/sync-reports")
+@RequestMapping("/api/v1/catalog/admin/sync-reports")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)

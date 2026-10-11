@@ -80,7 +80,7 @@ class OrgUnitContextAdviceTest {
     advice().availableOrgUnits(new MockHttpServletRequest());
 
     verify(backendApiClient).get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class);
-    verify(backendApiClient, never()).get(eq("/api/v1/me/org-units"), anyTypeRef());
+    verify(backendApiClient, never()).get(eq("/api/v1/org-units/me/switchable"), anyTypeRef());
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());
   }

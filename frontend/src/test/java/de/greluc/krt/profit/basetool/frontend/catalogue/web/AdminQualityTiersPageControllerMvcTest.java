@@ -60,13 +60,14 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * MVC test for {@link AdminQualityTiersPageController} and {@link
  * AdminQualityTiersRelayController}: the page and its table fragment render for an administrator
- * only, and the create, update and delete relays forward to {@code /api/v1/admin/quality-tiers},
- * evict the quality-tier catalogue and relay a backend {@code 409}.
+ * only, and the create, update and delete relays forward to {@code
+ * /api/v1/catalog/admin/quality-tiers}, evict the quality-tier catalogue and relay a backend {@code
+ * 409}.
  */
 @SpringBootTest
 class AdminQualityTiersPageControllerMvcTest {
 
-  private static final String BACKEND_BASE = "/api/v1/admin/quality-tiers";
+  private static final String BACKEND_BASE = "/api/v1/catalog/admin/quality-tiers";
 
   private static final String PAGE = "/admin/quality-tiers";
 
@@ -286,7 +287,10 @@ class AdminQualityTiersPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void updateRelaysTheVersionAndEvictsTheCatalogue() throws Exception {
     when(backendApiClient.put(
-            eq("/api/v1/admin/quality-tiers/{id}"), any(), eq(QualityTierDto.class), eq(GOOD_ID)))
+            eq("/api/v1/catalog/admin/quality-tiers/{id}"),
+            any(),
+            eq(QualityTierDto.class),
+            eq(GOOD_ID)))
         .thenReturn(new QualityTierDto(GOOD_ID, "GOOD", 650, "Gut", "Good", 10, false, 4L));
 
     mockMvc
@@ -304,7 +308,7 @@ class AdminQualityTiersPageControllerMvcTest {
     ArgumentCaptor<QualityTierWriteDto> body = ArgumentCaptor.forClass(QualityTierWriteDto.class);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/admin/quality-tiers/{id}"),
+            eq("/api/v1/catalog/admin/quality-tiers/{id}"),
             body.capture(),
             eq(QualityTierDto.class),
             eq(GOOD_ID));
@@ -316,7 +320,7 @@ class AdminQualityTiersPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteRelaysToTheBackendAndEvictsTheCatalogue() throws Exception {
-    when(backendApiClient.delete("/api/v1/admin/quality-tiers/{id}", Void.class, GOOD_ID))
+    when(backendApiClient.delete("/api/v1/catalog/admin/quality-tiers/{id}", Void.class, GOOD_ID))
         .thenReturn(null);
 
     mockMvc
@@ -326,14 +330,15 @@ class AdminQualityTiersPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).delete("/api/v1/admin/quality-tiers/{id}", Void.class, GOOD_ID);
+    verify(backendApiClient)
+        .delete("/api/v1/catalog/admin/quality-tiers/{id}", Void.class, GOOD_ID);
     verify(backendApiClient).evict(CacheDomain.QUALITY_TIER);
   }
 
   @Test
   @WithMockUser(roles = "ADMIN")
   void aTierInUseIsRelayedAs409WithoutEviction() throws Exception {
-    when(backendApiClient.delete("/api/v1/admin/quality-tiers/{id}", Void.class, GOOD_ID))
+    when(backendApiClient.delete("/api/v1/catalog/admin/quality-tiers/{id}", Void.class, GOOD_ID))
         .thenThrow(
             new BackendServiceException(
                 "in use", null, 409, "ENTITY_IN_USE", null, List.of(), "in use"));
@@ -353,7 +358,10 @@ class AdminQualityTiersPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void aStaleVersionIsRelayedAs409() throws Exception {
     when(backendApiClient.put(
-            eq("/api/v1/admin/quality-tiers/{id}"), any(), eq(QualityTierDto.class), eq(GOOD_ID)))
+            eq("/api/v1/catalog/admin/quality-tiers/{id}"),
+            any(),
+            eq(QualityTierDto.class),
+            eq(GOOD_ID)))
         .thenThrow(
             new BackendServiceException(
                 "stale", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "stale"));

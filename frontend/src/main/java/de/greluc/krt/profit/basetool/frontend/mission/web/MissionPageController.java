@@ -49,7 +49,7 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.UnitForm;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -101,9 +101,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 public class MissionPageController {
 
   /**
-   * The mission statuses {@code GET /api/v1/missions/search} filters on — the only {@code status}
-   * values the list page relays (REQ-SEC-051). The backend stores the status as a string, so this
-   * set is the vocabulary rather than an enum.
+   * The mission statuses {@code GET /api/v1/missions} filters on — the only {@code status} values
+   * the list page relays (REQ-SEC-051). The backend stores the status as a string, so this set is
+   * the vocabulary rather than an enum.
    */
   static final Set<String> MISSION_STATUSES = Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
 
@@ -522,7 +522,7 @@ public class MissionPageController {
    * form.
    *
    * @param principal authenticated OIDC user; the options are resolved via {@code
-   *     /api/v1/users/me/pickable-org-units}.
+   *     /api/v1/org-units/me/pickable}.
    * @return picker options, or an empty list when the lookup fails; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions(OidcUser principal) {
@@ -565,9 +565,9 @@ public class MissionPageController {
   @NotNull
   private String fetchRoundingMode() {
     try {
-      SystemSettingDto setting = missionClient.refineryRoundingMode();
-      if (setting != null && setting.value() != null) {
-        return setting.value();
+      RefinerySettingsDto settings = missionClient.refinerySettings();
+      if (settings != null && settings.roundingMode() != null) {
+        return settings.roundingMode();
       }
     } catch (Exception _) {
       log.warn("Failed to fetch refinery rounding mode, using default UP");

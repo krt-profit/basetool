@@ -245,7 +245,7 @@ class TenancyGuardTest {
 
   private static final int CONTROLLER_FLOOR = 23;
 
-  private static final int HANDLER_FLOOR = 126;
+  private static final int HANDLER_FLOOR = 125;
 
   @Test
   void everyOrgUnitReferenceOfAnEntityIsClassified() {

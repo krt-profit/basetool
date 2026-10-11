@@ -98,10 +98,9 @@ class ApiCacheControlFilterTest {
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "/api/v1/org-units/bank/balances",
-        "/api/v1/org-units/bank/accounts/42/transactions",
-        "/api/v1/finance-entries",
-        "/api/v1/finance-entries/42",
+        "/api/v1/bank/org-units/balances",
+        "/api/v1/bank/org-units/accounts/42/transactions",
+        "/api/v1/missions/{missionId}/finance-entries",
         "/api/v1/missions/42/finance-entries",
         "/api/v1/missions/42/finance-entries/summary",
         "/api/v1/operations/42/payouts",
@@ -142,7 +141,8 @@ class ApiCacheControlFilterTest {
         "private, no-store",
         run("GET", "/api/v1/material-exchange/offers").getHeader(CACHE_CONTROL));
     assertEquals(
-        "private, no-store", run("GET", "/api/v1/material-requests").getHeader(CACHE_CONTROL));
+        "private, no-store",
+        run("GET", "/api/v1/material-exchange/requests").getHeader(CACHE_CONTROL));
   }
 
   @Test

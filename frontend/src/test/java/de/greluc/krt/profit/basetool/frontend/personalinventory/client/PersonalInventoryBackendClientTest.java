@@ -108,11 +108,11 @@ class PersonalInventoryBackendClientTest {
     backend.expect("GET", "/api/v1/users/" + SUB);
     backend.expect(
         "GET",
-        "/api/v1/admin/personal-inventory/" + SUB + "?page=1&size=50&sort=name,asc&q=Med%20Pen");
-    backend.expect("GET", "/api/v1/admin/personal-inventory/" + SUB + "?size=10");
-    backend.expect("POST", "/api/v1/admin/personal-inventory/" + SUB, CREATE_BODY);
-    backend.expect("PUT", "/api/v1/admin/personal-inventory/items/" + ID, UPDATE_BODY);
-    backend.expect("DELETE", "/api/v1/admin/personal-inventory/items/" + ID, null);
+        "/api/v1/personal-inventory/admin/" + SUB + "?page=1&size=50&sort=name,asc&q=Med%20Pen");
+    backend.expect("GET", "/api/v1/personal-inventory/admin/" + SUB + "?size=10");
+    backend.expect("POST", "/api/v1/personal-inventory/admin/" + SUB, CREATE_BODY);
+    backend.expect("PUT", "/api/v1/personal-inventory/admin/items/" + ID, UPDATE_BODY);
+    backend.expect("DELETE", "/api/v1/personal-inventory/admin/items/" + ID, null);
   }
 
   /**

@@ -44,7 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * AJAX relay of the quality-tier admin page's create, update and delete to {@code
- * /api/v1/admin/quality-tiers} (REQ-ORDERS-036); a backend refusal is relayed as {@code
+ * /api/v1/catalog/admin/quality-tiers} (REQ-ORDERS-036); a backend refusal is relayed as {@code
  * application/problem+json} with the backend's status and problem code.
  *
  * <p>Every successful write evicts {@link CacheDomain#QUALITY_TIER} so the order pages pick the

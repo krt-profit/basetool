@@ -56,13 +56,13 @@ import org.springframework.stereotype.Service;
 public class ExchangeBackendClient {
 
   /** The backend's registry endpoints. */
-  private static final String CLIENTS = "/api/v1/admin/exchange-clients";
+  private static final String CLIENTS = "/api/v1/connected-apps/admin/clients";
 
   /** The backend's global switch endpoint. */
-  private static final String SETTINGS = "/api/v1/admin/exchange-settings";
+  private static final String SETTINGS = "/api/v1/connected-apps/admin/settings";
 
   /** The backend's bulk undo runs. */
-  private static final String UNDO_RUNS = "/api/v1/admin/exchange-undo-runs";
+  private static final String UNDO_RUNS = "/api/v1/connected-apps/admin/undo-runs";
 
   /** The backend's connected-apps endpoints. */
   private static final String CONNECTED_APPS = "/api/v1/connected-apps";

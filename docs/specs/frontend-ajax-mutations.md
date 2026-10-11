@@ -1615,8 +1615,8 @@ game items, bank accounts) keep the 50-row default and rely on the hint. The mar
 values are registered in `krt-catalog-search.js`: `remote-materials`,
 `remote-materials-joborder` (orders lines), `remote-materials-raw` (refinery inputs),
 `remote-locations`, and `remote-game-items` (the inventory item mode's bookable-item picker — the
-one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated backend
-`/api/v1/inventory/item-catalog`, REQ-INV-029). Each marker carries its kind-specific default
+one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated (full set) backend
+`/api/v1/game-items`, REQ-INV-029). Each marker carries its kind-specific default
 placeholder / no-results wording via the `krtComboboxI18n.kinds` map (REQ-FE-011) — the material and
 location pickers say "Material/Ort suchen oder wählen…", never the user-picker text.
 Server-rendered edit/redisplay states seed exactly
@@ -2049,8 +2049,8 @@ fall.
 **Acceptance**
 
 - [ ] An authenticated request to a `@RestController` in the `frontend` module triggers none of
-  `/api/v1/me/capabilities`, `/api/v1/notifications/unread-count`, `/api/v1/me/active-org-unit`,
-  `/api/v1/me/org-units` or the `CachedCatalog.SQUADRONS` page-walk.
+  `/api/v1/me/capabilities`, `/api/v1/notifications/unread-count`, `/api/v1/org-units/me/active`,
+  `/api/v1/org-units/me/switchable` or the `CachedCatalog.SQUADRONS` page-walk.
 - [ ] Every `@Controller` in the module carries `@UsesLayoutModel`; no `@RestController` carries it.
   Both halves are asserted, so the scoping can neither drift open nor close over a page.
 - [ ] View controllers are unaffected: pages still render with org-unit context, capability flags,
@@ -2350,9 +2350,10 @@ this rule is what notices.
   line and the error metric, must equal the request its lambda builds.
 - **The selection cannot shrink unnoticed:** at least 611 resolved call sites and seven probe
   templates.
-- `DeprecatedBackendEndpointCallGuardTest` reads the same scan, so it sees `execute(…)` sites too.
-  The one deprecated operation still relayed, `POST /api/v1/hangar/import/fleetview` (sunset
-  2027-05-14), is named in its list of reviewed relays.
+- No operation of the document is deprecated any more (the last one, `POST
+  /api/v1/hangar/import/fleetview`, was deleted in wave 6 of the API cut), so the guard that read
+  `deprecated: true` out of the document went with it; `BackendCallExistenceTest` still fails on a
+  call to a path or verb the backend does not serve.
 
 **Acceptance**
 
@@ -2360,10 +2361,10 @@ this rule is what notices.
   both reported; an `execute(…)` fixture declaring `GET` while sending `POST` is reported.
 - [x] A probe template that is no `GET` of the document is reported.
 - [x] The guard found the admin update and delete of a member's personal-inventory item calling
-  `PUT`/`DELETE /api/v1/admin/personal-inventory/{id}`, which the backend never served (it serves
+  `PUT`/`DELETE /api/v1/personal-inventory/admin/{id}`, which the backend never served (it serves
   `…/items/{id}`); both now call the backend's paths.
 
-**Enforced by:** `BackendCallExistenceTest`, `DeprecatedBackendEndpointCallGuardTest`,
+**Enforced by:** `BackendCallExistenceTest`,
 `AdminPersonalInventoryPageControllerMvcTest` · **Code:** `contract/BackendCallScanner`,
 `contract/BackendOperations` (tests) · **Related:** REQ-FE-015, REQ-API-001, ADR-0032
 

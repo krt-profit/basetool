@@ -46,7 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
  * endpoints to decline and to execute a request.
  */
 @RestController
-@RequestMapping("/api/v1/admin/deletion-requests")
+@RequestMapping("/api/v1/users/admin/deletion-requests")
 @RequiredArgsConstructor
 public class AdminDeletionRequestController {
 

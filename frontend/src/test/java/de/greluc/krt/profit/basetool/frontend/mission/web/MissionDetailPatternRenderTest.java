@@ -258,7 +258,7 @@ class MissionDetailPatternRenderTest {
     stubMission(true);
     UUID orderId = UUID.fromString("00000000-0000-0000-0000-000000001042");
     when(backendApiClient.get(
-            eq("/api/v1/refinery-orders/mission/{id}"), anyTypeRef(), eq(MISSION_ID)))
+            eq("/api/v1/refinery-orders?missionId={id}"), anyTypeRef(), eq(MISSION_ID)))
         .thenReturn(
             List.of(
                 new RefineryOrderListDto(

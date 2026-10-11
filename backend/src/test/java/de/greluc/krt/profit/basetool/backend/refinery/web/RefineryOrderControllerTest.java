@@ -36,10 +36,10 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
-import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -62,7 +62,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
  * Tests the inline owner-vs-Logistician shaping in {@link RefineryOrderController}: which {@code
- * targetUserId} is used and when {@link AccessDeniedException} is thrown.
+ * targetUserId} is used, when {@link AccessDeniedException} is thrown, and that the request records
+ * bind no server-managed field.
  */
 @ExtendWith(MockitoExtension.class)
 class RefineryOrderControllerTest {
@@ -71,7 +72,6 @@ class RefineryOrderControllerTest {
   @Mock private UserService userService;
   @Mock private RefineryOrderMapper mapper;
   @Mock private AuthHelperService authHelperService;
-  @Mock private RefineryAccessPolicy refineryAccessPolicy;
   @Mock private Jwt jwt;
 
   @InjectMocks private RefineryOrderController controller;
@@ -89,54 +89,30 @@ class RefineryOrderControllerTest {
   class UpdateMyRefineryOrderTests {
 
     @Test
-    void logisticianWithExplicitOwnerInBody_routesToBodyOwner() {
-      RefineryOrder existing = newOrder(CALLER_ID);
+    void logistician_routesToTheExistingOwner() {
+      RefineryOrder existing = newOrder(OTHER_USER_ID);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
-      RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID);
+      RefineryOrderUpdateRequest incoming = updateRequest();
       RefineryOrder mapped = new RefineryOrder();
       when(mapper.toEntity(incoming)).thenReturn(mapped);
       RefineryOrder updated = new RefineryOrder();
       when(service.updateRefineryOrder(eq(OTHER_USER_ID), eq(ORDER_ID), eq(mapped), eq(true)))
           .thenReturn(updated);
-      when(mapper.toDto(eq(updated), any())).thenReturn(incoming);
+      RefineryOrderDto out = dto();
+      when(mapper.toDto(eq(updated), any())).thenReturn(out);
 
       RefineryOrderDto result = controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
 
-      assertSame(incoming, result);
+      assertSame(out, result);
       ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
       verify(service)
           .updateRefineryOrder(userIdCaptor.capture(), eq(ORDER_ID), eq(mapped), eq(true));
       assertEquals(
           OTHER_USER_ID,
           userIdCaptor.getValue(),
-          "Logistician + body.owner.id present -> body's owner wins");
-    }
-
-    @Test
-    void logisticianWithNoOwnerInBody_fallsBackToExistingOwner() {
-      RefineryOrder existing = newOrder(OTHER_USER_ID);
-      when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-
-      RefineryOrderDto incoming = dtoWithOwner(null);
-      RefineryOrder mapped = new RefineryOrder();
-      when(mapper.toEntity(incoming)).thenReturn(mapped);
-      when(service.updateRefineryOrder(
-              any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
-          .thenReturn(new RefineryOrder());
-      when(mapper.toDto(any(), any())).thenReturn(incoming);
-
-      controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
-
-      ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
-      verify(service)
-          .updateRefineryOrder(userIdCaptor.capture(), eq(ORDER_ID), eq(mapped), eq(true));
-      assertEquals(
-          OTHER_USER_ID,
-          userIdCaptor.getValue(),
-          "Logistician + no body.owner -> existing.owner wins (NOT the caller)");
+          "Logistician -> existing.owner wins (NOT the caller); the request names no owner");
     }
 
     @Test
@@ -146,12 +122,12 @@ class RefineryOrderControllerTest {
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
-      RefineryOrderDto incoming = dtoWithOwner(null);
+      RefineryOrderUpdateRequest incoming = updateRequest();
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
       when(service.updateRefineryOrder(
               any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
           .thenReturn(new RefineryOrder());
-      when(mapper.toDto(any(), any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(dto());
 
       controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
 
@@ -169,12 +145,12 @@ class RefineryOrderControllerTest {
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
 
-      RefineryOrderDto incoming = dtoWithOwner(null);
+      RefineryOrderUpdateRequest incoming = updateRequest();
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
       when(service.updateRefineryOrder(
               any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
           .thenReturn(new RefineryOrder());
-      when(mapper.toDto(any(), any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(dto());
 
       controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
 
@@ -189,7 +165,7 @@ class RefineryOrderControllerTest {
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
 
-      RefineryOrderDto incoming = dtoWithOwner(null);
+      RefineryOrderUpdateRequest incoming = updateRequest();
 
       assertThrows(
           AccessDeniedException.class,
@@ -205,7 +181,7 @@ class RefineryOrderControllerTest {
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
 
-      RefineryOrderDto incoming = dtoWithOwner(null);
+      RefineryOrderUpdateRequest incoming = updateRequest();
 
       assertThrows(
           AccessDeniedException.class,
@@ -219,56 +195,61 @@ class RefineryOrderControllerTest {
   class CreateMyRefineryOrderTests {
 
     @Test
-    void inScopeCallerCanCreateForAnotherUser() {
-      when(refineryAccessPolicy.canManageUserRefineryOrders(OTHER_USER_ID)).thenReturn(true);
-
-      RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID);
+    void theOrderIsAlwaysAttributedToTheCaller() {
+      RefineryOrderCreateRequest incoming = createRequest(UUID.randomUUID());
       RefineryOrder mapped = new RefineryOrder();
       when(mapper.toEntity(incoming)).thenReturn(mapped);
       when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
-      when(mapper.toDto(any(), any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(dto());
 
       controller.createMyRefineryOrder(jwt, incoming);
 
-      ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
-      verify(service).createRefineryOrder(userIdCaptor.capture(), eq(mapped), any());
-      assertEquals(
-          OTHER_USER_ID,
-          userIdCaptor.getValue(),
-          "in-scope caller + body.owner.id -> create attributed to body's owner");
+      verify(service).createRefineryOrder(CALLER_ID, mapped, incoming.owningOrgUnitId());
     }
 
     @Test
-    void outOfScopeCaller_withBodyOwner_isIgnored_useCallerInstead() {
-      when(refineryAccessPolicy.canManageUserRefineryOrders(OTHER_USER_ID)).thenReturn(false);
-
-      RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID);
-      when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
-      when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
-      when(mapper.toDto(any(), any())).thenReturn(incoming);
-
-      controller.createMyRefineryOrder(jwt, incoming);
-
-      ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
-      verify(service).createRefineryOrder(userIdCaptor.capture(), any(), any());
+    void theRequestCarriesNoOwnerToHonour() {
       assertEquals(
-          CALLER_ID,
-          userIdCaptor.getValue(),
-          "out-of-scope caller spoofing body.owner.id must be ignored -> caller wins");
+          java.util.List.of(
+              "location",
+              "mission",
+              "startedAt",
+              "durationMinutes",
+              "expenses",
+              "otherExpenses",
+              "oreSales",
+              "refiningMethod",
+              "goods",
+              "owningOrgUnitId"),
+          java.util.Arrays.stream(RefineryOrderCreateRequest.class.getRecordComponents())
+              .map(java.lang.reflect.RecordComponent::getName)
+              .toList(),
+          "no id, owner, profit, owningSquadron, status or version may be bound on create");
     }
+  }
+
+  @Nested
+  class UpdateRequestShapeTests {
 
     @Test
-    void noOwnerInBody_useCallerInstead() {
-      RefineryOrderDto incoming = dtoWithOwner(null);
-      when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
-      when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
-      when(mapper.toDto(any(), any())).thenReturn(incoming);
-
-      controller.createMyRefineryOrder(jwt, incoming);
-
-      ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
-      verify(service).createRefineryOrder(userIdCaptor.capture(), any(), any());
-      assertEquals(CALLER_ID, userIdCaptor.getValue());
+    void theRequestCarriesNoOwnerIdProfitOrSquadron() {
+      assertEquals(
+          java.util.List.of(
+              "location",
+              "mission",
+              "startedAt",
+              "durationMinutes",
+              "expenses",
+              "otherExpenses",
+              "oreSales",
+              "refiningMethod",
+              "status",
+              "goods",
+              "version"),
+          java.util.Arrays.stream(RefineryOrderUpdateRequest.class.getRecordComponents())
+              .map(java.lang.reflect.RecordComponent::getName)
+              .toList(),
+          "no id, owner, profit or owningSquadron may be bound on update");
     }
   }
 
@@ -321,10 +302,10 @@ class RefineryOrderControllerTest {
 
     @Test
     void createUserRefineryOrder_admin_alwaysAttributesToPathUserId() {
-      RefineryOrderDto incoming = dtoWithOwner(null);
+      RefineryOrderCreateRequest incoming = createRequest(null);
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
       when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
-      when(mapper.toDto(any(), any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(dto());
 
       controller.createUserRefineryOrder(OTHER_USER_ID, incoming);
 
@@ -333,12 +314,12 @@ class RefineryOrderControllerTest {
 
     @Test
     void updateUserRefineryOrder_admin_alwaysPassesLogisticianTrue() {
-      RefineryOrderDto incoming = dtoWithOwner(null);
+      RefineryOrderUpdateRequest incoming = updateRequest();
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
       when(service.updateRefineryOrder(
               any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
           .thenReturn(new RefineryOrder());
-      when(mapper.toDto(any(), any())).thenReturn(incoming);
+      when(mapper.toDto(any(), any())).thenReturn(dto());
 
       controller.updateUserRefineryOrder(OTHER_USER_ID, ORDER_ID, incoming);
 
@@ -363,26 +344,12 @@ class RefineryOrderControllerTest {
     void getRefineryOrder_returnsMappedDto() {
       RefineryOrder order = newOrder(CALLER_ID);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(order);
-      RefineryOrderDto out = dtoWithOwner(CALLER_ID);
+      RefineryOrderDto out = dto();
       when(mapper.toDto(eq(order), any())).thenReturn(out);
 
       RefineryOrderDto result = controller.getRefineryOrder(ORDER_ID);
 
       assertSame(out, result);
-    }
-
-    @Test
-    void getYieldsForLocation_delegatesToService_andReturnsTheMap() {
-      UUID locationId = UUID.randomUUID();
-      UUID matA = UUID.randomUUID();
-      UUID matB = UUID.randomUUID();
-      java.util.Map<UUID, Integer> expected = java.util.Map.of(matA, 5, matB, -3);
-      when(service.getYieldBonusByMaterialForLocationId(locationId)).thenReturn(expected);
-
-      java.util.Map<UUID, Integer> result = controller.getYieldsForLocation(locationId);
-
-      assertSame(expected, result);
-      verify(service).getYieldBonusByMaterialForLocationId(locationId);
     }
   }
 
@@ -453,12 +420,10 @@ class RefineryOrderControllerTest {
     return o;
   }
 
-  private static RefineryOrderDto dtoWithOwner(UUID ownerId) {
-    UserReferenceDto owner =
-        ownerId == null ? null : new UserReferenceDto(ownerId, "user-" + ownerId, null, null, null);
+  private static RefineryOrderDto dto() {
     return new RefineryOrderDto(
         ORDER_ID,
-        owner,
+        null,
         null,
         null,
         Instant.now(),
@@ -473,5 +438,24 @@ class RefineryOrderControllerTest {
         null,
         1L,
         null);
+  }
+
+  private static RefineryOrderCreateRequest createRequest(UUID owningOrgUnitId) {
+    return new RefineryOrderCreateRequest(
+        null,
+        null,
+        Instant.now(),
+        10L,
+        null,
+        null,
+        null,
+        null,
+        java.util.List.of(),
+        owningOrgUnitId);
+  }
+
+  private static RefineryOrderUpdateRequest updateRequest() {
+    return new RefineryOrderUpdateRequest(
+        null, null, Instant.now(), 10L, null, null, null, null, "OPEN", java.util.List.of(), 1L);
   }
 }

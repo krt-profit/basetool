@@ -82,7 +82,7 @@ class LeitungPageControllerMvcTest {
 
   /** Returns an empty delegated view so the page renders without any manageable unit. */
   private void stubEmptyView() {
-    when(backendApiClient.get("/api/v1/leitung/view", LeitungViewDto.class))
+    when(backendApiClient.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
         .thenReturn(new LeitungViewDto(false, List.of(), List.of(), List.of(), List.of()));
   }
 
@@ -122,7 +122,7 @@ class LeitungPageControllerMvcTest {
             List.of(new LeitungMemberDto(UUID.randomUUID(), "Pilot", "MEMBER", null, 0L, false)),
             List.of(),
             null);
-    when(backendApiClient.get("/api/v1/leitung/view", LeitungViewDto.class))
+    when(backendApiClient.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
         .thenReturn(new LeitungViewDto(false, List.of(), List.of(), List.of(), List.of(sk)));
   }
 
@@ -186,7 +186,7 @@ class LeitungPageControllerMvcTest {
             members,
             List.of(),
             null);
-    when(backendApiClient.get("/api/v1/leitung/view", LeitungViewDto.class))
+    when(backendApiClient.get("/api/v1/org-chart/leadership", LeitungViewDto.class))
         .thenReturn(new LeitungViewDto(admin, List.of(), List.of(), List.of(squadron), List.of()));
   }
 

@@ -65,7 +65,7 @@ import org.springframework.web.bind.annotation.RestController;
  * user_approval_event}. Approval grants no Basetool roles by itself.
  */
 @RestController
-@RequestMapping("/api/v1/admin/registrations")
+@RequestMapping("/api/v1/users/admin/registrations")
 @RequiredArgsConstructor
 public class DiscordRegistrationAdminController {
 

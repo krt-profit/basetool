@@ -214,7 +214,7 @@ public class MaterialExchangeBackendClient {
   @Nullable
   public MaterialExchangeOfferDto deactivateOfferForItem(@NotNull UUID inventoryItemId) {
     return backendApiClient.post(
-        "/api/v1/material-exchange/items/{inventoryItemId}/deactivate",
+        "/api/v1/material-exchange/offers/deactivate?inventoryItemId={inventoryItemId}",
         null,
         MaterialExchangeOfferDto.class,
         inventoryItemId);
@@ -271,7 +271,7 @@ public class MaterialExchangeBackendClient {
   @Nullable
   public PageResponse<MaterialRequestDto> requests(@NotNull BoardFilter filter) {
     UriComponentsBuilder uri =
-        UriComponentsBuilder.fromPath("/api/v1/material-requests")
+        UriComponentsBuilder.fromPath("/api/v1/material-exchange/requests")
             .queryParam("tab", filter.tab())
             .queryParam("size", filter.size());
     appendIfPresent(uri, "minQuality", filter.minQuality());
@@ -288,7 +288,8 @@ public class MaterialExchangeBackendClient {
    */
   @Nullable
   public MaterialRequestDto request(@NotNull UUID id) {
-    return backendApiClient.get("/api/v1/material-requests/{id}", MaterialRequestDto.class, id);
+    return backendApiClient.get(
+        "/api/v1/material-exchange/requests/{id}", MaterialRequestDto.class, id);
   }
 
   /**
@@ -299,7 +300,7 @@ public class MaterialExchangeBackendClient {
   @Nullable
   public MaterialExchangeCountsDto requestCounts() {
     return backendApiClient.get(
-        "/api/v1/material-requests/counts", MaterialExchangeCountsDto.class);
+        "/api/v1/material-exchange/requests/counts", MaterialExchangeCountsDto.class);
   }
 
   /**
@@ -310,7 +311,8 @@ public class MaterialExchangeBackendClient {
    */
   @Nullable
   public MaterialRequestDto createMaterialRequest(@NotNull MaterialRequestCreateRequest request) {
-    return backendApiClient.post("/api/v1/material-requests", request, MaterialRequestDto.class);
+    return backendApiClient.post(
+        "/api/v1/material-exchange/requests", request, MaterialRequestDto.class);
   }
 
   /**
@@ -322,7 +324,7 @@ public class MaterialExchangeBackendClient {
   @Nullable
   public MaterialRequestDto createItemRequest(@NotNull MaterialItemRequestCreateRequest request) {
     return backendApiClient.post(
-        "/api/v1/material-requests/item", request, MaterialRequestDto.class);
+        "/api/v1/material-exchange/requests/item", request, MaterialRequestDto.class);
   }
 
   /**
@@ -336,7 +338,7 @@ public class MaterialExchangeBackendClient {
   public MaterialRequestDto updateRequest(
       @NotNull UUID id, @NotNull MaterialRequestUpdateRequest request) {
     return backendApiClient.put(
-        "/api/v1/material-requests/{id}", request, MaterialRequestDto.class, id);
+        "/api/v1/material-exchange/requests/{id}", request, MaterialRequestDto.class, id);
   }
 
   /**
@@ -348,7 +350,7 @@ public class MaterialExchangeBackendClient {
   @Nullable
   public MaterialRequestDto deactivateRequest(@NotNull UUID id) {
     return backendApiClient.post(
-        "/api/v1/material-requests/{id}/deactivate", null, MaterialRequestDto.class, id);
+        "/api/v1/material-exchange/requests/{id}/deactivate", null, MaterialRequestDto.class, id);
   }
 
   /**
@@ -360,7 +362,7 @@ public class MaterialExchangeBackendClient {
   @Nullable
   public MaterialRequestDto signalFulfillment(@NotNull UUID id) {
     return backendApiClient.post(
-        "/api/v1/material-requests/{id}/interest", null, MaterialRequestDto.class, id);
+        "/api/v1/material-exchange/requests/{id}/interest", null, MaterialRequestDto.class, id);
   }
 
   /**
@@ -372,7 +374,7 @@ public class MaterialExchangeBackendClient {
   @Nullable
   public MaterialRequestDto withdrawFulfillment(@NotNull UUID id) {
     return backendApiClient.delete(
-        "/api/v1/material-requests/{id}/interest", MaterialRequestDto.class, id);
+        "/api/v1/material-exchange/requests/{id}/interest", MaterialRequestDto.class, id);
   }
 
   /**

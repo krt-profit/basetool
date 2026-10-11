@@ -626,10 +626,7 @@ class InventoryPageControllerMvcTest {
             1,
             Collections.emptyList());
     when(backendApiClient.get(
-            eq(
-                "/api/v1/inventory/item-catalog?size="
-                    + PickerSearch.PAGE_SIZE
-                    + "&sort=name,asc&q={q}"),
+            eq("/api/v1/game-items?size=" + PickerSearch.PAGE_SIZE + "&sort=name,asc&q={q}"),
             anyTypeRef(),
             eq("Quantum")))
         .thenReturn(page);
@@ -654,10 +651,7 @@ class InventoryPageControllerMvcTest {
             1,
             Collections.emptyList());
     when(backendApiClient.get(
-            eq(
-                "/api/v1/inventory/item-catalog?size="
-                    + PickerSearch.PAGE_SIZE
-                    + "&sort=name,asc&q={q}"),
+            eq("/api/v1/game-items?size=" + PickerSearch.PAGE_SIZE + "&sort=name,asc&q={q}"),
             anyTypeRef(),
             eq("Quantum Drive")))
         .thenReturn(page);
@@ -669,10 +663,7 @@ class InventoryPageControllerMvcTest {
 
     verify(backendApiClient)
         .get(
-            eq(
-                "/api/v1/inventory/item-catalog?size="
-                    + PickerSearch.PAGE_SIZE
-                    + "&sort=name,asc&q={q}"),
+            eq("/api/v1/game-items?size=" + PickerSearch.PAGE_SIZE + "&sort=name,asc&q={q}"),
             anyTypeRef(),
             eq("Quantum Drive"));
   }
@@ -1210,7 +1201,7 @@ class InventoryPageControllerMvcTest {
         .thenAnswer(
             inv -> {
               String url = inv.getArgument(0);
-              return url.contains("pickable-org-units") ? ownerOptions : Collections.emptyList();
+              return url.contains("org-units/me/pickable") ? ownerOptions : Collections.emptyList();
             });
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());

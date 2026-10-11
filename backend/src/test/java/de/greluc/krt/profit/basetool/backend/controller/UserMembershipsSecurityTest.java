@@ -41,8 +41,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Verifies that every caller class passes the URL filter for {@code GET
- * /api/v1/users/{id}/memberships} instead of hitting the admin-only {@code /api/v1/users/**} rule;
- * the method-level {@code @PreAuthorize} owns the role allow-list.
+ * /api/v1/org-units/members/{id}/memberships} instead of hitting the admin-only {@code
+ * /api/v1/users/**} rule; the method-level {@code @PreAuthorize} owns the role allow-list.
  */
 @SpringBootTest
 class UserMembershipsSecurityTest {
@@ -60,7 +60,7 @@ class UserMembershipsSecurityTest {
   }
 
   /**
-   * Verifies that a squadron member reaches {@code GET /api/v1/users/{id}/memberships}.
+   * Verifies that a squadron member reaches {@code GET /api/v1/org-units/members/{id}/memberships}.
    *
    * @throws Exception MockMvc plumbing.
    */
@@ -68,7 +68,7 @@ class UserMembershipsSecurityTest {
   void getUserMemberships_squadronMember_isAllowed() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/users/{id}/memberships", UUID.randomUUID())
+            get("/api/v1/org-units/members/{id}/memberships", UUID.randomUUID())
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
   }
@@ -83,7 +83,7 @@ class UserMembershipsSecurityTest {
   void getUserMemberships_officer_isAllowed() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/users/{id}/memberships", UUID.randomUUID())
+            get("/api/v1/org-units/members/{id}/memberships", UUID.randomUUID())
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
         .andExpect(status().isOk());
   }
@@ -97,7 +97,7 @@ class UserMembershipsSecurityTest {
   void getUserMemberships_admin_isAllowed() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/users/{id}/memberships", UUID.randomUUID())
+            get("/api/v1/org-units/members/{id}/memberships", UUID.randomUUID())
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk());
   }
@@ -113,7 +113,7 @@ class UserMembershipsSecurityTest {
   void getUserMemberships_bankEmployee_isAllowed() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/users/{id}/memberships", UUID.randomUUID())
+            get("/api/v1/org-units/members/{id}/memberships", UUID.randomUUID())
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
         .andExpect(status().isOk());
   }
@@ -126,7 +126,7 @@ class UserMembershipsSecurityTest {
   @Test
   void getUserMemberships_anonymous_isRejected() throws Exception {
     mockMvc
-        .perform(get("/api/v1/users/{id}/memberships", UUID.randomUUID()))
+        .perform(get("/api/v1/org-units/members/{id}/memberships", UUID.randomUUID()))
         .andExpect(status().isUnauthorized());
   }
 }

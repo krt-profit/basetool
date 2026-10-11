@@ -67,7 +67,7 @@ import org.springframework.web.multipart.MultipartFile;
  * blueprints and runs the import on their behalf, with the target user taken from the path.
  */
 @RestController
-@RequestMapping("/api/v1/admin/personal-blueprints")
+@RequestMapping("/api/v1/personal-blueprints/admin")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(

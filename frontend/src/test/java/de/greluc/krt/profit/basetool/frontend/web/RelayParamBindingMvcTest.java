@@ -115,6 +115,6 @@ class RelayParamBindingMvcTest {
         .andExpect(status().isOk());
 
     verify(backendApiClient, never())
-        .get(contains("/api/v1/admin/personal-inventory/"), anyTypeRef());
+        .get(contains("/api/v1/personal-inventory/admin/"), anyTypeRef());
   }
 }

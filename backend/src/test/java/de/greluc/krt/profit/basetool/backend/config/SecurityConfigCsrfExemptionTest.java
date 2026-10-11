@@ -66,7 +66,7 @@ class SecurityConfigCsrfExemptionTest {
         "/api/v1/inventory/00000000-0000-4000-8000-00000000cafe/book-out",
         "/api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe",
         "/api/v1/orders/00000000-0000-4000-8000-00000000cafe/status",
-        "/api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/balance-target",
+        "/api/v1/bank/org-units/accounts/00000000-0000-4000-8000-00000000cafe/balance-target",
         "/api/v1/missions/00000000-0000-4000-8000-00000000cafe/join",
         "/api/v1/operations/00000000-0000-4000-8000-00000000cafe/payouts/paid-out",
         "/internal/discord/link",

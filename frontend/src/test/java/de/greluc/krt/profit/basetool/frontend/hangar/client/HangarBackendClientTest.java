@@ -88,7 +88,7 @@ class HangarBackendClientTest {
         "GET", "/api/v1/hangar/squadron-overview?page=1&size=10&search=Cutlass%20%26%20Co");
     backend.expect("GET", "/api/v1/hangar/squadron-overview?page=0&size=1");
     backend.expect("GET", "/api/v1/locations/home-locations");
-    backend.expect("GET", "/api/v1/users/me/pickable-org-units");
+    backend.expect("GET", "/api/v1/org-units/me/pickable");
   }
 
   @Test
@@ -131,24 +131,16 @@ class HangarBackendClientTest {
   @Test
   void importsStreamTheUploadAsTheFilePart() {
     backend.answerJson(IMPORT_RESULT);
-    backend.answerJson(IMPORT_RESULT);
 
     FleetviewImportResponseDto ships = client.importShips(upload("shiplist.json"));
-    FleetviewImportResponseDto fleetview = client.importFleetview(upload("fleetview.json"));
 
-    FleetviewImportResponseDto expected =
-        new FleetviewImportResponseDto(2, 1, 0, List.of("Odd"), List.of());
-    assertThat(ships).isEqualTo(expected);
-    assertThat(fleetview).isEqualTo(expected);
-    RecordedRequest first = backend.expect("POST", "/api/v1/hangar/import/ships");
-    assertThat(first.getHeader("Content-Type")).startsWith("multipart/form-data");
-    assertThat(first.getBody().readString(StandardCharsets.UTF_8))
+    assertThat(ships).isEqualTo(new FleetviewImportResponseDto(2, 1, 0, List.of("Odd"), List.of()));
+    RecordedRequest request = backend.expect("POST", "/api/v1/hangar/import/ships");
+    assertThat(request.getHeader("Content-Type")).startsWith("multipart/form-data");
+    assertThat(request.getBody().readString(StandardCharsets.UTF_8))
         .contains("name=\"file\"")
         .contains("filename=\"shiplist.json\"")
         .contains("{\"ships\":[]}");
-    RecordedRequest second = backend.expect("POST", "/api/v1/hangar/import/fleetview");
-    assertThat(second.getBody().readString(StandardCharsets.UTF_8))
-        .contains("filename=\"fleetview.json\"");
   }
 
   /**

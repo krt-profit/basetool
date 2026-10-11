@@ -30,7 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -89,8 +89,8 @@ class RefineryOrderHierarchyVisibilityTest {
             eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenReturn(order);
     when(backendApiClient.get(
-            eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
-        .thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));
+            eq("/api/v1/refinery-orders/settings"), eq(RefinerySettingsDto.class)))
+        .thenReturn(new RefinerySettingsDto("UP"));
 
     java.util.Map<String, Object> claims = new java.util.HashMap<>();
     claims.put(
@@ -154,8 +154,8 @@ class RefineryOrderHierarchyVisibilityTest {
             eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenReturn(order);
     when(backendApiClient.get(
-            eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
-        .thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));
+            eq("/api/v1/refinery-orders/settings"), eq(RefinerySettingsDto.class)))
+        .thenReturn(new RefinerySettingsDto("UP"));
 
     java.util.Map<String, Object> claims = new java.util.HashMap<>();
     claims.put(
@@ -229,8 +229,8 @@ class RefineryOrderHierarchyVisibilityTest {
             eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
         .thenReturn(order);
     when(backendApiClient.get(
-            eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
-        .thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));
+            eq("/api/v1/refinery-orders/settings"), eq(RefinerySettingsDto.class)))
+        .thenReturn(new RefinerySettingsDto("UP"));
 
     java.util.Map<String, Object> claims = new java.util.HashMap<>();
     claims.put(

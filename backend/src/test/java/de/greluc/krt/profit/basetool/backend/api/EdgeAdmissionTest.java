@@ -62,7 +62,7 @@ class EdgeAdmissionTest {
           "/api/v1/connected-apps/",
           "/api/v1/connected-apps/versekit/undo",
           "/api/v1/connected-apps/a-control-not-built-yet",
-          "/api/v1/admin/exchange-a-page-not-built-yet");
+          "/api/v1/connected-apps/admin/a-page-not-built-yet");
 
   /**
    * Verifies that the committed admission map is exactly what the generator renders.
@@ -153,7 +153,7 @@ class EdgeAdmissionTest {
         AppCallList.load(repositoryRoot().resolve("backend/src/test/resources/api/app-calls"));
     List<String> calls = new ArrayList<>();
     releases.forEach(release -> release.calls().forEach(call -> calls.add(call.key())));
-    assertThat(new LinkedHashSet<>(calls)).hasSizeGreaterThanOrEqualTo(243);
+    assertThat(new LinkedHashSet<>(calls)).hasSizeGreaterThanOrEqualTo(244);
 
     List<Pattern> entries = committedEntries();
     List<String> refused =
@@ -265,19 +265,19 @@ class EdgeAdmissionTest {
   void aDroppedFrozenOperationOrAnUnfrozenAdmissionIsReported() throws IOException {
     EdgeAdmission admission = EdgeAdmission.load();
     List<String> mapLines = committedLines(EdgeAdmission.MAP_FILE);
-    String dropped = "GET /api/v1/missions/search";
+    String dropped = "GET /api/v1/hangar/my-ships";
 
     List<String> frozen = new ArrayList<>(ExternalContractTest.frozenOperations());
     assertThat(frozen.remove(dropped)).isTrue();
-    EdgeAdmission smaller = EdgeAdmission.of(frozen, List.of(), document());
+    EdgeAdmission smaller = EdgeAdmission.of(frozen, EdgeAdmission.retiredOperations(), document());
     assertThat(smaller.differencesFrom(EdgeAdmission.parseMap(mapLines)))
         .singleElement()
         .asString()
-        .contains("/api/v1/missions/search")
+        .contains("/api/v1/hangar/my-ships")
         .contains("admits no operation");
 
     List<String> missing = new ArrayList<>(mapLines);
-    assertThat(missing.removeIf(line -> line.contains("\"~^GET:/api/v1/missions/search$\"")))
+    assertThat(missing.removeIf(line -> line.contains("\"~^GET:/api/v1/hangar/my-ships$\"")))
         .isTrue();
     assertThat(admission.differencesFrom(EdgeAdmission.parseMap(missing)))
         .singleElement()
@@ -409,15 +409,13 @@ class EdgeAdmissionTest {
    * admin registry of connected applications.
    *
    * @param path a documented path
-   * @return {@code true} for {@code /api/v1/exchange/**}, {@code /api/v1/connected-apps/**} and
-   *     {@code /api/v1/admin/exchange-*}
+   * @return {@code true} for {@code /api/v1/exchange/**} and {@code /api/v1/connected-apps/**}
    */
   private static boolean isExchangeOrConnectionPath(String path) {
     return path.equals("/api/v1/exchange")
         || path.startsWith("/api/v1/exchange/")
         || path.equals("/api/v1/connected-apps")
-        || path.startsWith("/api/v1/connected-apps/")
-        || path.startsWith("/api/v1/admin/exchange-");
+        || path.startsWith("/api/v1/connected-apps/");
   }
 
   /**

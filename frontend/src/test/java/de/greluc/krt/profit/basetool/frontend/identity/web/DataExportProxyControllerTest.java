@@ -130,7 +130,7 @@ class DataExportProxyControllerTest {
 
     String disposition = disposition(controller.adminPdf(SUBJECT));
 
-    assertEquals("/api/v1/admin/users/" + SUBJECT + "/export/pdf", takePath());
+    assertEquals("/api/v1/users/admin/" + SUBJECT + "/export/pdf", takePath());
     assertTrue(
         disposition.contains("filename=\"datenauskunft-" + SUBJECT + ".pdf\""),
         "unexpected disposition: " + disposition);
@@ -142,7 +142,7 @@ class DataExportProxyControllerTest {
 
     String disposition = disposition(controller.adminJson(SUBJECT));
 
-    assertEquals("/api/v1/admin/users/" + SUBJECT + "/export", takePath());
+    assertEquals("/api/v1/users/admin/" + SUBJECT + "/export", takePath());
     assertTrue(
         disposition.contains("filename=\"datenauskunft-" + SUBJECT + ".json\""),
         "unexpected disposition: " + disposition);

@@ -101,7 +101,7 @@ class AdminSyncReportsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void combined_fullPage_rendersSwapWrapperAndTabs() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/sync-reports"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/catalog/admin/sync-reports"), anyTypeRef()))
         .thenReturn(twoPages());
 
     mockMvc
@@ -119,7 +119,7 @@ class AdminSyncReportsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void combined_fullPage_rendersTheListPattern() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/sync-reports"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/catalog/admin/sync-reports"), anyTypeRef()))
         .thenReturn(twoPages());
 
     String html =
@@ -153,7 +153,7 @@ class AdminSyncReportsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void emptyResult_rendersTheEmptyState() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/sync-reports"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/catalog/admin/sync-reports"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0L, 0, List.of()));
 
     mockMvc
@@ -166,7 +166,7 @@ class AdminSyncReportsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void uex_fragmentResults_rendersOnlyInnerFragment_withTabBasePath() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/sync-reports"), anyTypeRef()))
+    when(backendApiClient.get(contains("/api/v1/catalog/admin/sync-reports"), anyTypeRef()))
         .thenReturn(twoPages());
 
     mockMvc

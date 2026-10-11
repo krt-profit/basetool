@@ -146,7 +146,7 @@ class MaterialboersePatternRenderTest {
   private void stubOffers(@NotNull List<MaterialExchangeOfferDto> offers) {
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(38, 5));
-    when(backendApiClient.get(contains("/material-requests/counts"), anyClass()))
+    when(backendApiClient.get(contains("/material-exchange/requests/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(12, 2));
     when(backendApiClient.get(contains("/material-exchange/offers?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(offers, 0, 200, offers.size(), 1, List.of()));
@@ -162,11 +162,12 @@ class MaterialboersePatternRenderTest {
     MaterialRequestDto request = request();
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(38, 5));
-    when(backendApiClient.get(contains("/material-requests/counts"), anyClass()))
+    when(backendApiClient.get(contains("/material-exchange/requests/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(12, 2));
-    when(backendApiClient.get(contains("/material-requests?"), anyTypeRef()))
+    when(backendApiClient.get(contains("/material-exchange/requests?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of()));
-    when(backendApiClient.get(eq("/api/v1/material-requests/{id}"), anyClass(), eq(request.id())))
+    when(backendApiClient.get(
+            eq("/api/v1/material-exchange/requests/{id}"), anyClass(), eq(request.id())))
         .thenReturn(request);
   }
 
@@ -265,7 +266,7 @@ class MaterialboersePatternRenderTest {
         .contains("data-testid=\"mg-interest-count\">2<")
         .containsPattern("class=\"btn btn--cta\"[^>]*data-mg-interest")
         .contains("Ich kann liefern");
-    verify(backendApiClient).get(contains("/material-requests?tab=mein"), anyTypeRef());
+    verify(backendApiClient).get(contains("/material-exchange/requests?tab=mein"), anyTypeRef());
   }
 
   /** The older {@code mode=requests&tab=mein} link still opens the caller's own requests. */
@@ -279,7 +280,7 @@ class MaterialboersePatternRenderTest {
     assertThat(html)
         .containsPattern("class=\"tab active\"[^>]*data-mb-mode=\"requests\"")
         .containsPattern("name=\"scope\" value=\"mine\" checked=\"checked\"");
-    verify(backendApiClient).get(contains("/material-requests?tab=mein"), anyTypeRef());
+    verify(backendApiClient).get(contains("/material-exchange/requests?tab=mein"), anyTypeRef());
   }
 
   /** The board fragment of the Gesuche carries the request list and the counts for the tabs. */

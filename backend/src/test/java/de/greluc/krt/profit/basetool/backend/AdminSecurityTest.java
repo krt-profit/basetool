@@ -52,7 +52,7 @@ class AdminSecurityTest {
   void testAdminRoles_ForbiddenForOfficer() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/roles")
+            get("/api/v1/roles")
                 .with(
                     jwt()
                         .authorities(
@@ -69,7 +69,7 @@ class AdminSecurityTest {
   void testAdminRoles_AllowedForAdmin() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/roles")
+            get("/api/v1/roles")
                 .with(
                     jwt()
                         .authorities(

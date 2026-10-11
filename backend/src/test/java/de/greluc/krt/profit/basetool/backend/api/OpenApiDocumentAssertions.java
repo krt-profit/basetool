@@ -54,28 +54,28 @@ public final class OpenApiDocumentAssertions {
    */
   public static final Map<String, Integer> DOMAIN_FLOOR =
       Map.ofEntries(
-          Map.entry("admin-system", 6),
+          Map.entry("admin-system", 4),
           Map.entry("audit", 4),
           Map.entry("bank", 65),
           Map.entry("blueprint", 25),
           Map.entry("catalogue", 90),
           Map.entry("dashboard", 4),
           Map.entry("exchange", 21),
-          Map.entry("hangar", 15),
-          Map.entry("identity", 58),
-          Map.entry("inventory", 28),
-          Map.entry("joborder", 39),
+          Map.entry("hangar", 14),
+          Map.entry("identity", 57),
+          Map.entry("inventory", 27),
+          Map.entry("joborder", 40),
           Map.entry("leadership", 1),
           Map.entry("livesync", 2),
           Map.entry("materialexchange", 21),
-          Map.entry("mission", 53),
+          Map.entry("mission", 50),
           Map.entry("notification", 13),
           Map.entry("operation", 12),
           Map.entry("orgchart", 5),
           Map.entry("orgunit", 40),
           Map.entry("personalinventory", 9),
           Map.entry("promotion", 34),
-          Map.entry("refinery", 14));
+          Map.entry("refinery", 15));
 
   /** The one domain of the exchange's internal relay document. */
   public static final String RELAY_DOMAIN = "exchange";

@@ -48,7 +48,7 @@ import org.springframework.web.context.WebApplicationContext;
  * <ul>
  *   <li>{@code /api/v1/users/me/export} is open to every authenticated member and accepts no user
  *       id.
- *   <li>{@code /api/v1/admin/users/&#123;id&#125;/export} is ADMIN-only at the URL matcher and the
+ *   <li>{@code /api/v1/users/admin/&#123;id&#125;/export} is ADMIN-only at the URL matcher and the
  *       method gate.
  * </ul>
  */
@@ -104,7 +104,7 @@ class DataExportControllerSecurityTest {
   void adminExport_member_isForbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/users/{id}/export", UUID.randomUUID())
+            get("/api/v1/users/admin/{id}/export", UUID.randomUUID())
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
 
@@ -115,7 +115,7 @@ class DataExportControllerSecurityTest {
   void adminExport_officer_isForbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/users/{id}/export", UUID.randomUUID())
+            get("/api/v1/users/admin/{id}/export", UUID.randomUUID())
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
         .andExpect(status().isForbidden());
 
@@ -126,7 +126,7 @@ class DataExportControllerSecurityTest {
   void adminExportPdf_bankManagement_isForbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/users/{id}/export/pdf", UUID.randomUUID())
+            get("/api/v1/users/admin/{id}/export/pdf", UUID.randomUUID())
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
         .andExpect(status().isForbidden());
 
@@ -137,7 +137,7 @@ class DataExportControllerSecurityTest {
   void adminExport_admin_isAllowed() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/users/{id}/export", UUID.randomUUID())
+            get("/api/v1/users/admin/{id}/export", UUID.randomUUID())
                 .with(
                     jwt()
                         .jwt(j -> j.subject(UUID.randomUUID().toString()))

@@ -55,7 +55,7 @@ import org.springframework.web.bind.annotation.RestController;
  * MaterialRequestService}, which enforces per-request ownership.
  */
 @RestController
-@RequestMapping("/api/v1/material-requests")
+@RequestMapping("/api/v1/material-exchange/requests")
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_KRT_MEMBER)
 @Tag(

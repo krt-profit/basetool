@@ -8,7 +8,7 @@
 The home page (`/`) shows the **upcoming missions of the next seven days** as the list „Nächste 7
 Tage", nearest planned start first (REQ-MISSION-012). Each row is a link to the mission and carries
 its date, name, TS time, server join, Treffpunkt, the **owning org unit** (Staffel/SK/Bereich/OL,
-or "ownerless", read from the `owningSquadron` field) and the translated status. It is populated from `GET /api/v1/missions/search` and
+or "ownerless", read from the `owningSquadron` field) and the translated status. It is populated from `GET /api/v1/missions` and
 uses the **broad mission-list scope** (the viewer's own org units plus every unit's
 organisation-wide missions), deliberately wider than the own-unit `/next` lookup described below.
 
@@ -116,7 +116,7 @@ The home page (`/`) renders the missions whose `plannedStartTime` falls within t
 `plannedStartTime` ascending — the nearest planned start first. This replaces the former single
 next-mission banner; the first row is the soonest upcoming mission.
 
-- **Source & scope.** The grid is populated from `GET /api/v1/missions/search` with `start = now`,
+- **Source & scope.** The grid is populated from `GET /api/v1/missions` with `start = now`,
   `end = now + 7d`, `status = PLANNED, ACTIVE`, `sort = plannedStartTime,asc`, `size = 50` — one
   page, so a week with more than 50 eligible missions shows the nearest 50. It therefore uses the
   **broad mission-list scope** — the viewer's own org units' missions (internal and public) **plus**
@@ -129,7 +129,7 @@ next-mission banner; the first row is the soonest upcoming mission.
   (`home.upcoming.my_unit`, the square `.chip--primary`). "Directly assigned" spans **every org-unit
   kind** — Staffel, Spezialkommando, Bereich (when the viewer is a direct member) and
   Organisationsleitung (when a direct member) — **not** only Staffeln. The set comes from the
-  kind-agnostic `GET /api/v1/users/me/org-unit-ids` self-endpoint (the caller's direct
+  kind-agnostic `GET /api/v1/org-units/me/ids` self-endpoint (the caller's direct
   `org_unit_membership` rows mapped to their org-unit ids), unioned with the Staffel ids already on
   the `/me` `UserDto` as a fallback; the mission's `owningSquadron.id` is matched against that set.
   The **leadership cascade** of the `/next` lookup (REQ-MISSION-008) is intentionally **not** applied
@@ -139,7 +139,7 @@ next-mission banner; the first row is the soonest upcoming mission.
 - **Signed-up chip.** A row the viewer holds a participant row on carries the „Angemeldet" chip
   (`home.upcoming.signed_up`, EN „Signed up", the square `.chip--success` of the detail page's „Du
   bist angemeldet"), directly under the status and above „Meine Einheit". It reads the boolean
-  `signedUp` on `MissionListDto`, which `GET /api/v1/missions` and `GET /api/v1/missions/search`
+  `signedUp` on `MissionListDto`, which `GET /api/v1/missions` and `GET /api/v1/missions`
   compute **for the caller only**: one batched query for the caller's own participations among the
   missions of the returned page (`MissionParticipantRepository#findMissionIdsSignedUpBy`), never one
   per row (REQ-DATA-003). It widens nothing — the page is already scoped, and the flag answers only
@@ -193,12 +193,12 @@ Amended 2026-10-04: the „Angemeldet" chip of the redesign's hand-off is built 
 `OrgUnitMembershipServiceTest` (`findDirectMembershipOrgUnitIds_returnsEveryKindWithoutCascade`,
 `findDirectMembershipOrgUnitIds_noMemberships_returnsEmpty`),
 `UserControllerTest` (`getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService`).
-**Code:** `frontend/.../HomeController#home` (the next-7-days `/api/v1/missions/search` call + the
-`/api/v1/users/me/org-unit-ids` own-unit lookup), `templates/index.html` (the `upcomingMissions`
+**Code:** `frontend/.../HomeController#home` (the next-7-days `/api/v1/missions` call + the
+`/api/v1/org-units/me/ids` own-unit lookup), `templates/index.html` (the `upcomingMissions`
 row list `.home-missions` + the `myOrgUnitIds` chip gate + the `signedUp` chip), `static/css/pages/index.css`; backend `UserController#getMyOrgUnitIds` +
 `MissionController#toListRows` + `MissionService#signedUpMissionIds` +
 `OrgUnitMembershipService#findDirectMembershipOrgUnitIds`. The mission grid reuses the existing
-`MissionController` `/api/v1/missions/search` endpoint; the only new backend surfaces are the
+`MissionController` `/api/v1/missions` endpoint; the only new backend surfaces are the
 kind-agnostic own-membership id lookup and the per-caller `signedUp` field on its rows.
 
 ## Out of scope

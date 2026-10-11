@@ -268,7 +268,7 @@ class BankBackendClientTest {
         "/api/v1/bank/accounts",
         "{\"name\":\"Kasse\",\"type\":\"SPECIAL\",\"orgUnitId\":null,\"areaName\":null}");
     backend.expect("PATCH", accounts, "{\"name\":\"Neu\",\"version\":1}");
-    backend.expect("PATCH", accounts + "/balance-target", "{\"target\":null,\"version\":1}");
+    backend.expect("PUT", accounts + "/balance-target", "{\"target\":null,\"version\":1}");
     backend.expect(
         "PATCH",
         accounts + "/approval-tiers",
@@ -311,7 +311,7 @@ class BankBackendClientTest {
     RecordedRequest report = backend.expect("GET", "/api/v1/bank/export/three-month-report");
     assertThat(report.getHeader("X-User-Time-Zone")).isNull();
     RecordedRequest orgUnitStatement =
-        backend.expect("GET", "/api/v1/org-units/bank/accounts/" + ID + "/statement?" + PERIOD);
+        backend.expect("GET", "/api/v1/bank/org-units/accounts/" + ID + "/statement?" + PERIOD);
     assertThat(orgUnitStatement.getHeader("X-User-Time-Zone")).isEqualTo("Europe/Berlin");
     backend.expect("POST", "/api/v1/bank/admin/wipe-reset", "{}");
   }
@@ -336,11 +336,11 @@ class BankBackendClientTest {
     client.orgUnitAccountBookings(ID, 0, 100, FROM, TO);
     client.orgUnitBalanceSeries(ID, FROM, TO);
 
-    String account = "/api/v1/org-units/bank/accounts/" + ID;
-    backend.expect("GET", "/api/v1/org-units/bank/balances");
-    backend.expect("GET", "/api/v1/org-units/bank/requests");
-    backend.expect("GET", "/api/v1/org-units/bank/requests/foreign");
-    backend.expect("GET", "/api/v1/org-units/bank/transfer-targets");
+    String account = "/api/v1/bank/org-units/accounts/" + ID;
+    backend.expect("GET", "/api/v1/bank/org-units/balances");
+    backend.expect("GET", "/api/v1/bank/org-units/requests");
+    backend.expect("GET", "/api/v1/bank/org-units/requests/foreign");
+    backend.expect("GET", "/api/v1/bank/org-units/transfer-targets");
     backend.expect("GET", account);
     backend.expect("GET", account + "/settings");
     backend.expect("GET", account + "/transactions?page=0&size=100&" + PERIOD);
@@ -384,8 +384,8 @@ class BankBackendClientTest {
         .isEqualTo(2L);
     client.revokeOwnerApproval(ID);
 
-    String requests = "/api/v1/org-units/bank/requests";
-    String account = "/api/v1/org-units/bank/accounts/" + ID;
+    String requests = "/api/v1/bank/org-units/requests";
+    String account = "/api/v1/bank/org-units/accounts/" + ID;
     String limitJson = "{\"limit\":1000}";
     backend.expect(
         "POST",

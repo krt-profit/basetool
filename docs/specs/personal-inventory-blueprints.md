@@ -172,7 +172,7 @@ unresolved name is still seeded (degraded) so the default is granted regardless.
 
 Administrators MUST be able to list the set, add a product (picked from the blueprint catalog
 type-ahead, resolved to a `product_key` + name + output item), and remove an entry, through an
-ADMIN-gated surface (`/api/v1/admin/default-blueprints`, class-level
+ADMIN-gated surface (`/api/v1/blueprints/admin/defaults`, class-level
 `@PreAuthorize(Roles.HAS_ROLE_ADMIN)`). A duplicate add MUST return 409. Adding MUST immediately
 grant the new default to all existing users (REQ-INV-016).
 
@@ -246,7 +246,7 @@ it preserves the surrounding guarantees:
   single unit applies — no owner is marked.
 
 The flag is self-service: the user reads / sets it through `GET` / `PUT
-/api/v1/users/me/blueprint-sharing` (JWT-scoped, optimistic-locked), saved in place on the
+/api/v1/blueprints/me/sharing` (JWT-scoped, optimistic-locked), saved in place on the
 profile page (REQ-FE-001) next to the payout preference. The two aggregations union the opted-in
 users' `owner_user_id`s into their org-unit member set before counting; an owner who is both a member
 and a global sharer is counted once.
@@ -564,7 +564,7 @@ removable owned blueprints of **every** user at once — a maintenance/reset too
   (REQ-INV-016), deleting every user's owned rows whose `product_key` is not in the `default_blueprint`
   set, so the purge never fights the default-provisioning sweep. One set-based bulk delete
   (`PersonalBlueprintRepository#deleteAllRemovable`); the removed count is returned.
-- **ADMIN-gated.** `DELETE /api/v1/admin/personal-blueprints`, `@PreAuthorize("hasRole('ADMIN')")`; a
+- **ADMIN-gated.** `DELETE /api/v1/personal-blueprints/admin`, `@PreAuthorize("hasRole('ADMIN')")`; a
   non-admin is rejected with 403. The service logs the purge at WARN.
 - **Explicit-warning guard (wipe-reset-grade).** Because it removes data across all users, the control
   is a distinct danger zone (always visible, independent of the member picker) whose **type-to-confirm**
@@ -678,7 +678,7 @@ when no client added the entry, and also when the client id is no longer registe
 not fall back, so the field only ever holds a name. A reader shows the name and falls back to
 `sourceClientId` when it is absent („über versekit"). No name is kept on the row. The same field is
 in every response that carries the entry: the member's and the admin's list
-(`/api/v1/admin/personal-blueprints/{userId}`), the single add and the update. A list resolves the
+(`/api/v1/personal-blueprints/admin/{userId}`), the single add and the update. A list resolves the
 names of all its rows in one registry query, and none when no row came from a client.
 
 **Acceptance**

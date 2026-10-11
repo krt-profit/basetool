@@ -460,7 +460,7 @@ class MemberManagementControllerTest {
       doThrow(new RuntimeException("detail unavailable"))
           .when(backendApiClient)
           .get(
-              eq("/api/v1/users/{id}/memberships/detail"),
+              eq("/api/v1/org-units/members/{id}/memberships/detail"),
               eq(MembershipDeltaResponse.class),
               eq(id));
 
@@ -500,7 +500,7 @@ class MemberManagementControllerTest {
                       null,
                       1L)));
       when(backendApiClient.get(
-              eq("/api/v1/users/{id}/memberships/detail"),
+              eq("/api/v1/org-units/members/{id}/memberships/detail"),
               eq(MembershipDeltaResponse.class),
               eq(id)))
           .thenReturn(detail);
@@ -661,7 +661,8 @@ class MemberManagementControllerTest {
 
       verify(backendApiClient)
           .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
-      verify(backendApiClient).patch(eq("/api/v1/users/{id}/memberships"), any(), any(), eq(id));
+      verify(backendApiClient)
+          .patch(eq("/api/v1/org-units/members/{id}/memberships"), any(), any(), eq(id));
     }
   }
 

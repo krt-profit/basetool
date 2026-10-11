@@ -183,7 +183,7 @@ class MissionAccessControlTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))
@@ -228,7 +228,7 @@ class MissionAccessControlTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(otherMember.getId().toString()))
@@ -267,7 +267,7 @@ class MissionAccessControlTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -312,7 +312,7 @@ class MissionAccessControlTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))
@@ -329,7 +329,7 @@ class MissionAccessControlTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))
@@ -372,7 +372,7 @@ class MissionAccessControlTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/participants/add")
+            post("/api/v1/missions/" + mission.getId() + "/participants")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(jsonBody))
         .andExpect(status().isUnauthorized());

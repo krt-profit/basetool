@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.web;
 
-import de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
@@ -67,10 +66,10 @@ import org.springframework.web.multipart.MultipartFile;
  * REST surface for the personal hangar, the squadron-wide overview, the admin per-user hangar and
  * the third-party ship-export JSON import.
  *
- * <p>{@code /my-ships} derives the owner from the JWT; {@code /users/{userId}/ships} is ADMIN-only.
- * The class-level {@code isAuthenticated()} gate is only the floor (REQ-SEC-052); the squadron
- * overview and the home-location bulk edit carry {@link #HANGAR_ACCESS} on the method, which the
- * URL rule repeats.
+ * <p>{@code /my-ships} derives the owner from the JWT; {@code /admin/users/{userId}/ships} is
+ * ADMIN-only. The class-level {@code isAuthenticated()} gate is only the floor (REQ-SEC-052); the
+ * squadron overview and the home-location bulk edit carry {@link #HANGAR_ACCESS} on the method,
+ * which the URL rule repeats.
  */
 @RestController
 @RequestMapping("/api/v1/hangar")
@@ -241,7 +240,7 @@ public class HangarController {
    *
    * @return paged ship DTOs
    */
-  @GetMapping("/users/{userId}/ships")
+  @GetMapping("/admin/users/{userId}/ships")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional(readOnly = true)
   public PageResponse<ShipDto> getUserShips(
@@ -257,7 +256,7 @@ public class HangarController {
   }
 
   /** Admin-only: adds a ship to a target user's hangar. */
-  @PostMapping("/users/{userId}/ships")
+  @PostMapping("/admin/users/{userId}/ships")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional
   public ShipDto addUserShip(
@@ -266,7 +265,7 @@ public class HangarController {
   }
 
   /** Admin-only: updates a target user's ship. */
-  @PutMapping("/users/{userId}/ships/{shipId}")
+  @PutMapping("/admin/users/{userId}/ships/{shipId}")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional
   public ShipDto updateUserShip(
@@ -277,7 +276,7 @@ public class HangarController {
   }
 
   /** Admin-only: deletes a target user's ship. */
-  @DeleteMapping("/users/{userId}/ships/{shipId}")
+  @DeleteMapping("/admin/users/{userId}/ships/{shipId}")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteUserShip(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID shipId) {
@@ -296,26 +295,6 @@ public class HangarController {
   @PreAuthorize("isAuthenticated()")
   @Transactional
   public FleetviewImportResponseDto importShips(
-      @AuthenticationPrincipal Jwt jwt, @RequestParam("file") @NotNull MultipartFile file) {
-    return hangarImportService.importShips(userService.getUserIdFromJwt(jwt), file);
-  }
-
-  /**
-   * Alias of {@link #importShips(Jwt, MultipartFile)} under the {@code /import/fleetview} path,
-   * with an identical response.
-   *
-   * @param jwt caller's JWT — its {@code sub} claim becomes the new rows' owner id
-   * @param file uploaded JSON file
-   * @return import summary (created / skipped / duplicate counts plus the unmatched-ship list)
-   * @deprecated use {@code /api/v1/hangar/import/ships}; the {@code Sunset} and {@code Link}
-   *     response headers carry the same hint
-   */
-  @PostMapping("/import/fleetview")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional
-  @ApiDeprecation(sunset = "2027-05-14", replacement = "/api/v1/hangar/import/ships")
-  @Deprecated(since = "2026-05-14", forRemoval = true)
-  public FleetviewImportResponseDto importFleetview(
       @AuthenticationPrincipal Jwt jwt, @RequestParam("file") @NotNull MultipartFile file) {
     return hangarImportService.importShips(userService.getUserIdFromJwt(jwt), file);
   }

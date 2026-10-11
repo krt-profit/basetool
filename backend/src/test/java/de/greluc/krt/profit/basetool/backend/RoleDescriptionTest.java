@@ -77,7 +77,7 @@ class RoleDescriptionTest {
 
     mockMvc
         .perform(
-            put("/api/v1/admin/roles/" + testRole.getName() + "/description")
+            put("/api/v1/roles/" + testRole.getName() + "/description")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(adminUser.getId().toString()))
@@ -107,7 +107,7 @@ class RoleDescriptionTest {
 
     mockMvc
         .perform(
-            put("/api/v1/admin/roles/" + testRole.getName() + "/description")
+            put("/api/v1/roles/" + testRole.getName() + "/description")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(regularUser.getId().toString()))

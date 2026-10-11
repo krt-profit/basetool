@@ -53,7 +53,7 @@ class AdminPersonSearchPageControllerTest {
           false,
           List.of());
 
-  private static final String SEARCH_URI = "/api/v1/admin/person-search?q={q}";
+  private static final String SEARCH_URI = "/api/v1/users/admin/person-search?q={q}";
 
   @Test
   void aTermUnderThreeCharactersNeverReachesTheBackend() {

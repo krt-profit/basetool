@@ -136,7 +136,7 @@ class BlueprintBackendClientTest {
     RecordedRequest own = backend.expect("POST", "/api/v1/personal-blueprints/import/preview");
     assertFilePart(own, "scmdb.json");
     RecordedRequest member =
-        backend.expect("POST", "/api/v1/admin/personal-blueprints/" + SUB + "/import/preview");
+        backend.expect("POST", "/api/v1/personal-blueprints/admin/" + SUB + "/import/preview");
     assertFilePart(member, "bp.json");
   }
 
@@ -171,9 +171,9 @@ class BlueprintBackendClientTest {
     client.addDefault(new DefaultBlueprintCreateRequest("aurora_mr"));
     client.removeDefault(ID);
 
-    backend.expect("GET", "/api/v1/admin/default-blueprints");
-    backend.expect("POST", "/api/v1/admin/default-blueprints", "{\"productKey\":\"aurora_mr\"}");
-    backend.expect("DELETE", "/api/v1/admin/default-blueprints/" + ID, null);
+    backend.expect("GET", "/api/v1/blueprints/admin/defaults");
+    backend.expect("POST", "/api/v1/blueprints/admin/defaults", "{\"productKey\":\"aurora_mr\"}");
+    backend.expect("DELETE", "/api/v1/blueprints/admin/defaults/" + ID, null);
   }
 
   @Test
@@ -199,23 +199,23 @@ class BlueprintBackendClientTest {
     backend.expect("GET", "/api/v1/users/" + SUB);
     backend.expect(
         "GET",
-        "/api/v1/admin/personal-blueprints/" + SUB + "?size=200&sort=productName,asc&q=Gladius");
+        "/api/v1/personal-blueprints/admin/" + SUB + "?size=200&sort=productName,asc&q=Gladius");
     backend.expect(
-        "GET", "/api/v1/admin/personal-blueprints/" + SUB + "?size=200&sort=productName,asc");
+        "GET", "/api/v1/personal-blueprints/admin/" + SUB + "?size=200&sort=productName,asc");
     backend.expect(
         "POST",
-        "/api/v1/admin/personal-blueprints/" + SUB + "/batch",
+        "/api/v1/personal-blueprints/admin/" + SUB + "/batch",
         "{\"productKeys\":[\"gladius\"]}");
     backend.expect(
         "PUT",
-        "/api/v1/admin/personal-blueprints/items/" + ID,
+        "/api/v1/personal-blueprints/admin/items/" + ID,
         "{\"acquiredAt\":null,\"note\":null,\"version\":0}");
-    backend.expect("DELETE", "/api/v1/admin/personal-blueprints/items/" + ID, null);
+    backend.expect("DELETE", "/api/v1/personal-blueprints/admin/items/" + ID, null);
     backend.expect(
         "POST",
-        "/api/v1/admin/personal-blueprints/" + SUB + "/import/apply",
+        "/api/v1/personal-blueprints/admin/" + SUB + "/import/apply",
         "{\"resolutions\":[]}");
-    backend.expect("DELETE", "/api/v1/admin/personal-blueprints", null);
+    backend.expect("DELETE", "/api/v1/personal-blueprints/admin", null);
   }
 
   /**

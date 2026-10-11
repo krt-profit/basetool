@@ -76,7 +76,7 @@ class MembersListPatternRenderTest {
     when(backendApiClient.get(eq("/api/v1/users?sort=username,asc"), anyTypeRef()))
         .thenReturn(page);
     when(backendApiClient.get(
-            eq("/api/v1/users/{id}/memberships"), anyTypeRef(), any(Object[].class)))
+            eq("/api/v1/org-units/members/{id}/memberships"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     return mockMvc

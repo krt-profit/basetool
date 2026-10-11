@@ -49,8 +49,8 @@ import org.springframework.web.context.WebApplicationContext;
  * <ul>
  *   <li>{@code /api/v1/users/me/deletion-request} is open to every authenticated member and accepts
  *       no user id.
- *   <li>{@code /api/v1/admin/deletion-requests} is admin-only at the URL matcher and the method
- *       level.
+ *   <li>{@code /api/v1/users/admin/deletion-requests} is admin-only at the URL matcher and the
+ *       method level.
  * </ul>
  */
 @LeafServiceMockTest
@@ -87,7 +87,7 @@ class DeletionRequestControllerSecurityTest {
   void adminQueue_member_isForbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/deletion-requests")
+            get("/api/v1/users/admin/deletion-requests")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }
@@ -96,7 +96,7 @@ class DeletionRequestControllerSecurityTest {
   void adminQueue_officer_isForbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/deletion-requests")
+            get("/api/v1/users/admin/deletion-requests")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
         .andExpect(status().isForbidden());
   }
@@ -105,7 +105,7 @@ class DeletionRequestControllerSecurityTest {
   void adminQueue_bankManagement_isForbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/deletion-requests")
+            get("/api/v1/users/admin/deletion-requests")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
         .andExpect(status().isForbidden());
   }
@@ -116,7 +116,7 @@ class DeletionRequestControllerSecurityTest {
 
     mockMvc
         .perform(
-            get("/api/v1/admin/deletion-requests")
+            get("/api/v1/users/admin/deletion-requests")
                 .with(
                     jwt()
                         .jwt(j -> j.subject(UUID.randomUUID().toString()))
@@ -128,7 +128,7 @@ class DeletionRequestControllerSecurityTest {
   void execute_officer_isForbiddenAndNeverReachesTheService() throws Exception {
     mockMvc
         .perform(
-            post("/api/v1/admin/deletion-requests/{id}/execute", UUID.randomUUID())
+            post("/api/v1/users/admin/deletion-requests/{id}/execute", UUID.randomUUID())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"grantHistoryErasure\":true}")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
@@ -141,7 +141,7 @@ class DeletionRequestControllerSecurityTest {
   void decline_member_isForbidden() throws Exception {
     mockMvc
         .perform(
-            post("/api/v1/admin/deletion-requests/{id}/decline", UUID.randomUUID())
+            post("/api/v1/users/admin/deletion-requests/{id}/decline", UUID.randomUUID())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"grantHistoryErasure\":false,\"note\":\"nope\"}")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))

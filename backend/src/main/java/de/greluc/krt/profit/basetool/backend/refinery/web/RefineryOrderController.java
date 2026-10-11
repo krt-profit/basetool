@@ -24,9 +24,10 @@ import de.greluc.krt.profit.basetool.backend.mapper.RefineryOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
-import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -34,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -75,7 +75,6 @@ public class RefineryOrderController {
   private final UserService userService;
   private final RefineryOrderMapper mapper;
   private final AuthHelperService authHelperService;
-  private final RefineryAccessPolicy refineryAccessPolicy;
 
   /**
    * Lists the calling user's own refinery orders, one page under the list filters
@@ -128,23 +127,6 @@ public class RefineryOrderController {
   }
 
   /**
-   * Returns the UEX-derived refinery yield bonus/malus per input material for a refinery location,
-   * as a {@code materialId → percent} map (positive = bonus, negative = malus, {@code 0} =
-   * baseline).
-   *
-   * <p>An unknown or {@code null} location returns an empty map, not 404.
-   *
-   * @param locationId the chosen refinery location
-   * @return per-material yield bonus map
-   */
-  @GetMapping("/locations/{locationId}/yields")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public Map<UUID, Integer> getYieldsForLocation(@PathVariable @NotNull UUID locationId) {
-    return refineryOrderService.getYieldBonusByMaterialForLocationId(locationId);
-  }
-
-  /**
    * Lists refinery orders linked to a mission: logisticians see every order within their org-unit
    * scope, other users only their own.
    *
@@ -153,11 +135,11 @@ public class RefineryOrderController {
    *
    * @return list of refinery-order list DTOs
    */
-  @GetMapping("/mission/{missionId}")
+  @GetMapping
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public List<RefineryOrderListDto> getMissionRefineryOrders(
-      @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID missionId) {
+      @AuthenticationPrincipal Jwt jwt, @RequestParam @NotNull UUID missionId) {
     boolean isLogistician = authHelperService.isLogisticianOrAbove();
     if (isLogistician) {
       return refineryOrderService.getMissionRefineryOrdersScoped(missionId).stream()
@@ -172,28 +154,21 @@ public class RefineryOrderController {
   }
 
   /**
-   * Creates a refinery order owned by the caller.
+   * Creates a refinery order owned by the caller. Creating for another member goes through {@link
+   * #createUserRefineryOrder}, whose per-target gate reads the member from the path (REQ-SEC-005).
    *
-   * <p>An owner named via {@code orderDto.owner()} is honoured only when the caller passes the same
-   * per-target scope gate as {@link #createRefineryOrderForUser}; otherwise it is ignored
-   * (REQ-SEC-005).
-   *
+   * @param jwt the caller's token, whose user owns the order
+   * @param request the order to create
    * @return the persisted DTO
    */
   @PostMapping
   @PreAuthorize("isAuthenticated()")
   public RefineryOrderDto createMyRefineryOrder(
-      @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
-    UUID userId = userService.getUserIdFromJwt(jwt);
-    if (orderDto.owner() != null && orderDto.owner().id() != null) {
-      UUID requestedOwnerId = orderDto.owner().id();
-      if (refineryAccessPolicy.canManageUserRefineryOrders(requestedOwnerId)) {
-        userId = requestedOwnerId;
-      }
-    }
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestBody @Valid @NotNull RefineryOrderCreateRequest request) {
     RefineryOrder saved =
         refineryOrderService.createRefineryOrder(
-            userId, mapper.toEntity(orderDto), orderDto.owningOrgUnitId());
+            userService.getUserIdFromJwt(jwt), mapper.toEntity(request), request.owningOrgUnitId());
     return mapper.toDto(
         saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
@@ -201,9 +176,11 @@ public class RefineryOrderController {
   /**
    * Updates a refinery order. Non-logistician callers must be the owner (HTTP-boundary check
    * because the rule is per-resource and {@code @PreAuthorize} can't see the order's owner).
-   * Logisticians may edit any order; in that case the {@code owner} can also be reassigned via the
-   * DTO.
+   * Logisticians may edit any order.
    *
+   * @param jwt the caller's token
+   * @param id the order to update
+   * @param request the new values and the last-seen version
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
@@ -211,7 +188,7 @@ public class RefineryOrderController {
   public RefineryOrderDto updateMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
-      @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+      @RequestBody @Valid @NotNull RefineryOrderUpdateRequest request) {
     UUID callerId = userService.getUserIdFromJwt(jwt);
     RefineryOrder existing = refineryOrderService.getRefineryOrder(id);
 
@@ -219,9 +196,7 @@ public class RefineryOrderController {
 
     UUID targetUserId = callerId;
     if (isLogistician) {
-      if (orderDto.owner() != null && orderDto.owner().id() != null) {
-        targetUserId = orderDto.owner().id();
-      } else if (existing.getOwner() != null) {
+      if (existing.getOwner() != null) {
         targetUserId = existing.getOwner().getId();
       }
     } else {
@@ -232,7 +207,7 @@ public class RefineryOrderController {
 
     RefineryOrder saved =
         refineryOrderService.updateRefineryOrder(
-            targetUserId, id, mapper.toEntity(orderDto), isLogistician);
+            targetUserId, id, mapper.toEntity(request), isLogistician);
     return mapper.toDto(
         saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
@@ -330,6 +305,8 @@ public class RefineryOrderController {
    * Creates a refinery order on behalf of a target user. Allowed for an admin, the target user, or
    * a logistician whose strict org-unit scope covers a unit the target belongs to.
    *
+   * @param userId the member who will own the order
+   * @param request the order to create
    * @return the persisted DTO
    */
   @PostMapping("/users/{userId}")
@@ -338,10 +315,11 @@ public class RefineryOrderController {
           + Roles.LOGISTICIAN
           + "') and @refineryAccessPolicy.canManageUserRefineryOrders(#userId)")
   public RefineryOrderDto createUserRefineryOrder(
-      @PathVariable @NotNull UUID userId, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+      @PathVariable @NotNull UUID userId,
+      @RequestBody @Valid @NotNull RefineryOrderCreateRequest request) {
     RefineryOrder saved =
         refineryOrderService.createRefineryOrder(
-            userId, mapper.toEntity(orderDto), orderDto.owningOrgUnitId());
+            userId, mapper.toEntity(request), request.owningOrgUnitId());
     return mapper.toDto(
         saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
@@ -349,6 +327,9 @@ public class RefineryOrderController {
   /**
    * Logistician-only: updates a target user's refinery order.
    *
+   * @param userId the member whose order is updated
+   * @param orderId the order to update
+   * @param request the new values and the last-seen version
    * @return the persisted DTO
    */
   @PutMapping("/users/{userId}/{orderId}")
@@ -359,9 +340,9 @@ public class RefineryOrderController {
   public RefineryOrderDto updateUserRefineryOrder(
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID orderId,
-      @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
+      @RequestBody @Valid @NotNull RefineryOrderUpdateRequest request) {
     RefineryOrder saved =
-        refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(orderDto), true);
+        refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(request), true);
     return mapper.toDto(
         saved, refineryOrderService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }

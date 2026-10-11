@@ -42,7 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code bySelf = false}.
  */
 @RestController
-@RequestMapping("/api/v1/admin/users/{userId}/export")
+@RequestMapping("/api/v1/users/admin/{userId}/export")
 @RequiredArgsConstructor
 public class AdminDataExportController {
 

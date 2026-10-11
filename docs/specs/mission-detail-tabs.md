@@ -82,7 +82,7 @@ or check-in change never leaves the bar stale (REQ-FE-010). The three tabs, plus
    loading every entry — so a live-update finance render costs one small query, not a full-ledger
    load-all (ADR-0078). The Wirtschaft `<details>` refinery/inventory lists are **no longer embedded
    in the mission DTO** (#1138): they are fetched with the rest of the finance section from
-   `GET /api/v1/refinery-orders/mission/{id}` and `GET /api/v1/inventory/mission/{id}` (both
+   `GET /api/v1/refinery-orders?missionId={id}` and `GET /api/v1/inventory/allocations?missionId={id}` (both
    member-gated), so the hottest mission GET no longer drags an unbounded, recursive economy payload.
 4. **Edit mode** (`#pane-verw`, formerly the „Verwaltung" tab; REQ-UI-027: tabs show views only) —
    role-gated (`canEdit` or `canManageManagers`), not rendered otherwise, and entered through the
@@ -311,15 +311,13 @@ the mission, so two racing same-section writers genuinely serialise — the lose
 bumped counter and 409s. This is safe only because **every mutable `Mission` scalar and association is
 `@OptimisticLock(excluded = true)` and the entity is `@DynamicUpdate`**: a section edit dirties only
 its own columns, so it never bumps the row `@Version` (no cross-section 409) and the column-narrowed
-flush never clobbers a concurrent other-section change. The legacy full-replace `updateMission`
-(`PUT /missions/{id}`), whose only remaining guard once the scalars are excluded is the row
-`@Version`, force-increments it via JPA `OPTIMISTIC_FORCE_INCREMENT` (`findByIdForFullReplace`), so
-two concurrent whole-mission overwrites still 409. Steps and goals additionally gain a **deferrable
+flush never clobbers a concurrent other-section change. The former full-replace `PUT /missions/{id}`
+was deleted in wave 3 of the API cut, so no write overwrites a whole mission and only the section
+counters guard an edit. Steps and goals additionally gain a **deferrable
 unique `(mission_id, order_index)` constraint** (V208) as the DB backstop — `DEFERRABLE INITIALLY
 DEFERRED` so a reorder's transient in-flush collision is tolerated, yet a genuinely duplicate ordinal
-is rejected at commit. The two unconditional cross-section pokes with no client echo keep the
-in-memory `bumpSectionVersion`: the legacy full-replace and the activation auto-stamp of
-`actualStartTime`.
+is rejected at commit. The one unconditional cross-section poke with no client echo keeps the
+in-memory `bumpSectionVersion`: the activation auto-stamp of `actualStartTime`.
 
 **The owner is a locked section too (BE-SIMP-03, 2026-09-22).** Its counter is not a `Mission`
 column but the JPA `@Version` of the 1:1 `mission_ownership` companion row, which `PUT
@@ -356,7 +354,6 @@ different people the later one silently won. Now:
 - [ ] A stale section-version echo returns 409; a matching echo advances only that section's counter.
 - [ ] A reorder that swaps ordinals commits without a unique violation; a duplicate `(mission_id,
   order_index)` is rejected once the deferred constraint is checked.
-- [ ] Two concurrent legacy full-replace `updateMission` saves: exactly one wins, the rest 409.
 - [x] An owner change with a stale `ownershipVersion` returns 409 and changes nothing; a matching
   one moves the counter by one and answers with it; the first change of a never-transferred mission
   ends at `1`, so an echo of the pre-change `0` is stale.
@@ -364,14 +361,14 @@ different people the later one silently won. Now:
 **Enforced by:** `MissionSectionLockConcurrencyTest` (real-contention same-section one-winner +
 cross-section no-collision), `MissionSectionLockDbEnforcementTest` (conditional bump, row-version
 decoupling, deferred-constraint tolerance + backstop), `MissionUniqueIndexBackstopTest`,
-`ConcurrencyTest` (full-replace one-winner), and the extended `MissionServiceSectionPatchTest` /
+and the extended `MissionServiceSectionPatchTest` /
 `MissionStepServiceTest` / `MissionObjectiveServiceTest`. The owner lock:
 `MissionOwnershipVersionIntegrationTest` (formula + counter movement against PostgreSQL),
 `MissionOwnerChangeControllerTest` (409 + `OPTIMISTIC_LOCK`, the counter in the answer, a missing
 version is a 400), `MissionServiceSectionPatchTest` (first-change materialisation), the frontend
 `MissionPageControllerMvcTest` (versioned body, 409 relay) and `MissionOwnerChangeE2eTest`. **Code:** `Mission` (`@DynamicUpdate` +
-per-scalar `@OptimisticLock(excluded = true)`), `MissionRepository.bump*VersionIfMatches` /
-`findByIdForFullReplace`, `MissionSectionVersions.enforceSectionVersion`, `MissionService` /
+per-scalar `@OptimisticLock(excluded = true)`), `MissionRepository.bump*VersionIfMatches`,
+`MissionSectionVersions.enforceSectionVersion`, `MissionService` /
 `MissionTimelineService` / `MissionParticipantService`, migration `V208`. **Issues:** #1112, #1114,
 #1147 (epic #1109).
 
@@ -394,7 +391,7 @@ units/frequencies; ADR-0044). It used to be forwarded to the anonymous tier too;
 (ADR-0159), not the forwarding.
 
 All five mutations (add / edit / remove / reorder / done-toggle) go through dedicated slim endpoints
-`…/missions/{id}/steps[/{stepId}][/reorder|/done]/slim` (`@PreAuthorize canManageMission`), each
+`…/missions/{id}/steps[/{stepId}][/reorder|/done]` (`@PreAuthorize canManageMission`), each
 echoing the mission's dedicated **`stepsVersion`** section counter — a manual `@OptimisticLock(excluded
 = true) Long` in the `coreVersion`/`scheduleVersion`/`flagsVersion`/`partyLeadVersion` family — so an
 Ablauf edit never 409s a concurrent core/schedule/flags edit, and a stale `stepsVersion` surfaces as
@@ -500,7 +497,7 @@ A member below Logistician sees the Ziele box read-only — it is non-PII planni
 like the Ablauf steps, units and frequencies (ADR-0057).
 
 All four mutations (add / edit / remove / reorder) go through dedicated slim endpoints
-`…/missions/{id}/objectives[/{objId}][/reorder]/slim` (`@PreAuthorize canManageMission`), each echoing
+`…/missions/{id}/objectives[/{objId}][/reorder]` (`@PreAuthorize canManageMission`), each echoing
 the mission's dedicated **`objectivesVersion`** section counter — a manual `@OptimisticLock(excluded =
 true) Long` in the `coreVersion`/`scheduleVersion`/`flagsVersion`/`partyLeadVersion`/`stepsVersion`
 family — so a goal edit never 409s a concurrent core / schedule / flags / Ablauf edit, and a stale
@@ -609,9 +606,9 @@ dialogs) and shown **read-only** in the Übersicht "Funk" panel alongside the ty
 channels. They are non-PII planning data, forwarded through the peer redaction like the typed
 frequencies, units and Ablauf steps.
 
-The three mutations go through dedicated slim endpoints: `POST …/missions/{id}/frequencies/custom/slim`
-(add) and `PUT …/missions/{id}/frequencies/custom/{freqId}/slim` (edit) each return the updated slim
-frequency list; delete reuses the generic `DELETE …/missions/{id}/frequencies/{freqId}/slim`. All are
+The three mutations go through dedicated slim endpoints: `POST …/missions/{id}/frequencies/custom`
+(add) and `PUT …/missions/{id}/frequencies/custom/{freqId}` (edit) each return the updated slim
+frequency list; delete reuses the generic `DELETE …/missions/{id}/frequencies/{freqId}`. All are
 `@PreAuthorize @missionSecurityService.canManageMission`. The edit path optimistic-locks on the
 frequency row's own `@Version` (a stale echo surfaces as HTTP 409) and rejects reaching a typed row
 through the custom path; the mission's `frequencies` collection is `@OptimisticLock(excluded = true)`,
@@ -680,7 +677,7 @@ frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
 ### REQ-MISSION-020 — Manager-only add-by-id for the app
 
 A mission manager adds a registered member to the roster by user id through
-`POST /api/v1/missions/{id}/participants/by-id/slim` (owner decision 2026-09-22, ADR-0170 amendment).
+`POST /api/v1/missions/{id}/participants/by-id` (owner decision 2026-09-22, ADR-0170 amendment).
 It replaces the deprecated `POST …/participants` deleted the same day and exists for the Android
 app's "Teilnehmer hinzufügen" on the public API vhost.
 
@@ -689,7 +686,7 @@ app's "Teilnehmer hinzufügen" on the public API vhost.
   sign-up answers. The member's org units and payout default are stamped as on any registered add.
 - **Answer:** the participant list, peer-redacted below Logistician (REQ-SEC-007).
 - **Edge:** admitted on the API vhost and frozen in REQ-API-009; the add-anybody
-  `…/participants/add` and `…/participants/slim` stay off the edge.
+  `POST …/participants` stays off the edge (the former `…/participants/add` is deleted).
 
 **Acceptance**
 
