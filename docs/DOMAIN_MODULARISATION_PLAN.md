@@ -1332,10 +1332,28 @@ as each pair is decoupled.
     (2) The overview gate's predicate stays in the scope kernel (`RequestScopeResolver`). Identity's
     `/me` capability view reads it too, and an `identity -> blueprint` edge would break the ranks.
     The policy builds on it, and the differential test keeps both live copies in step.
-  - **P3-7b — open.** Published query and command APIs for the exchange and the Materialbörse:
-    the product resolution, the import preview and name resolution, the variant-family resolver
-    and the personal-blueprint writes. Then the move into `blueprint.web` / `blueprint.internal`,
-    NullAway over the module, and the idioms.
+  - **P3-7b — done 2026-10-10, without the move.** The exchange, the Materialbörse and the job
+    order reach no blueprint implementation class any more. They go through five published
+    interfaces:
+    - `BlueprintProducts`, the product resolution: by key, by game item, all products, and the
+      `scwiki_key` index;
+    - `BlueprintImports`, the import preview and name resolution;
+    - `BlueprintFamilies`, the variant families;
+    - `DefaultBlueprintKeys`;
+    - `PersonalBlueprintCommands` (`add`, `delete`, all `MANDATORY`), implemented by
+      `PersonalBlueprintCommandService` over `PersonalBlueprintService`.
+
+    Their records `ResolvedProduct`, `NameResolution` and `ParsedEntry` moved out of the services
+    into `blueprint.api`. `ResolvedProduct.outputItemId` is now marked `@Nullable`, which it always
+    was. The existing services implement the interfaces, so no behaviour changes. NullAway takes in
+    the whole `blueprint` tree, which today is its `api` package. The §8.1 idioms were not swept,
+    because the implementation does not move.
+
+    *Correction — the move waits for P4-1:* `CraftableStockSource` is implemented in the layer
+    package `service` (`InventoryCraftableStock`), because the inventory has not moved. So `service`
+    depends on `blueprint.api`. Any blueprint implementation class in `blueprint.internal` needs
+    `service` (the scope hub, the audit recorder), which closes a `service <-> blueprint` package
+    cycle, as it did for the inventory. **Tracked as P4-2 (§7.6).**
 
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
@@ -1363,6 +1381,10 @@ service and repository (`InventoryOrgUnitReconciler`), the blueprint's craftabil
 job order's `JobOrderStockProjectionService` and `JobOrderMapper`, and the earmark finders of
 `JobOrderRepository` and `MissionRepository`. The Lager's own controller, services, mapper and
 repository then move together; NullAway already covers the `inventory` tree.
+**P4-2 — move the blueprint into `blueprint.web` / `blueprint.internal`** (carried from
+P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
+The five published interfaces already cover every foreign caller, so the move touches no
+other module; the §8.1 idioms go with it.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 

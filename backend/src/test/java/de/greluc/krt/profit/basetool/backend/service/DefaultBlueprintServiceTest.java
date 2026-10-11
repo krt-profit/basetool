@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.DefaultBlueprintMapper;
@@ -38,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.dto.DefaultBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.repository.DefaultBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;

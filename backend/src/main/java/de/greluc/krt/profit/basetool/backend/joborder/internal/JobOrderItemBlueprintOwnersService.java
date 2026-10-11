@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintFamilies;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -30,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintVariantFamilyResolver;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -64,7 +64,7 @@ public class JobOrderItemBlueprintOwnersService {
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final UserRepository userRepository;
-  private final BlueprintVariantFamilyResolver familyResolver;
+  private final BlueprintFamilies familyResolver;
 
   /**
    * Builds the blueprint-coverage view for the given order, restricted to the responsible org

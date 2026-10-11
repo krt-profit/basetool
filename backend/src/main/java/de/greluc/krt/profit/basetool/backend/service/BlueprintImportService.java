@@ -22,6 +22,10 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImports;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.NameResolution;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ParsedEntry;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAlias;
@@ -38,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportSuggestion
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -77,7 +80,7 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class BlueprintImportService {
+public class BlueprintImportService implements BlueprintImports {
 
   /** External catalogue every import row and learned alias belongs to. */
   private static final BlueprintExternalAliasSource SOURCE = BlueprintExternalAliasSource.SCMDB;
@@ -114,9 +117,10 @@ public class BlueprintImportService {
    * @param parsed the entries, one per blueprint
    * @return the preview with per-name rows and per-status counts
    */
+  @Override
   @NotNull
   public BlueprintImportPreviewDto previewEntries(
-      @NotNull UUID ownerUserId, @NotNull List<BlueprintExportParser.ParsedEntry> parsed) {
+      @NotNull UUID ownerUserId, @NotNull List<ParsedEntry> parsed) {
     Map<String, ResolvedProduct> productByKey = productIndex();
     List<ResolvedProduct> allProducts = new ArrayList<>(productByKey.values());
     Map<String, String> tagIndex =
@@ -126,7 +130,7 @@ public class BlueprintImportService {
 
     List<Resolution> resolutions = new ArrayList<>(parsed.size());
     Set<String> resolvedKeys = new HashSet<>();
-    for (BlueprintExportParser.ParsedEntry entry : parsed) {
+    for (ParsedEntry entry : parsed) {
       Resolution resolution = resolve(entry, productByKey, allProducts, tagIndex);
       resolutions.add(resolution);
       if (resolution.product != null) {
@@ -188,6 +192,7 @@ public class BlueprintImportService {
    * @param names the raw product names
    * @return one resolution per name, in the order given
    */
+  @Override
   @NotNull
   public List<NameResolution> resolveNames(@NotNull List<String> names) {
     if (names.isEmpty()) {
@@ -198,11 +203,7 @@ public class BlueprintImportService {
     List<NameResolution> resolutions = new ArrayList<>(names.size());
     for (String name : names) {
       Resolution resolution =
-          resolve(
-              new BlueprintExportParser.ParsedEntry(name, null, null),
-              productByKey,
-              allProducts,
-              Map.of());
+          resolve(new ParsedEntry(name, null, null), productByKey, allProducts, Map.of());
       resolutions.add(
           new NameResolution(resolution.status, resolution.product, resolution.suggestions));
     }
@@ -348,7 +349,7 @@ public class BlueprintImportService {
    */
   @NotNull
   private Resolution resolve(
-      @NotNull BlueprintExportParser.ParsedEntry entry,
+      @NotNull ParsedEntry entry,
       @NotNull Map<String, ResolvedProduct> productByKey,
       @NotNull List<ResolvedProduct> allProducts,
       @NotNull Map<String, String> tagIndex) {
@@ -576,18 +577,6 @@ public class BlueprintImportService {
       @NotNull BlueprintImportStatus status,
       @Nullable ResolvedProduct product,
       @Nullable Instant suggestedAcquiredAt,
-      @NotNull List<BlueprintImportSuggestionDto> suggestions) {}
-
-  /**
-   * How one bare name resolved.
-   *
-   * @param status {@code MATCHED}, {@code MATCHED_BY_ALIAS}, {@code SUGGESTED} or {@code UNMATCHED}
-   * @param product the resolved product, or {@code null} unless matched
-   * @param suggestions fuzzy candidates, highest first (empty unless {@code status} is SUGGESTED)
-   */
-  public record NameResolution(
-      @NotNull BlueprintImportStatus status,
-      @Nullable ResolvedProduct product,
       @NotNull List<BlueprintImportSuggestionDto> suggestions) {}
 
   /**

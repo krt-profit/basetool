@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.mapper.BlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
@@ -58,7 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class BlueprintProductService {
+public class BlueprintProductService implements BlueprintProducts {
 
   /** Default number of products returned when the caller does not specify a limit. */
   public static final int DEFAULT_LIMIT = 25;
@@ -114,6 +116,7 @@ public class BlueprintProductService {
    * @param productKey normalized product key
    * @return the resolved product, or empty for a blank key or one no active blueprint produces
    */
+  @Override
   @NotNull
   public Optional<ResolvedProduct> resolveByProductKey(@Nullable String productKey) {
     if (productKey == null || productKey.isBlank()) {
@@ -136,6 +139,7 @@ public class BlueprintProductService {
    * @return the resolved product, or empty if the id is {@code null} or no active blueprint
    *     produces the item
    */
+  @Override
   @NotNull
   public Optional<ResolvedProduct> resolveByGameItem(@Nullable UUID gameItemId) {
     if (gameItemId == null) {
@@ -249,6 +253,7 @@ public class BlueprintProductService {
    *
    * @return all active products, de-duplicated by normalized product key, in master-scan order
    */
+  @Override
   @NotNull
   public List<ResolvedProduct> allProducts() {
     return buildProductMap("").values().stream()
@@ -285,6 +290,7 @@ public class BlueprintProductService {
    * @return lower-cased {@code scwiki_key} to its product keys in first-seen order; never {@code
    *     null}
    */
+  @Override
   @NotNull
   public Map<String, Set<String>> scwikiKeyToProductKeys() {
     Map<String, Set<String>> index = new LinkedHashMap<>();
@@ -374,13 +380,4 @@ public class BlueprintProductService {
       this.displayName = displayName;
     }
   }
-
-  /**
-   * A product key resolved back to its canonical product, for stamping a new ownership row.
-   *
-   * @param productKey normalized product key
-   * @param productName canonical display name
-   * @param outputItemId resolved output {@code game_item} id, or {@code null} if unresolved
-   */
-  public record ResolvedProduct(String productKey, String productName, UUID outputItemId) {}
 }

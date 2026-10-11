@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImports;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ParsedEntry;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintDraftDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
@@ -32,8 +34,6 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractGoodDto
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractImageDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintExportParser;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -56,7 +56,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExchangeDraftService {
 
   private final ExchangeResolveService resolveService;
-  private final BlueprintImportService blueprintImportService;
+  private final BlueprintImports blueprintImportService;
   private final RefineryDraftBuilder refineryDraftBuilder;
 
   /**
@@ -89,12 +89,9 @@ public class ExchangeDraftService {
             name, acquiredAt == null ? Instant.MAX : acquiredAt, (a, b) -> a.isBefore(b) ? a : b);
       }
     }
-    List<BlueprintExportParser.ParsedEntry> entries = new ArrayList<>(earliest.size());
+    List<ParsedEntry> entries = new ArrayList<>(earliest.size());
     earliest.forEach(
-        (name, at) ->
-            entries.add(
-                new BlueprintExportParser.ParsedEntry(
-                    name, null, Instant.MAX.equals(at) ? null : at)));
+        (name, at) -> entries.add(new ParsedEntry(name, null, Instant.MAX.equals(at) ? null : at)));
     return blueprintImportService.previewEntries(member, entries);
   }
 

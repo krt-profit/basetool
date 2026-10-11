@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
@@ -33,8 +35,6 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.time.Instant;
 import java.util.Objects;
@@ -83,7 +83,7 @@ public class MaterialExchangeService {
    * Resolves the blueprint product of an item offer, gating it and supplying the display name
    * snapshotted onto the offer (REQ-MARKET-012).
    */
-  private final BlueprintProductService blueprintProductService;
+  private final BlueprintProducts blueprintProductService;
 
   /**
    * Resolves the acting member's active {@link de.greluc.krt.profit.basetool.backend.model.OrgUnit}

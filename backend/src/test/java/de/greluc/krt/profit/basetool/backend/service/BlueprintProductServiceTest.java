@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.mapper.BlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintIdNameRow;
@@ -40,7 +41,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeRe
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ParsedEntry;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
@@ -50,12 +51,11 @@ class BlueprintCorpusFixtureTest {
 
   @Test
   void parsesIntoThirtyOneDistinctBlueprints() throws IOException {
-    List<BlueprintExportParser.ParsedEntry> entries =
-        BlueprintExportParser.parse(mapper, fixtureAsUpload());
+    List<ParsedEntry> entries = BlueprintExportParser.parse(mapper, fixtureAsUpload());
 
     assertEquals(EXPECTED_EVENTS, entries.size());
     Set<String> names = new HashSet<>();
-    for (BlueprintExportParser.ParsedEntry entry : entries) {
+    for (ParsedEntry entry : entries) {
       assertNotNull(entry.suggestedAcquiredAt(), entry.externalName());
       names.add(entry.externalName());
     }
@@ -66,7 +66,7 @@ class BlueprintCorpusFixtureTest {
   void keepsNamesVerbatimIncludingPackTagsAndNoBreakSpace() throws IOException {
     List<String> names =
         BlueprintExportParser.parse(mapper, fixtureAsUpload()).stream()
-            .map(BlueprintExportParser.ParsedEntry::externalName)
+            .map(ParsedEntry::externalName)
             .toList();
 
     assertTrue(names.contains("[E-S3] CF-337 Panther \"Hazard-Zone\" Repeater"));
