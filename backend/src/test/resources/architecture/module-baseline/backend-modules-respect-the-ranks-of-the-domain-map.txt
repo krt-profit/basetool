@@ -31,11 +31,9 @@ identity -> privacy: UserController -> UserDeletionService
 identity -> privacy: UserRegistrationService -> UserDeletionService
 identity -> scope: MeController -> OwnerScopeService
 identity -> scope: UserService -> OwnerScopeService
-mission -> operation: Mission -> Operation
 mission -> operation: MissionDto -> OperationDto
 mission -> operation: MissionListDto -> OperationDto
 mission -> operation: MissionMapper -> OperationMapper
-mission -> operation: MissionService -> OperationRepository
 mission -> refinery: Mission -> RefineryOrder
 mission -> refinery: MissionFinanceEntryService -> RefineryOrder
 mission -> refinery: MissionFinanceEntryService -> RefineryOrderRepository

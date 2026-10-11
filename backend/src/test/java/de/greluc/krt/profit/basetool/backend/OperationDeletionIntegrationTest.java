@@ -89,7 +89,7 @@ class OperationDeletionIntegrationTest {
 
     mission = new Mission();
     mission.setName("Linked Mission");
-    mission.setOperation(operation);
+    mission.setOperationId(operation.getId());
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
@@ -175,7 +175,7 @@ class OperationDeletionIntegrationTest {
 
     Mission survivedMission = missionRepository.findById(missionId).orElseThrow();
     assertNull(
-        survivedMission.getOperation(), "mission must no longer reference the deleted operation");
+        survivedMission.getOperationId(), "mission must no longer reference the deleted operation");
 
     InventoryItem survivedItem = inventoryItemRepository.findById(itemId).orElseThrow();
     InventoryMissionAllocation survivedAllocation =

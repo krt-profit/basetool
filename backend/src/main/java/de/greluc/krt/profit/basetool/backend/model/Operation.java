@@ -66,7 +66,12 @@ public class Operation extends AbstractEntity<UUID> {
   @Column(nullable = false)
   private OperationStatus status;
 
-  @OneToMany(mappedBy = "operation")
+  /**
+   * Read-only view of the missions linked to this operation; the link is written only through
+   * {@code Mission.operationId}.
+   */
+  @OneToMany
+  @JoinColumn(name = "operation_id", insertable = false, updatable = false)
   @OrderBy("plannedStartTime DESC")
   private Set<Mission> missions = new HashSet<>();
 

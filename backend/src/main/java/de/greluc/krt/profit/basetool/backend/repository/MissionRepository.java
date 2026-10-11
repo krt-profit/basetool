@@ -170,10 +170,10 @@ public interface MissionRepository
    *
    * <p>Filters are optional ({@code null} removes a clause) except {@code status}, which is always
    * applied. Scoped by the org-unit scope-predicate triple; public missions stay visible across
-   * units, internal ownerless missions only to members or above. Fetches only {@code operation} and
-   * {@code owningOrgUnit}, so pagination stays in SQL.
+   * units, internal ownerless missions only to members or above. Fetches only {@code
+   * owningOrgUnit}, so pagination stays in SQL.
    */
-  @EntityGraph(attributePaths = {"operation", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"owningOrgUnit"})
   @Query(
       "SELECT m FROM Mission m WHERE "
           + ScopeSpecifications.MISSION_SCOPE_PREDICATE
@@ -182,7 +182,7 @@ public interface MissionRepository
           + " CAST(:query AS string), '%') ESCAPE '\\') AND (CAST(:start AS timestamp) IS NULL OR"
           + " m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
           + " m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS NULL OR"
-          + " m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR m.operation.id"
+          + " m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR m.operationId"
           + " = :operationId)")
   Page<Mission> searchMissions(
       @Param("query") String query,
@@ -220,7 +220,7 @@ public interface MissionRepository
    * @param operationId the operation whose missions are returned
    * @return the linked missions, empty when none is linked
    */
-  @Query("SELECT m FROM Mission m WHERE m.operation.id = :operationId")
+  @Query("SELECT m FROM Mission m WHERE m.operationId = :operationId")
   List<Mission> findAllLinkedToOperation(@Param("operationId") UUID operationId);
 
   /**
@@ -233,7 +233,7 @@ public interface MissionRepository
    */
   @Query(
       """
-      SELECT CASE WHEN COUNT(m) > 0 THEN TRUE ELSE FALSE END FROM Mission m WHERE m.operation.id =
+      SELECT CASE WHEN COUNT(m) > 0 THEN TRUE ELSE FALSE END FROM Mission m WHERE m.operationId =
       :operationId AND (m.actualStartTime IS NULL OR m.actualEndTime IS NULL)
       """)
   boolean existsByOperationIdWithUnfinishedActualTime(@Param("operationId") UUID operationId);

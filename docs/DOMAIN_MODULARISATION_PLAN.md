@@ -1355,6 +1355,52 @@ as each pair is decoupled.
     `service` (the scope hub, the audit recorder), which closes a `service <-> blueprint` package
     cycle, as it did for the inventory. **Tracked as P4-2 (§7.6).**
 
+- `operation` ⇄ `mission` — **P3-8a done 2026-10-11.** `Mission.operation` becomes `Mission.operationId`
+  (the same `operation_id` column and foreign key, still outside the row version and every section
+  counter; no migration), the fourth of the eight business associations of §5.6 turned into an id.
+  1. *Characterise*: `MissionOperationReadNoNPlusOneTest`, added before the change and green on the
+     unchanged code, keeps the mission list at the same statement count for 25 linked missions as
+     for 3 and pins every field of the `OperationDto` a mission DTO embeds (the owning squadron
+     reference, version, timestamps, the `null` payout flag) and the `null` for a mission without an
+     operation.
+  2. *Read SPI* (§5.3): what a mission shows of its operation comes from
+     `mission.api.OperationSummaryProvider`, implemented by `operation.internal.OperationSummaryReader`
+     with one projection query (`OperationRepository.findSummaries`), through the per-transaction
+     memo `mission.internal.MissionOperationSummaryCache` (`mapper.MissionOperationLookup`): its first
+     miss loads every operation the missions of the persistence context belong to, so a page costs
+     one statement whatever its size. `MissionMapper` builds the embedded `OperationDto` with the new
+     `OperationMapper#toDtoFromSummary`, which `OperationMapperTest` pins equal to `toDto` of the
+     entity. The existence checks of the create and the core patch ask the provider (same
+     `Operation not found`). DTOs, audit labels and the 404/403 behaviour are unchanged. The list
+     reads 4 statements for 3 and for 25 missions (proven able to fail: without the context scan it
+     is 26 against 4).
+  3. *JPQL*: `MissionRepository` (search, the detach finder, the unfinished-time check),
+     `OperationRepository` (the time-range search, the participant check) and
+     `ScopeSpecifications.OPERATION_SCOPE_PREDICATE` read `m.operationId`; the search's entity graph
+     drops `operation`. `Operation.missions` stays as a read-only `@OneToMany` over the same column
+     (`insertable = false, updatable = false`), so the finance, payout and delete code is unchanged
+     and the delete's `missions.clear()` writes nothing.
+  Baseline **45 → 43** (`Mission -> Operation`, `MissionService -> OperationRepository`); the
+  architecture test's to-one association floor drops 148 → 147 with the association.
+  **Corrections:** (1) The SPI is owned by the lower module, `mission.api`, and not `operation.api` as
+  the step list read: `mission` (rank 9) may not depend on `operation` (rank 11), and the read SPI of
+  every earlier pair is owned by its consumer. Its record `MissionOperationSummary` (`model.dto`)
+  and the memo's interface (`mapper`) sit in layer packages, because the mapper reads them and a
+  `mapper -> mission` edge closes a package cycle with the moved mission services (the reason
+  `MissionViewerAccess` sits in `mapper` too). (2) The mission DTOs embed the full `OperationDto`,
+  not `OperationReferenceDto`, so the wire shape and the OpenAPI schema stay as they are and three
+  `mission -> operation` edges remain in the baseline: `MissionDto` and `MissionListDto` to
+  `OperationDto`, and `MissionMapper` to `OperationMapper`. The baseline may only shrink, which is
+  why the summary carries the status as its name instead of an `OperationStatus` and why the
+  mapper keeps `OperationMapper`; the three leave when the mission DTOs stop embedding the
+  operation's DTO (the REST DTO separation of §5.2). (3) The `Operation` entity, `OperationStatus`,
+  `OperationRepository`, `OperationMapper` and the operation DTOs still do not move: read from the
+  imports, `MissionDto`/`MissionListDto` (`model.dto`) and `MissionMapper`/`OperationFinanceService`
+  (`mapper`) would close `model.dto ⇄ operation` and `mapper ⇄ operation` cycles, and
+  `BusinessMetricsCollector` (`task`) reads the repository. They move once (2) is done. The refinery
+  association (`Mission.refineryOrders`, `RefineryOrder.mission`, the `MissionFinanceContributor` SPI)
+  is the other half of P3-8 and still blocks the refinery's entities, repository and mapper.
+
 | Core step | Risk that matters most | Guard |
 | --- | --- | --- |
 | Inventory command API | Lock order (advisory lock first, ascending by key), bulk update after the loop, the `FORCE_INCREMENT` version echo | Existing concurrency and E2E tests (`MaterialCollectionDeliveredInPlaceE2eTest`), the ADR-0229 load-test cases, "only inventory writes `InventoryItem`", an audit contract per command, a 403 test per foreign entry point |

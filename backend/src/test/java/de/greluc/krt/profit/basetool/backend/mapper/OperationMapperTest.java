@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
+import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
 import java.time.Instant;
@@ -64,6 +66,52 @@ class OperationMapperTest {
     assertEquals(5L, dto.version());
     assertEquals(created, dto.createdAt());
     assertEquals(updated, dto.updatedAt());
+  }
+
+  @Test
+  void toDtoFromSummary_shouldBuildTheDtoToDtoBuildsFromTheEntity() {
+    UUID id = UUID.randomUUID();
+    Squadron owner = new Squadron();
+    owner.setId(UUID.randomUUID());
+    owner.setName("Staffel Nord");
+    owner.setShorthand("SN");
+    Operation entity = new Operation();
+    entity.setId(id);
+    entity.setName("Operation Sunfire");
+    entity.setDescription("Strike package");
+    entity.setStatus(OperationStatus.COMPLETED);
+    entity.setOwningOrgUnit(owner);
+    entity.setVersion(5L);
+    entity.setCreatedAt(Instant.parse("2026-01-01T10:00:00Z"));
+    entity.setUpdatedAt(Instant.parse("2026-02-01T10:00:00Z"));
+    MissionOperationSummary summary =
+        new MissionOperationSummary(
+            id,
+            "Operation Sunfire",
+            "Strike package",
+            "COMPLETED",
+            owner.getId(),
+            "Staffel Nord",
+            "SN",
+            5L,
+            entity.getCreatedAt(),
+            entity.getUpdatedAt());
+
+    assertEquals(mapper.toDto(entity), mapper.toDtoFromSummary(summary));
+  }
+
+  @Test
+  void toDtoFromSummary_shouldLeaveTheOwnerOutForAnOwnerlessOperation() {
+    MissionOperationSummary summary =
+        new MissionOperationSummary(
+            UUID.randomUUID(), "Op", null, "PLANNED", null, null, null, 0L, null, null);
+
+    OperationDto dto = mapper.toDtoFromSummary(summary);
+
+    assertNull(dto.owningSquadron());
+    assertEquals(OperationStatus.PLANNED, dto.status());
+    assertNull(dto.payoutPreliminary());
+    assertNull(mapper.toDtoFromSummary(null));
   }
 
   @Test

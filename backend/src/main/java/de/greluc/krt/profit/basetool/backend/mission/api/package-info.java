@@ -18,7 +18,8 @@
  */
 
 /**
- * The mission module's published API: the commands other modules may ask of it (plan §5.2, §5.3).
+ * The mission module's published API: the commands other modules may ask of it and the read SPIs it
+ * owns (plan §5.2, §5.3).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.mission.api;

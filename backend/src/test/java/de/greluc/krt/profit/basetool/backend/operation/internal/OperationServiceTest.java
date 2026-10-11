@@ -354,7 +354,7 @@ class OperationServiceTest {
 
     Mission m1 = new Mission();
     m1.setId(UUID.randomUUID());
-    m1.setOperation(operation);
+    m1.setOperationId(id);
     Set<Mission> missions = new HashSet<>();
     missions.add(m1);
     operation.setMissions(missions);
