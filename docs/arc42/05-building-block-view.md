@@ -233,6 +233,13 @@ view-shaping services in `service` and view models in `view`; the view shaping l
 `controller`, and `view` held one class. *Updated 2026-10-10:* every layer package is gone (plan
 F4).
 
+**The page chrome is one template fragment** (plan F5, REQ-FE-033, 2026-10-11). Each of the 90
+Thymeleaf page templates that carry the chrome hands `fragments/layout :: page` its title, its own
+stylesheet links, its content and its tail, and the layout supplies the `<html>` element and the
+`head`, `sidebar`, `header` and `toast` fragments around them; the variants (a toast, no app shell,
+the hangar's body attribute) are parameters of the layout. No page calls those fragments itself
+(`PageLayoutCompositionTest`), and `PageChromeSnapshotTest` pins the rendered chrome of every page.
+
 **One trap lives here and is worth naming in an architecture document**, because it is invisible
 from the code that suffers from it: `WebClient.exchange()` runs on a Reactor-Netty worker thread,
 not the servlet thread, so a plain `ThreadLocal` is not visible inside an exchange filter. Anything

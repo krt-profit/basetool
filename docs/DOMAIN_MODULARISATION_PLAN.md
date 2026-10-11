@@ -1570,9 +1570,9 @@ it `pageTitle`, `pageLinks`, `pageContent` and `pageTail` as `th:fragment` block
 names its variant as a parameter: `pageToast`, `pageBare` (no sidebar and header: the five error
 pages, pending approval, terms acceptance) and `pageShowModal` (the hangar's body attribute). It is
 native Thymeleaf with no signature, like `modal-wrapper`; no dependency was added. 90 of the 91
-non-fragment templates were converted, in six stacked commits, 83 with the app shell and 7 without
+non-fragment templates were converted, in five stacked commits, 83 with the app shell and 7 without
 it; `organisation/unit-detail.html` stays, because it has no head and no chrome (it is a roster
-fragment library). The 91 templates lost 137 lines net. Before the first conversion
+fragment library). The 90 pages and the new layout together lost 137 lines. Before the first conversion
 `PageChromeSnapshotTest` captured the chrome of every page into a golden file (`<html>` tag, head,
 `<body>` tag and the order of chrome, content, toast and tail) by rendering each page through the
 real fragments for an administrator with the page's own markup replaced by markers
@@ -1588,8 +1588,8 @@ hangar), four pages that passed an empty `additionalLinks` and a cosmetic `xmlns
 of the markup; what changes once now is the composition, that is the order, the toast placement and
 the body attributes. A snapshot of the fully rendered pages was not possible, because most pages
 need a model, so the oracle pins the chrome and the position of the page's own parts, and the
-content and tail blocks were moved by script without a byte changed inside them (the 160-odd
-existing render and MVC tests of the pages are the check on that). The frontend's Spring-context
+content and tail blocks were moved by script without a byte changed inside them (the full
+frontend suite, 3,957 tests with the existing render and MVC tests of the pages, is the check on that). The frontend's Spring-context
 budget rose from 21 to 22, the snapshot test's template resolver and controller being a context of
 their own (REQ-OPS-041). Open in F5: templates and assets per domain.
 
