@@ -170,7 +170,7 @@ class OrgUnitBankPageControllerMvcTest {
     mockMvc
         .perform(get("/org-unit-bank"))
         .andExpect(status().isOk())
-        .andExpect(view().name("org-unit-bank"))
+        .andExpect(view().name("bank/org-unit-bank"))
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
         .andExpect(content().string(Matchers.containsString("kpi-delta")))
         .andExpect(content().string(Matchers.containsString("kpi-sparkline")))
@@ -211,7 +211,7 @@ class OrgUnitBankPageControllerMvcTest {
     mockMvc
         .perform(get("/org-unit-bank").param("fragment", "orgUnitBank"))
         .andExpect(status().isOk())
-        .andExpect(view().name("org-unit-bank :: orgUnitBank"));
+        .andExpect(view().name("bank/org-unit-bank :: orgUnitBank"));
   }
 
   @Test
@@ -251,7 +251,7 @@ class OrgUnitBankPageControllerMvcTest {
     mockMvc
         .perform(get("/org-unit-bank").param("fragment", "orgUnitBankAccounts"))
         .andExpect(status().isOk())
-        .andExpect(view().name("org-unit-bank :: orgUnitBankAccounts"))
+        .andExpect(view().name("bank/org-unit-bank :: orgUnitBankAccounts"))
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")));
   }
 
@@ -316,7 +316,7 @@ class OrgUnitBankPageControllerMvcTest {
     mockMvc
         .perform(get("/org-unit-bank"))
         .andExpect(status().isOk())
-        .andExpect(view().name("org-unit-bank"))
+        .andExpect(view().name("bank/org-unit-bank"))
         .andExpect(model().attributeExists("balances", "ownRequests", "foreignRequests"))
         .andExpect(model().attributeExists("requestTransferTargets", "anyCanRequest", "sparks"))
         .andExpect(
@@ -492,7 +492,7 @@ class OrgUnitBankPageControllerMvcTest {
     mockMvc
         .perform(get("/org-unit-bank/accounts/" + accountId))
         .andExpect(status().isOk())
-        .andExpect(view().name("org-unit-bank-account-detail"))
+        .andExpect(view().name("bank/org-unit-bank-account-detail"))
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")))
         .andExpect(content().string(Matchers.containsString("bank-kpis")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-detail-target")))
@@ -642,7 +642,7 @@ class OrgUnitBankPageControllerMvcTest {
         .perform(
             get("/org-unit-bank/accounts/" + accountId).param("fragment", "orgUnitBankSettings"))
         .andExpect(status().isOk())
-        .andExpect(view().name("org-unit-bank-account-detail :: orgUnitBankSettings"));
+        .andExpect(view().name("bank/org-unit-bank-account-detail :: orgUnitBankSettings"));
   }
 
   /**

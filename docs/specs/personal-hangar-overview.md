@@ -93,7 +93,7 @@ without a reload.
 `ShipRepositoryPersonalHangarTest`, `HangarControllerTest`, `HangarPaginationE2eTest` · **Code:**
 `HangarController#getMyShips`, `HangarService#getMyShipsFiltered`,
 `ShipRepository#findByOwnerIdFiltered`, `PaginationUtil#createUnsortedPageRequest`,
-`HangarPageController#viewHangar`, `frontend/src/main/resources/templates/hangar.html`,
+`HangarPageController#viewHangar`, `frontend/src/main/resources/templates/hangar/hangar.html`,
 `frontend/src/main/resources/templates/kernel/fragments/pagination.html` · **Issues:** #773 (performance
 audit item 10), #772 (orders/refinery pagination).
 

@@ -82,7 +82,7 @@ class AdminAuditLogModalRenderMvcTest {
         mockMvc
             .perform(get("/admin/audit-log").param("domain", "BANK"))
             .andExpect(status().isOk())
-            .andExpect(view().name("admin/audit-log"))
+            .andExpect(view().name("audit/admin/audit-log"))
             .andReturn()
             .getResponse()
             .getContentAsString();

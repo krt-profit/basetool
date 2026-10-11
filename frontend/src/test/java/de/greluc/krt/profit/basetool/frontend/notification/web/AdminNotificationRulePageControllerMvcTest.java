@@ -116,7 +116,7 @@ class AdminNotificationRulePageControllerMvcTest {
     mockMvc
         .perform(get("/admin/notification-rules"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/notification-rules"))
+        .andExpect(view().name("notification/admin/notification-rules"))
         .andExpect(model().attribute("eventTypes", AdminNotificationRulePageController.EVENT_TYPES))
         .andExpect(
             model()
@@ -170,7 +170,7 @@ class AdminNotificationRulePageControllerMvcTest {
     mockMvc
         .perform(get("/admin/notification-rules").param("fragment", "rules"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/notification-rules :: rules"))
+        .andExpect(view().name("notification/admin/notification-rules :: rules"))
         .andExpect(content().string(containsString("id=\"rules-table\"")))
         .andExpect(content().string(containsString("seeded bank rule")))
         .andExpect(content().string(not(containsString("id=\"rules-host\""))))
@@ -204,7 +204,7 @@ class AdminNotificationRulePageControllerMvcTest {
     mockMvc
         .perform(get("/admin/notification-rules").param("fragment", "something-else"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/notification-rules"));
+        .andExpect(view().name("notification/admin/notification-rules"));
   }
 
   /**
@@ -220,7 +220,7 @@ class AdminNotificationRulePageControllerMvcTest {
     mockMvc
         .perform(get("/admin/notification-rules").param("fragment", "rules"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/notification-rules :: rules"))
+        .andExpect(view().name("notification/admin/notification-rules :: rules"))
         .andExpect(model().attribute("error", "admin.notificationRules.error.load"))
         .andExpect(model().attribute("rules", List.of()))
         .andExpect(content().string(containsString("class=\"alert alert-danger\"")))

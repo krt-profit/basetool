@@ -4,7 +4,7 @@
 # Unit hangar overview (Org-Einheitsübersicht) — pagination, scope & server-side filter
 
 > The overview lives at `/hangar/squadron` (route unchanged). Since 2026-10-03 it is the second tab
-> **„Org-Einheit <Kürzel>"** of the one hangar page (`hangar.html`, `hangar.tab.unit`; the active
+> **„Org-Einheit <Kürzel>"** of the one hangar page (`hangar/hangar.html`, `hangar.tab.unit`; the active
 > unit's shorthand, or „Org-Einheit" alone when no unit is active); `/hangar` is the first tab
 > „Meine Schiffe" and both routes render the same template with their tab active. Until then it was a
 > page of its own titled „Org-Einheitsübersicht". It spans every org unit the caller can see — not a
@@ -69,10 +69,10 @@ writes; the overview does not tell them apart.
 **Enforced by:** `HangarIntegrationTest`, `HangarControllerTest`, `HangarServiceTest`,
 `HangarPageControllerMvcTest` · **Code:** `HangarController`, `HangarService`,
 `ShipRepository#countShipsByType`, `HangarPageController`,
-`frontend/src/main/resources/templates/hangar.html` · **Issues:** —
+`frontend/src/main/resources/templates/hangar/hangar.html` · **Issues:** —
 
 *Amended 2026-10-03 (website overhaul phase 3):* the overview became the tab „Org-Einheit <Kürzel>" of
-`hangar.html` (`hangar-squadron.html` is gone, `/hangar/squadron` renders `hangar` and swaps its
+`hangar/hangar.html` (`hangar-squadron.html` is gone, `/hangar/squadron` renders `hangar` and swaps its
 `squadronResults` fragment), its rows became a tree with a readiness bar „n von m", and the
 „Details" disclosure and the „Zurück zum Hangar" link are gone (the chevron and the tab bar replace
 them).

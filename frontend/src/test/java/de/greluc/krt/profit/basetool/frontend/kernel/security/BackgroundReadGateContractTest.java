@@ -49,7 +49,7 @@ class BackgroundReadGateContractTest {
   private static final String P4K_MODULE = "/static/js/p4k-import.js";
 
   /** The notification bell + unread-badge module. */
-  private static final String NOTIFICATIONS_MODULE = "/static/js/notifications.js";
+  private static final String NOTIFICATIONS_MODULE = "/static/js/notification/notifications.js";
 
   /** The shared transport module owning {@code krtFetch.get} and {@code window.krtTermsGate}. */
   private static final String KRT_FETCH_MODULE = "/static/js/kernel/krt-fetch.js";
@@ -135,7 +135,7 @@ class BackgroundReadGateContractTest {
   @Test
   void noScriptOrTemplate_issuesARawRequest() throws IOException, URISyntaxException {
     List<Path> scripts = walk(KRT_FETCH_MODULE, ".js");
-    List<Path> templates = walk("/templates/bank-grants.html", ".html");
+    List<Path> templates = walk("/templates/bank/bank-grants.html", ".html");
     assertThat(scripts).as("scripts scanned").hasSizeGreaterThanOrEqualTo(MIN_SCRIPTS);
     assertThat(templates).as("templates scanned").hasSizeGreaterThanOrEqualTo(MIN_TEMPLATES);
 

@@ -112,7 +112,7 @@ class AdminAuditLogPageControllerTest {
 
     String view = controller.auditLog("BANK", null, null, null, null, null, 0, null, model);
 
-    assertEquals("admin/audit-log", view);
+    assertEquals("audit/admin/audit-log", view);
     assertEquals("BANK", model.getAttribute("activeDomain"));
     assertEquals("/api/proxy/audit/BANK/export", model.getAttribute("exportEndpoint"));
     assertEquals("/api/proxy/audit/BANK", model.getAttribute("purgeEndpoint"));
@@ -145,7 +145,7 @@ class AdminAuditLogPageControllerTest {
 
     String view = controller.auditLog("INVENTORY", null, null, null, null, null, 0, null, model);
 
-    assertEquals("admin/audit-log", view);
+    assertEquals("audit/admin/audit-log", view);
     assertEquals("INVENTORY", model.getAttribute("activeDomain"));
     assertEquals("/api/proxy/audit/INVENTORY/export", model.getAttribute("exportEndpoint"));
     assertEquals("/api/proxy/audit/INVENTORY", model.getAttribute("purgeEndpoint"));
@@ -175,7 +175,7 @@ class AdminAuditLogPageControllerTest {
 
     String view = controller.auditLog("PROMOTION", null, null, null, null, null, 0, null, model);
 
-    assertEquals("admin/audit-log", view);
+    assertEquals("audit/admin/audit-log", view);
     assertEquals("PROMOTION", model.getAttribute("activeDomain"));
     assertEquals("/api/proxy/audit/PROMOTION/export", model.getAttribute("exportEndpoint"));
     assertEquals("/api/proxy/audit/PROMOTION", model.getAttribute("purgeEndpoint"));
@@ -224,7 +224,7 @@ class AdminAuditLogPageControllerTest {
     String view =
         controller.auditLog("REFINERY", null, null, null, null, null, 0, "results", model);
 
-    assertEquals("admin/audit-log :: auditResults", view);
+    assertEquals("audit/admin/audit-log :: auditResults", view);
   }
 
   @Test

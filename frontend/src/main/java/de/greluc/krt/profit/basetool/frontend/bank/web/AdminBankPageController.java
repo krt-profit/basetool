@@ -63,7 +63,7 @@ public class AdminBankPageController {
   @NotNull
   @GetMapping("/admin/bank")
   public String bankAdmin() {
-    return "admin/bank";
+    return "bank/admin/bank";
   }
 
   /**

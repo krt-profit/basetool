@@ -205,10 +205,10 @@ the `aria-pressed` toggle and the edit-mode hint) and the Playwright e2e spec
 roving tabindex + arrow-key / Home/End navigation, the modal focus-trap / Esc / focus-return,
 and the horizontal-scroll restoration across a successful edit (`@Tag("e2e")`, so it runs on the
 ephemeral stack and is gated on the `e2e` PR label — see `.github/workflows/e2e.yml`).
-**Code:** `org-chart.html`, `static/js/org-chart.js` (tree-nav + per-Bereich collapse + dialog +
+**Code:** `orgchart/org-chart.html`, `static/js/orgchart/org-chart.js` (tree-nav + per-Bereich collapse + dialog +
 in-place refresh), `org-chart.css`
 (`.oc-fan--bereiche`, `.oc-leader-wrap`, `.oc-collapse`, `.oc-bereich-body`),
-`fragments/org-chart-node.html` (`ocBereich`) · **Issues:** —
+`orgchart/fragments/org-chart-node.html` (`ocBereich`) · **Issues:** —
 
 ### REQ-ORG-026 — Multi-Bereich chart with an Organisationsleitung level, coloured by Bereich
 
@@ -252,8 +252,8 @@ trees, the `oc-dept--profit` tint, the Bereichsleiter hero, the hidden legacy ti
 `createPosition`/`validateCardinality` tests, migrations `V166` (`org_unit.department`) + `V167`
 (widened `chk_org_chart_scope` + per-Bereich `BEREICHSLEITER` unique index) · **Code:**
 `OrgChartReadService#getOrgChart`/`buildBereich`, `OrgUnitRepository#findActiveSquadronsAndSpecialCommands`,
-`OlChartDto`, `BereichChartDto`, `org-chart.html` + `org-chart.js`
-(OL → Bereich connector fan + multi-tree keyboard nav + per-Bereich collapse), `fragments/org-chart-node.html`
+`OlChartDto`, `BereichChartDto`, `orgchart/org-chart.html` + `org-chart.js`
+(OL → Bereich connector fan + multi-tree keyboard nav + per-Bereich collapse), `orgchart/fragments/org-chart-node.html`
 (`ocBereich`, `ocUnitFan`), `org-chart.css` (`oc-dept--*`, `oc-bereich-tier`, `oc-fan--bereiche`,
 `oc-collapse`) · **Issues:** #692, #698.
 
@@ -300,8 +300,8 @@ descriptive label).
 `freeTextCommandLeader_admin_rendersTypedNameAndNoAccountMarker_notVacant`), migration `V171`
 (`display_name` + `chk_org_chart_holder` + widened `chk_org_chart_user`) · **Code:**
 `OrgChartService#createPosition`/`#updatePosition`/`#vacateCommandLeader`,
-`OrgChartPosition#displayName`, `org-chart.html` (free-text holder modal),
-`fragments/org-chart-node.html` (`ocNode` free-text branch + inline Kommandoleiter branch) ·
+`OrgChartPosition#displayName`, `orgchart/org-chart.html` (free-text holder modal),
+`orgchart/fragments/org-chart-node.html` (`ocNode` free-text branch + inline Kommandoleiter branch) ·
 **Issues:** —
 
 > **Amended by epic #800 (REQ-ROLE-006):** the free-text ⇄ account swap is removed — the chart

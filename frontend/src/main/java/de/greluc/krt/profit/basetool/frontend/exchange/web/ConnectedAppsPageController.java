@@ -82,6 +82,8 @@ public class ConnectedAppsPageController {
             .filter(Objects::nonNull)
             .flatMap(List::stream)
             .anyMatch(ConnectedInstallationDto::unseen));
-    return APPS_FRAGMENT.equals(fragment) ? "connected-apps :: " + APPS_FRAGMENT : "connected-apps";
+    return APPS_FRAGMENT.equals(fragment)
+        ? "exchange/connected-apps :: " + APPS_FRAGMENT
+        : "exchange/connected-apps";
   }
 }

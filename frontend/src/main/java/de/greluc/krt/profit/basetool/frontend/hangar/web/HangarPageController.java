@@ -278,9 +278,9 @@ public class HangarPageController {
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions());
 
     if (fragmentOnly) {
-      return "hangar :: hangarResults";
+      return "hangar/hangar :: hangarResults";
     }
-    return "hangar";
+    return "hangar/hangar";
   }
 
   /**
@@ -474,9 +474,9 @@ public class HangarPageController {
     model.addAttribute("mineTabCount", mineCountFuture.join());
     model.addAttribute("unitTabCount", res != null ? Long.valueOf(res.totalElements()) : null);
     if (fragmentOnly) {
-      return "hangar :: squadronResults";
+      return "hangar/hangar :: squadronResults";
     }
-    return "hangar";
+    return "hangar/hangar";
   }
 
   /**

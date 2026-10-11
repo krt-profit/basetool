@@ -60,7 +60,7 @@ class NotificationPreferenceProxyControllerTest {
 
     String view = controller(client).card(model);
 
-    assertEquals("fragments/profile-notification-prefs :: card", view);
+    assertEquals("notification/fragments/profile-notification-prefs :: card", view);
     assertEquals(false, model.getAttribute("notificationPrefsUnavailable"));
     List<NotificationPreferenceGroups.Group> groups =
         (List<NotificationPreferenceGroups.Group>) model.getAttribute("notificationPrefGroups");

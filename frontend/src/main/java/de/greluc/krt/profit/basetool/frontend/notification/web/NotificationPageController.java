@@ -208,7 +208,7 @@ public class NotificationPageController {
       model.addAttribute("notifHasMore", false);
       model.addAttribute("error", "notifications.error.load");
     }
-    return "notifications";
+    return "notification/notifications";
   }
 
   /**

@@ -402,7 +402,7 @@ redirects here with the bank tab preselected.
   backend as a query parameter and survives paging.
 
 **Enforced by:** `AdminAuditLogPageControllerTest`, `AuditLogE2eTest` · **Code:**
-`audit/web/AdminAuditLogPageController`, `templates/admin/audit-log.html`, `static/js/audit-log.js`
+`audit/web/AdminAuditLogPageController`, `templates/audit/admin/audit-log.html`, `static/js/audit/audit-log.js`
 
 ### REQ-AUDIT-003 — Per-area period export (PDF + JSON)
 
@@ -474,7 +474,7 @@ sweep"; that was true when written and is no longer.
 **Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `AuditAdminControllerSecurityTest` ·
 **Code:** `service/AuditService#purgeBefore`, `bank/internal/BankAuditService#purgeBefore`,
 `controller/AuditAdminController`, `bank/web/BankAdminController`, `model/dto/AuditPurgeResultDto`,
-`templates/admin/audit-log.html`, `static/js/audit-log.js` · **Decision:**
+`templates/audit/admin/audit-log.html`, `static/js/audit/audit-log.js` · **Decision:**
 [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md)
 
 ### REQ-AUDIT-005 — The trail records which client a mutation came through
@@ -651,7 +651,7 @@ and swallowed there, so the scheduler thread survives a bad run.
 `service/AuditRetentionService`, `audit/api/RetentionParticipant`, `task/AuditRetentionTask`, `audit/internal/AuditRetentionProperties`, `metrics/ScheduledJob#AUDIT_RETENTION`,
 `repository/AuditEventRepository#existsByDomainAndOccurredAtBefore`,
 `bank/internal/BankAuditService#holdsRowsBefore`,
-`bank/internal/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/admin/audit-log.html` ·
+`bank/internal/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/audit/admin/audit-log.html` ·
 **Decision:** [ADR-0179](../adr/0179-both-audit-trails-are-swept-on-a-retention-ceiling.md),
 amending [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md) ·
 **Record:** [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md)

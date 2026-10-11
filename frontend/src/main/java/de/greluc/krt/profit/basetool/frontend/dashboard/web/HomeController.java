@@ -80,7 +80,7 @@ public class HomeController {
   public String home(
       Model model, @AuthenticationPrincipal OidcUser principal, HttpServletRequest request) {
     if (principal == null) {
-      return "landing";
+      return "dashboard/landing";
     }
     try {
       Instant now = Instant.now();
@@ -157,7 +157,7 @@ public class HomeController {
     } catch (Exception e) {
       log.warn("Unexpected failure building home context", e);
     }
-    return "index";
+    return "dashboard/index";
   }
 
   /**

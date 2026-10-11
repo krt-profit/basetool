@@ -83,7 +83,7 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
     mockMvc
         .perform(get("/bank/manage"))
         .andExpect(status().isOk())
-        .andExpect(view().name("bank-manage"))
+        .andExpect(view().name("bank/bank-manage"))
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM (IRI)")))
         .andExpect(content().string(Matchers.containsString("value=\"" + orgUnitId + "\"")))
         .andExpect(content().string(Matchers.not(Matchers.containsString(">null</option>"))));

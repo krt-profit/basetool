@@ -736,7 +736,7 @@ dispatcher for every mapping it knows and fails when a variable-free `GET` route
 in `check`, not in the stack-bound `e2e` suite) + code/design
 review for the rest · **Code:** `static/css/kernel/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
 `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
-`static/css/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personal-inventory.css`
+`static/css/bank/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personal-inventory.css`
 (`.master-row`), `static/css/promotion-admin.css` (`.pa-sort-btn`), `static/js/kernel/sidebar.js`
 (`--krt-footer-height`).
 
@@ -986,7 +986,7 @@ band already is. The band therefore shows **three** coupled elements, not two.
 > `REQ-APP-SET-007` (`docs/specs/settings.md` in the `basetool-android` repository).
 
 Section 2b accepts three placements on a website — the home page, an always-visible navigation
-area, or both. The Basetool uses the **home page**: the band renders at the end of `index.html`'s
+area, or both. The Basetool uses the **home page**: the band renders at the end of `dashboard/index.html`'s
 `<main>`.
 
 It deliberately no longer sits in the global footer. As a full-width first row it cost every page a
@@ -1047,7 +1047,7 @@ Binding details:
 
 **Enforced by:** `FanKitComplianceMvcTest` · design review against the Fan Kit Guidelines and the
 Fankit Agreement ·
-**Code:** `shell/fragments/fankit.html`, `index.html`, `.krt-fankit-*` in `styles.css`,
+**Code:** `shell/fragments/fankit.html`, `dashboard/index.html`, `.krt-fankit-*` in `styles.css`,
 `fankit.*` in the three message bundles · **Related:** REQ-UI-009.
 
 ### REQ-UI-019 — The app wears the Basetool mark; the org mark stays on org surfaces

@@ -73,33 +73,33 @@ class AssetReferenceResolutionTest {
 
   @Test
   void aLinkToAMissingAssetIsReported(@TempDir Path root) throws IOException {
-    write(root.resolve("static/js/bank/bank.js"));
-    write(root.resolve("static/css/pages/bank/grants.css"));
+    write(root.resolve("static/js/bank/planted.js"));
+    write(root.resolve("static/css/pages/bank/planted.css"));
     List<Reference> references =
         List.of(
-            new Reference("bank/page.html", "/js/bank/bank.js"),
-            new Reference("bank/page.html", "/js/bank.js"),
-            new Reference("bank/page.html", "/css/pages/grants.css"),
-            new Reference("bank/page.html", "/css/pages/bank/grants.css"),
+            new Reference("bank/page.html", "/js/bank/planted.js"),
+            new Reference("bank/page.html", "/js/planted.js"),
+            new Reference("bank/page.html", "/css/pages/planted.css"),
+            new Reference("bank/page.html", "/css/pages/bank/planted.css"),
             new Reference("bank/page.html", "/js/${name}.js"),
             new Reference("bank/page.html", "/elsewhere/x.js"));
 
     assertThat(unresolved(references, root))
         .containsExactly(
-            "bank/page.html: /js/bank.js",
-            "bank/page.html: /css/pages/grants.css",
+            "bank/page.html: /js/planted.js",
+            "bank/page.html: /css/pages/planted.css",
             "bank/page.html: /js/${name}.js",
             "bank/page.html: /elsewhere/x.js");
   }
 
   @Test
   void anAssetNoTemplateLinksIsReported(@TempDir Path root) throws IOException {
-    write(root.resolve("static/js/bank/bank.js"));
-    write(root.resolve("static/js/bank/forgotten.js"));
-    write(root.resolve("static/css/pages/bank/forgotten.css"));
+    write(root.resolve("static/js/bank/planted.js"));
+    write(root.resolve("static/js/bank/unlinked.js"));
+    write(root.resolve("static/css/pages/bank/unlinked.css"));
 
-    assertThat(orphans(root, Set.of("/js/bank/bank.js")))
-        .containsExactly("/css/pages/bank/forgotten.css", "/js/bank/forgotten.js");
+    assertThat(orphans(root, Set.of("/js/bank/planted.js")))
+        .containsExactly("/css/pages/bank/unlinked.css", "/js/bank/unlinked.js");
   }
 
   @Test

@@ -630,11 +630,11 @@ swap with no navigation request). **Issues:** the epic children
 `krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `kernel/fragments/pagination.html`,
 `mission-detail.html`,
 `orders-index.html`, `orders-detail.html`, `refinery-orders-create.html`, `datetime-splitter.js`,
-`hangar.html`, `ship-data.html`, `personal-inventory.html`, `personal-inventory-blueprints.html`,
-`personal-inventory*.js`, `bank.js`, `bank-account-detail.html`, `bank-manage.html`,
-`bank-grants.html`, `promotion-admin-topics.html`, `promotion-admin-rank-requirements.html`,
-`promotion-manage.html`, `org-chart.html`, `members.html`, `member-edit.html`, `profile.html`,
-`index.html`, and the #582 admin pages — `announcement.html`, `sync-reports.html`, `locations.html`,
+`hangar/hangar.html`, `ship-data.html`, `personal-inventory.html`, `personal-inventory-blueprints.html`,
+`personal-inventory*.js`, `bank.js`, `bank/bank-account-detail.html`, `bank/bank-manage.html`,
+`bank/bank-grants.html`, `promotion-admin-topics.html`, `promotion-admin-rank-requirements.html`,
+`promotion-manage.html`, `orgchart/org-chart.html`, `members.html`, `member-edit.html`, `profile.html`,
+`dashboard/index.html`, and the #582 admin pages — `announcement.html`, `sync-reports.html`, `locations.html`,
 `materials.html`, `material-aliases.html`, `settings/admin-settings.html`, `uex.html`,
 `fragments/admin-uex.html`, `mission-data.html`, `special-commands.html`,
 `special-command-detail.html`, `p4k-import.js` — over `JobOrderPageController`,
@@ -1778,9 +1778,9 @@ active/name-sorted + unwraps content), `BankPageControllerTest` / `BankGrantsPag
 account roster preloaded; the grants filter seeds only the selected account) · **Code:**
 `krt-bank-account-search.js` (the `remote-bank-accounts` `krtComboboxRemoteSources` entry +
 `window.krtBankAccountMeta`), `krt-searchable-select.js` (the marker→`remoteSource` lookup, reused),
-`static/js/bank.js` (attribute-delegated source/filter handlers, metadata-map justification),
-`bank/web/BankProxyController#searchAccounts`, `templates/fragments/bank-movement-modal.html`,
-`templates/bank-grants.html`, `kernel/fragments/head.html` (script load order) · **ADR:** ADR-0053, ADR-0089,
+`static/js/bank/bank.js` (attribute-delegated source/filter handlers, metadata-map justification),
+`bank/web/BankProxyController#searchAccounts`, `templates/bank/fragments/bank-movement-modal.html`,
+`templates/bank/bank-grants.html`, `kernel/fragments/head.html` (script load order) · **ADR:** ADR-0053, ADR-0089,
 ADR-0106 · **Issues:** —
 
 ### REQ-FE-018 — The browser scripts are type-checked, and the DTO types are generated from the OpenAPI spec

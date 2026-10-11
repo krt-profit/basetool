@@ -273,8 +273,8 @@ public class AdminNotificationRulePageController {
     model.addAttribute("contextRoles", CONTEXT_ROLES);
     model.addAttribute("roleCodes", ROLE_CODES);
     return RULES_FRAGMENT.equals(fragment)
-        ? "admin/notification-rules :: " + RULES_FRAGMENT
-        : "admin/notification-rules";
+        ? "notification/admin/notification-rules :: " + RULES_FRAGMENT
+        : "notification/admin/notification-rules";
   }
 
   /**

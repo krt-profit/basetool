@@ -41,7 +41,7 @@ import org.junit.jupiter.api.Test;
 class NotificationStreamReconnectContractTest {
 
   /** The notification bell + unread-badge module. */
-  private static final String NOTIFICATIONS_MODULE = "/static/js/notifications.js";
+  private static final String NOTIFICATIONS_MODULE = "/static/js/notification/notifications.js";
 
   /** The gate-aware reader, from its declaration to its non-OK bail-out. */
   private static final Pattern READER_UP_TO_NOT_OK =

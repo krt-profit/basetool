@@ -464,9 +464,9 @@ public class AdminAuditLogPageController {
     model.addAttribute("exportEndpoint", "/api/proxy/audit/" + activeDomain + "/export");
     model.addAttribute("purgeEndpoint", "/api/proxy/audit/" + activeDomain);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
-      return "admin/audit-log :: auditResults";
+      return "audit/admin/audit-log :: auditResults";
     }
-    return "admin/audit-log";
+    return "audit/admin/audit-log";
   }
 
   /**

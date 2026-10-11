@@ -1,18 +1,18 @@
 {
   "domains": {
     "audit": [
-      "audit-log.js"
+      "audit/audit-log.js"
     ],
     "bank": [
-      "bank-account-detail.js",
-      "bank-grants-chart-prefs.js",
-      "bank-grants.js",
-      "bank-holder-detail.js",
-      "bank-layout-prefs.js",
-      "bank-manage.js",
-      "bank-requests.js",
-      "bank.js",
-      "org-unit-bank.js"
+      "bank/bank-account-detail.js",
+      "bank/bank-grants-chart-prefs.js",
+      "bank/bank-grants.js",
+      "bank/bank-holder-detail.js",
+      "bank/bank-layout-prefs.js",
+      "bank/bank-manage.js",
+      "bank/bank-requests.js",
+      "bank/bank.js",
+      "bank/org-unit-bank.js"
     ],
     "blueprint": [
       "admin-blueprints.js",
@@ -35,17 +35,17 @@
       "uex.js"
     ],
     "dashboard": [
-      "announcement.js",
-      "index.js"
+      "dashboard/announcement.js",
+      "dashboard/index.js"
     ],
     "exchange": [
-      "admin-exchange-clients.js",
-      "connected-apps-confirm.js",
-      "connected-apps.js"
+      "exchange/admin-exchange-clients.js",
+      "exchange/connected-apps-confirm.js",
+      "exchange/connected-apps.js"
     ],
     "hangar": [
-      "hangar-squadron.js",
-      "hangar.js"
+      "hangar/hangar-squadron.js",
+      "hangar/hangar.js"
     ],
     "identity": [
       "admin-deletion-requests.js",
@@ -129,9 +129,9 @@
       "missions.js"
     ],
     "notification": [
-      "notification-rules.js",
-      "notifications-page.js",
-      "notifications.js"
+      "notification/notification-rules.js",
+      "notification/notifications-page.js",
+      "notification/notifications.js"
     ],
     "operation": [
       "operation-detail.js",
@@ -139,7 +139,7 @@
       "operations.js"
     ],
     "orgchart": [
-      "org-chart.js"
+      "orgchart/org-chart.js"
     ],
     "orgunit": [
       "admin-org-structure.js",

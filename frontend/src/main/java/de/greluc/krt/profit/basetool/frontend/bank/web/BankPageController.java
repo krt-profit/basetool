@@ -101,14 +101,14 @@ public class BankPageController {
             : List.of());
     model.addAttribute("now", Instant.now().toString());
     if ("bankGrid".equals(fragment)) {
-      return "bank-dashboard :: bankGrid";
+      return "bank/bank-dashboard :: bankGrid";
     }
     boolean canBook =
         dashboard != null
             && dashboard.accounts() != null
             && dashboard.accounts().stream().anyMatch(a -> "ACTIVE".equals(a.status()));
     addMovementModalData(model, canBook);
-    return "bank-dashboard";
+    return "bank/bank-dashboard";
   }
 
   /**
@@ -186,9 +186,9 @@ public class BankPageController {
         "allOrgUnits", allOrgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : allOrgUnits);
     model.addAttribute("transferFeeRate", fetchTransferFeeRate());
     if ("accountBody".equals(fragment)) {
-      return "bank-account-detail :: accountBody";
+      return "bank/bank-account-detail :: accountBody";
     }
-    return "bank-account-detail";
+    return "bank/bank-account-detail";
   }
 
   /**
@@ -207,7 +207,7 @@ public class BankPageController {
   private String bookingsFragment(
       UUID id, Integer page, Integer size, String from, String to, Model model) {
     addBookingsModel(id, page, size, from, to, model);
-    return "bank-account-detail :: bookings";
+    return "bank/bank-account-detail :: bookings";
   }
 
   /**
@@ -228,7 +228,7 @@ public class BankPageController {
       log.warn("Error loading account {} for balance-chart fragment", id, e);
     }
     addChartModel(id, chartRange, detail, model);
-    return "bank-account-detail :: balanceChart";
+    return "bank/bank-account-detail :: balanceChart";
   }
 
   /**
@@ -383,7 +383,7 @@ public class BankPageController {
     model.addAttribute("holder", holder);
     model.addAttribute("bookings", bookings);
     model.addAttribute("paginationBaseUrl", "/bank/holders/" + id);
-    return "bank-holder-detail";
+    return "bank/bank-holder-detail";
   }
 
   /**
@@ -410,7 +410,7 @@ public class BankPageController {
     }
     model.addAttribute("bookings", bookings);
     model.addAttribute("paginationBaseUrl", "/bank/holders/" + id);
-    return "bank-holder-detail :: holderBookings";
+    return "bank/bank-holder-detail :: holderBookings";
   }
 
   /**

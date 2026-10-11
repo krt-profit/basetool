@@ -97,7 +97,7 @@ class BankGrantsPageControllerTest {
 
     String view = controller.grants(null, accountId, null, null, model);
 
-    assertEquals("bank-grants", view);
+    assertEquals("bank/bank-grants", view);
     assertEquals(Boolean.FALSE, model.getAttribute("byEmployee"));
     BankAccountDto selected = (BankAccountDto) model.getAttribute("selectedAccount");
     assertNotNull(selected);
@@ -148,7 +148,7 @@ class BankGrantsPageControllerTest {
 
     String view = controller.grants(null, accountId, null, "grantsMatrix", model);
 
-    assertEquals("bank-grants :: grantsMatrix", view);
+    assertEquals("bank/bank-grants :: grantsMatrix", view);
     List<BankGrantDto> grants = (List<BankGrantDto>) model.getAttribute("grants");
     assertNotNull(grants);
     assertEquals(1, grants.size());

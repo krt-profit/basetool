@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{bank.dashboard.title} + ' - ' + ${appTitle}">Kartellbank - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank/bank.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/bank/bank-dashboard.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-approval-request-filed=#{bank.movement.approvalRequestFiled},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey=${dashboard == null ? 'nav.section.bank' : (dashboard.management() ? 'bank.dashboard.subtitle.management(' + #lists.size(dashboard.accounts()) + ')' : 'bank.dashboard.subtitle.employee(' + #lists.size(dashboard.accounts()) + ')')}, titleText=#{bank.dashboard.title}, actions=~{::bank-dashboard-actions})}">
+        <th:block th:ref="bank-dashboard-actions">
+            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).BANK_MANAGEMENT)">
+                <button type="button" class="btn btn-ghost bank-download-btn"
+                        data-download-url="/api/proxy/bank/export/three-month-report"
+                        data-filename="bank-3-monats-report.pdf"
+                        data-testid="bank-report-download">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
+                    <span th:text="#{bank.dashboard.report}">3-Monats-Report</span>
+                </button>
+            </th:block>
+            <button type="button" class="btn btn--cta" th:if="${canBook}"
+                    data-trigger="open-modal-display" data-modal-id="bank-movement-modal"
+                    data-testid="bank-movement-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
+                <span th:text="#{bank.action.movement}">Kontobewegung</span>
+            </button>
+        </th:block>
+    </th:block>
+
+    <div class="toolbar" th:if="${!#lists.isEmpty(cards)}">
+        <th:block th:replace="~{kernel/fragments/components :: bankAccSearch('bank-acc-filter', '#bank-grid-results', '#bank-acc-filter-empty')}"></th:block>
+        <div class="bank-view-toggles" role="group" data-bank-view-toggles
+             th:aria-label="#{bank.dashboard.view.aria}">
+            <label class="switch" for="bank-view-layout">
+                <input type="checkbox" id="bank-view-layout" data-bank-view-layout data-testid="bank-view-layout"
+                       th:checked="${layout == 'table'}">
+                <span class="switch__track" aria-hidden="true"></span>
+                <span th:text="#{bank.dashboard.view.tableToggle}">Tabellenansicht</span>
+            </label>
+            <label class="switch" for="bank-view-group">
+                <input type="checkbox" id="bank-view-group" data-bank-view-group data-testid="bank-view-group"
+                       th:checked="${group == 'bereich'}">
+                <span class="switch__track" aria-hidden="true"></span>
+                <span th:text="#{bank.dashboard.view.groupToggle}">Nach Bereich gruppieren</span>
+            </label>
+        </div>
+        <span class="toolbar__spacer"></span>
+        <span class="toolbar__count">
+            <span th:text="#{bank.dashboard.asOf}">Stand</span>
+            <span class="utc-time" th:text="${now}">2026-06-12T14:02:00Z</span>
+        </span>
+    </div>
+
+    <div class="bank-totals" th:if="${dashboard != null and dashboard.totals() != null}"
+         data-testid="bank-totals">
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.dashboard.totals.balance}">Gesamtsaldo</div>
+            <div class="kpi-value"
+                 th:text="${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().totalBalance()), 1, 'POINT')} + ' aUEC'">4.812.500 aUEC</div>
+        </div>
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.dashboard.totals.inflow}">Eing&auml;nge 30 T</div>
+            <div class="kpi-value bank-amount--pos"
+                 th:text="'+' + ${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().inflow30d()), 1, 'POINT')}">+1.240.000</div>
+        </div>
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.dashboard.totals.outflow}">Ausg&auml;nge 30 T</div>
+            <div class="kpi-value bank-amount--neg"
+                 th:text="${#numbers.formatInteger(@moneyFormat.round(dashboard.totals().outflow30d()), 1, 'POINT')}">-385.000</div>
+        </div>
+        <div class="kpi-total">
+            <div class="kpi-label" th:text="#{bank.dashboard.totals.accounts}">Aktive Konten</div>
+            <div class="kpi-value"
+                 th:text="${dashboard.totals().activeAccounts()} + ' / ' + ${dashboard.totals().closedAccounts()} + ' ' + #{bank.dashboard.totals.closed}">7 / 1 geschlossen</div>
+        </div>
+    </div>
+
+    <div id="bank-grid-results" th:fragment="bankGrid">
+        <th:block th:if="${!#lists.isEmpty(cards)}">
+            <th:block th:if="${group != 'bereich'}">
+                <th:block th:if="${layout == 'table'}">
+                    <th:block th:replace="~{bank/fragments/bank-account-views :: accTable(${cards})}"></th:block>
+                </th:block>
+                <th:block th:unless="${layout == 'table'}">
+                    <th:block th:replace="~{bank/fragments/bank-account-views :: accGrid(${cards})}"></th:block>
+                </th:block>
+            </th:block>
+            <th:block th:if="${group == 'bereich'}">
+                <th:block th:each="grp : ${groups}">
+                    <th:block th:replace="~{bank/fragments/bank-account-views :: accGroup(${grp}, ${layout})}"></th:block>
+                </th:block>
+            </th:block>
+            <div id="bank-acc-filter-empty" class="empty-state mt-2" hidden>
+                <div class="empty-text" th:text="#{bank.filter.empty}">Keine Konten passen zum Filter.</div>
+            </div>
+        </th:block>
+
+        <th:block th:if="${#lists.isEmpty(cards)}">
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='bank.dashboard.empty.title', textKey='bank.dashboard.empty', emptyId='bank-dashboard-empty')}"></th:block>
+        </th:block>
+    </div>
+
+    <th:block th:if="${canBook}">
+        <th:block th:replace="~{bank/fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'bankGrid', null, true, false, true, true, true)}"></th:block>
+    </th:block>
+</main>
+</th:block>
+<th:block th:fragment="pageTail">
+<script th:src="@{/js/bank/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/bank/bank-layout-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/bank/bank-grants-chart-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

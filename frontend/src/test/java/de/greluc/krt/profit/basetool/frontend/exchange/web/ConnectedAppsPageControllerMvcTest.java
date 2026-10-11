@@ -117,7 +117,7 @@ class ConnectedAppsPageControllerMvcTest {
     mockMvc
         .perform(get("/connected-apps"))
         .andExpect(status().isOk())
-        .andExpect(view().name("connected-apps"))
+        .andExpect(view().name("exchange/connected-apps"))
         .andExpect(content().string(containsString("id=\"ca-host\"")))
         .andExpect(content().string(containsString("data-client-id=\"versekit\"")))
         .andExpect(content().string(containsString("VerseKit – „Basetool-Support &lt;b&gt;")))
@@ -225,7 +225,7 @@ class ConnectedAppsPageControllerMvcTest {
     mockMvc
         .perform(get("/connected-apps").param("fragment", "apps"))
         .andExpect(status().isOk())
-        .andExpect(view().name("connected-apps :: apps"))
+        .andExpect(view().name("exchange/connected-apps :: apps"))
         .andExpect(content().string(containsString("data-client-id=\"versekit\"")))
         .andExpect(content().string(not(containsString("id=\"ca-host\""))));
   }

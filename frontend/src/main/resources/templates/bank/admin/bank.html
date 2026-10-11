@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<head>
+    <title th:text="#{admin.bank.title} + ' - ' + ${appTitle}">Bank-Administration - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.admin.group.bank', titleText=#{admin.bank.title})}"></th:block>
+
+    <div th:if="${wipeResult != null}" class="alert alert-success" role="status" data-testid="bank-wipe-success"
+         th:text="#{admin.bank.wipe.success(${wipeResult.accountsReset()}, ${wipeResult.holderStashesZeroed()})}">
+        5 Konten und 12 Halter-Best&auml;nde auf 0 gesetzt.</div>
+    <div th:if="${wipeNoop != null}" class="alert alert-info" role="status" data-testid="bank-wipe-noop"
+         th:text="#{admin.bank.wipe.noop}">Alle Salden waren bereits 0 — nichts zu tun.</div>
+    <div th:if="${error != null}" class="alert alert-danger" role="alert" data-testid="bank-wipe-error"
+         th:text="#{${error}}">Fehler.</div>
+
+    <div class="bank-danger-card" data-testid="bank-wipe-card">
+        <div class="bank-danger-head">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-reset"/></svg>
+            <h2 th:text="#{admin.bank.wipe.title}">Wipe-Reset</h2>
+        </div>
+        <p th:text="#{admin.bank.wipe.text}">Setzt nach einem Star-Citizen-Wipe alle Kontosalden und Halter-Best&auml;nde der gesamten Kartellbank auf 0. Die Aktion ist nicht umkehrbar; das Hauptbuch beh&auml;lt die historischen Buchungen, erg&auml;nzt um eine WIPE_RESET-Gegenbuchung je Bestand.</p>
+        <button type="button" class="btn btn-danger" data-trigger="open-modal-display"
+                data-modal-id="bank-wipe-modal" data-testid="bank-wipe-open"
+                th:text="#{admin.bank.wipe.button}">Wipe-Reset ausf&uuml;hren</button>
+    </div>
+
+    <div th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-wipe-modal', titleKey='admin.bank.wipe.modal.title', variant='krt-modal--danger', body=~{::.bank-wipe-form})}">
+            <form method="post" th:action="@{/admin/bank/wipe-reset}" class="no-track bank-wipe-form" data-bank-wipe
+                  th:data-wipe-success="#{admin.bank.wipe.success}"
+                  th:data-wipe-noop="#{admin.bank.wipe.noop}"
+                  th:data-wipe-error="#{admin.bank.wipe.error.failed}">
+                <div class="krt-modal-body">
+                    <p th:text="#{admin.bank.wipe.modal.text}">Diese Aktion setzt die gesamte Kartellbank auf 0. Tippe WIPE, um zu best&auml;tigen.</p>
+                    <div class="bank-form-row">
+                        <label for="bank-wipe-confirm" th:text="#{admin.bank.wipe.modal.label}">Best&auml;tigung</label>
+                        <input type="text" id="bank-wipe-confirm" name="confirm" class="confirm-input"
+                               autocomplete="off" data-confirm-token="WIPE"
+                               data-confirm-submit="bank-wipe-submit"
+                               data-testid="bank-wipe-confirm" placeholder="WIPE">
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-wipe-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger" id="bank-wipe-submit"
+                            data-testid="bank-wipe-submit" disabled
+                            th:text="#{admin.bank.wipe.button}">Wipe-Reset ausf&uuml;hren</button>
+                </div>
+            </form>
+    </div>
+</main>
+
+<script th:src="@{/js/bank/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/bank/bank-layout-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/bank/bank-grants-chart-prefs.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

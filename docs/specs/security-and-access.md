@@ -4065,7 +4065,7 @@ REQ-FE-025) ·
 `ApiVhostAnonymousSurfaceTest` and the nightly `edge-deny-probe.yml` (the same statuses from outside
 the host) · **Code:** `backend/…/config/SecurityConfig`, `frontend/…/kernel/security/SecurityConfig`,
 `frontend/…/dashboard/web/HomeController`, `frontend/…/kernel/layout/SafeCsrfAdvice`,
-`templates/landing.html` · **ADR:**
+`templates/dashboard/landing.html` · **ADR:**
 [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
 
 ---

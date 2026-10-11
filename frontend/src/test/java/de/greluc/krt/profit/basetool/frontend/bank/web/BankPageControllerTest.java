@@ -137,7 +137,7 @@ class BankPageControllerTest {
 
     String view = controller.dashboard(null, null, null, model);
 
-    assertEquals("bank-dashboard", view);
+    assertEquals("bank/bank-dashboard", view);
     List<BankDashboardViewAssembler.BankDashboardCardView> cards =
         (List<BankDashboardViewAssembler.BankDashboardCardView>) model.getAttribute("cards");
     assertNotNull(cards);
@@ -235,7 +235,7 @@ class BankPageControllerTest {
 
     String view = controller.dashboard("card", "bereich", null, model);
 
-    assertEquals("bank-dashboard", view);
+    assertEquals("bank/bank-dashboard", view);
     assertEquals("bereich", model.getAttribute("group"));
     List<BankDashboardViewAssembler.BankDashboardGroupView> groups =
         (List<BankDashboardViewAssembler.BankDashboardGroupView>) model.getAttribute("groups");
@@ -264,7 +264,7 @@ class BankPageControllerTest {
 
     String view = controller.dashboard("table", "alpha", "bankGrid", model);
 
-    assertEquals("bank-dashboard :: bankGrid", view);
+    assertEquals("bank/bank-dashboard :: bankGrid", view);
     assertEquals("table", model.getAttribute("layout"));
     assertEquals("alpha", model.getAttribute("group"));
     assertEquals(List.of(), model.getAttribute("groups"));
@@ -316,7 +316,7 @@ class BankPageControllerTest {
 
     String view = controller.accountDetail(accountId, null, null, null, null, null, null, model);
 
-    assertEquals("bank-account-detail", view);
+    assertEquals("bank/bank-account-detail", view);
     assertNull(
         model.getAttribute("transferTargets"),
         "no transfer-target roster is preloaded — the picker searches on demand");
@@ -386,7 +386,7 @@ class BankPageControllerTest {
 
     String view = controller.accountDetail(accountId, 2, null, null, null, null, "bookings", model);
 
-    assertEquals("bank-account-detail :: bookings", view);
+    assertEquals("bank/bank-account-detail :: bookings", view);
     assertEquals(bookings, model.getAttribute("bookings"));
     assertTrue(
         model
@@ -437,7 +437,7 @@ class BankPageControllerTest {
     String view =
         controller.accountDetail(accountId, null, null, null, null, null, "accountBody", model);
 
-    assertEquals("bank-account-detail :: accountBody", view);
+    assertEquals("bank/bank-account-detail :: accountBody", view);
     assertNotNull(model.getAttribute("detail"));
     assertNotNull(model.getAttribute("activeHolders"));
     assertNotNull(model.getAttribute("holders"));
@@ -464,7 +464,7 @@ class BankPageControllerTest {
 
     String view = controller.holderDetail(holderId, null, null, model);
 
-    assertEquals("bank-holder-detail", view);
+    assertEquals("bank/bank-holder-detail", view);
     assertEquals(holder, model.getAttribute("holder"));
     assertEquals(bookings, model.getAttribute("bookings"));
     assertEquals("/bank/holders/" + holderId, model.getAttribute("paginationBaseUrl"));
@@ -483,7 +483,7 @@ class BankPageControllerTest {
 
     String view = controller.holderDetail(holderId, 2, "holderBookings", model);
 
-    assertEquals("bank-holder-detail :: holderBookings", view);
+    assertEquals("bank/bank-holder-detail :: holderBookings", view);
     assertEquals(bookings, model.getAttribute("bookings"));
     assertEquals("/bank/holders/" + holderId, model.getAttribute("paginationBaseUrl"));
     verify(backendApiClient, never())

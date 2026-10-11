@@ -76,7 +76,7 @@ class OrgChartPageControllerTest {
 
     String view = controller.orgChart(null, model);
 
-    assertEquals("org-chart", view);
+    assertEquals("orgchart/org-chart", view);
     assertSame(chart, model.getAttribute("orgChart"));
     verify(backend, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
@@ -92,7 +92,7 @@ class OrgChartPageControllerTest {
 
     String view = controller.orgChart(null, model);
 
-    assertEquals("org-chart", view);
+    assertEquals("orgchart/org-chart", view);
     assertEquals("error.orgChart.load", model.getAttribute("error"));
   }
 
@@ -107,7 +107,7 @@ class OrgChartPageControllerTest {
 
     String view = controller.orgChart("chartBody", model);
 
-    assertEquals("org-chart :: chartBody", view);
+    assertEquals("orgchart/org-chart :: chartBody", view);
     assertSame(chart, model.getAttribute("orgChart"));
   }
 

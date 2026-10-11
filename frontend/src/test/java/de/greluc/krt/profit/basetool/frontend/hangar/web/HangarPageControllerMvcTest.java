@@ -90,7 +90,10 @@ class HangarPageControllerMvcTest {
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS), anyTypeRef()))
         .thenReturn(locations);
 
-    mockMvc.perform(get("/hangar")).andExpect(status().isOk()).andExpect(view().name("hangar"));
+    mockMvc
+        .perform(get("/hangar"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("hangar/hangar"));
   }
 
   @Test
@@ -128,7 +131,7 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar"))
+        .andExpect(view().name("hangar/hangar"))
         .andExpect(content().string(containsString("id=\"hangar-filter-form\"")))
         .andExpect(content().string(containsString("id=\"hangar-ship-filter\"")))
         .andExpect(content().string(containsString("name=\"search\"")))
@@ -156,7 +159,7 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar"))
+        .andExpect(view().name("hangar/hangar"))
         .andExpect(content().string(containsString("id=\"set-home-location-btn\"")))
         .andExpect(content().string(containsString("id=\"home-location-modal\"")))
         .andExpect(content().string(containsString("Orison")));
@@ -179,7 +182,7 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar").param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar :: hangarResults"))
+        .andExpect(view().name("hangar/hangar :: hangarResults"))
         .andExpect(content().string(containsString("data-testid=\"hangar-ship-row\"")))
         .andExpect(content().string(containsString("id=\"hangar-stats\"")))
         .andExpect(
@@ -213,7 +216,7 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar/squadron"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar"))
+        .andExpect(view().name("hangar/hangar"))
         .andExpect(content().string(containsString("id=\"squadron-filter-form\"")))
         .andExpect(content().string(containsString("id=\"squadron-ship-filter\"")))
         .andExpect(content().string(containsString("page-size-picker")))
@@ -237,7 +240,7 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar/squadron").param("fragment", "results"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar :: squadronResults"))
+        .andExpect(view().name("hangar/hangar :: squadronResults"))
         .andExpect(content().string(containsString("data-testid=\"squadron-type-row\"")))
         .andExpect(
             content()
@@ -258,7 +261,7 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar/squadron").param("size", "5000"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar"));
+        .andExpect(view().name("hangar/hangar"));
   }
 
   @Test
@@ -275,7 +278,7 @@ class HangarPageControllerMvcTest {
     mockMvc
         .perform(get("/hangar/squadron").param("search", "Cutlass"))
         .andExpect(status().isOk())
-        .andExpect(view().name("hangar"))
+        .andExpect(view().name("hangar/hangar"))
         .andExpect(
             content()
                 .string(containsString("/hangar/squadron?search=Cutlass&amp;page=0&amp;size=10")))

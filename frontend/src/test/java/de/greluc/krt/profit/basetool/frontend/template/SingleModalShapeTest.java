@@ -303,7 +303,7 @@ class SingleModalShapeTest {
    * @throws URISyntaxException if the classpath root cannot be resolved
    */
   private static List<Path> templates() throws IOException, URISyntaxException {
-    return filesUnder("/templates/bank-grants.html", ".html");
+    return filesUnder("/templates/bank/bank-grants.html", ".html");
   }
 
   /**

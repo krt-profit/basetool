@@ -102,7 +102,7 @@ class StaticResourcesCachingTest {
   @Test
   void pageStylesheet_ShouldBePublicAndImmutable() throws Exception {
     for (String resource :
-        new String[] {"/css/pages/shell/error-404.css", "/css/pages/hangar.css"}) {
+        new String[] {"/css/pages/shell/error-404.css", "/css/pages/hangar/hangar.css"}) {
       mockMvc
           .perform(get(resource))
           .andExpect(status().isOk())

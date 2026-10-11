@@ -110,7 +110,7 @@ class AdminBankPageControllerTest {
 
   @Test
   void bankAdmin_returnsView() {
-    assertEquals("admin/bank", controller.bankAdmin());
+    assertEquals("bank/admin/bank", controller.bankAdmin());
   }
 
   @Test

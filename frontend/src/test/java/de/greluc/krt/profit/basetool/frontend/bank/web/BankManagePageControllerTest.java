@@ -118,7 +118,7 @@ class BankManagePageControllerTest {
         controller.manage(
             null, null, null, null, management(), oidcUser(UUID.randomUUID().toString()), model);
 
-    assertEquals("bank-manage", view);
+    assertEquals("bank/bank-manage", view);
     assertEquals("halter", model.getAttribute("activeTab"));
     assertNull(model.getAttribute("transferFeeRate"));
     List<BankAccountDto> accounts = (List<BankAccountDto>) model.getAttribute("accounts");
@@ -197,7 +197,7 @@ class BankManagePageControllerTest {
             oidcUser(UUID.randomUUID().toString()),
             model);
 
-    assertEquals("bank-manage", view);
+    assertEquals("bank/bank-manage", view);
     assertEquals("halter", model.getAttribute("activeTab"));
     assertEquals(List.of(), model.getAttribute("accounts"));
     assertEquals(0L, model.getAttribute("accountCount"));
@@ -225,7 +225,7 @@ class BankManagePageControllerTest {
             oidcUser(UUID.randomUUID().toString()),
             model);
 
-    assertEquals("bank-manage :: manageBody", view);
+    assertEquals("bank/bank-manage :: manageBody", view);
     assertEquals("halter", model.getAttribute("activeTab"));
     assertNotNull(model.getAttribute("accounts"));
     assertNotNull(model.getAttribute("holders"));
