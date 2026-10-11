@@ -89,11 +89,12 @@ class MaterialgesuchPageControllerMvcTest {
   private void stubBoard(MaterialRequestDto request) {
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(0, 0));
-    when(backendApiClient.get(contains("/material-requests/counts"), anyClass()))
+    when(backendApiClient.get(contains("/material-exchange/requests/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
-    when(backendApiClient.get(contains("/material-requests?"), anyTypeRef()))
+    when(backendApiClient.get(contains("/material-exchange/requests?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of()));
-    when(backendApiClient.get(eq("/api/v1/material-requests/{id}"), anyClass(), eq(request.id())))
+    when(backendApiClient.get(
+            eq("/api/v1/material-exchange/requests/{id}"), anyClass(), eq(request.id())))
         .thenReturn(request);
   }
 
@@ -225,7 +226,7 @@ class MaterialgesuchPageControllerMvcTest {
   void createRequestProxy_forwardsToBackend() throws Exception {
     UUID materialId = UUID.fromString("7b1e2c3d-4a5f-4e6d-8c7b-9a0f1e2d3c4b");
     when(backendApiClient.post(
-            eq("/api/v1/material-requests"), any(), eq(MaterialRequestDto.class)))
+            eq("/api/v1/material-exchange/requests"), any(), eq(MaterialRequestDto.class)))
         .thenReturn(materialRequest());
 
     mockMvc
@@ -240,7 +241,7 @@ class MaterialgesuchPageControllerMvcTest {
 
     verify(backendApiClient)
         .post(
-            eq("/api/v1/material-requests"),
+            eq("/api/v1/material-exchange/requests"),
             eq(new MaterialRequestCreateRequest(materialId, null, 5.0, null)),
             eq(MaterialRequestDto.class));
   }
@@ -250,7 +251,7 @@ class MaterialgesuchPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void updateRequestProxy_backendConflict_relays409() throws Exception {
     when(backendApiClient.put(
-            contains("/material-requests/"), any(), eq(MaterialRequestDto.class), any()))
+            contains("/material-exchange/requests/"), any(), eq(MaterialRequestDto.class), any()))
         .thenThrow(
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, List.of(), "conflict"));
@@ -271,7 +272,7 @@ class MaterialgesuchPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void deactivateRequestProxy_ok() throws Exception {
     when(backendApiClient.post(
-            eq("/api/v1/material-requests/{id}/deactivate"),
+            eq("/api/v1/material-exchange/requests/{id}/deactivate"),
             any(),
             eq(MaterialRequestDto.class),
             eq(requestId)))

@@ -39,7 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.time.Instant;
 import java.util.*;
@@ -142,8 +142,8 @@ class OfficerRefineryAccessTest {
         .thenReturn(
             new PageResponse<>(List.of(rawMaterial, secondRawMaterial), 0, 100, 2, 1, List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
-        .thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));
+            eq("/api/v1/refinery-orders/settings"), eq(RefinerySettingsDto.class)))
+        .thenReturn(new RefinerySettingsDto("UP"));
 
     Map<String, Object> claims = new HashMap<>();
     claims.put(IdTokenClaimNames.SUB, userId.toString());
@@ -230,8 +230,8 @@ class OfficerRefineryAccessTest {
         .thenReturn(orderDto);
 
     when(backendApiClient.get(
-            eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
-        .thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));
+            eq("/api/v1/refinery-orders/settings"), eq(RefinerySettingsDto.class)))
+        .thenReturn(new RefinerySettingsDto("UP"));
 
     Map<String, Object> claims = new HashMap<>();
     claims.put(IdTokenClaimNames.SUB, officerId.toString());

@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemForm;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -1142,8 +1141,7 @@ public class RefineryOrderPageController {
 
   private String fetchRoundingMode() {
     try {
-      SystemSettingDto setting = Objects.requireNonNull(refineryClient.roundingMode());
-      return setting.value();
+      return Objects.requireNonNull(refineryClient.settings()).roundingMode();
     } catch (Exception _) {
       log.warn("Failed to fetch refinery rounding mode, using default UP");
       return "UP";

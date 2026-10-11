@@ -56,6 +56,9 @@ public class HangarBackendClient {
   /** The backend's ship collection, which also clears the caller's hangar. */
   private static final String SHIPS = "/api/v1/hangar/ships";
 
+  /** The ship-export import path, whose format the backend detects. */
+  private static final String IMPORT_SHIPS = "/api/v1/hangar/import/ships";
+
   private static final ParameterizedTypeReference<PageResponse<ShipDto>> SHIP_PAGE =
       new ParameterizedTypeReference<PageResponse<ShipDto>>() {};
 
@@ -182,18 +185,18 @@ public class HangarBackendClient {
    */
   @Nullable
   public FleetviewImportResponseDto importShips(@NotNull Resource upload) {
-    return upload("/api/v1/hangar/import/ships", upload);
-  }
-
-  /**
-   * Imports a CCU Game Fleetview export through the backend's deprecated Fleetview-only path.
-   *
-   * @param upload the uploaded file, streamed as the {@code file} part
-   * @return the import result, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public FleetviewImportResponseDto importFleetview(@NotNull Resource upload) {
-    return upload("/api/v1/hangar/import/fleetview", upload);
+    MultipartBodyBuilder builder = new MultipartBodyBuilder();
+    builder.part("file", upload).contentType(MediaType.APPLICATION_OCTET_STREAM);
+    return backendApiClient.execute(
+        HttpMethod.POST,
+        IMPORT_SHIPS,
+        webClient ->
+            webClient
+                .post()
+                .uri(IMPORT_SHIPS)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(builder.build())),
+        spec -> spec.bodyToMono(FleetviewImportResponseDto.class));
   }
 
   /** Deletes every ship of the caller's hangar. */
@@ -203,29 +206,6 @@ public class HangarBackendClient {
         SHIPS,
         webClient -> webClient.delete().uri(SHIPS),
         WebClient.ResponseSpec::toBodilessEntity);
-  }
-
-  /**
-   * Posts a ship export as a multipart upload to one of the import paths.
-   *
-   * @param path the backend import path
-   * @param upload the uploaded file
-   * @return the import result, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  private FleetviewImportResponseDto upload(@NotNull String path, @NotNull Resource upload) {
-    MultipartBodyBuilder builder = new MultipartBodyBuilder();
-    builder.part("file", upload).contentType(MediaType.APPLICATION_OCTET_STREAM);
-    return backendApiClient.execute(
-        HttpMethod.POST,
-        path,
-        webClient ->
-            webClient
-                .post()
-                .uri(path)
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(builder.build())),
-        spec -> spec.bodyToMono(FleetviewImportResponseDto.class));
   }
 
   /**

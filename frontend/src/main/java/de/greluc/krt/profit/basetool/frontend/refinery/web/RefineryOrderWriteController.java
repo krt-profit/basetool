@@ -24,22 +24,24 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MissionReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodForm;
-import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemForm;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderUpdateRequest;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -53,9 +55,12 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -138,7 +143,8 @@ public class RefineryOrderWriteController {
   public String createOrder(
       @Valid @ModelAttribute("refineryOrderForm") RefineryOrderForm form,
       BindingResult bindingResult,
-      RedirectAttributes redirectAttributes) {
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal OidcUser principal) {
     if (bindingResult.hasErrors()) {
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.create.failed");
       redirectAttributes.addFlashAttribute("refineryOrderForm", form);
@@ -146,18 +152,18 @@ public class RefineryOrderWriteController {
           + (form.getSource() != null ? "?source=" + form.getSource() : "");
     }
     try {
-      RefineryOrderDto orderDto = buildRefineryOrderDto(null, form, form.getOwningOrgUnitId());
+      RefineryOrderCreateRequest request = buildCreateRequest(form);
 
-      if (orderDto.goods().isEmpty()) {
+      if (request.goods().isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.material.invalid");
         redirectAttributes.addFlashAttribute("refineryOrderForm", form);
         return "redirect:/refinery-orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }
 
-      log.debug("Sending refinery order DTO: {}", orderDto);
+      log.debug("Sending refinery order request: {}", request);
 
-      refineryClient.create(orderDto);
+      createFor(request, form.getOwnerId(), principal);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.create");
 
@@ -202,13 +208,13 @@ public class RefineryOrderWriteController {
       return "redirect:/refinery-orders/" + id;
     }
     try {
-      RefineryOrderDto orderDto = buildRefineryOrderDto(id, form, null);
-      if (orderDto.goods().isEmpty()) {
+      RefineryOrderUpdateRequest request = buildUpdateRequest(form);
+      if (request.goods().isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.material.invalid");
         redirectAttributes.addFlashAttribute("refineryOrderForm", form);
         return "redirect:/refinery-orders/" + id;
       }
-      refineryClient.update(id, orderDto);
+      refineryClient.update(id, request);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.update");
     } catch (BackendServiceException e) {
@@ -323,19 +329,117 @@ public class RefineryOrderWriteController {
   }
 
   /**
-   * Builds the {@link RefineryOrderDto} from a create or edit form, dropping goods rows without an
-   * input material or quantity. Shared by {@link #createOrder}, {@link #updateOrder} and their AJAX
-   * twins.
+   * Builds the create request from the create form, dropping goods rows without an input material
+   * or quantity. Shared by {@link #createOrder} and its AJAX twin.
    *
-   * @param id the refinery order id, or {@code null} when building a create DTO
-   * @param form the bound create/edit form
-   * @param owningOrgUnitId the owning org-unit stamp; {@code null} on the edit path, which keeps
-   *     the original
-   * @return the order DTO ready to POST/PUT
+   * @param form the bound create form
+   * @return the request ready to POST
    */
   @NotNull
-  private RefineryOrderDto buildRefineryOrderDto(
-      UUID id, RefineryOrderForm form, UUID owningOrgUnitId) {
+  private RefineryOrderCreateRequest buildCreateRequest(RefineryOrderForm form) {
+    return new RefineryOrderCreateRequest(
+        locationOf(form),
+        missionOf(form),
+        parseStartedAt(form.getStartedAt()),
+        durationMinutesOf(form),
+        nullToZero(form.getExpenses()),
+        nullToZero(form.getOtherExpenses()),
+        nullToZero(form.getOreSales()),
+        refiningMethodOf(form),
+        goodsOf(form),
+        form.getOwningOrgUnitId());
+  }
+
+  /**
+   * Builds the update request from the edit form, dropping goods rows without an input material or
+   * quantity. Shared by {@link #updateOrder} and its AJAX twin.
+   *
+   * @param form the bound edit form
+   * @return the request ready to PUT, carrying the form's optimistic-lock version
+   */
+  @NotNull
+  private RefineryOrderUpdateRequest buildUpdateRequest(RefineryOrderForm form) {
+    return new RefineryOrderUpdateRequest(
+        locationOf(form),
+        missionOf(form),
+        parseStartedAt(form.getStartedAt()),
+        durationMinutesOf(form),
+        nullToZero(form.getExpenses()),
+        nullToZero(form.getOtherExpenses()),
+        nullToZero(form.getOreSales()),
+        refiningMethodOf(form),
+        form.getStatus() != null ? form.getStatus() : RefineryOrderStatus.OPEN,
+        goodsOf(form),
+        form.getVersion());
+  }
+
+  /**
+   * Stores a new order, for the caller or, when a logistician picked another member as the owner,
+   * for that member through the per-target path.
+   *
+   * @param request the order to create
+   * @param ownerId the owner picked in the form, or {@code null}
+   * @param principal the authenticated user, or {@code null} when unknown
+   */
+  private void createFor(
+      RefineryOrderCreateRequest request, UUID ownerId, @Nullable OidcUser principal) {
+    UUID callerId = callerId(principal);
+    if (ownerId != null && callerId != null && !ownerId.equals(callerId)) {
+      refineryClient.createFor(ownerId, request);
+    } else {
+      refineryClient.create(request);
+    }
+  }
+
+  /**
+   * Resolves the caller's user id from the token, falling back to the backend's profile read.
+   *
+   * @param principal the authenticated user, or {@code null}
+   * @return the user id, or {@code null} when it cannot be determined
+   */
+  @Nullable
+  private UUID callerId(@Nullable OidcUser principal) {
+    if (principal == null) {
+      return null;
+    }
+    try {
+      return CurrentUser.userId(principal);
+    } catch (Exception _) {
+      try {
+        UserDto me = refineryClient.currentUser();
+        return me != null ? me.id() : null;
+      } catch (Exception e) {
+        log.warn("Failed to get current user ID from backend: {}", e.getMessage());
+        return null;
+      }
+    }
+  }
+
+  private static LocationDto locationOf(RefineryOrderForm form) {
+    return form.getLocationId() != null
+        ? new LocationDto(form.getLocationId(), null, null, false, false, null)
+        : null;
+  }
+
+  private static MissionReferenceDto missionOf(RefineryOrderForm form) {
+    return form.getMissionId() != null
+        ? new MissionReferenceDto(form.getMissionId(), null, null, null)
+        : null;
+  }
+
+  private static RefiningMethodDto refiningMethodOf(RefineryOrderForm form) {
+    return form.getRefiningMethodId() != null
+        ? new RefiningMethodDto(form.getRefiningMethodId(), null, null, null, null, null, null)
+        : null;
+  }
+
+  private static long durationMinutesOf(RefineryOrderForm form) {
+    return (long)
+        ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60
+            + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0));
+  }
+
+  private static List<RefineryGoodDto> goodsOf(RefineryOrderForm form) {
     List<RefineryGoodDto> goodsDto = new ArrayList<>();
     for (RefineryGoodForm g : form.getGoods()) {
       if (g.getInputMaterialId() != null && g.getInputQuantity() != null) {
@@ -386,34 +490,7 @@ public class RefineryOrderWriteController {
                 null));
       }
     }
-    Instant startedAtTime = parseStartedAt(form.getStartedAt());
-    return new RefineryOrderDto(
-        id,
-        form.getOwnerId() != null
-            ? new UserReferenceDto(form.getOwnerId(), null, null, null, null)
-            : null,
-        form.getLocationId() != null
-            ? new LocationDto(form.getLocationId(), null, null, false, false, null)
-            : null,
-        form.getMissionId() != null
-            ? new MissionReferenceDto(form.getMissionId(), null, null, null)
-            : null,
-        startedAtTime,
-        (long)
-            ((form.getDurationHours() != null ? form.getDurationHours() : 0) * 60
-                + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0)),
-        nullToZero(form.getExpenses()),
-        nullToZero(form.getOtherExpenses()),
-        nullToZero(form.getOreSales()),
-        null,
-        form.getRefiningMethodId() != null
-            ? new RefiningMethodDto(form.getRefiningMethodId(), null, null, null, null, null, null)
-            : null,
-        goodsDto,
-        form.getStatus() != null ? form.getStatus() : RefineryOrderStatus.OPEN,
-        null,
-        form.getVersion(),
-        owningOrgUnitId);
+    return goodsDto;
   }
 
   /**
@@ -476,12 +553,12 @@ public class RefineryOrderWriteController {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().build();
     }
-    RefineryOrderDto orderDto = buildRefineryOrderDto(id, form, null);
-    if (orderDto.goods().isEmpty()) {
+    RefineryOrderUpdateRequest request = buildUpdateRequest(form);
+    if (request.goods().isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
     try {
-      refineryClient.update(id, orderDto);
+      refineryClient.update(id, request);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
     } catch (BackendServiceException bse) {
@@ -562,16 +639,17 @@ public class RefineryOrderWriteController {
   @ResponseBody
   public ResponseEntity<Object> createOrderAjax(
       @Valid @ModelAttribute("refineryOrderForm") RefineryOrderForm form,
-      BindingResult bindingResult) {
+      BindingResult bindingResult,
+      @AuthenticationPrincipal OidcUser principal) {
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().build();
     }
-    RefineryOrderDto orderDto = buildRefineryOrderDto(null, form, form.getOwningOrgUnitId());
-    if (orderDto.goods().isEmpty()) {
+    RefineryOrderCreateRequest request = buildCreateRequest(form);
+    if (request.goods().isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
     try {
-      refineryClient.create(orderDto);
+      createFor(request, form.getOwnerId(), principal);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
     } catch (BackendServiceException bse) {

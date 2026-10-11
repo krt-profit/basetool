@@ -22,10 +22,11 @@ package de.greluc.krt.profit.basetool.frontend.refinery.client;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
-import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreItemDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderUpdateRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
@@ -102,10 +103,14 @@ class RefineryBackendClientTest {
   void orderMutations() {
     backend.answerJson("{}");
     backend.answerJson("{}");
+    backend.answerJson("{}");
     backend.answerEmpty();
     backend.answerEmpty();
-    RefineryOrderDto order =
-        new RefineryOrderDto(
+    RefineryOrderCreateRequest created =
+        new RefineryOrderCreateRequest(
+            null, null, null, null, null, null, null, null, List.of(), ORG_UNIT);
+    RefineryOrderUpdateRequest updated =
+        new RefineryOrderUpdateRequest(
             null,
             null,
             null,
@@ -114,17 +119,13 @@ class RefineryBackendClientTest {
             null,
             null,
             null,
-            null,
-            null,
-            null,
-            List.of(),
             RefineryOrderStatus.OPEN,
-            null,
-            3L,
-            ORG_UNIT);
+            List.of(),
+            3L);
 
-    client.create(order);
-    client.update(ID, order);
+    client.create(created);
+    client.createFor(USER, created);
+    client.update(ID, updated);
     client.cancel(ID);
     client.store(
         ID,
@@ -133,15 +134,20 @@ class RefineryBackendClientTest {
                 new RefineryOrderStoreItemDto(
                     MATERIAL, LOCATION, 2, 1.25, USER, null, null, ORG_UNIT, false))));
 
-    String orderJson =
-        "{\"id\":null,\"owner\":null,\"location\":null,\"mission\":null,\"startedAt\":null,"
-            + "\"durationMinutes\":null,\"expenses\":null,\"otherExpenses\":null,"
-            + "\"oreSales\":null,\"profit\":null,\"refiningMethod\":null,\"goods\":[],"
-            + "\"status\":\"OPEN\",\"owningSquadron\":null,\"version\":3,\"owningOrgUnitId\":\""
+    String createdJson =
+        "{\"location\":null,\"mission\":null,\"startedAt\":null,\"durationMinutes\":null,"
+            + "\"expenses\":null,\"otherExpenses\":null,\"oreSales\":null,"
+            + "\"refiningMethod\":null,\"goods\":[],\"owningOrgUnitId\":\""
             + ORG_UNIT
-            + "\"";
-    assertThat(body(backend.expect("POST", "/api/v1/refinery-orders"))).startsWith(orderJson);
-    assertThat(body(backend.expect("PUT", "/api/v1/refinery-orders/" + ID))).startsWith(orderJson);
+            + "\"}";
+    String updatedJson =
+        "{\"location\":null,\"mission\":null,\"startedAt\":null,\"durationMinutes\":null,"
+            + "\"expenses\":null,\"otherExpenses\":null,\"oreSales\":null,"
+            + "\"refiningMethod\":null,\"status\":\"OPEN\",\"goods\":[],\"version\":3}";
+    assertThat(body(backend.expect("POST", "/api/v1/refinery-orders"))).isEqualTo(createdJson);
+    assertThat(body(backend.expect("POST", "/api/v1/refinery-orders/users/" + USER)))
+        .isEqualTo(createdJson);
+    assertThat(body(backend.expect("PUT", "/api/v1/refinery-orders/" + ID))).isEqualTo(updatedJson);
     backend.expect("DELETE", "/api/v1/refinery-orders/" + ID, null);
     backend.expect(
         "POST",
@@ -191,7 +197,7 @@ class RefineryBackendClientTest {
     client.user(USER);
     client.currentUser();
     client.activeJobOrders();
-    client.roundingMode();
+    assertThat(client.settings()).isNotNull();
 
     backend.expect("GET", "/api/v1/missions?size=1000&sort=plannedStartTime,desc");
     backend.expect("GET", "/api/v1/org-units/me/pickable");
@@ -199,7 +205,7 @@ class RefineryBackendClientTest {
     backend.expect("GET", "/api/v1/users/" + USER);
     backend.expect("GET", "/api/v1/users/me");
     backend.expect("GET", "/api/v1/orders/lookup");
-    backend.expect("GET", "/api/v1/settings/refinery.rounding.mode");
+    backend.expect("GET", "/api/v1/refinery-orders/settings");
   }
 
   /**

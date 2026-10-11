@@ -45,7 +45,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class DashboardBackendClient {
 
   /** The backend's announcement endpoint. */
-  private static final String ANNOUNCEMENT = "/api/v1/announcement";
+  private static final String ANNOUNCEMENT = "/api/v1/announcements/current";
 
   private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_PAGE =
       new ParameterizedTypeReference<>() {};

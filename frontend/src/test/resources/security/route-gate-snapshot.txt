@@ -245,7 +245,6 @@
 /hangar/add POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#addShipAjax gate=class:isAuthenticated() layout=yes
 /hangar/home-location POST -> HangarPageController#setHomeLocation gate=class:isAuthenticated() layout=yes
 /hangar/home-location POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#setHomeLocationAjax gate=class:isAuthenticated() layout=yes
-/hangar/import/fleetview POST consumes=[multipart/form-data] -> HangarImportProxyController#importFleetview gate=method:isAuthenticated() layout=no
 /hangar/import/ships POST consumes=[multipart/form-data] -> HangarImportProxyController#importShips gate=method:isAuthenticated() layout=no
 /hangar/ships/all DELETE -> HangarDeleteAllProxyController#deleteAllShips gate=method:isAuthenticated() layout=no
 /hangar/squadron GET -> HangarPageController#viewSquadron gate=class:isAuthenticated() layout=yes

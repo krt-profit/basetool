@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
@@ -47,7 +48,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -221,16 +221,11 @@ public class JobOrderPageController {
       }
 
       try {
-        SystemSettingDto yellowSetting = jobOrderClient.ageYellowSetting();
-        yellowDays = Integer.parseInt(yellowSetting.value());
+        JobOrderSettingsDto settings = jobOrderClient.settings();
+        yellowDays = settings.ageYellowDays();
+        redDays = settings.ageRedDays();
       } catch (Exception _) {
-        log.warn("Could not fetch yellow days setting, using default");
-      }
-      try {
-        SystemSettingDto redSetting = jobOrderClient.ageRedSetting();
-        redDays = Integer.parseInt(redSetting.value());
-      } catch (Exception _) {
-        log.warn("Could not fetch red days setting, using default");
+        log.warn("Could not fetch the job-order age settings, using the defaults");
       }
     } catch (Exception e) {
       log.error("Failed to fetch orders", e);
@@ -402,16 +397,11 @@ public class JobOrderPageController {
       int yellowDays = 30;
       int redDays = 90;
       try {
-        SystemSettingDto yellowSetting = jobOrderClient.ageYellowSetting();
-        yellowDays = Integer.parseInt(yellowSetting.value());
+        JobOrderSettingsDto settings = jobOrderClient.settings();
+        yellowDays = settings.ageYellowDays();
+        redDays = settings.ageRedDays();
       } catch (Exception _) {
-        log.warn("Could not fetch yellow days setting, using default");
-      }
-      try {
-        SystemSettingDto redSetting = jobOrderClient.ageRedSetting();
-        redDays = Integer.parseInt(redSetting.value());
-      } catch (Exception _) {
-        log.warn("Could not fetch red days setting, using default");
+        log.warn("Could not fetch the job-order age settings, using the defaults");
       }
       model.addAttribute("ageYellowDays", yellowDays);
       model.addAttribute("ageRedDays", redDays);

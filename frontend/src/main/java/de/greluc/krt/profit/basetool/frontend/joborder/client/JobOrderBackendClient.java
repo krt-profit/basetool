@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOverviewDto;
@@ -51,7 +52,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
-import de.greluc.krt.profit.basetool.frontend.settings.model.SystemSettingDto;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -164,25 +164,13 @@ public class JobOrderBackendClient {
   }
 
   /**
-   * Reads the cached yellow ageing threshold of a job order.
+   * Reads the cached ageing thresholds of a job order.
    *
-   * @return the setting, or {@code null} when the backend sent no body
+   * @return the thresholds, or {@code null} when the backend sent no body
    */
   @Nullable
-  public SystemSettingDto ageYellowSetting() {
-    return backendApiClient.getCached(
-        CachedCatalog.SETTING_JOB_ORDER_AGE_YELLOW, SystemSettingDto.class);
-  }
-
-  /**
-   * Reads the cached red ageing threshold of a job order.
-   *
-   * @return the setting, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public SystemSettingDto ageRedSetting() {
-    return backendApiClient.getCached(
-        CachedCatalog.SETTING_JOB_ORDER_AGE_RED, SystemSettingDto.class);
+  public JobOrderSettingsDto settings() {
+    return backendApiClient.getCached(CachedCatalog.SETTINGS_JOB_ORDER, JobOrderSettingsDto.class);
   }
 
   /**
