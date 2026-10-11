@@ -645,11 +645,7 @@ public class MissionBackendClient {
    */
   public void addManager(@NotNull UUID missionId, @NotNull UUID userId) {
     backendApiClient.post(
-        "/api/v1/missions/{missionUuid}/managers/{userUuid}",
-        null,
-        Void.class,
-        missionId,
-        userId);
+        "/api/v1/missions/{missionUuid}/managers/{userUuid}", null, Void.class, missionId, userId);
   }
 
   /**
