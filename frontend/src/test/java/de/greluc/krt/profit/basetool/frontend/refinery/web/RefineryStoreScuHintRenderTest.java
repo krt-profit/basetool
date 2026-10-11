@@ -1,0 +1,178 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.refinery.web;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * Render test that the store dialog shows the SCU input hint only on SCU rows, never on PIECE rows.
+ */
+@SpringBootTest
+class RefineryStoreScuHintRenderTest {
+
+  @Autowired private WebApplicationContext context;
+
+  private MockMvc mockMvc;
+
+  @MockitoBean private BackendApiClient backendApiClient;
+
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
+
+  @BeforeEach
+  void setup() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.capabilities(true, true, true));
+  }
+
+  private OAuth2AuthenticationToken logisticianToken(UUID userId) {
+    Map<String, Object> claims = new HashMap<>();
+    claims.put(IdTokenClaimNames.SUB, userId.toString());
+    claims.put("preferred_username", "logistician");
+    OidcIdToken idToken =
+        new OidcIdToken("token-value", Instant.now(), Instant.now().plusSeconds(3600), claims);
+    OidcUser oidcUser =
+        new DefaultOidcUser(
+            Collections.singletonList(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")), idToken);
+    return new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
+  }
+
+  private MaterialDto material(String name, String quantityType) {
+    return new MaterialDto(
+        UUID.randomUUID(),
+        name,
+        null,
+        quantityType,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        1L);
+  }
+
+  @Test
+  void storeDialog_ScuHint_RendersOnlyForScuRows_NotPieceRows() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+
+    RefineryGoodDto scuGood =
+        new RefineryGoodDto(
+            UUID.randomUUID(),
+            material("Quantanium Ore", "SCU"),
+            100,
+            material("Refined Quantanium", "SCU"),
+            100,
+            100,
+            null);
+    RefineryGoodDto pieceGood =
+        new RefineryGoodDto(
+            UUID.randomUUID(),
+            material("Recovered Bundle", "PIECE"),
+            5,
+            material("Salvaged Component", "PIECE"),
+            5,
+            100,
+            null);
+
+    RefineryOrderDto order =
+        new RefineryOrderDto(
+            orderId,
+            new UserReferenceDto(userId, "logistician", null, "Logistician", 0),
+            new LocationDto(UUID.randomUUID(), "ArcCorp Mining", null, false, false, 1L),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(scuGood, pieceGood),
+            RefineryOrderStatus.OPEN,
+            null,
+            1L,
+            null);
+
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
+        .thenReturn(order);
+
+    String html =
+        mockMvc
+            .perform(
+                get("/refinery-orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("SCU output store row present").contains("Refined Quantanium");
+    assertThat(html).as("PIECE output store row present").contains("Salvaged Component");
+
+    int scuHintCount = html.split("class=\"scu-hint\"", -1).length - 1;
+    assertThat(scuHintCount)
+        .as("scu-hint disc renders once (SCU row only), not on the PIECE row")
+        .isEqualTo(1);
+  }
+}

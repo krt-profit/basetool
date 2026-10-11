@@ -1,0 +1,104 @@
+rule_files:
+  - ../alerts/ops-automation.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: HostScriptDrift fires for a differing file once it has lasted an hour
+    interval: 1m
+    input_series:
+      - series: 'basetool_host_scripts_drift{file="deploy.sh", kind="differs", job="node", instance="host:9100"}'
+        values: "1x120"
+      - series: 'basetool_host_scripts_check_timestamp_seconds{job="node", instance="host:9100"}'
+        values: "0+0x120"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: HostScriptDrift
+        exp_alerts: []
+      - eval_time: 90m
+        alertname: HostScriptDrift
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              file: deploy.sh
+              kind: differs
+              job: node
+              instance: "host:9100"
+            exp_annotations:
+              summary: "Host script deploy.sh is not the deployed release's (differs)"
+              description: "deploy.sh hashes every script the role installs under /var/iri/code/scripts and compares it with the host-scripts.sha256 manifest its release carries; deploy.sh is `differs` (`differs` = other bytes, `missing` = not installed). Scripts reach a host only through the Ansible role, never the config bundle, so a stale one keeps running until the role is re-run from the release's tag: `ansible-playbook site.yml --limit <host> --tags deploy,scripts --check --diff`, then without `--check` (an owner-approved host write on production). A stale deploy.sh, lib/common.sh, lib/container-runtime.sh or render-env-d.py also makes deploy.sh REFUSE the next release (`HOST SCRIPTS:` FATAL, DeployFailed). Which files: `{app=\"ops-deploy\"} |~ \"host scripts:\"` in Grafana -> Explore -> Loki. docs/deployment.md, Before a promotion: the host scripts."
+
+  - name: HostScriptDrift names a missing file and stays silent for the others
+    interval: 1m
+    input_series:
+      - series: 'basetool_host_scripts_drift{file="lib/common.sh", kind="missing", job="node", instance="host:9100"}'
+        values: "1x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: HostScriptDrift
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              file: lib/common.sh
+              kind: missing
+              job: node
+              instance: "host:9100"
+            exp_annotations:
+              summary: "Host script lib/common.sh is not the deployed release's (missing)"
+              description: "deploy.sh hashes every script the role installs under /var/iri/code/scripts and compares it with the host-scripts.sha256 manifest its release carries; lib/common.sh is `missing` (`differs` = other bytes, `missing` = not installed). Scripts reach a host only through the Ansible role, never the config bundle, so a stale one keeps running until the role is re-run from the release's tag: `ansible-playbook site.yml --limit <host> --tags deploy,scripts --check --diff`, then without `--check` (an owner-approved host write on production). A stale deploy.sh, lib/common.sh, lib/container-runtime.sh or render-env-d.py also makes deploy.sh REFUSE the next release (`HOST SCRIPTS:` FATAL, DeployFailed). Which files: `{app=\"ops-deploy\"} |~ \"host scripts:\"` in Grafana -> Explore -> Loki. docs/deployment.md, Before a promotion: the host scripts."
+
+  - name: HostScriptDrift is silent once the series is gone
+    interval: 1m
+    input_series:
+      - series: 'basetool_host_scripts_drift{file="deploy.sh", kind="differs", job="node", instance="host:9100"}'
+        values: "1x70 stale"
+      - series: 'basetool_host_scripts_check_timestamp_seconds{job="node", instance="host:9100"}'
+        values: "0+0x120"
+    alert_rule_test:
+      - eval_time: 100m
+        alertname: HostScriptDrift
+        exp_alerts: []
+
+  - name: HostScriptsCheckStale fires when the comparison stopped
+    interval: 1m
+    input_series:
+      - series: 'basetool_host_scripts_check_timestamp_seconds{job="node", instance="host:9100"}'
+        values: "-50000+0x180"
+    alert_rule_test:
+      - eval_time: 2h
+        alertname: HostScriptsCheckStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: node
+              instance: "host:9100"
+            exp_annotations:
+              summary: "Host scripts have not been compared with a release manifest for over 12h, or never"
+              description: "No deploy tick has compared the host scripts with a release manifest for 12 hours, or the metric is absent. Absent on a host with a deployed release means its deploy.sh predates the check (ADR-0247) and is stale: run the role from the release tag with `--tags deploy,scripts`. It is also absent while the deployed release carries no host-scripts.sha256 (the first release that ships one starts the check), and stale while the deploy timer is stopped (DeployHeartbeatStale names that) or a failed target sits in its backoff. `{app=\"ops-deploy\"} |~ \"host scripts:\"` in Grafana -> Explore -> Loki shows the last comparison."
+
+  - name: HostScriptsCheckStale fires when the metric has never been written
+    interval: 1m
+    input_series:
+      - series: 'up{job="node", instance="host:9100"}'
+        values: "1x180"
+    alert_rule_test:
+      - eval_time: 2h
+        alertname: HostScriptsCheckStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Host scripts have not been compared with a release manifest for over 12h, or never"
+              description: "No deploy tick has compared the host scripts with a release manifest for 12 hours, or the metric is absent. Absent on a host with a deployed release means its deploy.sh predates the check (ADR-0247) and is stale: run the role from the release tag with `--tags deploy,scripts`. It is also absent while the deployed release carries no host-scripts.sha256 (the first release that ships one starts the check), and stale while the deploy timer is stopped (DeployHeartbeatStale names that) or a failed target sits in its backoff. `{app=\"ops-deploy\"} |~ \"host scripts:\"` in Grafana -> Explore -> Loki shows the last comparison."
+
+  - name: HostScriptsCheckStale is silent after a recent comparison, drift or not
+    interval: 1m
+    input_series:
+      - series: 'basetool_host_scripts_check_timestamp_seconds{job="node", instance="host:9100"}'
+        values: "-600+0x180"
+      - series: 'basetool_host_scripts_drift{file="restore-drill.sh", kind="differs", job="node", instance="host:9100"}'
+        values: "1x180"
+    alert_rule_test:
+      - eval_time: 2h
+        alertname: HostScriptsCheckStale
+        exp_alerts: []

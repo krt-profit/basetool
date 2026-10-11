@@ -19,20 +19,20 @@
 
 package de.greluc.krt.profit.basetool.frontend.materialexchange.client;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeCountsDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeItemReleaseRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeReleasableItemDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeReleaseRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialItemRequestCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestCreateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestUpdateRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintProductDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeCountsDto;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeItemReleaseRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferDto;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeReleasableItemDto;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeReleaseRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialItemRequestCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestDto;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialRequestUpdateRequest;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

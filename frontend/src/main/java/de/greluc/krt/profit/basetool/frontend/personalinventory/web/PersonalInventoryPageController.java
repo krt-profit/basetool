@@ -1,0 +1,406 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.personalinventory.web;
+
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
+
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.UexLocationDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryForm;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemCreateRequest;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
+import jakarta.validation.Valid;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+/**
+ * Page controller backing the personal inventory user area. Renders the list view, the create/edit
+ * modal (KRT-styled, no native confirm()) and proxies form submissions to the backend via {@link
+ * PersonalInventoryBackendClient}.
+ */
+@Controller
+@UsesLayoutModel
+@RequestMapping("/personal-inventory")
+@RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
+@Slf4j
+public class PersonalInventoryPageController {
+
+  /**
+   * Character budget for the type-ahead term when it is written to a log line. A location name that
+   * a user could plausibly be typing fits comfortably; anything longer is a paste or an attack and
+   * is truncated by {@link LogSafe#text(String, int)} rather than allowed to stretch the line.
+   */
+  private static final int MAX_LOGGED_QUERY = 80;
+
+  /** Sends the page's item, blueprint-count and location requests. */
+  private final PersonalInventoryBackendClient personalInventoryClient;
+
+  /**
+   * Renders the personal-inventory list with the create/edit modal.
+   *
+   * @param q optional free-text filter, echoed into the search input
+   * @param page zero-based page index
+   * @param size page size, defaults to 50
+   * @param sort optional sort spec ({@code field,asc|desc}), whitelisted by the backend
+   * @param fragment {@code "results"} renders only the item-list fragment (REQ-FE-002)
+   * @param model model populated with the form, filter, item list and page metadata, and for the
+   *     full page {@code blueprintCount}
+   * @return the {@code personal-inventory} view name, or its {@code results} fragment
+   */
+  @NotNull
+  @GetMapping
+  public String view(
+      @RequestParam(required = false) String q,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    if (!model.containsAttribute("personalInventoryForm")) {
+      model.addAttribute("personalInventoryForm", new PersonalInventoryForm());
+    }
+    populateListing(model, q, page, size, sort);
+    if ("results".equals(fragment)) {
+      return "personal-inventory :: results";
+    }
+    model.addAttribute("blueprintCount", countBlueprints());
+    return "personal-inventory";
+  }
+
+  /**
+   * Reads how many blueprints the caller owns, for the „Blueprints" tab's count.
+   *
+   * @return the caller's blueprint total, or {@code null} when the backend cannot answer
+   */
+  @Nullable
+  private Long countBlueprints() {
+    try {
+      PageResponse<PersonalBlueprintDto> owned = personalInventoryClient.blueprintCountPage();
+      return owned == null ? null : owned.totalElements();
+    } catch (Exception e) {
+      log.debug("Failed to count owned blueprints: {}", e.getMessage());
+      return null;
+    }
+  }
+
+  /**
+   * Creates a personal-inventory item; validation errors re-render the list view inline instead of
+   * redirecting.
+   *
+   * @param form form-bound DTO
+   * @param bindingResult validation errors carrier
+   * @param model model used for inline re-rendering on validation failure
+   * @param redirectAttributes flash attributes carrier
+   * @return the inline {@code personal-inventory} view on validation failure, otherwise a redirect
+   */
+  @NotNull
+  @PostMapping("/add")
+  public String add(
+      @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
+      BindingResult bindingResult,
+      Model model,
+      RedirectAttributes redirectAttributes) {
+    if (bindingResult.hasErrors()) {
+      model.addAttribute("showItemModal", true);
+      model.addAttribute("modalAction", "/personal-inventory/add");
+      populateListing(model, null, null, null, null);
+      return "personal-inventory";
+    }
+
+    try {
+      PersonalInventoryItemCreateRequest request =
+          new PersonalInventoryItemCreateRequest(
+              form.getName(),
+              form.getNote(),
+              form.getLocationUexId(),
+              form.getLocationType(),
+              form.getQuantity());
+      personalInventoryClient.create(request);
+      redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.created");
+    } catch (Exception e) {
+      log.error("Failed to create personal inventory item", e);
+      redirectAttributes.addFlashAttribute("errorToast", "personalInventory.error.create");
+      redirectAttributes.addFlashAttribute("personalInventoryForm", form);
+    }
+    return "redirect:/personal-inventory";
+  }
+
+  /**
+   * Updates a personal-inventory item; validation errors re-render inline, and a 409 becomes the
+   * optimistic-lock toast via {@link #classifyError}.
+   *
+   * @param id inventory item id
+   * @param form form-bound DTO
+   * @param bindingResult validation errors carrier
+   * @param model model used for inline re-rendering on validation failure
+   * @param redirectAttributes flash attributes carrier
+   * @return the inline {@code personal-inventory} view on validation failure, otherwise a redirect
+   */
+  @NotNull
+  @PostMapping("/{id}/update")
+  public String update(
+      @PathVariable @NotNull UUID id,
+      @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
+      BindingResult bindingResult,
+      Model model,
+      RedirectAttributes redirectAttributes) {
+    if (bindingResult.hasErrors()) {
+      model.addAttribute("showItemModal", true);
+      model.addAttribute("modalAction", "/personal-inventory/" + id + "/update");
+      populateListing(model, null, null, null, null);
+      return "personal-inventory";
+    }
+
+    try {
+      PersonalInventoryItemUpdateRequest request =
+          new PersonalInventoryItemUpdateRequest(
+              form.getName(),
+              form.getNote(),
+              form.getLocationUexId(),
+              form.getLocationType(),
+              form.getQuantity(),
+              form.getVersion());
+      personalInventoryClient.update(id, request);
+      redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.updated");
+    } catch (Exception e) {
+      log.error("Failed to update personal inventory item {}", id, e);
+      redirectAttributes.addFlashAttribute(
+          "errorToast", classifyError(e, "personalInventory.error.update"));
+    }
+    return "redirect:/personal-inventory";
+  }
+
+  /**
+   * Deletes a personal-inventory item. Failure surfaces as a 409-aware toast.
+   *
+   * @param id inventory item id
+   * @param redirectAttributes flash attributes carrier
+   * @return redirect to {@code /personal-inventory}
+   */
+  @NotNull
+  @PostMapping("/{id}/delete")
+  public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
+    try {
+      personalInventoryClient.delete(id);
+      redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.deleted");
+    } catch (Exception e) {
+      log.error("Failed to delete personal inventory item {}", id, e);
+      redirectAttributes.addFlashAttribute(
+          "errorToast", classifyError(e, "personalInventory.error.delete"));
+    }
+    return "redirect:/personal-inventory";
+  }
+
+  /**
+   * AJAX twin of {@link #add}, selected by {@code X-Requested-With=XMLHttpRequest}: creates an item
+   * from JSON so the page can re-render its list fragment in place.
+   *
+   * @param request the item payload submitted as JSON
+   * @return {@code 204} on success, {@code 422} on a missing required field, or the relayed backend
+   *     {@code problem+json}
+   */
+  @PostMapping(value = "/add", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> addAjax(@RequestBody PersonalInventoryItemCreateRequest request) {
+    if (isInvalidCreate(request)) {
+      return validationProblem();
+    }
+    return relay(
+        log,
+        "create personal inventory item (ajax)",
+        () -> {
+          personalInventoryClient.create(request);
+          return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * AJAX twin of {@link #update}: updates an item from JSON; a concurrent edit returns a {@code
+   * 409} carrying {@code OPTIMISTIC_LOCK}.
+   *
+   * @param id inventory item id
+   * @param request the item payload including the last-seen {@code version}
+   * @return {@code 204} on success, {@code 422} on a missing required field, or the relayed backend
+   *     {@code problem+json}
+   */
+  @PostMapping(value = "/{id}/update", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> updateAjax(
+      @PathVariable @NotNull UUID id, @RequestBody PersonalInventoryItemUpdateRequest request) {
+    if (request == null
+        || request.name() == null
+        || request.name().isBlank()
+        || request.locationUexId() == null
+        || request.locationType() == null
+        || request.quantity() == null
+        || request.quantity() < 1) {
+      return validationProblem();
+    }
+    return relay(
+        log,
+        "update personal inventory item " + id + " (ajax)",
+        () -> {
+          personalInventoryClient.update(id, request);
+          return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * AJAX twin of {@link #delete}: deletes an item so the page can re-render its list fragment in
+   * place.
+   *
+   * @param id inventory item id
+   * @return {@code 204} on success, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
+  @ResponseBody
+  public ResponseEntity<Object> deleteAjax(@PathVariable @NotNull UUID id) {
+    return relay(
+        log,
+        "delete personal inventory item " + id + " (ajax)",
+        () -> {
+          personalInventoryClient.delete(id);
+          return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * Validates the JSON create payload like the {@code PersonalInventoryForm} constraints: name,
+   * location id and type present, quantity at least one.
+   *
+   * @param request the create payload to validate
+   * @return {@code true} when a required field is missing or out of range
+   */
+  private static boolean isInvalidCreate(PersonalInventoryItemCreateRequest request) {
+    return request == null
+        || request.name() == null
+        || request.name().isBlank()
+        || request.locationUexId() == null
+        || request.locationType() == null
+        || request.quantity() == null
+        || request.quantity() < 1;
+  }
+
+  /**
+   * Builds the {@code 422} {@code problem+json} carrying the stable {@code VALIDATION} code that
+   * {@code personal-inventory.html} maps to an inline toast when a required field is missing on an
+   * AJAX write, so the create/edit modal surfaces the error without a navigation.
+   *
+   * @return a {@code 422} {@code problem+json} response
+   */
+  private static ResponseEntity<Object> validationProblem() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", 422);
+    body.put("code", "VALIDATION");
+    return ResponseEntity.status(422).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body);
+  }
+
+  /**
+   * AJAX endpoint backing the KRT-styled UEX location typeahead. The frontend module deliberately
+   * proxies through itself rather than letting the browser hit the backend directly so that the
+   * same Spring Security session and CSRF policy apply.
+   */
+  @GetMapping("/uex-search")
+  @ResponseBody
+  public List<UexLocationDto> uexSearch(
+      @RequestParam(required = false) String q, @RequestParam(required = false) Integer limit) {
+    try {
+      String query = q == null ? "" : q;
+      int effectiveLimit = limit == null ? 25 : Math.clamp(limit, 1, 2000);
+      List<UexLocationDto> result = personalInventoryClient.searchLocations(query, effectiveLimit);
+      return result == null ? Collections.emptyList() : result;
+    } catch (Exception e) {
+      log.debug(
+          "UEX location typeahead failed for query='{}': {}",
+          LogSafe.text(q, MAX_LOGGED_QUERY),
+          e.getMessage());
+      return Collections.emptyList();
+    }
+  }
+
+  /**
+   * Populates the model attributes that the {@code personal-inventory} template needs to render the
+   * listing under the modal: the filter query echoed into the search input, the fetched item list
+   * and the page metadata used by the pagination fragment. Used both by the GET handler and by the
+   * POST handlers when re-rendering after a validation error.
+   */
+  private void populateListing(
+      @NotNull Model model, String q, Integer page, Integer size, String sort) {
+    model.addAttribute("filterQuery", q == null ? "" : q);
+    PageResponse<PersonalInventoryItemDto> items = fetchItems(q, page, size, sort);
+    model.addAttribute("items", items != null ? items.content() : Collections.emptyList());
+    model.addAttribute("page", items);
+  }
+
+  private PageResponse<PersonalInventoryItemDto> fetchItems(
+      String q, Integer page, Integer size, String sort) {
+    try {
+      return personalInventoryClient.itemPage(
+          new PersonalInventoryBackendClient.ItemQuery(
+              page, size == null ? 50 : size, RelayParams.sortSpecOrNull(sort), q));
+    } catch (Exception e) {
+      log.error("Failed to fetch personal inventory items", e);
+      return new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of());
+    }
+  }
+
+  /**
+   * Maps backend service exceptions into specific user-facing toast keys, falling back to the
+   * supplied generic key for any error other than a 409 optimistic-locking conflict (the only case
+   * worth distinguishing for the user).
+   */
+  private String classifyError(Exception e, String defaultKey) {
+    if (e instanceof BackendServiceException bse && bse.getStatusCode() == 409) {
+      return "personalInventory.error.conflict";
+    }
+    return defaultKey;
+  }
+}
