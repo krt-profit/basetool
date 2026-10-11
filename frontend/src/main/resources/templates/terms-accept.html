@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageBare=true, pageContent=~{::pageContent})}">
+<head>
     <title th:text="${appTitle} + ' - ' + #{termsAccept.title}">Profit Basetool - Nutzungsbedingungen bestätigen</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/legal.css}">
@@ -8,6 +8,7 @@
     </th:block>
 </head>
 <body>
+<th:block th:fragment="pageContent">
 <header>
     <nav>
         <a th:href="@{/}" class="brand">
@@ -40,5 +41,6 @@
     </div>
 </main>
 <script th:src="@{/js/terms-accept.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
 </body>
 </html>

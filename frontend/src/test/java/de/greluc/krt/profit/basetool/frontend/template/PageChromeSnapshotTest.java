@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
@@ -70,9 +71,10 @@ import org.thymeleaf.templateresource.StringTemplateResource;
  * <p>Each page is rendered through the real fragments for an administrator, with the page's own
  * markup replaced by markers ({@link ChromeNeutraliser}), so no page needs a model. The golden file
  * is {@value #RESOURCE}; rewrite it with {@code -PupdateSnapshots} when a change of the chrome is
- * intended. The planted tests prove the comparison fails when a page is composed differently.
+ * intended. The planted tests prove the comparison fails when a page, or the layout fragment, is
+ * composed differently.
  */
-@SpringBootTest
+@SpringBootTest(properties = "spring.thymeleaf.cache=false")
 @Import(PageChromeSnapshotTest.OracleConfig.class)
 class PageChromeSnapshotTest {
 
@@ -82,8 +84,18 @@ class PageChromeSnapshotTest {
   /** The view-name prefix the oracle resolver answers. */
   private static final String PREFIX = "chrome-oracle/";
 
+  /** The layout fragment's template name, which the planted tests replace. */
+  private static final String LAYOUT = "fragments/layout";
+
   /** The floor of page templates that carry the chrome, so a vanished scan cannot pass. */
   private static final int PAGE_FLOOR = 90;
+
+  /** A page with links, a toast and a tail, which the page-level planted changes edit. */
+  private static final String FULL_PAGE = "admin-settings.html";
+
+  /** Pages the layout-level planted changes render: full chrome, no toast, and the bare shell. */
+  private static final List<String> LAYOUT_PROBES =
+      List.of(FULL_PAGE, "app-link-help.html", "error.html");
 
   private static final Path TEMPLATE_ROOT = Path.of("src", "main", "resources", "templates");
 
@@ -120,58 +132,92 @@ class PageChromeSnapshotTest {
   }
 
   @Test
-  void aPageWithoutItsHeaderFails() throws Exception {
-    assertPlantedChange("admin-settings.html", source -> source.replace(HEADER_CALL, ""));
+  void aPageThatDropsItsToastFails() throws Exception {
+    assertPlantedPageChange(source -> source.replace(", pageToast=true", ""));
   }
 
   @Test
-  void aPageWithTheHeaderBeforeTheSidebarFails() throws Exception {
-    assertPlantedChange(
-        "admin-settings.html",
-        source ->
-            source.replace(
-                SIDEBAR_CALL + "\n\n" + HEADER_CALL, HEADER_CALL + "\n\n" + SIDEBAR_CALL));
+  void aPageThatDropsItsTailFails() throws Exception {
+    assertPlantedPageChange(source -> source.replace(", pageTail=~{::pageTail}", ""));
   }
 
   @Test
-  void aPageWithoutItsToastFails() throws Exception {
-    assertPlantedChange("admin-settings.html", source -> source.replace(TOAST_CALL, ""));
+  void aPageThatDropsItsLinksFails() throws Exception {
+    assertPlantedPageChange(source -> source.replace(", pageLinks=~{::extraLinks}", ""));
   }
 
   @Test
-  void aPageWithAnExtraBodyAttributeFails() throws Exception {
-    assertPlantedChange(
-        "admin-settings.html", source -> source.replace("<body>", "<body class=\"planted\">"));
+  void aPageThatTurnsTheChromeOffFails() throws Exception {
+    assertPlantedPageChange(
+        source -> source.replace("pageTitle=~{::title}", "pageTitle=~{::title}, pageBare=true"));
+  }
+
+  @Test
+  void aPageThatAddsABodyAttributeFails() throws Exception {
+    assertPlantedPageChange(
+        source -> source.replace(", pageToast=true", ", pageToast=true, pageShowModal=true"));
   }
 
   @Test
   void aPageWithAnotherStylesheetFails() throws Exception {
-    assertPlantedChange(
-        "admin-settings.html",
+    assertPlantedPageChange(
         source -> source.replace("/css/pages/admin-settings.css", "/css/pages/planted.css"));
   }
 
-  private static final String SIDEBAR_CALL =
-      "<th:block th:replace=\"~{fragments/sidebar :: sidebar}\" />";
+  @Test
+  void aLayoutWithTheHeaderBeforeTheSidebarFails() throws Exception {
+    assertPlantedLayoutChange(
+        layout -> {
+          String sidebar = "<th:block th:replace=\"~{fragments/sidebar :: sidebar}\" />";
+          String header = "<th:block th:replace=\"~{fragments/header :: header}\" />";
+          return layout.replace(sidebar, "@@").replace(header, sidebar).replace("@@", header);
+        });
+  }
 
-  private static final String HEADER_CALL =
-      "<th:block th:replace=\"~{fragments/header :: header}\" />";
+  @Test
+  void aLayoutWithTheContentAfterTheToastFails() throws Exception {
+    assertPlantedLayoutChange(
+        layout -> {
+          String content = "<th:block th:replace=\"${pageContent}\"></th:block>";
+          return layout.replace(content, "").replace("</body>", content + "\n</body>");
+        });
+  }
 
-  private static final String TOAST_CALL =
-      "<th:block th:replace=\"~{fragments/toast :: toast}\" />";
+  @Test
+  void aLayoutThatIgnoresTheBareShellFails() throws Exception {
+    assertPlantedLayoutChange(
+        layout -> layout.replace("th:unless=\"${pageBare}\"", "th:if=\"true\""));
+  }
 
-  private void assertPlantedChange(
-      @NotNull String page, @NotNull java.util.function.UnaryOperator<String> change)
-      throws Exception {
-    String original =
-        Files.readString(TEMPLATE_ROOT.resolve(page), StandardCharsets.UTF_8).replace("\r\n", "\n");
+  private void assertPlantedPageChange(@NotNull UnaryOperator<String> change) throws Exception {
+    String original = source(FULL_PAGE);
     String planted = change.apply(original);
     assertThat(planted).as("the planted change must alter the source").isNotEqualTo(original);
-    resolver.overrides.put(page.substring(0, page.length() - ".html".length()), planted);
+    resolver.overrides.put(FULL_PAGE.substring(0, FULL_PAGE.length() - ".html".length()), planted);
 
-    List<String> rendered = render(page);
+    assertThat(render(FULL_PAGE))
+        .as("planted change in " + FULL_PAGE)
+        .isNotEqualTo(goldenLines(FULL_PAGE));
+  }
 
-    assertThat(rendered).as("planted change in " + page).isNotEqualTo(goldenLines(page));
+  private void assertPlantedLayoutChange(@NotNull UnaryOperator<String> change) throws Exception {
+    String original = source(LAYOUT + ".html");
+    String planted = change.apply(original);
+    assertThat(planted).as("the planted change must alter the layout").isNotEqualTo(original);
+    resolver.overrides.put(LAYOUT, planted);
+
+    List<String> rendered = new ArrayList<>();
+    List<String> golden = new ArrayList<>();
+    for (String page : LAYOUT_PROBES) {
+      rendered.addAll(render(page));
+      golden.addAll(goldenLines(page));
+    }
+    assertThat(rendered).as("planted change in the layout").isNotEqualTo(golden);
+  }
+
+  private static @NotNull String source(@NotNull String name) throws IOException {
+    return Files.readString(TEMPLATE_ROOT.resolve(name), StandardCharsets.UTF_8)
+        .replace("\r\n", "\n");
   }
 
   private @NotNull List<String> goldenLines(@NotNull String page) throws IOException {
@@ -245,7 +291,8 @@ class PageChromeSnapshotTest {
   }
 
   /**
-   * Serves a page template with its own markup neutralised, from disk or from a planted override.
+   * Serves a page template with its own markup neutralised, from disk or from a planted override,
+   * and the layout fragment from a planted override while one is set.
    */
   static final class OracleResolver implements ITemplateResolver {
 
@@ -267,6 +314,9 @@ class PageChromeSnapshotTest {
         String ownerTemplate,
         String template,
         Map<String, Object> templateResolutionAttributes) {
+      if (LAYOUT.equals(template) && overrides.containsKey(LAYOUT)) {
+        return resolution(overrides.get(LAYOUT));
+      }
       if (!template.startsWith(PREFIX)) {
         return null;
       }
@@ -279,8 +329,12 @@ class PageChromeSnapshotTest {
           throw new UncheckedIOException(ex);
         }
       }
+      return resolution(ChromeNeutraliser.neutralise(source));
+    }
+
+    private static TemplateResolution resolution(String source) {
       return new TemplateResolution(
-          new StringTemplateResource(ChromeNeutraliser.neutralise(source)),
+          new StringTemplateResource(source),
           TemplateMode.HTML,
           NonCacheableCacheEntryValidity.INSTANCE);
     }
