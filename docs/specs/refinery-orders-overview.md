@@ -247,8 +247,8 @@ shows differs from the signed-in member. The read DTO `RefineryOrderDto` is unch
 
 `GET /api/v1/refinery-orders/settings` answers the refinery rounding mode that converts units to SCU
 (`roundingMode`, a `java.math.RoundingMode` name, default `UP`) to every authenticated caller. The
-web reads it instead of `GET /api/v1/settings/refinery.rounding.mode`; the admin page keeps writing the
-value through `PUT /api/v1/settings/{key}`.
+web reads it instead of `GET /api/v1/settings/refinery.rounding.mode`; the admin page keeps reading and writing the
+value through `/api/v1/settings/{key}`, which only ADMIN may read (REQ-SEC-083).
 
 **Enforced by:** `RefineryOrderControllerTest` (`CreateMyRefineryOrderTests`, `UpdateRequestShapeTests`),
 `RefineryOrderMapperTest`, `RefinerySettingsServiceTest`, `SmallRestPathCutTest` · **Code:**

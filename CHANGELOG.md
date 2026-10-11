@@ -22,6 +22,8 @@
 
 - **REST-API, Welle 6 (der kleine Rest).** Die Ankündigung liegt unter `/api/v1/announcements/current` (Lesen mit `204`, wenn keine aktiv ist, Schreiben, Löschen und die Admin-Ansicht `…/admin`), die Materialgesuche der Materialbörse unter `/api/v1/material-exchange/requests/…`; das Zurückziehen eines Angebots über die Lagerzeile ist `POST /api/v1/material-exchange/offers/deactivate?inventoryItemId=`. Die Job-Alters-Schwellen liefert `GET /api/v1/orders/settings`, den Rundungsmodus der Raffinerie `GET /api/v1/refinery-orders/settings`; `GET /api/v1/settings/{key}` bleibt der Admin-Speicher dahinter. Raffinerie-Aufträge werden mit eigenen Anfrage-Objekten angelegt und geändert (ohne `id`, Besitzer, Gewinn und Staffel); für ein anderes Mitglied bestellt die Logistik über `POST /api/v1/refinery-orders/users/{userId}`. Der veraltete Fleetview-Import `POST /api/v1/hangar/import/fleetview` ist entfernt (im Web kommen Schiffslisten über `POST /api/v1/hangar/import/ships`, der Import-Knopf heißt jetzt „Schiffsliste importieren“; der eigene Fleetview-Import der Android-App entfällt mit Version 19), und mit ihm die Deprecation-Header-Mechanik. Alte Pfade antworten `410 APP_UPDATE_REQUIRED` (App) oder `404`; die neue Android-Version 19 ist Voraussetzung.
 
+- **Einstellungen lesen nur noch Admins.** `GET /api/v1/settings` und `GET /api/v1/settings/{key}` (der rohe Einstellungsspeicher) verlangen die Rolle ADMIN wie das Schreiben; Mitglieder und die App lesen die Schwellen und den Rundungsmodus über `GET /api/v1/orders/settings` und `GET /api/v1/refinery-orders/settings` (REQ-SEC-083).
+
 ## [v1.14.0](https://github.com/krt-profit/basetool/releases/tag/v1.14.0) - 2026-10-10
 
 ### Added
