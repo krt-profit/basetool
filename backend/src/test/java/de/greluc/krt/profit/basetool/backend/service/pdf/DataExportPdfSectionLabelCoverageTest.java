@@ -21,7 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service.pdf;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -56,7 +57,7 @@ class DataExportPdfSectionLabelCoverageTest {
   }
 
   private static List<String> sectionKeys() {
-    return DataExportSections.SECTIONS.stream().map(DataExportSections.Section::key).toList();
+    return ExportSectionDeclarations.inReadingOrder().stream().map(Section::key).toList();
   }
 
   /**

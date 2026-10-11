@@ -28,7 +28,9 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationType;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
@@ -196,7 +198,7 @@ class DataExportIntegrationTest {
 
     DataExportService.DataExport export = dataExportService.export(subject);
 
-    assertThat(export.sections()).hasSameSizeAs(DataExportSections.SECTIONS);
+    assertThat(export.sections()).hasSameSizeAs(ExportSectionDeclarations.inReadingOrder());
     assertThat(export.subjectId()).isEqualTo(subject);
     assertThat(export.subjectHandle()).isEqualTo("ZzzSubjectZzz");
     assertThat(export.sections().stream().filter(s -> s.key().equals("account")).findFirst())
@@ -214,10 +216,10 @@ class DataExportIntegrationTest {
         .allSatisfy(
             s ->
                 assertThat(s.legalBasis())
-                    .isIn(DataExportSections.ART_15, DataExportSections.ART_15_20));
+                    .isIn(LegalBasis.ART_15.name(), LegalBasis.ART_15_20.name()));
     assertThat(export.sections().stream().map(DataExportService.ExportSection::key).toList())
         .containsExactlyElementsOf(
-            DataExportSections.SECTIONS.stream().map(DataExportSections.Section::key).toList());
+            ExportSectionDeclarations.inReadingOrder().stream().map(Section::key).toList());
   }
 
   @Test
@@ -230,7 +232,7 @@ class DataExportIntegrationTest {
 
     assertThat(allStrings(export))
         .withFailMessage(
-            "An export leaked another member's handle. The projections in DataExportSections must "
+            "An export leaked another member's handle. The projections of the export sections must "
                 + "not select another member's handle column, and free text must go through "
                 + "HandleScrubber.")
         .noneMatch(v -> v.contains(OTHER_HANDLE));
@@ -295,10 +297,10 @@ class DataExportIntegrationTest {
 
   @Test
   void noSectionSelectsTheAuditSubjectLabel() {
-    assertThat(DataExportSections.SECTIONS)
+    assertThat(ExportSectionDeclarations.inReadingOrder())
         .withFailMessage(
             "A section selects subject_label. It is a person for the job-order and "
-                + "account-deletion trails, and adding the section to FREE_TEXT_SECTIONS does not "
+                + "account-deletion trails, and scrubbing the column in the section does not "
                 + "fix it -- the scrubber is built from the roster and cannot see a non-member.")
         .noneMatch(section -> section.sql().contains("subject_label"));
   }

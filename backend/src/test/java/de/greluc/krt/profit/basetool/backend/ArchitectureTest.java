@@ -150,7 +150,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageL
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.platform.internal.RequestBodyLimitProperties;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.DataExportSections;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonSearchTargets;
@@ -334,7 +333,6 @@ class ArchitectureTest {
           ClientAttribution.class,
           ClientDirectory.class,
           ConnectedAppsProperties.class,
-          DataExportSections.class,
           ExchangeChangeRetentionProperties.class,
           ExchangeClientDirectory.class,
           ExchangeConnectionRetentionProperties.class,
@@ -1077,7 +1075,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 63);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 62);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);

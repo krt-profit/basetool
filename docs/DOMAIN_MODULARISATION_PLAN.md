@@ -1511,7 +1511,8 @@ requests, each green on its own: (a) `UserErasureParticipant` with the orchestra
 2026-10-11**; (b) `HandleAnonymisationParticipant`, which replaces `service.BankHandleSnapshots`
 and the audit, job-order and handover repositories `HandleAnonymisationService` writes — **done
 2026-10-11**; (c)
-`PersonalDataExportSection`, one per module for the sections of `DataExportSections`; (d)
+`PersonalDataExportSection`, one per module for the sections of `DataExportSections` — **done
+2026-10-11**; (d)
 `PersonMentionSource`, for the targets of `PersonSearchTargets`; (e) `UserReassignmentParticipant`,
 for the `FOLLOWS_THE_MEMBER` / `STAYS_WITH_THE_ACT` lists of `UserAccountMergeService`. Each rewrites
 its live-schema coverage test to compare the union of the registered participants with
@@ -1621,6 +1622,46 @@ package cycle `audit` ⇄ `repository` (the lesson of P3-8a); it moves with the 
 repository. (5) The sentinel is no parameter: every participant reads `kernel.HandleAnonymisation`.
 (6) The spellings reach the participants as the distinct, trimmed, non-blank list, longest first,
 that the orchestrator always built; a participant with no text-matched column ignores it.
+**P4 slice c — done 2026-10-11 (the export sections).** `DataExportService` no longer reads a
+central list: it runs the sections the modules declare, and `DataExportSections` is gone.
+1. *Characterise*: `PersonalDataExportCatalogueTest` (reading order, key, legal basis, a digest of
+   every statement, the scrubbed and the exempted columns of the 45 sections against a committed
+   catalogue) and `DataExportEndStateTest` (real Postgres: a member with a row in every one of the
+   45 sections next to a second member whose rows and handle must not appear; the JSON compared with
+   a committed document after ids, instants and the job-order display id are replaced), both added
+   before the change in their own commit and green on the unchanged code. Proven able to fail:
+   dropping the scrub of the market offers' remark and changing the legal basis of the realm roles
+   turn both red.
+2. *SPI*: `platform.api.PersonalDataExportSection` with `sections()` and the nested `Section`
+   record (position, key, `LegalBasis`, rationale, statement, `scrubbedColumns`,
+   `unscrubbedPersonColumns`; `scrubbing(...)` and `keeping(...)` extend one). It is a pure
+   declaration, so it is not an `@ObserverSpi` and no participant is transactional. Sixteen
+   implementations, one per owning module: identity (5 sections), orgunit (2), orgchart (1),
+   promotion (1), inventory (1), hangar (1), exchange (6), personalinventory (1), blueprint (1),
+   notification (3), mission (5), refinery (1), joborder (2), materialexchange (4), bank (9: seven
+   bank sections and the two bank audit trails), audit (2). The inventory's and the blueprint's sit
+   in `service`, assigned by their names, until their modules move (P4-1, P4-2).
+3. *Registry*: `privacy.internal.PersonalDataExportRegistry` collects the beans, orders them by
+   position and refuses a duplicate key or position at startup. The two maps of the old class,
+   `FREE_TEXT_COLUMNS` and `UNSCRUBBED_PERSON_COLUMNS`, became declarations on the section that
+   selects the column.
+4. *Gates*: the tests read the union of the participants, found by scanning
+   (`ExportSectionDeclarations`), not a list: `GdprParticipantCoverageTest` derives the exported
+   member columns from it (a section a participant declares closes its gap, shown by a planted
+   participant; the floor stays 44), `DataExportScrubCoverageTest`, the two PDF label tests and the
+   integration tests use it, and the new `PersonalDataExportOwnershipTest` holds every section to
+   the module that owns the table its `:userId` condition filters.
+The export JSON and PDF are unchanged. Baseline **36 → 36** (the file holds 36 since P4-3): the declarations are SQL text and name
+no class.
+**Corrections:** (1) The plan and the evidence counted 36 sections; there are 45. (2) The reading
+order is global and a module's sections are not contiguous in it (identity's `realmRoles` follows
+the org-chart placement, the bank's audit trails follow the activity trail), so the position sits on
+each section (10, 20, ... in the old order) and not on the participant, as the erasure's does.
+(3) The legal basis is an enum; the export and the PDF still carry its name. (4) The leaf-helper
+floor of `ArchitectureTest` fell from 63 to 62 with the class. (5) The characterisation first
+asserted that the external contact is absent from the whole document, which is wrong for the
+member's own prose; it now separates a name in a column no section selects (must be absent) from
+one in the member's own text (stays).
 **P4-1 — move the inventory into `inventory.web` / `inventory.internal`** (carried from P3-5e,
 §7.5). It waits until the layer classes that consume `inventory.api` have left the layer packages:
 identity's `MeController`, the org-unit membership

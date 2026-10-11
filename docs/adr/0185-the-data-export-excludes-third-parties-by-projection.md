@@ -215,6 +215,14 @@ application/json`; and the JSON export returned a POJO, so it negotiated its way
 served to the member as `datenauskunft.json`. Both content types are pinned on the `ResponseEntity`
 now, which is what every other download endpoint in the codebase already did.
 
+## Implementation note — 2026-10-11
+
+`DataExportSections`, named throughout this ADR, no longer exists: the sections, their scrub
+columns and their exemptions are declared by the module that owns each table, as
+`platform.api.PersonalDataExportSection` implementations (plan §7.6, P4 slice c). The decision
+is unchanged: a section is still one written statement that selects only the subject's own
+columns, and the gates named above now read the union of the modules' declarations.
+
 ## Alternatives considered
 
 - **Localise the ~30 per-section hints into the three bundles.** Rejected: it would put thirty

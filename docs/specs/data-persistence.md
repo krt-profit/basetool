@@ -1150,8 +1150,8 @@ listed with its reason:
   (`audit_event.target_user_id`, `bank_audit_event.target_user_id`, REQ-AUDIT-001; and
   `p4k_import_job.created_by`, the enqueuing admin's id on an import job, pruned to seven days
   after every import run).
-- **Export** (REQ-SEC-058, `DataExportSections`): a section selects the member's rows by it, or it
-  is listed as not exported. Today 43 columns are exported and 13 are not, each of which names the
+- **Export** (REQ-SEC-058, the `PersonalDataExportSection` participants of the modules): a
+  section selects the member's rows by it, or it is listed as not exported. Today 43 columns are exported and 13 are not, each of which names the
   member as the actor on somebody else's or the organisation's record, or mirrors an exported
   column. The eight columns that held data about the member without a section
   (`bank_account_approval_limit.grantee_user_id`, `bank_account_grant.user_id`,
@@ -1170,14 +1170,18 @@ listed with its reason:
   column that no longer exists fails; a column listed as not exported that a section exports fails.
 - [x] Every listed deletion step is a call `UserDeletionService` or an `UserErasureParticipant`
   makes.
+- [x] The export check reads the union of the sections every `PersonalDataExportSection` declares,
+  found by scanning: a section a participant declares counts, a column no participant declares
+  fails, and each section sits in the module that owns the table it filters
+  (`PersonalDataExportOwnershipTest`).
 - [x] Proven able to fail: a table with a non-cascading foreign key to `app_user` and an
   unregistered `*_by` column, created in a rolled-back transaction, is reported by all three
   registries; a deletion step the service never calls is reported. Selection floor: 56 columns.
 
 **Enforced by:** `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest`,
 `UserIdentityColumnForeignKeyTest` · **Code:** `UserDeletionService`, the `UserErasureParticipant`
-implementations, `DataExportSections`,
-`UserAccountMergeService`
+implementations, the `PersonalDataExportSection`
+implementations, `UserAccountMergeService`
 
 ### REQ-DATA-022 — a cached instance is never edited; caches move to read models
 
