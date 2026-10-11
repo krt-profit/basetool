@@ -987,8 +987,8 @@ their "must stay green" period here (D-01).
   one membership query and two dead methods. (2) Like `MemberEvaluationErasure`,
   `BankHandleSnapshots` cannot sit in `bank.api` while its caller lives in the `service` package the
   bank depends on; it stays there, registered in `BANK_CLASSES` and assigned by a `class` rule, and
-  is carried into Phase 4 with the GDPR participants (§7.6; still open after P4 slice a, it goes with
-  the anonymisation slice). (3) `BusinessMetricsCollector` (`app`)
+  is carried into Phase 4 with the GDPR participants (§7.6; still open after P4 slice a, it went
+  with the anonymisation slice, P4 slice b). (3) `BusinessMetricsCollector` (`app`)
   still reads the booking-request repository directly; it leaves with the per-module gauges of §5.1.
 
 ### 7.5 Phase 3 — the business core
@@ -1503,12 +1503,13 @@ Carried into this phase from Phase 2: `service.MemberEvaluationErasure` (promoti
 `personalinventory.api.PersonalInventoryErasure` were the interim erasure commands `UserDeletionService`
 called; both were replaced by `UserErasureParticipant` implementations in P4 slice a (below), and
 `MemberEvaluationErasure` left the `service` package with that step (P2-3); `service.BankHandleSnapshots`
-(bank) goes the same way with the anonymisation slice (P2-5).
+(bank) went the same way with the anonymisation slice (P4 slice b below, P2-5).
 
 **Slices of the GDPR participants.** The five SPIs are one family each and ship as stacked pull
 requests, each green on its own: (a) `UserErasureParticipant` with the orchestrator — **done
 2026-10-11**; (b) `HandleAnonymisationParticipant`, which replaces `service.BankHandleSnapshots`
-and the audit, job-order and handover repositories `HandleAnonymisationService` writes; (c)
+and the audit, job-order and handover repositories `HandleAnonymisationService` writes — **done
+2026-10-11**; (c)
 `PersonalDataExportSection`, one per module for the sections of `DataExportSections`; (d)
 `PersonMentionSource`, for the targets of `PersonSearchTargets`; (e) `UserReassignmentParticipant`,
 for the `FOLLOWS_THE_MEMBER` / `STAYS_WITH_THE_ACT` lists of `UserAccountMergeService`. Each rewrites
@@ -1574,6 +1575,51 @@ P4-2 (§7.5), and the notification services still live in the layer packages; ea
 moves with its module. (7) The plan's remark that the inventory
 observer's `beforeUserPurge` waits for §7.6 is settled here: it left `StockChangeObserver`, which keeps
 `lower`, `beforeDelete` and `beforeWipe`.
+**P4 slice b — done 2026-10-11 (the handle-anonymisation participants).** `HandleAnonymisationService`
+no longer names a foreign repository or `BankHandleSnapshots`: it normalises the spellings, runs the
+registered `HandleAnonymisationParticipant`s and writes the activity trail's marker row. Its
+collaborators fall from six to two (the participants and the audit recorder).
+1. *Characterise*: `HandleAnonymisationEndStateTest` (real Postgres, added before the change and
+   green on the unchanged code) gives a member a handle snapshot in each of the twelve covered
+   columns, matched by id or by spelling, beside a second member and unrelated names whose rows of
+   the same tables must stay, and pins every rewritten and every untouched value, the eight counts
+   and the two marker rows with their exact details. Proven able to fail: dropping the item-handover
+   rewrite or the bank-holder rewrite turns it red.
+2. *SPI*: `platform.api.HandleAnonymisationParticipant` (`@ObserverSpi`, every implementation
+   `MANDATORY`) with `position()`, `columns()` (the `table.column` set it rewrites),
+   `anonymise(userId, spellings)`, which returns the rows rewritten per table (`Rewritten`: activity
+   audit, bank audit, bank transactions, booking requests, bank holders, job orders, material and
+   item handovers), and `recordAnonymised(userId, rewritten)`, which lets a participant write its own
+   marker. Three implementations, one per module:
+   - `AuditHandleAnonymisation` (10, `service`): the actor snapshot by id, then the subject label per
+     spelling;
+   - `BankHandleAnonymisation` (20, `bank.internal`, the former `BankHandleSnapshotService`): the
+     four bank tables by id, and the bank trail's own `HANDLE_SNAPSHOTS_ANONYMISED` marker;
+   - `JobOrderHandleAnonymisation` (30, `joborder.internal`): per spelling the order contact, the
+     material-handover recipient and the item-handover recipient.
+3. *Orchestrator*: `HandleAnonymisationService.inRunOrder()` sorts by position; the activity trail's
+   marker is written from the summed counts after the participants, then each participant records
+   its own marker, so the activity row still precedes the bank row. `ANONYMISED_COLUMNS` is gone.
+4. *Gates*: `HandleAnonymisationCoverageTest` holds the union of the participants' `columns()` equal
+   to the `ANONYMISED` dispositions of `HandleErasureCoverage`, every such column to a text column of
+   the live schema and to a `PersonSearchTargets` column, and pins the run order and the uniqueness
+   of the positions (a planted drift in the registry is found); `HandleErasureCoverageTest` lost the
+   two checks against the constant; `ArchitectureTest.BANK_CLASSES` is empty and the domain map lost
+   the `BankHandleSnapshots` rule.
+Baseline **38 → 38**: the orchestrator reached the bank and the job order from rank 13, so no edge
+was in play.
+**Corrections:** (1) The SPI is owned by `platform.api`, as in slice a: `audit` (rank 1) is a
+participant and may not depend on `privacy`/`identity`. (2) The baseline file holds 38 edges since
+P3-8b; slice a's line "43 → 43" quoted the number before that step and is corrected here. (3) Statements
+of independent tables swapped places because one participant per module runs its statements
+together: the audit subject-label rewrite now runs before the bank tables, the job-order rewrites
+per spelling follow them; no foreign key relates the tables and `HandleAnonymisationEndStateTest`
+pins the result. (4) The audit participant sits in `service`, not in `audit.internal`: the audit
+repository stays in the layer package `repository`, and a class in `audit` using it would close a
+package cycle `audit` ⇄ `repository` (the lesson of P3-8a); it moves with the audit module's
+repository. (5) The sentinel is no parameter: every participant reads `kernel.HandleAnonymisation`.
+(6) The spellings reach the participants as the distinct, trimmed, non-blank list, longest first,
+that the orchestrator always built; a participant with no text-matched column ignores it.
 **P4-1 — move the inventory into `inventory.web` / `inventory.internal`** (carried from P3-5e,
 §7.5). It waits until the layer classes that consume `inventory.api` have left the layer packages:
 identity's `MeController`, the org-unit membership

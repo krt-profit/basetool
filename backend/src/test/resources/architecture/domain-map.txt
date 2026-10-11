@@ -167,7 +167,6 @@ class BlueprintEnvelopeReader blueprint upload-preview envelope SPI, implemented
 class BlueprintAccessPolicy blueprint the blueprint module's access policy (plan 5.4)
 class BlueprintPackTags blueprint log-name clean-up used only by BlueprintImportService
 class BasetoolErrorController platform container error dispatch as RFC 7807
-class BankHandleSnapshots bank GDPR handle anonymisation of the bank tables; in service until 7.6, a bank package would close a service-bank package cycle
 
 package dto catalogue external feed DTO packages of the UEX, SC Wiki and P4K imports
 package integration catalogue outbound catalogue clients
