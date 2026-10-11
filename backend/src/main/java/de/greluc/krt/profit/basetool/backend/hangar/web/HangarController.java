@@ -66,10 +66,10 @@ import org.springframework.web.multipart.MultipartFile;
  * REST surface for the personal hangar, the squadron-wide overview, the admin per-user hangar and
  * the third-party ship-export JSON import.
  *
- * <p>{@code /my-ships} derives the owner from the JWT; {@code /admin/users/{userId}/ships} is ADMIN-only.
- * The class-level {@code isAuthenticated()} gate is only the floor (REQ-SEC-052); the squadron
- * overview and the home-location bulk edit carry {@link #HANGAR_ACCESS} on the method, which the
- * URL rule repeats.
+ * <p>{@code /my-ships} derives the owner from the JWT; {@code /admin/users/{userId}/ships} is
+ * ADMIN-only. The class-level {@code isAuthenticated()} gate is only the floor (REQ-SEC-052); the
+ * squadron overview and the home-location bulk edit carry {@link #HANGAR_ACCESS} on the method,
+ * which the URL rule repeats.
  */
 @RestController
 @RequestMapping("/api/v1/hangar")
