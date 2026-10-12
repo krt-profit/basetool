@@ -2648,6 +2648,15 @@ head's first, synchronous script. The list only shrinks.
   assets are cached for a year as `immutable`; the map is what makes a changed module a new URL. The
   CSP is unchanged: `script-src 'nonce-…' 'strict-dynamic'` admits the static imports of a nonced
   module and the nonced map.
+- **No module is wrapped in an immediately invoked function.** A body that opens with an early
+  `return` is a named function with one call (`initBankGrants()`), never a wrapper expression.
+- **The seams between the parts of a page are hook registries**, never `window` names:
+  `mission/mission-hooks.js`, `joborder/joborder-hooks.js`, `operation/operation-hooks.js`,
+  `inventory/inventory-hooks.js` and `kernel/krt-hooks.js`. The registry is a leaf module with no
+  effect, so the parts keep their load order; a `window` name stays only where a Playwright source,
+  a node test, a classic script or an inline bootstrap reads it (today `krtFetch`, `krtCsrf`,
+  `krtLiveSync`, `krtModal`, `krtSearchableSelect`, `krtHtml`, `krtComboboxRemoteSources`,
+  `krtEvents`, `krtI18nText`, `krtMaterialRelease`, `krtMaterialRequest`).
 - **A script under its plain URL is revalidated.** `/js/**` answers `Cache-Control: no-cache`; only a
   content-hashed name answers `max-age=31536000, public, immutable`, so a module the scan missed is
   never held stale for a year.
@@ -2661,7 +2670,7 @@ head's first, synchronous script. The list only shrinks.
 
 **Acceptance**
 
-- [x] 142 of 143 scripts are modules; the order of the document listeners, their handler bodies and the
+- [x] 147 of 148 scripts are modules; the order of the document listeners, their handler bodies and the
   live-sync receivers of the split `bank.js` is identical to the former file's when recorded against a
   stub document (2026-10-12).
 - [x] A rendered page carries the import map before its first module script, with the hashed URL of an
@@ -2670,6 +2679,10 @@ head's first, synchronous script. The list only shrinks.
 - [x] A module linked as a classic script, a classic script linked as a module, a module with a
   `defer`, an import outside the boundary, a dynamic import and a cycle are each reported; the classic
   list cannot grow.
+- [x] The import graph of the modules, registries left out, is identical before and after the move of
+  the page seams into registries, so the modules evaluate in the old tag order (compared by script on
+  the two revisions); the mission dialog, the order material removal and the catalogue table filter
+  work through their hooks on the rendered pages under the real CSP.
 - [x] A script under its plain URL answers `no-cache` with `Last-Modified`, under its hashed URL `immutable`,
   and a hashed name with a wrong hash answers 404.
 - [x] The two rendered pages checked in a browser under the real CSP (`org-unit-bank`, `inventory-admin`)

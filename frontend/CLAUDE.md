@@ -333,6 +333,15 @@ classic (today only `kernel/krt-client-error.js`; the list only shrinks). The ru
   are listed in ADR-0250. A module that registers document listeners does it
   in an exported `init…` function the entry module calls, so the order of listeners per event type is
   visible in one place (`bank/bank.js` is the example).
+- **No immediately invoked function, no `window` seam.** A body that opens with an early `return`
+  is a named function and one call (`function initBankGrants() { … }`, then `initBankGrants();`). The
+  parts of one page that offer something to each other at run time (a section writer, a dialog
+  opener, a reload) set a member of the domain's hook registry (`mission/mission-hooks.js`,
+  `joborder/joborder-hooks.js`, `operation/operation-hooks.js`, `inventory/inventory-hooks.js`,
+  `kernel/krt-hooks.js` across the kernel boundary) where they used to set `window.<name>`, and the
+  others read it where they need it: a registry has no effect and no imports, so the parts keep their
+  tag order. A `window` name stays only where a Playwright source, a node test or the classic beacon
+  reads it (ADR-0250).
 
 ## Package layout (REQ-FE-032, plan §5.9)
 
