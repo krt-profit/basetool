@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;

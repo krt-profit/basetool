@@ -25,7 +25,7 @@ import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFi
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedCityQueries;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedModuleCache;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCreateDto;
-import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.model.JobType;

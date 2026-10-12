@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.web;
 
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;

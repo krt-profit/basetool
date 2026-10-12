@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.RoleMapper;
 import de.greluc.krt.profit.basetool.backend.model.Role;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.RoleDto;
 import de.greluc.krt.profit.basetool.backend.service.RoleService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;

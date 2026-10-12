@@ -48,12 +48,12 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandGro
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;

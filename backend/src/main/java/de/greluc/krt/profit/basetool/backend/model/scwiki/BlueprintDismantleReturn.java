@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.scwiki;
 
-import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

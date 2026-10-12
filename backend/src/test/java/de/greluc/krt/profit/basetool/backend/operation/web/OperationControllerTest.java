@@ -28,7 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.controller.RoleGateFixture;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationDto;

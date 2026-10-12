@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
+import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.persistence.CascadeType;

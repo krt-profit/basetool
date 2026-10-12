@@ -130,7 +130,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipant
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -311,7 +310,7 @@ class ArchitectureTest {
 
   /** The model: JPA-managed types, their nested classes and the legacy model package tree. */
   static final DescribedPredicate<JavaClass> MODEL_CODE =
-      layer("model code", PERSISTENT_TYPES, AbstractEntity.class);
+      layer("model code", PERSISTENT_TYPES, User.class);
 
   /** The validation leaf: constraints, validators and the legacy validation package. */
   static final DescribedPredicate<JavaClass> VALIDATION_CODE =
@@ -1661,7 +1660,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 273);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 272);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 
