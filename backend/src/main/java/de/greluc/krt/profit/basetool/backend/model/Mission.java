@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
+import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

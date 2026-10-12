@@ -20,11 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ItemDerivationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;

@@ -345,16 +345,15 @@ since the go-live of 2026-09-28, so these risks hold now.
   the image pins name different Keycloak lines, and `ServiceRegistrationsTest` fails when one of the
   six service registrations no longer resolves, implements its SPI, instantiates or keeps its
   provider id. Neither runs the SPI inside Keycloak; that stays the sandbox smoke test's job.
-- **The catalogue's entities, repositories, mappers and controllers cannot leave the layer
-  packages yet** (opened 2026-10-12). Every catalogue entity extends `AbstractEntity` and every
-  controller returns `PageResponse`, both kernel types that still lie in the `model` package, and
-  `model` already reaches the catalogue through the entities that point at it. Moving a catalogue
-  entity or controller into `catalogue.internal` would close a `catalogue ↔ model` package cycle,
-  which `ArchitectureTest` refuses; the two types move to the `kernel` package first (102 and 91
-  files import them), and then 159 of the 182 catalogue classes still in the layer packages can
-  follow; the other 23 (the UEX and SC Wiki clients and syncs) also wait for `AuthHelperService`,
-  `CacheConfig` and `ResponseSizeLimitInterceptor`, platform types that lie in layer packages too
-  (plan §7.6, P4-5).
+- **The catalogue's mappers, controllers and services cannot leave the layer packages yet**
+  (opened 2026-10-12; narrowed the same day). `AbstractEntity` and `PageResponse` now lie in
+  `kernel`, so the 101 entities, enums, DTOs, repositories and validation types of the catalogue
+  can move without closing a `catalogue ↔ model` cycle. The mappers, and the controllers and
+  services that call them, still name `CentralMapperConfig`, a platform class in the layer package
+  `mapper`, and `mapper` is part of the cycle; `AdminP4kImportController` also uses
+  `P4kImportJobRunner`. The 23 UEX and SC Wiki classes wait for `AuthHelperService`, `CacheConfig`
+  and `ResponseSizeLimitInterceptor`, platform types that lie in layer packages too (plan §7.6,
+  P4-5).
 - **Three master-data caches still hold entities** (opened 2026-10-03 with thirty-two; the
   catalogue's twenty-nine closed 2026-10-12). `RoleService` and `SquadronService` share the cached
   instance, and their mutators are safe only because they load through self-invocation; a test runs

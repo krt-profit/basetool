@@ -103,8 +103,6 @@ class RedisJsonFanout platform Redis pub/sub transport shared by notification an
 class KrtPdfSupport platform shared PDF design layer
 class AuditLogPdfFormat audit audit PDF format
 class CentralMapperConfig platform MapStruct shared config
-class PageResponse kernel paging envelope used by every list endpoint
-class AbstractEntity kernel JPA base class of every entity
 class DtoConstraints kernel shared validation constants
 class OnUpdate kernel validation group
 class ProblemCode kernel the problem-code contract every registry enum implements (ADR-0235)

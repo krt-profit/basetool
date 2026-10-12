@@ -19,13 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationPreferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationPreferenceWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationUnreadCountDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.NotificationMuteService;
 import de.greluc.krt.profit.basetool.backend.service.NotificationService;
 import de.greluc.krt.profit.basetool.backend.service.NotificationStreamService;

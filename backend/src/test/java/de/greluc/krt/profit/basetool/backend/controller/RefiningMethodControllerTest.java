@@ -24,9 +24,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.RefiningMethodService;
 import java.util.List;
 import java.util.UUID;

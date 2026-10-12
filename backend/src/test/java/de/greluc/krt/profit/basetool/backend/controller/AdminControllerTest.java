@@ -24,9 +24,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.mapper.RoleMapper;
 import de.greluc.krt.profit.basetool.backend.model.Role;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.RoleDto;
 import de.greluc.krt.profit.basetool.backend.service.RoleService;
 import java.util.List;

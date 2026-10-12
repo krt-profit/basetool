@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.personalinventory.web;
 
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemCreateRequest;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemResponse;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemService;

@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.web;
 
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.operation.internal.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationDto;

@@ -24,7 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevel;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionLevelContentService;

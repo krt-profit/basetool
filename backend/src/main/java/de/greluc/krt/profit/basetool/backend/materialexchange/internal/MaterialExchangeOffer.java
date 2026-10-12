@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;

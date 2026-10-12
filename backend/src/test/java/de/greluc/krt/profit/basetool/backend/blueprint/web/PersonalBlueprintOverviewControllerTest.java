@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintOverviewEntryDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintOverviewOwnerDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

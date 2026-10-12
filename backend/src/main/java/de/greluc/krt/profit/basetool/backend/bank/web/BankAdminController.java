@@ -25,9 +25,9 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditReportServic
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankWipeResetResultDto;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditPurgeResultDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.web.UserZone;

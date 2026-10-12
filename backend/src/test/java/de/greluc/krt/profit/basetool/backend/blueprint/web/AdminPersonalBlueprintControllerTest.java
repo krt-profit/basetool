@@ -34,8 +34,8 @@ import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprin
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintBatchResult;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintService;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import java.time.Instant;

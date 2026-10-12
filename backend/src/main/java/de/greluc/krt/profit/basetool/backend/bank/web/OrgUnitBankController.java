@@ -32,7 +32,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountSet
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.web.UserZone;
