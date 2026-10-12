@@ -1277,7 +1277,8 @@ as each pair is decoupled.
     inventory into `inventory.web` / `inventory.internal` once those consumers have left the
     layer packages (P4-1, §7.6), then NullAway covers it without a further change. *Update
     2026-10-11:* part 1 of P4-1 moved the services, the controller and the participants (§7.6);
-    the repositories, the mapper and the entities wait for a read API.
+    *Update 2026-10-12:* part 2 added the read API and moved the repositories, the mapper and the DTOs;
+    the entities stay in `model` until the row is a record (§7.6).
 
 - `hangar` — **done 2026-10-10** (P3-6).
   1. *Characterise*: `HangarModuleContractTest` pins that creating, updating and deleting a ship
@@ -1762,10 +1763,11 @@ layer repository and close no package cycle. (6) The ledger check reads `BankHol
 (`existsByUserId` on both accounts) instead of counting rows with a native query; the message and the
 409 are unchanged. (7) The two coverage tests that read the old static lists now run in a transaction,
 because a participant is `MANDATORY` even for its declarations.
-**P4-1 — move the inventory into `inventory.web` / `inventory.internal` — part 1 done 2026-10-11**
-(carried from P3-5e, §7.5). The Lager's controller, services, access policy and participants move; its
-data layer (entities, repositories, mapper, DTOs, projections) stays in the layer packages, for the
-reasons below, and is **part 2**.
+**P4-1 — move the inventory into `inventory.web` / `inventory.internal` — part 1 done 2026-10-11, part 2
+done 2026-10-12** (carried from P3-5e, §7.5). Part 1: the Lager's controller, services, access policy and
+participants move; its data layer (entities, repositories, mapper, DTOs, projections) stays in the layer
+packages, for the reasons below. Part 2 (after the corrections of part 1) moves the data layer except the
+entities.
 1. *Probe* (not a guess): a class-dependency graph over the compiled `main` classes (`jdeps
    -verbose:class`, nested and generated classes folded onto their source type, one node per first
    package segment), the inventory types reassigned to `inventory`. Moving all 58 inventory types
@@ -1820,8 +1822,7 @@ reasons below, and is **part 2**.
      `model`, `repository` and `mapper` into the set).
    - The Lager DTOs and `model.projection` aggregates: the mapper and the repository return them, and
      `JobOrderItemStockGroupDto` embeds `InventoryGameItemReferenceDto`.
-   **Part 2** moves them once those readers go through `inventory.api`; the entity association of the
-   three job-order entities becomes an id first (as `MaterialExchangeOffer.inventoryItem` did in 5d-4).
+   **Part 2** (below) moves them once those readers go through `inventory.api`.
 5. *Gates*: baseline **36 → 35** (`orgunit -> inventory: OrgUnitMembershipService ->
    InventoryOrgUnitReconciler`; the file holds 35 lines in 7 module pairs), written by
    `ModuleBaselineTest`'s store. `ModularityTest` stays green, so no foreign module reaches an
@@ -1839,6 +1840,103 @@ only its Javadoc named it; only the service did. (3) The package-info of nine mo
 `ModularityTest` failed on `main` and is restored to `hangar::api` here. (4) The GDPR slices a, c, d
 and e recorded "the inventory participants sit in `service` until P4-1": since this step they sit in
 `inventory.internal`; the blueprint's and the notification's still sit in `service`.
+**P4-1, part 2 — done 2026-10-12.** The Lager's repositories, mapper, catalogue service, request and read
+DTOs and projections move into `inventory.internal` / `inventory.api`; the three entities stay.
+1. *Enumerate* every use of the Lager repositories outside the module (class, finder, what it needs):
+   - `ExchangeDemandService`: `findGameItemStockRowsByJobOrderIds` (the item earmarks of many orders).
+   - `ExchangeStockFeedService`: `findExchangeLots`, `findExchangeLotsByKeys` (the lot rows);
+     `ExchangeStockWriteService`: `countExchangeLots`.
+   - `JobOrderQueryService`: `findGameItemStockRowsByJobOrderIds`, `findByJobOrderIdAndMaterialId`,
+     `findByJobOrderIdOrdered`, `findGameItemRowsByJobOrderIdOrdered`, with the mapper's `toDto`;
+     `JobOrderStockReadService`: the last two, with `gameItemToReferenceDto`.
+   - `JobOrderHandoverService`, `JobOrderItemProductionService`: `findByIdForUpdate` (the locked row that
+     `takeFromEarmarkedRow` then lowers); `JobOrderService`: `findById` (the unlink check).
+   - `MaterialExchangeBoardService`: `findReleasableForUser`, `findWithMaterialByIdIn`, `findById`;
+     `MaterialExchangeService`: `findById`.
+   - the layer's `JobOrderStockProjectionService`: `findMaterialStockRowsByJobOrderIds`.
+   Twelve finders in all. The two allocation repositories have no reader outside the module.
+2. *Characterise* (green on the unchanged code, before any change): `JobOrderLinkedStockReadNoNPlusOneTest`
+   (real Postgres) reads the stock earmarked to an order with 3 and with 25 rows of each kind (the material
+   collection, the item stock, the linked rows of a material and the orphaned rows as Lager DTOs, the batched
+   stock index): every read issues the same number of statements for both sizes, within a bound of 15. The
+   DTO bytes were already pinned by `OpenApiGeneratorTest` (`openapi.json` stays untouched),
+   `InventoryEarmarkReadNoNPlusOneTest` and `MaterialExchangeBoardNoNPlusOneTest`; all stayed green
+   unchanged.
+3. *The three associations* (the premise of part 1 was wrong, see Corrections): `JobOrderMaterial`,
+   `JobOrderHandoverItem` and `MaterialClaim` hold no association to `InventoryItem`. What they import is
+   the static `InventoryItem.roundToScuScale` in their `@PrePersist`/`@PreUpdate` hook, as do the Lager's
+   own code and the Materialbörse. It is `kernel.ScuAmounts.roundToScuScale` now (three decimals half up,
+   `null` stays `null`), and `ScuAmountsTest` carries the three rounding tests.
+4. *Read API*: `inventory.api.StockReads`, implemented by the read-only bean
+   `inventory.internal.InventoryStockReads`, one method per use above: `exchangeLots`, `exchangeLotsByKeys`,
+   `countExchangeLots`, `gameItemStockOfOrders`, `materialRowsOfOrder` and `gameItemRowsOfOrder` (the
+   `LinkedStockRow` record: owner, location, material or item, stock, the order's slice, delivered),
+   `rowsOfOrderForMaterial` and `orphanedRowsOfOrder` (Lager DTOs, so the job order needs neither the
+   repository nor the mapper), `findRow`, `findRowsWithMaterial` and `releasableRows` (the Materialbörse;
+   these three still return the entity, which it writes through). `StockCommands.lockRow` is the
+   handover's and the production's `findByIdForUpdate` under the caller's transaction. The repository
+   calls, arguments and transactions are the same, so the statement counts are the same.
+   `JobOrderStockProjectionService` reads its material rows through `service.OrderLinkedStockRows`, a seam
+   the layer owns and `InventoryStockReads` implements (the pattern of `mapper.StockViewerAccess`): the
+   projection belongs to the job order and is read by the exchange, and `service -> inventory.api` would
+   close `service ⇄ inventory` (probed again, 2 class edges). `joborder.web.GameItemController` asks
+   `inventory.api.StockItemCatalogue`, which `InventoryItemCatalogService` implements.
+5. *Probe and move* (class graph over the compiled `main` classes with `jdeps -verbose:class`, nested and
+   generated classes folded onto their source type, one node per first package segment): with the foreign
+   readers routed, moving the repositories, the mapper, the catalogue service, the enums, the stack
+   projections and the DTOs closes no cycle once `JobOrderMapper` stops listing `InventoryItemMapper` in
+   `uses` (the mapping never needed it; it was the one import of `mapper -> inventory`) and the remaining
+   edges below stay out. Moved to `inventory.internal`: the three repositories, `InventoryItemMapper` with
+   `InventoryEarmarkLookup` (no layer class asks it now), `InventoryItemCatalogService`, `CheckoutType`,
+   `BulkRebookMode`, `InventoryItemStackAggregate`, `InventoryStackAggregate`, `OwnedStockSlice` and 22
+   request, result and read DTOs. Moved to `inventory.api`, because the job order and the exchange read
+   them: `InventoryItemDto` with `JobOrderAllocationDto` and `MissionAllocationDto`, `AllocationReductionDto`,
+   `JobOrderGameItemStockRow` and `ExchangeStockLotRow` (the repository's nested projection, now top-level).
+   Ten tests moved with their classes.
+6. *NullAway* covers the moved tree: the optional finder parameters (the filter lists, the minimum
+   quality, the pinned org unit, the stack's quality and owning unit, the picker's query), the optional
+   components of the DTOs (`InventoryItemDto`'s user, material, game item, location, quality, note and
+   owning unit; the aggregate, group and stack DTOs; the book-out request's optional fields; the two
+   allocation DTOs' names) and the mapper's two slice methods carry `@Nullable`; two group sorts use
+   `Objects.requireNonNull` on a component their builders always set.
+7. *Gates*: baseline **32 → 32** (6 module pairs, unchanged: no edge was in play). The model-code floor of
+   `noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities` drops 340 → 312 with the 28 types that
+   left the model tree; `ArchitectureTest.LEAF_HELPER_CLASSES` gains `ScuAmounts`, `InventoryItemDto` and the
+   two allocation DTOs (the owner redactor builds them); eight class rules left the domain map and the name
+   rule is `^(Inventory|StockViewerAccess)`; `OrderLinkedStockRows` is assigned to `inventory`.
+   `ModularityTest` stays green, so no foreign module reaches an `inventory.internal` type.
+**What stays, and the import that blocks it:**
+   - The entities `InventoryItem`, `InventoryJobOrderAllocation`, `InventoryMissionAllocation` (`model`):
+     moving the three together closes no package cycle (probed: moving one alone does, through the other
+     two). Seven foreign classes hold the row, so it could only go to `inventory.api` as a published
+     entity: `ExchangeStockWriteService` (the rows `StockCommands.lockLotRows` returns, `bookOutRow`,
+     `markStolen`), `JobOrderHandoverService` and `JobOrderItemProductionService` (`lockRow`, then the
+     material, quality, location and slice of the row), `JobOrderService` (`findRow`, then
+     `releaseJobOrderEarmark`), `MaterialExchangeBoardService` and `MaterialExchangeService`
+     (`findRow`, `findRowsWithMaterial`, `releasableRows`; the offer takes the row's owner and org unit),
+     and in `inventory.api` itself `StockCommands`, `InventoryAllocations` and `InventoryAuditLabels`.
+     Part 3 turns the row into a record plus id commands, then the three entities move into
+     `inventory.internal`. Every other module's entity that a foreign module still holds (`Mission`,
+     `Ship`, ...) also stays in `model`.
+   - `InventoryGameItemReferenceDto` (`model.dto`): `JobOrderItemStockGroupDto` embeds it; in `inventory`
+     it would close `model ⇄ inventory` (1 class edge).
+   - `JobOrderEarmark`, `MissionEarmark` (`model.projection`): `JobOrderRepository.findEarmarks` and
+     `MissionRepository.findEarmarks` return them (1 class edge each, closing a 7-node cycle).
+   - `JobOrderMaterialStockRow` (`model.projection`): the seam `service.OrderLinkedStockRows` and
+     `JobOrderStockProjectionService` (2 class edges, `service ⇄ inventory`).
+   - `StockViewerAccess` (`mapper`): `JobOrderMapper` (1 class edge, `mapper ⇄ inventory ⇄ service`).
+**Corrections:** (1) Part 1 named three entity associations as the blocker. None exists: `JobOrderMaterial`,
+`JobOrderHandoverItem` and `MaterialClaim` import `InventoryItem` for one static rounding helper, which is
+`kernel.ScuAmounts` now; there was no id conversion, no migration and no memo to add. (2) The real blocker
+of the entities is the other side: the published API and its seven foreign holders take or return the row
+itself (`StockCommands.lockLotRows`, `lockRow`, `bookOutRow`, `markStolen`, `takeFromEarmarkedRow`,
+`releaseJobOrderEarmark`; `StockReads.findRow`, `findRowsWithMaterial`, `releasableRows`). (3) The projection
+service could not use `inventory.api` directly, and the plan's alternative (moving it into the job order's
+`api`) needs a published type for the exchange's `OrderLinkedStockIndex` first; the layer seam is the
+interim, and goes with the projection service when the job order's services move. (4) Part 1 quoted the
+baseline as 36 → 35 in 7 pairs; the file held 32 in 6 (the P4-2 entry says so too) and still does.
+(5) `JobOrderMapper` listed `InventoryItemMapper` in `uses` without needing it. (6) `ExchangeStockLotRow`
+had to leave the repository with the move: a published type must not be nested in an internal repository.
 **P4-2 — move the blueprint into `blueprint.web` / `blueprint.internal`** (carried from
 P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
 The five published interfaces already cover every foreign caller, so the move touches no
