@@ -17,8 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.livesync.internal;
 
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncFanout;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;

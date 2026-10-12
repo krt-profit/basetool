@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.livesync.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -30,16 +30,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-import de.greluc.krt.profit.basetool.backend.dto.LiveSyncChangedRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncChangedRequest;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncRelayService;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncStreamService;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncSubscriptionAuthorizer;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserArgumentResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.GlobalExceptionHandler;
-import de.greluc.krt.profit.basetool.backend.service.LiveSyncRelayService;
-import de.greluc.krt.profit.basetool.backend.service.LiveSyncStreamService;
-import de.greluc.krt.profit.basetool.backend.service.LiveSyncSubscriptionAuthorizer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;

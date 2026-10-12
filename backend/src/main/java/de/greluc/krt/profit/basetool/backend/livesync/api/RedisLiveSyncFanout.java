@@ -17,9 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.livesync.api;
 
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.RedisJsonFanout;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -116,7 +115,7 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
    * @param pattern the subscription pattern; unused
    */
   @Override
-  public void onMessage(@NotNull Message message, byte[] pattern) {
+  public void onMessage(@NotNull Message message, @Nullable byte[] pattern) {
     transport.consume(message, this::deliver);
   }
 

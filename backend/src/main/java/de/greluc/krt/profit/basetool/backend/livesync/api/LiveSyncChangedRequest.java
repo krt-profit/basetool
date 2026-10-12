@@ -17,10 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.dto;
+package de.greluc.krt.profit.basetool.backend.livesync.api;
 
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;

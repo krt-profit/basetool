@@ -17,16 +17,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.controller;
+package de.greluc.krt.profit.basetool.backend.livesync.web;
 
-import de.greluc.krt.profit.basetool.backend.dto.LiveSyncChangedRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.RateLimitExceededException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncChangedRequest;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncRelayService;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncStreamService;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncSubscriptionAuthorizer;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
-import de.greluc.krt.profit.basetool.backend.service.LiveSyncRelayService;
-import de.greluc.krt.profit.basetool.backend.service.LiveSyncStreamService;
-import de.greluc.krt.profit.basetool.backend.service.LiveSyncSubscriptionAuthorizer;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

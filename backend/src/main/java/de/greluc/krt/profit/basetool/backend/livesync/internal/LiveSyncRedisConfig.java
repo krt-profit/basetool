@@ -17,9 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.livesync.internal;
 
-import de.greluc.krt.profit.basetool.backend.livesync.internal.LiveSyncFanoutProperties;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncFanout;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncStreamService;
+import de.greluc.krt.profit.basetool.backend.livesync.api.RedisLiveSyncFanout;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageListenerContainer;
 import io.micrometer.core.instrument.Gauge;

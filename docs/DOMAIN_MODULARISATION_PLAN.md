@@ -2729,6 +2729,15 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
    the domain-map rule `name ^Audit audit` assigns no class any more and left. Baseline unchanged.
 5. *Text scan*: no code or resource names the old packages; nine source paths in `audit.md` and `security-and-access.md` follow.
 
+**Umbrella step 3 — the live-sync module's nine classes move into `livesync.api` / `livesync.internal` / `livesync.web` — done 2026-10-12**
+1. *Move* (19 files, six tests follow because they read package-private limits): the request record, the fan-out SPI, the relay, stream and
+   subscription-authorizer services and the Redis fan-out to `livesync.api`, the two Redis/local transport classes to `livesync.internal`, `LiveSyncController` to
+   `livesync.web`. Paths, bean names and metrics are unchanged.
+2. *NullAway*: `RedisLiveSyncFanout.onMessage` takes a `@Nullable` pattern (the Spring listener contract), the authorizer map lookup is wrapped in
+   `Objects.requireNonNull` inside the existing `try`, so a missing authorizer still refuses the subscription as a failed check. No suppression.
+3. *Gates*: the domain-map rule `name ^(LiveSync|LocalLiveSync|RedisLiveSync)` assigns no class any more and left; no floor or baseline line changed.
+4. *Text scan*: source paths in `frontend-ajax-mutations.md`; nothing in code or resources.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2747,7 +2756,7 @@ before a decision.
   - [x] **2.** done — `audit` (12): `AuditEvent`, `AuditEventRepository`, `AuditService` and its report,
         retention and handle-anonymisation participant, mapper, controller, task. The P4 slice-b entry
         records that the participant waits for the repository.
-  - [ ] **3.** `livesync` (9: controller, DTO, seven services).
+  - [x] **3.** done — `livesync` (9: controller, DTO, seven services).
   - [ ] **4.** `notification` (47: entities and enums, rules, mail, recipient services, the GDPR
         participants that sit in `service`).
   - [x] **5.** done (5a `kernel`, 5b `platform`; owner decision 2026-10-12) — `kernel` (20 types in the layer packages `exception` and `validation`) and `platform`

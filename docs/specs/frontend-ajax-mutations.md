@@ -2006,7 +2006,7 @@ registry: the admin area is web-only permanently, so a room there would have no 
 > (`@EnableRedisIndexedHttpSession` — no session store, no login), and it fails one bean earlier
 > anyway, in the keyspace-notification initializer, before any `SmartLifecycle` runs.
 >
-> **Code:** `backend/…/controller/LiveSyncController`, `backend/…/service/LiveSyncStreamService`,
+> **Code:** `backend/…/livesync/web/LiveSyncController`, `backend/…/livesync/api/LiveSyncStreamService`,
 > `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `backend/…/livesync/api/LiveSyncTopicAuthorizer`
 > and its `*LiveSyncTopicAuthorizer` implementations, `RedisLiveSyncFanout`,
 > `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `NotificationRedisConfig`,

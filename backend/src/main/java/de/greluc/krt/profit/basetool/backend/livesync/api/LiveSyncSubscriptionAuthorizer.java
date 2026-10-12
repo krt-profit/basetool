@@ -17,17 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.livesync.api;
 
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -114,7 +112,7 @@ public class LiveSyncSubscriptionAuthorizer {
             case SELF ->
                 topic.requiredResourceId().equals(authHelperService.currentUserId().orElse(null));
             case MISSION, OPERATION, JOB_ORDER, JOB_ORDER_QUEUE, REFINERY_ORDER, BANK_ACCOUNT ->
-                topicAuthorizers.get(kind).mayJoin(topic);
+                Objects.requireNonNull(topicAuthorizers.get(kind)).mayJoin(topic);
           };
       return allowed ? Verdict.permit() : Verdict.refuse(MetricNames.SUBSCRIBE_DENY_AUTHZ);
     } catch (RuntimeException e) {
