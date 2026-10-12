@@ -68,6 +68,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibi
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankViewUserDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibilityService;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
+import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
@@ -164,7 +165,6 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintOverviewService;
 import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
@@ -1632,7 +1632,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 340);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 325);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 
