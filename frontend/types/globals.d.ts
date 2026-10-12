@@ -826,16 +826,13 @@ interface Window {
         /** Endpoint the owners panel queries, with its own query string already applied. */
         ownersUrl?: string;
     };
-    krtHerkunft?: KrtHerkunftApi;
     /** The shared Lager behaviour of the two inventory pages (`inventory-common.js`). */
-    krtInventory?: KrtInventoryApi;
     krtMaterialRelease?: KrtMaterialDialogApi;
     krtMaterialRequest?: KrtMaterialDialogApi;
     /**
      * The refinery yield-badge manager; required because both refinery-order modules call it
      * unguarded at parse time.
      */
-    krtRefineryYield: KrtRefineryYieldApi;
     krtOpenEditCrewModal?: (source: Element) => void;
     krtOperationsReload?: (...args: any[]) => void;
     krtRefreshOrdersQueue?: (...args: any[]) => void;

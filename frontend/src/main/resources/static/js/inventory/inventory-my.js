@@ -35,8 +35,10 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
+import { krtInventory } from '/js/inventory/inventory-common.js';
+import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
 
-const myLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
+const myLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
     triggerPrefix: 'inv-my',
     basePath: '/inventory/my',
     stackPerOwner: false,
@@ -1050,8 +1052,8 @@ function toggleUmbuchenMode() {
         targetUser.required = true;
         targetLocation.required = true;
     }
-    if (window.krtHerkunft) {
-        window.krtHerkunft.recompute('umbuchen');
+    if (krtHerkunft) {
+        krtHerkunft.recompute('umbuchen');
     }
 }
 
@@ -1148,8 +1150,8 @@ function openUmbuchenModal(
     if (locationMode) locationMode.checked = true;
     toggleUmbuchenMode();
     setMyDisplay('umbuchenModal', 'flex');
-    if (window.krtHerkunft) {
-        window.krtHerkunft.populate('umbuchen', id);
+    if (krtHerkunft) {
+        krtHerkunft.populate('umbuchen', id);
     }
 }
 
@@ -1201,14 +1203,14 @@ function submitUmbuchen(event) {
             }
             return;
         }
-        if (window.krtHerkunft && !window.krtHerkunft.isValid('umbuchen')) {
+        if (krtHerkunft && !krtHerkunft.isValid('umbuchen')) {
             if (typeof showFrontendErrorToast === 'function') {
                 showFrontendErrorToast(assocI18n.overallocated);
             }
             return;
         }
-        const reductions = window.krtHerkunft
-            ? window.krtHerkunft.collect('umbuchen')
+        const reductions = krtHerkunft
+            ? krtHerkunft.collect('umbuchen')
             : { jobOrderReductions: null, missionReductions: null };
         url = `/inventory/${umbuchenItemId}/transfer`;
         payload = {

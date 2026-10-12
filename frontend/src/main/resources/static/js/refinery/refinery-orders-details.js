@@ -28,6 +28,7 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
 
 /**
  * A form control of a material or store row, whose `id`, `name` and `value` the renumbering
@@ -36,7 +37,7 @@ import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
  * @typedef {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement} RodFormControl
  */
 
-window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
+krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
 const REFINERY_ORDER_SECTIONS = {
     order: { container: '#refinery-order-results', fragmentValue: 'order' },
@@ -342,7 +343,7 @@ function updateOutputMaterial(selectElement) {
         outputDisplay.style.opacity = '0.7';
     }
 
-    window.krtRefineryYield.refreshFor(selectElement);
+    krtRefineryYield.refreshFor(selectElement);
 }
 
 function initRefineryOrderSection() {
@@ -372,7 +373,7 @@ function initRefineryOrderSection() {
     updateEndsAt();
     updateProfitPreview();
 
-    window.krtRefineryYield.refreshAll();
+    krtRefineryYield.refreshAll();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -389,7 +390,7 @@ document.addEventListener('krt:swapped', (ev) => {
         syncRefineryStatusBadge();
         revealRefineryStoreWhenReady();
         initRefineryOrderSection();
-        window.krtRefineryYield.onLocationChange(
+        krtRefineryYield.onLocationChange(
             /** @type {KrtRefineryControl | null} */ (document.getElementById('locationId')),
         );
     } else if (container.id === 'refinery-store-results') {
@@ -768,7 +769,7 @@ if (krtEvents && typeof krtEvents.on === 'function') {
         updateOutputMaterial(el);
     });
     krtEvents.on('change', 'rod-location-change', (el) => {
-        window.krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
+        krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
     });
     krtEvents.on('input', 'rod-calc-scu', (el) => {
         calcScu(el.getAttribute('data-index'));

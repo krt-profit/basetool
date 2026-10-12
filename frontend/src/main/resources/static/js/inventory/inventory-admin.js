@@ -36,8 +36,10 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
+import { krtInventory } from '/js/inventory/inventory-common.js';
+import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
 
-const adminLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
+const adminLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
     triggerPrefix: 'inv-admin',
     basePath: '/inventory/all',
     stackPerOwner: true,
@@ -591,8 +593,8 @@ function openUmbuchenModal(
     }
     adminLager.refreshUmbuchenTransferOrgUnitPicker();
     krtModal.open(modal);
-    if (window.krtHerkunft && id) {
-        window.krtHerkunft.populate('umbuchen', id);
+    if (krtHerkunft && id) {
+        krtHerkunft.populate('umbuchen', id);
     }
 }
 
@@ -628,14 +630,14 @@ function submitUmbuchen(event) {
         }
         return;
     }
-    if (window.krtHerkunft && !window.krtHerkunft.isValid('umbuchen')) {
+    if (krtHerkunft && !krtHerkunft.isValid('umbuchen')) {
         if (typeof showFrontendErrorToast === 'function') {
             showFrontendErrorToast(assocI18n.overallocated);
         }
         return;
     }
-    const reductions = window.krtHerkunft
-        ? window.krtHerkunft.collect('umbuchen')
+    const reductions = krtHerkunft
+        ? krtHerkunft.collect('umbuchen')
         : { jobOrderReductions: null, missionReductions: null };
     const payload = {
         amount,

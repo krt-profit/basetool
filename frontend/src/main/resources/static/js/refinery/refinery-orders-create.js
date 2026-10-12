@@ -27,8 +27,9 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
 
-window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
+krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
 /**
  * Derives a material row's SCU amount from its unit quantity.
@@ -83,7 +84,7 @@ function updateOutputMaterial(selectElement) {
         outputDisplay.style.opacity = '0.7';
     }
 
-    window.krtRefineryYield.refreshFor(selectElement);
+    krtRefineryYield.refreshFor(selectElement);
 }
 
 function setStartedAtNow() {
@@ -394,7 +395,7 @@ if (krtEvents && typeof krtEvents.on === 'function') {
         updateOutputMaterial(/** @type {KrtRefineryControl} */ (el));
     });
     krtEvents.on('change', 'rfc-location-change', (el) => {
-        window.krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
+        krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
     });
     krtEvents.on('input', 'rfc-calc-scu', (el) => {
         calcScu(el.getAttribute('data-index'));
@@ -530,7 +531,7 @@ function _reinitRefineryForm(fromSwap) {
     ).forEach((select) => {
         if (select.value) updateOutputMaterial(select);
     });
-    if (window.krtRefineryYield) {
+    if (krtRefineryYield) {
         const locationSelect = /** @type {KrtRefineryControl | null} */ (
             document.getElementById('locationId')
         );
@@ -538,11 +539,11 @@ function _reinitRefineryForm(fromSwap) {
             fromSwap &&
             locationSelect &&
             locationSelect.value &&
-            typeof window.krtRefineryYield.onLocationChange === 'function'
+            typeof krtRefineryYield.onLocationChange === 'function'
         ) {
-            window.krtRefineryYield.onLocationChange(locationSelect);
+            krtRefineryYield.onLocationChange(locationSelect);
         } else {
-            window.krtRefineryYield.refreshAll();
+            krtRefineryYield.refreshAll();
         }
     }
     updateProfitPreview();

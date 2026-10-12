@@ -90,7 +90,8 @@ function onLocationChange(selectElement) {
         });
 }
 
-window.krtRefineryYield = {
+/** @type {KrtRefineryYieldApi} */
+export const krtRefineryYield = {
     init,
     setBadge,
     refreshFor,

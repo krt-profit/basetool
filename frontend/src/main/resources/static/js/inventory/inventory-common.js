@@ -30,6 +30,7 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
 
 const ASSOC_EPS = 0.0005;
 
@@ -844,8 +845,8 @@ function createLager(cfg) {
         loadSellTerminals(materialId, terminalSelect, sellRadio, sellNotPossibleReason);
 
         krtModal.open(modal);
-        if (window.krtHerkunft && id) {
-            window.krtHerkunft.populate('bookout', id);
+        if (krtHerkunft && id) {
+            krtHerkunft.populate('bookout', id);
         }
     }
 
@@ -854,8 +855,8 @@ function createLager(cfg) {
         if (typeof resetUnsavedChanges === 'function') {
             resetUnsavedChanges();
         }
-        if (window.krtHerkunft) {
-            window.krtHerkunft.reset('bookout');
+        if (krtHerkunft) {
+            krtHerkunft.reset('bookout');
         }
         const modal = document.getElementById('bookOutModal');
         if (modal) krtModal.close(modal);
@@ -884,14 +885,14 @@ function createLager(cfg) {
         const versionEl = input('version');
         if (!amountEl || !versionEl) return;
         const amount = krtScuInput ? krtScuInput.parse(amountEl.value) : parseFloat(amountEl.value);
-        if (window.krtHerkunft && !window.krtHerkunft.isValid('bookout')) {
+        if (krtHerkunft && !krtHerkunft.isValid('bookout')) {
             if (typeof showFrontendErrorToast === 'function') {
                 showFrontendErrorToast(assocI18n.overallocated);
             }
             return;
         }
-        const reductions = window.krtHerkunft
-            ? window.krtHerkunft.collect('bookout')
+        const reductions = krtHerkunft
+            ? krtHerkunft.collect('bookout')
             : { jobOrderReductions: null, missionReductions: null };
         const payload = {
             amount,
@@ -1055,8 +1056,8 @@ function createLager(cfg) {
     /** Closes the Umbuchen modal and resets its unsaved-changes and Herkunft state. */
     function closeUmbuchenModal() {
         if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
-        if (window.krtHerkunft) {
-            window.krtHerkunft.reset('umbuchen');
+        if (krtHerkunft) {
+            krtHerkunft.reset('umbuchen');
         }
         const modal = document.getElementById('umbuchenModal');
         if (modal) krtModal.close(modal);
@@ -1605,4 +1606,5 @@ function createLager(cfg) {
     };
 }
 
-window.krtInventory = { createLager };
+/** @type {KrtInventoryApi} */
+export const krtInventory = { createLager };

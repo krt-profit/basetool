@@ -678,7 +678,8 @@ function collect(prefix) {
     return out;
 }
 
-window.krtHerkunft = {
+/** @type {KrtHerkunftApi} */
+export const krtHerkunft = {
     populate,
     recompute,
     collect,
