@@ -2416,6 +2416,17 @@ Two frontend meters were added by the 2026-08 logging audit:
   for a report-only policy too, which is why the beacon needs no `report-uri` for this phase.
   `sum(increase(basetool_client_error_total{kind="csp_violation"}[7d]))` staying empty is the
   precondition for switching production to `enforce` (`deployment.md`).
+- `basetool_client_csp_violation_total{directive}` — counter minted by `ClientErrorReportController`
+  beside `basetool_client_error_total` for every accepted `csp_violation` beacon, so a spike names
+  its violated directive without raising the logger to `DEBUG` on production. `directive` is the
+  first word of the beacon's `message`, kept only when it is a name in the server-side allow-list
+  (`ClientErrorReportController.CSP_DIRECTIVES`: the `*-src` fetch directives, `base-uri`,
+  `form-action`, `frame-ancestors`, `sandbox`, `require-trusted-types-for`, `trusted-types`) and
+  counted as `other` otherwise, so the label set is bounded whatever a caller sends (REQ-OBS-006).
+  Panel 85 on dashboard `07` plots it per hour beside panel 43. `require-trusted-types-for` and
+  `trusted-types` are the report-only Trusted Types policy, `script-src-*` / `style-src-*` /
+  `img-src` / `connect-src` the enforced one. No alert of its own: `ClientErrorSpike` already
+  fires on the `csp_violation` kind and its text points here.
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =

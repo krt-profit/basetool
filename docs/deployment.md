@@ -1208,7 +1208,10 @@ policy went live, no CSP violation was reported, and the dialog page walk of the
 sum(increase(basetool_client_error_total{kind="csp_violation"}[7d])) > 0
 ```
 
-A hit is a violation, not necessarily a Trusted Types one. To name it, raise
+A hit is a violation, not necessarily a Trusted Types one. The directive names it without a write:
+`sum by (directive) (increase(basetool_client_csp_violation_total[7d]))` (dashboard `07`, panel 85)
+— `require-trusted-types-for` and `trusted-types` are this policy, anything else is the enforced
+policy. To name the sink or the blocked origin, raise
 `de.greluc.krt.profit.basetool.frontend.shell.web.ClientErrorReportController` to DEBUG through
 `/actuator/loggers` (REQ-OBS-016; a production write as well) and read `{app="frontend"} |= "Client
 error reported [kind=csp_violation"`: a Trusted Types sink shows as `message=require-trusted-types-for
