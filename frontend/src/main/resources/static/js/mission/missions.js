@@ -2,6 +2,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 
 const MISSIONS_SECTIONS = {
     list: { container: '#missions-results', fragmentValue: 'results' },
@@ -143,7 +144,7 @@ const MISSIONS_SECTIONS = {
             });
             selectPeriod('UPCOMING');
             persistFilters();
-            if (window.krtFilterChips) window.krtFilterChips.refresh(form);
+            if (krtFilterChips) krtFilterChips.refresh(form);
             loadResults();
         });
     }

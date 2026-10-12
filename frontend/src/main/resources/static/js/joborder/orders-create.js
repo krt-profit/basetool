@@ -27,6 +27,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtEnhanceComboboxes, krtSearchableSelect } from '/js/kernel/krt-searchable-select.js';
 
 function buildScuHint() {
     const hint = document.createElement('span');
@@ -435,8 +436,8 @@ function addMaterialRow() {
     );
 
     container.appendChild(row);
-    if (window.krtEnhanceComboboxes) {
-        window.krtEnhanceComboboxes(row);
+    if (krtEnhanceComboboxes) {
+        krtEnhanceComboboxes(row);
     }
     materialIndex++;
     syncMaterialRemoveButtons();
@@ -544,8 +545,8 @@ function addItemLine(prefill) {
         itemSelect.appendChild(seeded);
         itemSelect.value = prefill.gameItemId;
     }
-    if (itemSelect && window.krtSearchableSelect) {
-        window.krtSearchableSelect(itemSelect, {
+    if (itemSelect && krtSearchableSelect) {
+        krtSearchableSelect(itemSelect, {
             placeholder: ITEM_I18N.searchPlaceholder,
             noResultsText: ITEM_I18N.searchNoResults,
             hintText: ITEM_I18N.searchHint,

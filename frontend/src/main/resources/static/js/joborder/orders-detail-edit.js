@@ -40,6 +40,7 @@ import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const handoverForm = /** @type {HTMLFormElement | null} */ (
@@ -245,8 +246,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             materialsContainer.appendChild(fragment);
             const newRow = /** @type {Element} */ (materialsContainer.lastElementChild);
-            if (window.krtEnhanceComboboxes) {
-                window.krtEnhanceComboboxes(newRow);
+            if (krtEnhanceComboboxes) {
+                krtEnhanceComboboxes(newRow);
             }
             refreshEditMaterialUnit(newRow);
         });

@@ -21,6 +21,7 @@
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 
 (function () {
     const form = document.getElementById('rule-form');
@@ -232,8 +233,8 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
          */
         function enhanceSelectorRow(row, selector) {
             const enhance = function () {
-                if (window.krtEnhanceComboboxes) {
-                    window.krtEnhanceComboboxes(row);
+                if (krtEnhanceComboboxes) {
+                    krtEnhanceComboboxes(row);
                 }
             };
             const userId = selector && selector.kind === 'SPECIFIC_USER' ? selector.userId : null;

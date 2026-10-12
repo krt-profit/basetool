@@ -24,6 +24,7 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 
 const DEMAND_SECTIONS = {
     demand: { container: '#orders-material-demand-results', fragmentValue: 'results' },
@@ -417,7 +418,7 @@ function applyDemandView() {
 
     applyDemandSort();
     restoreBucketStates(document);
-    if (window.krtFilterPanel) window.krtFilterPanel.refresh('demandFilterPanel');
+    if (krtFilterPanel) krtFilterPanel.refresh('demandFilterPanel');
 }
 
 /**
@@ -572,9 +573,9 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     readDemandState();
     restoreDemandControls();
-    if (window.krtFilterPanel) {
-        window.krtFilterPanel.registerCounter('demandFilterPanel', countActiveDemandFilters);
-        window.krtFilterPanel.refresh('demandFilterPanel');
+    if (krtFilterPanel) {
+        krtFilterPanel.registerCounter('demandFilterPanel', countActiveDemandFilters);
+        krtFilterPanel.refresh('demandFilterPanel');
     }
     applyDemandView();
 

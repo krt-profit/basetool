@@ -24,6 +24,8 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 
 const ORDERS_SECTIONS = {
     queue: { container: '#orders-results', fragmentValue: 'results' },
@@ -424,11 +426,11 @@ function countActiveOrdersFilters() {
 }
 
 function refreshOrdersFilterBadge() {
-    if (window.krtFilterPanel) window.krtFilterPanel.refresh('orders-filter-panel');
+    if (krtFilterPanel) krtFilterPanel.refresh('orders-filter-panel');
 }
 
-if (window.krtFilterPanel && typeof window.krtFilterPanel.registerCounter === 'function') {
-    window.krtFilterPanel.registerCounter('orders-filter-panel', countActiveOrdersFilters);
+if (krtFilterPanel && typeof krtFilterPanel.registerCounter === 'function') {
+    krtFilterPanel.registerCounter('orders-filter-panel', countActiveOrdersFilters);
 }
 
 if (krtEvents && typeof krtEvents.on === 'function') {
@@ -453,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusDiffers = restoreStatusFilter();
     const squadronDiffers = restoreSquadronFilter();
     refreshOrdersFilterBadge();
-    if (window.krtFilterChips) window.krtFilterChips.refresh();
+    if (krtFilterChips) krtFilterChips.refresh();
     if ((scopeDiffers || statusDiffers || squadronDiffers) && krtFetch) applyOrdersFilter();
 
     const filterForm = document.getElementById('orders-filter-form');

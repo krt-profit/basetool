@@ -1,6 +1,7 @@
 // @ts-check
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 
 (function () {
     const filterForm = /** @type {HTMLFormElement | null} */ (
@@ -128,7 +129,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
             });
             selectPeriod('UPCOMING');
             persistFilters();
-            if (window.krtFilterChips) window.krtFilterChips.refresh(form);
+            if (krtFilterChips) krtFilterChips.refresh(form);
             loadResults();
         });
     }

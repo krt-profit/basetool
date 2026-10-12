@@ -22,6 +22,9 @@
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
+import { krtOverflowMenu } from '/js/kernel/krt-overflow-menu.js';
 
 (function () {
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
@@ -246,11 +249,11 @@ import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
     /** Re-renders the filter chips and the filter badge after a programmatic change. */
     function refreshFilterUi() {
-        if (window.krtFilterChips && form) {
-            window.krtFilterChips.refresh(form);
+        if (krtFilterChips && form) {
+            krtFilterChips.refresh(form);
         }
-        if (window.krtFilterPanel) {
-            window.krtFilterPanel.refresh(FILTER_PANEL_ID);
+        if (krtFilterPanel) {
+            krtFilterPanel.refresh(FILTER_PANEL_ID);
         }
     }
 
@@ -377,8 +380,8 @@ import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
             btn.classList.toggle('active', on);
             btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
-        if (window.krtOverflowMenu) {
-            window.krtOverflowMenu.closeAll();
+        if (krtOverflowMenu) {
+            krtOverflowMenu.closeAll();
         }
         document.querySelectorAll('[data-mb-cta-group]').forEach((group) => {
             /** @type {HTMLElement} */ (group).hidden =

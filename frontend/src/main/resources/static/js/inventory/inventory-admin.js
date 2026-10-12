@@ -34,6 +34,8 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 
 const adminLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-admin',
@@ -236,8 +238,8 @@ function countActiveAdminInventoryFilters() {
 
 function filterInventory() {
     persistAdminInventoryFilters();
-    if (window.krtFilterPanel) window.krtFilterPanel.refresh('globalFilterPanel');
-    if (window.krtFilterChips) window.krtFilterChips.refresh();
+    if (krtFilterPanel) krtFilterPanel.refresh('globalFilterPanel');
+    if (krtFilterChips) krtFilterChips.refresh();
     const itemsView = adminLager.lagerIsItemsView();
     const activeMats = adminLager.collectChecked('matCheck');
     const activeGameItems = adminLager.collectChecked('gameItemCheck');
@@ -433,14 +435,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ) {
         adminLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
-    if (window.krtFilterPanel) {
-        window.krtFilterPanel.registerCounter(
-            'globalFilterPanel',
-            countActiveAdminInventoryFilters,
-        );
-        window.krtFilterPanel.refresh('globalFilterPanel');
+    if (krtFilterPanel) {
+        krtFilterPanel.registerCounter('globalFilterPanel', countActiveAdminInventoryFilters);
+        krtFilterPanel.refresh('globalFilterPanel');
     }
-    if (window.krtFilterChips) window.krtFilterChips.refresh();
+    if (krtFilterChips) krtFilterChips.refresh();
     if (filtersRestored) filterInventory();
 });
 

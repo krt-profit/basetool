@@ -2,6 +2,7 @@
 
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtCsrf, krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 
 const form = /** @type {HTMLFormElement | null} */ (document.getElementById('audit-filter-form'));
 const resultsContainer = document.getElementById('audit-results');
@@ -58,7 +59,7 @@ if (form && resultsContainer && krtFetch) {
             form.querySelectorAll('select').forEach((el) => {
                 el.selectedIndex = 0;
             });
-            if (window.krtFilterChips) window.krtFilterChips.refresh(form);
+            if (krtFilterChips) krtFilterChips.refresh(form);
             loadResults(resetLink.getAttribute('href'));
         });
     }

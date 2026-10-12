@@ -310,7 +310,8 @@ function initAll(root) {
     for (let i = 0; i < bars.length; i++) init(/** @type {HTMLElement} */ (bars[i]));
 }
 
-window.krtFilterChips = {
+/** @type {KrtFilterChipsApi} */
+export const krtFilterChips = {
     /**
      * Re-renders the chip bars; a page that swaps its filter form calls this after the swap.
      *

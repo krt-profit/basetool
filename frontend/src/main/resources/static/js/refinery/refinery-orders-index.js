@@ -20,6 +20,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 
 const REFINERY_SECTIONS = {
     queue: { container: '#refinery-orders-results', fragmentValue: 'results' },
@@ -321,7 +322,7 @@ const REFINERY_SECTIONS = {
         }
         if (view && (differs || typeof saved.view !== 'string')) persist();
         if (differs) {
-            if (window.krtFilterChips) window.krtFilterChips.refresh(form || undefined);
+            if (krtFilterChips) krtFilterChips.refresh(form || undefined);
             load(true);
         }
     }

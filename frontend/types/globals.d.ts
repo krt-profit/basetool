@@ -741,9 +741,6 @@ interface Window {
 
     krtEvents: KrtEventsApi;
     krtLiveSync: KrtLiveSyncApi;
-    krtFilterPanel: KrtFilterPanelApi;
-    krtOverflowMenu: KrtOverflowMenuApi;
-    krtFilterChips: KrtFilterChipsApi;
     krtHtml: KrtHtmlApi;
     /** The browser's Trusted Types factory; absent where the browser has none. */
     trustedTypes?: TrustedTypePolicyFactory;
@@ -756,7 +753,6 @@ interface Window {
     krtModalClose: (overlay: Element | null) => void;
     openModal?: (...args: any[]) => void;
 
-    krtEnhanceComboboxes?: (root: ParentNode) => void;
     krtLocalizeDates: (root?: ParentNode | null) => void;
     krtSearchableSelect?: (select: HTMLSelectElement, config: Record<string, unknown>) => unknown;
     krtComboboxRemoteSources?: Record<string, unknown>;

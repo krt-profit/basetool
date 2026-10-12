@@ -28,6 +28,8 @@ import {
 } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 
 function pmPutEvaluation(url, payload) {
     if (!krtFetch) {
@@ -615,8 +617,8 @@ document.addEventListener('DOMContentLoaded', () => {
     pmApplyCollapsedState(pmLoadCollapsedTopics());
     pmFormatLastEvaluated();
     pmRestoreFilters();
-    if (window.krtFilterPanel) window.krtFilterPanel.refresh('pm-filter-panel');
-    if (window.krtFilterChips) window.krtFilterChips.refresh();
+    if (krtFilterPanel) krtFilterPanel.refresh('pm-filter-panel');
+    if (krtFilterChips) krtFilterChips.refresh();
     const initialSort = pmRestoreSortMode();
     pmSetSortMode(initialSort);
     pmApplySort(initialSort);

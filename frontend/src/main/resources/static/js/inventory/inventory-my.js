@@ -33,6 +33,8 @@ import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 
 const myLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-my',
@@ -762,8 +764,8 @@ function countActiveMyInventoryFilters() {
 function filterMyInventory() {
     clearBulkSelection();
     persistMyInventoryFilters();
-    if (window.krtFilterPanel) window.krtFilterPanel.refresh('myFilterPanel');
-    if (window.krtFilterChips) window.krtFilterChips.refresh();
+    if (krtFilterPanel) krtFilterPanel.refresh('myFilterPanel');
+    if (krtFilterChips) krtFilterChips.refresh();
     const itemsView = myLager.lagerIsItemsView();
     const activeMaterials = myLager.collectChecked('matCheck');
     const activeGameItems = myLager.collectChecked('gameItemCheck');
@@ -963,11 +965,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ) {
         myLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
-    if (window.krtFilterPanel) {
-        window.krtFilterPanel.registerCounter('myFilterPanel', countActiveMyInventoryFilters);
-        window.krtFilterPanel.refresh('myFilterPanel');
+    if (krtFilterPanel) {
+        krtFilterPanel.registerCounter('myFilterPanel', countActiveMyInventoryFilters);
+        krtFilterPanel.refresh('myFilterPanel');
     }
-    if (window.krtFilterChips) window.krtFilterChips.refresh();
+    if (krtFilterChips) krtFilterChips.refresh();
     if (filtersRestored) filterMyInventory();
 });
 

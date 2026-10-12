@@ -730,5 +730,6 @@ document.addEventListener('krt:swapped', (event) => {
     enhanceWithin((detail && detail.container) || document);
 });
 
+export { krtSearchableSelect, enhanceWithin as krtEnhanceComboboxes };
+
 window.krtSearchableSelect = krtSearchableSelect;
-window.krtEnhanceComboboxes = enhanceWithin;

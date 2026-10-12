@@ -28,6 +28,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 
 const ASSOC_EPS = 0.0005;
 
@@ -388,8 +389,8 @@ function createLager(cfg) {
             .then((html) => {
                 krtFetch.setTrustedHtml(content, html);
                 headerRow.setAttribute('data-stack-loaded', 'true');
-                if (typeof window.krtEnhanceComboboxes === 'function') {
-                    window.krtEnhanceComboboxes(content);
+                if (typeof krtEnhanceComboboxes === 'function') {
+                    krtEnhanceComboboxes(content);
                 }
                 if (cfg.onStackEntriesLoaded) cfg.onStackEntriesLoaded(content);
             })

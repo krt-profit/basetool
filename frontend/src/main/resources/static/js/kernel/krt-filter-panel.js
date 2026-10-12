@@ -156,7 +156,8 @@ function initAll() {
     }
 }
 
-window.krtFilterPanel = {
+/** @type {KrtFilterPanelApi} */
+export const krtFilterPanel = {
     /**
      * Registers a page-specific active-filter counter, replacing the generic scan.
      *

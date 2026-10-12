@@ -26,6 +26,7 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 
 window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
@@ -211,8 +212,8 @@ function addMaterialRow() {
     });
 
     container.appendChild(template);
-    if (window.krtEnhanceComboboxes) {
-        window.krtEnhanceComboboxes(template);
+    if (krtEnhanceComboboxes) {
+        krtEnhanceComboboxes(template);
     }
 }
 

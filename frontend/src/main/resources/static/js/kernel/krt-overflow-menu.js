@@ -182,7 +182,8 @@ document.addEventListener('keydown', (event) => {
     items[next].focus();
 });
 
-window.krtOverflowMenu = {
+/** @type {KrtOverflowMenuApi} */
+export const krtOverflowMenu = {
     /**
      * Closes every open overflow menu without moving focus.
      */
