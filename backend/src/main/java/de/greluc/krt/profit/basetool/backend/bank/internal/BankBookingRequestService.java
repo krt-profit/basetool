@@ -44,6 +44,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -128,7 +129,7 @@ public class BankBookingRequestService {
       @NotNull UUID accountId,
       @NotNull BankBookingRequestType type,
       @NotNull BigDecimal amount,
-      String note,
+      @Nullable String note,
       @Nullable String justification,
       @Nullable UUID targetAccountId,
       boolean requiresOwnerApproval,
@@ -806,7 +807,7 @@ public class BankBookingRequestService {
               request.getType(),
               request.getAmount(),
               request.getAccount().getAccountNo(),
-              request.getOwnerApprovalGrantedByHandle(),
+              Objects.requireNonNull(request.getOwnerApprovalGrantedByHandle()),
               actor));
     } else {
       eventPublisher.publishEvent(BankNotices.approvalRevoked(request.getId()));
@@ -909,7 +910,7 @@ public class BankBookingRequestService {
    * @param userId the user id, possibly {@code null}
    * @return the effective name, or {@code "unknown"}
    */
-  private String resolveHandle(UUID userId) {
+  private String resolveHandle(@Nullable UUID userId) {
     return Optional.ofNullable(userId)
         .flatMap(userRepository::findById)
         .map(User::getEffectiveName)

@@ -42,6 +42,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
 /**
@@ -78,6 +79,7 @@ public class NotificationRule extends AbstractEntity<UUID> {
 
   /** Free-text admin description of the rule's intent; {@code null} allowed. */
   @Column(name = "description", length = 255)
+  @Nullable
   private String description;
 
   /** Whether the rule is active; disabled rules are ignored by the engine. */

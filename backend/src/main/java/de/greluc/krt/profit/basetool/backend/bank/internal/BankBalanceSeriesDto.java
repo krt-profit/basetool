@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import java.math.BigDecimal;
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Account-detail balance chart payload (REQ-BANK-049): the end-of-bucket balance series over the
@@ -31,4 +32,5 @@ import java.util.List;
  * @param balanceTarget the account's balance target (REQ-BANK-036), or {@code null} when none is
  *     set
  */
-public record BankBalanceSeriesDto(List<BankBalancePointDto> points, BigDecimal balanceTarget) {}
+public record BankBalanceSeriesDto(
+    List<BankBalancePointDto> points, @Nullable BigDecimal balanceTarget) {}

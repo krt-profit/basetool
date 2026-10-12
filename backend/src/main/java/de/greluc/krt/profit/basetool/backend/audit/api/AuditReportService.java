@@ -81,12 +81,12 @@ public class AuditReportService {
                 e ->
                     new AuditLogPdfFormat.Row(
                         e.getOccurredAt(),
-                        HandleAnonymisation.humanise(
+                        HandleAnonymisation.humaniseRequired(
                             e.getActorHandle(), label("general.anonymisedHandle")),
                         e.getEventType().name(),
                         e.getSubjectLabel() == null
                             ? "—"
-                            : HandleAnonymisation.humanise(
+                            : HandleAnonymisation.humaniseRequired(
                                 e.getSubjectLabel(), label("general.anonymisedHandle")),
                         e.getDetails() != null ? e.getDetails() : ""))
             .toList();

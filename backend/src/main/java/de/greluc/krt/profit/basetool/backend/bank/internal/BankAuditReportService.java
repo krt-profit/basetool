@@ -87,7 +87,7 @@ public class BankAuditReportService {
                 e ->
                     new AuditLogPdfFormat.Row(
                         e.getOccurredAt(),
-                        HandleAnonymisation.humanise(
+                        HandleAnonymisation.humaniseRequired(
                             e.getActorHandle(), label("general.anonymisedHandle")),
                         e.getEventType().name(),
                         e.getAccountId() != null

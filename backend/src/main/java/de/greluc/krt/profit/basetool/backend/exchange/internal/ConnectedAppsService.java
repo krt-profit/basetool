@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -144,7 +145,7 @@ public class ConnectedAppsService {
                               i.getLastSeenAt(),
                               unseen.contains(i.getId())))
                   .toList(),
-              writes.get(client.getClientId()).stream()
+              Objects.requireNonNull(writes.get(client.getClientId())).stream()
                   .map(
                       w ->
                           new ConnectedAppActivityDto(

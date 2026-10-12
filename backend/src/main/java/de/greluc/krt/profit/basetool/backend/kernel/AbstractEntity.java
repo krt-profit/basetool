@@ -31,6 +31,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.proxy.HibernateProxy;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Persistable;
 
 /** Base class shared by all JPA entities (Abstract Entity). */
@@ -39,7 +40,9 @@ import org.springframework.data.domain.Persistable;
 @Setter
 public abstract class AbstractEntity<K extends Serializable> implements Persistable<K> {
 
-  @Version private Long version;
+  @Version
+  @Setter(onParam_ = @__(@Nullable))
+  private Long version;
 
   @CreationTimestamp
   @Column(updatable = false)

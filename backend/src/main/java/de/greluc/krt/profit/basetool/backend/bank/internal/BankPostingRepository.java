@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -122,8 +123,8 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
       """)
   Page<BankBookingRow> findBookings(
       @Param("accountId") UUID accountId,
-      @Param("from") Instant from,
-      @Param("to") Instant to,
+      @Param("from") @Nullable Instant from,
+      @Param("to") @Nullable Instant to,
       Pageable pageable);
 
   /**

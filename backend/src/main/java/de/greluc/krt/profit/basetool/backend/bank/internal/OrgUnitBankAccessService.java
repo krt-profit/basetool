@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -1122,7 +1123,8 @@ public class OrgUnitBankAccessService {
       boolean match =
           switch (grant.getGranteeKind()) {
             case GLOBAL_ROLE ->
-                authHelperService.hasReachableRole(Roles.authority(grant.getRoleCode()));
+                authHelperService.hasReachableRole(
+                    Roles.authority(Objects.requireNonNull(grant.getRoleCode())));
             case ALL_MEMBERS -> authHelperService.isMemberOrAbove();
             case USER -> userId.filter(id -> id.equals(grant.getGranteeUserId())).isPresent();
             case MEMBERSHIP_ROLE, AREA_MEMBERS -> false;
@@ -1177,7 +1179,7 @@ public class OrgUnitBankAccessService {
           yield false;
         }
         MembershipRole holderRole =
-            account.getOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND
+            Objects.requireNonNull(account.getOrgUnit()).getKind() == OrgUnitKind.SPECIAL_COMMAND
                 ? MembershipRole.SK_LEAD
                 : MembershipRole.STAFFELLEITER;
         yield ownerScopeService.currentUserHoldsRoleOnOrgUnit(owner, holderRole);
@@ -1358,7 +1360,8 @@ public class OrgUnitBankAccessService {
                   && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owner, role);
             }
             case GLOBAL_ROLE ->
-                authHelperService.hasReachableRole(Roles.authority(limit.getRoleCode()));
+                authHelperService.hasReachableRole(
+                    Roles.authority(Objects.requireNonNull(limit.getRoleCode())));
             case AREA_MEMBERS -> owner != null && callerIsMemberOfAreaCascade(owner);
             case ALL_MEMBERS ->
                 owner != null && ownerScopeService.currentUserIsMemberOfOrgUnit(owner);

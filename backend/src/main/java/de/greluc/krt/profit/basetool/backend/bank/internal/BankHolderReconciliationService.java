@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -80,7 +81,9 @@ public class BankHolderReconciliationService implements UserSyncFollowUp {
     Map<UUID, BankHolder> holderByUser =
         staffHolders.stream()
             .filter(h -> h.getUser() != null)
-            .collect(Collectors.toMap(h -> h.getUser().getId(), h -> h, (a, _) -> a));
+            .collect(
+                Collectors.toMap(
+                    h -> Objects.requireNonNull(h.getUser()).getId(), h -> h, (a, _) -> a));
 
     int created = 0;
     Set<UUID> missing =

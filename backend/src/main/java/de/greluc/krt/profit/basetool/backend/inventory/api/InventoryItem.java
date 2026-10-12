@@ -117,6 +117,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
 
   @Min(0)
   @Column(nullable = false)
+  @Setter(onParam_ = @__(@Nullable))
   private Double amount;
 
   @Column(nullable = false)
@@ -175,6 +176,8 @@ public class InventoryItem extends AbstractEntity<UUID> {
   @PrePersist
   @PreUpdate
   void roundAmountToScuScale() {
-    amount = ScuAmounts.roundToScuScale(amount);
+    if (amount != null) {
+      amount = ScuAmounts.roundToScuScale(amount.doubleValue());
+    }
   }
 }

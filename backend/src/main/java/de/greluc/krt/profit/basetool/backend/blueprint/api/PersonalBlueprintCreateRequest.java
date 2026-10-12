@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.blueprint.api;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Payload adding one blueprint to the caller's owned set; the server resolves display name and
@@ -33,5 +34,5 @@ import java.time.Instant;
  */
 public record PersonalBlueprintCreateRequest(
     @NotBlank @Size(max = 255) String productKey,
-    Instant acquiredAt,
-    @Size(max = 2000) String note) {}
+    @Nullable Instant acquiredAt,
+    @Nullable @Size(max = 2000) String note) {}

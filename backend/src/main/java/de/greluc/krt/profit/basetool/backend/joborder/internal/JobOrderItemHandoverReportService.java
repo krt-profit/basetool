@@ -125,7 +125,7 @@ public class JobOrderItemHandoverReportService {
       KrtPdfSupport.addMetaRow(
           metaTable,
           "EMPFÄNGER (HANDLE)",
-          HandleAnonymisation.humanise(recipientHandle, label("general.anonymisedHandle")));
+          HandleAnonymisation.humaniseRequired(recipientHandle, label("general.anonymisedHandle")));
       krt.document().add(metaTable);
 
       KrtPdfSupport.addSectionHeader(krt, "ÜBERGEBENE GÜTER");

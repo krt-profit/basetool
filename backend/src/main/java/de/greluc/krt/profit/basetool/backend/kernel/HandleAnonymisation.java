@@ -77,4 +77,18 @@ public final class HandleAnonymisation {
       @Nullable String handle, @NotNull String anonymisedLabel) {
     return SENTINEL.equals(handle) ? anonymisedLabel : handle;
   }
+
+  /**
+   * Renders a present handle for human-facing backend output; {@link #humanise} for a handle that
+   * cannot be {@code null}.
+   *
+   * @param handle the stored handle snapshot
+   * @param anonymisedLabel the resolved {@code general.anonymisedHandle} label
+   * @return the label when the value is the erasure sentinel, otherwise the handle unchanged
+   */
+  @Contract(pure = true)
+  public static @NotNull String humaniseRequired(
+      @NotNull String handle, @NotNull String anonymisedLabel) {
+    return SENTINEL.equals(handle) ? anonymisedLabel : handle;
+  }
 }

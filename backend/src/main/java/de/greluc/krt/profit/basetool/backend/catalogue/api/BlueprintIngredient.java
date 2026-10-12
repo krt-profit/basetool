@@ -105,6 +105,7 @@ public class BlueprintIngredient extends AbstractEntity<UUID> {
 
   /** Wiki display name of the ingredient at sync time — kept even when the FK resolves. */
   @Column(name = "wiki_name_snapshot")
+  @Nullable
   private String wikiNameSnapshot;
 
   /** Quantity in SCU for a RESOURCE line. */

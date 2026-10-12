@@ -2908,7 +2908,7 @@ The question for the owner: A, B or C.
    the promotion repositories; `HandleErasureCoverage.of` returns `@Nullable`; `AndroidClientProperties.releasesUrl` reads the override once; eleven dereferences of a value that is non-null by the surrounding rule are wrapped in `Objects.requireNonNull`
    (the same `NullPointerException`). `OrgUnitMembershipService.patchFlags` got an overload on the plain values, which the `MembershipOperations` SPI calls, because the SPI's version may be `null` (an ADD or REMOVE carries none) and the request record
    cannot say so without two conflicting nullness annotations; a `null` version still ends in the same 409.
-4. *Open*: `bank`, `exchange`, `kernel` and `app` stay on the `api`-only list.
+4. *Open — then done (entry "Umbrella follow-up: NullAway checks bank, exchange, kernel and app" below)*: `bank`, `exchange`, `kernel` and `app` stayed on the `api`-only list.
 
 **Umbrella step 17 — requirement status, arc42 and the CLAUDE.md files — done 2026-10-12, partly**
 1. *Plan §14 status*: REQ-XCH-009/011 need nothing but the rewritten source paths; REQ-DATA-010 waits for the access-policy decision of step 12 (the six scope fragments are still `ScopeSpecifications`);
@@ -3037,6 +3037,13 @@ The owner did not accept the empty module baseline of steps 6 and 7: five classe
 2. *Built*: `platform.api.BusinessGaugeSource` (`register(MeterRegistry)` and `sample()`) with the builders `BusinessGauges` (count gauge, age gauge, `ageSeconds`). Eight sources, each beside the repository it reads: `IdentityBusinessGauges` (registrations, orphaned accounts), `DeletionRequestBusinessGauges` (`privacy.internal`), `BankBusinessGauges`, `JobOrderBusinessGauges`, `OperationBusinessGauges`, `RefineryBusinessGauges`, `P4kImportBusinessGauges` (`catalogue.internal`), `MaterialExchangeBusinessGauges`. `BusinessMetricsCollector` is `app.internal` and only registers the sources once and samples them in one read-only transaction on the same interval, still as `ScheduledJob.BUSINESS_METRICS`. The `task` package is gone. The shape of the interface is **derived, not individually reviewed**.
 3. *Proof*: before the change the registered meter set was written down (22 gauges plus `scheduled.job.enabled{task=business_metrics}`: name, tags, base unit); `BusinessMetricsCollectorTest` compares the set of the new wiring with that list (`monitoring/business-gauges.txt`) and keeps every value test. Metric names, labels and values are unchanged, so `monitoring/` needs no edit. The module-pair floor of `ModuleBaselineTest` falls 174 to 167 because `app` no longer names five modules.
 
+**Umbrella follow-up: NullAway checks bank, exchange, kernel and app — done 2026-10-12**
+1. *Census*: with `bank`, `exchange`, `kernel` and `app` added, `-Xmaxerrs` raised: 215 findings (`bank` 53, `exchange` 71, `kernel` 2, the rest in the modules that call the kernel's helpers); the cascade came from the kernel's nullable returns (`ScuAmounts`, `StringNormalization`, `HandleAnonymisation`, `LikePatterns`) and from `AppException`. `app` had none.
+2. *Kernel, by making the contract explicit*: `ScuAmounts.roundToScuScale(double)` is a non-null overload (a primitive argument now selects it; the `Double` overload stays nullable); `HandleAnonymisation.humaniseRequired` is the non-null twin of `humanise`; the protected `AppException` constructors take a `@Nullable` kind (the `DomainProblem` constructors pass none); `ProblemResponseFactory.problem` takes a `@Nullable` title and detail, which `ProblemDetail` accepts; `AbstractEntity.setVersion` and `InventoryItem.setAmount` accept `null` (the create paths clear the version; a builder fills the amount last). `PaginationUtil`'s documented nullable page, size and sort parameters are `@Nullable`.
+3. *Modules, by annotation or restructuring, no suppression*: `@Nullable` on the optional JPQL parameters of the bank and exchange repositories, on the optional fields of `JobOrder.comment`, `GameItem`, `ShipType`, `Manufacturer`, `Material`, `BlueprintIngredient`, `MissionStep`, `NotificationRule` and on the optional components of the bank, exchange and blueprint DTOs and records they flow into; the entity amount hooks guard their `null` instead of rounding it; sites that read a `Map.get` or an optional association after the surrounding rule has established it are wrapped in `Objects.requireNonNull` (the same `NullPointerException` the dereference threw). Two reports (bank statement and management) print an empty cell for a missing holder, which is what the PDF cell already rendered for `null`.
+4. *Enabled*: `bank`, `exchange`, `kernel` and `app` join `nullAwayPackages` as whole trees; with them every module is checked as a whole tree.
+5. *Not individually reviewed*: the choice of `@Nullable` versus `requireNonNull` at each site follows the surrounding rule and is flagged for review.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -3094,9 +3101,7 @@ before a decision.
         `TableOwnershipTest`); each move updates the owner of the tables it moves, nothing else.
   - [x] **15.** struck by the owner 2026-10-12 — P3-11, the per-command audit contract: it was never defined and is not implemented.
 - Quality gates:
-  - [x] **16.** partly done, `bank`, `exchange`, `kernel`, `app` open — NullAway to the whole tree of every module as it becomes whole (today: `blueprint`,
-        `catalogue`, `hangar`, `identity`, `inventory`, `joborder`, `materialexchange`, `mission`,
-        `operation`, `refinery`, `scope`; the other modules' `api` packages only).
+  - [x] **16.** done — NullAway to the whole tree of every module (`bank`, `exchange`, `kernel` and `app` last, see the follow-up entry).
   - [x] **17.** partly done, REQ-DATA-010 waits — Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
         REQ-XCH-009/011; arc42 §5.2/§5.3 per module; CLAUDE.md files.
 - Gradle extraction, last (they move whole source trees):

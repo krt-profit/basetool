@@ -110,14 +110,18 @@ basetool {
   nullAwayPackages.addAll(
     listOf(
         "admin",
+        "app",
         "audit",
+        "bank",
         "blueprint",
         "catalogue",
         "dashboard",
+        "exchange",
         "hangar",
         "identity",
         "inventory",
         "joborder",
+        "kernel",
         "livesync",
         "materialexchange",
         "mission",

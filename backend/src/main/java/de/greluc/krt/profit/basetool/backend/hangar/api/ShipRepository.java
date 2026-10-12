@@ -398,7 +398,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
-      @Param("query") String query,
+      @Param("query") @Nullable String query,
       Pageable pageable);
 
   /**

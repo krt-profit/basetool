@@ -317,7 +317,7 @@ public class ExchangeStockWriteService {
     List<Lot> lots = new ArrayList<>(ops.size());
     for (int i = 0; i < ops.size(); i++) {
       ExchangeStockChangeSet.Op op = ops.get(i);
-      Catalogue entry = catalogue.get(i);
+      Catalogue entry = Objects.requireNonNull(catalogue.get(i));
       Skip skip = null;
       Lot lot = null;
       if (entry.result() != null) {
@@ -354,7 +354,7 @@ public class ExchangeStockWriteService {
       ExchangeStockChangeSet.Op op = ops.get(i);
       Lot lot = lots.get(i);
       String unit = lot.unit();
-      List<InventoryItem> rows = locked.get(lot.key());
+      List<InventoryItem> rows = Objects.requireNonNull(locked.get(lot.key()));
       BigDecimal current = quantities.computeIfAbsent(lot.key(), _ -> round(sum(rows), unit));
       BigDecimal expected = round(op.expectedQuantity().amount(), unit);
       BigDecimal target = round(op.quantity().amount(), unit);
@@ -398,7 +398,9 @@ public class ExchangeStockWriteService {
     for (ExchangeResolveResponse.Result result : materials.results()) {
       if (result.status() == ExchangeResolveResponse.Status.RESOLVED) {
         Material material =
-            materialRepository.findById(UUID.fromString(result.ref().bt())).orElseThrow();
+            materialRepository
+                .findById(UUID.fromString(Objects.requireNonNull(result.ref()).bt()))
+                .orElseThrow();
         byIndex.put(result.index(), Catalogue.of(material));
       } else if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS) {
         byIndex.put(result.index(), Catalogue.skip(AMBIGUOUS, "AMBIGUOUS"));
@@ -415,7 +417,9 @@ public class ExchangeStockWriteService {
         int index = retry.get(result.index());
         if (result.status() == ExchangeResolveResponse.Status.RESOLVED) {
           GameItem item =
-              gameItemRepository.findById(UUID.fromString(result.ref().bt())).orElseThrow();
+              gameItemRepository
+                  .findById(UUID.fromString(Objects.requireNonNull(result.ref()).bt()))
+                  .orElseThrow();
           byIndex.put(index, Catalogue.of(item));
         } else if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS) {
           byIndex.put(index, Catalogue.skip(AMBIGUOUS, "AMBIGUOUS"));
@@ -916,7 +920,7 @@ public class ExchangeStockWriteService {
      */
     @NotNull
     UUID catalogueId() {
-      return material != null ? material.getId() : gameItem.getId();
+      return material != null ? material.getId() : Objects.requireNonNull(gameItem).getId();
     }
 
     /**
@@ -926,7 +930,10 @@ public class ExchangeStockWriteService {
      */
     @NotNull
     String key() {
-      String head = material != null ? "m:" + material.getId() : "i:" + gameItem.getId();
+      String head =
+          material != null
+              ? "m:" + material.getId()
+              : "i:" + Objects.requireNonNull(gameItem).getId();
       return head
           + "|l:"
           + location.getId()

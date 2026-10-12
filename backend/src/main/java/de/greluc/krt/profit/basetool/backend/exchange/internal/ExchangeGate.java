@@ -211,7 +211,10 @@ public class ExchangeGate {
       return false;
     }
     return installationRepository
-        .findByKey(subject.externalClient(), UUID.fromString(subject.subject()), key)
+        .findByKey(
+            Objects.requireNonNull(subject.externalClient()),
+            UUID.fromString(subject.subject()),
+            key)
         .map(ExchangeInstallation::getRevokedAt)
         .isPresent();
   }

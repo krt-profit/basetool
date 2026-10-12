@@ -47,6 +47,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -309,11 +310,12 @@ public class ExchangeUndoService {
    */
   private boolean restoreLot(
       @NotNull UUID member, @NotNull String lotKey, @Nullable JsonNode before) {
-    if (before == null || before.get("quantity") == null || text(before, "unit") == null) {
+    String unit = text(before, "unit");
+    if (before == null || before.get("quantity") == null || unit == null) {
       return false;
     }
     BigDecimal quantity = before.get("quantity").decimalValue();
-    return stockWriteService.restoreLot(member, lotKey, quantity, text(before, "unit"));
+    return stockWriteService.restoreLot(member, lotKey, quantity, unit);
   }
 
   /**
@@ -351,7 +353,7 @@ public class ExchangeUndoService {
         new ShipRequestDto(
             text(before, "name"),
             shipType,
-            text(before, "insurance"),
+            Objects.requireNonNull(text(before, "insurance")),
             locationId,
             fitted != null && fitted.asBoolean(),
             ship.map(Ship::getVersion).orElse(null),

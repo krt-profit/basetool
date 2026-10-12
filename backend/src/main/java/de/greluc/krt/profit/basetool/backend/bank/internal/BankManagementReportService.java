@@ -228,6 +228,7 @@ public class BankManagementReportService {
     boolean alt = false;
     for (BankBookingRow row : rows) {
       Color bg = KrtPdfSupport.rowBackground(alt);
+      @Nullable
       String holder =
           row.type() == BankTransactionType.WIPE_RESET
               ? ""
@@ -238,7 +239,9 @@ public class BankManagementReportService {
       KrtPdfSupport.addTableCell(table, label("pdf.bank.type." + row.type().name()), bg, false);
       KrtPdfSupport.addTableCell(
           table,
-          HandleAnonymisation.humanise(holder, label("general.anonymisedHandle")),
+          holder == null
+              ? ""
+              : HandleAnonymisation.humaniseRequired(holder, label("general.anonymisedHandle")),
           bg,
           false);
       KrtPdfSupport.addTableCell(
@@ -280,7 +283,8 @@ public class BankManagementReportService {
         if (row.counterpartyHandle() == null) {
           yield "";
         }
-        String handle = HandleAnonymisation.humanise(row.counterpartyHandle(), anonymisedLabel);
+        String handle =
+            HandleAnonymisation.humaniseRequired(row.counterpartyHandle(), anonymisedLabel);
         yield row.counterpartyOrgUnitName() == null
             ? handle
             : handle + " (" + row.counterpartyOrgUnitName() + ")";

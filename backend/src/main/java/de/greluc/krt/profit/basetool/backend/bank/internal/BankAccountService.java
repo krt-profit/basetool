@@ -544,7 +544,8 @@ public class BankAccountService {
    * @param sign the wanted amount sign (+1 or -1; 0 never matches)
    * @return the matching holder's handle, or {@code null}
    */
-  private static String matchHolderHandle(@NotNull List<BankHolderLeg> holderLegs, int sign) {
+  private static @Nullable String matchHolderHandle(
+      @NotNull List<BankHolderLeg> holderLegs, int sign) {
     return holderLegs.stream()
         .filter(leg -> leg.amount().signum() == sign)
         .map(BankHolderLeg::handle)

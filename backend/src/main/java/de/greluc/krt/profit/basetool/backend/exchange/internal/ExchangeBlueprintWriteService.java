@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -213,7 +214,7 @@ public class ExchangeBlueprintWriteService {
       if (op.key() != null && "remove".equals(op.op())) {
         productKey = productKeyOf(op.key(), keysByBt);
       } else if (op.ref() != null) {
-        ExchangeResolveResponse.Result result = resolved.get(i);
+        ExchangeResolveResponse.Result result = Objects.requireNonNull(resolved.get(i));
         if (result.status() == ExchangeResolveResponse.Status.UNMATCHED) {
           plan.add(new Skip(UNMATCHED, UNMATCHED_REASON));
           continue;
@@ -222,7 +223,7 @@ public class ExchangeBlueprintWriteService {
           plan.add(new Skip(AMBIGUOUS, AMBIGUOUS_REASON));
           continue;
         }
-        productKey = productKeyOf(result.ref().bt(), keysByBt);
+        productKey = productKeyOf(Objects.requireNonNull(result.ref()).bt(), keysByBt);
       } else {
         plan.add(new Skip(UNMATCHED, UNMATCHED_REASON));
         continue;

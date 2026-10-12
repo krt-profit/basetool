@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -92,7 +93,7 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
           yield Set.of();
         }
         MembershipRole holderRole =
-            account.getOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND
+            Objects.requireNonNull(account.getOrgUnit()).getKind() == OrgUnitKind.SPECIAL_COMMAND
                 ? MembershipRole.SK_LEAD
                 : MembershipRole.STAFFELLEITER;
         yield orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(owner, holderRole);

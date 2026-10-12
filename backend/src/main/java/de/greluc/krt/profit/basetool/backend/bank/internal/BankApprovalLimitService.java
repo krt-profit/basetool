@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -162,12 +163,12 @@ public class BankApprovalLimitService {
             roleLimits.put(limit.getRoleCode(), limit.getLimitAmount());
         case ALL_MEMBERS -> allMembersLimit = limit.getLimitAmount();
         case AREA_MEMBERS -> areaMembersLimit = limit.getLimitAmount();
-        case USER ->
-            userLimits.add(
-                new BankApprovalLimitUserDto(
-                    limit.getGranteeUserId(),
-                    names.getOrDefault(limit.getGranteeUserId(), ""),
-                    limit.getLimitAmount()));
+        case USER -> {
+          UUID granteeUserId = Objects.requireNonNull(limit.getGranteeUserId());
+          userLimits.add(
+              new BankApprovalLimitUserDto(
+                  granteeUserId, names.getOrDefault(granteeUserId, ""), limit.getLimitAmount()));
+        }
         case null -> throw new NullPointerException("grantee kind");
       }
     }

@@ -94,6 +94,7 @@ public class GameItem extends AbstractEntity<UUID> {
 
   /** RSI engine class name (e.g. {@code "rsi_explorer_armor_light_helmet_01_01_10"}). R4. */
   @Column(name = "class_name")
+  @Nullable
   private String className;
 
   /** Wiki classification (e.g. {@code "FPS.Armor.Helmet"}, {@code "Ship.Weapon.Gun"}). R4. */

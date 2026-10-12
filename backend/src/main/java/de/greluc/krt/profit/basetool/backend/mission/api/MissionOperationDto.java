@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.mission.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -79,6 +80,8 @@ public record MissionOperationDto(
       return null;
     }
     return new SquadronReferenceDto(
-        summary.owningOrgUnitId(), summary.owningOrgUnitName(), summary.owningOrgUnitShorthand());
+        summary.owningOrgUnitId(),
+        Objects.requireNonNull(summary.owningOrgUnitName()),
+        Objects.requireNonNull(summary.owningOrgUnitShorthand()));
   }
 }

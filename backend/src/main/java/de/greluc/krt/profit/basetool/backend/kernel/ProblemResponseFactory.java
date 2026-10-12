@@ -48,8 +48,8 @@ public class ProblemResponseFactory {
    * Builds the base {@link ProblemDetail} shared by every problem surface.
    *
    * @param status the HTTP status
-   * @param title the localized summary
-   * @param detail the localized explanation
+   * @param title the localized summary, or {@code null} to leave it to the status
+   * @param detail the localized explanation, or {@code null} to omit it
    * @param instanceUri the request URI for {@code instance}, or {@code null}/blank to omit it
    * @param typeSuffix appended to {@link AppProblemProperties#baseUri()} to form the {@code type}
    * @param code the stable, machine-readable {@code code} extension
@@ -58,8 +58,8 @@ public class ProblemResponseFactory {
    */
   public ProblemDetail problem(
       HttpStatus status,
-      String title,
-      String detail,
+      @Nullable String title,
+      @Nullable String detail,
       @Nullable String instanceUri,
       String typeSuffix,
       String code,

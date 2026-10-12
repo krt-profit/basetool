@@ -50,10 +50,11 @@ public abstract sealed class AppException extends RuntimeException
   /**
    * Creates an exception whose accessors all delegate to a fixed {@code kind}.
    *
-   * @param kind the fixed identity the accessors delegate to
+   * @param kind the fixed identity the accessors delegate to, or {@code null} for a {@link
+   *     DomainProblem}
    * @param message verbatim {@code detail} or an i18n key
    */
-  protected AppException(AppExceptionKind kind, String message) {
+  protected AppException(@Nullable AppExceptionKind kind, String message) {
     super(message);
     this.kind = kind;
   }
@@ -66,7 +67,7 @@ public abstract sealed class AppException extends RuntimeException
    * @param message human-readable description; either a verbatim {@code detail} or an i18n key
    * @param cause underlying failure that triggered this exception
    */
-  protected AppException(AppExceptionKind kind, String message, Throwable cause) {
+  protected AppException(@Nullable AppExceptionKind kind, String message, Throwable cause) {
     super(message, cause);
     this.kind = kind;
   }

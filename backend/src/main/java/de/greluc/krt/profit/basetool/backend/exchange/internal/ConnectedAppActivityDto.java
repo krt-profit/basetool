@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import java.time.Instant;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One recent write of a connected client to the member's data (REQ-XCH-032).
@@ -32,4 +33,4 @@ import java.time.Instant;
  * @param undone whether the member has undone it
  */
 public record ConnectedAppActivityDto(
-    Instant recordedAt, String resource, String action, String label, boolean undone) {}
+    Instant recordedAt, String resource, String action, @Nullable String label, boolean undone) {}

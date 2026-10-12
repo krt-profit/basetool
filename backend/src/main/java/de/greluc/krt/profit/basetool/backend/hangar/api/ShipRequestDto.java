@@ -32,14 +32,14 @@ import org.jetbrains.annotations.Nullable;
  * {@code null} the user's single membership is stamped. It is ignored on update.
  */
 public record ShipRequestDto(
-    String name,
+    @Nullable String name,
     @NotNull(message = "{validation.shiptype.required}") UUID shipTypeId,
     @NotBlank(message = "{validation.insurance.required}")
         @Pattern(
             regexp = "^(0|([1-9]|[1-9][0-9]|1[0-1][0-9]|120)|LTI)$",
             message = "{validation.insurance.pattern}")
         String insurance,
-    UUID locationId,
+    @Nullable UUID locationId,
     boolean fitted,
-    Long version,
+    @Nullable Long version,
     @Nullable UUID owningOrgUnitId) {}

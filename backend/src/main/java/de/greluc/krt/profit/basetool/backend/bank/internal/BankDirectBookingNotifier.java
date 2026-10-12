@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -156,7 +157,7 @@ public class BankDirectBookingNotifier {
             booked.id(), recipient, request.amount(), actors.current()));
   }
 
-  private String accountNo(UUID accountId) {
+  private @Nullable String accountNo(UUID accountId) {
     return accountRepository.findById(accountId).map(BankAccount::getAccountNo).orElse(null);
   }
 }

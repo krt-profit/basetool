@@ -411,7 +411,7 @@ public class MaterialRequestService {
     if (requested == null || requested <= 0.0) {
       throw new BadRequestException("The desired amount must be a positive quantity.");
     }
-    double amount = ScuAmounts.roundToScuScale(requested);
+    double amount = ScuAmounts.roundToScuScale(requested.doubleValue());
     if (amount <= 0.0) {
       throw new BadRequestException("The desired amount must be a positive quantity.");
     }

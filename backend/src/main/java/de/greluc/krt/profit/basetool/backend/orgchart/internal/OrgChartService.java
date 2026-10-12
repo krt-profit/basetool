@@ -703,7 +703,8 @@ public class OrgChartService implements MembershipChangeObserver {
    * @throws NotFoundException if {@code userId} does not match an existing user.
    */
   @Nullable
-  private User resolveHolderForCreate(OrgChartPositionType type, UUID userId, String displayName) {
+  private User resolveHolderForCreate(
+      OrgChartPositionType type, UUID userId, @Nullable String displayName) {
     if (userId != null && displayName != null) {
       throw new BadRequestException(ERR_HOLDER_AMBIGUOUS);
     }
@@ -716,7 +717,7 @@ public class OrgChartService implements MembershipChangeObserver {
     return Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
   }
 
-  private String validateAndNormalizeName(OrgChartPositionType type, String rawName) {
+  private @Nullable String validateAndNormalizeName(OrgChartPositionType type, String rawName) {
     String normalized = StringNormalization.trimToNull(rawName);
     if (normalized != null && type != OrgChartPositionType.COMMAND_LEAD) {
       throw new BadRequestException(ERR_NAME_NOT_ALLOWED);

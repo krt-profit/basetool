@@ -103,6 +103,7 @@ public class JobOrder extends AbstractEntity<UUID> {
    * when left empty.
    */
   @Column(name = "comment", length = COMMENT_MAX_LENGTH)
+  @Nullable
   private String comment;
 
   @Enumerated(EnumType.STRING)

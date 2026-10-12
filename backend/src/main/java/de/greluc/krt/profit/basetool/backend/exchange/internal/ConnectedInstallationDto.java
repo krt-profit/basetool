@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One installation of a connected client (REQ-XCH-007, REQ-XCH-032).
@@ -32,4 +33,4 @@ import java.util.UUID;
  * @param unseen whether the member has not yet seen the notification announcing it
  */
 public record ConnectedInstallationDto(
-    UUID id, String label, Instant firstSeenAt, Instant lastSeenAt, boolean unseen) {}
+    UUID id, @Nullable String label, Instant firstSeenAt, Instant lastSeenAt, boolean unseen) {}

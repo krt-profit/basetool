@@ -523,7 +523,7 @@ public class MaterialExchangeService {
     if (requested == null || requested <= 0.0) {
       throw new BadRequestException("The offered amount must be a positive quantity.");
     }
-    double offered = ScuAmounts.roundToScuScale(requested);
+    double offered = ScuAmounts.roundToScuScale(requested.doubleValue());
     double available = item.getAmount() == null ? 0.0 : item.getAmount();
     if (offered <= 0.0) {
       throw new BadRequestException("The offered amount must be a positive quantity.");

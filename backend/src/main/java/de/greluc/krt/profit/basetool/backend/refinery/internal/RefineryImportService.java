@@ -59,6 +59,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -133,7 +134,7 @@ public class RefineryImportService implements RefineryDraftBuilder {
     if (extract.schemaVersion() == null || extract.schemaVersion() != SUPPORTED_SCHEMA_VERSION) {
       throw new BadRequestException("error.refineryImport.unsupportedSchemaVersion");
     }
-    RefineryExtractOrderDto order = extract.orders().getFirst();
+    RefineryExtractOrderDto order = Objects.requireNonNull(extract.orders()).getFirst();
     if (order.panelType() == null || !PANEL_TYPE_SETUP.equalsIgnoreCase(order.panelType().trim())) {
       throw new BadRequestException("error.refineryImport.unsupportedPanelType");
     }
@@ -173,7 +174,8 @@ public class RefineryImportService implements RefineryDraftBuilder {
               null));
     }
 
-    List<RefineryExtractGoodDto> sourceGoods = sortedByRowIndex(order.goods());
+    List<RefineryExtractGoodDto> sourceGoods =
+        sortedByRowIndex(Objects.requireNonNull(order.goods()));
     boolean orderUnquoted =
         Boolean.FALSE.equals(order.quoted())
             || (!sourceGoods.isEmpty()

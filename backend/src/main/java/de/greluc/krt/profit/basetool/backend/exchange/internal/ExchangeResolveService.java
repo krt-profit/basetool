@@ -528,7 +528,7 @@ public class ExchangeResolveService {
     return meterRegistry.counter(
         MetricNames.EXCHANGE_RESOLVE_REFS,
         MetricNames.TAG_KIND,
-        lower(kind.name()),
+        kind.name().toLowerCase(Locale.ROOT),
         MetricNames.TAG_STATUS,
         status.wire());
   }

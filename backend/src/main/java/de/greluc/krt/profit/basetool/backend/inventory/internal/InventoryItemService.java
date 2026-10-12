@@ -474,7 +474,7 @@ public class InventoryItemService {
     item.setGameItem(gameItem);
     item.setLocation(location);
     item.setQuality(dto.quality());
-    item.setAmount(ScuAmounts.roundToScuScale(dto.amount()));
+    item.setAmount(ScuAmounts.roundToScuScale(dto.amount().doubleValue()));
     item.setPersonal(isPersonal);
     item.setStolen(isStolen);
     List<InventoryAllocationInput> jobAllocations =
@@ -499,7 +499,10 @@ public class InventoryItemService {
         assertMaterialRequiredByJobOrder(Objects.requireNonNull(material), allocation.targetId());
       }
       InventoryAllocations.addJobOrder(
-          item, allocation.targetId(), ScuAmounts.roundToScuScale(allocation.amount()), false);
+          item,
+          allocation.targetId(),
+          ScuAmounts.roundToScuScale(allocation.amount().doubleValue()),
+          false);
     }
     Set<UUID> seenMissions = new HashSet<>();
     for (InventoryAllocationInput allocation : missionAllocations) {
@@ -510,7 +513,9 @@ public class InventoryItemService {
       Entities.require(
           Optional.ofNullable(earmarkTargets.mission(allocation.targetId())), "Mission not found");
       InventoryAllocations.addMission(
-          item, allocation.targetId(), ScuAmounts.roundToScuScale(allocation.amount()));
+          item,
+          allocation.targetId(),
+          ScuAmounts.roundToScuScale(allocation.amount().doubleValue()));
     }
     if (!InventoryAllocations.fits(item)) {
       throw new OverAllocationException();
@@ -860,7 +865,7 @@ public class InventoryItemService {
               ? "An item allocation amount must be a whole number"
               : "A PIECE allocation amount must be a whole number");
     }
-    return ScuAmounts.roundToScuScale(raw);
+    return ScuAmounts.roundToScuScale(raw.doubleValue());
   }
 
   /**

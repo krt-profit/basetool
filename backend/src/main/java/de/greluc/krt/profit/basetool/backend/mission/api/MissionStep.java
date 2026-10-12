@@ -69,6 +69,7 @@ public class MissionStep extends AbstractEntity<UUID> {
 
   /** Optional free-text "Zeit / Ort" hint shown next to the title (e.g. "TS 19:30"). Nullable. */
   @Column(length = 200)
+  @Nullable
   private String meta;
 
   /**

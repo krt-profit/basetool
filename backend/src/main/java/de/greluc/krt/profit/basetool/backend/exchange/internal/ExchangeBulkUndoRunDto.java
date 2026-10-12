@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * An admin's bulk undo of one client and its progress (REQ-XCH-034).
@@ -51,8 +52,8 @@ public record ExchangeBulkUndoRunDto(
     String status,
     Instant since,
     UUID installationId,
-    String resource,
-    String requestedByName,
+    @Nullable String resource,
+    @Nullable String requestedByName,
     int membersTotal,
     int membersDone,
     int membersFailed,

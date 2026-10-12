@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A bulk undo run with the entries it left alone (REQ-XCH-034).
@@ -40,5 +41,9 @@ public record ExchangeBulkUndoRunDetailDto(
    * @param label the entry's name as the member's pages show it, or {@code null} when unknown
    * @param reason {@code CHANGED_AFTERWARDS}, {@code GONE} or {@code FAILED}
    */
-  public record SkippedEntry(String memberName, String resource, String label, String reason) {}
+  public record SkippedEntry(
+      @Nullable String memberName,
+      @Nullable String resource,
+      @Nullable String label,
+      String reason) {}
 }

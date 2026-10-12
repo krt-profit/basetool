@@ -364,7 +364,7 @@ public class InventoryCheckoutService {
     newItem.setGameItem(item.getGameItem());
     newItem.setLocation(targetLocation);
     newItem.setQuality(item.getQuality());
-    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount()));
+    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount().doubleValue()));
     newItem.setPersonal(item.getPersonal());
     newItem.setStolen(item.getStolen());
     Map<UUID, Double> orderReductions =
@@ -411,7 +411,7 @@ public class InventoryCheckoutService {
                 sourceId,
                 sourceUser,
                 targetUser,
-                ScuAmounts.roundToScuScale(dto.amount()),
+                ScuAmounts.roundToScuScale(dto.amount().doubleValue()),
                 sourceLocation,
                 targetLocation)));
     final InventoryItem mergedTarget =
@@ -655,7 +655,7 @@ public class InventoryCheckoutService {
     newItem.setGameItem(item.getGameItem());
     newItem.setLocation(item.getLocation());
     newItem.setQuality(item.getQuality());
-    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount()));
+    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount().doubleValue()));
     newItem.setPersonal(targetPersonal);
     newItem.setStolen(item.getStolen());
     InventoryItem savedNew = inventoryItemRepository.save(newItem);

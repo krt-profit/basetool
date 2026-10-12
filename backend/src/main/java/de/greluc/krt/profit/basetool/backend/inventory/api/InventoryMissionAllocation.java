@@ -89,6 +89,8 @@ public class InventoryMissionAllocation extends AbstractEntity<UUID> {
   @PrePersist
   @PreUpdate
   void roundAmountToScuScale() {
-    amount = ScuAmounts.roundToScuScale(amount);
+    if (amount != null) {
+      amount = ScuAmounts.roundToScuScale(amount.doubleValue());
+    }
   }
 }

@@ -51,6 +51,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -177,7 +178,7 @@ public class ExchangeDemandService {
     List<ExchangeDemandMaterialDto> lines = new ArrayList<>();
     open.forEach(
         (line, amount) -> {
-          MaterialDto material = materials.get(line.materialId());
+          MaterialDto material = Objects.requireNonNull(materials.get(line.materialId()));
           String unit =
               QuantityType.PIECE.name().equals(material.quantityType())
                   ? QuantityType.PIECE.name()
@@ -216,7 +217,8 @@ public class ExchangeDemandService {
     rawMaterials.sort(Comparator.comparing(Material::getName, String.CASE_INSENSITIVE_ORDER));
     for (Material raw : rawMaterials) {
       List<ExchangeItemRefDto> list =
-          raws.computeIfAbsent(raw.getRefinedMaterial().getId(), _ -> new ArrayList<>());
+          raws.computeIfAbsent(
+              Objects.requireNonNull(raw.getRefinedMaterial()).getId(), _ -> new ArrayList<>());
       if (list.size() < MAX_RAW_REFS) {
         list.add(new ExchangeItemRefDto(raw.getId().toString(), cut(raw.getName())));
       }
@@ -278,7 +280,7 @@ public class ExchangeDemandService {
       Map<UUID, Double> marks = earmarked.getOrDefault(order.getId(), Map.of());
       orderOpen.forEach(
           (gameItemId, open) ->
-              lines.get(gameItemId).open +=
+              Objects.requireNonNull(lines.get(gameItemId)).open +=
                   Math.max(0, open - (int) Math.round(marks.getOrDefault(gameItemId, 0.0))));
     }
     List<ExchangeDemandItemDto> result = new ArrayList<>();
