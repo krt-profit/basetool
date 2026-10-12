@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { showKrtConfirm } from '/js/kernel/toast.js';
+
 (function () {
     const BASE = '/connected-apps';
 
@@ -190,17 +192,15 @@
                 },
             });
         };
-        if (typeof window.showKrtConfirm !== 'function') {
+        if (typeof showKrtConfirm !== 'function') {
             send();
             return;
         }
-        window
-            .showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel)
-            .then((ok) => {
-                if (ok) {
-                    send();
-                }
-            });
+        showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
+            if (ok) {
+                send();
+            }
+        });
     }
 
     host.addEventListener('click', (event) => {

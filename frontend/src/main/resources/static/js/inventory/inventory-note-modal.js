@@ -21,6 +21,12 @@
 
 /* global noteI18n, inventoryConflictI18n */
 
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
+
 /** @type {HTMLElement | null} */
 let activeNoteButton = null;
 
@@ -61,11 +67,11 @@ export function updateNoteCounter() {
 
 export function showInventoryToast(type, msg) {
     if (type === 'error') {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(msg);
+        if (typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(msg);
         }
-    } else if (typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(msg);
+    } else if (typeof showFrontendSuccessToast === 'function') {
+        showFrontendSuccessToast(msg);
     }
 }
 
@@ -80,11 +86,11 @@ export function saveNote() {
 
 export function removeNote() {
     if (!activeNoteButton) return;
-    if (typeof window.showKrtConfirm !== 'function') {
+    if (typeof showKrtConfirm !== 'function') {
         submitNoteUpdate('');
         return;
     }
-    window.showKrtConfirm(noteI18n.confirmTitle, noteI18n.confirmMessage).then((confirmed) => {
+    showKrtConfirm(noteI18n.confirmTitle, noteI18n.confirmMessage).then((confirmed) => {
         if (confirmed) submitNoteUpdate('');
     });
 }

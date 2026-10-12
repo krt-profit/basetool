@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { showKrtConfirm } from '/js/kernel/toast.js';
+
 (function () {
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const gi18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
@@ -515,33 +517,31 @@
     }
 
     function deactivateOffer(id) {
-        if (!window.showKrtConfirm) {
+        if (!showKrtConfirm) {
             return;
         }
-        window
-            .showKrtConfirm(
-                i18n.deactivateConfirmTitle,
-                i18n.deactivateConfirmBody,
-                i18n.confirmYes,
-                i18n.confirmNo,
-            )
-            .then((ok) => {
-                if (!ok) {
-                    return;
-                }
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: `/materialboerse/offers/${id}/deactivate/ajax`,
-                    successMessage: i18n.deactivated,
-                    errorMessage: i18n.error,
-                    serialize: SERIALIZE_KEY,
-                    onSuccess() {
-                        notifyPeersBoard();
-                        selectedId = null;
-                        return swapBoard();
-                    },
-                });
+        showKrtConfirm(
+            i18n.deactivateConfirmTitle,
+            i18n.deactivateConfirmBody,
+            i18n.confirmYes,
+            i18n.confirmNo,
+        ).then((ok) => {
+            if (!ok) {
+                return;
+            }
+            window.krtFetch.write({
+                method: 'POST',
+                url: `/materialboerse/offers/${id}/deactivate/ajax`,
+                successMessage: i18n.deactivated,
+                errorMessage: i18n.error,
+                serialize: SERIALIZE_KEY,
+                onSuccess() {
+                    notifyPeersBoard();
+                    selectedId = null;
+                    return swapBoard();
+                },
             });
+        });
     }
 
     function onReleased(body) {
@@ -568,33 +568,31 @@
     }
 
     function deactivateRequest(id) {
-        if (!window.showKrtConfirm) {
+        if (!showKrtConfirm) {
             return;
         }
-        window
-            .showKrtConfirm(
-                gi18n.deactivateConfirmTitle,
-                gi18n.deactivateConfirmBody,
-                gi18n.confirmYes,
-                gi18n.confirmNo,
-            )
-            .then((ok) => {
-                if (!ok) {
-                    return;
-                }
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: `/materialboerse/requests/${id}/deactivate/ajax`,
-                    successMessage: gi18n.deactivated,
-                    errorMessage: gi18n.error,
-                    serialize: REQUEST_SERIALIZE_KEY,
-                    onSuccess() {
-                        notifyPeersRequests();
-                        selectedRequestId = null;
-                        return swapBoard();
-                    },
-                });
+        showKrtConfirm(
+            gi18n.deactivateConfirmTitle,
+            gi18n.deactivateConfirmBody,
+            gi18n.confirmYes,
+            gi18n.confirmNo,
+        ).then((ok) => {
+            if (!ok) {
+                return;
+            }
+            window.krtFetch.write({
+                method: 'POST',
+                url: `/materialboerse/requests/${id}/deactivate/ajax`,
+                successMessage: gi18n.deactivated,
+                errorMessage: gi18n.error,
+                serialize: REQUEST_SERIALIZE_KEY,
+                onSuccess() {
+                    notifyPeersRequests();
+                    selectedRequestId = null;
+                    return swapBoard();
+                },
             });
+        });
     }
 
     function onRequestCreated(body) {

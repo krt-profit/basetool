@@ -19,7 +19,9 @@
 
 // @ts-check
 
-/* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId, showFrontendErrorToast */
+/* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId */
+
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 
 /**
  * Fills a date-time input (plain or split into date and time parts) with the current local time;
@@ -84,8 +86,8 @@ async function saveActualTimeInPlace(field, nowDate) {
         console.error(
             '[mission-detail] Schedule-Version nicht gefunden (mission-schedule-version input)',
         );
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(
+        if (typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(
                 window.krtI18nText(
                     window.MSG_MISSION_ACTUAL_TIME_ERROR,
                     'MSG_MISSION_ACTUAL_TIME_ERROR',
@@ -140,7 +142,7 @@ async function changeMissionOwner() {
         return;
     }
 
-    const ownerConfirmed = await window.showKrtConfirm?.(
+    const ownerConfirmed = await showKrtConfirm?.(
         MSG_CONFIRM_OWNER_CHANGE,
         MSG_CONFIRM_OWNER_CHANGE,
         window.krtI18nText(
@@ -239,7 +241,7 @@ async function changeMissionOwningOrgUnit() {
         return attr != null && attr !== '' ? parseInt(attr, 10) : 0;
     };
 
-    const confirmed = await window.showKrtConfirm?.(
+    const confirmed = await showKrtConfirm?.(
         MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
         MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
         window.krtI18nText(
@@ -310,7 +312,7 @@ async function changeMissionOwningOrgUnit() {
  * @returns {Promise<void>} settles once the removal finished or was declined
  */
 async function removeMissionManager(userId) {
-    const removeConfirmed = await window.showKrtConfirm?.(
+    const removeConfirmed = await showKrtConfirm?.(
         window.krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
         window.krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
         window.krtI18nText(

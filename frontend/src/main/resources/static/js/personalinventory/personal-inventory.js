@@ -1,5 +1,7 @@
 // @ts-check
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+
 const SEARCH_LIMIT = 2000;
 
 /** @type {HTMLElement | null} */
@@ -186,8 +188,8 @@ function submitItemForm() {
     const isUpdate = /\/update$/.test(action);
     const uexId = hiddenUexId ? hiddenUexId.value : '';
     if (!uexId) {
-        if (window.showFrontendErrorToast) {
-            window.showFrontendErrorToast(
+        if (showFrontendErrorToast) {
+            showFrontendErrorToast(
                 window.krtI18nText(
                     i18n.locationRequired || i18n.errorCreate,
                     'krtPersonalInventoryI18n.locationRequired',

@@ -19,7 +19,7 @@
 
 // @ts-check
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, showFrontendErrorToast, showFrontendSuccessToast, ORDER_HANDOVER_I18N */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, ORDER_HANDOVER_I18N */
 
 import { validateItemHandoverForm } from '/js/joborder/orders-detail-reports.js';
 import {
@@ -31,6 +31,11 @@ import {
     resetInventoryCache,
     validateHandoverAmounts,
 } from '/js/joborder/orders-detail.js';
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const handoverForm = /** @type {HTMLFormElement | null} */ (
@@ -328,11 +333,11 @@ export function krtOrderWrite(opts) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
-        if (!orderId || typeof window.showKrtConfirm !== 'function' || !window.krtFetch) {
+        if (!orderId || typeof showKrtConfirm !== 'function' || !window.krtFetch) {
             form.submit();
             return;
         }
-        const ok = await window.showKrtConfirm(
+        const ok = await showKrtConfirm(
             MSG_DELETE_TITLE,
             MSG_DELETE_MESSAGE,
             MSG_DELETE_CONFIRM,

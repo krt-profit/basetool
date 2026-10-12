@@ -20,6 +20,7 @@
 
 import { genericError } from '/js/bank/bank-messages.js';
 import { clearErrors, showError } from '/js/bank/bank-form-errors.js';
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
 
 /**
  * Builds the JSON + CSRF request headers via the shared window.krtCsrf, falling back to reading
@@ -101,8 +102,8 @@ export function initDownloadButtons() {
             /** @type {string} */ (button.getAttribute('data-download-url')),
             button.getAttribute('data-filename') || 'report.pdf',
             (message) => {
-                if (typeof window.showFrontendErrorToast === 'function') {
-                    window.showFrontendErrorToast(message);
+                if (typeof showFrontendErrorToast === 'function') {
+                    showFrontendErrorToast(message);
                 }
             },
         ).finally(() => {

@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+
 (function () {
     const form = document.getElementById('rule-form');
     const container = document.getElementById('selectors-container');
@@ -349,8 +351,8 @@
                     }
                 })
                 .catch(() => {
-                    if (typeof window.showFrontendErrorToast === 'function') {
-                        window.showFrontendErrorToast(i18n.error);
+                    if (typeof showFrontendErrorToast === 'function') {
+                        showFrontendErrorToast(i18n.error);
                     }
                 });
         }
@@ -414,19 +416,17 @@
 
         /** @param {() => void} action */
         function confirmThen(action) {
-            if (typeof window.showKrtConfirm === 'function') {
-                window
-                    .showKrtConfirm(
-                        i18n.confirmDeleteTitle,
-                        i18n.confirmDeleteBody,
-                        i18n.confirmOk,
-                        i18n.confirmCancel,
-                    )
-                    .then((ok) => {
-                        if (ok) {
-                            action();
-                        }
-                    });
+            if (typeof showKrtConfirm === 'function') {
+                showKrtConfirm(
+                    i18n.confirmDeleteTitle,
+                    i18n.confirmDeleteBody,
+                    i18n.confirmOk,
+                    i18n.confirmCancel,
+                ).then((ok) => {
+                    if (ok) {
+                        action();
+                    }
+                });
             } else {
                 action();
             }

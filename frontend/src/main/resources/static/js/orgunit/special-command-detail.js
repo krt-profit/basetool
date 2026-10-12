@@ -20,6 +20,8 @@
 
 /* global MEMBER_MSG, MEMBER_CONFLICT */
 
+import { showKrtConfirm } from '/js/kernel/toast.js';
+
 const SERIALIZE_KEY = 'sk-roster';
 
 /**
@@ -66,11 +68,11 @@ function currentRow(skId, userId) {
  * @param {() => void} run the confirmed action
  */
 function confirmThen(title, message, run) {
-    if (typeof window.showKrtConfirm !== 'function') {
+    if (typeof showKrtConfirm !== 'function') {
         run();
         return;
     }
-    window.showKrtConfirm(title, message, MEMBER_MSG.confirm, MEMBER_MSG.cancel).then((ok) => {
+    showKrtConfirm(title, message, MEMBER_MSG.confirm, MEMBER_MSG.cancel).then((ok) => {
         if (ok) {
             run();
         }

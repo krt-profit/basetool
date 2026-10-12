@@ -21,6 +21,8 @@
 
 /* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG, INV_OWNER_PICKER_MSG */
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const matSelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('materialId')
@@ -897,8 +899,7 @@ function syncPersonalAllocations() {
         event.preventDefault();
         const blank = markBlankAllocationAmounts();
         if (blank.length) {
-            if (window.showFrontendErrorToast)
-                window.showFrontendErrorToast(INV_ADD_MSG.allocAmountMissing);
+            if (showFrontendErrorToast) showFrontendErrorToast(INV_ADD_MSG.allocAmountMissing);
             blank[0].focus();
             return;
         }
@@ -920,7 +921,7 @@ function syncPersonalAllocations() {
                     msg = INV_ADD_MSG.allocAmountMissing;
                 else if (problem && problem.code === 'VALIDATION') msg = INV_ADD_MSG.validation;
                 else if (problem && problem.detail) msg = problem.detail;
-                if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
+                if (showFrontendErrorToast) showFrontendErrorToast(msg);
                 return true;
             },
             onSuccess(body) {

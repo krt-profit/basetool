@@ -21,6 +21,8 @@
 
 /* global MSG_ENABLED, MSG_DISABLED, MSG_ERROR, MSG_SAVED, MSG_PROFIT_ENABLED, MSG_PROFIT_DISABLED, MSG_PROFIT_ERROR, MSG_PROFIT_SAVED, SAVE_SUCCESS, SAVE_ERROR, SAVE_CONFLICT */
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+
 /**
  * Wires one family of optimistic boolean toggles: each change flips the label at once and PATCHes
  * through krtFetch.write (REQ-FE-002). On failure the checkbox and label are reverted and an error
@@ -66,8 +68,7 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
                         if (status === 409) {
                             return false;
                         }
-                        if (window.showFrontendErrorToast)
-                            window.showFrontendErrorToast(labels.error);
+                        if (showFrontendErrorToast) showFrontendErrorToast(labels.error);
                         return true;
                     },
                     onNetworkError() {

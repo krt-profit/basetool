@@ -18,6 +18,9 @@
  * the rows wholesale, so a per-button listener would survive exactly one mutation. Where krtFetch
  * did not load, the forms keep their native POST -> redirect fallback.
  */
+
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+
 const cfg = window.krtDefaultBlueprints || {};
 /** @type {KrtI18nDict} */
 const i18n = cfg.i18n || {};
@@ -77,15 +80,15 @@ function str(value) {
 
 /** @param {string | undefined} message */
 function successToast(message) {
-    if (message && typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(message);
+    if (message && typeof showFrontendSuccessToast === 'function') {
+        showFrontendSuccessToast(message);
     }
 }
 
 /** @param {string | undefined} message */
 function errorToast(message) {
-    if (message && typeof window.showFrontendErrorToast === 'function') {
-        window.showFrontendErrorToast(message);
+    if (message && typeof showFrontendErrorToast === 'function') {
+        showFrontendErrorToast(message);
     }
 }
 

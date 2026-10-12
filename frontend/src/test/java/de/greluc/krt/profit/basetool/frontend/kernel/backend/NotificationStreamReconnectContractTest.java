@@ -62,7 +62,7 @@ class NotificationStreamReconnectContractTest {
 
   /** The body of {@code stopSse}. */
   private static final Pattern STOP_SSE =
-      Pattern.compile("function stopSse\\(\\) \\{(.*?)\\n    \\}", Pattern.DOTALL);
+      Pattern.compile("function stopSse\\(\\) \\{(.*?)\\n\\}", Pattern.DOTALL);
 
   /**
    * A refused badge read stops the stream whichever way the re-auth helper decided: a null answer

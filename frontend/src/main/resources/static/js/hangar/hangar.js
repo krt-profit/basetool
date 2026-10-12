@@ -21,6 +21,8 @@
 
 /* global hangarI18n, hangarConflict */
 
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
     const closeBtn = document.querySelector('.close-ship-modal');
@@ -352,8 +354,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function showError(msg) {
-            if (window.showFrontendErrorToast) {
-                window.showFrontendErrorToast(msg);
+            if (showFrontendErrorToast) {
+                showFrontendErrorToast(msg);
             }
         }
 
@@ -512,8 +514,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     onSuccess() {
                         window.krtModal.close(deleteAllModal);
                         afterHangarWrite();
-                        if (window.showFrontendSuccessToast) {
-                            window.showFrontendSuccessToast(
+                        if (showFrontendSuccessToast) {
+                            showFrontendSuccessToast(
                                 /** @type {string} */ (deleteAllBtn.getAttribute('data-success')),
                             );
                         }

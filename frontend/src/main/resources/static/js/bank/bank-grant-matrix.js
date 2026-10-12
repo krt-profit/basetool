@@ -19,6 +19,7 @@
  */
 
 import { genericError } from '/js/bank/bank-messages.js';
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
 
 /** Maps a grant flag name onto the row attribute the next toggle click reads. */
 const FLAG_ATTR = {
@@ -109,14 +110,14 @@ export function initGrantMatrix() {
             },
             onError(status, payload) {
                 const message = payload && payload.message ? payload.message : genericError();
-                if (typeof window.showFrontendErrorToast === 'function') {
-                    window.showFrontendErrorToast(message);
+                if (typeof showFrontendErrorToast === 'function') {
+                    showFrontendErrorToast(message);
                 }
                 return true;
             },
             onNetworkError() {
-                if (typeof window.showFrontendErrorToast === 'function') {
-                    window.showFrontendErrorToast(genericError());
+                if (typeof showFrontendErrorToast === 'function') {
+                    showFrontendErrorToast(genericError());
                 }
                 return true;
             },

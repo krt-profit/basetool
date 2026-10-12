@@ -21,6 +21,8 @@
 
 /* global DISCORD_MSG */
 
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     if (!window.krtFetch) {
         return;
@@ -269,8 +271,8 @@ document.addEventListener('DOMContentLoaded', () => {
             toast: false,
             errorMessage: DISCORD_MSG.approveError,
             onSuccess() {
-                if (window.showFrontendSuccessToast) {
-                    window.showFrontendSuccessToast(DISCORD_MSG.approved);
+                if (showFrontendSuccessToast) {
+                    showFrontendSuccessToast(DISCORD_MSG.approved);
                 }
                 removeRow(row);
             },
@@ -391,8 +393,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.rejectError,
                 onSuccess(data) {
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(DISCORD_MSG.rejected);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(DISCORD_MSG.rejected);
                     }
                     closeReject();
                     removeRow(row);
@@ -415,8 +417,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const picker = linkPicker();
             const targetUserId = picker && picker.value ? picker.value : '';
             if (!targetUserId) {
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(DISCORD_MSG.linkNoTarget);
+                if (showFrontendErrorToast) {
+                    showFrontendErrorToast(DISCORD_MSG.linkNoTarget);
                 }
                 return;
             }
@@ -433,8 +435,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.linkError,
                 onSuccess() {
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(DISCORD_MSG.linked);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(DISCORD_MSG.linked);
                     }
                     closeLink();
                     removeRow(row);
@@ -457,8 +459,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const picker = mergePicker();
             const sourceUserId = picker && picker.value ? picker.value : '';
             if (!sourceUserId) {
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(DISCORD_MSG.mergeNoSource);
+                if (showFrontendErrorToast) {
+                    showFrontendErrorToast(DISCORD_MSG.mergeNoSource);
                 }
                 return;
             }
@@ -475,8 +477,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.mergeError,
                 onSuccess(data) {
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(DISCORD_MSG.merged);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(DISCORD_MSG.merged);
                     }
                     if (data && data.version != null) {
                         row.setAttribute('data-version', String(data.version));
@@ -511,8 +513,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.reopenError,
                 onSuccess(data) {
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(DISCORD_MSG.reopened);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(DISCORD_MSG.reopened);
                     }
                     closeReopen();
                     removeRejectedRow(row);

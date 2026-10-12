@@ -19,6 +19,7 @@
  */
 
 import { genericError } from '/js/bank/bank-messages.js';
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 
 /**
  * Registers the document listeners of the type-to-confirm hurdle and the admin wipe-reset form it
@@ -84,14 +85,14 @@ export function initTypeToConfirm() {
                         body && body.accountsReset != null ? body.accountsReset : 0;
                     const zeroed =
                         body && body.holderStashesZeroed != null ? body.holderStashesZeroed : 0;
-                    if (typeof window.showFrontendSuccessToast === 'function') {
+                    if (typeof showFrontendSuccessToast === 'function') {
                         const message =
                             accountsReset === 0
                                 ? form.getAttribute('data-wipe-noop') || ''
                                 : (form.getAttribute('data-wipe-success') || '')
                                       .replace('{0}', accountsReset)
                                       .replace('{1}', zeroed);
-                        window.showFrontendSuccessToast(message);
+                        showFrontendSuccessToast(message);
                     }
                     const overlay = form.closest('.krt-modal-overlay');
                     const closeBtn = /** @type {HTMLElement | null} */ (

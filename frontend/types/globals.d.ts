@@ -108,12 +108,6 @@ interface KrtHtmlApi {
 /** The tagged-template HTML builder; see {@linkcode KrtHtmlApi}. Installed by `krt-html.js`. */
 declare const krtHtml: KrtHtmlApi;
 
-/** Shows a transient error toast. Installed by the layout's toast module. */
-declare function showFrontendErrorToast(message: string): void;
-
-/** Shows a transient success toast. Installed by the layout's toast module. */
-declare function showFrontendSuccessToast(message: string): void;
-
 /** CSRF token access and refresh, installed by `krt-fetch.js`. */
 interface KrtCsrfApi {
     /** The current CSRF token from the `_csrf` meta tag, or null when absent. */
@@ -758,19 +752,6 @@ interface Window {
     krtHtml: KrtHtmlApi;
     /** The browser's Trusted Types factory; absent where the browser has none. */
     trustedTypes?: TrustedTypePolicyFactory;
-
-    showFrontendErrorToast?: (message: string) => void;
-    showFrontendSuccessToast?: (message: string) => void;
-    /**
-     * KRT-styled confirmation modal replacing the native `window.confirm`; resolves true when the
-     * user confirmed. Omitted labels fall back to their `krtToastI18n` defaults.
-     */
-    showKrtConfirm?: (
-        title: string | null,
-        message: string,
-        confirmLabel?: string,
-        cancelLabel?: string,
-    ) => Promise<boolean>;
 
     krtModal: KrtModalApi;
     krtNav?: KrtNavApi;

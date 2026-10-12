@@ -1,5 +1,7 @@
 // @ts-check
 
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+
 document.addEventListener('input', (event) => {
     const input = /** @type {HTMLInputElement | null} */ (
         /** @type {Element} */ (event.target).closest(
@@ -45,9 +47,9 @@ document.addEventListener('submit', (event) => {
             errorMessage: form.getAttribute('data-purge-error') || '',
             onSuccess(body) {
                 const count = body && body.deleted != null ? body.deleted : 0;
-                if (typeof window.showFrontendSuccessToast === 'function') {
+                if (typeof showFrontendSuccessToast === 'function') {
                     const tpl = form.getAttribute('data-purge-success') || '{0}';
-                    window.showFrontendSuccessToast(String(tpl).replace('{0}', count));
+                    showFrontendSuccessToast(String(tpl).replace('{0}', count));
                 }
                 const overlay = form.closest('.krt-modal-overlay');
                 const closeBtn = /** @type {HTMLElement | null} */ (

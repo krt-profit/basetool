@@ -78,7 +78,7 @@ class BackgroundReadGateContractTest {
 
   /** The {@code get} function of the transport, up to the next function declaration. */
   private static final Pattern TRANSPORT_GET_BODY =
-      Pattern.compile("async function get\\(url, opts\\) \\{(.*?)\\n    }\\n", Pattern.DOTALL);
+      Pattern.compile("async function get\\(url, opts\\) \\{(.*?)\\n}\\n", Pattern.DOTALL);
 
   /** The shared read call in {@code p4k-import.js}. */
   private static final Pattern P4K_SHARED_READ =

@@ -21,11 +21,17 @@
 
 /* global AR_CATEGORIES_BY_TOPIC, MSG_SAVED, MSG_DELETED, MSG_ERROR, MSG_CONFLICT, MSG_INVALID_STEP, MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_DELETE_GROUP_TITLE, MSG_DELETE_GROUP_MSG, MSG_GROUP_DELETED, MSG_OK, MSG_CANCEL, MSG_REFRESH_FAILED */
 
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
+
 function toastSuccess(msg) {
-    if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(msg);
+    if (showFrontendSuccessToast) showFrontendSuccessToast(msg);
 }
 function toastError(msg) {
-    if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
+    if (showFrontendErrorToast) showFrontendErrorToast(msg);
 }
 
 /**
@@ -241,7 +247,7 @@ function deleteRequirement(id) {
 }
 
 function confirmAndDelete(id) {
-    const fn = window.showKrtConfirm;
+    const fn = showKrtConfirm;
     if (typeof fn !== 'function') return;
     fn(MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_OK, MSG_CANCEL).then((ok) => {
         if (!ok) return;
@@ -254,7 +260,7 @@ function confirmAndDelete(id) {
 }
 
 function confirmAndDeleteGroup(fromRank, toRank) {
-    const fn = window.showKrtConfirm;
+    const fn = showKrtConfirm;
     if (typeof fn !== 'function') return;
     const rows = document.querySelectorAll(
         `.rank-group[data-ar-from-rank="${fromRank}"][data-ar-to-rank="${

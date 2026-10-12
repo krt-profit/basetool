@@ -1,4 +1,11 @@
 // @ts-check
+
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
+
 const fragmentPolicy =
     window.trustedTypes && typeof window.trustedTypes.createPolicy === 'function'
         ? window.trustedTypes.createPolicy('krt-fragment', { createHTML: (markup) => markup })
@@ -241,14 +248,14 @@ function syncVersion(containerSelector, newVersion) {
 }
 
 function errorToast(message) {
-    if (typeof window.showFrontendErrorToast === 'function') {
-        window.showFrontendErrorToast(message);
+    if (typeof showFrontendErrorToast === 'function') {
+        showFrontendErrorToast(message);
     }
 }
 
 function successToast(message) {
-    if (typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(message);
+    if (typeof showFrontendSuccessToast === 'function') {
+        showFrontendSuccessToast(message);
     }
 }
 
@@ -489,8 +496,8 @@ async function handleProblem(response, problem, opts) {
                           'krtFetchI18n.conflictDetail',
                       );
             errorToast(prefix + detail);
-            if (typeof window.showKrtConfirm === 'function') {
-                const ok = await window.showKrtConfirm(
+            if (typeof showKrtConfirm === 'function') {
+                const ok = await showKrtConfirm(
                     text(conflict.title, defaults().conflictTitle, 'krtFetchI18n.conflictTitle'),
                     text(
                         conflict.reloadQuestion,

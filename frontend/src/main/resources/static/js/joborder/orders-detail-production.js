@@ -19,9 +19,10 @@
 
 // @ts-check
 
-/* global MSG_STOLEN, MSG_QUALITY, MSG_INVENTORY_BELOW_FLOOR, MSG_PRODUCTION_COUNTED_HIGHER, showFrontendErrorToast, showFrontendSuccessToast, PRODUCTION_I18N */
+/* global MSG_STOLEN, MSG_QUALITY, MSG_INVENTORY_BELOW_FLOOR, MSG_PRODUCTION_COUNTED_HIGHER, PRODUCTION_I18N */
 
 import { krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 
 (function () {
     const nav = /** @type {HTMLElement | null} */ (

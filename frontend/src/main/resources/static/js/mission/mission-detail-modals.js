@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { showKrtConfirm } from '/js/kernel/toast.js';
+
 (function () {
     const objectiveList = document.getElementById('mission-create-objective-list');
     const stepList = document.getElementById('mission-create-step-list');
@@ -574,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dict.delete_confirm,
                 'MISSION_CUSTOM_FREQ_I18N.delete_confirm',
             );
-            const ok = await window.showKrtConfirm?.(
+            const ok = await showKrtConfirm?.(
                 msg,
                 msg,
                 window.krtI18nText(

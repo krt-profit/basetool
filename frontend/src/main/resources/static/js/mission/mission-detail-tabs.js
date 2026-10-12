@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+
 (function () {
     const tabs = /** @type {HTMLElement[]} */ (
         Array.from(document.querySelectorAll('.tab-nav .tab[data-tab]'))
@@ -79,9 +81,9 @@
         if (!validKeys.includes(key) || key === currentKey()) {
             return false;
         }
-        if (dirty && typeof window.showKrtConfirm === 'function') {
+        if (dirty && typeof showKrtConfirm === 'function') {
             const i18n = window.MISSION_TAB_I18N || {};
-            const go = await window.showKrtConfirm(
+            const go = await showKrtConfirm(
                 window.krtI18nText(i18n['unsaved.title'], 'MISSION_TAB_I18N[unsaved.title]'),
                 window.krtI18nText(i18n['unsaved.message'], 'MISSION_TAB_I18N[unsaved.message]'),
                 window.krtI18nText(i18n['unsaved.continue'], 'MISSION_TAB_I18N[unsaved.continue]'),
@@ -231,32 +233,30 @@
         Object.keys(map || {}).forEach((field) => {
             const slot = form.querySelector(`.field-error[data-error-for="${field}"]`);
             if (slot) slot.textContent = map[field];
-            else if (window.showFrontendErrorToast) window.showFrontendErrorToast(map[field]);
+            else if (showFrontendErrorToast) showFrontendErrorToast(map[field]);
         });
     }
     function handleConflict(problem) {
         const code = problem && problem.code;
         if (code === 'OPTIMISTIC_LOCK' || code === 'PESSIMISTIC_LOCK') {
-            if (typeof window.showKrtConfirm === 'function') {
-                window
-                    .showKrtConfirm(
-                        msg('mission.conflict.toast.title'),
-                        msg('mission.conflict.action.reload.question'),
-                        msg('mission.conflict.action.reload'),
-                        msg('mission.conflict.action.dismiss'),
-                    )
-                    .then((ok) => {
-                        if (ok) window.location.reload();
-                    });
+            if (typeof showKrtConfirm === 'function') {
+                showKrtConfirm(
+                    msg('mission.conflict.toast.title'),
+                    msg('mission.conflict.action.reload.question'),
+                    msg('mission.conflict.action.reload'),
+                    msg('mission.conflict.action.dismiss'),
+                ).then((ok) => {
+                    if (ok) window.location.reload();
+                });
             } else {
                 window.location.reload();
             }
-        } else if (window.showFrontendErrorToast) {
+        } else if (showFrontendErrorToast) {
             const ownerRequired =
                 window.krtFetch && window.krtFetch.ownerOrgUnitRequiredMessage
                     ? window.krtFetch.ownerOrgUnitRequiredMessage(problem)
                     : null;
-            window.showFrontendErrorToast(
+            showFrontendErrorToast(
                 ownerRequired ||
                     (problem && problem.detail) ||
                     msg('mission.conflict.toast.detail'),

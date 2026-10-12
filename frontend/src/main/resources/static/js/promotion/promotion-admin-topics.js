@@ -21,11 +21,17 @@
 
 /* global MSG_SAVED, MSG_DELETED, MSG_ERROR, MSG_CONFLICT, MSG_DELETE_TOPIC_TITLE, MSG_DELETE_TOPIC_MSG, MSG_DELETE_CATEGORY_TITLE, MSG_DELETE_CATEGORY_MSG, MSG_OK, MSG_CANCEL, MSG_DIRTY_LEAVE, MSG_REFRESH_FAILED */
 
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
+
 function toastSuccess(msg) {
-    if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(msg);
+    if (showFrontendSuccessToast) showFrontendSuccessToast(msg);
 }
 function toastError(msg) {
-    if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
+    if (showFrontendErrorToast) showFrontendErrorToast(msg);
 }
 
 /**
@@ -211,7 +217,7 @@ function updateTopic() {
 function deleteTopic(btn) {
     const id = btn.getAttribute('data-pa-id');
     const name = btn.getAttribute('data-pa-name') || '';
-    const fn = window.showKrtConfirm;
+    const fn = showKrtConfirm;
     if (typeof fn !== 'function') return;
     fn(
         MSG_DELETE_TOPIC_TITLE,
@@ -278,7 +284,7 @@ function updateCategory() {
 function deleteCategory(btn) {
     const id = btn.getAttribute('data-pa-id');
     const name = btn.getAttribute('data-pa-name') || '';
-    const fn = window.showKrtConfirm;
+    const fn = showKrtConfirm;
     if (typeof fn !== 'function') return;
     fn(
         MSG_DELETE_CATEGORY_TITLE,
@@ -444,7 +450,7 @@ function paSaveAll() {
     });
 }
 function paDiscardAll() {
-    const fn = window.showKrtConfirm;
+    const fn = showKrtConfirm;
     if (typeof fn !== 'function') return;
     fn(MSG_DELETE_TOPIC_TITLE, MSG_DIRTY_LEAVE, MSG_OK, MSG_CANCEL).then((ok) => {
         if (!ok) return;

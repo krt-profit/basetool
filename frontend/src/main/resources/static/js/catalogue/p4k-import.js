@@ -1,4 +1,7 @@
 // @ts-check
+
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
 /** @type {HTMLElement | null} */
@@ -71,12 +74,12 @@ function gateTookOver() {
 }
 
 function toastError() {
-    if (window.showFrontendErrorToast)
-        window.showFrontendErrorToast(window.krtI18nText(i18n().error, 'krtP4kImportI18n.error'));
+    if (showFrontendErrorToast)
+        showFrontendErrorToast(window.krtI18nText(i18n().error, 'krtP4kImportI18n.error'));
 }
 
 function toastOk(msg) {
-    if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(msg);
+    if (showFrontendSuccessToast) showFrontendSuccessToast(msg);
 }
 
 function init() {
@@ -149,8 +152,8 @@ function jobFromWrite(result, reported) {
 function upload() {
     const file = selectedFile();
     if (!file) {
-        if (window.showFrontendErrorToast)
-            window.showFrontendErrorToast(
+        if (showFrontendErrorToast)
+            showFrontendErrorToast(
                 window.krtI18nText(i18n().pickFirst, 'krtP4kImportI18n.pickFirst'),
             );
         return;

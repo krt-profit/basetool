@@ -21,6 +21,8 @@
 
 /* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
     missions: { container: '#op-missions-results', fragmentValue: 'missions' },
@@ -569,8 +571,8 @@ async function handlePayoutPaidToggle(checkbox) {
             toast: false,
             onError(status) {
                 checkbox.checked = previous;
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(
+                if (showFrontendErrorToast) {
+                    showFrontendErrorToast(
                         status === 401 || status === 403
                             ? MSG_PAYOUT_PAID_FORBIDDEN
                             : MSG_PAYOUT_PAID_ERROR,
@@ -580,8 +582,8 @@ async function handlePayoutPaidToggle(checkbox) {
             },
             onNetworkError() {
                 checkbox.checked = previous;
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
+                if (showFrontendErrorToast) {
+                    showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
                 }
                 return true;
             },

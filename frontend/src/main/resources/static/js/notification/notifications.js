@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { showKrtConfirm } from '/js/kernel/toast.js';
+
 const POLL_INTERVAL_FAST_MS = 60000;
 const POLL_INTERVAL_SLOW_MS = 300000;
 const SSE_LIVENESS_TIMEOUT_MS = 60000;
@@ -441,8 +443,8 @@ function updatePageHint(list, total) {
 }
 
 function confirmThen(title, body, action) {
-    if (typeof window.showKrtConfirm === 'function') {
-        window.showKrtConfirm(title, body, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
+    if (typeof showKrtConfirm === 'function') {
+        showKrtConfirm(title, body, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
             if (ok) {
                 action();
             }

@@ -13,6 +13,8 @@
 
 // @ts-check
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+
 (function () {
     /**
      * The seed values `open` takes from its caller; absent fields are blank.
@@ -214,8 +216,8 @@
 
     /** Shows a transient client-side validation error toast. */
     function showError(message) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(message || i18n.error || '');
+        if (typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(message || i18n.error || '');
         }
     }
 

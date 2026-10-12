@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+
 /**
  * Hides and empties every inline error slot of a form.
  *
@@ -46,7 +48,7 @@ export function showError(form, field, message) {
     if (slot) {
         slot.textContent = message;
         slot.classList.add('visible');
-    } else if (typeof window.showFrontendErrorToast === 'function') {
-        window.showFrontendErrorToast(message);
+    } else if (typeof showFrontendErrorToast === 'function') {
+        showFrontendErrorToast(message);
     }
 }

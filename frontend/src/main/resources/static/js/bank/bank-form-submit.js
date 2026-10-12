@@ -21,6 +21,7 @@
 import { approvalRequestFiledMessage, genericError } from '/js/bank/bank-messages.js';
 import { clearErrors, showError } from '/js/bank/bank-form-errors.js';
 import { publishBankLiveSync } from '/js/bank/bank-livesync.js';
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 
 /** Form field names serialized as JSON numbers instead of strings. */
 const NUMBER_FIELDS = [
@@ -149,8 +150,8 @@ async function submitBankForm(form) {
         onSuccess(payload) {
             handleBankSuccess(form);
             if (payload && payload.pendingRequest) {
-                if (typeof window.showFrontendSuccessToast === 'function') {
-                    window.showFrontendSuccessToast(approvalRequestFiledMessage());
+                if (typeof showFrontendSuccessToast === 'function') {
+                    showFrontendSuccessToast(approvalRequestFiledMessage());
                 }
             }
         },
@@ -194,8 +195,8 @@ function handleBankSuccess(form) {
     }
     const main = document.querySelector('main[data-bank-saved]');
     const savedMessage = main ? main.getAttribute('data-bank-saved') : null;
-    if (savedMessage && typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(savedMessage);
+    if (savedMessage && typeof showFrontendSuccessToast === 'function') {
+        showFrontendSuccessToast(savedMessage);
     }
     publishBankLiveSync(form);
     const spec = REFRESH_TARGETS[form.getAttribute('data-refresh')];

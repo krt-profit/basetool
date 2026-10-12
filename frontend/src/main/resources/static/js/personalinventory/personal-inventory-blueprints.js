@@ -1,5 +1,7 @@
 // @ts-check
 
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+
 /** @type {HTMLInputElement | null} */
 let searchInput = null;
 /** @type {HTMLElement | null} */
@@ -423,8 +425,8 @@ function addSelected() {
                     i18n().skippedLabel,
                     'krtBlueprintsI18n.skippedLabel',
                 )}: ${(res.skippedAlreadyOwned || 0) + (res.skippedUnresolved || 0)}`;
-                if (window.showFrontendSuccessToast) {
-                    window.showFrontendSuccessToast(msg);
+                if (showFrontendSuccessToast) {
+                    showFrontendSuccessToast(msg);
                 }
                 staged.clear();
                 renderStaging();
@@ -700,9 +702,9 @@ function submitDeleteAll(e) {
             conflict: conflictObj(),
             onSuccess(body) {
                 const count = body && body.deleted != null ? body.deleted : 0;
-                if (window.showFrontendSuccessToast) {
+                if (showFrontendSuccessToast) {
                     const tpl = i18n().removedAllCount || '{0}';
-                    window.showFrontendSuccessToast(String(tpl).replace('{0}', count));
+                    showFrontendSuccessToast(String(tpl).replace('{0}', count));
                 }
                 closeDeleteAll();
                 afterListWrite();

@@ -1,4 +1,7 @@
 // @ts-check
+
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
 /** @type {HTMLElement | null} */
@@ -85,8 +88,8 @@ function loadHandoff() {
 }
 
 function handoffNotFound() {
-    if (window.showFrontendErrorToast) {
-        window.showFrontendErrorToast(
+    if (showFrontendErrorToast) {
+        showFrontendErrorToast(
             window.krtI18nText(
                 i18n().handoffNotFound || i18n().error,
                 'krtBlueprintsImportI18n.handoffNotFound',
@@ -421,8 +424,8 @@ function apply() {
                     i18n().skippedLabel,
                     'krtBlueprintsImportI18n.skippedLabel',
                 )}: ${res.skipped || 0}`;
-                if (window.showFrontendSuccessToast) {
-                    window.showFrontendSuccessToast(msg);
+                if (showFrontendSuccessToast) {
+                    showFrontendSuccessToast(msg);
                 }
                 closeModal();
                 window.krtFetch.swap({
@@ -446,10 +449,8 @@ function applyError() {
 }
 
 function toastError() {
-    if (window.showFrontendErrorToast)
-        window.showFrontendErrorToast(
-            window.krtI18nText(i18n().error, 'krtBlueprintsImportI18n.error'),
-        );
+    if (showFrontendErrorToast)
+        showFrontendErrorToast(window.krtI18nText(i18n().error, 'krtBlueprintsImportI18n.error'));
 }
 
 function openModal() {

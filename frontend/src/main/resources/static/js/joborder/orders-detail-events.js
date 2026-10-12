@@ -19,7 +19,7 @@
 
 // @ts-check
 
-/* global ORDER_CONFLICT, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast */
+/* global ORDER_CONFLICT, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR */
 
 import {
     _toggleBlueprintCounting,
@@ -54,6 +54,7 @@ import {
     openHandoverModal,
     updateHandoverIndexes,
 } from '/js/joborder/orders-detail.js';
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'od-update-status', (el) => {

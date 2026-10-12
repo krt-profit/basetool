@@ -21,6 +21,8 @@
 
 /* global MSG_OWNER_UPDATED, MSG_LOCATION_UPDATED, MSG_DELIVERED_UPDATED, MSG_ERROR_GENERIC */
 
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+
 /**
  * Finds the collection row of an inventory entry.
  *
@@ -148,7 +150,7 @@ async function collectionTransfer(inventoryId, target, successMessage) {
         toast: false,
         errorMessage: MSG_ERROR_GENERIC,
         onSuccess(body) {
-            window.showFrontendSuccessToast(successMessage);
+            showFrontendSuccessToast(successMessage);
             if (body && body.id) {
                 row.setAttribute('data-inventory-id', body.id);
                 if (body.version != null) {
@@ -215,7 +217,7 @@ async function onDeliveredToggle(cb) {
         toast: false,
         errorMessage: MSG_ERROR_GENERIC,
         onSuccess() {
-            window.showFrontendSuccessToast(MSG_DELIVERED_UPDATED);
+            showFrontendSuccessToast(MSG_DELIVERED_UPDATED);
             broadcastCollectionChanged();
         },
     });

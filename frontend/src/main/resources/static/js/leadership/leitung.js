@@ -6,6 +6,8 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
+import { showKrtConfirm } from '/js/kernel/toast.js';
+
 /** @type {Record<string, any>} */
 const i18n = /** @type {any} */ (window).leitungI18n || {};
 
@@ -94,11 +96,11 @@ function write(opts) {
  * @param {() => void} run the confirmed action
  */
 function confirmThen(title, message, run) {
-    if (typeof window.showKrtConfirm !== 'function') {
+    if (typeof showKrtConfirm !== 'function') {
         run();
         return;
     }
-    window.showKrtConfirm(title, message, i18n.confirm, i18n.cancel).then((ok) => {
+    showKrtConfirm(title, message, i18n.confirm, i18n.cancel).then((ok) => {
         if (ok) {
             run();
         }

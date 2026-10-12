@@ -19,6 +19,9 @@
  */
 
 /* global stackEntriesI18n, bookOutI18n, inventoryConflictI18n, assocI18n, stolenMarkI18n */
+
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+
 const ASSOC_EPS = 0.0005;
 
 /**
@@ -878,8 +881,8 @@ function createLager(cfg) {
             ? window.krtScuInput.parse(amountEl.value)
             : parseFloat(amountEl.value);
         if (window.krtHerkunft && !window.krtHerkunft.isValid('bookout')) {
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(assocI18n.overallocated);
+            if (typeof showFrontendErrorToast === 'function') {
+                showFrontendErrorToast(assocI18n.overallocated);
             }
             return;
         }
@@ -1008,8 +1011,8 @@ function createLager(cfg) {
             amount > stolenMarkTarget.max + 0.0005 ||
             (stolenMarkTarget.piece && !Number.isInteger(amount));
         if (invalid) {
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(stolenMarkI18n.errorAmount);
+            if (typeof showFrontendErrorToast === 'function') {
+                showFrontendErrorToast(stolenMarkI18n.errorAmount);
             }
             return;
         }
@@ -1340,8 +1343,8 @@ function createLager(cfg) {
             },
             onError(status) {
                 if (status === 422) {
-                    if (typeof window.showFrontendErrorToast === 'function') {
-                        window.showFrontendErrorToast(assocI18n.overallocated);
+                    if (typeof showFrontendErrorToast === 'function') {
+                        showFrontendErrorToast(assocI18n.overallocated);
                     }
                     return true;
                 }
@@ -1372,8 +1375,8 @@ function createLager(cfg) {
             );
             amount = parseFloat(amountInput ? amountInput.value : '');
             if (isNaN(amount) || amount <= 0 || (isPiece && amount % 1 !== 0)) {
-                if (typeof window.showFrontendErrorToast === 'function') {
-                    window.showFrontendErrorToast(assocI18n.amountRequired);
+                if (typeof showFrontendErrorToast === 'function') {
+                    showFrontendErrorToast(assocI18n.amountRequired);
                 }
                 return;
             }

@@ -21,6 +21,8 @@
 
 /* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_MISSION_PARTICIPANT_REQUIRED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+
 window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
 /**
@@ -482,8 +484,8 @@ function _submitRefineryCreate(form, submitter) {
         toast: false,
         errorMessage: MSG_RFC_CREATE_FAILED,
         onError(status, body) {
-            if (window.showFrontendErrorToast) {
-                window.showFrontendErrorToast(_refineryCreateErrorMessage(status, body));
+            if (showFrontendErrorToast) {
+                showFrontendErrorToast(_refineryCreateErrorMessage(status, body));
             }
             return true;
         },
@@ -573,14 +575,14 @@ function _swapRefineryImportFragment(html) {
 function _applyRefineryImportResult(result) {
     if (!result.ok) return;
     if (result.redirected || typeof result.body !== 'string') {
-        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+        if (showFrontendErrorToast) showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
         return;
     }
     _swapRefineryImportFragment(result.body);
 }
 
 function _refineryImportFailed() {
-    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+    if (showFrontendErrorToast) showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
     return true;
 }
 

@@ -12,6 +12,8 @@
 
 // @ts-check
 
+import { showKrtConfirm } from '/js/kernel/toast.js';
+
 (function () {
     const i18n = window.materialboerseInventoryI18n || {};
     const release = window.krtMaterialRelease;
@@ -60,37 +62,35 @@
             );
             return;
         }
-        if (!window.showKrtConfirm) {
+        if (!showKrtConfirm) {
             return;
         }
-        window
-            .showKrtConfirm(
-                i18n.deactivateTitle,
-                i18n.deactivateBody,
-                i18n.confirmYes,
-                i18n.confirmNo,
-            )
-            .then((ok) => {
-                if (!ok) {
+        showKrtConfirm(
+            i18n.deactivateTitle,
+            i18n.deactivateBody,
+            i18n.confirmYes,
+            i18n.confirmNo,
+        ).then((ok) => {
+            if (!ok) {
+                el.checked = true;
+                return;
+            }
+            window.krtFetch.write({
+                method: 'POST',
+                url: `/materialboerse/items/${itemId}/deactivate/ajax`,
+                successMessage: i18n.deactivated,
+                errorMessage: i18n.error,
+                serialize: 'materialboerse',
+                onSuccess() {
+                    setStatus(itemId, false);
+                    if (window.krtLiveSync) {
+                        window.krtLiveSync.sendChanged('materialboard', ['board']);
+                    }
+                },
+                onError() {
                     el.checked = true;
-                    return;
-                }
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: `/materialboerse/items/${itemId}/deactivate/ajax`,
-                    successMessage: i18n.deactivated,
-                    errorMessage: i18n.error,
-                    serialize: 'materialboerse',
-                    onSuccess() {
-                        setStatus(itemId, false);
-                        if (window.krtLiveSync) {
-                            window.krtLiveSync.sendChanged('materialboard', ['board']);
-                        }
-                    },
-                    onError() {
-                        el.checked = true;
-                    },
-                });
+                },
             });
+        });
     });
 })();

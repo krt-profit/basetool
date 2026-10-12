@@ -21,6 +21,11 @@
 /* global MSG_DELETE_TITLE, MSG_DELETE_CONFIRM, MSG_DELETE_LABEL, MSG_CANCEL_LABEL, MSG_DELETE_SUCCESS, MSG_DELETE_ERROR, MSG_SYNC_SUCCESS, MSG_SYNC_ERROR, MSG_CONSOLIDATE_SUCCESS, MSG_CONSOLIDATE_ERROR, MSG_CONSOLIDATE_NO_TARGET */
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
 
 const MEMBERS_SECTIONS = {
     roster: { container: '#members-results', fragmentValue: 'results' },
@@ -122,8 +127,8 @@ function bindFilter() {
  * @param {string | null} userId the member's id
  */
 async function deleteUser(userId) {
-    const confirmed = window.showKrtConfirm
-        ? await window.showKrtConfirm(
+    const confirmed = showKrtConfirm
+        ? await showKrtConfirm(
               MSG_DELETE_TITLE,
               MSG_DELETE_CONFIRM,
               MSG_DELETE_LABEL,
@@ -194,8 +199,8 @@ function confirmConsolidate() {
     );
     const targetUserId = picker && picker.value ? picker.value : '';
     if (!targetUserId) {
-        if (window.showFrontendErrorToast) {
-            window.showFrontendErrorToast(MSG_CONSOLIDATE_NO_TARGET);
+        if (showFrontendErrorToast) {
+            showFrontendErrorToast(MSG_CONSOLIDATE_NO_TARGET);
         }
         return;
     }
@@ -211,8 +216,8 @@ function confirmConsolidate() {
         toast: false,
         errorMessage: MSG_CONSOLIDATE_ERROR,
         onSuccess() {
-            if (window.showFrontendSuccessToast) {
-                window.showFrontendSuccessToast(MSG_CONSOLIDATE_SUCCESS);
+            if (showFrontendSuccessToast) {
+                showFrontendSuccessToast(MSG_CONSOLIDATE_SUCCESS);
             }
             closeConsolidate();
             refreshMembersResults();

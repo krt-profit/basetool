@@ -21,6 +21,8 @@
 
 /* global SYNC_MSG */
 
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     if (window.krtFetch) {
         window.krtFetch.bindSwap({ container: '#sync-results', history: true });
@@ -88,8 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
             errorMessage: SYNC_MSG.deleteError,
             onSuccess(body) {
                 const count = body && body.deleted != null ? body.deleted : 0;
-                if (window.showFrontendSuccessToast) {
-                    window.showFrontendSuccessToast(SYNC_MSG.successTemplate.replace('{0}', count));
+                if (showFrontendSuccessToast) {
+                    showFrontendSuccessToast(SYNC_MSG.successTemplate.replace('{0}', count));
                 }
                 if (window.krtFetch) {
                     window.krtFetch.swap({

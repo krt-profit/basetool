@@ -21,6 +21,8 @@
 
 /* global KRT_ORDERS_REORDER_I18N */
 
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+
 /**
  * Moves a job order to a priority slot, refreshes the queue and toasts the outcome.
  *
@@ -56,8 +58,8 @@ async function persistOrderReorder(orderId, targetPriority) {
             preserveScroll: true,
         });
     }
-    if (res.ok && typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(KRT_ORDERS_REORDER_I18N.success);
+    if (res.ok && typeof showFrontendSuccessToast === 'function') {
+        showFrontendSuccessToast(KRT_ORDERS_REORDER_I18N.success);
     }
 }
 

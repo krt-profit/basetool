@@ -19,7 +19,9 @@
 
 // @ts-check
 
-/* global materialIndex: writable, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_MATERIAL_LABEL, MSG_AMOUNT_LABEL, MSG_MINQUALITY_LABEL, SCU_HINT_TEXT, MSG_SCMDB_SUCCESS, MSG_SCMDB_SOME_UNKNOWN, MSG_SCMDB_NO_MATCH, MSG_SCMDB_NOT_FOUND, ITEM_I18N, EDIT_ITEMS, MSG_MATERIAL_INVALID, MSG_ITEM_INVALID, MSG_CREATE_FAILED, MSG_UPDATE_FAILED, showFrontendErrorToast */
+/* global materialIndex: writable, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_MATERIAL_LABEL, MSG_AMOUNT_LABEL, MSG_MINQUALITY_LABEL, SCU_HINT_TEXT, MSG_SCMDB_SUCCESS, MSG_SCMDB_SOME_UNKNOWN, MSG_SCMDB_NO_MATCH, MSG_SCMDB_NOT_FOUND, ITEM_I18N, EDIT_ITEMS, MSG_MATERIAL_INVALID, MSG_ITEM_INVALID, MSG_CREATE_FAILED, MSG_UPDATE_FAILED */
+
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 
 function buildScuHint() {
     const hint = document.createElement('span');
@@ -379,8 +381,8 @@ async function importFromScmdb() {
             successMsg += ` (${MSG_SCMDB_SOME_UNKNOWN}: ${unknownMaterials.join(', ')})`;
         }
 
-        if (window.showFrontendSuccessToast) {
-            window.showFrontendSuccessToast(successMsg);
+        if (showFrontendSuccessToast) {
+            showFrontendSuccessToast(successMsg);
         }
     } else {
         let errorMsg = MSG_SCMDB_NO_MATCH;
@@ -388,8 +390,8 @@ async function importFromScmdb() {
             errorMsg = `${MSG_SCMDB_NOT_FOUND}: ${unknownMaterials.join(', ')}`;
         }
 
-        if (window.showFrontendErrorToast) {
-            window.showFrontendErrorToast(errorMsg);
+        if (showFrontendErrorToast) {
+            showFrontendErrorToast(errorMsg);
         }
     }
 }

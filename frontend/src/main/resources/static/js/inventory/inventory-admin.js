@@ -28,6 +28,7 @@ import {
     showInventoryToast,
     updateNoteCounter,
 } from '/js/inventory/inventory-note-modal.js';
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
 
 const adminLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-admin',
@@ -620,14 +621,14 @@ function submitUmbuchen(event) {
         (targetUserId === null || targetUserId === adminUmbuchenSource.userId) &&
         (targetLocationId === null || targetLocationId === adminUmbuchenSource.locationId)
     ) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(umbuchenI18n.unchanged);
+        if (typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(umbuchenI18n.unchanged);
         }
         return;
     }
     if (window.krtHerkunft && !window.krtHerkunft.isValid('umbuchen')) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(assocI18n.overallocated);
+        if (typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(assocI18n.overallocated);
         }
         return;
     }

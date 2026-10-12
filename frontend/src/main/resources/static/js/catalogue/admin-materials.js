@@ -22,6 +22,7 @@
 /* global CAT_MSG, CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR */
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
+import { showKrtConfirm } from '/js/kernel/toast.js';
 
 /** @type {string[]} */
 const materialNames = [];
@@ -188,8 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const message = form.getAttribute('data-krt-confirm-message') || '';
         const proceed =
-            typeof window.showKrtConfirm === 'function'
-                ? window.showKrtConfirm(null, message)
+            typeof showKrtConfirm === 'function'
+                ? showKrtConfirm(null, message)
                 : Promise.resolve(true);
         proceed.then((ok) => {
             if (!ok) {

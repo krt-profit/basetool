@@ -28,6 +28,7 @@ import {
     showInventoryToast,
     updateNoteCounter,
 } from '/js/inventory/inventory-note-modal.js';
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 
 const myLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-my',
@@ -248,8 +249,8 @@ async function toggleSelectAllInView() {
         updateBulkCheckoutState();
     } catch (e) {
         console.error('Failed to select all inventory entries', e);
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(bulkI18n.selectAllFailed);
+        if (typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(bulkI18n.selectAllFailed);
         }
     } finally {
         bulkSelectAllInFlight = false;
@@ -298,10 +299,8 @@ async function executeBulkCheckout() {
         errorMessage: bulkI18n.errorFailed,
         conflict: inventoryConflictI18n,
         onSuccess() {
-            if (typeof window.showFrontendSuccessToast === 'function') {
-                window.showFrontendSuccessToast(
-                    bulkI18n.success.replace('{0}', String(ids.length)),
-                );
+            if (typeof showFrontendSuccessToast === 'function') {
+                showFrontendSuccessToast(bulkI18n.success.replace('{0}', String(ids.length)));
             }
             filterMyInventory();
             broadcastInventoryChanged();
@@ -328,8 +327,8 @@ function bulkRebookMode() {
 }
 
 function showBulkRebookError(message) {
-    if (typeof window.showFrontendErrorToast === 'function') {
-        window.showFrontendErrorToast(message);
+    if (typeof showFrontendErrorToast === 'function') {
+        showFrontendErrorToast(message);
     }
 }
 
@@ -440,8 +439,8 @@ function reportBulkRebookOutcome(body) {
                   .replace('{0}', String(rebooked))
                   .replace('{1}', String(skipped))
             : bulkRebookI18n.success.replace('{0}', String(rebooked));
-    if (typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(message);
+    if (typeof showFrontendSuccessToast === 'function') {
+        showFrontendSuccessToast(message);
     }
 }
 
@@ -1193,14 +1192,14 @@ function submitUmbuchen(event) {
             (targetUserId === null || targetUserId === umbuchenSource.userId) &&
             (targetLocationId === null || targetLocationId === umbuchenSource.locationId)
         ) {
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(umbuchenI18n.unchanged);
+            if (typeof showFrontendErrorToast === 'function') {
+                showFrontendErrorToast(umbuchenI18n.unchanged);
             }
             return;
         }
         if (window.krtHerkunft && !window.krtHerkunft.isValid('umbuchen')) {
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(assocI18n.overallocated);
+            if (typeof showFrontendErrorToast === 'function') {
+                showFrontendErrorToast(assocI18n.overallocated);
             }
             return;
         }
@@ -1364,8 +1363,8 @@ function reportBulkOrgUnitOutcome(body) {
                   .replace('{0}', String(changed))
                   .replace('{1}', String(skipped))
             : orgUnitChangeI18n.successBulk.replace('{0}', String(changed));
-    if (typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(message);
+    if (typeof showFrontendSuccessToast === 'function') {
+        showFrontendSuccessToast(message);
     }
 }
 
@@ -1472,8 +1471,8 @@ function reportBulkStolenOutcome(body) {
     const message = stolenMarkI18n.successBulk
         .replace('{0}', String(changed))
         .replace('{1}', String(skipped));
-    if (typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(message);
+    if (typeof showFrontendSuccessToast === 'function') {
+        showFrontendSuccessToast(message);
     }
 }
 

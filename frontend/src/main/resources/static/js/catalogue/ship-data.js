@@ -22,6 +22,7 @@
 /* global shipDataI18n, shipDataConflict, shipDataResetUrl */
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const shipTypesData = /** @type {HTMLDataListElement | null} */ (
@@ -151,8 +152,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                             ? form.getAttribute('data-label-show')
                             : form.getAttribute('data-label-hide');
                     }
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(i18n.saved);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(i18n.saved);
                     }
                 },
             })
@@ -175,8 +176,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 conflict,
                 onSuccess() {
                     closeModal('reset-fitted-confirm-modal');
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(i18n.resetSuccess);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(i18n.resetSuccess);
                     }
                 },
             })

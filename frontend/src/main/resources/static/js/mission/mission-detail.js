@@ -21,6 +21,8 @@
 
 /* global missionId */
 
+import { showKrtConfirm } from '/js/kernel/toast.js';
+
 const MISSION_SECTIONS = {
     crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
     finance: { container: '#finance-results', fragmentValue: 'finance' },
@@ -307,7 +309,7 @@ async function deleteStep(btn) {
         window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.delete_confirm,
         'MISSION_STEP_I18N.delete_confirm',
     );
-    const ok = await window.showKrtConfirm?.(
+    const ok = await showKrtConfirm?.(
         msg,
         msg,
         window.krtI18nText(
@@ -539,7 +541,7 @@ document.addEventListener('dragend', () => {
             window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.delete_confirm,
             'MISSION_OBJECTIVE_I18N.delete_confirm',
         );
-        const ok = await window.showKrtConfirm?.(
+        const ok = await showKrtConfirm?.(
             msg,
             msg,
             window.krtI18nText(

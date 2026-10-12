@@ -21,6 +21,12 @@
 
 /* global OC_I18N */
 
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
+
 const ORG_CHART_SECTIONS = {
     chart: { container: '#oc-chart', fragmentValue: 'chartBody' },
 };
@@ -210,7 +216,7 @@ function openModal(mode, ctx) {
 
 function send(method, url, body) {
     if (!window.krtFetch) {
-        window.showFrontendErrorToast(OC_I18N.genericError);
+        showFrontendErrorToast(OC_I18N.genericError);
         return;
     }
     window.krtFetch.write({
@@ -220,7 +226,7 @@ function send(method, url, body) {
         toast: false,
         errorMessage: OC_I18N.genericError,
         onSuccess() {
-            window.showFrontendSuccessToast(OC_I18N.saved);
+            showFrontendSuccessToast(OC_I18N.saved);
             const keepScroll = chart ? chart.scrollLeft : 0;
             closeModal();
             refreshChart(keepScroll);
@@ -228,14 +234,14 @@ function send(method, url, body) {
         },
         onError(_status, data) {
             if (data && data.code === 'OPTIMISTIC_LOCK') {
-                window.showFrontendErrorToast(OC_I18N.conflict);
+                showFrontendErrorToast(OC_I18N.conflict);
                 const keepScroll = chart ? chart.scrollLeft : 0;
                 closeModal();
                 refreshChart(keepScroll);
                 return true;
             }
             const message = data && data.detail ? data.detail : OC_I18N.genericError;
-            window.showFrontendErrorToast(message);
+            showFrontendErrorToast(message);
             return true;
         },
     });
@@ -257,7 +263,7 @@ function submitModal() {
     if (mode === 'grandAdmiral') {
         const gaName = field('oc-display-name').trim();
         if (!gaName) {
-            window.showFrontendErrorToast(OC_I18N.displayNameRequired);
+            showFrontendErrorToast(OC_I18N.displayNameRequired);
             return;
         }
         const olId = encodeURIComponent(field('oc-org-unit-id'));
@@ -272,7 +278,7 @@ function submitModal() {
 
     if (mode === 'reassign') {
         if (!displayName) {
-            window.showFrontendErrorToast(OC_I18N.displayNameRequired);
+            showFrontendErrorToast(OC_I18N.displayNameRequired);
             return;
         }
         send('PUT', `/org-chart/positions/${positionId}/ajax`, {
@@ -285,7 +291,7 @@ function submitModal() {
     const staffChoice = field('oc-staff-choice') === '1';
     const positionType = staffChoice ? field('oc-stafftype') : field('oc-position-type');
     if (!displayName && !userOptional) {
-        window.showFrontendErrorToast(OC_I18N.displayNameRequired);
+        showFrontendErrorToast(OC_I18N.displayNameRequired);
         return;
     }
     const body = { positionType };
@@ -346,7 +352,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     });
 
     window.krtEvents.on('click', 'oc-ga-remove', (btn) => {
-        window.showKrtConfirm?.(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm).then((ok) => {
+        showKrtConfirm?.(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm).then((ok) => {
             if (ok) {
                 const olId = encodeURIComponent(String(btn.getAttribute('data-org-unit-id')));
                 send(
@@ -382,7 +388,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const isCommand = btn.getAttribute('data-position-type') === 'COMMAND_LEAD';
         const message = isCommand ? OC_I18N.removeConfirmCommand : OC_I18N.removeConfirm;
         const title = OC_I18N.removeConfirmTitle;
-        window.showKrtConfirm?.(title, message).then((ok) => {
+        showKrtConfirm?.(title, message).then((ok) => {
             if (ok) {
                 const id = encodeURIComponent(String(btn.getAttribute('data-position-id')));
                 send('DELETE', `/org-chart/positions/${id}/ajax`, null);
@@ -393,7 +399,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'oc-vacate', (btn) => {
         const title = OC_I18N.vacateConfirmTitle;
         const message = OC_I18N.vacateConfirm;
-        window.showKrtConfirm?.(title, message).then((ok) => {
+        showKrtConfirm?.(title, message).then((ok) => {
             if (ok) {
                 const id = encodeURIComponent(String(btn.getAttribute('data-position-id')));
                 const version = encodeURIComponent(String(btn.getAttribute('data-version')));

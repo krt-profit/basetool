@@ -20,6 +20,8 @@
 
 /* global QT_MSG, QT_CONFLICT */
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+
 (function () {
     const PAGE_URL = '/admin/quality-tiers';
 
@@ -81,8 +83,8 @@
 
     /** @param {string} message */
     function errorToast(message) {
-        if (message && typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(message);
+        if (message && typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(message);
         }
     }
 

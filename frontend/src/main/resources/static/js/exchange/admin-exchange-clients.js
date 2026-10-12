@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+
 const EXCHANGE_CLIENTS_SECTIONS = {
     registry: { container: '#xc-registry-host', fragmentValue: 'registry' },
     undoRuns: { container: '#xc-undo-runs-host', fragmentValue: 'undoRuns' },
@@ -233,8 +235,8 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                     }
                 })
                 .catch(() => {
-                    if (typeof window.showFrontendErrorToast === 'function') {
-                        window.showFrontendErrorToast(i18n.error);
+                    if (typeof showFrontendErrorToast === 'function') {
+                        showFrontendErrorToast(i18n.error);
                     }
                 });
         }
@@ -256,17 +258,15 @@ const EXCHANGE_CLIENTS_SECTIONS = {
          * @param {() => void} action
          */
         function confirmThen(titleText, bodyText, action) {
-            if (typeof window.showKrtConfirm !== 'function') {
+            if (typeof showKrtConfirm !== 'function') {
                 action();
                 return;
             }
-            window
-                .showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel)
-                .then((ok) => {
-                    if (ok) {
-                        action();
-                    }
-                });
+            showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
+                if (ok) {
+                    action();
+                }
+            });
         }
 
         /** @param {SubmitEvent} event */
@@ -585,8 +585,8 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                     });
                 })
                 .catch(() => {
-                    if (typeof window.showFrontendErrorToast === 'function') {
-                        window.showFrontendErrorToast(i18n.error);
+                    if (typeof showFrontendErrorToast === 'function') {
+                        showFrontendErrorToast(i18n.error);
                     }
                 });
         }
@@ -674,22 +674,20 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                     },
                 });
             };
-            if (typeof window.showKrtConfirm !== 'function') {
+            if (typeof showKrtConfirm !== 'function') {
                 send();
                 return;
             }
-            window
-                .showKrtConfirm(
-                    i18n.confirmTitle,
-                    i18n.confirmBody,
-                    i18n.confirmOk,
-                    i18n.confirmCancel,
-                )
-                .then((ok) => {
-                    if (ok) {
-                        send();
-                    }
-                });
+            showKrtConfirm(
+                i18n.confirmTitle,
+                i18n.confirmBody,
+                i18n.confirmOk,
+                i18n.confirmCancel,
+            ).then((ok) => {
+                if (ok) {
+                    send();
+                }
+            });
         }
 
         /** Re-renders the switch and the client table, which show the client suspended. */
@@ -788,8 +786,8 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                     window.krtModal.open('xc-undo-run-modal');
                 })
                 .catch(() => {
-                    if (typeof window.showFrontendErrorToast === 'function') {
-                        window.showFrontendErrorToast(i18n.error);
+                    if (typeof showFrontendErrorToast === 'function') {
+                        showFrontendErrorToast(i18n.error);
                     }
                 });
         }

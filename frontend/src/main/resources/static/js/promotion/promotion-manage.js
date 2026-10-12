@@ -21,13 +21,19 @@
 
 /* global MSG_SAVED, MSG_ERROR, MSG_CONFLICT, MSG_LAST_EVAL, MSG_BULK_CONFIRM_TITLE, MSG_BULK_CONFIRM_MSG, MSG_BULK_NEED_CAT, MSG_BULK_NEED_LEVEL, MSG_CSV_NAME, MSG_CSV_HEADER_MEMBER, MSG_CSV_HEADER_RANK, MSG_CSV_HEADER_ELIG, MSG_CSV_HEADER_LAST, SORT_LABELS, STORAGE_KEY_COLLAPSED, STORAGE_KEY_SORT, STORAGE_KEY_FILTERS, MSG_REFRESH_FAILED */
 
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
+
 function pmPutEvaluation(url, payload) {
     if (!window.krtFetch) {
         return Promise.resolve(null);
     }
     function toastError(message) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(message);
+        if (typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(message);
         }
     }
     return window.krtFetch
@@ -166,14 +172,14 @@ function pmProcessNextSave() {
                         cell.classList.remove('pm-cell-saved');
                     }, 850);
                 }
-                if (typeof window.showFrontendSuccessToast === 'function') {
-                    window.showFrontendSuccessToast(MSG_SAVED);
+                if (typeof showFrontendSuccessToast === 'function') {
+                    showFrontendSuccessToast(MSG_SAVED);
                 }
             }
         })
         .catch(() => {
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(MSG_ERROR);
+            if (typeof showFrontendErrorToast === 'function') {
+                showFrontendErrorToast(MSG_ERROR);
             }
         })
         .finally(() => {
@@ -449,14 +455,14 @@ function pmBulkApply() {
     const categoryId = catSel ? catSel.value : '';
     const level = lvlSel ? lvlSel.value : '';
     if (!categoryId) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(MSG_BULK_NEED_CAT);
+        if (typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(MSG_BULK_NEED_CAT);
         }
         return;
     }
     if (!level) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(MSG_BULK_NEED_LEVEL);
+        if (typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(MSG_BULK_NEED_LEVEL);
         }
         return;
     }
@@ -471,7 +477,7 @@ function pmBulkApply() {
         .replace('{category}', catLabel);
 
     const confirmFn =
-        window.showKrtConfirm ||
+        showKrtConfirm ||
         function () {
             return Promise.resolve(true);
         };

@@ -18,7 +18,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, MSG_SAVING, MSG_REFINERY_UPDATE_FAILED, MSG_REFINERY_STORE_FAILED, MSG_REFINERY_CANCEL_FAILED, MSG_CANCEL_CONFIRM, MSG_CANCEL_TITLE, MSG_CANCEL_DISMISS, REFINERY_DETAIL_MSG, STORE_INHERITED_ORG_UNIT_ID, STORE_ORG_UNIT_PLACEHOLDER, RATING_LEVELS, SPEED_LEVELS, showFrontendErrorToast */
+/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, MSG_SAVING, MSG_REFINERY_UPDATE_FAILED, MSG_REFINERY_STORE_FAILED, MSG_REFINERY_CANCEL_FAILED, MSG_CANCEL_CONFIRM, MSG_CANCEL_TITLE, MSG_CANCEL_DISMISS, REFINERY_DETAIL_MSG, STORE_INHERITED_ORG_UNIT_ID, STORE_ORG_UNIT_PLACEHOLDER, RATING_LEVELS, SPEED_LEVELS */
+
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 
 /**
  * A form control of a material or store row, whose `id`, `name` and `value` the renumbering
@@ -834,8 +836,8 @@ function submitRefineryStoreForm(form, submitter) {
 }
 
 async function submitRefineryCancelForm(form, submitter) {
-    if (typeof window.showKrtConfirm === 'function') {
-        const ok = await window.showKrtConfirm(
+    if (typeof showKrtConfirm === 'function') {
+        const ok = await showKrtConfirm(
             MSG_CANCEL_TITLE,
             MSG_CANCEL_CONFIRM,
             MSG_CANCEL_TITLE,

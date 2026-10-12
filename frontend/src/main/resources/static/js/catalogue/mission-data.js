@@ -21,6 +21,8 @@
 
 /* global MISSION_MSG, MISSION_CONFLICT, MISSION_TITLES */
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+
 const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
 
 /**
@@ -495,8 +497,8 @@ function setupDragAndDrop(containerId, reorderUrl) {
                         if (status === 409) {
                             return false;
                         }
-                        if (window.showFrontendErrorToast) {
-                            window.showFrontendErrorToast(MISSION_MSG.error);
+                        if (showFrontendErrorToast) {
+                            showFrontendErrorToast(MISSION_MSG.error);
                         }
                         return true;
                     },
