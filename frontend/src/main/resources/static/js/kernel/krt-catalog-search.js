@@ -19,6 +19,7 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtComboboxRemoteSources } from '/js/kernel/krt-combobox-sources.js';
 
 /** @param {ApiDto<'MaterialDto'>} row */
 function toMaterialOption(row) {
@@ -56,19 +57,18 @@ function fetchCatalog(path, query, toOption) {
         });
 }
 
-window.krtComboboxRemoteSources ||= {};
-window.krtComboboxRemoteSources['remote-materials'] = function (query) {
+krtComboboxRemoteSources['remote-materials'] = function (query) {
     return fetchCatalog('/catalog/material-search', query, toMaterialOption);
 };
-window.krtComboboxRemoteSources['remote-materials-joborder'] = function (query) {
+krtComboboxRemoteSources['remote-materials-joborder'] = function (query) {
     return fetchCatalog('/catalog/material-search?jobOrder=true', query, toMaterialOption);
 };
-window.krtComboboxRemoteSources['remote-materials-raw'] = function (query) {
+krtComboboxRemoteSources['remote-materials-raw'] = function (query) {
     return fetchCatalog('/catalog/material-search?raw=true', query, toMaterialOption);
 };
-window.krtComboboxRemoteSources['remote-locations'] = function (query) {
+krtComboboxRemoteSources['remote-locations'] = function (query) {
     return fetchCatalog('/catalog/location-search', query, toLocationOption);
 };
-window.krtComboboxRemoteSources['remote-game-items'] = function (query) {
+krtComboboxRemoteSources['remote-game-items'] = function (query) {
     return fetchCatalog('/inventory/item-search', query, toGameItemOption);
 };

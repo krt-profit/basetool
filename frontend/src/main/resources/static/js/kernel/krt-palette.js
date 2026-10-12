@@ -19,6 +19,7 @@
  */
 
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtChrome } from '/js/kernel/krt-chrome.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const RECENT_KEY = 'krt.recent';
@@ -120,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 crumb,
                 icon: 'swap',
                 run() {
-                    if (window.krtNav) window.krtNav.open(select);
+                    if (krtChrome.nav) krtChrome.nav.open(select);
                 },
             });
         }
@@ -380,7 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
         paletteInput.setSelectionRange(end, end);
     };
 
-    window.krtPalette = { open };
+    krtChrome.palette = { open };
 
     paletteInput.addEventListener('input', render);
     paletteInput.addEventListener('keydown', (e) => {
@@ -410,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-palette-open]').forEach((trigger) => {
         trigger.addEventListener('click', () => {
-            if (window.krtNav) window.krtNav.close();
+            if (krtChrome.nav) krtChrome.nav.close();
             open('');
         });
     });
@@ -426,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
             paletteInput.select();
             return;
         }
-        if (window.krtNav) window.krtNav.close();
+        if (krtChrome.nav) krtChrome.nav.close();
         open('');
     });
 

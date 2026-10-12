@@ -746,8 +746,6 @@ interface Window {
     trustedTypes?: TrustedTypePolicyFactory;
 
     krtModal: KrtModalApi;
-    krtNav?: KrtNavApi;
-    krtPalette?: KrtPaletteApi;
     /** Alias of `krtModal.open` for the mission page. */
     krtModalOpen: (overlay: Element | null) => void;
     krtModalClose: (overlay: Element | null) => void;

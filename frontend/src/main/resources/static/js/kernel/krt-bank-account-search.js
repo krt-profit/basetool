@@ -19,15 +19,16 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtComboboxRemoteSources } from '/js/kernel/krt-combobox-sources.js';
 
 const JUSTIFICATION_TYPES = ['CARTEL', 'CARTEL_BANK', 'SPECIAL'];
 
-const accountMeta = window.krtBankAccountMeta || {};
-window.krtBankAccountMeta = accountMeta;
+/** @type {Record<string, boolean>} */
+export const krtBankAccountMeta = {};
 
 function toOption(row) {
     const requiresJustification = JUSTIFICATION_TYPES.indexOf(row.type) !== -1;
-    accountMeta[row.id] = requiresJustification;
+    krtBankAccountMeta[row.id] = requiresJustification;
     const accountNo = row.accountNo || '';
     const name = row.name || '';
     const label = accountNo && name ? `${accountNo} — ${name}` : accountNo || name || row.id;
@@ -45,7 +46,6 @@ function fetchAccounts(query) {
         });
 }
 
-window.krtComboboxRemoteSources ||= {};
-window.krtComboboxRemoteSources['remote-bank-accounts'] = function (query) {
+krtComboboxRemoteSources['remote-bank-accounts'] = function (query) {
     return fetchAccounts(query);
 };

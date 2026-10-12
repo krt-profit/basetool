@@ -19,6 +19,7 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtComboboxRemoteSources } from '/js/kernel/krt-combobox-sources.js';
 
 function toOption(row) {
     return {
@@ -38,10 +39,9 @@ function fetchUsers(path, query) {
         });
 }
 
-window.krtComboboxRemoteSources ||= {};
-window.krtComboboxRemoteSources['remote-users'] = function (query) {
+krtComboboxRemoteSources['remote-users'] = function (query) {
     return fetchUsers('/users/search', query);
 };
-window.krtComboboxRemoteSources['remote-bank-users'] = function (query) {
+krtComboboxRemoteSources['remote-bank-users'] = function (query) {
     return fetchUsers('/users/search-bank', query);
 };

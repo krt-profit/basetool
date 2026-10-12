@@ -1,5 +1,8 @@
 // @ts-check
 /* exported krtSearchableSelect */
+
+import { krtComboboxRemoteSources } from '/js/kernel/krt-combobox-sources.js';
+
 let comboboxSeq = 0;
 
 const COMBOBOX_DATA_KEYS = [
@@ -695,7 +698,7 @@ function krtSearchableSelect(select, config) {
 function autoConfig(select) {
     const i18n = window.krtComboboxI18n || {};
     const d = select.dataset;
-    const remoteSources = window.krtComboboxRemoteSources || {};
+    const remoteSources = krtComboboxRemoteSources;
     const remoteSource = remoteSources[d.krtCombobox];
     const kind = (i18n.kinds || {})[d.krtCombobox] || {};
     return {

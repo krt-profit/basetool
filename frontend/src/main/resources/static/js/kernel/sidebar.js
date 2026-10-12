@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtChrome } from '/js/kernel/krt-chrome.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const phone = window.matchMedia('(max-width: 768px)');
     const sidebarEl = document.getElementById('sidebar');
@@ -319,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return !!sidebarEl && sidebarEl.classList.contains('open');
     };
 
-    window.krtNav = {
+    krtChrome.nav = {
         open(focus) {
             openSidebar(focus || null);
         },
@@ -407,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toPaletteEl.addEventListener('click', () => {
             const text = filterEl ? filterEl.value.trim() : '';
             closeSidebar(false);
-            if (window.krtPalette) window.krtPalette.open(text);
+            if (krtChrome.palette) krtChrome.palette.open(text);
         });
     }
 
