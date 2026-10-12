@@ -21,7 +21,8 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

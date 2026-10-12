@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SpaceStationDto;
-import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
 import org.mapstruct.Mapper;
 
 /**

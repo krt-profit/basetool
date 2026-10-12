@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import java.util.List;
 import org.jetbrains.annotations.Nullable;
 

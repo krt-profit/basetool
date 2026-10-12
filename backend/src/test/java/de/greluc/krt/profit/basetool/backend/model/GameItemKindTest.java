@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import org.junit.jupiter.api.Test;
 
 /**

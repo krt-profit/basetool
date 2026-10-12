@@ -19,20 +19,20 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintDismantleReturnDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintRequirementGroupDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintRequirementIngredientDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintRequirementModifierDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintRequirementModifierSegmentDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintSummaryPropertyDto;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintDismantleReturn;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredient;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintModifierSegment;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintRequirementGroup;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintRequirementModifier;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintSummaryProperty;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintDismantleReturn;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierSegment;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroup;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroupDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementIngredientDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifier;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifierDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifierSegmentDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintSummaryProperty;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintDismantleReturnDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintSummaryPropertyDto;
 import java.util.List;
 import java.util.Objects;
 import org.jetbrains.annotations.NotNull;

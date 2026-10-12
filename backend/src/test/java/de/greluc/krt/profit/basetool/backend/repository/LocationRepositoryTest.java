@@ -21,7 +21,8 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

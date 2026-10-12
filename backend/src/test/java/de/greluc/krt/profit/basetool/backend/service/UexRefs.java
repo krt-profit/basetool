@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.PairKeyRef;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexKeyRef;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.PairKeyRef;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
 import java.util.UUID;
 
 /** Test factories for the id-projection rows the UEX syncs preload (BE-PERF-09). */

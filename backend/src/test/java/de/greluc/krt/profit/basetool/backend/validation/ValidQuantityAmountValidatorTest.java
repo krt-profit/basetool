@@ -24,6 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPieceTypeLookup;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityAware;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ValidQuantityAmountValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAliasSource;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasSource;
 
 /**
  * External catalogue that produced an {@link ExternalSyncReport} event. Independent of {@link

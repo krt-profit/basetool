@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportResultDto;
 import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.model.P4kImportJobKind;
-import de.greluc.krt.profit.basetool.backend.model.dto.P4kImportResultDto;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +32,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Runs an enqueued {@link de.greluc.krt.profit.basetool.backend.model.P4kImportJob} on the
+ * Runs an enqueued {@link de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob} on the
  * single-thread {@code @Async} import executor, delegating every state change and the
  * parse-and-reconcile work to the transactional {@link P4kImportJobService} and {@link
  * P4kImportService}.
@@ -54,7 +54,7 @@ public class P4kImportJobRunner {
   /**
    * Executes one import job asynchronously on the {@code importExecutor}. Never throws: every
    * failure is recorded on the job as {@link
-   * de.greluc.krt.profit.basetool.backend.model.P4kImportJobStatus#FAILED FAILED}.
+   * de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus#FAILED FAILED}.
    *
    * @param jobId the (already-committed) job to run
    * @param kind whether to preview or apply

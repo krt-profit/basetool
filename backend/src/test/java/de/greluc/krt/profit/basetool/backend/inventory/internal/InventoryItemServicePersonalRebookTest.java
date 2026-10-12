@@ -32,6 +32,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
@@ -42,15 +47,10 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
@@ -403,8 +403,8 @@ class InventoryItemServicePersonalRebookTest {
     InventoryItem item = newItem(10.0, 1L, false);
     item.setMaterial(null);
     item.setQuality(null);
-    de.greluc.krt.profit.basetool.backend.model.GameItem gameItem =
-        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gameItem =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
     gameItem.setId(UUID.randomUUID());
     gameItem.setName("Quantum Drive");
     item.setGameItem(gameItem);
@@ -432,8 +432,8 @@ class InventoryItemServicePersonalRebookTest {
     InventoryItem item = newItem(10.0, 1L, false);
     item.setMaterial(null);
     item.setQuality(null);
-    de.greluc.krt.profit.basetool.backend.model.GameItem gameItem =
-        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gameItem =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
     gameItem.setId(UUID.randomUUID());
     item.setGameItem(gameItem);
     when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -452,8 +452,8 @@ class InventoryItemServicePersonalRebookTest {
     InventoryItem item = newItem(1.5, 1L, false);
     item.setMaterial(null);
     item.setQuality(null);
-    de.greluc.krt.profit.basetool.backend.model.GameItem gameItem =
-        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gameItem =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
     gameItem.setId(UUID.randomUUID());
     item.setGameItem(gameItem);
     when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -473,8 +473,8 @@ class InventoryItemServicePersonalRebookTest {
     InventoryItem item = newItem(1.5, 1L, false);
     item.setMaterial(null);
     item.setQuality(null);
-    de.greluc.krt.profit.basetool.backend.model.GameItem gameItem =
-        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gameItem =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
     gameItem.setId(UUID.randomUUID());
     item.setGameItem(gameItem);
     when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));

@@ -21,10 +21,10 @@ package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Material;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 

@@ -19,16 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemPrice;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexMatrixLookups;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemPriceDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
-import de.greluc.krt.profit.basetool.backend.model.GameItemPrice;
-import de.greluc.krt.profit.basetool.backend.repository.GameItemPriceRepository;
-import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;

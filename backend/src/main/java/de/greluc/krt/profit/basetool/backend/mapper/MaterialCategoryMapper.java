@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

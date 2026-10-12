@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequestKind;
@@ -33,8 +35,6 @@ import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialR
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialRequestDto;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialRequestService;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialRequestUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import java.time.Instant;
 import java.util.List;

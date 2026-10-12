@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
-import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

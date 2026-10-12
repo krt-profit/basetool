@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintModifierSegment;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintRequirementModifier;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierSegment;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifier;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

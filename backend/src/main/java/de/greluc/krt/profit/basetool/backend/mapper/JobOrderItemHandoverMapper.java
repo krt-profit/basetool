@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandoverEntry;
-import de.greluc.krt.profit.basetool.backend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverEntryDto;
 import org.jetbrains.annotations.Nullable;

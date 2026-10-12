@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.QualityTier;
-import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper from the {@link QualityTier} catalogue entity to its DTO. */

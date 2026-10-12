@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -25,6 +25,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
@@ -37,18 +42,13 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -1407,11 +1407,11 @@ class JobOrderServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.JobOrder();
     order.setId(orderId);
 
-    de.greluc.krt.profit.basetool.backend.model.Material requiredMat =
-        new de.greluc.krt.profit.basetool.backend.model.Material();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.Material requiredMat =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     requiredMat.setId(requiredMatId);
-    de.greluc.krt.profit.basetool.backend.model.Material orphanMat =
-        new de.greluc.krt.profit.basetool.backend.model.Material();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.Material orphanMat =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     orphanMat.setId(orphanMatId);
 
     de.greluc.krt.profit.basetool.backend.model.InventoryItem requiredItem =
@@ -1469,11 +1469,11 @@ class JobOrderServiceTest {
     order.setId(orderId);
     order.setType(JobOrderType.ITEM);
 
-    de.greluc.krt.profit.basetool.backend.model.GameItem requestedGameItem =
-        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem requestedGameItem =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
     requestedGameItem.setId(requestedGameItemId);
-    de.greluc.krt.profit.basetool.backend.model.GameItem orphanGameItem =
-        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem orphanGameItem =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
     orphanGameItem.setId(orphanGameItemId);
 
     de.greluc.krt.profit.basetool.backend.model.InventoryItem requestedRow =

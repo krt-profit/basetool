@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
-import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

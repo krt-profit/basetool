@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.service.ShipTypeService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.util.Set;

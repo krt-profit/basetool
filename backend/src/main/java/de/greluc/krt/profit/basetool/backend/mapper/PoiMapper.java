@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.mapper;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.PoiDto;
-import de.greluc.krt.profit.basetool.backend.model.Poi;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Poi;
 import org.mapstruct.Mapper;
 
 /**

@@ -34,16 +34,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemPrice;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemPriceDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
-import de.greluc.krt.profit.basetool.backend.model.GameItemPrice;
-import de.greluc.krt.profit.basetool.backend.model.Terminal;
-import de.greluc.krt.profit.basetool.backend.repository.GameItemPriceRepository;
-import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.Collection;
 import java.util.HashMap;
@@ -273,13 +273,12 @@ class UexItemPriceSyncServiceTest {
     assertEquals(Set.of(staleId), Set.copyOf(sweep.getValue()));
   }
 
-  private void knownItems(
-      de.greluc.krt.profit.basetool.backend.catalogue.internal.UexKeyRef... refs) {
+  private void knownItems(de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef... refs) {
     when(gameItemRepository.findUexItemRefs()).thenReturn(List.of(refs));
   }
 
   private void knownTerminals(
-      de.greluc.krt.profit.basetool.backend.catalogue.internal.UexKeyRef... refs) {
+      de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef... refs) {
     when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(refs));
   }
 

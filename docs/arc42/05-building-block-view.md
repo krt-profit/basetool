@@ -212,11 +212,13 @@ an entity of the catalogue. The six records no model class embeds (`CityDto`, `O
 modules call (`BlueprintNameNormalizer`, `MaterialNameCanonicalizer`) sit in `catalogue.api`; the
 sync infrastructure (`SyncCoordinator`, `SyncChunkWriter`, `SyncReportService`), the UEX, SC Wiki
 and P4K feed records (`catalogue.internal.uex`, `.scwiki`, `.p4k`), the sync report entity and its
-repository, the key projections and the integration properties sit in `catalogue.internal`.
-Entities, repositories, mappers, controllers and the other DTOs stay in the layer packages. The
-kernel types `AbstractEntity` and `PageResponse` lie in `kernel` since 2026-10-12, so the entities,
-enums, DTOs and repositories can follow; the mappers, controllers and services wait for
-`CentralMapperConfig` to leave the `mapper` package (§11).
+repository and the integration properties sit in `catalogue.internal`. The kernel types
+`AbstractEntity` and `PageResponse` lie in `kernel` since 2026-10-12, and the catalogue's entities,
+enums, DTOs, repositories and validation types followed (P4-5 part 2): 69 in `catalogue.api`, which
+publishes the entities as the foundation modules do (§5.2 of the plan), and 32 in
+`catalogue.internal`; whatever an `api` type depends on lies in `api` too, because the layers inside
+a module must stay acyclic. The mappers, controllers and services stay in the layer packages until
+`CentralMapperConfig` has left the `mapper` package (§11).
 
 The inventory (the Lager) moved since P4-1: `InventoryItemController` sits in `inventory.web`, and
 `inventory.internal` holds the Lager services (item, aggregation, checkout, org-unit change, stolen

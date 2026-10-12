@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
-import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

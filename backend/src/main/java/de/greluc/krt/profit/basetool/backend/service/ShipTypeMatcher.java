@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

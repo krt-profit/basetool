@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
-import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.service.FrequencyTypeService;
 import java.util.List;
 import org.junit.jupiter.api.Test;

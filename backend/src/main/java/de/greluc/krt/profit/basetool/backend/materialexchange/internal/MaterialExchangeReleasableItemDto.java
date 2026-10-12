@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 

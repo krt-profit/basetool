@@ -24,9 +24,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OutpostDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Outpost;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.mapper.OutpostMapper;
-import de.greluc.krt.profit.basetool.backend.model.Outpost;
 import de.greluc.krt.profit.basetool.backend.service.OutpostService;
 import java.util.List;
 import java.util.UUID;

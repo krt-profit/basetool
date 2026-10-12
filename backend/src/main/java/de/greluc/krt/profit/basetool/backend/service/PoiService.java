@@ -20,12 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.PoiDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Poi;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PoiMapper;
-import de.greluc.krt.profit.basetool.backend.model.Poi;
-import de.greluc.krt.profit.basetool.backend.repository.PoiRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;

@@ -246,7 +246,7 @@ the modules its row allows; a dependency upward is inverted through an SPI or an
 | --- | --- | --- |
 | 0 | `kernel`, `platform` | `kernel`: `AbstractEntity`, `PageResponse`, `Entities`, `OptimisticLock`, `StringNormalization`, `LikePatterns`, validation constraints, the error-model base (§5.5), handle anonymisation, `UserRef`/`OrgUnitRef` value types (`OrgUnitRef` only once `OrgUnitKind` is a kernel type, §7.3), SCU rounding. `platform`: web, logging, metrics infrastructure and the access core (`AuthHelperService`, `AuthenticatedSubject`, `ClientAttribution`); `Roles`, `Permissions`, `RequestMemo` and `ProblemResponseFactory` are kernel types (corrected 2026-10-04, P1-9). Closed to domain meaning, like `logging-support` (ADR-0205). |
 | 1 | `audit`, `notification`, `livesync` | Platform services every domain may call; they depend upward only through SPIs. |
-| 2 | `catalogue` | Materials, items, locations, ship types, refining methods, job and frequency types, and the UEX, SC Wiki and P4K imports — including the recipe graph (`model.scwiki.Blueprint`). |
+| 2 | `catalogue` | Materials, items, locations, ship types, refining methods, job and frequency types, and the UEX, SC Wiki and P4K imports — including the recipe graph (`catalogue.api.Blueprint`). |
 | 3 | `identity` | Users, registration, profile, terms consent, and the GDPR orchestration, which calls the other modules through identity-owned SPIs. |
 | 4 | `orgunit` | Squadrons, special commands, Bereiche, Organisationsleitung, memberships and appointments (the Leitung write paths), and the leadership cascade (`OrgUnitCascadeService`). |
 | 5 | `scope` | The request-scoped scope kernel: `RequestScopeResolver`, `ScopePredicate`, `OrgUnitStampingService`, `ScopeSpecifications`, the authorities converter — and `OwnerScopeService` and `AccessGateService` until the per-domain access policies (§5.4) have taken their methods over. |
@@ -2285,6 +2285,53 @@ all at once: the mappers, and with them the controllers and services that call t
 selects it) but because `PageResponse` left the `model.dto` package tree. (3) The probe counts 200
 classes in layer packages against the plan's 182, because it counts the 18 generated MapStruct
 `*Impl` classes as types of their own.
+
+**P4-5, part 2 — the catalogue's entities, enums, DTOs, repositories and validation types move into `catalogue.api` / `catalogue.internal` — done 2026-10-12**
+1. *Re-probe* on the fresh main (b9bbb6234): the 101 classes the part 1b probe found (68 in `model`,
+   29 repositories, 4 validation types) still close no package cycle when they join `catalogue`.
+   `@EntityScan` / `@EnableJpaRepositories` are not configured anywhere: Spring Boot scans from the
+   application's package, so the new packages are found. `LikeEscapeCatalogRepositoriesDataTest`,
+   `LocationRepositoryTest` and `CatalogueCachedReadsTest` fail at injection if an entity or
+   repository is not found.
+2. *Placement*: a class another module (or the layer packages that still stand in for one) uses goes
+   to `catalogue.api` (§5.2: a foundation module publishes its entities); the rest to
+   `catalogue.internal`; and everything an `api` type depends on goes to `api` too, because
+   `layersInsideEachModuleShouldBeFreeOfDependencyCycles` refuses `api ⇄ internal` (it caught 16 of
+   the 101 and three part-1 projection types, `LookupTableRepository`, `PairKeyRef`, `UexKeyRef`,
+   which the `api` repositories extend or return). Result: **69 types in `api`, 32 in `internal`**,
+   plus the three projection types. `git mv` and a script rewrote the imports (533 files in the first pass, 120 in the second), added the
+   imports that the former same-package and wildcard use needed, and rewrote every fully qualified
+   name in code, Javadoc and strings.
+3. *Behaviour*: entity mappings, table names, queries, cache wire records and `openapi.json` are
+   unchanged (`OpenApiGeneratorTest` green, `openapi.json` byte-identical). NullAway checks the
+   moved classes now; six sites needed an annotation, not code: `category` of
+   `MaterialPriceOverviewDto` and `MaterialMatrixItemDto`, `BlueprintModifierSegment.modifier`
+   (`clearSegments` sets it to `null`), and the two parameters of
+   `RefineryYieldRepository.findAllForLocation` (the query tests `IS NOT NULL`).
+4. *Gates*, each set from the failing assertion: the join-column floor 272 → **239** and the
+   validation-leaf floor 8 → **7** (non-entity types left the `model` and `validation` package
+   trees); the leaf-helper floor 60 → **69** after `LocationReferenceDto`, `MaterialCategoryDto`,
+   `MaterialDto`, `MaterialReferenceDto` and `QuantityType` joined `LEAF_HELPER_CLASSES` (the leaf
+   rule allows model code, and these left the `model` package tree); the domain map lost
+   `name ^(Blueprint) catalogue`, which assigned no class any more
+   (`everyRuleOfTheDomainMapAssignsAClass`). Module baseline 32 → 32.
+5. *Left out*: `CentralMapperConfig` stays in `mapper`. It is a platform type, but 54 files name it
+   (the 35 mappers in `mapper`, 19 mappers in 15 modules, the mapper-layer anchor of
+   `ArchitectureTest`), and a move into `platform.api` needs `platform::api` in the declaration of
+   every module that has a mapper, a move into the kernel a change of the domain map. That is not
+   the small step part 3 asked for. Part 3 therefore starts with it, together with
+   `P4kImportJobRunner`.
+**Corrections:** (1) The `$` of a nested class ends a fully qualified name, and the script's word
+boundary stopped at it: three `@Query` constructor expressions
+(`BlueprintRepository$ExchangeBlueprintKeyRow`, `GameItemRepository$ExchangeItemKeyRow`,
+`LocationRepository$ExchangeLocationRow`) kept the old package and failed the context load with
+"Could not resolve class … named for instantiation". A string concatenation that splits a name
+(the `MaterialMapper` expression, split for the line length) is not found either. (2) The 16 types
+and three projections that moved from `internal` to `api` were a second pass; part 1 had put the
+projection types in `internal` because no `api` type used them yet. (3) The tests of the moved
+classes stay in their old test packages; they compile against the new packages. 81 catalogue
+classes remain in the layer packages: the mappers, controllers, services and the 23 of the UEX and
+SC Wiki side.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 

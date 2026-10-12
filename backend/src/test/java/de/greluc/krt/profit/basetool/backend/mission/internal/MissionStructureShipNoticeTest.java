@@ -24,11 +24,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
@@ -56,7 +56,7 @@ class MissionStructureShipNoticeTest {
   @Mock private ShipRepository shipRepository;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository shipTypeRepository;
+  private de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository shipTypeRepository;
 
   @Mock private MissionNotificationPublisher notificationPublisher;
   @Mock private de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder auditRecorder;

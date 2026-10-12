@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import org.jetbrains.annotations.NotNull;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
@@ -45,8 +45,9 @@ public interface MaterialMapper {
   @Mapping(
       target = "isManualEntry",
       expression =
-          "java(entity.getSourceSystems()"
-              + " == de.greluc.krt.profit.basetool.backend.model.MaterialSourceSystem.MANUAL)")
+          "java(entity.getSourceSystems() =="
+              + " de.greluc.krt.profit.basetool.backend.catalogue.api."
+              + "MaterialSourceSystem.MANUAL)")
   MaterialDto toDto(Material entity);
 
   /**

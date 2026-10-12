@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.P4kImportJob;
-import de.greluc.krt.profit.basetool.backend.model.dto.P4kImportJobDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.P4kImportResultDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportResultDto;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
