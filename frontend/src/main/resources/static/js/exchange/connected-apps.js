@@ -116,7 +116,7 @@ function initConnectedApps() {
     if (undoForm instanceof HTMLFormElement) {
         undoForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            if (!undoClientId || !krtFetch) {
+            if (!undoClientId) {
                 return;
             }
             const span = /** @type {HTMLSelectElement | null} */ (
@@ -147,9 +147,6 @@ function initConnectedApps() {
      * @param {Element} submitter
      */
     function markSeen(id, submitter) {
-        if (!krtFetch) {
-            return;
-        }
         krtFetch.write({
             method: 'POST',
             url: `${BASE}/installations/${encodeURIComponent(id)}/seen`,
@@ -180,9 +177,6 @@ function initConnectedApps() {
      * @param {Element} submitter
      */
     function disconnect(titleText, bodyText, url, submitter) {
-        if (!krtFetch) {
-            return;
-        }
         const send = function () {
             krtFetch.write({
                 method: 'DELETE',
@@ -195,10 +189,7 @@ function initConnectedApps() {
                 },
             });
         };
-        if (typeof showKrtConfirm !== 'function') {
-            send();
-            return;
-        }
+
         showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
             if (ok) {
                 send();
@@ -215,7 +206,7 @@ function initConnectedApps() {
         if (undoBtn) {
             const app = undoBtn.closest('[data-client-id]');
             undoClientId = app ? app.getAttribute('data-client-id') : null;
-            if (undoClientId && krtModal) {
+            if (undoClientId) {
                 krtModal.open('ca-undo-modal');
             }
             return;

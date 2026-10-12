@@ -146,10 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         event.preventDefault();
-        if (!krtFetch) {
-            form.submit();
-            return;
-        }
+
         const nameInput = /** @type {HTMLInputElement | null} */ (
             form.querySelector('input[name="name"]')
         );
@@ -193,16 +190,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         event.preventDefault();
         const message = form.getAttribute('data-krt-confirm-message') || '';
-        const proceed =
-            typeof showKrtConfirm === 'function'
-                ? showKrtConfirm(null, message)
-                : Promise.resolve(true);
+        const proceed = showKrtConfirm(null, message);
         proceed.then((ok) => {
             if (!ok) {
                 return;
             }
             const categoryId = form.getAttribute('data-category-id');
-            if (krtFetch && categoryId) {
+            if (categoryId) {
                 krtFetch.write({
                     method: 'POST',
                     url: /** @type {string} */ (form.getAttribute('action')),
@@ -267,9 +261,6 @@ function updateMaterial(selectElement) {
     const tr = closestRow;
     const matId = /** @type {string} */ (tr.getAttribute('data-mat-id'));
     const updateType = selectElement.getAttribute('data-update-type');
-    if (!krtFetch) {
-        return;
-    }
 
     selectElement.disabled = true;
 
@@ -317,11 +308,9 @@ function updateMaterial(selectElement) {
         });
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('change', 'admin-materials-update', (el) => {
-        updateMaterial(/** @type {HTMLInputElement | HTMLSelectElement} */ (el));
-    });
-}
+krtEvents.on('change', 'admin-materials-update', (el) => {
+    updateMaterial(/** @type {HTMLInputElement | HTMLSelectElement} */ (el));
+});
 
 /**
  * Looks up a text, select or textarea control of the create-material modal.
@@ -391,9 +380,6 @@ function submitCreateMaterial(btn) {
         isVolatileTime: createMaterialCheckbox('cm-volatile-time').checked,
     };
 
-    if (!krtFetch) {
-        return;
-    }
     krtFetch.write({
         method: 'POST',
         url: '/admin/materials/ajax',
@@ -464,13 +450,11 @@ function refreshMaterialsTable() {
         });
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'materials-open-create-modal', openCreateMaterialModal);
-    krtEvents.on('click', 'materials-close-create-modal', closeCreateMaterialModal);
-    krtEvents.on('click', 'materials-submit-create', (btn) => {
-        submitCreateMaterial(btn);
-    });
-}
+krtEvents.on('click', 'materials-open-create-modal', openCreateMaterialModal);
+krtEvents.on('click', 'materials-close-create-modal', closeCreateMaterialModal);
+krtEvents.on('click', 'materials-submit-create', (btn) => {
+    submitCreateMaterial(btn);
+});
 
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {

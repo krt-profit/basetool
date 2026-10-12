@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const query = params.toString();
             target = `/hangar/squadron${query ? `?${query}` : ''}`;
         }
-        if (!resultsContainer || !krtFetch) {
+        if (!resultsContainer) {
             window.location.assign(target);
             return;
         }
@@ -116,7 +116,5 @@ document.addEventListener('DOMContentLoaded', () => {
             applySquadronFilter(clear.getAttribute('href'));
         });
     }
-    if (krtFetch && typeof krtFetch.bindSwap === 'function') {
-        krtFetch.bindSwap({ container: '#squadron-results', history: true });
-    }
+    krtFetch.bindSwap({ container: '#squadron-results', history: true });
 });

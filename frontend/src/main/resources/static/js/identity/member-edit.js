@@ -19,7 +19,7 @@
 
 // @ts-check
 
-import { krtCsrf, krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * Wires the Stammdaten / Mitgliedschaften / Datenauskunft tabs: arrow-key navigation and the
@@ -204,12 +204,7 @@ function bindSubmit() {
     const formElement = /** @type {HTMLFormElement | null} */ (
         document.getElementById('member-edit-form')
     );
-    if (
-        !formElement ||
-        formElement.getAttribute('data-member-edit') === null ||
-        !krtFetch ||
-        !krtCsrf
-    ) {
+    if (!formElement || formElement.getAttribute('data-member-edit') === null) {
         return;
     }
     const form = formElement;

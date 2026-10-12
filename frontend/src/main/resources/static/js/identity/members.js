@@ -38,7 +38,7 @@ const MEMBERS_SECTIONS = {
 /** Re-renders the roster fragment in place, or reloads when the transport is missing. */
 function refreshMembersResults() {
     const container = document.getElementById('members-results');
-    if (!container || !krtFetch) {
+    if (!container) {
         location.reload();
         return;
     }
@@ -62,7 +62,7 @@ function bindFilter() {
 
     /** Swaps the roster for the current filter values, or submits the form without transport. */
     function applyMembersFilter() {
-        if (!filterForm || !resultsContainer || !krtFetch) {
+        if (!filterForm || !resultsContainer) {
             if (filterForm) filterForm.submit();
             return;
         }
@@ -129,14 +129,12 @@ function bindFilter() {
  * @param {string | null} userId the member's id
  */
 async function deleteUser(userId) {
-    const confirmed = showKrtConfirm
-        ? await showKrtConfirm(
-              MSG_DELETE_TITLE,
-              MSG_DELETE_CONFIRM,
-              MSG_DELETE_LABEL,
-              MSG_CANCEL_LABEL,
-          )
-        : false;
+    const confirmed = await showKrtConfirm(
+        MSG_DELETE_TITLE,
+        MSG_DELETE_CONFIRM,
+        MSG_DELETE_LABEL,
+        MSG_CANCEL_LABEL,
+    );
     if (!confirmed) return;
     krtFetch.write({
         method: 'DELETE',
@@ -172,7 +170,7 @@ let consolidateSource = null;
  */
 function openConsolidate(el) {
     const modal = document.getElementById('consolidate-modal');
-    if (!modal || !krtModal) return;
+    if (!modal) return;
     consolidateSource = {
         id: el.getAttribute('data-user-id'),
         version: el.getAttribute('data-user-version'),
@@ -190,7 +188,7 @@ function openConsolidate(el) {
 /** Forgets the source member and closes the consolidation dialog. */
 function closeConsolidate() {
     consolidateSource = null;
-    if (krtModal) krtModal.close('consolidate-modal');
+    krtModal.close('consolidate-modal');
 }
 
 /** Consolidates the source member into the picked target member. */
@@ -201,9 +199,7 @@ function confirmConsolidate() {
     );
     const targetUserId = picker && picker.value ? picker.value : '';
     if (!targetUserId) {
-        if (showFrontendErrorToast) {
-            showFrontendErrorToast(MSG_CONSOLIDATE_NO_TARGET);
-        }
+        showFrontendErrorToast(MSG_CONSOLIDATE_NO_TARGET);
         return;
     }
     const source = consolidateSource;
@@ -218,9 +214,7 @@ function confirmConsolidate() {
         toast: false,
         errorMessage: MSG_CONSOLIDATE_ERROR,
         onSuccess() {
-            if (showFrontendSuccessToast) {
-                showFrontendSuccessToast(MSG_CONSOLIDATE_SUCCESS);
-            }
+            showFrontendSuccessToast(MSG_CONSOLIDATE_SUCCESS);
             closeConsolidate();
             refreshMembersResults();
         },
@@ -250,9 +244,6 @@ krtEvents.on('click', 'members-consolidate', (el) => {
 });
 
 function initMembers() {
-    if (!krtLiveSync || typeof krtLiveSync.createReceiver !== 'function') {
-        return;
-    }
     if (!document.getElementById('members-results')) {
         return;
     }

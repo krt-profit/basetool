@@ -85,7 +85,7 @@ function initAdminQualityTiers() {
 
     /** @param {string} message */
     function errorToast(message) {
-        if (message && typeof showFrontendErrorToast === 'function') {
+        if (message) {
             showFrontendErrorToast(message);
         }
     }
@@ -222,7 +222,7 @@ function initAdminQualityTiers() {
 
     form.addEventListener('submit', (event) => {
         event.preventDefault();
-        if (!krtFetch || !idInput) {
+        if (!idInput) {
             return;
         }
         const id = idInput.value;
@@ -244,7 +244,7 @@ function initAdminQualityTiers() {
 
     if (deleteConfirm) {
         deleteConfirm.addEventListener('click', () => {
-            if (!krtFetch || !pendingDeleteId) {
+            if (!pendingDeleteId) {
                 return;
             }
             const id = pendingDeleteId;

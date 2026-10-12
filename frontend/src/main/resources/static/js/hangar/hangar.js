@@ -54,13 +54,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function reswapHangar() {
-        if (krtFetch) {
-            krtFetch.swap({
-                url: currentListUrl(),
-                container: '#hangar-results',
-                history: false,
-            });
-        }
+        krtFetch.swap({
+            url: currentListUrl(),
+            container: '#hangar-results',
+            history: false,
+        });
     }
 
     const HANGAR_SECTIONS = { ships: { container: '#hangar-results' } };
@@ -69,12 +67,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function afterHangarWrite() {
         reswapHangar();
-        if (hangarTopic && krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        if (hangarTopic && typeof krtLiveSync.sendChanged === 'function') {
             krtLiveSync.sendChanged(hangarTopic, Object.keys(HANGAR_SECTIONS));
         }
     }
 
-    if (hangarTopic && krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+    if (hangarTopic) {
         krtLiveSync.createReceiver({
             topic: hangarTopic,
             sections: HANGAR_SECTIONS,
@@ -217,9 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closeModal() {
-        if (typeof resetUnsavedChanges === 'function') {
-            resetUnsavedChanges();
-        }
+        resetUnsavedChanges();
         krtModal.close(modal);
     }
 
@@ -276,10 +272,8 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal();
     }
 
-    if (krtEvents && typeof krtEvents.on === 'function') {
-        krtEvents.on('click', 'hangar-add-ship', openAddModal);
-        krtEvents.on('click', 'hangar-edit-ship', openEditModal);
-    }
+    krtEvents.on('click', 'hangar-add-ship', openAddModal);
+    krtEvents.on('click', 'hangar-edit-ship', openEditModal);
 
     modalDeleteBtn.addEventListener('click', () => {
         if (!deleteForm) return;
@@ -349,9 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function showError(msg) {
-            if (showFrontendErrorToast) {
-                showFrontendErrorToast(msg);
-            }
+            showFrontendErrorToast(msg);
         }
 
         function fillParagraphs(list, names) {
@@ -413,9 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showError(button.getAttribute('data-error-toolarge'));
                 return;
             }
-            if (!krtFetch) {
-                return;
-            }
+
             const formData = new FormData();
             formData.append('file', file);
 
@@ -509,11 +499,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     onSuccess() {
                         krtModal.close(deleteAllModal);
                         afterHangarWrite();
-                        if (showFrontendSuccessToast) {
-                            showFrontendSuccessToast(
-                                /** @type {string} */ (deleteAllBtn.getAttribute('data-success')),
-                            );
-                        }
+                        showFrontendSuccessToast(
+                            /** @type {string} */ (deleteAllBtn.getAttribute('data-success')),
+                        );
                     },
                 })
                 .then(() => {
@@ -540,13 +528,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (krtEvents && typeof krtEvents.on === 'function') {
-            krtEvents.on('click', 'hangar-open-home', (btn) => {
-                if (btn && /** @type {HTMLButtonElement} */ (btn).disabled) return;
-                refreshHomeBody();
-                krtModal.open(homeModal);
-            });
-        }
+        krtEvents.on('click', 'hangar-open-home', (btn) => {
+            if (btn && /** @type {HTMLButtonElement} */ (btn).disabled) return;
+            refreshHomeBody();
+            krtModal.open(homeModal);
+        });
 
         homeModal.querySelectorAll('.close-home-cancel, .close-modal-home').forEach((el) => {
             el.addEventListener('click', closeHome);
@@ -681,7 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function applyHangarFilter(url) {
         const target = url || filterUrl();
-        if (!hangarResults || !krtFetch) {
+        if (!hangarResults) {
             window.location.assign(target);
             return;
         }
@@ -744,7 +730,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (krtFetch && typeof krtFetch.bindSwap === 'function') {
-        krtFetch.bindSwap({ container: '#hangar-results', history: true });
-    }
+    krtFetch.bindSwap({ container: '#hangar-results', history: true });
 });

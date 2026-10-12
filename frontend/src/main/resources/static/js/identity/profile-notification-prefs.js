@@ -21,9 +21,6 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 function initProfileNotificationPrefs() {
-    if (!krtFetch) {
-        return;
-    }
     /** @type {Record<string, string>} */
     const i18n = window.krtProfileI18n || {};
 
@@ -36,9 +33,6 @@ function initProfileNotificationPrefs() {
      * @returns {Promise<boolean> | undefined} the swap, or undefined when no swap helper exists
      */
     function refreshCard() {
-        if (!krtFetch.swap) {
-            return undefined;
-        }
         return krtFetch.swap({
             url: BASE_URL,
             container: HOST,

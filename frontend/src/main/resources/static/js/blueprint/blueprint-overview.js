@@ -69,7 +69,7 @@ function ownersUrl(productKey) {
     const base = config().ownersUrl || '';
     const sep = base.indexOf('?') === -1 ? '?' : '&';
     const url = `${base + sep}productKey=${encodeURIComponent(productKey)}`;
-    return safeSameOriginUrl ? safeSameOriginUrl(url, url) : url;
+    return safeSameOriginUrl(url, url);
 }
 
 /**
@@ -317,10 +317,6 @@ function buildSearchUrl(form) {
  * @returns {void}
  */
 function swapResults(url) {
-    if (!krtFetch) {
-        window.location.assign(url);
-        return;
-    }
     krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
 }
 
@@ -363,9 +359,7 @@ function wireFilter() {
 document.addEventListener('DOMContentLoaded', () => {
     wireRows(document);
     wireFilter();
-    if (krtFetch) {
-        krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
-    }
+    krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
 });
 
 document.addEventListener('krt:swapped', (event) => {

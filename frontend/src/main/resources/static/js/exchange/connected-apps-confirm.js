@@ -117,7 +117,7 @@ function initConnectedAppsConfirm() {
         return false;
     }
 
-    if (!handoffId || !krtFetch) {
+    if (!handoffId) {
         show('cac-missing');
         return;
     }

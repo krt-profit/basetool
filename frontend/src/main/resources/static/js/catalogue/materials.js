@@ -186,11 +186,9 @@ function filterFlatView(filter) {
     return container ? filterCards(container, filter) : 0;
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('input', 'materials-filter', filterMaterials);
-    krtEvents.on('change', 'materials-filter', filterMaterials);
-    krtEvents.on('click', 'materials-toggle-kind', (el) => {
-        toggleKindGroup(el);
-    });
-    krtEvents.on('change', 'materials-toggle-grouping', onToggleGrouping);
-}
+krtEvents.on('input', 'materials-filter', filterMaterials);
+krtEvents.on('change', 'materials-filter', filterMaterials);
+krtEvents.on('click', 'materials-toggle-kind', (el) => {
+    toggleKindGroup(el);
+});
+krtEvents.on('change', 'materials-toggle-grouping', onToggleGrouping);

@@ -124,10 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         event.preventDefault();
-        if (!krtFetch) {
-            form.submit();
-            return;
-        }
+
         const row = form.closest('tr');
         const button = /** @type {HTMLButtonElement | null} */ (
             form.querySelector('button[type="submit"]')

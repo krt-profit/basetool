@@ -90,9 +90,7 @@ function filterTable(tableId, query) {
  * @param {string | null} id the overlay id
  */
 function closeModal(id) {
-    if (typeof resetUnsavedChanges === 'function') {
-        resetUnsavedChanges();
-    }
+    resetUnsavedChanges();
     krtModal.close(id);
 }
 
@@ -108,16 +106,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'ship-close-modal', (el) => {
-        closeModal(el.getAttribute('data-modal-id'));
-    });
-}
+krtEvents.on('click', 'ship-close-modal', (el) => {
+    closeModal(el.getAttribute('data-modal-id'));
+});
 
 function initShipData() {
-    if (!krtFetch) {
-        return;
-    }
     const i18n = shipDataI18n;
     const conflict = shipDataConflict;
 
@@ -157,9 +150,7 @@ function initShipData() {
                             ? form.getAttribute('data-label-show')
                             : form.getAttribute('data-label-hide');
                     }
-                    if (showFrontendSuccessToast) {
-                        showFrontendSuccessToast(i18n.saved);
-                    }
+                    showFrontendSuccessToast(i18n.saved);
                 },
             })
             .then(() => {
@@ -181,9 +172,7 @@ function initShipData() {
                 conflict,
                 onSuccess() {
                     closeModal('reset-fitted-confirm-modal');
-                    if (showFrontendSuccessToast) {
-                        showFrontendSuccessToast(i18n.resetSuccess);
-                    }
+                    showFrontendSuccessToast(i18n.resetSuccess);
                 },
             })
             .then(() => {

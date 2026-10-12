@@ -38,14 +38,14 @@ function initAdminExchangeClients() {
 
     /** Tells the other admins' open pages that the switch or the client table changed. */
     function broadcastRegistry() {
-        if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        if (typeof krtLiveSync.sendChanged === 'function') {
             krtLiveSync.sendChanged('exchange-clients', ['registry']);
         }
     }
 
     /** Tells the other admins' open pages that a bulk undo started and suspended its client. */
     function broadcastUndoStart() {
-        if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        if (typeof krtLiveSync.sendChanged === 'function') {
             krtLiveSync.sendChanged('exchange-clients', ['registry', 'undoRuns']);
         }
     }
@@ -239,9 +239,7 @@ function initAdminExchangeClients() {
                     }
                 })
                 .catch(() => {
-                    if (typeof showFrontendErrorToast === 'function') {
-                        showFrontendErrorToast(i18n.error);
-                    }
+                    showFrontendErrorToast(i18n.error);
                 });
         }
 
@@ -262,10 +260,6 @@ function initAdminExchangeClients() {
          * @param {() => void} action
          */
         function confirmThen(titleText, bodyText, action) {
-            if (typeof showKrtConfirm !== 'function') {
-                action();
-                return;
-            }
             showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
                 if (ok) {
                     action();
@@ -276,7 +270,7 @@ function initAdminExchangeClients() {
         /** @param {SubmitEvent} event */
         function onSubmit(event) {
             event.preventDefault();
-            if (!krtFetch || !el.form.reportValidity()) {
+            if (!el.form.reportValidity()) {
                 return;
             }
             const id = editedId();
@@ -312,7 +306,7 @@ function initAdminExchangeClients() {
         function changeStatus(row, action, submitter) {
             const id = row.getAttribute('data-client-id');
             const rowVersion = row.getAttribute('data-version');
-            if (!id || !krtFetch) {
+            if (!id) {
                 return;
             }
             const send = function () {
@@ -339,7 +333,7 @@ function initAdminExchangeClients() {
         /** @param {Element} submitter */
         function toggleSwitch(submitter) {
             const box = document.getElementById('xc-switch');
-            if (!box || !krtFetch) {
+            if (!box) {
                 return;
             }
             const enabled = box.getAttribute('data-enabled') === 'true';
@@ -589,9 +583,7 @@ function initAdminExchangeClients() {
                     });
                 })
                 .catch(() => {
-                    if (typeof showFrontendErrorToast === 'function') {
-                        showFrontendErrorToast(i18n.error);
-                    }
+                    showFrontendErrorToast(i18n.error);
                 });
         }
 
@@ -624,7 +616,7 @@ function initAdminExchangeClients() {
         /** Asks the backend what the scope reaches and allows the start once it reaches anything. */
         function runCheck() {
             const id = form.getAttribute('data-client-id') || '';
-            if (!id || !krtFetch || !form.reportValidity()) {
+            if (!id || !form.reportValidity()) {
                 return;
             }
             krtFetch.write({
@@ -654,7 +646,7 @@ function initAdminExchangeClients() {
         /** Starts the run after a confirmation and shows it in the list. */
         function start() {
             const id = form.getAttribute('data-client-id') || '';
-            if (!id || !krtFetch || submit.disabled) {
+            if (!id || submit.disabled) {
                 return;
             }
             const send = function () {
@@ -678,10 +670,7 @@ function initAdminExchangeClients() {
                     },
                 });
             };
-            if (typeof showKrtConfirm !== 'function') {
-                send();
-                return;
-            }
+
             showKrtConfirm(
                 i18n.confirmTitle,
                 i18n.confirmBody,
@@ -790,9 +779,7 @@ function initAdminExchangeClients() {
                     krtModal.open('xc-undo-run-modal');
                 })
                 .catch(() => {
-                    if (typeof showFrontendErrorToast === 'function') {
-                        showFrontendErrorToast(i18n.error);
-                    }
+                    showFrontendErrorToast(i18n.error);
                 });
         }
 
@@ -830,22 +817,20 @@ function initAdminExchangeClients() {
 
         schedulePoll();
 
-        if (krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
-            krtLiveSync.createReceiver({
-                topic: 'exchange-clients',
-                sections: EXCHANGE_CLIENTS_SECTIONS,
-                coalesceMs: 1500,
-                /** @param {string[]} keys the sections another admin changed */
-                refresh(keys) {
-                    if (keys.includes('registry')) {
-                        refreshRegistry();
-                    }
-                    if (keys.includes('undoRuns')) {
-                        refreshRuns();
-                    }
-                },
-            });
-        }
+        krtLiveSync.createReceiver({
+            topic: 'exchange-clients',
+            sections: EXCHANGE_CLIENTS_SECTIONS,
+            coalesceMs: 1500,
+            /** @param {string[]} keys the sections another admin changed */
+            refresh(keys) {
+                if (keys.includes('registry')) {
+                    refreshRegistry();
+                }
+                if (keys.includes('undoRuns')) {
+                    refreshRuns();
+                }
+            },
+        });
     }
 }
 

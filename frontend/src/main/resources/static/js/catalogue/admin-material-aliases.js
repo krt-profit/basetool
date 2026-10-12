@@ -173,10 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         event.preventDefault();
-        if (!krtFetch) {
-            form.submit();
-            return;
-        }
+
         const submitBtn = /** @type {HTMLButtonElement | null} */ (
             form.querySelector('button[type="submit"]')
         );
