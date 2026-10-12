@@ -28,6 +28,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -256,13 +257,10 @@ public final class ShipTypeMatcher {
     if (name == null || name.isBlank()) {
       return Set.of();
     }
-    Set<String> tokens = new HashSet<>();
-    for (String t : TOKEN_SPLIT.split(name.toLowerCase(Locale.ROOT))) {
-      if (!t.isEmpty()) {
-        tokens.add(t);
-      }
-    }
-    return tokens;
+    return TOKEN_SPLIT
+        .splitAsStream(name.toLowerCase(Locale.ROOT))
+        .filter(t -> !t.isEmpty())
+        .collect(Collectors.toCollection(HashSet::new));
   }
 
   /**

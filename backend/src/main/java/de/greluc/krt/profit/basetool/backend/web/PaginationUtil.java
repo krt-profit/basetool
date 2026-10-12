@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.web;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -49,6 +51,12 @@ public final class PaginationUtil {
 
   /** Default {@code size} when the caller supplies none or a non-positive value. */
   public static final int DEFAULT_PAGE_SIZE = 50;
+
+  /** Separates the sort terms of a {@code sort} query parameter. */
+  private static final Pattern SORT_PARTS = Pattern.compile("[;]");
+
+  /** Separates the field from the direction within one sort term. */
+  private static final Pattern SORT_TOKENS = Pattern.compile(",");
 
   /** The largest {@code size} a list answers with. */
   @RequiredArgsConstructor
@@ -170,16 +178,16 @@ public final class PaginationUtil {
       return Sort.by(defaultField).ascending();
     }
     List<Sort.Order> orders = new ArrayList<>();
-    String[] parts = sortParam.split("[;]");
+    List<String> parts = SORT_PARTS.splitAsStream(sortParam).toList();
     for (String part : parts) {
-      String[] tokens = part.split(",");
-      String field = tokens[0].trim();
+      List<String> tokens = SORT_TOKENS.splitAsStream(part).toList();
+      String field = tokens.get(0).trim();
       if (!allowed.contains(field)) {
         throw new IllegalArgumentException("Unsupported sort field: " + field);
       }
       Sort.Direction dir = Sort.Direction.ASC;
-      if (tokens.length > 1) {
-        String d = tokens[1].trim();
+      if (tokens.size() > 1) {
+        String d = tokens.get(1).trim();
         if (d.equalsIgnoreCase("desc")) {
           dir = Sort.Direction.DESC;
         }
@@ -201,7 +209,7 @@ public final class PaginationUtil {
    */
   public static List<String> toSortStrings(@NotNull Sort sort) {
     return sort.stream()
-        .map(o -> o.getProperty() + "," + o.getDirection().name().toLowerCase())
+        .map(o -> o.getProperty() + "," + o.getDirection().name().toLowerCase(Locale.ROOT))
         .toList();
   }
 }

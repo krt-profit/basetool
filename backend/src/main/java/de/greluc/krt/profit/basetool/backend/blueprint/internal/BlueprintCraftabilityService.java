@@ -44,6 +44,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -355,7 +356,7 @@ public class BlueprintCraftabilityService {
    * ITEM bridged to one (ADR-0046).
    *
    * @param flat the recipe's flat ingredient list
-   * @param group the requirement group instance, matched by reference
+   * @param group the requirement group whose ingredients are searched
    * @param itemBridges resolved ITEM-ingredient bridges ({@code game_item} id to {@link Material})
    * @return the driving material id, or {@code null} for a slot with no material-bearing line
    */
@@ -365,7 +366,7 @@ public class BlueprintCraftabilityService {
       @NotNull BlueprintRequirementGroup group,
       @NotNull Map<UUID, Material> itemBridges) {
     for (BlueprintIngredient ingredient : flat) {
-      if (ingredient.getRequirementGroup() != group) {
+      if (!Objects.equals(ingredient.getRequirementGroup(), group)) {
         continue;
       }
       if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {

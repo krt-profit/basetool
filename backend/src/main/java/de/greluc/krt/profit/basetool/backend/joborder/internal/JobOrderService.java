@@ -257,7 +257,8 @@ public class JobOrderService {
    * Publishes a {@link JobOrderClosedEvent} so the order's open notices are cleared after commit
    * (REQ-NOTIF-018).
    *
-   * @param jobOrderId the completed, rejected or deleted order
+   * @param jobOrder the completed, rejected or deleted order
+   * @param statusCode the order's final status code
    */
   private void publishJobOrderFinished(@NotNull JobOrder jobOrder, @NotNull String statusCode) {
     eventPublisher.publishEvent(finishedNotice(jobOrder, statusCode));
@@ -660,7 +661,7 @@ public class JobOrderService {
         continue;
       }
       JobOrderItem parent = byClientId.get(parentClientId);
-      if (parent != null && parent != resolved.get(i)) {
+      if (parent != null && !parent.equals(resolved.get(i))) {
         resolved.get(i).setParentItem(parent);
       }
     }

@@ -30,8 +30,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>{@code id}, {@code username}, {@code email} and {@code enabled} come from the Admin {@code GET
  * /users} response; {@code roles} is joined in per realm role. {@code discordUserId} is enriched
  * only for users the sync back-fills, so {@code null} means "leave the existing link alone" in
- * {@link de.greluc.krt.profit.basetool.backend.service.UserService#syncUser(KeycloakUserDto)}
- * (REQ-DATA-006).
+ * {@code UserReconciliationService#syncUser(KeycloakUserDto)} (REQ-DATA-006).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record KeycloakUserDto(

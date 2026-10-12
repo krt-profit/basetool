@@ -62,7 +62,6 @@ class JobOrderHandoverServiceTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private StockChangeObserver offerRatchet;
   @Mock private JobOrderHandoverMapper jobOrderHandoverMapper;
-  @Mock private JobOrderMaterialRepository jobOrderMaterialRepository;
   @Mock private JobOrderService jobOrderService;
   @Mock private UserService userService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
@@ -381,7 +380,6 @@ class JobOrderHandoverServiceTest {
         jobOrderMaterial2.getAmount(),
         0.0001,
         "Second material's open amount must be reduced from 8.0 to 0.0");
-    verify(jobOrderMaterialRepository, never()).save(any());
     verify(inventoryItemRepository).delete(inventoryItem2);
     verify(inventoryItemRepository)
         .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId2);

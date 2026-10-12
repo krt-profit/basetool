@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Builder for the RFC&nbsp;7807 {@link ProblemDetail} bodies of every error surface: title, {@code
- * type} (from {@link AppProblemProperties#getBaseUri()}), optional {@code instance}, and the {@code
+ * type} (from {@link AppProblemProperties#baseUri()}), optional {@code instance}, and the {@code
  * code} and {@code correlationId} extensions.
  *
  * <p>The caller supplies the {@code correlationId}.
@@ -51,8 +51,7 @@ public class ProblemResponseFactory {
    * @param title the localized summary
    * @param detail the localized explanation
    * @param instanceUri the request URI for {@code instance}, or {@code null}/blank to omit it
-   * @param typeSuffix appended to {@link AppProblemProperties#getBaseUri()} to form the {@code
-   *     type}
+   * @param typeSuffix appended to {@link AppProblemProperties#baseUri()} to form the {@code type}
    * @param code the stable, machine-readable {@code code} extension
    * @param correlationId the correlation id echoed as the {@code correlationId} extension
    * @return the assembled problem detail

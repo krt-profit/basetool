@@ -830,7 +830,7 @@ public class InventoryCheckoutService {
 
   /**
    * Joins the distinct merged notes with {@link #NOTE_MERGE_SEPARATOR}, truncating to {@link
-   * #NOTE_MAX_LENGTH} so the write never overflows the {@code note} column.
+   * #NOTE_MAX_LENGTH} so the write never overflows the {@code inventory_item.note} column.
    *
    * @param notes the ordered accumulator of distinct notes.
    * @return the combined note, or {@code null} when no folded row carried a note.

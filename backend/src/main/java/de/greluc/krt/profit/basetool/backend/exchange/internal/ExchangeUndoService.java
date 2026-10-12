@@ -343,7 +343,7 @@ public class ExchangeUndoService {
     String location = text(before, "location");
     UUID locationId = location == null ? null : UUID.fromString(location);
     if (!shipTypeRepository.existsById(shipType)
-        || locationId != null && !locationRepository.existsById(locationId)) {
+        || (locationId != null && !locationRepository.existsById(locationId))) {
       return false;
     }
     JsonNode fitted = before.get("fitted");

@@ -70,13 +70,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class JobOrderItemHandoverService {
 
-  /**
-   * Tolerance for comparing item stock amounts stored as {@code double}. Item rows hold whole
-   * units, so a residual below this is floating-point noise rather than a real remainder; a row at
-   * or below it is treated as depleted and removed. Mirrors {@link JobOrderHandoverService}.
-   */
-  private static final double QUANTITY_EPSILON = 1e-4;
-
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;

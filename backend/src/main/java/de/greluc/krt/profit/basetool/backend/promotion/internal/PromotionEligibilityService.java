@@ -249,7 +249,7 @@ public class PromotionEligibilityService {
       UUID topicId = entry.getKey();
       List<RankRequirement> topicReqs = new ArrayList<>(entry.getValue());
       topicReqs.sort(
-          Comparator.comparingInt((RankRequirement r) -> r.getMinimumLevel().ordinal()).reversed());
+          Comparator.comparingInt((RankRequirement r) -> r.getMinimumLevel().getRank()).reversed());
 
       Set<UUID> reservedCategories = new HashSet<>();
       for (RankRequirement req : topicReqs) {

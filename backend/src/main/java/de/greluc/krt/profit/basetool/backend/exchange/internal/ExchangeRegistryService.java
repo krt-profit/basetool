@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 @RequiredArgsConstructor
 public class ExchangeRegistryService {
+
+  /** Separates the components of a dotted version. */
+  private static final Pattern DOT = Pattern.compile("[.]");
 
   private final ExchangeClientRepository clientRepository;
   private final ExchangeRegistryMirrorSync mirrorSync;
@@ -335,12 +339,12 @@ public class ExchangeRegistryService {
     if (before == null) {
       return true;
     }
-    String[] a = before.split("[.]");
-    String[] b = after.split("[.]");
-    for (int i = 0; i < Math.max(a.length, b.length); i++) {
+    List<String> a = DOT.splitAsStream(before).toList();
+    List<String> b = DOT.splitAsStream(after).toList();
+    for (int i = 0; i < Math.max(a.size(), b.size()); i++) {
       try {
-        long x = i < a.length ? Long.parseLong(a[i].strip()) : 0;
-        long y = i < b.length ? Long.parseLong(b[i].strip()) : 0;
+        long x = i < a.size() ? Long.parseLong(a.get(i).strip()) : 0;
+        long y = i < b.size() ? Long.parseLong(b.get(i).strip()) : 0;
         if (x != y) {
           return y > x;
         }

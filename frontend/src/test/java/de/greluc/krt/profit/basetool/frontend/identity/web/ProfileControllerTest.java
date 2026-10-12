@@ -47,6 +47,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
@@ -183,7 +184,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(3);
     when(principal.getAttribute("description")).thenReturn("From-Token");
     when(principal.getAttribute("displayName")).thenReturn("JD");
-    when(backendApiClient.get(any(String.class), any(Class.class)))
+    when(backendApiClient.get(any(String.class), ArgumentMatchers.<Class<Object>>any()))
         .thenThrow(new RuntimeException("backend down"));
 
     Model model = new ConcurrentModel();

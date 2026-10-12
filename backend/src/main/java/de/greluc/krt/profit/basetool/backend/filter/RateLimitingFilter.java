@@ -252,7 +252,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
   /**
    * Builds the list of bucket slots that apply to the current request — the global default (when
-   * the path matches {@link RateLimitProperties#getPaths()}) plus every endpoint-specific rule that
+   * the path matches {@link RateLimitProperties#paths()}) plus every endpoint-specific rule that
    * matches both the request URI AND the HTTP method. Order is irrelevant here; the caller sorts
    * tightest-first before consumption.
    */

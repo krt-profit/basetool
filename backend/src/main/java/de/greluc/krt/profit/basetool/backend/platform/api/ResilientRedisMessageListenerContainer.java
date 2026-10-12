@@ -45,12 +45,6 @@ public class ResilientRedisMessageListenerContainer extends RedisMessageListener
   /** Delay between two subscription attempts, in milliseconds. */
   private final long retryIntervalMillis;
 
-  /**
-   * Callback passed to {@code super.stop(Runnable)} when only the superclass teardown is wanted;
-   * {@code super.stop()} would dispatch to {@link #stop(Runnable)} and cancel the pending retry.
-   */
-  private static final Runnable NO_OP_CALLBACK = () -> {};
-
   /** Guards {@link #retryExecutor} and {@link #pendingRetry}. */
   private final Object retryMonitor = new Object();
 
@@ -146,6 +140,12 @@ public class ResilientRedisMessageListenerContainer extends RedisMessageListener
   }
 
   /**
+   * Callback passed to {@code super.stop(Runnable)} when only the superclass teardown is wanted;
+   * {@code super.stop()} would dispatch to {@link #stop(Runnable)} and cancel the pending retry.
+   */
+  private static void noOpCallback() {}
+
+  /**
    * Runs one subscription attempt, scheduling the next one when it fails.
    *
    * @param isRetry {@code false} for the attempt made during context refresh, {@code true} for a
@@ -156,7 +156,7 @@ public class ResilientRedisMessageListenerContainer extends RedisMessageListener
     try {
       super.start();
       if (stopRequested) {
-        super.stop(NO_OP_CALLBACK);
+        super.stop(ResilientRedisMessageListenerContainer::noOpCallback);
         return;
       }
       shutdownRetries(false);
@@ -164,7 +164,7 @@ public class ResilientRedisMessageListenerContainer extends RedisMessageListener
         log.info("Redis fan-out subscription re-established for container '{}'.", describe());
       }
     } catch (RuntimeException ex) {
-      super.stop(NO_OP_CALLBACK);
+      super.stop(ResilientRedisMessageListenerContainer::noOpCallback);
       if (isRetry) {
         log.debug("Redis fan-out subscription retry for '{}' failed again.", describe(), ex);
       } else {

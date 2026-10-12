@@ -45,10 +45,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * correlation id in the response header.
  *
  * <p>The correlation id comes from the inbound header ({@link
- * LoggingProperties#getCorrelationIdHeader()}) or is a fresh UUID; the user id is the caller's
- * {@code sub} via {@code AuthenticatedSubject} (ADR-0129), or {@code anonymous}. The MDC is cleared
- * in a {@code finally} block, and async dispatches re-bind the values the initial dispatch
- * resolved.
+ * LoggingProperties#correlationIdHeader()}) or is a fresh UUID; the user id is the caller's {@code
+ * sub} via {@code AuthenticatedSubject} (ADR-0129), or {@code anonymous}. The MDC is cleared in a
+ * {@code finally} block, and async dispatches re-bind the values the initial dispatch resolved.
  */
 @Slf4j
 @Component

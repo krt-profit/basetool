@@ -135,7 +135,7 @@ public class GlobalExceptionHandler extends ApplicationProblemHandlers {
       if (current instanceof AuthenticationCredentialsNotFoundException missing) {
         return missing;
       }
-      current = current.getCause() == current ? null : current.getCause();
+      current = current.equals(current.getCause()) ? null : current.getCause();
     }
     return null;
   }

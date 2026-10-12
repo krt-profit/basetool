@@ -34,7 +34,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DataExportReportService {
 
-  private final DataExportService dataExportService;
   private final MessageSource messageSource;
 
   /**

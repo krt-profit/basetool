@@ -23,7 +23,11 @@ pitest {
   jvmArgs.set(
     provider {
       val args =
-        mutableListOf("--enable-native-access=ALL-UNNAMED", "-Dspring.profiles.active=test")
+        mutableListOf(
+          "--enable-native-access=ALL-UNNAMED",
+          "--sun-misc-unsafe-memory-access=allow",
+          "-Dspring.profiles.active=test",
+        )
       mockitoAgent.get().files.singleOrNull()?.let {
         args += "-Xshare:off"
         args += "-javaagent:${it.absolutePath}"

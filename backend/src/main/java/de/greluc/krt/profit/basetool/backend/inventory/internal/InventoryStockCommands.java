@@ -133,8 +133,8 @@ public class InventoryStockCommands implements StockCommands {
                     lot.location().getId(),
                     lot.stolen()));
     rows.sort(
-        Comparator.comparing((InventoryItem r) -> Boolean.TRUE.equals(r.getPersonal()) ? 0 : 1)
-            .thenComparing(r -> r.getOwningOrgUnit() == null ? 0 : 1)
+        Comparator.comparingInt((InventoryItem r) -> Boolean.TRUE.equals(r.getPersonal()) ? 0 : 1)
+            .thenComparingInt(r -> r.getOwningOrgUnit() == null ? 0 : 1)
             .thenComparing(
                 InventoryItem::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder())));
     return rows;

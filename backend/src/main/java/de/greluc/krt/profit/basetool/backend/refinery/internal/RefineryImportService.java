@@ -322,7 +322,7 @@ public class RefineryImportService implements RefineryDraftBuilder {
    *   <li>exact case-insensitive name;
    *   <li>unique canonical-core fold;
    *   <li>best {@link FuzzyNameMatcher} candidate at or above {@link
-   *       RefineryImportProperties#getMethodFuzzyAcceptThreshold()}.
+   *       RefineryImportProperties#methodFuzzyAcceptThreshold()}.
    * </ol>
    *
    * @param rawName verbatim screen read; null/blank yields empty

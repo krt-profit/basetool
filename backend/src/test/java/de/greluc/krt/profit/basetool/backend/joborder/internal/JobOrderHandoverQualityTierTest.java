@@ -70,7 +70,6 @@ class JobOrderHandoverQualityTierTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private StockChangeObserver offerRatchet;
   @Mock private JobOrderHandoverMapper jobOrderHandoverMapper;
-  @Mock private JobOrderMaterialRepository jobOrderMaterialRepository;
   @Mock private JobOrderService jobOrderService;
   @Mock private UserService userService;
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;

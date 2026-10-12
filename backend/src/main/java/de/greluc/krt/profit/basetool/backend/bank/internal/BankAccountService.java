@@ -169,7 +169,7 @@ public class BankAccountService {
             ? Map.of()
             : holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
-    return rows.map(row -> toBookingDto(accountId, row, accountLegsByTx, holderLegsByTx));
+    return rows.map(row -> toBookingDto(row, accountLegsByTx, holderLegsByTx));
   }
 
   /**
@@ -487,7 +487,6 @@ public class BankAccountService {
    * Maps one booking row to its DTO, resolving the holder annotation and, for transfers, the
    * counter account from the batched legs (ADR-0039).
    *
-   * @param accountId the account whose history is rendered
    * @param row the projected booking row
    * @param accountLegsByTx account legs of the page's transfers, grouped by transaction
    * @param holderLegsByTx holder legs of the page's transactions, grouped by transaction
@@ -495,7 +494,6 @@ public class BankAccountService {
    */
   @NotNull
   private BankBookingDto toBookingDto(
-      @NotNull UUID accountId,
       @NotNull BankBookingRow row,
       @NotNull Map<UUID, List<BankCounterLeg>> accountLegsByTx,
       @NotNull Map<UUID, List<BankHolderLeg>> holderLegsByTx) {
