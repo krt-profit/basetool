@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.config.PathControlInventory.Endpoint;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
+import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;
+import de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;

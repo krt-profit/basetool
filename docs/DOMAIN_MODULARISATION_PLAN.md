@@ -2465,17 +2465,111 @@ corrected by hand again. **Open:** `backend/build-settings.properties` points th
    SpEL.
 **What remains of the scope module** (part 2): `CustomJwtGrantedAuthoritiesConverter` stays in
 `service`. It is the only blocked class: it calls `UserReconciliationService.syncUser(jwt)`, an
-identity service of rank 3, so the direction is right and no SPI belongs here; the identity slice has
-to move `UserReconciliationService`, `UserService` and `UserRegistrationService` together first
-(§7.6, identity). After that the converter moves to `scope.internal` (its callers in `config` and
-`exchange.internal` use it by type, so it may need `scope.api`). `OwnerScopeService` and
-`AccessGateService` stay until the per-domain access policies have taken over their methods (§5.4).
+identity service of rank 3, so the direction is right and no SPI belongs here. *Corrected
+2026-10-12:* the identity slice does not simply move the three services; four of their calls must
+be inverted first (P4-7, slices a to c below), and the converter moves in slice c. After that it goes to
+`scope.internal` (its callers in `config` and `exchange.internal` use it by type, so it may need
+`scope.api`). `OwnerScopeService` and `AccessGateService` stay until the per-domain access policies
+have taken over their methods (§5.4).
 **Corrections:** (1) §5.1 lists the authorities converter as part of the scope kernel, and the
 domain map assigns it there; it is the one scope class that cannot move yet. (2) The plan counted
 `OrgUnitCascadeService` among the orgunit classes only; it is also a blocker of the scope kernel, and
 moving it was not an SPI case but a plain move, because nothing in it points upward. (3) A fixpoint
 over the nine candidates alone moves three classes; the obstacle is not in the scope set but in two
 classes of other modules that still lie in `service`.
+
+**P4-7 — the identity module's call seams, in three slices; slice a: the Keycloak client and the identity leaves move into `identity.api` / `identity.internal` / `identity.web`, `RestClientConfig` into `platform.api` — part 1a done 2026-10-12**
+(owner decision of 2026-10-12: option 1, identity-owned SPIs in slices a, b and c, each green and merged before the next starts).
+1. *Probe on `e6c94b4c8`* (ArchUnit dependencies over the compiled classes, nested and generated classes
+   folded, one node per first package segment; throwaway, deleted). 65 classes of the domain map's
+   `identity` rules lie in layer packages.
+   - `UserReconciliationService`, `UserService` and `UserRegistrationService` moved alone close
+     `{config, service, identity}`. The closing `identity -> service` edges are exactly four:
+     `UserService -> OrgUnitMembershipQueryService` (`findStaffelMembershipOrgUnitIds`,
+     `findAllMembershipsForUser`), `UserService -> OrgUnitMembershipService`
+     (`reconcileStaffelMemberships`, `addMember`, `removeMember`, `patchFlags`),
+     `UserRegistrationService -> UserDeletionService` (`deleteUser`) and
+     `UserRegistrationService -> KeycloakService` (`unlinkDiscordIdentity`, `linkDiscordIdentity`,
+     `deleteUser`). `UserReconciliationService` is held only by the other two.
+   - Pulling the targets along does not converge: `OrgUnitMembership*Service` to `orgunit` drags its
+     mapper, `SpecialCommandService` and `OrgUnitSeatNotifier`, and makes `identity -> orgunit` a real
+     module edge (rank 3 to rank 4); `UserDeletionService` to `privacy` gives `identity -> privacy`
+     against `privacy -> identity`; `KeycloakService` with `KeycloakTrustSupport` adds
+     `identity -> config` (`RestClientConfig`) against `config -> identity` (`SecurityConfig`). All 65
+     at once close a cycle through 13 top-level packages: `model.User` is named by every entity of
+     `model`, and the identity events name `model`'s notification enums back.
+   - Hence the three slices: **a** (this one) takes the Keycloak edge away and moves what moves freely;
+     **b** and **c** invert the other three edges through identity-owned SPIs.
+2. *`RestClientConfig` to `platform.api`* (five files named it, plus `RestClientConfigTest`, which
+   followed): the one platform type `KeycloakTrustSupport` needed. Bean names (`restClientBuilder`,
+   `externalRestClientBuilder`) and behaviour are unchanged; `CONNECT_TIMEOUT` and `READ_TIMEOUT` became
+   `public`, because the trust support lies in another package now.
+3. *Probe after it*: `KeycloakService` and `KeycloakTrustSupport` alone close no cycle. A greedy
+   addition of the other candidates found 43 classes that can join; this slice takes 33 of them and
+   leaves out the rest to stay reviewable and free of entities (no `DATA` change): `UserRepository`
+   with its two fragment types (279 files name it), `RoleRepository` (58 files), the entities
+   `TermsAcceptance` and `UserApprovalEvent` with their repositories, and `ApprovalDecision`
+   (named by `UserApprovalEvent`); the first draft also moved `TermsAcceptanceStatusDto` and
+   `ApprovalDecision` and closed `{repository, notification, identity, model}` through
+   `TermsAcceptanceRepository -> TermsAcceptanceStatusDto`, so both stayed.
+4. *Move* (33 types, 14 tests, 108 files; `git mv` and the import script of P4-6):
+   - to `identity.api` (what other classes use): `KeycloakService`, `KeycloakTrustSupport`,
+     `KeycloakUserDto`, `PendingApprovalAccessFilter`, `TermsAcceptanceAccessFilter` (the two filters
+     that `SecurityConfig` registers), the registration requests and results the remaining controllers
+     use (`ApproveRegistrationRequest`, `LinkRegistrationRequest`, `RejectRegistrationRequest`,
+     `ReopenRegistrationRequest`, `PendingRegistrationDto`, `RegistrationStatusDto`,
+     `UserSyncResultDto`);
+   - to `identity.web` (new): `AdminController`, `AdminTermsController`,
+     `DiscordAccountExistenceController`, `TermsController`, `TermsDocumentController`;
+   - to `identity.internal`: the role, terms and Discord-existence services, mapper and DTOs,
+     `DiscordSpiPrecheckProperties`, `TermsVersionProvider`, `UserActorHandleResolver` and
+     `UserRoleRecipientDirectory`.
+   The constants `PendingApprovalAccessFilter.SELF_STATUS_PATH`, `ANONYMOUS_READ_PATHS` and
+   `TermsAcceptanceAccessFilter.EXEMPT_PATHS` are `public` now, because `FilterExemptionSetsTest`
+   stays in `config` beside its package-private `PathControlInventory`.
+5. *Unchanged*: bean names, REST paths, `@PreAuthorize`, `@Transactional`, cache names, metrics,
+   `openapi.json` byte-identical. Ten of the moved classes log (`KeycloakService`, both filters, the
+   Discord-existence and terms services, `RoleService`, `TermsVersionProvider` and three controllers);
+   their logger names follow the packages (`…identity.api.KeycloakService`), and neither `monitoring/`
+   nor `observability.md` matches a logger name of these classes. `KeycloakTrustSupport` is a pure
+   move: the missing connect and read timeout of S-01 is untouched, and `PlatformMirrorParityTest`
+   reads the new path of the file and still holds it equal to the ingest copy.
+6. *NullAway*: the whole `identity` tree is checked now (`identity.api` was). One finding:
+   `TermsAcceptanceService.withAliasedSort` wraps the sort it builds in a loop in
+   `Objects.requireNonNull`; the pageable is sorted there, so the loop runs at least once. No suppression.
+7. *Gates*, measured from the failing assertions: the service layer's selection floor 508 to **507**
+   and the join-column floor 239 to **224** (DTOs left the `model` tree); the domain map lost the four
+   class rules of the moved filters, trust support and precheck properties, which the package rule
+   takes now. Module baseline **32 to 32**, unchanged: `KeycloakTrustSupport -> RestClientConfig` is
+   an `identity -> platform` edge, and the filters are used by `config` (rank 14). `ModularityTest`
+   needed no change: `identity` already allows `platform::api`.
+**What remains of P4-7** (designed here so the next prompts are cheap):
+   - *Slice b — the membership-operations SPI.* An identity-owned interface in `identity.api` with the
+     six calls `UserService` makes (`findStaffelMembershipOrgUnitIds`, `findAllMembershipsForUser`,
+     `reconcileStaffelMemberships`, `addMember`, `removeMember`, `patchFlags`), implemented by a thin
+     bean of the orgunit classes that stay in `service` and delegating to `OrgUnitMembershipService`
+     and `OrgUnitMembershipQueryService` with the same transaction propagation (`MANDATORY` for the
+     writes), so `UserService` names neither. A differential test drives the membership-delta paths
+     of `UserService` through the old and the new seam over one fixture and requires the same
+     rows, audit entries and exceptions. Baseline: the lines `UserService -> OrgUnitMembershipQueryService`
+     and `-> OrgUnitMembershipService` go; the others name request types and the entity.
+   - *Slice c — the account-erasure SPI and the move.* An identity-owned interface for
+     `UserRegistrationService`'s `deleteUser(UUID, KeycloakPresenceCheck)`, implemented by
+     `UserDeletionService` (the privacy orchestrator), then the three services move together
+     (`identity.api` for what other modules call, the rest `identity.internal`), and so does
+     `CustomJwtGrantedAuthoritiesConverter`, into `scope.internal` (its users in `config` and
+     `exchange.internal` need it public in `scope.api`). `UserService -> OwnerScopeService` is the
+     baselined `identity -> scope` edge and stays; it is measured through `ModuleBaselineTest`, never
+     edited by hand.
+   - *Later*: the `User` entity, `UserRepository` (279 files), `Role` and the remaining identity
+     classes wait for the orgunit entities to leave `model` (`model -> identity` and
+     `identity -> model` close the cycle today); identity's REST surface shedding, D-17 and the
+     access policies of section 5.4 are separate steps.
+**Corrections:** (1) The P4-6 entry said the identity slice moves the three services together and
+that nothing else is needed; the probe above shows four calls that must be inverted first, so
+the move is slice c. (2) The 32 leaf classes of the first probe were not free of the `User`/`Role`
+edge in every case: `Role` and `UserReferenceDto` are named by `User` and the model DTOs and stay;
+`RoleDto`, `RoleMapper` and `RoleService` moved because they point at `Role`, not the other way.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
@@ -2911,7 +3005,7 @@ They are fixed before the refactor starts (D-07), independently of this plan.
 
 | ID | Defect | Verified severity | Fix | Guard |
 | --- | --- | --- | --- | --- |
-| S-01 | The pinned Keycloak trust client has **no connect or read timeout** (`backend/…/config/KeycloakTrustSupport.java`), and in production it backs both the Keycloak Admin API client and the internal JWKS decoder — which also discards Spring Security's own 30 s / 30 s defaults, set because the key fetch runs under a lock. If Keycloak accepts a connection and never answers, every token validation after the five-minute key cache fails after 15 s for as long as it hangs; `ConnectedAppsService.disconnectClient` holds a database connection per hung attempt | Availability of authentication, medium-low (not attacker-triggerable) | Give the pinned factory the connect and read timeouts of `RestClientConfig` (5 s / 30 s), HTTP/1.1, for both uses; the same in ingest's copy | A test asserting the factory's timeouts; `SecurityConfigInternalJwksDecoderTest`, `KeycloakServiceTest` |
+| S-01 | The pinned Keycloak trust client has **no connect or read timeout** (`backend/…/identity/api/KeycloakTrustSupport.java`), and in production it backs both the Keycloak Admin API client and the internal JWKS decoder — which also discards Spring Security's own 30 s / 30 s defaults, set because the key fetch runs under a lock. If Keycloak accepts a connection and never answers, every token validation after the five-minute key cache fails after 15 s for as long as it hangs; `ConnectedAppsService.disconnectClient` holds a database connection per hung attempt | Availability of authentication, medium-low (not attacker-triggerable) | Give the pinned factory the connect and read timeouts of `RestClientConfig` (5 s / 30 s), HTTP/1.1, for both uses; the same in ingest's copy | A test asserting the factory's timeouts; `SecurityConfigInternalJwksDecoderTest`, `KeycloakServiceTest` |
 | S-02 | Five frontend call sites tag users in log lines with `String.hashCode()` of the username (`BackendRoleSyncFilter`, `JobOrderPageController`, `JobOrderWriteController`, `RefineryOrderPageController`); they feed 14 log statements, six at INFO or above, and a 32-bit hash of a name from a known member list is reversible by dictionary. `PiiMasker` does not catch it | Privacy, low (REQ-OBS-004: never log names) | Log the subject id from the MDC instead, or a keyed HMAC rendered with `HexFormat` | A log-capture test asserting no username-derived token |
 | S-03 | Generated `toString()` prints credentials: the frontend and ingest `MonitoringScrapeProperties` are Lombok `@Data` classes that print the scrape password (the backend twin is a redacting record); the keycloak-spi record `Brokered` prints a Discord access token, the username and the e-mail, in a JVM that has no masker. No code logs these objects today | Latent, low | Records with a redacting `toString` in frontend and ingest; a presence-only `toString` for `Brokered`; `PiiMasker` also masks `password=` and `secret=` | G-22 (`toString` ratchet); the existing scrape-security tests |
 | S-04 | The promotion CSV export (`static/js/promotion-manage.js`) quotes cells but does not neutralise a leading `=`, `+`, `-`, `@`, tab or carriage return. Usernames come from Discord and cannot be edited; the realistic attacker is an admin or officer writing a topic name, the victim another officer opening the export | Low | Prefix such cells with `'` | A unit test over the escaper |

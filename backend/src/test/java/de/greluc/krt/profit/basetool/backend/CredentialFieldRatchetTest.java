@@ -36,7 +36,7 @@ class CredentialFieldRatchetTest {
 
   private static final Set<String> REVIEWED_REDACTING_TYPES =
       Set.of(
-          "de.greluc.krt.profit.basetool.backend.config.DiscordSpiPrecheckProperties",
+          "de.greluc.krt.profit.basetool.backend.identity.internal.DiscordSpiPrecheckProperties",
           "de.greluc.krt.profit.basetool.backend.identity.api.KeycloakSyncProperties",
           "de.greluc.krt.profit.basetool.backend.config.MonitoringScrapeProperties");
 

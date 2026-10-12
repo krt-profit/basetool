@@ -56,7 +56,7 @@ class PlatformMirrorParityTest {
   @Test
   void keycloakTrustSupportIsTheSameCodeInBackendAndIngest() throws IOException {
     Path root = repoRoot();
-    String backend = code(root.resolve(BACKEND_MAIN + "config/KeycloakTrustSupport.java"));
+    String backend = code(root.resolve(BACKEND_MAIN + "identity/api/KeycloakTrustSupport.java"));
     String ingest = code(root.resolve(INGEST_MAIN + "relay/KeycloakTrustSupport.java"));
 
     assertThat(ingest.replace("KEYCLOAK_READ_TIMEOUT_CEILING", "READ_TIMEOUT"))
@@ -75,7 +75,7 @@ class PlatformMirrorParityTest {
     Path root = repoRoot();
     for (String file :
         List.of(
-            root.resolve(BACKEND_MAIN + "config/KeycloakTrustSupport.java").toString(),
+            root.resolve(BACKEND_MAIN + "identity/api/KeycloakTrustSupport.java").toString(),
             root.resolve(INGEST_MAIN + "relay/KeycloakTrustSupport.java").toString())) {
       String code = code(Path.of(file));
       assertThat(code).as(file).contains("getTrustManagers()");

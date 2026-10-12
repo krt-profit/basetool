@@ -83,10 +83,6 @@ class UserApprovalMailEventListener identity after-commit identity mail listener
 class PendingRegistrationMailEventListener identity after-commit identity mail listener
 class UserApprovalMailService identity identity mail composition
 class PendingRegistrationMailService identity identity mail composition
-class PendingApprovalAccessFilter identity enforces the approval gate (REQ-SEC-017)
-class TermsAcceptanceAccessFilter identity enforces the terms gate (REQ-SEC-028)
-class DiscordSpiPrecheckProperties identity Discord SPI precheck secret (REQ-SEC-022)
-class KeycloakTrustSupport identity Keycloak admin-client truststore
 class KeycloakHealthIndicator platform health probe
 class UserSyncTask identity Keycloak user-sync trigger
 class RejectedRegistrationRetentionTask identity rejected-registration purge (REQ-SEC-057)

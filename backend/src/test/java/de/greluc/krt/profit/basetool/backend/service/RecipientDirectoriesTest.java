@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRecipientD
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibilityService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRepository;
+import de.greluc.krt.profit.basetool.backend.identity.internal.UserRoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.model.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;

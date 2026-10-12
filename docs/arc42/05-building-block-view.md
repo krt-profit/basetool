@@ -67,7 +67,7 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `model` | JPA entities, `@Version`, the OrgUnit hierarchy |
 | `dto` / `mapper` | Records on the boundary, MapStruct between them and entities |
 | `task` | Scheduled jobs |
-| `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), through its external builder that refuses non-external addresses (REQ-SEC-081); the primary builder is `KeycloakService`'s |
+| `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `platform.api.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), through its external builder that refuses non-external addresses (REQ-SEC-081); the primary builder is `KeycloakService`'s |
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
 | `filter` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
 
@@ -262,6 +262,16 @@ beside the problem codes. `scope.internal` holds `ScopeActiveOrgUnitProvider`, w
 `orgunit.api` as a prerequisite, because the scope kernel calls it. `CustomJwtGrantedAuthoritiesConverter`
 stays in `service` until the identity module takes `UserReconciliationService`, which the converter
 calls to reconcile the user behind each token.
+
+The identity module moved in part since P4-7 slice a (plan §7.6). `identity.api` publishes the Keycloak
+client (`KeycloakService`, `KeycloakTrustSupport`, `KeycloakUserDto`), the two access filters
+`SecurityConfig` registers (`PendingApprovalAccessFilter`, `TermsAcceptanceAccessFilter`) and the
+registration request and result records beside the events; `identity.web` holds the role, terms and
+Discord-existence controllers, `identity.internal` their services, mappers and DTOs. `RestClientConfig`
+lies in `platform.api`, which `KeycloakTrustSupport` needs. `UserService`, `UserRegistrationService`,
+`UserReconciliationService`, the `User` entity and `UserRepository` stay in the layer packages until two
+calls are inverted through identity-owned SPIs (membership operations towards the org-unit services,
+account erasure towards the GDPR orchestrator; slices b and c).
 
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:

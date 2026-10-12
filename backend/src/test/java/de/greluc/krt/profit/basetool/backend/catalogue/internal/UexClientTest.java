@@ -29,8 +29,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodity
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexStarSystemDto;
-import de.greluc.krt.profit.basetool.backend.config.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;

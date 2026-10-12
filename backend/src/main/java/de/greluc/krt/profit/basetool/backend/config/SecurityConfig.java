@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakTrustSupport;
+import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;
+import de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;

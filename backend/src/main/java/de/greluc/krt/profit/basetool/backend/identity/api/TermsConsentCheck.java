@@ -23,7 +23,8 @@ import java.util.UUID;
 
 /**
  * The Terms-of-Use acceptance check (REQ-SEC-028), declared in the {@code support} leaf so {@code
- * config.TermsAcceptanceAccessFilter} can use it without depending on {@code service} (ADR-0047).
+ * identity.api.TermsAcceptanceAccessFilter} can use it without depending on {@code service}
+ * (ADR-0047).
  */
 @FunctionalInterface
 public interface TermsConsentCheck {

@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.ResponseSizeLimitInterceptor;
+import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
 import io.micrometer.observation.ObservationRegistry;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;

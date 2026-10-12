@@ -19,9 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncFollowUp;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.HashSet;
 import java.util.List;

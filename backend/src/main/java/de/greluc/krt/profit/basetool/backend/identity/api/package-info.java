@@ -18,8 +18,9 @@
  */
 
 /**
- * The identity module's published API: the terms-consent check, the user redaction and, in {@code
- * events}, registration, approval and departure events (plan §5.2).
+ * The identity module's published API: the Keycloak client and its trust support, the approval and
+ * terms access filters, the registration request and result records, the terms-consent check, the
+ * user redaction and, in {@code events}, registration, approval and departure events (plan §5.2).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.identity.api;
