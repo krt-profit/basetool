@@ -18,27 +18,30 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+
 const INVENTORY_INDEX_SECTIONS = {
     stock: { container: '#inventory-results', fragmentValue: 'results' },
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({ container: '#inventory-results', history: true });
+    if (krtFetch) {
+        krtFetch.bindSwap({ container: '#inventory-results', history: true });
     }
     if (
-        window.krtLiveSync &&
-        typeof window.krtLiveSync.createReceiver === 'function' &&
-        window.krtFetch &&
-        typeof window.krtFetch.swap === 'function' &&
+        krtLiveSync &&
+        typeof krtLiveSync.createReceiver === 'function' &&
+        krtFetch &&
+        typeof krtFetch.swap === 'function' &&
         document.getElementById('inventory-results')
     ) {
-        window.krtLiveSync.createReceiver({
+        krtLiveSync.createReceiver({
             topic: 'inventory',
             sections: INVENTORY_INDEX_SECTIONS,
             coalesceMs: 1500,
             refresh() {
-                window.krtFetch.swap({
+                krtFetch.swap({
                     url: window.location.pathname + window.location.search,
                     container: '#inventory-results',
                     fragmentValue: INVENTORY_INDEX_SECTIONS.stock.fragmentValue,

@@ -18,13 +18,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+
 const REFINERY_SECTIONS = {
     queue: { container: '#refinery-orders-results', fragmentValue: 'results' },
 };
 
 (function () {
-    'use strict';
-
     const FILTER_PREF_KEY = 'refinery_orders_filter';
     const VIEWS = ['RUNNING', 'READY', 'COMPLETED', 'ALL'];
     const DEFAULT_VIEW = 'RUNNING';
@@ -61,9 +63,9 @@ const REFINERY_SECTIONS = {
      *     in sync; a peer refresh keeps the scroll position instead
      */
     function load(fromUser) {
-        if (!results || !window.krtFetch) return;
+        if (!results || !krtFetch) return;
         const query = queryString();
-        window.krtFetch.swap({
+        krtFetch.swap({
             url: `/refinery-orders${query ? `?${query}` : ''}`,
             container: results,
             indicator: indicator || undefined,
@@ -72,8 +74,8 @@ const REFINERY_SECTIONS = {
         });
     }
 
-    if (results && window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
-        window.krtLiveSync.createReceiver({
+    if (results && krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+        krtLiveSync.createReceiver({
             topic: 'refinery',
             sections: REFINERY_SECTIONS,
             coalesceMs: 1500,
@@ -320,7 +322,7 @@ const REFINERY_SECTIONS = {
         }
         if (view && (differs || typeof saved.view !== 'string')) persist();
         if (differs) {
-            if (window.krtFilterChips) window.krtFilterChips.refresh(form || undefined);
+            if (krtFilterChips) krtFilterChips.refresh(form || undefined);
             load(true);
         }
     }

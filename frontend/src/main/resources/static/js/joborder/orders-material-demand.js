@@ -21,6 +21,11 @@
 
 /* global KRT_DEMAND_LIVESYNC_UPDATES, KRT_DEMAND_SECTION_REFRESH_ERROR */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
+
 const DEMAND_SECTIONS = {
     demand: { container: '#orders-material-demand-results', fragmentValue: 'results' },
 };
@@ -413,7 +418,7 @@ function applyDemandView() {
 
     applyDemandSort();
     restoreBucketStates(document);
-    if (window.krtFilterPanel) window.krtFilterPanel.refresh('demandFilterPanel');
+    if (krtFilterPanel) krtFilterPanel.refresh('demandFilterPanel');
 }
 
 /**
@@ -544,16 +549,16 @@ function restoreBucketStates(root) {
     });
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'demand-toggle-orders', toggleBucketOrders);
-    window.krtEvents.on('click', 'demand-toggle-multi', toggleDemandMulti);
-    window.krtEvents.on('change', 'demand-toggle-material-all', toggleDemandMaterialAll);
-    window.krtEvents.on('change', 'demand-update-material-state', syncDemandMaterialSelection);
-    window.krtEvents.on('change', 'demand-update-quality', syncDemandQualitySelection);
-    window.krtEvents.on('change', 'demand-toggle-hide-covered', toggleDemandHideCovered);
-    window.krtEvents.on('click', 'demand-reset-filters', resetDemandFilters);
-    window.krtEvents.on('input', 'demand-material-search', filterDemandMaterialOptions);
-    window.krtEvents.on('click', 'demand-sort', cycleDemandSort);
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'demand-toggle-orders', toggleBucketOrders);
+    krtEvents.on('click', 'demand-toggle-multi', toggleDemandMulti);
+    krtEvents.on('change', 'demand-toggle-material-all', toggleDemandMaterialAll);
+    krtEvents.on('change', 'demand-update-material-state', syncDemandMaterialSelection);
+    krtEvents.on('change', 'demand-update-quality', syncDemandQualitySelection);
+    krtEvents.on('change', 'demand-toggle-hide-covered', toggleDemandHideCovered);
+    krtEvents.on('click', 'demand-reset-filters', resetDemandFilters);
+    krtEvents.on('input', 'demand-material-search', filterDemandMaterialOptions);
+    krtEvents.on('click', 'demand-sort', cycleDemandSort);
 }
 
 document.addEventListener('click', (e) => {
@@ -568,25 +573,25 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     readDemandState();
     restoreDemandControls();
-    if (window.krtFilterPanel) {
-        window.krtFilterPanel.registerCounter('demandFilterPanel', countActiveDemandFilters);
-        window.krtFilterPanel.refresh('demandFilterPanel');
+    if (krtFilterPanel) {
+        krtFilterPanel.registerCounter('demandFilterPanel', countActiveDemandFilters);
+        krtFilterPanel.refresh('demandFilterPanel');
     }
     applyDemandView();
 
     if (
-        window.krtLiveSync &&
-        typeof window.krtLiveSync.createReceiver === 'function' &&
-        window.krtFetch &&
-        typeof window.krtFetch.swap === 'function' &&
+        krtLiveSync &&
+        typeof krtLiveSync.createReceiver === 'function' &&
+        krtFetch &&
+        typeof krtFetch.swap === 'function' &&
         document.getElementById('orders-material-demand-results')
     ) {
-        window.krtLiveSync.createReceiver({
+        krtLiveSync.createReceiver({
             topic: 'orders',
             sections: DEMAND_SECTIONS,
             coalesceMs: 1500,
             refresh() {
-                window.krtFetch.swap({
+                krtFetch.swap({
                     url: window.location.pathname,
                     container: '#orders-material-demand-results',
                     fragmentValue: DEMAND_SECTIONS.demand.fragmentValue,

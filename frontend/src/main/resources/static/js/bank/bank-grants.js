@@ -19,8 +19,6 @@
  */
 
 (function () {
-    'use strict';
-
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('bank-grants-filter-form')
     );

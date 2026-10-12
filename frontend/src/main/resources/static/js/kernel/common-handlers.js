@@ -1,8 +1,9 @@
 // @ts-check
 
-(function () {
-    'use strict';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
+(function () {
     window.addEventListener('pageshow', (event) => {
         if (event.persisted) {
             window.location.reload();
@@ -62,10 +63,10 @@
         repositionHintFrom(event.target);
     });
 
-    if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
+    if (!krtEvents || typeof krtEvents.on !== 'function') {
         return;
     }
-    const on = window.krtEvents.on;
+    const on = krtEvents.on;
 
     /**
      * Whitelist for same-origin path URLs: a leading `/` not followed by `/` or a backslash, and no
@@ -190,7 +191,7 @@
         const id = el.getAttribute('data-modal-id');
         if (!id || !document.getElementById(id)) return;
         event.preventDefault();
-        window.krtModal.open(id);
+        krtModal.open(id);
     });
 
     /**
@@ -200,6 +201,6 @@
         const id = el.getAttribute('data-modal-id');
         if (!id || !document.getElementById(id)) return;
         event.preventDefault();
-        window.krtModal.close(id);
+        krtModal.close(id);
     });
 })();

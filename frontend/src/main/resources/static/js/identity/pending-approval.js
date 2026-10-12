@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 (function () {
     const POLL_INTERVAL_MS = 20000;
     const STATE_ACTIVE = 'ACTIVE';
@@ -69,7 +71,7 @@
     }
 
     function poll() {
-        window.krtFetch
+        krtFetch
             .getJson(statusUrl)
             .then((data) => {
                 const status = data ? data.approvalStatus : null;

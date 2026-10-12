@@ -1,12 +1,14 @@
 // @ts-check
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+
 const MISSIONS_SECTIONS = {
     list: { container: '#missions-results', fragmentValue: 'results' },
 };
 
 (function () {
-    'use strict';
-
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('missions-filter-form')
     );
@@ -14,7 +16,7 @@ const MISSIONS_SECTIONS = {
     const loadingIndicator = document.getElementById('missions-loading-indicator');
     const resetBtn = document.getElementById('missions-filter-reset');
 
-    if (!resultsContainer || !window.krtFetch) return;
+    if (!resultsContainer || !krtFetch) return;
 
     /** @type {number | null} */
     let debounceTimer = null;
@@ -31,7 +33,7 @@ const MISSIONS_SECTIONS = {
 
     function loadResults(pushHistory) {
         const query = buildQueryString();
-        window.krtFetch.swap({
+        krtFetch.swap({
             url: `/missions${query ? `?${query}` : ''}`,
             container: resultsContainer,
             indicator: loadingIndicator,
@@ -39,8 +41,8 @@ const MISSIONS_SECTIONS = {
         });
     }
 
-    if (window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
-        window.krtLiveSync.createReceiver({
+    if (krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+        krtLiveSync.createReceiver({
             topic: 'missions',
             sections: MISSIONS_SECTIONS,
             coalesceMs: 1500,
@@ -142,7 +144,7 @@ const MISSIONS_SECTIONS = {
             });
             selectPeriod('UPCOMING');
             persistFilters();
-            if (window.krtFilterChips) window.krtFilterChips.refresh(form);
+            if (krtFilterChips) krtFilterChips.refresh(form);
             loadResults();
         });
     }

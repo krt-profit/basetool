@@ -19,12 +19,18 @@
 
 // @ts-check
 
-(function () {
-    'use strict';
+import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
+import { krtOverflowMenu } from '/js/kernel/krt-overflow-menu.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
+(function () {
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const gi18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
-    if (!window.krtFetch || !document.getElementById('mb-board')) {
+    if (!krtFetch || !document.getElementById('mb-board')) {
         return;
     }
 
@@ -244,11 +250,11 @@
 
     /** Re-renders the filter chips and the filter badge after a programmatic change. */
     function refreshFilterUi() {
-        if (window.krtFilterChips && form) {
-            window.krtFilterChips.refresh(form);
+        if (krtFilterChips && form) {
+            krtFilterChips.refresh(form);
         }
-        if (window.krtFilterPanel) {
-            window.krtFilterPanel.refresh(FILTER_PANEL_ID);
+        if (krtFilterPanel) {
+            krtFilterPanel.refresh(FILTER_PANEL_ID);
         }
     }
 
@@ -286,7 +292,7 @@
     function swapList() {
         const p = params();
         p.set('fragment', 'list');
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: `/materialboerse?${p.toString()}`,
             container: activeMode() === 'requests' ? '#mg-listwrap' : '#mb-listwrap',
             fragmentValue: 'list',
@@ -297,7 +303,7 @@
     function swapBoard() {
         const p = params();
         p.set('fragment', 'board');
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: `/materialboerse?${p.toString()}`,
             container: '#mb-board',
             fragmentValue: 'board',
@@ -306,7 +312,7 @@
     }
 
     function swapDetail(id) {
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: `/materialboerse?fragment=detail&selected=${encodeURIComponent(id)}`,
             container: '#mb-detail',
             fragmentValue: 'detail',
@@ -315,7 +321,7 @@
     }
 
     function swapRequestDetail(id) {
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: `/materialboerse?view=requests&fragment=detail&selected=${encodeURIComponent(id)}`,
             container: '#mg-detail',
             fragmentValue: 'detail',
@@ -350,15 +356,15 @@
             const hours = Math.floor((Date.now() - then) / 3600000);
             let text;
             if (hours < 1) {
-                text = window.krtI18nText(i18n.agoNow, 'materialboerseI18n.agoNow');
+                text = krtI18nText(i18n.agoNow, 'materialboerseI18n.agoNow');
             } else if (hours < 24) {
-                text = fmt(window.krtI18nText(i18n.agoHours, 'materialboerseI18n.agoHours'), hours);
+                text = fmt(krtI18nText(i18n.agoHours, 'materialboerseI18n.agoHours'), hours);
             } else {
                 const days = Math.round(hours / 24);
                 text =
                     days === 1
-                        ? window.krtI18nText(i18n.agoDayOne, 'materialboerseI18n.agoDayOne')
-                        : fmt(window.krtI18nText(i18n.agoDays, 'materialboerseI18n.agoDays'), days);
+                        ? krtI18nText(i18n.agoDayOne, 'materialboerseI18n.agoDayOne')
+                        : fmt(krtI18nText(i18n.agoDays, 'materialboerseI18n.agoDays'), days);
             }
             el.textContent = text;
         });
@@ -375,8 +381,8 @@
             btn.classList.toggle('active', on);
             btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
-        if (window.krtOverflowMenu) {
-            window.krtOverflowMenu.closeAll();
+        if (krtOverflowMenu) {
+            krtOverflowMenu.closeAll();
         }
         document.querySelectorAll('[data-mb-cta-group]').forEach((group) => {
             /** @type {HTMLElement} */ (group).hidden =
@@ -503,7 +509,7 @@
     function toggleInterest(button) {
         const id = button.getAttribute('data-offer-id');
         const interested = button.getAttribute('data-interested') === 'true';
-        window.krtFetch.write({
+        krtFetch.write({
             method: interested ? 'DELETE' : 'POST',
             url: `/materialboerse/offers/${id}/interest/ajax`,
             successMessage: interested ? i18n.interestRemoved : i18n.interestAdded,
@@ -517,33 +523,31 @@
     }
 
     function deactivateOffer(id) {
-        if (!window.showKrtConfirm) {
+        if (!showKrtConfirm) {
             return;
         }
-        window
-            .showKrtConfirm(
-                i18n.deactivateConfirmTitle,
-                i18n.deactivateConfirmBody,
-                i18n.confirmYes,
-                i18n.confirmNo,
-            )
-            .then((ok) => {
-                if (!ok) {
-                    return;
-                }
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: `/materialboerse/offers/${id}/deactivate/ajax`,
-                    successMessage: i18n.deactivated,
-                    errorMessage: i18n.error,
-                    serialize: SERIALIZE_KEY,
-                    onSuccess() {
-                        notifyPeersBoard();
-                        selectedId = null;
-                        return swapBoard();
-                    },
-                });
+        showKrtConfirm(
+            i18n.deactivateConfirmTitle,
+            i18n.deactivateConfirmBody,
+            i18n.confirmYes,
+            i18n.confirmNo,
+        ).then((ok) => {
+            if (!ok) {
+                return;
+            }
+            krtFetch.write({
+                method: 'POST',
+                url: `/materialboerse/offers/${id}/deactivate/ajax`,
+                successMessage: i18n.deactivated,
+                errorMessage: i18n.error,
+                serialize: SERIALIZE_KEY,
+                onSuccess() {
+                    notifyPeersBoard();
+                    selectedId = null;
+                    return swapBoard();
+                },
             });
+        });
     }
 
     function onReleased(body) {
@@ -556,7 +560,7 @@
     function toggleFulfillment(button) {
         const id = button.getAttribute('data-request-id');
         const interested = button.getAttribute('data-interested') === 'true';
-        window.krtFetch.write({
+        krtFetch.write({
             method: interested ? 'DELETE' : 'POST',
             url: `/materialboerse/requests/${id}/interest/ajax`,
             successMessage: interested ? gi18n.interestRemoved : gi18n.interestAdded,
@@ -570,33 +574,31 @@
     }
 
     function deactivateRequest(id) {
-        if (!window.showKrtConfirm) {
+        if (!showKrtConfirm) {
             return;
         }
-        window
-            .showKrtConfirm(
-                gi18n.deactivateConfirmTitle,
-                gi18n.deactivateConfirmBody,
-                gi18n.confirmYes,
-                gi18n.confirmNo,
-            )
-            .then((ok) => {
-                if (!ok) {
-                    return;
-                }
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: `/materialboerse/requests/${id}/deactivate/ajax`,
-                    successMessage: gi18n.deactivated,
-                    errorMessage: gi18n.error,
-                    serialize: REQUEST_SERIALIZE_KEY,
-                    onSuccess() {
-                        notifyPeersRequests();
-                        selectedRequestId = null;
-                        return swapBoard();
-                    },
-                });
+        showKrtConfirm(
+            gi18n.deactivateConfirmTitle,
+            gi18n.deactivateConfirmBody,
+            gi18n.confirmYes,
+            gi18n.confirmNo,
+        ).then((ok) => {
+            if (!ok) {
+                return;
+            }
+            krtFetch.write({
+                method: 'POST',
+                url: `/materialboerse/requests/${id}/deactivate/ajax`,
+                successMessage: gi18n.deactivated,
+                errorMessage: gi18n.error,
+                serialize: REQUEST_SERIALIZE_KEY,
+                onSuccess() {
+                    notifyPeersRequests();
+                    selectedRequestId = null;
+                    return swapBoard();
+                },
             });
+        });
     }
 
     function onRequestCreated(body) {
@@ -607,14 +609,14 @@
     }
 
     function notifyPeersBoard() {
-        if (window.krtLiveSync) {
-            window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
+        if (krtLiveSync) {
+            krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
         }
     }
 
     function notifyPeersRequests() {
-        if (window.krtLiveSync) {
-            window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
+        if (krtLiveSync) {
+            krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
         }
     }
 
@@ -785,8 +787,8 @@
             }
         }, 400);
     }
-    if (window.krtLiveSync) {
-        window.krtLiveSync.subscribe(MATERIALBOARD_TOPIC, { onChanged: onPeerChanged });
+    if (krtLiveSync) {
+        krtLiveSync.subscribe(MATERIALBOARD_TOPIC, { onChanged: onPeerChanged });
     }
 
     document.addEventListener('krt:swapped', () => {

@@ -21,7 +21,15 @@
 
 /* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_MISSION_PARTICIPANT_REQUIRED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
 
-window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
+
+krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
 /**
  * Derives a material row's SCU amount from its unit quantity.
@@ -76,7 +84,7 @@ function updateOutputMaterial(selectElement) {
         outputDisplay.style.opacity = '0.7';
     }
 
-    window.krtRefineryYield.refreshFor(selectElement);
+    krtRefineryYield.refreshFor(selectElement);
 }
 
 function setStartedAtNow() {
@@ -205,8 +213,8 @@ function addMaterialRow() {
     });
 
     container.appendChild(template);
-    if (window.krtEnhanceComboboxes) {
-        window.krtEnhanceComboboxes(template);
+    if (krtEnhanceComboboxes) {
+        krtEnhanceComboboxes(template);
     }
 }
 
@@ -368,35 +376,35 @@ function updateProfitPreview() {
     }
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
-    window.krtEvents.on('focusout', 'rfc-update-profit', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
+    krtEvents.on('focusout', 'rfc-update-profit', (el) => {
         const field = /** @type {HTMLInputElement} */ (el);
         if (field.value.trim() === '') {
             field.value = '0';
             updateProfitPreview();
         }
     });
-    window.krtEvents.on('click', 'rfc-set-started-now', setStartedAtNow);
-    window.krtEvents.on('change', 'rfc-update-method', updateMethodRatings);
-    window.krtEvents.on('click', 'rfc-add-material', addMaterialRow);
-    window.krtEvents.on('click', 'rfc-remove-material', (el) => {
+    krtEvents.on('click', 'rfc-set-started-now', setStartedAtNow);
+    krtEvents.on('change', 'rfc-update-method', updateMethodRatings);
+    krtEvents.on('click', 'rfc-add-material', addMaterialRow);
+    krtEvents.on('click', 'rfc-remove-material', (el) => {
         removeMaterialRow(el);
     });
-    window.krtEvents.on('change', 'rfc-update-output', (el) => {
+    krtEvents.on('change', 'rfc-update-output', (el) => {
         updateOutputMaterial(/** @type {KrtRefineryControl} */ (el));
     });
-    window.krtEvents.on('change', 'rfc-location-change', (el) => {
-        window.krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
+    krtEvents.on('change', 'rfc-location-change', (el) => {
+        krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
     });
-    window.krtEvents.on('input', 'rfc-calc-scu', (el) => {
+    krtEvents.on('input', 'rfc-calc-scu', (el) => {
         calcScu(el.getAttribute('data-index'));
     });
-    window.krtEvents.on('click', 'rfc-import-pick', () => {
+    krtEvents.on('click', 'rfc-import-pick', () => {
         const fileInput = document.getElementById('refineryImportFile');
         if (fileInput) fileInput.click();
     });
-    window.krtEvents.on('change', 'rfc-import-file', (el) => {
+    krtEvents.on('change', 'rfc-import-file', (el) => {
         const fileField = /** @type {HTMLInputElement} */ (el);
         if (fileField.files && fileField.files.length > 0) {
             const importForm = /** @type {HTMLFormElement | null} */ (
@@ -405,7 +413,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             if (importForm) importForm.requestSubmit();
         }
     });
-    window.krtEvents.on('click', 'rfc-apply-suggestion', (el) => {
+    krtEvents.on('click', 'rfc-apply-suggestion', (el) => {
         const materialId = el.getAttribute('data-material-id');
         const materialName = el.getAttribute('data-material-name') || '';
         const entry = el.closest('.material-entry');
@@ -430,7 +438,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             }
             select.dispatchEvent(new Event('change', { bubbles: true }));
         };
-        window.krtFetch
+        krtFetch
             .getJson(`/catalog/material-search?raw=true&q=${encodeURIComponent(materialName)}`)
             .then((list) => {
                 const rows = Array.isArray(list) ? list : [];
@@ -472,23 +480,23 @@ function _refineryCreateErrorMessage(status, body) {
  * @param {HTMLElement | null} submitter the control that triggered the submit
  */
 function _submitRefineryCreate(form, submitter) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         form.submit();
         return;
     }
-    window.krtFetch.submitForm({
+    krtFetch.submitForm({
         form,
         submitter,
         toast: false,
         errorMessage: MSG_RFC_CREATE_FAILED,
         onError(status, body) {
-            if (window.showFrontendErrorToast) {
-                window.showFrontendErrorToast(_refineryCreateErrorMessage(status, body));
+            if (showFrontendErrorToast) {
+                showFrontendErrorToast(_refineryCreateErrorMessage(status, body));
             }
             return true;
         },
         onSuccess(body) {
-            if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+            if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
             if (body && body.targetUrl) window.location.assign(body.targetUrl);
             else window.location.reload();
         },
@@ -523,7 +531,7 @@ function _reinitRefineryForm(fromSwap) {
     ).forEach((select) => {
         if (select.value) updateOutputMaterial(select);
     });
-    if (window.krtRefineryYield) {
+    if (krtRefineryYield) {
         const locationSelect = /** @type {KrtRefineryControl | null} */ (
             document.getElementById('locationId')
         );
@@ -531,11 +539,11 @@ function _reinitRefineryForm(fromSwap) {
             fromSwap &&
             locationSelect &&
             locationSelect.value &&
-            typeof window.krtRefineryYield.onLocationChange === 'function'
+            typeof krtRefineryYield.onLocationChange === 'function'
         ) {
-            window.krtRefineryYield.onLocationChange(locationSelect);
+            krtRefineryYield.onLocationChange(locationSelect);
         } else {
-            window.krtRefineryYield.refreshAll();
+            krtRefineryYield.refreshAll();
         }
     }
     updateProfitPreview();
@@ -565,31 +573,31 @@ function _swapRefineryImportFragment(html) {
         window.location.reload();
         return;
     }
-    window.krtFetch.setTrustedHtml(container, html);
+    krtFetch.setTrustedHtml(container, html);
     document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
-    if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+    if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
 }
 
 function _applyRefineryImportResult(result) {
     if (!result.ok) return;
     if (result.redirected || typeof result.body !== 'string') {
-        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+        if (showFrontendErrorToast) showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
         return;
     }
     _swapRefineryImportFragment(result.body);
 }
 
 function _refineryImportFailed() {
-    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+    if (showFrontendErrorToast) showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
     return true;
 }
 
 function _submitRefineryImport(form) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         form.submit();
         return;
     }
-    window.krtFetch
+    krtFetch
         .submitForm({
             form,
             method: 'POST',
@@ -620,8 +628,8 @@ function _loadRefineryHandoff() {
             window.history.replaceState(null, '', cleaned);
         }
     } catch (_e) {}
-    if (!window.krtFetch) return;
-    window.krtFetch
+    if (!krtFetch) return;
+    krtFetch
         .write({
             method: 'POST',
             url: `/refinery-orders/import-handoff?handoff=${encodeURIComponent(id)}`,

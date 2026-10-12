@@ -21,17 +21,22 @@
 
 /* global OPS_MSG */
 
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+
 function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('delete-operation-form')
     );
     if (!deleteForm) return;
-    deleteForm.action = window.safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
-    window.krtModal.open(document.getElementById('delete-operation-modal'));
+    deleteForm.action = safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
+    krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'operations-open-delete', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'operations-open-delete', (el) => {
         openDeleteModal(el.getAttribute('data-id'));
     });
 }
@@ -48,7 +53,7 @@ function opsConflictStrings() {
 
 function closeOperationModal(id) {
     const modal = document.getElementById(id);
-    if (modal) window.krtModal.close(modal);
+    if (modal) krtModal.close(modal);
 }
 
 function reloadOperationsList() {
@@ -56,7 +61,7 @@ function reloadOperationsList() {
 }
 
 (function () {
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
 
     const createForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('create-operation-form')
@@ -71,7 +76,7 @@ function reloadOperationsList() {
                 createForm.querySelector('button[type="submit"]')
             );
             if (submitBtn) submitBtn.disabled = true;
-            window.krtFetch
+            krtFetch
                 .write({
                     method: 'POST',
                     url: /** @type {string} */ (createForm.getAttribute('action')),
@@ -112,7 +117,7 @@ function reloadOperationsList() {
                 deleteForm.querySelector('button[type="submit"]')
             );
             if (submitBtn) submitBtn.disabled = true;
-            window.krtFetch
+            krtFetch
                 .write({
                     method: 'POST',
                     url: deleteForm.action,

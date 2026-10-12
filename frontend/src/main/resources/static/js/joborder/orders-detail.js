@@ -19,7 +19,14 @@
 
 // @ts-check
 
-/* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, showFrontendErrorToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_HANDOVER_I18N */
+/* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_HANDOVER_I18N */
+
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 /** @type {any[]} */
 export let cachedInventoryItems = [];
@@ -60,10 +67,10 @@ const ORDER_SECTIONS = {
 };
 
 (function () {
-    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
+    if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
-    const orderSeam = window.krtFetch.sectionWrite({
+    const orderSeam = krtFetch.sectionWrite({
         dict() {
             return {
                 'orders.section.refresh.error':
@@ -78,20 +85,16 @@ const ORDER_SECTIONS = {
             return window.orderId ? `/orders/${window.orderId}` : null;
         },
         broadcast(keys) {
-            if (
-                window.orderId &&
-                window.krtLiveSync &&
-                typeof window.krtLiveSync.sendChanged === 'function'
-            ) {
-                window.krtLiveSync.sendChanged(`order:${window.orderId}`, keys);
+            if (window.orderId && krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged(`order:${window.orderId}`, keys);
             }
         },
     });
     window.krtRefreshOrderSection = orderSeam.refresh;
     window.krtNotifyOrderChanged = orderSeam.notify;
 
-    if (window.orderId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
-        window.krtLiveSync.createReceiver({
+    if (window.orderId && krtLiveSync && krtLiveSync.createReceiver) {
+        krtLiveSync.createReceiver({
             topic: `order:${window.orderId}`,
             sections: ORDER_SECTIONS,
             refresh(keys) {
@@ -111,8 +114,8 @@ const ORDER_SECTIONS = {
 })();
 
 export function _publishOrdersQueue() {
-    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-        window.krtLiveSync.sendChanged('orders', ['queue', 'demand']);
+    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        krtLiveSync.sendChanged('orders', ['queue', 'demand']);
     }
 }
 
@@ -183,8 +186,8 @@ export function _serializeHandoverForm() {
         );
         const inventoryItemId = sel ? sel.value : '';
         const amount =
-            amtInput && window.krtScuInput
-                ? window.krtScuInput.parse(amtInput.value)
+            amtInput && krtScuInput
+                ? krtScuInput.parse(amtInput.value)
                 : amtInput
                   ? parseFloat(amtInput.value)
                   : NaN;
@@ -316,7 +319,7 @@ async function _loadHandoverTierSuggestions(materialIds, orderId) {
         const tiers = _orderTiersForMaterial(materialId);
         if (tiers.length < 2) continue;
         try {
-            const entries = await window.krtFetch.getJson(
+            const entries = await krtFetch.getJson(
                 `/orders/${orderId}/materials/${materialId}/attribution`,
             );
             /** @type {Map<string, {code: string, amount: number}>} */
@@ -371,7 +374,7 @@ function _refreshHandoverTierChoice(row, inv) {
 }
 
 export async function openHandoverModal() {
-    window.krtModal.open(document.getElementById('handover-modal'));
+    krtModal.open(document.getElementById('handover-modal'));
     if (!isInventoryCached) {
         try {
             /** @type {Map<string, HTMLElement>} */
@@ -387,7 +390,7 @@ export async function openHandoverModal() {
                 const orderId = row.dataset.orderId;
                 const matId = row.dataset.materialId;
                 if (orderId && matId) {
-                    return window.krtFetch
+                    return krtFetch
                         .getJson(`/orders/${orderId}/materials/${matId}/inventory`)
                         .catch(() => []);
                 }
@@ -539,8 +542,7 @@ function _refreshHandoverMissionPicker(row) {
     const missions = inv && Array.isArray(inv.missionAllocations) ? inv.missionAllocations : [];
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
     const isPiece = !!(inv && inv.material && inv.material.quantityType === 'PIECE');
-    const handed =
-        amtInput && window.krtScuInput ? window.krtScuInput.parse(amtInput.value) : Number.NaN;
+    const handed = amtInput && krtScuInput ? krtScuInput.parse(amtInput.value) : Number.NaN;
     const ambiguous = missions.length >= 2 && isFinite(handed) && handed > missionRest + 0.0005;
 
     let holder = /** @type {HTMLElement | null} */ (
@@ -623,9 +625,7 @@ function _updateHandoverMissionRest(row) {
     const inv = cachedInventoryItems.find((i) => i.id === sel.value);
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
     const isPiece = !!(inv && inv.material && inv.material.quantityType === 'PIECE');
-    const handed = window.krtScuInput
-        ? window.krtScuInput.parse(amtInput.value)
-        : parseFloat(amtInput.value);
+    const handed = krtScuInput ? krtScuInput.parse(amtInput.value) : parseFloat(amtInput.value);
     let assigned = 0;
     holder.querySelectorAll('[data-mission-input]').forEach((el) => {
         const v = parseFloat(/** @type {HTMLInputElement} */ (el).value);
@@ -688,7 +688,7 @@ export function validateHandoverAmounts() {
         const inv = cachedInventoryItems.find((i) => i.id === sel.value);
         if (!inv) continue;
         const isPiece = !!(inv.material && inv.material.quantityType === 'PIECE');
-        const entered = /** @type {KrtScuInputApi} */ (window.krtScuInput).parse(inp.value);
+        const entered = /** @type {KrtScuInputApi} */ (krtScuInput).parse(inp.value);
         const sliceMax = orderSliceAmount(inv);
         if (entered > sliceMax) {
             const available = _handoverFmtAmount(sliceMax, isPiece);

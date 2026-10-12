@@ -19,30 +19,28 @@
 
 // @ts-check
 
-(function () {
-    'use strict';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-    const RESULTS_ID = 'person-search-results';
+const RESULTS_ID = 'person-search-results';
 
-    document.addEventListener('submit', (event) => {
-        const form = event.target;
-        if (!(form instanceof HTMLFormElement) || form.id !== 'person-search-form') {
-            return;
-        }
-        event.preventDefault();
-        /** @type {HTMLInputElement | null} */
-        const input = form.querySelector('input[name="q"]');
-        const term = input ? input.value.trim() : '';
-        const action = form.getAttribute('action') || '/admin/person-search';
-        const url = action + (term ? `?q=${encodeURIComponent(term)}` : '');
-        if (window.krtFetch) {
-            window.krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
-        } else {
-            window.location.assign(url);
-        }
-    });
-
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
+document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.id !== 'person-search-form') {
+        return;
     }
-})();
+    event.preventDefault();
+    /** @type {HTMLInputElement | null} */
+    const input = form.querySelector('input[name="q"]');
+    const term = input ? input.value.trim() : '';
+    const action = form.getAttribute('action') || '/admin/person-search';
+    const url = action + (term ? `?q=${encodeURIComponent(term)}` : '');
+    if (krtFetch) {
+        krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
+    } else {
+        window.location.assign(url);
+    }
+});
+
+if (krtFetch) {
+    krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
+}

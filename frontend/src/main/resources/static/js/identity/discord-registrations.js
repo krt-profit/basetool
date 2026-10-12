@@ -21,8 +21,12 @@
 
 /* global DISCORD_MSG */
 
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 document.addEventListener('DOMContentLoaded', () => {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     const body = document.getElementById('registrationsBody');
@@ -262,15 +266,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function approve(row) {
         const id = row.getAttribute('data-id');
         const version = row.getAttribute('data-version');
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: `/admin/discord-registrations/${encodeURIComponent(id)}/approve`,
             payload: { version: version == null ? null : Number(version) },
             toast: false,
             errorMessage: DISCORD_MSG.approveError,
             onSuccess() {
-                if (window.showFrontendSuccessToast) {
-                    window.showFrontendSuccessToast(DISCORD_MSG.approved);
+                if (showFrontendSuccessToast) {
+                    showFrontendSuccessToast(DISCORD_MSG.approved);
                 }
                 removeRow(row);
             },
@@ -282,11 +286,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (reasonInput) {
             reasonInput.value = '';
         }
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     }
 
     function closeReject() {
-        window.krtModal.close(modal);
+        krtModal.close(modal);
         rejectTarget = null;
     }
 
@@ -296,11 +300,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (picker && picker.krtCombobox) {
             picker.krtCombobox.setValue('');
         }
-        window.krtModal.open(linkModal);
+        krtModal.open(linkModal);
     }
 
     function closeLink() {
-        window.krtModal.close(linkModal);
+        krtModal.close(linkModal);
         linkTarget = null;
     }
 
@@ -310,11 +314,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (picker && picker.krtCombobox) {
             picker.krtCombobox.setValue('');
         }
-        window.krtModal.open(mergeModal);
+        krtModal.open(mergeModal);
     }
 
     function closeMerge() {
-        window.krtModal.close(mergeModal);
+        krtModal.close(mergeModal);
         mergeTarget = null;
     }
 
@@ -323,11 +327,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (reopenReasonInput) {
             reopenReasonInput.value = '';
         }
-        window.krtModal.open(reopenModal);
+        krtModal.open(reopenModal);
     }
 
     function closeReopen() {
-        window.krtModal.close(reopenModal);
+        krtModal.close(reopenModal);
         reopenTarget = null;
     }
 
@@ -381,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const id = row.getAttribute('data-id');
             const version = row.getAttribute('data-version');
             const reason = reasonInput ? reasonInput.value.trim() : '';
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/reject`,
                 payload: {
@@ -391,8 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.rejectError,
                 onSuccess(data) {
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(DISCORD_MSG.rejected);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(DISCORD_MSG.rejected);
                     }
                     closeReject();
                     removeRow(row);
@@ -415,15 +419,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const picker = linkPicker();
             const targetUserId = picker && picker.value ? picker.value : '';
             if (!targetUserId) {
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(DISCORD_MSG.linkNoTarget);
+                if (showFrontendErrorToast) {
+                    showFrontendErrorToast(DISCORD_MSG.linkNoTarget);
                 }
                 return;
             }
             const row = linkTarget;
             const id = row.getAttribute('data-id');
             const version = row.getAttribute('data-version');
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/link`,
                 payload: {
@@ -433,8 +437,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.linkError,
                 onSuccess() {
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(DISCORD_MSG.linked);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(DISCORD_MSG.linked);
                     }
                     closeLink();
                     removeRow(row);
@@ -457,15 +461,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const picker = mergePicker();
             const sourceUserId = picker && picker.value ? picker.value : '';
             if (!sourceUserId) {
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(DISCORD_MSG.mergeNoSource);
+                if (showFrontendErrorToast) {
+                    showFrontendErrorToast(DISCORD_MSG.mergeNoSource);
                 }
                 return;
             }
             const row = mergeTarget;
             const id = row.getAttribute('data-id');
             const version = row.getAttribute('data-version');
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/merge`,
                 payload: {
@@ -475,8 +479,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.mergeError,
                 onSuccess(data) {
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(DISCORD_MSG.merged);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(DISCORD_MSG.merged);
                     }
                     if (data && data.version != null) {
                         row.setAttribute('data-version', String(data.version));
@@ -501,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const id = row.getAttribute('data-id');
             const version = row.getAttribute('data-version');
             const reason = reopenReasonInput ? reopenReasonInput.value.trim() : '';
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/reopen`,
                 payload: {
@@ -511,8 +515,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.reopenError,
                 onSuccess(data) {
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(DISCORD_MSG.reopened);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(DISCORD_MSG.reopened);
                     }
                     closeReopen();
                     removeRejectedRow(row);

@@ -19,6 +19,8 @@
  */
 
 import { bankRefreshError } from '/js/bank/bank-messages.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const BANK_ACCOUNT_SECTIONS = {
     account: { container: '#bank-account-results', fragmentValue: 'accountBody' },
@@ -90,7 +92,7 @@ function bankAccountId() {
  */
 function makeBankReceiverRefresh(sectionMap) {
     return function (keys) {
-        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+        if (!krtFetch || typeof krtFetch.swap !== 'function') {
             return;
         }
         const url = window.location.pathname + window.location.search;
@@ -103,7 +105,7 @@ function makeBankReceiverRefresh(sectionMap) {
                 return;
             }
             done[cfg.container] = true;
-            window.krtFetch.swap({
+            krtFetch.swap({
                 url,
                 container: cfg.container,
                 fragmentValue: cfg.fragmentValue,
@@ -119,10 +121,10 @@ function makeBankReceiverRefresh(sectionMap) {
  */
 export function initLiveSyncReceivers() {
     if (
-        !window.krtLiveSync ||
-        typeof window.krtLiveSync.createReceiver !== 'function' ||
-        !window.krtFetch ||
-        typeof window.krtFetch.swap !== 'function'
+        !krtLiveSync ||
+        typeof krtLiveSync.createReceiver !== 'function' ||
+        !krtFetch ||
+        typeof krtFetch.swap !== 'function'
     ) {
         return;
     }
@@ -136,7 +138,7 @@ export function initLiveSyncReceivers() {
         document.querySelector('#bank-manage-results') ||
         document.querySelector('#bank-grants-results');
     if (hasStaffRoom) {
-        window.krtLiveSync.createReceiver({
+        krtLiveSync.createReceiver({
             topic: 'bank',
             sections: BANK_STAFF_SECTIONS,
             coalesceMs: 1500,
@@ -149,7 +151,7 @@ export function initLiveSyncReceivers() {
         document.querySelector('#org-unit-bank-results') ||
         document.querySelector('#org-unit-bank-settings-results');
     if (hasOrgUnitRoom) {
-        window.krtLiveSync.createReceiver({
+        krtLiveSync.createReceiver({
             topic: 'orgunit-bank',
             sections: ORGUNIT_BANK_SECTIONS,
             coalesceMs: 1500,
@@ -163,7 +165,7 @@ export function initLiveSyncReceivers() {
         const sectionMap = document.querySelector('#bank-account-results')
             ? BANK_ACCOUNT_SECTIONS
             : ORGUNIT_ACCOUNT_SECTIONS;
-        window.krtLiveSync.createReceiver({
+        krtLiveSync.createReceiver({
             topic: `bank:${accountId}`,
             sections: sectionMap,
             refresh: makeBankReceiverRefresh(sectionMap),
@@ -211,7 +213,7 @@ function resolveBankLiveSyncAccount(form, ref) {
  * @param {HTMLFormElement} form the form whose write just succeeded
  */
 export function publishBankLiveSync(form) {
-    if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') {
+    if (!krtLiveSync || typeof krtLiveSync.sendChanged !== 'function') {
         return;
     }
     const spec = form.getAttribute('data-livesync');
@@ -248,6 +250,6 @@ export function publishBankLiveSync(form) {
                 return;
             }
             sent[key] = true;
-            window.krtLiveSync.sendChanged(topic, sections);
+            krtLiveSync.sendChanged(topic, sections);
         });
 }

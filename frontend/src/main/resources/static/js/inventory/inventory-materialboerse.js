@@ -12,12 +12,15 @@
 
 // @ts-check
 
-(function () {
-    'use strict';
+import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
+(function () {
     const i18n = window.materialboerseInventoryI18n || {};
     const release = window.krtMaterialRelease;
-    if (!window.krtEvents || !release || !window.krtFetch) {
+    if (!krtEvents || !release || !krtFetch) {
         return;
     }
 
@@ -37,7 +40,7 @@
         chip.classList.toggle('chip--muted', !released);
     }
 
-    window.krtEvents.on('change', 'inv-boerse-toggle', (element) => {
+    krtEvents.on('change', 'inv-boerse-toggle', (element) => {
         const el = /** @type {HTMLInputElement} */ (element);
         const itemId = el.getAttribute('data-id');
         if (el.checked) {
@@ -62,37 +65,35 @@
             );
             return;
         }
-        if (!window.showKrtConfirm) {
+        if (!showKrtConfirm) {
             return;
         }
-        window
-            .showKrtConfirm(
-                i18n.deactivateTitle,
-                i18n.deactivateBody,
-                i18n.confirmYes,
-                i18n.confirmNo,
-            )
-            .then((ok) => {
-                if (!ok) {
+        showKrtConfirm(
+            i18n.deactivateTitle,
+            i18n.deactivateBody,
+            i18n.confirmYes,
+            i18n.confirmNo,
+        ).then((ok) => {
+            if (!ok) {
+                el.checked = true;
+                return;
+            }
+            krtFetch.write({
+                method: 'POST',
+                url: `/materialboerse/items/${itemId}/deactivate/ajax`,
+                successMessage: i18n.deactivated,
+                errorMessage: i18n.error,
+                serialize: 'materialboerse',
+                onSuccess() {
+                    setStatus(itemId, false);
+                    if (krtLiveSync) {
+                        krtLiveSync.sendChanged('materialboard', ['board']);
+                    }
+                },
+                onError() {
                     el.checked = true;
-                    return;
-                }
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: `/materialboerse/items/${itemId}/deactivate/ajax`,
-                    successMessage: i18n.deactivated,
-                    errorMessage: i18n.error,
-                    serialize: 'materialboerse',
-                    onSuccess() {
-                        setStatus(itemId, false);
-                        if (window.krtLiveSync) {
-                            window.krtLiveSync.sendChanged('materialboard', ['board']);
-                        }
-                    },
-                    onError() {
-                        el.checked = true;
-                    },
-                });
+                },
             });
+        });
     });
 })();

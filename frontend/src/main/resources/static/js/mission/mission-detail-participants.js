@@ -19,6 +19,10 @@
 
 // @ts-check
 
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     (function wireParticipantAjax() {
         if (!window.krtMissionWrite || !window.missionId) {
@@ -97,14 +101,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     window.krtModalClose(editForm.closest('.krt-modal-overlay'));
                     const dto = res.body;
-                    if (
-                        dto &&
-                        dto.version !== undefined &&
-                        dto.version !== null &&
-                        window.krtFetch
-                    ) {
+                    if (dto && dto.version !== undefined && dto.version !== null && krtFetch) {
                         document.querySelectorAll(`[data-participant-id="${pId}"]`).forEach((c) => {
-                            window.krtFetch.syncVersion(c, dto.version);
+                            krtFetch.syncVersion(c, dto.version);
                         });
                     }
                     window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
@@ -134,9 +133,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (res.ok) {
                 const dto = res.body;
-                if (dto && dto.version !== undefined && dto.version !== null && window.krtFetch) {
+                if (dto && dto.version !== undefined && dto.version !== null && krtFetch) {
                     document.querySelectorAll(`[data-participant-id="${pId}"]`).forEach((c) => {
-                        window.krtFetch.syncVersion(c, dto.version);
+                        krtFetch.syncVersion(c, dto.version);
                     });
                 }
                 window.krtRefreshMissionSection(['crew', 'finance']);
@@ -175,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (editCrewModal && editCrewForm && editCrewJobs) {
         window.krtOpenEditCrewModal = function (source) {
-            editCrewForm.action = window.safeSameOriginUrl(
+            editCrewForm.action = safeSameOriginUrl(
                 source.getAttribute('data-action') || '/missions',
                 editCrewForm.action,
             );
@@ -293,10 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const hint = document.createElement('div');
         hint.className = 'autocomplete-notice';
         hint.setAttribute('aria-disabled', 'true');
-        hint.textContent = window.krtI18nText(
-            (window.krtComboboxI18n || {}).hint,
-            'krtComboboxI18n.hint',
-        );
+        hint.textContent = krtI18nText((window.krtComboboxI18n || {}).hint, 'krtComboboxI18n.hint');
         container.appendChild(hint);
     }
 
@@ -329,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             debounceTimer = setTimeout(() => {
-                window.krtFetch
+                krtFetch
                     .getJson(`/users/search?query=${encodeURIComponent(val)}`)
                     .then((users) => {
                         closeAllLists();
@@ -417,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         partyLeadDebounce = setTimeout(() => {
-            window.krtFetch
+            krtFetch
                 .getJson(`/users/search?query=${encodeURIComponent(val)}`)
                 .then((users) => {
                     partyLeadCloseLists();

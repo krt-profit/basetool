@@ -19,6 +19,12 @@
 
 // @ts-check
 
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
 const EXCHANGE_CLIENTS_SECTIONS = {
     registry: { container: '#xc-registry-host', fragmentValue: 'registry' },
     undoRuns: { container: '#xc-undo-runs-host', fragmentValue: 'undoRuns' },
@@ -32,15 +38,15 @@ const EXCHANGE_CLIENTS_SECTIONS = {
 
     /** Tells the other admins' open pages that the switch or the client table changed. */
     function broadcastRegistry() {
-        if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-            window.krtLiveSync.sendChanged('exchange-clients', ['registry']);
+        if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+            krtLiveSync.sendChanged('exchange-clients', ['registry']);
         }
     }
 
     /** Tells the other admins' open pages that a bulk undo started and suspended its client. */
     function broadcastUndoStart() {
-        if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-            window.krtLiveSync.sendChanged('exchange-clients', ['registry', 'undoRuns']);
+        if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+            krtLiveSync.sendChanged('exchange-clients', ['registry', 'undoRuns']);
         }
     }
 
@@ -109,7 +115,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             /** @param {string} key */
             const text = function (key) {
                 const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-                return window.krtI18nText(data[key], attribute);
+                return krtI18nText(data[key], attribute);
             };
             return {
                 saved: text('saved'),
@@ -225,7 +231,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
 
         /** @param {string} id */
         function editClient(id) {
-            window.krtFetch
+            krtFetch
                 .getJson(`${BASE}/${encodeURIComponent(id)}`)
                 .then((client) => {
                     if (client) {
@@ -233,15 +239,15 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                     }
                 })
                 .catch(() => {
-                    if (typeof window.showFrontendErrorToast === 'function') {
-                        window.showFrontendErrorToast(i18n.error);
+                    if (typeof showFrontendErrorToast === 'function') {
+                        showFrontendErrorToast(i18n.error);
                     }
                 });
         }
 
         /** Re-renders the switch and the client table in place from the `registry` fragment. */
         function refreshRegistry() {
-            return window.krtFetch.swap({
+            return krtFetch.swap({
                 url: BASE,
                 container: '#xc-registry-host',
                 fragmentValue: 'registry',
@@ -256,29 +262,27 @@ const EXCHANGE_CLIENTS_SECTIONS = {
          * @param {() => void} action
          */
         function confirmThen(titleText, bodyText, action) {
-            if (typeof window.showKrtConfirm !== 'function') {
+            if (typeof showKrtConfirm !== 'function') {
                 action();
                 return;
             }
-            window
-                .showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel)
-                .then((ok) => {
-                    if (ok) {
-                        action();
-                    }
-                });
+            showKrtConfirm(titleText, bodyText, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
+                if (ok) {
+                    action();
+                }
+            });
         }
 
         /** @param {SubmitEvent} event */
         function onSubmit(event) {
             event.preventDefault();
-            if (!window.krtFetch || !el.form.reportValidity()) {
+            if (!krtFetch || !el.form.reportValidity()) {
                 return;
             }
             const id = editedId();
             const submitter = el.form.querySelector('button[type="submit"]');
             const save = function () {
-                window.krtFetch.write({
+                krtFetch.write({
                     method: id ? 'PUT' : 'POST',
                     url: BASE + (id ? `/${encodeURIComponent(id)}` : ''),
                     payload: buildPayload(),
@@ -308,11 +312,11 @@ const EXCHANGE_CLIENTS_SECTIONS = {
         function changeStatus(row, action, submitter) {
             const id = row.getAttribute('data-client-id');
             const rowVersion = row.getAttribute('data-version');
-            if (!id || !window.krtFetch) {
+            if (!id || !krtFetch) {
                 return;
             }
             const send = function () {
-                window.krtFetch.write({
+                krtFetch.write({
                     method: 'POST',
                     url: `${BASE}/${encodeURIComponent(id)}/${action}`,
                     payload: { version: rowVersion == null ? null : Number(rowVersion) },
@@ -335,7 +339,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
         /** @param {Element} submitter */
         function toggleSwitch(submitter) {
             const box = document.getElementById('xc-switch');
-            if (!box || !window.krtFetch) {
+            if (!box || !krtFetch) {
                 return;
             }
             const enabled = box.getAttribute('data-enabled') === 'true';
@@ -344,7 +348,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                 enabled ? i18n.confirmOffTitle : i18n.confirmOnTitle,
                 enabled ? i18n.confirmOffBody : i18n.confirmOnBody,
                 () => {
-                    window.krtFetch.write({
+                    krtFetch.write({
                         method: 'PUT',
                         url: `${BASE}/settings`,
                         payload: {
@@ -472,7 +476,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
              */
             const text = function (source, key) {
                 const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-                return window.krtI18nText(source[key], attribute);
+                return krtI18nText(source[key], attribute);
             };
             return {
                 started: text(data, 'started'),
@@ -562,7 +566,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             if (!id || !iso) {
                 return;
             }
-            window.krtFetch
+            krtFetch
                 .getJson(
                     `${BASE}/${encodeURIComponent(id)}/undo/installations?since=${encodeURIComponent(
                         iso,
@@ -585,8 +589,8 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                     });
                 })
                 .catch(() => {
-                    if (typeof window.showFrontendErrorToast === 'function') {
-                        window.showFrontendErrorToast(i18n.error);
+                    if (typeof showFrontendErrorToast === 'function') {
+                        showFrontendErrorToast(i18n.error);
                     }
                 });
         }
@@ -614,16 +618,16 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             }
             resetCheck();
             loadInstallations();
-            window.krtModal.open('xc-undo-modal');
+            krtModal.open('xc-undo-modal');
         }
 
         /** Asks the backend what the scope reaches and allows the start once it reaches anything. */
         function runCheck() {
             const id = form.getAttribute('data-client-id') || '';
-            if (!id || !window.krtFetch || !form.reportValidity()) {
+            if (!id || !krtFetch || !form.reportValidity()) {
                 return;
             }
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `${BASE}/${encodeURIComponent(id)}/undo/preview`,
                 payload: scope(),
@@ -650,11 +654,11 @@ const EXCHANGE_CLIENTS_SECTIONS = {
         /** Starts the run after a confirmation and shows it in the list. */
         function start() {
             const id = form.getAttribute('data-client-id') || '';
-            if (!id || !window.krtFetch || submit.disabled) {
+            if (!id || !krtFetch || submit.disabled) {
                 return;
             }
             const send = function () {
-                window.krtFetch.write({
+                krtFetch.write({
                     method: 'POST',
                     url: `${BASE}/${encodeURIComponent(id)}/undo`,
                     payload: scope(),
@@ -662,7 +666,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                     errorMessage: i18n.error,
                     submitter: submit,
                     onSuccess() {
-                        window.krtModal.close('xc-undo-modal');
+                        krtModal.close('xc-undo-modal');
                         broadcastUndoStart();
                         return Promise.all([refreshRegistry(), refreshRuns()]);
                     },
@@ -674,27 +678,25 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                     },
                 });
             };
-            if (typeof window.showKrtConfirm !== 'function') {
+            if (typeof showKrtConfirm !== 'function') {
                 send();
                 return;
             }
-            window
-                .showKrtConfirm(
-                    i18n.confirmTitle,
-                    i18n.confirmBody,
-                    i18n.confirmOk,
-                    i18n.confirmCancel,
-                )
-                .then((ok) => {
-                    if (ok) {
-                        send();
-                    }
-                });
+            showKrtConfirm(
+                i18n.confirmTitle,
+                i18n.confirmBody,
+                i18n.confirmOk,
+                i18n.confirmCancel,
+            ).then((ok) => {
+                if (ok) {
+                    send();
+                }
+            });
         }
 
         /** Re-renders the switch and the client table, which show the client suspended. */
         function refreshRegistry() {
-            return window.krtFetch.swap({
+            return krtFetch.swap({
                 url: BASE,
                 container: '#xc-registry-host',
                 fragmentValue: 'registry',
@@ -704,7 +706,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
 
         /** Re-renders the run list in place and keeps polling while a run is going. */
         function refreshRuns() {
-            return window.krtFetch
+            return krtFetch
                 .swap({
                     url: BASE,
                     container: '#xc-undo-runs-host',
@@ -734,7 +736,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
          * @param {string} runId
          */
         function showRun(runId) {
-            window.krtFetch
+            krtFetch
                 .getJson(`${BASE}/undo-runs/${encodeURIComponent(runId)}`)
                 .then((/** @type {ApiDto<'ExchangeBulkUndoRunDetailDto'> | null} */ detail) => {
                     const body = document.getElementById('xc-undo-run-body');
@@ -785,11 +787,11 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                             body.appendChild(more);
                         }
                     }
-                    window.krtModal.open('xc-undo-run-modal');
+                    krtModal.open('xc-undo-run-modal');
                 })
                 .catch(() => {
-                    if (typeof window.showFrontendErrorToast === 'function') {
-                        window.showFrontendErrorToast(i18n.error);
+                    if (typeof showFrontendErrorToast === 'function') {
+                        showFrontendErrorToast(i18n.error);
                     }
                 });
         }
@@ -828,8 +830,8 @@ const EXCHANGE_CLIENTS_SECTIONS = {
 
         schedulePoll();
 
-        if (window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
-            window.krtLiveSync.createReceiver({
+        if (krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+            krtLiveSync.createReceiver({
                 topic: 'exchange-clients',
                 sections: EXCHANGE_CLIENTS_SECTIONS,
                 coalesceMs: 1500,

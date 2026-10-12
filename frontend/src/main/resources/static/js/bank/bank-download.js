@@ -20,6 +20,9 @@
 
 import { genericError } from '/js/bank/bank-messages.js';
 import { clearErrors, showError } from '/js/bank/bank-form-errors.js';
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtCsrf, krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * Builds the JSON + CSRF request headers via the shared window.krtCsrf, falling back to reading
@@ -29,8 +32,8 @@ import { clearErrors, showError } from '/js/bank/bank-form-errors.js';
  * @returns {Object<string,string>} headers for a same-origin JSON fetch
  */
 function csrfHeaders(base) {
-    if (window.krtCsrf && typeof window.krtCsrf.headers === 'function') {
-        return window.krtCsrf.headers(base);
+    if (krtCsrf && typeof krtCsrf.headers === 'function') {
+        return krtCsrf.headers(base);
     }
     const headers = Object.assign(
         { Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -65,7 +68,7 @@ async function downloadBankPdf(url, filename, onError) {
     }
     let response;
     try {
-        response = await window.krtFetch.get(url, { headers });
+        response = await krtFetch.get(url, { headers });
     } catch {
         response = null;
     }
@@ -78,7 +81,7 @@ async function downloadBankPdf(url, filename, onError) {
     const a = document.createElement('a');
     a.href = objectUrl;
     a.download = filename;
-    window.krtModal.layerRoot().appendChild(a);
+    krtModal.layerRoot().appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(objectUrl);
@@ -101,8 +104,8 @@ export function initDownloadButtons() {
             /** @type {string} */ (button.getAttribute('data-download-url')),
             button.getAttribute('data-filename') || 'report.pdf',
             (message) => {
-                if (typeof window.showFrontendErrorToast === 'function') {
-                    window.showFrontendErrorToast(message);
+                if (typeof showFrontendErrorToast === 'function') {
+                    showFrontendErrorToast(message);
                 }
             },
         ).finally(() => {

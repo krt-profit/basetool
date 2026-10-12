@@ -19,7 +19,15 @@
 
 // @ts-check
 
-/* global materialIndex: writable, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_MATERIAL_LABEL, MSG_AMOUNT_LABEL, MSG_MINQUALITY_LABEL, SCU_HINT_TEXT, MSG_SCMDB_SUCCESS, MSG_SCMDB_SOME_UNKNOWN, MSG_SCMDB_NO_MATCH, MSG_SCMDB_NOT_FOUND, ITEM_I18N, EDIT_ITEMS, MSG_MATERIAL_INVALID, MSG_ITEM_INVALID, MSG_CREATE_FAILED, MSG_UPDATE_FAILED, showFrontendErrorToast */
+/* global materialIndex: writable, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_MATERIAL_LABEL, MSG_AMOUNT_LABEL, MSG_MINQUALITY_LABEL, SCU_HINT_TEXT, MSG_SCMDB_SUCCESS, MSG_SCMDB_SOME_UNKNOWN, MSG_SCMDB_NO_MATCH, MSG_SCMDB_NOT_FOUND, ITEM_I18N, EDIT_ITEMS, MSG_MATERIAL_INVALID, MSG_ITEM_INVALID, MSG_CREATE_FAILED, MSG_UPDATE_FAILED */
+
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtEnhanceComboboxes, krtSearchableSelect } from '/js/kernel/krt-searchable-select.js';
 
 function buildScuHint() {
     const hint = document.createElement('span');
@@ -135,7 +143,7 @@ function refreshMaterialUnit(row) {
  * @returns {number} the amount, or NaN when it is not a number
  */
 function parseAmount(raw) {
-    if (window.krtScuInput) return window.krtScuInput.parse(raw);
+    if (krtScuInput) return krtScuInput.parse(raw);
     return parseFloat(String(raw).replace(',', '.'));
 }
 
@@ -284,7 +292,7 @@ function updateCounter(area) {
 async function findJobOrderMaterialByName(normalizedName) {
     try {
         const list =
-            (await window.krtFetch.getJson(
+            (await krtFetch.getJson(
                 `/catalog/material-search?jobOrder=true&q=${encodeURIComponent(normalizedName)}`,
             )) || [];
         return list.find((m) => (m.name || '').trim().toLowerCase() === normalizedName) || null;
@@ -371,16 +379,16 @@ async function importFromScmdb() {
         importField.value = '';
         syncMaterialRemoveButtons();
         updateMaterialSummary();
-        if (window.krtModal) {
-            window.krtModal.close('orders-scmdb-modal');
+        if (krtModal) {
+            krtModal.close('orders-scmdb-modal');
         }
         let successMsg = MSG_SCMDB_SUCCESS;
         if (unknownMaterials.length > 0) {
             successMsg += ` (${MSG_SCMDB_SOME_UNKNOWN}: ${unknownMaterials.join(', ')})`;
         }
 
-        if (window.showFrontendSuccessToast) {
-            window.showFrontendSuccessToast(successMsg);
+        if (showFrontendSuccessToast) {
+            showFrontendSuccessToast(successMsg);
         }
     } else {
         let errorMsg = MSG_SCMDB_NO_MATCH;
@@ -388,8 +396,8 @@ async function importFromScmdb() {
             errorMsg = `${MSG_SCMDB_NOT_FOUND}: ${unknownMaterials.join(', ')}`;
         }
 
-        if (window.showFrontendErrorToast) {
-            window.showFrontendErrorToast(errorMsg);
+        if (showFrontendErrorToast) {
+            showFrontendErrorToast(errorMsg);
         }
     }
 }
@@ -428,8 +436,8 @@ function addMaterialRow() {
     );
 
     container.appendChild(row);
-    if (window.krtEnhanceComboboxes) {
-        window.krtEnhanceComboboxes(row);
+    if (krtEnhanceComboboxes) {
+        krtEnhanceComboboxes(row);
     }
     materialIndex++;
     syncMaterialRemoveButtons();
@@ -439,7 +447,7 @@ function addMaterialRow() {
 let itemLineIndex = 0;
 
 function fetchItemOptions(query) {
-    return window.krtFetch
+    return krtFetch
         .getJson(`/orders/item-search?q=${encodeURIComponent(query || '')}`)
         .then((list) => {
             return (list || []).map((gi) => {
@@ -537,8 +545,8 @@ function addItemLine(prefill) {
         itemSelect.appendChild(seeded);
         itemSelect.value = prefill.gameItemId;
     }
-    if (itemSelect && window.krtSearchableSelect) {
-        window.krtSearchableSelect(itemSelect, {
+    if (itemSelect && krtSearchableSelect) {
+        krtSearchableSelect(itemSelect, {
             placeholder: ITEM_I18N.searchPlaceholder,
             noResultsText: ITEM_I18N.searchNoResults,
             hintText: ITEM_I18N.searchHint,
@@ -572,7 +580,7 @@ function loadBlueprints(row, preselectBpId, qualities) {
         bpSelect.replaceChildren();
         return;
     }
-    window.krtFetch
+    krtFetch
         .getJson(`/orders/item-blueprints/${encodeURIComponent(gameItemId)}`)
         .catch(() => [])
         .then((list) => {
@@ -611,7 +619,7 @@ function loadDerivation(row, qualities) {
     const derived = row.querySelector('[data-role="derived"]');
     const unresolved = row.querySelector('[data-role="unresolved"]');
     const subs = row.querySelector('[data-role="subassemblies"]');
-    window.krtFetch
+    krtFetch
         .getJson(`/orders/item-derivation/${encodeURIComponent(blueprintId)}?amount=${amount}`)
         .then((d) => {
             if (!d) {
@@ -755,19 +763,19 @@ document.querySelectorAll('textarea[data-counter]').forEach((area) => {
 updateMaterialSummary();
 updateItemSummary();
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'orders-import-scmdb', importFromScmdb);
-    window.krtEvents.on('click', 'orders-add-material', addMaterialRow);
-    window.krtEvents.on('click', 'orders-remove-material', removeMaterialRow);
-    window.krtEvents.on('click', 'orders-add-item', () => addItemLine());
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'orders-import-scmdb', importFromScmdb);
+    krtEvents.on('click', 'orders-add-material', addMaterialRow);
+    krtEvents.on('click', 'orders-remove-material', removeMaterialRow);
+    krtEvents.on('click', 'orders-add-item', () => addItemLine());
 }
 
 function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         form.submit();
         return;
     }
-    window.krtFetch.submitForm({
+    krtFetch.submitForm({
         form,
         submitter,
         toast: false,

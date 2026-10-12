@@ -22,6 +22,11 @@
 /* global CAT_MSG, CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR */
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
+import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 /** @type {string[]} */
 const materialNames = [];
@@ -140,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         event.preventDefault();
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             form.submit();
             return;
         }
@@ -154,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return;
         }
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: /** @type {string} */ (form.getAttribute('action')),
             payload: { name },
@@ -188,16 +193,16 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const message = form.getAttribute('data-krt-confirm-message') || '';
         const proceed =
-            typeof window.showKrtConfirm === 'function'
-                ? window.showKrtConfirm(null, message)
+            typeof showKrtConfirm === 'function'
+                ? showKrtConfirm(null, message)
                 : Promise.resolve(true);
         proceed.then((ok) => {
             if (!ok) {
                 return;
             }
             const categoryId = form.getAttribute('data-category-id');
-            if (window.krtFetch && categoryId) {
-                window.krtFetch.write({
+            if (krtFetch && categoryId) {
+                krtFetch.write({
                     method: 'POST',
                     url: /** @type {string} */ (form.getAttribute('action')),
                     successMessage: CAT_MSG.deleteSuccess,
@@ -261,7 +266,7 @@ function updateMaterial(selectElement) {
     const tr = closestRow;
     const matId = /** @type {string} */ (tr.getAttribute('data-mat-id'));
     const updateType = selectElement.getAttribute('data-update-type');
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
 
@@ -295,7 +300,7 @@ function updateMaterial(selectElement) {
         return requestBody;
     }
 
-    window.krtFetch
+    krtFetch
         .write({
             method: 'PUT',
             url: `/admin/materials/${encodeURIComponent(matId)}/ajax`,
@@ -311,8 +316,8 @@ function updateMaterial(selectElement) {
         });
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('change', 'admin-materials-update', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('change', 'admin-materials-update', (el) => {
         updateMaterial(/** @type {HTMLInputElement | HTMLSelectElement} */ (el));
     });
 }
@@ -352,13 +357,13 @@ function openCreateMaterialModal() {
     createMaterialCheckbox('cm-illegal').checked = false;
     createMaterialCheckbox('cm-volatile-qt').checked = false;
     createMaterialCheckbox('cm-volatile-time').checked = false;
-    window.krtModal.open('modal-create-material', {
+    krtModal.open('modal-create-material', {
         focus: document.getElementById('cm-name'),
     });
 }
 /** Closes the create-material modal. */
 function closeCreateMaterialModal() {
-    window.krtModal.close('modal-create-material');
+    krtModal.close('modal-create-material');
 }
 /**
  * Creates a material from the modal's fields and refreshes the table on success.
@@ -385,10 +390,10 @@ function submitCreateMaterial(btn) {
         isVolatileTime: createMaterialCheckbox('cm-volatile-time').checked,
     };
 
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
-    window.krtFetch.write({
+    krtFetch.write({
         method: 'POST',
         url: '/admin/materials/ajax',
         payload,
@@ -423,7 +428,7 @@ function replaceFromDocument(fresh, selector) {
  * @returns {Promise<boolean>} true when the table was refreshed
  */
 function refreshMaterialsTable() {
-    return window.krtFetch
+    return krtFetch
         .get(window.location.pathname + window.location.search)
         .then((res) => {
             return !res || !res.ok ? null : res.text();
@@ -432,7 +437,7 @@ function refreshMaterialsTable() {
             if (html === null) {
                 return false;
             }
-            const fresh = window.krtFetch.parseTrustedDocument(html);
+            const fresh = krtFetch.parseTrustedDocument(html);
             if (!fresh.querySelector('#materials-results #materialsTable tbody')) {
                 return false;
             }
@@ -458,10 +463,10 @@ function refreshMaterialsTable() {
         });
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'materials-open-create-modal', openCreateMaterialModal);
-    window.krtEvents.on('click', 'materials-close-create-modal', closeCreateMaterialModal);
-    window.krtEvents.on('click', 'materials-submit-create', (btn) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'materials-open-create-modal', openCreateMaterialModal);
+    krtEvents.on('click', 'materials-close-create-modal', closeCreateMaterialModal);
+    krtEvents.on('click', 'materials-submit-create', (btn) => {
         submitCreateMaterial(btn);
     });
 }

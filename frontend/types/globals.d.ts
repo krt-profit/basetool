@@ -105,15 +105,6 @@ interface KrtHtmlApi {
     readonly policyName: string;
 }
 
-/** The tagged-template HTML builder; see {@linkcode KrtHtmlApi}. Installed by `krt-html.js`. */
-declare const krtHtml: KrtHtmlApi;
-
-/** Shows a transient error toast. Installed by the layout's toast module. */
-declare function showFrontendErrorToast(message: string): void;
-
-/** Shows a transient success toast. Installed by the layout's toast module. */
-declare function showFrontendSuccessToast(message: string): void;
-
 /** CSRF token access and refresh, installed by `krt-fetch.js`. */
 interface KrtCsrfApi {
     /** The current CSRF token from the `_csrf` meta tag, or null when absent. */
@@ -747,43 +738,20 @@ interface Window {
 
     krtFetch: KrtFetchApi;
     krtCsrf: KrtCsrfApi;
-    krtReauth: KrtReauthApi;
-    krtTermsGate: KrtTermsGateApi;
 
     krtEvents: KrtEventsApi;
     krtLiveSync: KrtLiveSyncApi;
-    krtFilterPanel: KrtFilterPanelApi;
-    krtOverflowMenu: KrtOverflowMenuApi;
-    krtFilterChips: KrtFilterChipsApi;
     krtHtml: KrtHtmlApi;
     /** The browser's Trusted Types factory; absent where the browser has none. */
     trustedTypes?: TrustedTypePolicyFactory;
 
-    showFrontendErrorToast?: (message: string) => void;
-    showFrontendSuccessToast?: (message: string) => void;
-    /**
-     * KRT-styled confirmation modal replacing the native `window.confirm`; resolves true when the
-     * user confirmed. Omitted labels fall back to their `krtToastI18n` defaults.
-     */
-    showKrtConfirm?: (
-        title: string | null,
-        message: string,
-        confirmLabel?: string,
-        cancelLabel?: string,
-    ) => Promise<boolean>;
-
     krtModal: KrtModalApi;
-    krtNav?: KrtNavApi;
-    krtPalette?: KrtPaletteApi;
     /** Alias of `krtModal.open` for the mission page. */
     krtModalOpen: (overlay: Element | null) => void;
     krtModalClose: (overlay: Element | null) => void;
     openModal?: (...args: any[]) => void;
 
-    krtEnhanceComboboxes?: (root: ParentNode) => void;
     krtLocalizeDates: (root?: ParentNode | null) => void;
-    krtInitDatetimeSplitGroup?: (root: ParentNode) => void;
-    krtSyncDatetimeSplitGroup?: (root: ParentNode) => void;
     krtSearchableSelect?: (select: HTMLSelectElement, config: Record<string, unknown>) => unknown;
     krtComboboxRemoteSources?: Record<string, unknown>;
     krtSegSet: (targetId: string, value: string) => void;
@@ -838,15 +806,6 @@ interface Window {
     krtFetchI18n?: KrtI18nDict;
 
     /**
-     * Returns `url` when it is a same-origin absolute path, otherwise `fallback` (null when
-     * omitted). Installed by `safe-url.js` from the layout head, so every page has it.
-     */
-    safeSameOriginUrl: {
-        (url: unknown): string | null;
-        <T>(url: unknown, fallback: T): string | T;
-    };
-
-    /**
      * Whether a bank booking needs a justification, keyed by account id; filled as the remote
      * picker resolves accounts.
      */
@@ -867,17 +826,13 @@ interface Window {
         /** Endpoint the owners panel queries, with its own query string already applied. */
         ownersUrl?: string;
     };
-    krtHerkunft?: KrtHerkunftApi;
     /** The shared Lager behaviour of the two inventory pages (`inventory-common.js`). */
-    krtInventory?: KrtInventoryApi;
-    krtScuInput?: KrtScuInputApi;
     krtMaterialRelease?: KrtMaterialDialogApi;
     krtMaterialRequest?: KrtMaterialDialogApi;
     /**
      * The refinery yield-badge manager; required because both refinery-order modules call it
      * unguarded at parse time.
      */
-    krtRefineryYield: KrtRefineryYieldApi;
     krtOpenEditCrewModal?: (source: Element) => void;
     krtOperationsReload?: (...args: any[]) => void;
     krtRefreshOrdersQueue?: (...args: any[]) => void;
@@ -940,7 +895,6 @@ interface Window {
     orderId?: string | null;
     __unsavedChangesInitialized?: boolean;
     __ordersDragging?: boolean;
-    resetUnsavedChanges?: () => void;
     filterTable?: (...args: any[]) => void;
     confirmRemoveMaterial?: (...args: any[]) => void;
     materialRowToDelete?: Element | null;

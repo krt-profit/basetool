@@ -19,9 +19,11 @@
 
 // @ts-check
 
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 (function () {
-    'use strict';
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     /** @type {KrtI18nDict} */
@@ -51,7 +53,7 @@
 
     /** Reloads the queue table in place. */
     function refresh() {
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: '/admin/deletion-requests',
             container: '#deletionRequestsHost',
             fragmentValue: 'rows',
@@ -64,12 +66,12 @@
      * @param {string} id
      */
     function openModal(id) {
-        window.krtModal.open(id);
+        krtModal.open(id);
     }
 
     /** @param {string} id */
     function closeModal(id) {
-        window.krtModal.close(id);
+        krtModal.close(id);
     }
 
     /**
@@ -151,7 +153,7 @@
             if (slot) {
                 slot.textContent = '';
             }
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/deletion-requests/${current.id}/decline`,
                 payload: { note: text, version: current.version },
@@ -173,7 +175,7 @@
             }
             /** @type {HTMLInputElement | null} */
             const erase = document.querySelector('#execute-erase-history');
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/deletion-requests/${current.id}/execute`,
                 payload: {

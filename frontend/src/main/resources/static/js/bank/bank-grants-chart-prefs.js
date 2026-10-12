@@ -18,93 +18,90 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-(function () {
-    function storageKey() {
-        const main = document.querySelector('main[data-user-id]');
-        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
-        return `bank_grants_view_${uid}`;
-    }
+function storageKey() {
+    const main = document.querySelector('main[data-user-id]');
+    const uid = main ? main.getAttribute('data-user-id') : 'unknown';
+    return `bank_grants_view_${uid}`;
+}
 
-    function onGrantsPage() {
-        return !!document.querySelector('[data-role="bank-grants-filter"]');
-    }
+function onGrantsPage() {
+    return !!document.querySelector('[data-role="bank-grants-filter"]');
+}
 
-    function readSaved() {
-        try {
-            const raw = localStorage.getItem(storageKey());
-            if (raw === null) {
-                return null;
-            }
-            const parsed = JSON.parse(raw) || {};
-            return {
-                view: parsed.view === 'employee' ? 'employee' : 'account',
-                accountId: typeof parsed.accountId === 'string' ? parsed.accountId : null,
-                userId: typeof parsed.userId === 'string' ? parsed.userId : null,
-            };
-        } catch {
+function readSaved() {
+    try {
+        const raw = localStorage.getItem(storageKey());
+        if (raw === null) {
             return null;
         }
-    }
-
-    function writeSaved(state) {
-        try {
-            localStorage.setItem(storageKey(), JSON.stringify(state));
-        } catch {}
-    }
-
-    function urlState() {
-        const params = new URLSearchParams(window.location.search);
-        const view =
-            (params.get('view') || '').toLowerCase() === 'employee' ? 'employee' : 'account';
+        const parsed = JSON.parse(raw) || {};
         return {
-            view,
-            accountId: view === 'account' ? params.get('accountId') : null,
-            userId: view === 'employee' ? params.get('userId') : null,
+            view: parsed.view === 'employee' ? 'employee' : 'account',
+            accountId: typeof parsed.accountId === 'string' ? parsed.accountId : null,
+            userId: typeof parsed.userId === 'string' ? parsed.userId : null,
         };
+    } catch {
+        return null;
     }
+}
 
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!onGrantsPage()) {
-            return;
-        }
-        if (/[?&](view|accountId|userId)=/.test(window.location.search)) {
-            writeSaved(urlState());
-            return;
-        }
-        const saved = readSaved();
-        if (saved === null) {
-            writeSaved(urlState());
-            return;
-        }
-        if (saved.view === 'employee' || saved.accountId || saved.userId) {
-            const params = new URLSearchParams();
-            params.set('view', saved.view);
-            if (saved.view === 'account' && saved.accountId) {
-                params.set('accountId', saved.accountId);
-            }
-            if (saved.view === 'employee' && saved.userId) {
-                params.set('userId', saved.userId);
-            }
-            window.location.replace(`/bank/grants?${params.toString()}`);
-        }
-    });
+function writeSaved(state) {
+    try {
+        localStorage.setItem(storageKey(), JSON.stringify(state));
+    } catch {}
+}
 
-    document.addEventListener('change', (event) => {
-        const target = /** @type {Element} */ (event.target);
-        const select = /** @type {HTMLSelectElement | null} */ (
-            target.closest ? target.closest('[data-role="bank-grants-filter"]') : null
-        );
-        if (!select) {
-            return;
+function urlState() {
+    const params = new URLSearchParams(window.location.search);
+    const view = (params.get('view') || '').toLowerCase() === 'employee' ? 'employee' : 'account';
+    return {
+        view,
+        accountId: view === 'account' ? params.get('accountId') : null,
+        userId: view === 'employee' ? params.get('userId') : null,
+    };
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!onGrantsPage()) {
+        return;
+    }
+    if (/[?&](view|accountId|userId)=/.test(window.location.search)) {
+        writeSaved(urlState());
+        return;
+    }
+    const saved = readSaved();
+    if (saved === null) {
+        writeSaved(urlState());
+        return;
+    }
+    if (saved.view === 'employee' || saved.accountId || saved.userId) {
+        const params = new URLSearchParams();
+        params.set('view', saved.view);
+        if (saved.view === 'account' && saved.accountId) {
+            params.set('accountId', saved.accountId);
         }
-        const view = select.getAttribute('data-view') === 'employee' ? 'employee' : 'account';
-        writeSaved({
-            view,
-            accountId: view === 'account' && select.value ? select.value : null,
-            userId: view === 'employee' && select.value ? select.value : null,
-        });
+        if (saved.view === 'employee' && saved.userId) {
+            params.set('userId', saved.userId);
+        }
+        window.location.replace(`/bank/grants?${params.toString()}`);
+    }
+});
+
+document.addEventListener('change', (event) => {
+    const target = /** @type {Element} */ (event.target);
+    const select = /** @type {HTMLSelectElement | null} */ (
+        target.closest ? target.closest('[data-role="bank-grants-filter"]') : null
+    );
+    if (!select) {
+        return;
+    }
+    const view = select.getAttribute('data-view') === 'employee' ? 'employee' : 'account';
+    writeSaved({
+        view,
+        accountId: view === 'account' && select.value ? select.value : null,
+        userId: view === 'employee' && select.value ? select.value : null,
     });
-})();
+});
 
 (function () {
     const CHART_CONTAINER_IDS = ['bank-chart-results', 'org-unit-bank-chart-results'];

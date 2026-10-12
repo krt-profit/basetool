@@ -21,11 +21,20 @@
 
 /* global AR_CATEGORIES_BY_TOPIC, MSG_SAVED, MSG_DELETED, MSG_ERROR, MSG_CONFLICT, MSG_INVALID_STEP, MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_DELETE_GROUP_TITLE, MSG_DELETE_GROUP_MSG, MSG_GROUP_DELETED, MSG_OK, MSG_CANCEL, MSG_REFRESH_FAILED */
 
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+
 function toastSuccess(msg) {
-    if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(msg);
+    if (showFrontendSuccessToast) showFrontendSuccessToast(msg);
 }
 function toastError(msg) {
-    if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
+    if (showFrontendErrorToast) showFrontendErrorToast(msg);
 }
 
 /**
@@ -39,18 +48,18 @@ function arControl(id) {
 }
 
 function closeModal(id) {
-    window.krtModal.close(id);
+    krtModal.close(id);
 }
 function openModal(id) {
-    window.krtModal.open(id);
+    krtModal.open(id);
 }
 
 function arRefresh() {
-    if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+    if (!krtFetch || typeof krtFetch.swap !== 'function') {
         window.location.reload();
         return Promise.resolve(false);
     }
-    return window.krtFetch.swap({
+    return krtFetch.swap({
         url: '/promotion/admin/rank-requirements',
         container: '#ar-results',
         fragmentValue: 'ranksResults',
@@ -94,11 +103,11 @@ function isValidSingleStep(fromVal, toVal) {
 }
 
 function apiCall(url, method, body) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         toastError(MSG_ERROR);
         return Promise.resolve(null);
     }
-    return window.krtFetch
+    return krtFetch
         .write({
             method,
             url,
@@ -241,7 +250,7 @@ function deleteRequirement(id) {
 }
 
 function confirmAndDelete(id) {
-    const fn = window.showKrtConfirm;
+    const fn = showKrtConfirm;
     if (typeof fn !== 'function') return;
     fn(MSG_DELETE_TITLE, MSG_DELETE_MSG, MSG_OK, MSG_CANCEL).then((ok) => {
         if (!ok) return;
@@ -254,7 +263,7 @@ function confirmAndDelete(id) {
 }
 
 function confirmAndDeleteGroup(fromRank, toRank) {
-    const fn = window.showKrtConfirm;
+    const fn = showKrtConfirm;
     if (typeof fn !== 'function') return;
     const rows = document.querySelectorAll(
         `.rank-group[data-ar-from-rank="${fromRank}"][data-ar-to-rank="${
@@ -322,32 +331,32 @@ function applyFilter() {
 document.addEventListener('DOMContentLoaded', () => {
     rebuildCategoryDropdown(document.getElementById('cr-topic'));
 
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'ar-open-create', () => {
+    if (krtEvents && typeof krtEvents.on === 'function') {
+        krtEvents.on('click', 'ar-open-create', () => {
             openCreateModal(null);
         });
-        window.krtEvents.on('click', 'ar-matrix-add', openCreateModal);
-        window.krtEvents.on('click', 'ar-matrix-show', showMatrixCell);
-        window.krtEvents.on('click', 'ar-open-edit', openEditModal);
-        window.krtEvents.on('click', 'ar-open-delete', (btn) => {
+        krtEvents.on('click', 'ar-matrix-add', openCreateModal);
+        krtEvents.on('click', 'ar-matrix-show', showMatrixCell);
+        krtEvents.on('click', 'ar-open-edit', openEditModal);
+        krtEvents.on('click', 'ar-open-delete', (btn) => {
             confirmAndDelete(btn.getAttribute('data-ar-id'));
         });
-        window.krtEvents.on('click', 'ar-delete-group', (btn) => {
+        krtEvents.on('click', 'ar-delete-group', (btn) => {
             confirmAndDeleteGroup(
                 parseInt(btn.getAttribute('data-ar-from-rank') ?? '', 10),
                 parseInt(btn.getAttribute('data-ar-to-rank') ?? '', 10),
             );
         });
-        window.krtEvents.on('click', 'ar-close-create', () => {
+        krtEvents.on('click', 'ar-close-create', () => {
             closeModal('modal-create');
         });
-        window.krtEvents.on('click', 'ar-close-edit', () => {
+        krtEvents.on('click', 'ar-close-edit', () => {
             closeModal('modal-edit');
         });
-        window.krtEvents.on('click', 'ar-submit-create', submitCreate);
-        window.krtEvents.on('click', 'ar-submit-edit', submitEdit);
-        window.krtEvents.on('change', 'ar-topic-change', rebuildCategoryDropdown);
-        window.krtEvents.on('input', 'ar-rank-from', syncToRank);
+        krtEvents.on('click', 'ar-submit-create', submitCreate);
+        krtEvents.on('click', 'ar-submit-edit', submitEdit);
+        krtEvents.on('change', 'ar-topic-change', rebuildCategoryDropdown);
+        krtEvents.on('input', 'ar-rank-from', syncToRank);
     }
 
     document.querySelectorAll('.ar-rank-from').forEach((el) => {

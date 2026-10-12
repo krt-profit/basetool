@@ -19,6 +19,10 @@
 
 // @ts-check
 
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
 (function () {
     const tabs = /** @type {HTMLElement[]} */ (
         Array.from(document.querySelectorAll('.tab-nav .tab[data-tab]'))
@@ -79,13 +83,13 @@
         if (!validKeys.includes(key) || key === currentKey()) {
             return false;
         }
-        if (dirty && typeof window.showKrtConfirm === 'function') {
+        if (dirty && typeof showKrtConfirm === 'function') {
             const i18n = window.MISSION_TAB_I18N || {};
-            const go = await window.showKrtConfirm(
-                window.krtI18nText(i18n['unsaved.title'], 'MISSION_TAB_I18N[unsaved.title]'),
-                window.krtI18nText(i18n['unsaved.message'], 'MISSION_TAB_I18N[unsaved.message]'),
-                window.krtI18nText(i18n['unsaved.continue'], 'MISSION_TAB_I18N[unsaved.continue]'),
-                window.krtI18nText(i18n['unsaved.cancel'], 'MISSION_TAB_I18N[unsaved.cancel]'),
+            const go = await showKrtConfirm(
+                krtI18nText(i18n['unsaved.title'], 'MISSION_TAB_I18N[unsaved.title]'),
+                krtI18nText(i18n['unsaved.message'], 'MISSION_TAB_I18N[unsaved.message]'),
+                krtI18nText(i18n['unsaved.continue'], 'MISSION_TAB_I18N[unsaved.continue]'),
+                krtI18nText(i18n['unsaved.cancel'], 'MISSION_TAB_I18N[unsaved.cancel]'),
             );
             if (!go) return false;
             dirty = false;
@@ -205,7 +209,7 @@
      * @returns {string} the localized string
      */
     function msg(key) {
-        return window.krtI18nText(D[key], `MISSION_SUBRES_I18N[${key}]`);
+        return krtI18nText(D[key], `MISSION_SUBRES_I18N[${key}]`);
     }
     const SAVED = msg('mission.save.section.ok');
     const FAILED = msg('mission.save.section.error');
@@ -231,32 +235,30 @@
         Object.keys(map || {}).forEach((field) => {
             const slot = form.querySelector(`.field-error[data-error-for="${field}"]`);
             if (slot) slot.textContent = map[field];
-            else if (window.showFrontendErrorToast) window.showFrontendErrorToast(map[field]);
+            else if (showFrontendErrorToast) showFrontendErrorToast(map[field]);
         });
     }
     function handleConflict(problem) {
         const code = problem && problem.code;
         if (code === 'OPTIMISTIC_LOCK' || code === 'PESSIMISTIC_LOCK') {
-            if (typeof window.showKrtConfirm === 'function') {
-                window
-                    .showKrtConfirm(
-                        msg('mission.conflict.toast.title'),
-                        msg('mission.conflict.action.reload.question'),
-                        msg('mission.conflict.action.reload'),
-                        msg('mission.conflict.action.dismiss'),
-                    )
-                    .then((ok) => {
-                        if (ok) window.location.reload();
-                    });
+            if (typeof showKrtConfirm === 'function') {
+                showKrtConfirm(
+                    msg('mission.conflict.toast.title'),
+                    msg('mission.conflict.action.reload.question'),
+                    msg('mission.conflict.action.reload'),
+                    msg('mission.conflict.action.dismiss'),
+                ).then((ok) => {
+                    if (ok) window.location.reload();
+                });
             } else {
                 window.location.reload();
             }
-        } else if (window.showFrontendErrorToast) {
+        } else if (showFrontendErrorToast) {
             const ownerRequired =
-                window.krtFetch && window.krtFetch.ownerOrgUnitRequiredMessage
-                    ? window.krtFetch.ownerOrgUnitRequiredMessage(problem)
+                krtFetch && krtFetch.ownerOrgUnitRequiredMessage
+                    ? krtFetch.ownerOrgUnitRequiredMessage(problem)
                     : null;
-            window.showFrontendErrorToast(
+            showFrontendErrorToast(
                 ownerRequired ||
                     (problem && problem.detail) ||
                     msg('mission.conflict.toast.detail'),
@@ -309,12 +311,12 @@
     }
 
     async function submitInPlace() {
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             form.submit();
             return;
         }
         markDirtySections();
-        await window.krtFetch.submitForm({
+        await krtFetch.submitForm({
             form,
             url: form.action,
             serialize: 'section:schedule',

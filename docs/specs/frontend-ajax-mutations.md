@@ -2637,7 +2637,10 @@ head's first, synchronous script. The list only shrinks.
 - **Imports are static, absolute and bounded.** `import … from '/js/<domain>/<file>.js'` and
   `export … from` name an absolute asset path of the module's own domain or of the kernel. A relative
   path, a bare specifier, a dynamic `import()`, an import of another domain and an import cycle are
-  rejected. The kernel API stays `window.krt*`; only module-to-module dependencies are imports.
+  rejected. The kernel API is imported too: every kernel script exports its API and its consumers import
+  it, `tsconfig.json` maps `/js/*` and sets `moduleDetection: force`, and a kernel name stays on `window`
+  only where something outside the module graph reads it (a Playwright source, a node test, the head's
+  `krtEvents` stub, the classic beacon's `krtI18nText`).
 - **Every page renders an import map.** `kernel/fragments/head.html` renders, before its first module
   script and with the request's CSP nonce, `<script type="importmap">` mapping each module the page's
   module scripts import — transitively, the entry scripts themselves excluded unless imported — to the
@@ -2645,6 +2648,9 @@ head's first, synchronous script. The list only shrinks.
   assets are cached for a year as `immutable`; the map is what makes a changed module a new URL. The
   CSP is unchanged: `script-src 'nonce-…' 'strict-dynamic'` admits the static imports of a nonced
   module and the nonced map.
+- **A script under its plain URL is revalidated.** `/js/**` answers `Cache-Control: no-cache`; only a
+  content-hashed name answers `max-age=31536000, public, immutable`, so a module the scan missed is
+  never held stale for a year.
 - **The map is found by scanning**, not declared: the page template, `kernel/fragments/layout` and every
   fragment they include by a literal `~{template :: name}` reference are searched for module
   scripts. A module a page loads through a construct the scan cannot follow would be requested under
@@ -2655,7 +2661,7 @@ head's first, synchronous script. The list only shrinks.
 
 **Acceptance**
 
-- [x] 139 of 140 scripts are modules; the order of the document listeners, their handler bodies and the
+- [x] 142 of 143 scripts are modules; the order of the document listeners, their handler bodies and the
   live-sync receivers of the split `bank.js` is identical to the former file's when recorded against a
   stub document (2026-10-12).
 - [x] A rendered page carries the import map before its first module script, with the hashed URL of an
@@ -2664,11 +2670,14 @@ head's first, synchronous script. The list only shrinks.
 - [x] A module linked as a classic script, a classic script linked as a module, a module with a
   `defer`, an import outside the boundary, a dynamic import and a cycle are each reported; the classic
   list cannot grow.
+- [x] A script under its plain URL answers `no-cache` with `Last-Modified`, under its hashed URL `immutable`,
+  and a hashed name with a wrong hash answers 404.
 - [x] The two rendered pages checked in a browser under the real CSP (`org-unit-bank`, `inventory-admin`)
   load every module without a violation or script error.
 
 **Enforced by:** `ModuleScriptsTest`, `ModuleImportMapTest`,
 `StaticResourceHandlerMappingTest#everyImportMapEntryIsTheContentHashedUrlAndIsServed`,
+`StaticResourceHandlerMappingTest#aScriptIsImmutableOnlyUnderItsContentHashedUrl`,
 `OrgUnitBankPageControllerMvcTest#orgUnitBank_rendersTheImportMapBeforeItsModuleScripts`,
 `:frontend:testEslintBans`, `:frontend:lintJs` (`no-restricted-imports` per domain),
 `InlineScriptLoadOrderTest` · **Code:** `kernel/layout/ModuleImportMap.java`,

@@ -21,6 +21,7 @@
 import { setMovementRowActive } from '/js/bank/bank-controls.js';
 import { toggleCounterpartyExternal } from '/js/bank/bank-counterparty.js';
 import { toggleSplitRow, updateFeePreview } from '/js/bank/bank-previews.js';
+import { krtBankAccountMeta } from '/js/kernel/krt-bank-account-search.js';
 
 /**
  * Maps a movement type on the unified "Kontobewegung" modal onto its backend endpoint and the
@@ -64,7 +65,7 @@ function updateMovementJustification(form) {
             input.required =
                 !!option && option.getAttribute('data-requires-justification') === 'true';
         } else {
-            const meta = window.krtBankAccountMeta || {};
+            const meta = krtBankAccountMeta || {};
             input.required = !!source.value && meta[source.value] === true;
         }
     } else {

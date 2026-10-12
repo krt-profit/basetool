@@ -6,9 +6,9 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
-(function () {
-    'use strict';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
+(function () {
     const submitButton = document.getElementById('terms-accept-submit');
     const errorMessage = document.getElementById('terms-accept-error');
 
@@ -21,7 +21,7 @@
             errorMessage.hidden = true;
         }
 
-        const result = await window.krtFetch.write({
+        const result = await krtFetch.write({
             method: 'POST',
             url: '/terms/accept',
             payload: {},

@@ -19,7 +19,7 @@
 
 // @ts-check
 
-/* global MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, showFrontendErrorToast, showFrontendSuccessToast */
+/* global MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR */
 
 import {
     _refreshMaterialsSection,
@@ -32,6 +32,10 @@ import {
     _odElementById,
     _publishOrdersQueue,
 } from '/js/joborder/orders-detail.js';
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * @typedef {object} OdClaimModalOptions
@@ -82,7 +86,7 @@ function _openClaimModal(opts) {
     }
     const claimScuHint = document.getElementById('claim-scu-hint');
     if (claimScuHint) claimScuHint.classList.toggle('is-hidden', opts.quantityType === 'PIECE');
-    window.krtModal.open(document.getElementById('claim-modal'));
+    krtModal.open(document.getElementById('claim-modal'));
 }
 
 /**
@@ -128,7 +132,7 @@ export function submitClaim() {
     const materialId = _odControlById('claim-material-id').value;
     const quality = _odControlById('claim-quality').value;
     const squadronId = _odControlById('claim-squadron').value;
-    const amount = /** @type {KrtScuInputApi} */ (window.krtScuInput).parse(
+    const amount = /** @type {KrtScuInputApi} */ (krtScuInput).parse(
         _odControlById('claim-amount').value,
     );
     const max = parseFloat(_odControlById('claim-max').value);
@@ -156,7 +160,7 @@ export function submitClaim() {
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
         onSuccess() {
-            window.krtModal.close(document.getElementById('claim-modal'));
+            krtModal.close(document.getElementById('claim-modal'));
             showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
             _refreshMaterialsSection();
         },
@@ -176,7 +180,7 @@ export function withdrawClaimAction() {
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
         onSuccess() {
-            window.krtModal.close(document.getElementById('claim-modal'));
+            krtModal.close(document.getElementById('claim-modal'));
             showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS);
             _refreshMaterialsSection();
         },
@@ -215,7 +219,7 @@ export function updateStatus(selectElement) {
     if (newStatus === 'COMPLETED' || newStatus === 'REJECTED') {
         _pendingStatus = newStatus;
         _previousStatus = _knownStatus(selectElement);
-        window.krtModal.open(document.getElementById('status-warning-modal'));
+        krtModal.open(document.getElementById('status-warning-modal'));
     } else {
         _doStatusUpdate(selectElement.dataset.orderId, newStatus, selectElement);
     }
@@ -223,7 +227,7 @@ export function updateStatus(selectElement) {
 
 /** Dismisses the terminal-status warning and restores the previous status. */
 export function cancelStatusChange() {
-    window.krtModal.close(document.getElementById('status-warning-modal'));
+    krtModal.close(document.getElementById('status-warning-modal'));
     const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('status-select'));
     if (sel && _previousStatus) {
         sel.value = _previousStatus;
@@ -234,7 +238,7 @@ export function cancelStatusChange() {
 
 /** Confirms the terminal-status warning and saves the pending status. */
 export function confirmStatusChange() {
-    window.krtModal.close(document.getElementById('status-warning-modal'));
+    krtModal.close(document.getElementById('status-warning-modal'));
     const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('status-select'));
     if (!sel || !_pendingStatus) return;
     _doStatusUpdate(sel.dataset.orderId, _pendingStatus, sel);
@@ -305,7 +309,7 @@ function _doStatusUpdate(orderId, status, selectElement) {
 export function _toggleBlueprintCounting(checkbox) {
     const orderId = checkbox.getAttribute('data-order-id');
     const desired = checkbox.checked;
-    if (!orderId || !window.krtFetch) {
+    if (!orderId || !krtFetch) {
         return;
     }
     checkbox.disabled = true;

@@ -18,6 +18,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
 const ORG_STRUCTURE_SECTIONS = {
     units: { container: '#org-structure-units', fragmentValue: 'units' },
     forms: { container: '#org-structure-forms', fragmentValue: 'forms' },
@@ -26,12 +31,12 @@ const ORG_STRUCTURE_SECTIONS = {
 const ORG_STRUCTURE_CHART_SECTION = 'chart';
 
 (function () {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     const i18n = readMessages();
 
-    const orgStructureSeam = window.krtFetch.sectionWrite({
+    const orgStructureSeam = krtFetch.sectionWrite({
         dict() {
             return { 'admin.orgStructure.refresh.error': i18n.refreshError };
         },
@@ -41,8 +46,8 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
             return '/admin/org-structure';
         },
         broadcast(keys) {
-            if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-                window.krtLiveSync.sendChanged(
+            if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged(
                     'org-structure',
                     keys.concat([ORG_STRUCTURE_CHART_SECTION]),
                 );
@@ -58,8 +63,8 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         return orgStructureSeam.refresh(['units']);
     }
 
-    if (window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
-        window.krtLiveSync.createReceiver({
+    if (krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+        krtLiveSync.createReceiver({
             topic: 'org-structure',
             sections: ORG_STRUCTURE_SECTIONS,
             coalesceMs: 1500,
@@ -84,8 +89,8 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         const holder = document.getElementById('os-i18n');
         const data = holder ? holder.dataset : {};
         return {
-            saved: window.krtI18nText(data.saved, 'data-saved'),
-            error: window.krtI18nText(data.error, 'data-error'),
+            saved: krtI18nText(data.saved, 'data-saved'),
+            error: krtI18nText(data.error, 'data-error'),
             refreshError: data.refreshError || '',
         };
     }
@@ -99,13 +104,13 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         return value === '' || value == null ? null : value;
     }
 
-    if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
+    if (!krtEvents || typeof krtEvents.on !== 'function') {
         return;
     }
 
-    window.krtEvents.on('submit', 'os-create-ol', (form, event) => {
+    krtEvents.on('submit', 'os-create-ol', (form, event) => {
         event.preventDefault();
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: '/admin/org-structure/organisationsleitung',
             payload: {
@@ -120,9 +125,9 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         });
     });
 
-    window.krtEvents.on('submit', 'os-create-bereich', (form, event) => {
+    krtEvents.on('submit', 'os-create-bereich', (form, event) => {
         event.preventDefault();
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: '/admin/org-structure/bereiche',
             payload: {
@@ -139,13 +144,13 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         });
     });
 
-    window.krtEvents.on('change', 'os-parent-select', (select) => {
+    krtEvents.on('change', 'os-parent-select', (select) => {
         const row = select.closest('[data-org-unit-id]');
         if (!row) {
             return;
         }
         const id = row.getAttribute('data-org-unit-id');
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'PATCH',
             url: `/admin/org-structure/org-units/${encodeURIComponent(String(id))}/parent`,
             serialize: `org-unit:${id}`,

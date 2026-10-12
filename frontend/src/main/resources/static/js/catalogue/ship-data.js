@@ -22,6 +22,11 @@
 /* global shipDataI18n, shipDataConflict, shipDataResetUrl */
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const shipTypesData = /** @type {HTMLDataListElement | null} */ (
@@ -84,10 +89,10 @@ function filterTable(tableId, query) {
  * @param {string | null} id the overlay id
  */
 function closeModal(id) {
-    if (typeof window.resetUnsavedChanges === 'function') {
-        window.resetUnsavedChanges();
+    if (typeof resetUnsavedChanges === 'function') {
+        resetUnsavedChanges();
     }
-    window.krtModal.close(id);
+    krtModal.close(id);
 }
 
 window.filterTable = filterTable;
@@ -96,20 +101,20 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.krt-modal-overlay').forEach((m) => {
         m.addEventListener('click', (e) => {
             if (e.target === m) {
-                window.krtModal.close(m);
+                krtModal.close(m);
             }
         });
     });
 });
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'ship-close-modal', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'ship-close-modal', (el) => {
         closeModal(el.getAttribute('data-modal-id'));
     });
 }
 
 (function () {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     const i18n = shipDataI18n;
@@ -131,7 +136,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         if (btn) {
             btn.disabled = true;
         }
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: `${form.getAttribute('action')}?hidden=${desired}`,
@@ -151,8 +156,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                             ? form.getAttribute('data-label-show')
                             : form.getAttribute('data-label-hide');
                     }
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(i18n.saved);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(i18n.saved);
                     }
                 },
             })
@@ -163,10 +168,10 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             });
     });
 
-    window.krtEvents.on('click', 'shipdata-reset', (target) => {
+    krtEvents.on('click', 'shipdata-reset', (target) => {
         const el = /** @type {HTMLButtonElement} */ (target);
         el.disabled = true;
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: shipDataResetUrl,
@@ -175,8 +180,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 conflict,
                 onSuccess() {
                     closeModal('reset-fitted-confirm-modal');
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(i18n.resetSuccess);
+                    if (showFrontendSuccessToast) {
+                        showFrontendSuccessToast(i18n.resetSuccess);
                     }
                 },
             })

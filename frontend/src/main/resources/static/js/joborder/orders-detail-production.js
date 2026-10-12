@@ -19,9 +19,14 @@
 
 // @ts-check
 
-/* global MSG_STOLEN, MSG_QUALITY, MSG_INVENTORY_BELOW_FLOOR, MSG_PRODUCTION_COUNTED_HIGHER, showFrontendErrorToast, showFrontendSuccessToast, PRODUCTION_I18N */
+/* global MSG_STOLEN, MSG_QUALITY, MSG_INVENTORY_BELOW_FLOOR, MSG_PRODUCTION_COUNTED_HIGHER, PRODUCTION_I18N */
 
 import { krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
+import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 (function () {
     const nav = /** @type {HTMLElement | null} */ (
@@ -374,7 +379,7 @@ export function openProductionModal(button) {
 
     _prodResetBookIn();
 
-    window.krtModal.open('production-modal');
+    krtModal.open('production-modal');
 
     const row = button.closest('tr');
     const demandLis = row ? row.querySelectorAll('.od-production-demand li') : [];
@@ -438,7 +443,7 @@ export function openProductionModal(button) {
             skipCb.addEventListener('change', _prodReconcile);
         }
         Promise.all([
-            window.krtFetch
+            krtFetch
                 .getJson(`/orders/${orderId}/materials/${mat.materialId}/inventory`)
                 .catch(() => []),
             _prodLoadHigherAttribution(orderId, mat),
@@ -568,7 +573,7 @@ async function _prodLoadHigherAttribution(orderId, mat) {
     });
     if (tiers.size < 2 || !orderId) return higher;
     try {
-        const entries = await window.krtFetch.getJson(
+        const entries = await krtFetch.getJson(
             `/orders/${orderId}/materials/${mat.materialId}/attribution`,
         );
         for (const entry of entries) {
@@ -728,7 +733,7 @@ export function _prodRefreshOrgUnitPicker() {
         wrapper.hidden = true;
         return;
     }
-    window.krtFetch
+    krtFetch
         .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) {
@@ -925,7 +930,7 @@ export function bookProduction() {
         toast: false,
         errorMessage: PRODUCTION_I18N.allocError,
         onSuccess() {
-            window.krtModal.close('production-modal');
+            krtModal.close('production-modal');
             showFrontendSuccessToast(PRODUCTION_I18N.booked);
             if (window.krtRefreshOrderSection) {
                 window.krtRefreshOrderSection([
@@ -937,8 +942,8 @@ export function bookProduction() {
                     'item-handover-lines',
                 ]);
             }
-            if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-                window.krtLiveSync.sendChanged('inventory', ['stock']);
+            if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged('inventory', ['stock']);
             }
         },
     });

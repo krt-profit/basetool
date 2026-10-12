@@ -21,6 +21,15 @@
 
 /* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
     missions: { container: '#op-missions-results', fragmentValue: 'missions' },
@@ -44,10 +53,10 @@ function withOverview(keys) {
 }
 
 (function () {
-    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
+    if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
-    const operationSeam = window.krtFetch.sectionWrite({
+    const operationSeam = krtFetch.sectionWrite({
         dict() {
             return { 'operation.section.refresh.error': OPS_DETAIL_MSG.sectionRefreshError };
         },
@@ -59,18 +68,18 @@ function withOverview(keys) {
         broadcast(keys) {
             if (
                 window.operationId &&
-                window.krtLiveSync &&
-                typeof window.krtLiveSync.sendChanged === 'function'
+                krtLiveSync &&
+                typeof krtLiveSync.sendChanged === 'function'
             ) {
-                window.krtLiveSync.sendChanged(`operation:${window.operationId}`, keys);
+                krtLiveSync.sendChanged(`operation:${window.operationId}`, keys);
             }
         },
     });
     window.opRefreshSection = operationSeam.refresh;
     window.opNotifyChanged = operationSeam.notify;
 
-    if (window.operationId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
-        window.krtLiveSync.createReceiver({
+    if (window.operationId && krtLiveSync && krtLiveSync.createReceiver) {
+        krtLiveSync.createReceiver({
             topic: `operation:${window.operationId}`,
             sections: OPERATION_SECTIONS,
             refresh(keys) {
@@ -227,13 +236,13 @@ function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement} */ (
         document.getElementById('delete-operation-form')
     );
-    deleteForm.action = window.safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
-    window.krtModal.open(document.getElementById('delete-operation-modal'));
+    deleteForm.action = safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
+    krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({
+    if (krtFetch) {
+        krtFetch.bindSwap({
             container: '#op-missions-results',
             fragmentValue: 'missions',
             history: true,
@@ -241,8 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'operation-open-delete', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'operation-open-delete', (el) => {
         openDeleteModal(el.getAttribute('data-id'));
     });
 }
@@ -281,15 +290,15 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     function renderPreview() {
         if (!input || !preview) return;
         preview.textContent = '';
-        if (!window.krtFetch) return;
-        window.krtFetch.write({
+        if (!krtFetch) return;
+        krtFetch.write({
             method: 'POST',
             url: '/operations/markdown-preview',
             payload: { markdown: input.value },
             accept: 'text/html, application/problem+json',
             toast: false,
             onSuccess(html) {
-                window.krtFetch.setTrustedHtml(preview, typeof html === 'string' ? html : '');
+                krtFetch.setTrustedHtml(preview, typeof html === 'string' ? html : '');
             },
             onError() {
                 return true;
@@ -340,7 +349,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             e = input.selectionEnd;
         const sel =
             input.value.slice(s, e) ||
-            window.krtI18nText(OPS_DETAIL_MSG.linkText, 'OPS_DETAIL_MSG.linkText');
+            krtI18nText(OPS_DETAIL_MSG.linkText, 'OPS_DETAIL_MSG.linkText');
         input.setRangeText(`[${sel}](https://)`, s, e, 'end');
         input.focus();
     }
@@ -371,8 +380,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 form.reset();
             }
             showView('edit');
-            if (typeof window.resetUnsavedChanges === 'function') {
-                window.resetUnsavedChanges();
+            if (typeof resetUnsavedChanges === 'function') {
+                resetUnsavedChanges();
             }
         });
     }
@@ -410,7 +419,7 @@ function adoptOperationFormValues(form) {
 }
 
 (function () {
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
 
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('operation-form'));
     if (form) {
@@ -419,7 +428,7 @@ function adoptOperationFormValues(form) {
             const versionInput = /** @type {HTMLInputElement | null} */ (
                 form.querySelector('[name="version"]')
             );
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: /** @type {string} */ (form.getAttribute('action')),
                 serialize: 'operation:core',
@@ -446,7 +455,7 @@ function adoptOperationFormValues(form) {
                         versionInput.value = body.version;
                     }
                     adoptOperationFormValues(form);
-                    window.krtModal.close('edit-operation-modal');
+                    krtModal.close('edit-operation-modal');
                     if (window.opRefreshSection) {
                         window.opRefreshSection('overview');
                     }
@@ -461,7 +470,7 @@ function adoptOperationFormValues(form) {
     if (deleteForm) {
         deleteForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: deleteForm.action,
                 submitter: deleteForm.querySelector('button[type="submit"]'),
@@ -562,15 +571,15 @@ async function handlePayoutPaidToggle(checkbox) {
     const previous = !desired;
     checkbox.disabled = true;
     try {
-        const result = await window.krtFetch.write({
+        const result = await krtFetch.write({
             method: 'POST',
             url,
             payload: { participantKey, paidOut: desired },
             toast: false,
             onError(status) {
                 checkbox.checked = previous;
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(
+                if (showFrontendErrorToast) {
+                    showFrontendErrorToast(
                         status === 401 || status === 403
                             ? MSG_PAYOUT_PAID_FORBIDDEN
                             : MSG_PAYOUT_PAID_ERROR,
@@ -580,8 +589,8 @@ async function handlePayoutPaidToggle(checkbox) {
             },
             onNetworkError() {
                 checkbox.checked = previous;
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
+                if (showFrontendErrorToast) {
+                    showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
                 }
                 return true;
             },
@@ -634,11 +643,11 @@ document.addEventListener('change', (ev) => {
         if (!missionId) return;
         body.setAttribute('data-loaded', 'loading');
         const url = `/operations/${encodeURIComponent(opId)}/finance/${encodeURIComponent(missionId)}`;
-        window.krtFetch
+        krtFetch
             .get(url)
             .then((r) => (r && r.ok ? r.text() : Promise.reject(r ? r.status : 0)))
             .then((html) => {
-                window.krtFetch.setTrustedHtml(body, html);
+                krtFetch.setTrustedHtml(body, html);
                 body.setAttribute('data-loaded', 'true');
             })
             .catch(() => {

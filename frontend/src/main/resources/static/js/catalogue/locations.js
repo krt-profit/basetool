@@ -22,6 +22,7 @@
 /* global LOCATION_MSG, LOCATION_CONFLICT */
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dataList = /** @type {HTMLDataListElement | null} */ (
@@ -122,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         event.preventDefault();
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             form.submit();
             return;
         }
@@ -133,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (button) {
             button.disabled = true;
         }
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: /** @type {string} */ (form.getAttribute('action')),

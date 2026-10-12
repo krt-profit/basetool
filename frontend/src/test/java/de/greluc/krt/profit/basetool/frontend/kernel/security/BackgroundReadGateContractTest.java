@@ -78,19 +78,18 @@ class BackgroundReadGateContractTest {
 
   /** The {@code get} function of the transport, up to the next function declaration. */
   private static final Pattern TRANSPORT_GET_BODY =
-      Pattern.compile("async function get\\(url, opts\\) \\{(.*?)\\n    }\\n", Pattern.DOTALL);
+      Pattern.compile("async function get\\(url, opts\\) \\{(.*?)\\n}\\n", Pattern.DOTALL);
 
   /** The shared read call in {@code p4k-import.js}. */
   private static final Pattern P4K_SHARED_READ =
-      Pattern.compile("window\\.krtFetch\\s*\\.get\\(jobsUrl\\(\\)");
+      Pattern.compile("(?<![.\\w])krtFetch\\s*\\.get\\(jobsUrl\\(\\)");
 
   /** The gate-aware reader hand-off in {@code p4k-import.js}. */
   private static final Pattern P4K_READER_HANDOFF = Pattern.compile("\\.then\\(readJson\\)");
 
   /** The module's read helper in {@code notifications.js}, delegating to the shared read path. */
   private static final Pattern NOTIFICATIONS_SHARED_READ =
-      Pattern.compile(
-          "function readNotifications\\(url\\) \\{\\s*return window\\.krtFetch\\.get\\(url");
+      Pattern.compile("function readNotifications\\(url\\) \\{\\s*return krtFetch\\.get\\(url");
 
   /** A call of the read helper in {@code notifications.js} (its declaration excluded). */
   private static final Pattern NOTIFICATIONS_READ_CALL =
@@ -230,7 +229,7 @@ class BackgroundReadGateContractTest {
   void theNotificationReads_goThroughTheSharedReadPath() throws IOException {
     String module = readResource(NOTIFICATIONS_MODULE);
     assertThat(NOTIFICATIONS_SHARED_READ.matcher(module).find())
-        .as("readNotifications must delegate to window.krtFetch.get")
+        .as("readNotifications must delegate to krtFetch.get")
         .isTrue();
     int reads = count(NOTIFICATIONS_READ_CALL, module);
     assertThat(reads).as("the badge, dropdown and paging reads").isEqualTo(3);

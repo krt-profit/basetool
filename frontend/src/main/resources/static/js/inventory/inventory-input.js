@@ -21,6 +21,11 @@
 
 /* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG, INV_OWNER_PICKER_MSG */
 
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const matSelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('materialId')
@@ -109,13 +114,13 @@ const INVENTORY_INPUT_ORDER_SECTIONS = {
 
 function startOrderNeedsLiveSync() {
     if (
-        !window.krtLiveSync ||
-        typeof window.krtLiveSync.createReceiver !== 'function' ||
+        !krtLiveSync ||
+        typeof krtLiveSync.createReceiver !== 'function' ||
         !document.getElementById('jobOrderAllocGroup')
     ) {
         return;
     }
-    window.krtLiveSync.createReceiver({
+    krtLiveSync.createReceiver({
         topic: 'orders',
         sections: INVENTORY_INPUT_ORDER_SECTIONS,
         coalesceMs: 1500,
@@ -124,7 +129,7 @@ function startOrderNeedsLiveSync() {
 }
 
 function refreshOrderNeeds() {
-    window.krtFetch
+    krtFetch
         .getJson('/inventory/order-needs')
         .then((needs) => {
             if (!needs) return;
@@ -336,7 +341,7 @@ function scheduleMergeProbe() {
         return;
     }
     mergeProbeTimer = window.setTimeout(() => {
-        window.krtFetch
+        krtFetch
             .getJson(`/inventory/merge-candidates?${query}`)
             .then((answer) => {
                 if (sequence !== mergeProbeSequence) return;
@@ -482,7 +487,7 @@ function reloadOwnerPickerForUser() {
         scheduleMergeProbe();
         return;
     }
-    window.krtFetch
+    krtFetch
         .getJson(`/users/${encodeURIComponent(userId)}/memberships?allKinds=true`)
         .catch(() => {
             return [];
@@ -863,7 +868,7 @@ function updateAllocOver() {
     if (!overEl) return;
     const amountEl = /** @type {HTMLInputElement | null} */ (document.getElementById('amount'));
     const raw = amountEl ? amountEl.value : '';
-    const amount = window.krtScuInput && amountEl ? window.krtScuInput.parse(raw) : parseFloat(raw);
+    const amount = krtScuInput && amountEl ? krtScuInput.parse(raw) : parseFloat(raw);
     const total = isNaN(amount) ? 0 : amount;
     const over =
         allocDimensionSum('jobOrder') > total + 1e-6 || allocDimensionSum('mission') > total + 1e-6;
@@ -888,7 +893,7 @@ function syncPersonalAllocations() {
 }
 
 (function () {
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('inventory-input-form')
     );
@@ -897,12 +902,11 @@ function syncPersonalAllocations() {
         event.preventDefault();
         const blank = markBlankAllocationAmounts();
         if (blank.length) {
-            if (window.showFrontendErrorToast)
-                window.showFrontendErrorToast(INV_ADD_MSG.allocAmountMissing);
+            if (showFrontendErrorToast) showFrontendErrorToast(INV_ADD_MSG.allocAmountMissing);
             blank[0].focus();
             return;
         }
-        window.krtFetch.submitForm({
+        krtFetch.submitForm({
             form,
             submitter: form.querySelector('button[type="submit"]'),
             toast: false,
@@ -910,8 +914,8 @@ function syncPersonalAllocations() {
             onError(status, problem) {
                 let msg = INV_ADD_MSG.failed;
                 const ownerRequired =
-                    window.krtFetch && window.krtFetch.ownerOrgUnitRequiredMessage
-                        ? window.krtFetch.ownerOrgUnitRequiredMessage(problem)
+                    krtFetch && krtFetch.ownerOrgUnitRequiredMessage
+                        ? krtFetch.ownerOrgUnitRequiredMessage(problem)
                         : null;
                 if (ownerRequired) msg = ownerRequired;
                 else if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT')
@@ -920,7 +924,7 @@ function syncPersonalAllocations() {
                     msg = INV_ADD_MSG.allocAmountMissing;
                 else if (problem && problem.code === 'VALIDATION') msg = INV_ADD_MSG.validation;
                 else if (problem && problem.detail) msg = problem.detail;
-                if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
+                if (showFrontendErrorToast) showFrontendErrorToast(msg);
                 return true;
             },
             onSuccess(body) {

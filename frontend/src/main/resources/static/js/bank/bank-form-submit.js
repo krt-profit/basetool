@@ -21,6 +21,9 @@
 import { approvalRequestFiledMessage, genericError } from '/js/bank/bank-messages.js';
 import { clearErrors, showError } from '/js/bank/bank-form-errors.js';
 import { publishBankLiveSync } from '/js/bank/bank-livesync.js';
+import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** Form field names serialized as JSON numbers instead of strings. */
 const NUMBER_FIELDS = [
@@ -139,7 +142,7 @@ async function submitBankForm(form) {
     );
 
     const submitButton = form.querySelector('button[type="submit"]');
-    await window.krtFetch.write({
+    await krtFetch.write({
         method,
         url: endpoint,
         payload: method !== 'GET' && method !== 'DELETE' ? body : undefined,
@@ -149,8 +152,8 @@ async function submitBankForm(form) {
         onSuccess(payload) {
             handleBankSuccess(form);
             if (payload && payload.pendingRequest) {
-                if (typeof window.showFrontendSuccessToast === 'function') {
-                    window.showFrontendSuccessToast(approvalRequestFiledMessage());
+                if (typeof showFrontendSuccessToast === 'function') {
+                    showFrontendSuccessToast(approvalRequestFiledMessage());
                 }
             }
         },
@@ -190,16 +193,16 @@ async function submitBankForm(form) {
 function handleBankSuccess(form) {
     const modal = form.closest('.krt-modal-overlay');
     if (modal) {
-        window.krtModal.close(modal);
+        krtModal.close(modal);
     }
     const main = document.querySelector('main[data-bank-saved]');
     const savedMessage = main ? main.getAttribute('data-bank-saved') : null;
-    if (savedMessage && typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(savedMessage);
+    if (savedMessage && typeof showFrontendSuccessToast === 'function') {
+        showFrontendSuccessToast(savedMessage);
     }
     publishBankLiveSync(form);
     const spec = REFRESH_TARGETS[form.getAttribute('data-refresh')];
-    if (!spec || !window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+    if (!spec || !krtFetch || typeof krtFetch.swap !== 'function') {
         window.location.reload();
         return;
     }
@@ -218,7 +221,7 @@ function handleBankSuccess(form) {
     frozen.forEach((button) => {
         button.disabled = true;
     });
-    window.krtFetch
+    krtFetch
         .swap({
             url,
             container: spec.container,

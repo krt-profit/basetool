@@ -18,36 +18,34 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-(function () {
-    'use strict';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtComboboxRemoteSources } from '/js/kernel/krt-combobox-sources.js';
 
-    const JUSTIFICATION_TYPES = ['CARTEL', 'CARTEL_BANK', 'SPECIAL'];
+const JUSTIFICATION_TYPES = ['CARTEL', 'CARTEL_BANK', 'SPECIAL'];
 
-    const accountMeta = window.krtBankAccountMeta || {};
-    window.krtBankAccountMeta = accountMeta;
+/** @type {Record<string, boolean>} */
+export const krtBankAccountMeta = {};
 
-    function toOption(row) {
-        const requiresJustification = JUSTIFICATION_TYPES.indexOf(row.type) !== -1;
-        accountMeta[row.id] = requiresJustification;
-        const accountNo = row.accountNo || '';
-        const name = row.name || '';
-        const label = accountNo && name ? `${accountNo} — ${name}` : accountNo || name || row.id;
-        return { value: row.id, label };
-    }
+function toOption(row) {
+    const requiresJustification = JUSTIFICATION_TYPES.indexOf(row.type) !== -1;
+    krtBankAccountMeta[row.id] = requiresJustification;
+    const accountNo = row.accountNo || '';
+    const name = row.name || '';
+    const label = accountNo && name ? `${accountNo} — ${name}` : accountNo || name || row.id;
+    return { value: row.id, label };
+}
 
-    function fetchAccounts(query) {
-        return window.krtFetch
-            .getJson(`/api/proxy/bank/accounts/search?query=${encodeURIComponent(query || '')}`)
-            .then((list) => {
-                return (list || []).map(toOption);
-            })
-            .catch(() => {
-                return [];
-            });
-    }
+function fetchAccounts(query) {
+    return krtFetch
+        .getJson(`/api/proxy/bank/accounts/search?query=${encodeURIComponent(query || '')}`)
+        .then((list) => {
+            return (list || []).map(toOption);
+        })
+        .catch(() => {
+            return [];
+        });
+}
 
-    window.krtComboboxRemoteSources ||= {};
-    window.krtComboboxRemoteSources['remote-bank-accounts'] = function (query) {
-        return fetchAccounts(query);
-    };
-})();
+krtComboboxRemoteSources['remote-bank-accounts'] = function (query) {
+    return fetchAccounts(query);
+};

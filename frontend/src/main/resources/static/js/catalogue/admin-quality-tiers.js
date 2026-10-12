@@ -20,9 +20,11 @@
 
 /* global QT_MSG, QT_CONFLICT */
 
-(function () {
-    'use strict';
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
+(function () {
     const PAGE_URL = '/admin/quality-tiers';
 
     const modal = document.getElementById('qt-modal');
@@ -83,8 +85,8 @@
 
     /** @param {string} message */
     function errorToast(message) {
-        if (message && typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(message);
+        if (message && typeof showFrontendErrorToast === 'function') {
+            showFrontendErrorToast(message);
         }
     }
 
@@ -129,7 +131,7 @@
         versionInput.value = '';
         setActive(true);
         applyBaseLock(false);
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     }
 
     /** @param {HTMLElement} btn */
@@ -159,7 +161,7 @@
         sortInput.value = btn.dataset.sortOrder || '0';
         setActive(btn.dataset.active === 'true');
         applyBaseLock(btn.dataset.base === 'true');
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     }
 
     /** @param {HTMLElement} btn */
@@ -168,12 +170,12 @@
         if (deleteCode) {
             deleteCode.textContent = btn.dataset.code || '';
         }
-        window.krtModal.open(deleteModal);
+        krtModal.open(deleteModal);
     }
 
     /** @returns {Promise<boolean>} */
     function refreshTable() {
-        return window.krtFetch.swap({ url: PAGE_URL, container: '#qt-results', history: false });
+        return krtFetch.swap({ url: PAGE_URL, container: '#qt-results', history: false });
     }
 
     /**
@@ -220,11 +222,11 @@
 
     form.addEventListener('submit', (event) => {
         event.preventDefault();
-        if (!window.krtFetch || !idInput) {
+        if (!krtFetch || !idInput) {
             return;
         }
         const id = idInput.value;
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: id ? `${PAGE_URL}/${encodeURIComponent(id)}` : PAGE_URL,
             payload: payload(),
@@ -234,7 +236,7 @@
             conflict: QT_CONFLICT,
             onError: refusalHandler(false),
             onSuccess() {
-                window.krtModal.close(modal);
+                krtModal.close(modal);
                 return refreshTable();
             },
         });
@@ -242,11 +244,11 @@
 
     if (deleteConfirm) {
         deleteConfirm.addEventListener('click', () => {
-            if (!window.krtFetch || !pendingDeleteId) {
+            if (!krtFetch || !pendingDeleteId) {
                 return;
             }
             const id = pendingDeleteId;
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `${PAGE_URL}/${encodeURIComponent(id)}/delete`,
                 submitter: deleteConfirm,
@@ -256,7 +258,7 @@
                 onError: refusalHandler(true),
                 onSuccess() {
                     pendingDeleteId = null;
-                    window.krtModal.close(deleteModal);
+                    krtModal.close(deleteModal);
                     return refreshTable();
                 },
             });

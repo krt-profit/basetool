@@ -1,9 +1,20 @@
 // @ts-check
+
+import { krtModal } from '/js/kernel/krt-modal.js';
+
+let isDirty = false;
+
+/**
+ * Clears the unsaved-changes guard, for a save that did not submit a form.
+ */
+export function resetUnsavedChanges() {
+    isDirty = false;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     if (window.__unsavedChangesInitialized) return;
     window.__unsavedChangesInitialized = true;
 
-    let isDirty = false;
     /** @type {string | null} */
     let targetUrl = null;
 
@@ -44,10 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('input', markDirty, true);
     document.addEventListener('change', markDirty, true);
 
-    window.resetUnsavedChanges = function () {
-        isDirty = false;
-    };
-
     document.addEventListener('submit', () => {
         isDirty = false;
     });
@@ -71,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
             targetUrl = a.href;
 
             if (modal) {
-                window.krtModal.open(modal);
+                krtModal.open(modal);
             }
         }
     });
@@ -79,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     [stayBtn, closeBtn].forEach((btn) => {
         if (!btn) return;
         btn.addEventListener('click', () => {
-            if (modal) window.krtModal.close(modal);
+            if (modal) krtModal.close(modal);
             targetUrl = null;
         });
     });
@@ -97,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modal) {
         window.addEventListener('click', (event) => {
             if (event.target === modal) {
-                window.krtModal.close(modal);
+                krtModal.close(modal);
                 targetUrl = null;
             }
         });

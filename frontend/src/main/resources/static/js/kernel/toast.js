@@ -18,13 +18,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtModal } from '/js/kernel/krt-modal.js';
+
 /**
  * Where a transient overlay must go to be seen and usable.
  *
  * @returns {HTMLElement} the open modal dialog, else the body
  */
 function toastLayer() {
-    return window.krtModal ? window.krtModal.layerRoot() : document.body;
+    return krtModal ? krtModal.layerRoot() : document.body;
 }
 
 function initToasts() {
@@ -43,7 +45,12 @@ function initToasts() {
     });
 }
 
-window.showFrontendErrorToast = function (message) {
+/**
+ * Shows a transient error toast.
+ *
+ * @param {string} message the text under the error title
+ */
+export function showFrontendErrorToast(message) {
     const toast = document.createElement('div');
     toast.className = 'notification-toast error-toast';
     toast.setAttribute('data-duration', '7000');
@@ -59,9 +66,14 @@ window.showFrontendErrorToast = function (message) {
     toastLayer().appendChild(toast);
 
     initToasts();
-};
+}
 
-window.showFrontendSuccessToast = function (message) {
+/**
+ * Shows a transient success toast.
+ *
+ * @param {string} message the text under the success title
+ */
+export function showFrontendSuccessToast(message) {
     const toast = document.createElement('div');
     toast.className = 'notification-toast';
     toast.setAttribute('data-duration', '5000');
@@ -77,11 +89,20 @@ window.showFrontendSuccessToast = function (message) {
     toastLayer().appendChild(toast);
 
     initToasts();
-};
+}
 
 document.addEventListener('DOMContentLoaded', initToasts);
 
-window.showKrtConfirm = function (title, message, confirmLabel, cancelLabel) {
+/**
+ * Shows the KRT confirmation dialog in place of the native confirm.
+ *
+ * @param {string | null} [title] the heading; the localized default when empty
+ * @param {string} [message] the question
+ * @param {string} [confirmLabel] the confirm button text; the localized default when empty
+ * @param {string} [cancelLabel] the cancel button text; the localized default when empty
+ * @returns {Promise<boolean>} true when confirmed, false when cancelled or dismissed
+ */
+export function showKrtConfirm(title, message, confirmLabel, cancelLabel) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.className = 'krt-confirm-overlay';
@@ -142,4 +163,4 @@ window.showKrtConfirm = function (title, message, confirmLabel, cancelLabel) {
 
         setTimeout(() => btnOk.focus(), 50);
     });
-};
+}
