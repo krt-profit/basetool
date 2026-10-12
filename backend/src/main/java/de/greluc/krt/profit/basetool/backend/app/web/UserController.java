@@ -24,16 +24,15 @@ import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceSearchService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.UserDirectoryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
-import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.privacy.api.AccountConsolidationService;
@@ -41,12 +40,10 @@ import de.greluc.krt.profit.basetool.backend.privacy.api.ConsolidateAccountReque
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -75,16 +72,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Transactional
 public class UserController {
 
-  /**
-   * Sort whitelist of the reference searches: the projected columns only ({@code email} is not part
-   * of the reference projection, so it is not offered).
-   */
-  private static final Set<String> REFERENCE_SORT = Set.of("username", "rank", "id");
-
   private final UserService userService;
   private final UserDeletionService userDeletionService;
   private final UserMapper userMapper;
-  private final UserDirectoryService userDirectoryService;
+  private final UserReferenceSearchService userReferenceSearchService;
   private final UserSyncService userSyncService;
   private final MemberPayoutSettings memberPayoutSettings;
   private final MemberBlueprintSharings memberBlueprintSharings;
@@ -139,33 +130,6 @@ public class UserController {
   }
 
   /**
-   * Bank-audience twin of the member search {@code GET /users/search} for the bank grantee/holder
-   * pickers: identical query, scope and projection, with the role gate widened to {@code
-   * BANK_EMPLOYEE} (REQ-BANK-008/009/044).
-   *
-   * @return paged user DTOs, peer-redacted for non-elevated callers
-   */
-  @GetMapping("/bank/members/search")
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.KRT_MEMBER
-          + "', '"
-          + Roles.BANK_EMPLOYEE
-          + "')")
-  @Transactional(readOnly = true)
-  public PageResponse<UserDto> searchUsersForBank(
-      @RequestParam(required = false) String query,
-      @RequestParam(required = false) Integer page,
-      @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
-    return userDirectoryService.search(query, page, size, sort);
-  }
-
-  /**
    * Slim paged picker search with the same query, scope and role gate as {@code GET /users/search},
    * returning SQL-projected {@link
    * de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto} rows for the {@code
@@ -189,57 +153,7 @@ public class UserController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
-    return runReferenceSearch(query, page, size, sort);
-  }
-
-  /**
-   * Bank-audience twin of {@link #searchUserReferences}, with the widened role gate of {@link
-   * #searchUsersForBank}, for the {@code remote-bank-users} pickers (REQ-BANK-008/009/044).
-   *
-   * @param query free-text username/displayName filter, or {@code null}/blank to match all
-   * @param page requested page index, or {@code null} for the first page
-   * @param size requested page size, or {@code null} for the default
-   * @param sort requested sort expression ({@code username}, {@code rank} or {@code id}), or {@code
-   *     null} for the username default
-   * @return one page of matching user references
-   */
-  @GetMapping("/bank/members/search/references")
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.KRT_MEMBER
-          + "', '"
-          + Roles.BANK_EMPLOYEE
-          + "')")
-  @Transactional(readOnly = true)
-  public PageResponse<UserReferenceDto> searchUserReferencesForBank(
-      @RequestParam(required = false) String query,
-      @RequestParam(required = false) Integer page,
-      @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
-    return runReferenceSearch(query, page, size, sort);
-  }
-
-  /**
-   * Shared body of the two reference-search endpoints: resolves the page request against {@link
-   * #REFERENCE_SORT} and runs the squadron-scoped projection. A {@code null} query (the browse-mode
-   * empty {@code ?query=}) is normalised to the match-all empty string, as in the member search.
-   *
-   * @param query free-text filter, or {@code null}/blank to match all
-   * @param page requested page index, or {@code null}
-   * @param size requested page size, or {@code null}
-   * @param sort requested sort expression, or {@code null}
-   * @return one page of matching user references
-   */
-  private PageResponse<UserReferenceDto> runReferenceSearch(
-      String query, Integer page, Integer size, String sort) {
-    Pageable pageable =
-        PaginationUtil.createPageRequest(page, size, sort, REFERENCE_SORT, "username");
-    return PageResponse.of(
-        userService.searchReferencesByUsername(query == null ? "" : query, pageable));
+    return userReferenceSearchService.search(query, page, size, sort);
   }
 
   /**

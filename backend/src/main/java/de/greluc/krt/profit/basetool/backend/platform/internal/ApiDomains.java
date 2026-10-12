@@ -64,6 +64,7 @@ public final class ApiDomains {
           Map.entry("BankExportController", "bank"),
           Map.entry("BankGrantController", "bank"),
           Map.entry("BankHolderController", "bank"),
+          Map.entry("BankMemberSearchController", "identity"),
           Map.entry("BankRequestController", "bank"),
           Map.entry("BasetoolErrorController", "admin-system"),
           Map.entry("BlueprintController", "blueprint"),

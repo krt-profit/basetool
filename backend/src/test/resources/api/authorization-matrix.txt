@@ -38,8 +38,8 @@ POST /api/v1/bank/holders/transfer | BankHolderController#transfer | pre=hasRole
 GET /api/v1/bank/holders/{id} | BankHolderController#getHolder | pre=@bankSecurityService.canSeeHolder(#id, authentication) | url=anyRequest -> authenticated
 PATCH /api/v1/bank/holders/{id} | BankHolderController#updateHolder | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 GET /api/v1/bank/holders/{id}/transactions | BankHolderController#getHolderBookings | pre=@bankSecurityService.canSeeHolder(#id, authentication) | url=anyRequest -> authenticated
-GET /api/v1/bank/members/search | UserController#searchUsersForBank | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
-GET /api/v1/bank/members/search/references | UserController#searchUserReferencesForBank | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
+GET /api/v1/bank/members/search | BankMemberSearchController#searchUsersForBank | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
+GET /api/v1/bank/members/search/references | BankMemberSearchController#searchUserReferencesForBank | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/accounts/{id} | OrgUnitBankController#getAccountDetail | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/bank/org-units/accounts/{id}/approval-limit/all-members | OrgUnitBankController#clearAllMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/bank/org-units/accounts/{id}/approval-limit/all-members | OrgUnitBankController#setAllMembersApprovalLimit | pre=isAuthenticated() | url=anyRequest -> authenticated

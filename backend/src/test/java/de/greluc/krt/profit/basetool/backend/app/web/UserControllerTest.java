@@ -28,11 +28,12 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharin
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceSearchService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.UserDirectoryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
@@ -61,7 +63,7 @@ class UserControllerTest {
   @Mock private UserService userService;
   @Mock private UserDeletionService userDeletionService;
   @Mock private UserMapper userMapper;
-  @Mock private UserDirectoryService userDirectoryService;
+  @Mock private UserReferenceSearchService userReferenceSearchService;
 
   @Mock private UserSyncService userSyncService;
   @Mock private MemberPayoutSettings memberPayoutSettings;
@@ -204,5 +206,13 @@ class UserControllerTest {
         1L,
         null,
         false);
+  }
+
+  @Test
+  void searchUserReferences_delegatesToTheReferenceSearch() {
+    PageResponse<UserReferenceDto> page = PageResponse.of(new PageImpl<>(List.of()));
+    when(userReferenceSearchService.search("ali", 2, 10, "rank")).thenReturn(page);
+
+    assertSame(page, controller.searchUserReferences("ali", 2, 10, "rank"));
   }
 }
