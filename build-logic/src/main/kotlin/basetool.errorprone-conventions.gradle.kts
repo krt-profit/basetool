@@ -18,6 +18,7 @@ dependencies {
 }
 
 tasks.named<JavaCompile>("compileJava") {
+  options.forkOptions.jvmArgs?.add("--sun-misc-unsafe-memory-access=allow")
   options.errorprone {
     disableWarningsInGeneratedCode.set(true)
     check("NullAway", CheckSeverity.ERROR)
