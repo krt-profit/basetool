@@ -16,6 +16,7 @@
         </th:block>
     </th:block>
 
+    <section class="list-panel">
     <form id="refinery-filter-form" method="get" th:action="@{/refinery-orders}" class="no-track">
         <div class="toolbar">
             <th:block th:replace="~{kernel/fragments/components :: segmented(name='view', labelKey='refineryorder.view.label', selected=${view}, variant='refinery-segments',
@@ -24,9 +25,8 @@
                             {value: 'COMPLETED', labelKey: 'refineryorder.view.completed', count: refineryCounts?.completed()},
                             {value: 'ALL', labelKey: 'filter.all', count: refineryCounts?.all()}} })}"></th:block>
             <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('refinery-search', 'q', ${searchQuery}, 'refineryorder.search.placeholder')}"></th:block>
-            <label class="switch" for="refinery-only-mine">
-                <input type="checkbox" id="refinery-only-mine" name="onlyMine" value="true" th:checked="${onlyMine}">
-                <span class="switch__track" aria-hidden="true"></span>
+            <label class="krt-switch" for="refinery-only-mine">
+                <input type="checkbox" role="switch" id="refinery-only-mine" name="onlyMine" value="true" th:checked="${onlyMine}">
                 <span th:text="#{refineryorder.index.filter.onlyMine}">Meine Auftr&auml;ge</span>
             </label>
             <span id="refinery-loading-indicator" hidden><span class="krt-loading-indicator"></span></span>
@@ -99,6 +99,7 @@
         <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
     </div>
+    </section>
 </main>
 </th:block>
 <th:block th:fragment="pageTail">

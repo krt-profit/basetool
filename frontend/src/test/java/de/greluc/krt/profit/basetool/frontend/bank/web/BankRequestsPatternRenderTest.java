@@ -234,7 +234,7 @@ class BankRequestsPatternRenderTest {
         .contains("data-testid=\"segment-status-pending\"")
         .contains("data-testid=\"segment-status-all\"")
         .containsPattern("name=\"status\" value=\"PENDING\" checked=\"checked\"")
-        .contains("class=\"seg-count\"")
+        .contains("class=\"krt-segmented__count\"")
         .containsPattern("data-testid=\"bank-requests-waiting\"[^>]*>2 warten auf dich<")
         .contains("data-count-waiting=\"2\"");
     assertThat(html)

@@ -388,7 +388,9 @@
         if (tabCount) {
             tabCount.textContent = String(total);
         }
-        const allCount = document.querySelector('[data-testid="segment-bpScope-all"] .seg-count');
+        const allCount = document.querySelector(
+            '[data-testid="segment-bpScope-all"] .krt-segmented__count',
+        );
         if (allCount) {
             allCount.textContent = String(total);
         }

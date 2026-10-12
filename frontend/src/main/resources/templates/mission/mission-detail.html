@@ -577,7 +577,7 @@
 
                                 <div class="form-group span-all">
                                     <span class="form-label" id="mission-status-label" th:text="#{mission.status}">Status</span>
-                                    <th:block th:replace="~{kernel/fragments/components :: segmented(name='status', labelKey='mission.status', variant='segmented--block segmented--lg', selected=*{status},
+                                    <th:block th:replace="~{kernel/fragments/components :: segmented(name='status', labelKey='mission.status', variant='krt-segmented--block', selected=*{status},
                                         options=${ {{value: 'PLANNED', labelKey: 'mission.status.planned'}, {value: 'ACTIVE', labelKey: 'mission.status.active'}, {value: 'COMPLETED', labelKey: 'mission.status.completed'}, {value: 'CANCELLED', labelKey: 'mission.status.cancelled'}} })}"></th:block>
                                     <div class="field-error" data-error-for="status" th:text="${#fields.hasErrors('status') ? #fields.errors('status')[0] : ''}"></div>
                                 </div>
@@ -685,9 +685,8 @@
                         <fieldset class="form-section" th:if="${isNew or mission.canEdit}">
                             <legend class="form-section__head" th:text="|3 · #{mission.form.section.visibility}|">3 · Sichtbarkeit</legend>
                             <div class="form-group">
-                                <label class="switch" for="isInternal">
-                                    <input type="checkbox" id="isInternal" th:field="*{isInternal}">
-                                    <span class="switch__track" aria-hidden="true"></span>
+                                <label class="krt-switch" for="isInternal">
+                                    <input type="checkbox" role="switch" id="isInternal" th:field="*{isInternal}">
                                     <span th:text="#{mission.is_internal}">Intern</span>
                                 </label>
                             </div>

@@ -117,7 +117,7 @@
         }
     }
     @media (width <= 1024px) {
-        .switch {
+        .krt-switch {
             min-height: var(--touch-target);
         }
     }

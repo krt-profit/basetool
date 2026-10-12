@@ -83,7 +83,7 @@
             display: inline;
         }
     }
-    .form-group label:not(.segmented > label),
+    .form-group label:not(.krt-segmented__item),
     .ship-insurance > legend {
         display: block;
         margin-bottom: 0.5rem;

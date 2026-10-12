@@ -136,7 +136,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .containsPattern("class=\"page-eyebrow\"[^>]*>Benutzer &amp; Inhalte<")
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .containsPattern("id=\"add-sc-btn\" class=\"btn btn--cta\"")
-        .contains("class=\"switch\" for=\"includeInactive\"")
+        .contains("class=\"krt-switch\" for=\"includeInactive\"")
         .contains("class=\"data-table data-table--stack\"")
         .containsPattern("class=\"row-link\"[^>]*href=\"/organisation/special-commands/")
         .doesNotContain("Mitglieder verwalten</a>")

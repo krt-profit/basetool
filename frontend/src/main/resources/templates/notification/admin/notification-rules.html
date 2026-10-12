@@ -110,14 +110,12 @@
             <fieldset class="form-section" data-testid="rule-section-options">
                 <legend class="form-section__head" th:text="|3 · #{admin.notificationRules.section.options}|">3 · Optionen</legend>
                 <div class="form-grid">
-                    <label class="switch" for="rule-enabled">
-                        <input type="checkbox" id="rule-enabled" checked>
-                        <span class="switch__track" aria-hidden="true"></span>
+                    <label class="krt-switch" for="rule-enabled">
+                        <input type="checkbox" role="switch" id="rule-enabled" checked>
                         <span th:text="#{admin.notificationRules.enabled}">Aktiv</span>
                     </label>
-                    <label class="switch" for="rule-excludeActor">
-                        <input type="checkbox" id="rule-excludeActor" checked>
-                        <span class="switch__track" aria-hidden="true"></span>
+                    <label class="krt-switch" for="rule-excludeActor">
+                        <input type="checkbox" role="switch" id="rule-excludeActor" checked>
                         <span th:text="#{admin.notificationRules.excludeActor}">Ersteller ausnehmen</span>
                     </label>
                 </div>

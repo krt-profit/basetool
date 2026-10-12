@@ -104,7 +104,7 @@ class AdminTermsPatternRenderTest {
         .contains("data-list-count-for=\"admin-terms-results\"")
         .contains("data-testid=\"segment-filter-pending\"")
         .containsPattern("name=\"filter\" value=\"ACCEPTED\" checked=\"checked\"")
-        .containsPattern("class=\"seg-count\">3<")
+        .containsPattern("class=\"krt-segmented__count\">3<")
         .contains("class=\"data-table data-table--stack\"")
         .containsPattern("class=\"chip chip--success\">Zugestimmt<")
         .contains("01.09.2026 10:00 UTC")

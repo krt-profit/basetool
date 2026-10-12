@@ -1,7 +1,7 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    .form-group > label:not(.switch) {
+    .form-group > label:not(.krt-switch) {
         display: block;
         margin-bottom: 0.5rem;
         font-family: var(--font-body);

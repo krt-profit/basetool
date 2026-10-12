@@ -105,7 +105,7 @@ class InventoryInputFormPatternRenderTest {
         .containsPattern("class=\"form-section__head\">1 " + DOT)
         .containsPattern("class=\"form-section__head\">2 " + DOT)
         .containsPattern("class=\"form-section__head\">3 " + DOT)
-        .contains("class=\"segmented segmented--block segmented--lg\"")
+        .contains("class=\"krt-segmented krt-segmented--block\"")
         .contains("name=\"inventoryCatalogMode\" value=\"material\"")
         .containsPattern("value=\"material\"[^>]*checked")
         .contains("class=\"form-grid\"")

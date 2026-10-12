@@ -147,7 +147,7 @@
             const value = source.getAttribute(`data-count-${segment.toLowerCase()}`);
             const input = form.querySelector(`input[name="status"][value="${segment}"]`);
             const label = input ? input.closest('label') : null;
-            const badge = label ? label.querySelector('.seg-count') : null;
+            const badge = label ? label.querySelector('.krt-segmented__count') : null;
             if (badge && value !== null) badge.textContent = value;
         });
         const waiting = form.querySelector('[data-bank-waiting-count]');

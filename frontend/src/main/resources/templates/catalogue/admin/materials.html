@@ -24,6 +24,7 @@
         <div th:replace="~{kernel/fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
     </th:block>
 
+    <section class="list-panel">
     <div class="toolbar">
         <div class="toolbar__search">
             <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
@@ -116,6 +117,7 @@
             <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.materials.empty', textKey='admin.materials.empty.text')}"></th:block>
         </th:block>
     </div>
+    </section>
 
     <section class="card admin-materials-categories" aria-labelledby="material-categories-title">
         <div class="card-head">

@@ -270,7 +270,7 @@ class BankStaffPagesPatternRenderTest {
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box")
         .contains("class=\"toolbar\"")
-        .contains("class=\"switch\" for=\"bank-view-layout\"")
+        .contains("class=\"krt-switch\" for=\"bank-view-layout\"")
         .contains("data-bank-view-group");
   }
 

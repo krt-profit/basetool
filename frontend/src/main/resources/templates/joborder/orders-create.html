@@ -16,16 +16,16 @@
         <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
         <div th:if="${success}" class="alert alert-success" role="status" th:text="#{__${success}__}">Erfolg</div>
 
-        <div class="segmented segmented--block segmented--lg orders-create__kind" role="radiogroup"
+        <div class="krt-segmented krt-segmented--block orders-create__kind" role="radiogroup"
              th:attr="aria-label=#{orders.create.kind}" data-segmented="orderModeToggle"
              th:hidden="${editOrderId != null}">
-            <label data-testid="order-mode-material">
+            <label class="krt-segmented__item" data-testid="order-mode-material">
                 <input type="radio" name="orderModeToggle" value="material"
                        th:checked="${editOrderId == null}"
                        data-trigger="order-mode-toggle" />
                 <span th:text="#{orders.create.kind.material}">Materialauftrag</span>
             </label>
-            <label data-testid="order-mode-item">
+            <label class="krt-segmented__item" data-testid="order-mode-item">
                 <input type="radio" name="orderModeToggle" value="item"
                        th:checked="${editOrderId != null}"
                        data-trigger="order-mode-toggle" />

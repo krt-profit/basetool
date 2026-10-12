@@ -359,7 +359,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"krt-bp-refinery-toggle\"")))
         .andExpect(
-            content().string(containsString("class=\"switch\" for=\"krt-bp-refinery-toggle\"")))
+            content().string(containsString("class=\"krt-switch\" for=\"krt-bp-refinery-toggle\"")))
         .andExpect(content().string(containsString("data-testid=\"segment-bpScope-all\"")))
         .andExpect(content().string(containsString("data-testid=\"segment-bpScope-craftable\"")))
         .andExpect(content().string(not(containsString("krt-bp-craftable-toggle"))));

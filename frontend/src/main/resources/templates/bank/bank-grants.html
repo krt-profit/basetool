@@ -18,6 +18,7 @@
         </th:block>
     </th:block>
 
+    <section class="list-panel">
     <form id="bank-grants-filter-form" class="no-track" method="get" th:action="@{/bank/grants}">
         <div class="toolbar">
             <th:block th:replace="~{kernel/fragments/components :: segmented(name='view', labelKey='bank.grants.view.aria', selected=${byEmployee ? 'employee' : 'account'},
@@ -112,6 +113,7 @@
         </th:block>
         </th:block>
     </div>
+    </section>
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-grant-create-modal', titleKey='bank.modal.grant.title', body=~{::bank-grant-create-modal-body})}">
         <th:block th:ref="bank-grant-create-modal-body">

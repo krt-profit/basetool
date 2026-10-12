@@ -90,7 +90,7 @@ or check-in change never leaves the bar stale (REQ-FE-010). The three tabs, plus
    or any tab leaves it. The left column is the mission **details** form as a `.form-layout.card`
    with numbered sections **1 · Einsatz** (name, status as a four-option `.segmented`, operation,
    Treffpunkt, description, calendar link), **2 · Zeitplan** (meeting time, planned and actual
-   start/end) and **3 · Sichtbarkeit** (internal as a `.switch`), disabled as a whole for a caller
+   start/end) and **3 · Sichtbarkeit** (internal as a `.krt-switch`), disabled as a whole for a caller
    without `canEdit`, and its one CTA „Änderungen speichern" in a `.form-actions--sticky`; the right
    column stacks four cards in the order **Ziele → Ablauf → Organisation → Verwaltungsrechte** (owner
    decision). "Organisation" holds the party lead, the typed

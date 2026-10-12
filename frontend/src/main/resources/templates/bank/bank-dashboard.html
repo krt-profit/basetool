@@ -34,16 +34,14 @@
         <th:block th:replace="~{kernel/fragments/components :: bankAccSearch('bank-acc-filter', '#bank-grid-results', '#bank-acc-filter-empty')}"></th:block>
         <div class="bank-view-toggles" role="group" data-bank-view-toggles
              th:aria-label="#{bank.dashboard.view.aria}">
-            <label class="switch" for="bank-view-layout">
-                <input type="checkbox" id="bank-view-layout" data-bank-view-layout data-testid="bank-view-layout"
+            <label class="krt-switch" for="bank-view-layout">
+                <input type="checkbox" role="switch" id="bank-view-layout" data-bank-view-layout data-testid="bank-view-layout"
                        th:checked="${layout == 'table'}">
-                <span class="switch__track" aria-hidden="true"></span>
                 <span th:text="#{bank.dashboard.view.tableToggle}">Tabellenansicht</span>
             </label>
-            <label class="switch" for="bank-view-group">
-                <input type="checkbox" id="bank-view-group" data-bank-view-group data-testid="bank-view-group"
+            <label class="krt-switch" for="bank-view-group">
+                <input type="checkbox" role="switch" id="bank-view-group" data-bank-view-group data-testid="bank-view-group"
                        th:checked="${group == 'bereich'}">
-                <span class="switch__track" aria-hidden="true"></span>
                 <span th:text="#{bank.dashboard.view.groupToggle}">Nach Bereich gruppieren</span>
             </label>
         </div>

@@ -15,7 +15,7 @@
 > [0240](../adr/0240-navigation-is-a-structured-drawer-a-quick-access-and-a-phone-tab-bar.md) (REQ-UI-026) ·
 > [0242](../adr/0242-page-patterns-a-to-c-and-the-design-system-update-2026-10.md) (REQ-UI-027, REQ-UI-009) ·
 > [0243](../adr/0243-colours-and-stacking-layers-are-written-through-tokens.md) (REQ-UI-001, REQ-UI-023) ·
-> **Next free id:** `REQ-UI-028` · **Visual source of truth:** the design
+> **Next free id:** `REQ-UI-029` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
 
@@ -1548,13 +1548,13 @@ krt-profit/design-system#6), and every work page follows one of three patterns.
    the end — no column holding only an „Öffnen" button. Below 768 px a row stacks: title and status
    on the first line, the other cells as one meta line (a `data-label` prefixes its cell), a lone
    chevron centred on the right; nothing scrolls sideways.
-7. **Filters** sit in a `.toolbar` (DS-5): the search always visible, a `.segmented` control for two
-   to four exclusive options (DS-6), further filters behind „Filter" with a `.filter-badge`, active
+7. **Filters** sit in a `.toolbar` (DS-5): the search always visible, a `.krt-segmented` control for two
+   to four exclusive options (DS-6, REQ-UI-028), further filters behind „Filter" with a square `.filter-count`, active
    filters as `.filter-chips` with „Alle zurücksetzen". Filters apply live through `krtFetch`, never
    through a „Filtern" button; per-browser persistence (REQ-UI-017) stays.
 8. **Forms** use `.form-layout` (at most 760 px) with numbered `.form-section`s, a `.form-grid` that
    is two columns from tablet up, computed values as `.field-computed`, two to four exclusive options
-   as `.segmented--lg` instead of radios, and the actions in `.form-actions--sticky` with a live
+   as `.krt-segmented--block` instead of radios, and the actions in `.form-actions--sticky` with a live
    `.form-actions__summary` (DS-9).
 9. **Layout** uses `.stack`, `.cluster`, `.split` and `.grid-auto` (DS-12). No `krtm-*` class
    (the last ones were replaced in phase 4).
@@ -1580,7 +1580,7 @@ krt-profit/design-system#6), and every work page follows one of three patterns.
 | `fragments/components :: segmented` | a `role="radiogroup"` of radios inside labels; `name`, `options` (each with `value`, `labelKey`, optional `count`; a `null` value is the „all" option), `selected`, `labelKey`, `variant`, `form` |
 | `fragments/components :: overflowMenu` | the „⋯" toggle (`aria-haspopup`, `aria-expanded`, `aria-controls`) and a hidden `role="menu"` panel; `id` and the slot `items` |
 | `fragments/components :: filterChips(formId)` | the chip bar bound to a filter form |
-| `fragments/components :: filterPopover` | the „Filter" button with a `.filter-badge` and a popover panel holding the further filters (`panelId`, `panelName`, `testid`, slot `body`); a bottom sheet above the tab bar on phones. It keeps the `.filter-toggle`/`.filter-panel` contract of REQ-FE-021, so `krt-filter-panel.js` counts its active controls; a `data-filter-transient` panel always starts closed, stores no preference, focuses its first field, closes on Escape or an outside click, and flips to the left edge when it would leave the viewport |
+| `fragments/components :: filterPopover` | the „Filter" button with a square `.filter-count` badge (and `.is-filtered` while a filter is active) and a popover panel holding the further filters (`panelId`, `panelName`, `testid`, slot `body`); a bottom sheet above the tab bar on phones. It keeps the `.filter-toggle`/`.filter-panel` contract of REQ-FE-021, so `krt-filter-panel.js` counts its active controls; a `data-filter-transient` panel always starts closed, stores no preference, focuses its first field, closes on Escape or an outside click, and flips to the left edge when it would leave the viewport |
 | `fragments/components :: listFoot(pageResponse, baseUrl)` | „1–7 von 24" and the pagination below a table; its `data-list-total` keeps the page head's count chip (`countFor`) current after every live swap (`krt-list-count.js`) |
 
 Two global scripts drive them: `krt-overflow-menu.js` opens and closes the menus (toggle, Escape,
@@ -1727,6 +1727,36 @@ gray — see REQ-UI-009) ·
 `kernel/fragments/components.html`, `static/js/kernel/krt-overflow-menu.js`, `static/js/kernel/krt-filter-chips.js`,
 `frontend/.stylelintrc.json`, `frontend/.stylelintrc.templates.json` · **Related:** REQ-UI-004,
 REQ-UI-006, REQ-UI-009, REQ-UI-017, REQ-UI-022, REQ-FE-021
+
+### REQ-UI-028 — Controls carry a fill and a 3:1 border, toggles are `.krt-segmented`, list pages sit on one panel
+
+Segment toggles, the filter button, the title count and row icon buttons stood as black boxes with a
+`#282828` hairline on black: 1.42:1, where WCAG 1.4.11 asks 3:1. The 2026-10 design system
+(krt-profit/design-system#7, `proposals/list-readability-claude-code-auftrag.md`) fixes it for the
+whole app.
+
+1. **Tokens.** `:root` mirrors `--surface-canvas/-panel/-inset/-raised` and `--control-bg`,
+   `--control-bg-hover`, `--control-border` (Grau 2), `--control-fg`, `--control-selected-bg/-border/-fg`;
+   `--action-neutral` is Grau 2. The app mirrors `tokens.css` rather than loading it (cascade layers,
+   REQ-UI-001's single copy of a colour value).
+2. **Controls.** `.btn-ghost`, `.btn-quiet-danger`, `.btn-secondary`, text inputs, selects, textareas,
+   checkbox/radio, `.pagination .page-btn` and `.chip-select` have the `--control-bg` fill and a 1px
+   `--control-border`. The hairline stays for decorative dividers only.
+3. **Toggles.** Every period, status or view toggle is `.krt-segmented` with `.krt-segmented__item`
+   (and `.krt-segmented__count`): the `segmented` fragment's radios, or links with `aria-current`.
+   Selected = tint, orange border and a 3px underline, never a filled orange block.
+   On/off options are `label.krt-switch` with `role="switch"`.
+4. **List pages.** The head's count is `.count-badge`; toolbar, filter chips, table and pagination sit
+   on one `section.list-panel`. An active filter puts `.is-filtered` on the „Filter" button and shows
+   the square `.filter-count`.
+5. **Muted text** is `--color-gray-2-text`; quality and other data values are `--data-fg`, orange is
+   for identity and actions.
+
+**Enforced by:** `PagePatternFragmentsRenderTest`, the per-page pattern render tests,
+`AccessibleTextTintTest`, `ColourTokenCopyTest`, `CustomPropertyExistenceTest`, Stylelint ·
+**Code:** `static/css/kernel/styles.css`, `kernel/fragments/components.html`,
+`kernel/fragments/page-head.html`, `static/js/kernel/krt-filter-panel.js` ·
+**Related:** REQ-UI-001, REQ-UI-006, REQ-UI-027
 
 ## Out of scope
 

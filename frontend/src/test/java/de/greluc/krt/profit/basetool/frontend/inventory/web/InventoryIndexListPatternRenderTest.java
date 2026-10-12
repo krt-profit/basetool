@@ -155,7 +155,7 @@ class InventoryIndexListPatternRenderTest {
         .doesNotContain("data-trigger=\"navigate-href\"");
     assertThat(html.substring(html.indexOf("<main"), html.indexOf("</main>")))
         .doesNotContainPattern("class=\"[^\"]*krtm-");
-    assertThat(html.split("btn--cta", -1)).hasSize(2);
+    assertThat(html).doesNotContain("btn--cta").contains("class=\"krt-segmented\"");
     assertThat(html)
         .contains("data-testid=\"lager-view-material\"")
         .contains("data-testid=\"lager-view-items\"")

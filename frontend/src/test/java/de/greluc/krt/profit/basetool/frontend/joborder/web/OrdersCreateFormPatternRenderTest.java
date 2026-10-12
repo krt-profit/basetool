@@ -126,7 +126,7 @@ class OrdersCreateFormPatternRenderTest {
         .doesNotContain("Zurück zur Übersicht")
         .doesNotContain("<details");
     assertThat(html)
-        .contains("class=\"segmented segmented--block segmented--lg orders-create__kind\"")
+        .contains("class=\"krt-segmented krt-segmented--block orders-create__kind\"")
         .contains("data-testid=\"order-mode-material\"")
         .contains("data-testid=\"order-mode-item\"")
         .containsPattern("name=\"orderModeToggle\" value=\"material\"[^>]*checked=\"checked\"")
@@ -207,7 +207,7 @@ class OrdersCreateFormPatternRenderTest {
 
     assertThat(html)
         .contains("<h1>Auftrag bearbeiten</h1>")
-        .containsPattern("class=\"segmented [^\"]*\"[^>]*hidden=\"hidden\"")
+        .containsPattern("class=\"krt-segmented [^\"]*\"[^>]*hidden=\"hidden\"")
         .containsPattern("name=\"orderModeToggle\" value=\"item\"[^>]*checked=\"checked\"")
         .containsPattern("id=\"mode-material\" hidden=\"hidden\"")
         .doesNotContain("id=\"mode-item\" hidden")

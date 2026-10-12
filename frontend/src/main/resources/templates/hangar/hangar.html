@@ -64,6 +64,7 @@
     <div th:if="${error}" class="alert alert-danger" th:text="#{__${error}__}">Fehler</div>
 
     <th:block th:if="${mineTab}">
+        <section class="list-panel">
         <form id="hangar-filter-form" class="no-track" role="search" method="get" th:action="@{/hangar}">
             <div class="toolbar">
                 <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('hangar-ship-filter', 'search', ${search}, 'hangar.filter.placeholder')}"></th:block>
@@ -156,9 +157,11 @@
             <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
         </div>
+        </section>
     </th:block>
 
     <th:block th:unless="${mineTab}">
+        <section class="list-panel">
         <form id="squadron-filter-form" class="no-track" role="search" method="get" th:action="@{/hangar/squadron}">
             <div class="toolbar">
                 <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('squadron-ship-filter', 'search', ${search}, 'hangar.filter.placeholder')}"></th:block>
@@ -246,6 +249,7 @@
             <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
         </div>
+        </section>
     </th:block>
 
     <th:block th:if="${mineTab}">
@@ -278,7 +282,7 @@
                           th:with="insVal=*{insurance}, insKind=${insVal == null or insVal == '' ? null : (insVal == '0' ? 'NONE' : (insVal == 'LTI' ? 'LTI' : 'MONTHS'))}">
                     <legend th:text="#{hangar.ship.insurance}">Versicherung</legend>
                     <th:block th:replace="~{kernel/fragments/components :: segmented(name='insuranceKind', labelKey='hangar.ship.insurance',
-                        selected=${insKind}, variant='segmented--block segmented--lg',
+                        selected=${insKind}, variant='krt-segmented--block',
                         options=${ {{value: 'NONE', labelKey: 'hangar.ship.insurance.none'},
                                     {value: 'MONTHS', labelKey: 'hangar.ship.insurance.kind.months'},
                                     {value: 'LTI', labelKey: 'hangar.ship.insurance.lti'}} })}"></th:block>

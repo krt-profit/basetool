@@ -118,7 +118,7 @@
                             <legend class="form-section__head" th:text="'3 · ' + #{profile.payout.preference}">3 · Standard-Auszahlungsart</legend>
                             <div class="form-group">
                                 <th:block th:replace="~{kernel/fragments/components :: segmented(name='defaultPayoutPreference', labelKey='profile.payout.preference',
-                                    selected=*{defaultPayoutPreference}, variant='segmented--block segmented--lg',
+                                    selected=*{defaultPayoutPreference}, variant='krt-segmented--block',
                                     options=${ {{value: 'PAYOUT', labelKey: 'mission.payout.preference.payout'},
                                                 {value: 'DONATE', labelKey: 'mission.payout.preference.donate'}} })}"></th:block>
                                 <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.payout.preference.hint}">Pre-selected at every mission sign-up. You can still change it per mission.</span></p>
