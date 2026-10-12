@@ -19,8 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.EvictAllMaterialCaches;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCreateDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialSellingTerminalDto;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.config.EvictAllMaterialCaches;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
@@ -32,13 +35,10 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialSellingTerminalDto;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;

@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

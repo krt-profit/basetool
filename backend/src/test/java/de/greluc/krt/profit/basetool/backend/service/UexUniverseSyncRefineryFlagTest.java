@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.dto.uex.UexTerminalDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexTerminalDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.SpaceStation;

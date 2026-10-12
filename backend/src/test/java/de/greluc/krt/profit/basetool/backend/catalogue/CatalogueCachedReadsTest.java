@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.controller.CityController;
 import de.greluc.krt.profit.basetool.backend.controller.FrequencyTypeController;
 import de.greluc.krt.profit.basetool.backend.controller.JobTypeController;
@@ -53,7 +54,6 @@ import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
 import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;

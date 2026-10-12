@@ -18,7 +18,8 @@
  */
 
 /**
- * The catalogue module's internal helpers: the UEX value parsing, the stale-price sweep and the
- * cached entity graphs (plan §5.2).
+ * The catalogue module's internal types: the sync coordination and chunk writing, the sync report,
+ * the UEX, SC Wiki and P4K feed records, the integration properties, the UEX value parsing and the
+ * stale-price sweep (plan §5.2).
  */
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;

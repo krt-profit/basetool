@@ -24,7 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductRow;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import java.util.List;
 import java.util.Map;

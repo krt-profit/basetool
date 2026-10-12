@@ -21,12 +21,13 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintIdNameRow;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.mapper.BlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintIdNameRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintRecipeResponse;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;

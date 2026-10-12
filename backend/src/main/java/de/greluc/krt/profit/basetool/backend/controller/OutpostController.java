@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.OutpostMapper;
-import de.greluc.krt.profit.basetool.backend.model.dto.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.OutpostService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;

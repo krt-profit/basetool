@@ -19,8 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
-import de.greluc.krt.profit.basetool.backend.dto.uex.UexCategoryDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCategoryDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.UexCategory;
 import de.greluc.krt.profit.basetool.backend.repository.UexCategoryRepository;

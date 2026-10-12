@@ -25,7 +25,7 @@ import java.util.UUID;
 
 /**
  * Frontend mirror of the backend {@code MaterialExternalAliasDto}; fields must match {@code
- * de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasDto}.
+ * de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialExternalAliasDto}.
  *
  * @param id alias UUID
  * @param version optimistic-lock token

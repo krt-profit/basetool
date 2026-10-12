@@ -19,8 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import java.util.HashMap;
 import java.util.HashSet;

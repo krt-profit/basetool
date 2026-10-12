@@ -19,14 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ExternalSyncReport;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportPurgeResultDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.SyncReportMapper;
-import de.greluc.krt.profit.basetool.backend.model.ExternalSyncReport;
-import de.greluc.krt.profit.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.SyncReportDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SyncReportPurgeResultDto;
-import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.PairKeyRef;
 import de.greluc.krt.profit.basetool.backend.model.RefineryYield;
 import java.util.List;
 import java.util.Optional;

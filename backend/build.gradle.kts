@@ -107,7 +107,6 @@ val nullAwayPackages =
       "admin",
       "audit",
       "bank",
-      "catalogue",
       "exchange",
       "hangar",
       "identity",
@@ -128,6 +127,7 @@ val nullAwayPackages =
     .plus(
       listOf(
           "blueprint",
+          "catalogue",
           "hangar",
           "inventory",
           "joborder",

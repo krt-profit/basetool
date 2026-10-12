@@ -917,7 +917,7 @@ class ArchitectureTest {
   void controllerLayerShouldNotDependOnRepositoryLayer() {
     assertClassFloor("controllerLayerShouldNotDependOnRepositoryLayer", CONTROLLER_CODE, 99);
     assertClassFloor(
-        "controllerLayerShouldNotDependOnRepositoryLayer (targets)", REPOSITORY_CODE, 115);
+        "controllerLayerShouldNotDependOnRepositoryLayer (targets)", REPOSITORY_CODE, 114);
     controllerLayerShouldNotDependOnRepositoryLayerRule().check(CLASSES);
   }
 
@@ -1071,7 +1071,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 61);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 60);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);
@@ -1630,7 +1630,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 340);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 324);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

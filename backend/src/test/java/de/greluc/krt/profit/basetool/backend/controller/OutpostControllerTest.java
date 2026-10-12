@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.mapper.OutpostMapper;
 import de.greluc.krt.profit.basetool.backend.model.Outpost;
-import de.greluc.krt.profit.basetool.backend.model.dto.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.OutpostService;
 import java.util.List;

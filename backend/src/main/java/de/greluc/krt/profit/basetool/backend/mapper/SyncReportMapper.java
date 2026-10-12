@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.ExternalSyncReport;
-import de.greluc.krt.profit.basetool.backend.model.dto.SyncReportDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ExternalSyncReport;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

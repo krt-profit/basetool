@@ -24,7 +24,7 @@ import java.util.UUID;
 
 /**
  * Frontend-side projection of the {@code Poi} payload returned by the backend's UEX-overrides
- * endpoint. Mirrors {@code de.greluc.krt.profit.basetool.backend.model.dto.PoiDto} exactly.
+ * endpoint. Mirrors {@code de.greluc.krt.profit.basetool.backend.catalogue.api.PoiDto} exactly.
  *
  * @param id POI primary key
  * @param name canonical POI name as supplied by UEX

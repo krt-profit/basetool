@@ -19,10 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialSellingTerminalDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.PairKeyRef;
 import de.greluc.krt.profit.basetool.backend.model.MaterialPrice;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialSellingTerminalDto;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -98,7 +99,7 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    */
   @Query(
       """
-          SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto(
+          SELECT new de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto(
               p.id, t.name, p.priceBuy, p.priceSell, p.scuBuy, p.scuSell, p.statusBuy, p.statusSell
           )
           FROM MaterialPrice p
@@ -119,7 +120,7 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    */
   @Query(
       """
-          SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MaterialSellingTerminalDto(
+          SELECT new de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialSellingTerminalDto(
               t.id, t.name, p.priceSell
           )
           FROM MaterialPrice p

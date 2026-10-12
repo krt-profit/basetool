@@ -23,10 +23,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.mapper.StarSystemMapper;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.service.StarSystemService;
 import java.util.List;
 import java.util.UUID;

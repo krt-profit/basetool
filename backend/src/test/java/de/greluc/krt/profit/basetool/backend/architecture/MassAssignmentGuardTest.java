@@ -31,6 +31,9 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankWithdrawalRequest
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankAccountRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto.BookInDto;
@@ -57,12 +60,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.Sp
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrganisationsleitungDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionCreateRequest;

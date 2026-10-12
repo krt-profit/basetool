@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.model.DefaultBlueprint;
 import de.greluc.krt.profit.basetool.backend.repository.DefaultBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;

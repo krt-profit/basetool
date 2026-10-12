@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialNameCanonicalizer;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
@@ -50,7 +51,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
-import de.greluc.krt.profit.basetool.backend.service.MaterialNameCanonicalizer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;

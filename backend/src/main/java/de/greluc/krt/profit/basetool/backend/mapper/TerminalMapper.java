@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.model.Terminal;
-import de.greluc.krt.profit.basetool.backend.model.dto.TerminalDto;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Terminal entities and DTOs. */

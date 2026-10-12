@@ -34,8 +34,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.config.UexProperties;
-import de.greluc.krt.profit.basetool.backend.dto.uex.UexItemPriceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexProperties;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexItemPriceDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.GameItemPrice;
@@ -272,11 +273,13 @@ class UexItemPriceSyncServiceTest {
     assertEquals(Set.of(staleId), Set.copyOf(sweep.getValue()));
   }
 
-  private void knownItems(de.greluc.krt.profit.basetool.backend.repository.UexKeyRef... refs) {
+  private void knownItems(
+      de.greluc.krt.profit.basetool.backend.catalogue.internal.UexKeyRef... refs) {
     when(gameItemRepository.findUexItemRefs()).thenReturn(List.of(refs));
   }
 
-  private void knownTerminals(de.greluc.krt.profit.basetool.backend.repository.UexKeyRef... refs) {
+  private void knownTerminals(
+      de.greluc.krt.profit.basetool.backend.catalogue.internal.UexKeyRef... refs) {
     when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(refs));
   }
 

@@ -23,7 +23,7 @@ import static de.greluc.krt.profit.basetool.backend.service.UexFetchResults.fetc
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import de.greluc.krt.profit.basetool.backend.dto.uex.UexCompanyDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCompanyDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.ManufacturerUexCompany;

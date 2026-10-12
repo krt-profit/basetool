@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.OutpostMapper;
 import de.greluc.krt.profit.basetool.backend.model.Outpost;
-import de.greluc.krt.profit.basetool.backend.model.dto.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.repository.OutpostRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

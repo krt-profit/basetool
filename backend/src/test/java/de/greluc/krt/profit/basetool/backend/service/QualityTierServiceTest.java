@@ -28,13 +28,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.QualityTierWriteDto;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
 import de.greluc.krt.profit.basetool.backend.mapper.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.model.QualityTier;
-import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierWriteDto;
 import de.greluc.krt.profit.basetool.backend.repository.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.List;

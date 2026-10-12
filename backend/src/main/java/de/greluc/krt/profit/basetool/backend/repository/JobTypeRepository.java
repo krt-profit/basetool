@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.LookupTableRepository;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import java.util.List;

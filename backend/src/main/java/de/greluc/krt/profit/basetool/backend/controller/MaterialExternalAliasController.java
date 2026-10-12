@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialExternalAliasDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialExternalAliasMapper;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.profit.basetool.backend.validation.OnUpdate;
 import io.swagger.v3.oas.annotations.Operation;

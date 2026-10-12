@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexProperties;
 import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.config.RestClientConfig;
-import de.greluc.krt.profit.basetool.backend.config.UexProperties;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.MeterRegistry;

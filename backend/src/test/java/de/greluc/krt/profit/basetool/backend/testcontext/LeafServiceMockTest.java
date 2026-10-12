@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.testcontext;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryImportService;
 import de.greluc.krt.profit.basetool.backend.service.DataExportReportService;
@@ -26,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.service.DataExportService;
 import de.greluc.krt.profit.basetool.backend.service.DeletionRequestService;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.profit.basetool.backend.service.PersonSearchService;
-import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

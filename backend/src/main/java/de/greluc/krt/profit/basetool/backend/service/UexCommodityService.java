@@ -20,8 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
-import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityDto;
-import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityPriceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexMatrixLookups;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialPrice;
