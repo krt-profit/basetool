@@ -269,12 +269,14 @@ client (`KeycloakService`, `KeycloakTrustSupport`, `KeycloakUserDto`), the two a
 registration request and result records beside the events; `identity.web` holds the role, terms and
 Discord-existence controllers, `identity.internal` their services, mappers and DTOs. `RestClientConfig`
 lies in `platform.api`, which `KeycloakTrustSupport` needs. `UserService`, `UserRegistrationService`,
-`UserReconciliationService`, the `User` entity and `UserRepository` stay in the layer packages until two
-calls are inverted through identity-owned SPIs. Slice b is done: `UserService` reaches the org-unit
+`UserReconciliationService` now lie in `identity.api` (P4-7 slice c); the `User` entity and `UserRepository` stay
+in the layer packages. The calls out of the identity module are inverted through identity-owned SPIs:  `UserService` reaches the org-unit
 membership services only through `identity.api.MembershipOperations`, which
 `service.OrgUnitMembershipOperations` implements as a pass-through (it also sets the initial flags of a
-new Spezialkommando member). The seam names no org-unit type and has no type parameter. The account-erasure call
-towards the GDPR orchestrator follows in slice c.
+new Spezialkommando member; the seam names no org-unit type and has no type parameter),
+`identity.api.AccountErasure` (the registration flow's deletion, implemented by the GDPR orchestrator) and
+`identity.api.SquadronVisibility` (the two scope questions of the user queries, implemented by
+`OwnerScopeService`). `CustomJwtGrantedAuthoritiesConverter` lies in `scope.api`, because the exchange calls it.
 
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:

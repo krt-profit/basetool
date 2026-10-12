@@ -2643,6 +2643,41 @@ owner decided on 2026-10-12 to leave that as it is.
    left (the return type is gone). `UserService -> MembershipDeltaRequest` stays, because the request is
    still the parameter of the public method. No floor, domain-map rule or declaration changed.
 
+**P4-7, slice c — the account-erasure SPI, the three user services and the JWT converter move — done 2026-10-12**
+1. *Account-erasure SPI*: `identity.api.AccountErasure#deleteAccount(UUID, KeycloakPresence)` with the
+   identity-owned enum `KeycloakPresence` (`ENFORCED`, `WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER`).
+   `UserDeletionService` implements it, `@Transactional` like the method it forwards to (REQUIRED, read
+   from the code), and maps the enum with an exhaustive switch without a `default`. The method is named
+   `deleteAccount` because a second `deleteUser` overload made `any(), any()` ambiguous in existing tests.
+   `UserRegistrationService` depends on the SPI only. `UserAccountErasureSeamTest` (real schema, one
+   rolled-back transaction) pins the mapping of every constant, that the seam is the orchestrator bean, and
+   that unknown user, still-in-Keycloak, waived and enforced probe leave the same rows and audit rows and
+   fail with the same exception as the orchestrator's own method.
+2. *Fresh probe on `affe46d76`*: the three services moved together close no cycle at top level and none
+   inside the module. Placement: all three are named by other modules or layer classes, so all three are
+   in `identity.api` (`UserService` has 29 foreign users).
+3. *A finding the plan did not have*: `ModularityTest` refused `identity.api.UserService -> OwnerScopeService`,
+   because identity may not declare `scope::api` (rank 3 against 5). While `UserService` lay in a layer
+   package, Spring Modulith did not see the baselined `identity -> scope` edge. It is gone now: an
+   identity-owned `identity.api.SquadronVisibility` with the two calls `UserService` made
+   (`canSeeSquadron`, `currentUserListScopeSquadronIds`), which `OwnerScopeService` implements with the
+   same method bodies (bean name unchanged; the `scope -> identity` edge is a lower-rank one). **The shape of
+   this SPI is the two verbatim calls; the plan did not name it and the owner has not been asked about it
+   separately, so it is open to review in this pull request.** It also removes the cycle the converter's move
+   would have closed (`scope -> identity: converter -> UserReconciliationService` against `identity -> scope`).
+4. *The converter*: `CustomJwtGrantedAuthoritiesConverter` moved to `scope.api`, not `scope.internal`:
+   `exchange.internal.DatabaseActingMemberAuthorities` calls `assembleFor(User)`, and a class another
+   module calls belongs to `api`. Its logger name follows the package.
+5. *NullAway* (the whole `identity` tree was already checked): `PartialRoleScopeProperties.isPartialRoleScopeClient`
+   takes a `@Nullable` claim (its Javadoc always said so), one `discordUserId` null check in
+   `UserReconciliationService`, and the converter's final `AuthenticationServiceException` is built with the
+   cause only when there is one. No suppression.
+6. *Gates*: baseline **28 → 26**, measured by `ModuleBaselineTest`: `identity -> privacy: UserRegistrationService ->
+   UserDeletionService` and `identity -> scope: UserService -> OwnerScopeService` left; `UserService ->
+   MembershipDeltaRequest` stays (public parameter). One domain-map class rule (the converter) left. No floor
+   changed. The tests of the moved classes stay in their packages and compile against the new ones.
+   Four logger names follow the packages (`UserService`, `UserReconciliationService`, `UserRegistrationService`, the converter); nothing in `monitoring/` or the observability spec matches them.
+
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
 Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-logic` convention

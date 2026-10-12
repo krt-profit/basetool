@@ -23,5 +23,4 @@ identity -> privacy: UserController -> AccountConsolidationService
 identity -> privacy: UserController -> ConsolidateAccountRequest
 identity -> privacy: UserController -> UserDeletionService
 identity -> scope: MeController -> OwnerScopeService
-identity -> scope: UserService -> OwnerScopeService
 notification -> orgunit: OrgUnitRef -> OrgUnitKind

@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.CustomJwtGrantedAuthoritiesConverter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Collection;
@@ -56,7 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Reconciles the local {@code app_user} mirror with Keycloak.
  *
- * <p>{@link #syncUser(Jwt)} runs on every authentication via {@link
+ * <p>{@link #syncUser(Jwt)} runs on every authentication via {@code
  * CustomJwtGrantedAuthoritiesConverter}; {@link #syncUser(KeycloakUserDto)} and {@link
  * #markMissingUsers} are driven by {@link UserSyncTask} from the Admin API. New registrations are
  * stamped PENDING through {@link UserRegistrationService#stampNewPendingRegistration}.

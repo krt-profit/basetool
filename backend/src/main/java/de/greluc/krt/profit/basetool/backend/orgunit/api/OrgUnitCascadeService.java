@@ -39,8 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Computes which org units a set of memberships reaches through the leadership cascade
- * (REQ-ORG-015), shared by {@link OwnerScopeService} and {@link
- * de.greluc.krt.profit.basetool.backend.service.CustomJwtGrantedAuthoritiesConverter}.
+ * (REQ-ORG-015), shared by {@link OwnerScopeService} and {@code
+ * CustomJwtGrantedAuthoritiesConverter}.
  *
  * <ul>
  *   <li>A Bereichsleitung membership ({@link MembershipRole#isAreaRank()}) reaches the Bereich and

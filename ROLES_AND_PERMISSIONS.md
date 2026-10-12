@@ -14,7 +14,7 @@
 > the role seeds in
 > [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java)
 > and the authority converter
-> [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/CustomJwtGrantedAuthoritiesConverter.java).
+> [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/CustomJwtGrantedAuthoritiesConverter.java).
 > **When this document and the code disagree, the code always wins**
 > (`@PreAuthorize` + `SecurityConfig`).
 
@@ -284,7 +284,7 @@ public route at all. See [`docs/specs/observability.md`](docs/specs/observabilit
 OrgUnit membership** (`org_unit_membership.is_logistician` /
 `is_mission_manager`) — and every leadership rank below (`SK_LEAD`, the four Staffel ranks, the
 Bereich ranks, `OL_MEMBER`) mints both on its own reach. The
-[`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/CustomJwtGrantedAuthoritiesConverter.java)
+[`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/CustomJwtGrantedAuthoritiesConverter.java)
 promotes these into two authority surfaces:
 
 - **Flat** `ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER`, as soon as **any**

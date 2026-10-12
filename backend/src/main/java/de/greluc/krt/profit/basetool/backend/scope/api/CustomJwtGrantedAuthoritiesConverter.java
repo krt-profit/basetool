@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.scope.api;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -305,9 +305,10 @@ public class CustomJwtGrantedAuthoritiesConverter
             + " failures. Authentication denied.",
         MAX_SYNC_ATTEMPTS,
         lastLockingFailure);
-    throw new AuthenticationServiceException(
-        "Failed to resolve user authorities after " + MAX_SYNC_ATTEMPTS + " attempts",
-        lastLockingFailure);
+    String message = "Failed to resolve user authorities after " + MAX_SYNC_ATTEMPTS + " attempts";
+    throw lastLockingFailure == null
+        ? new AuthenticationServiceException(message)
+        : new AuthenticationServiceException(message, lastLockingFailure);
   }
 
   /**
