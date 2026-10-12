@@ -242,7 +242,13 @@ class JobOrderItemProductionServiceTest {
         new JobOrderItemProductionCreateDto(2, LINE_VERSION, List.of(), List.of(), defaultBookIn());
 
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
-        .isInstanceOf(ProductionAllocationException.class);
+        .isInstanceOfSatisfying(
+            ProductionAllocationException.class,
+            ex -> {
+              assertThat(ex.reason())
+                  .isEqualTo(ProductionAllocationException.Reason.AMOUNT_EXCEEDS_REMAINING);
+              assertThat(ex.logExtra()).containsEntry("amount", 2).containsEntry("remaining", 1);
+            });
     assertThat(line.getManufacturedAmount()).isEqualTo(3);
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
@@ -261,7 +267,15 @@ class JobOrderItemProductionServiceTest {
             defaultBookIn());
 
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
-        .isInstanceOf(ProductionAllocationException.class);
+        .isInstanceOfSatisfying(
+            ProductionAllocationException.class,
+            ex -> {
+              assertThat(ex.reason())
+                  .isEqualTo(ProductionAllocationException.Reason.DEMAND_MISMATCH);
+              assertThat(ex.logExtra())
+                  .containsEntry("materialId", materialId)
+                  .containsEntry("consumed", 30.0);
+            });
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
   }
@@ -279,9 +293,99 @@ class JobOrderItemProductionServiceTest {
             defaultBookIn());
 
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
-        .isInstanceOf(ProductionAllocationException.class);
+        .isInstanceOfSatisfying(
+            ProductionAllocationException.class,
+            ex -> {
+              assertThat(ex.reason())
+                  .isEqualTo(ProductionAllocationException.Reason.DEMAND_MISMATCH);
+              assertThat(ex.logExtra()).containsEntry("consumed", 50.0);
+            });
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
+  }
+
+  @Test
+  void bookProduction_consumesAMaterialTheLineDoesNotRequire_throws422WithTheMaterial() {
+    UUID otherMaterialId = UUID.randomUUID();
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(
+                new JobOrderItemProductionConsumptionDto(
+                    inventoryId, materialId, 40.0, INVENTORY_VERSION),
+                new JobOrderItemProductionConsumptionDto(
+                    UUID.randomUUID(), otherMaterialId, 5.0, INVENTORY_VERSION)),
+            List.of(),
+            defaultBookIn());
+
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOfSatisfying(
+            ProductionAllocationException.class,
+            ex -> {
+              assertThat(ex.reason())
+                  .isEqualTo(ProductionAllocationException.Reason.MATERIAL_NOT_REQUIRED);
+              assertThat(ex.logExtra())
+                  .containsOnlyKeys("reason", "materialId", "consumed")
+                  .containsEntry("materialId", otherMaterialId)
+                  .containsEntry("consumed", 5.0);
+            });
+    verify(inventoryItemRepository, never()).save(any());
+  }
+
+  @Test
+  void bookProduction_drawsOverTheOrderSlice_throws422WithEntryAndSlice() {
+    InventoryAllocations.jobOrderSlice(inventoryItem, orderId).setAmount(10.0);
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(
+                new JobOrderItemProductionConsumptionDto(
+                    inventoryId, materialId, 40.0, INVENTORY_VERSION)),
+            List.of(),
+            defaultBookIn());
+
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOfSatisfying(
+            ProductionAllocationException.class,
+            ex -> {
+              assertThat(ex.reason())
+                  .isEqualTo(ProductionAllocationException.Reason.OVER_ORDER_SLICE);
+              assertThat(ex.logExtra())
+                  .containsOnlyKeys("reason", "materialId", "inventoryItemId", "consumed", "slice")
+                  .containsEntry("inventoryItemId", inventoryId)
+                  .containsEntry("consumed", 40.0)
+                  .containsEntry("slice", 10.0);
+            });
+    verify(inventoryItemRepository, never()).save(any());
+  }
+
+  @Test
+  void bookProduction_drawsOverTheStock_throws422WithEntryAndStock() {
+    inventoryItem.setAmount(30.0);
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(
+                new JobOrderItemProductionConsumptionDto(
+                    inventoryId, materialId, 40.0, INVENTORY_VERSION)),
+            List.of(),
+            defaultBookIn());
+
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOfSatisfying(
+            ProductionAllocationException.class,
+            ex -> {
+              assertThat(ex.reason()).isEqualTo(ProductionAllocationException.Reason.OVER_STOCK);
+              assertThat(ex.logExtra())
+                  .containsOnlyKeys("reason", "materialId", "inventoryItemId", "consumed", "stock")
+                  .containsEntry("inventoryItemId", inventoryId)
+                  .containsEntry("consumed", 40.0)
+                  .containsEntry("stock", 30.0);
+            });
+    verify(inventoryItemRepository, never()).save(any());
   }
 
   @Test
