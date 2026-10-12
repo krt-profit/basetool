@@ -25,7 +25,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import de.greluc.krt.profit.basetool.backend.app.web.UserController;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.GateReport;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.HandlerKey;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
@@ -208,9 +207,6 @@ class TenancyGuardTest {
   /** Selected write handlers that write no tenant data, each with the reason. */
   private static final Map<HandlerKey, String> NOT_TENANT_WRITES =
       Map.of(
-          new HandlerKey(UserController.class, "updateReadAnnouncement"),
-          "marks an announcement read for the caller; the controller is selected only through"
-              + " UserDeletionService",
           new HandlerKey(ConnectedAppsController.class, "markSeen"),
           "marks one of the caller's own installations seen; the controller is selected only"
               + " through the undo, which restores the caller's own stock through StockCommands",
@@ -245,7 +241,7 @@ class TenancyGuardTest {
 
   private static final int CONTROLLER_FLOOR = 23;
 
-  private static final int HANDLER_FLOOR = 125;
+  private static final int HANDLER_FLOOR = 124;
 
   @Test
   void everyOrgUnitReferenceOfAnEntityIsClassified() {

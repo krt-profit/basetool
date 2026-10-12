@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharin
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
@@ -378,21 +377,6 @@ public class UserController {
   @Transactional(readOnly = true)
   public UserRsiHandleResponse getUserRsiHandle(@PathVariable @NotNull UUID id) {
     return new UserRsiHandleResponse(userService.findById(id).getRsiHandle());
-  }
-
-  /**
-   * Records that the calling user has read the given announcement (clears the unread badge).
-   *
-   * @param id announcement just read
-   * @return the persisted DTO
-   */
-  @NotNull
-  @PutMapping("/announcements/{id}/read")
-  @PreAuthorize("isAuthenticated()")
-  public UserDto updateReadAnnouncement(
-      @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
-    User me = userService.updateReadAnnouncement(userService.getUserIdFromJwt(jwt), id);
-    return UserDtoRedaction.withSelfEmail(userMapper.toDto(me), me);
   }
 
   /**

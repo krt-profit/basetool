@@ -52,28 +52,39 @@ class ApiDomainsMatchTheDomainMapTest {
 
   /** Controllers whose API domain differs from their module's, each with the reason. */
   static final Map<String, String> CONTROLLER_TO_API =
-      Map.of(
-          "LeitungController",
-          "leadership: the REST cut keeps the Leitung endpoints a domain; the code places the"
-              + " Leitung view in orgchart",
-          "BlueprintController",
-          "blueprint: the REST cut serves the recipe graph with the blueprints; the code keeps"
-              + " the synced graph in the catalogue",
-          "UexLocationController",
-          "catalogue: the REST cut serves the UEX locations with the catalogue; the code"
-              + " serves the picker from the personal inventory",
-          "MeController",
-          "identity: the REST cut serves the caller's own context under identity; the code"
-              + " hosts the read across seven modules in the composition root",
-          "UserController",
-          "identity: the REST cut serves the member endpoints under identity; the code hosts"
-              + " them across eight modules in the composition root",
-          "UserProfileController",
-          "identity: the REST cut serves the user list, search and profile under identity; the"
-              + " code needs the user mapper of the org-unit module",
-          "MemberMembershipController",
-          "identity: the REST cut serves the member memberships under identity; the code keeps"
-              + " them with the org-unit module");
+      Map.ofEntries(
+          Map.entry(
+              "LeitungController",
+              "leadership: the REST cut keeps the Leitung endpoints a domain; the code places the"
+                  + " Leitung view in orgchart"),
+          Map.entry(
+              "BlueprintController",
+              "blueprint: the REST cut serves the recipe graph with the blueprints; the code keeps"
+                  + " the synced graph in the catalogue"),
+          Map.entry(
+              "UexLocationController",
+              "catalogue: the REST cut serves the UEX locations with the catalogue; the code"
+                  + " serves the picker from the personal inventory"),
+          Map.entry(
+              "MeController",
+              "identity: the REST cut serves the caller's own context under identity; the code"
+                  + " hosts the read across seven modules in the composition root"),
+          Map.entry(
+              "UserController",
+              "identity: the REST cut serves the member endpoints under identity; the code hosts"
+                  + " them across eight modules in the composition root"),
+          Map.entry(
+              "UserProfileController",
+              "identity: the REST cut serves the user list, search and profile under identity; the"
+                  + " code needs the user mapper of the org-unit module"),
+          Map.entry(
+              "MemberMembershipController",
+              "identity: the REST cut serves the member memberships under identity; the code keeps"
+                  + " them with the org-unit module"),
+          Map.entry(
+              "AnnouncementReadController",
+              "identity: the REST cut serves the member's read marker under identity; the code"
+                  + " keeps it with the announcements of the dashboard"));
 
   /** The controllers today; a smaller selection would check less. */
   private static final int CONTROLLER_FLOOR = 98;

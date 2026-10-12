@@ -54,6 +54,7 @@ public final class ApiDomains {
           Map.entry("AdminQualityTierController", "catalogue"),
           Map.entry("AdminTermsController", "identity"),
           Map.entry("AnnouncementController", "dashboard"),
+          Map.entry("AnnouncementReadController", "identity"),
           Map.entry("AppVersionPolicyController", "admin-system"),
           Map.entry("AuditAdminController", "audit"),
           Map.entry("BankAccountController", "bank"),

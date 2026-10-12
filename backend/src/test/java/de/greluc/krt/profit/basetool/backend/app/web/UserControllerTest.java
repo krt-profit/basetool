@@ -26,7 +26,6 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -173,24 +172,6 @@ class UserControllerTest {
     assertTrue(result.shareBlueprintsGlobally());
     assertEquals(3L, result.version());
     verify(memberBlueprintSharings).update(CALLER_ID, true, 2L);
-  }
-
-  @Test
-  void updateReadAnnouncement_resolvesIdFromJwt_andForwardsAnnouncementId() {
-    UUID announcementId = UUID.randomUUID();
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    User updated = new User();
-    updated.setEmail("me@example.invalid");
-    when(userService.updateReadAnnouncement(CALLER_ID, announcementId)).thenReturn(updated);
-    UserDto dto = mockDto(CALLER_ID);
-    when(userMapper.toDto(updated)).thenReturn(dto);
-
-    UserDto result = controller.updateReadAnnouncement(jwt, announcementId);
-
-    assertNotNull(result);
-    assertEquals(CALLER_ID, result.id());
-    assertEquals("me@example.invalid", result.email());
-    verify(userService).updateReadAnnouncement(CALLER_ID, announcementId);
   }
 
   @Test
