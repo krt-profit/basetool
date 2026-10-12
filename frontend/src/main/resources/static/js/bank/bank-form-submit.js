@@ -152,9 +152,7 @@ async function submitBankForm(form) {
         onSuccess(payload) {
             handleBankSuccess(form);
             if (payload && payload.pendingRequest) {
-                if (typeof showFrontendSuccessToast === 'function') {
-                    showFrontendSuccessToast(approvalRequestFiledMessage());
-                }
+                showFrontendSuccessToast(approvalRequestFiledMessage());
             }
         },
         onError(status, payload) {
@@ -197,12 +195,12 @@ function handleBankSuccess(form) {
     }
     const main = document.querySelector('main[data-bank-saved]');
     const savedMessage = main ? main.getAttribute('data-bank-saved') : null;
-    if (savedMessage && typeof showFrontendSuccessToast === 'function') {
+    if (savedMessage) {
         showFrontendSuccessToast(savedMessage);
     }
     publishBankLiveSync(form);
     const spec = REFRESH_TARGETS[form.getAttribute('data-refresh')];
-    if (!spec || !krtFetch || typeof krtFetch.swap !== 'function') {
+    if (!spec) {
         window.location.reload();
         return;
     }

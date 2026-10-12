@@ -253,15 +253,11 @@ function syncVersion(containerSelector, newVersion) {
 }
 
 function errorToast(message) {
-    if (typeof showFrontendErrorToast === 'function') {
-        showFrontendErrorToast(message);
-    }
+    showFrontendErrorToast(message);
 }
 
 function successToast(message) {
-    if (typeof showFrontendSuccessToast === 'function') {
-        showFrontendSuccessToast(message);
-    }
+    showFrontendSuccessToast(message);
 }
 
 /**
@@ -501,7 +497,7 @@ async function handleProblem(response, problem, opts) {
                           'krtFetchI18n.conflictDetail',
                       );
             errorToast(prefix + detail);
-            if (typeof showKrtConfirm === 'function') {
+            {
                 const ok = await showKrtConfirm(
                     text(conflict.title, defaults().conflictTitle, 'krtFetchI18n.conflictTitle'),
                     text(

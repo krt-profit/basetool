@@ -25,30 +25,13 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtCsrf, krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
- * Builds the JSON + CSRF request headers via the shared window.krtCsrf, falling back to reading
- * the CSRF meta tags when krt-fetch.js is absent.
+ * Builds the JSON + CSRF request headers through the shared krtCsrf.
  *
  * @param {Object<string,string>} [base] optional base headers merged under the CSRF header
  * @returns {Object<string,string>} headers for a same-origin JSON fetch
  */
 function csrfHeaders(base) {
-    if (krtCsrf && typeof krtCsrf.headers === 'function') {
-        return krtCsrf.headers(base);
-    }
-    const headers = Object.assign(
-        { Accept: 'application/json', 'Content-Type': 'application/json' },
-        base || {},
-    );
-    const token = /** @type {HTMLMetaElement | null} */ (
-        document.querySelector('meta[name="_csrf"]')
-    )?.content;
-    const header = /** @type {HTMLMetaElement | null} */ (
-        document.querySelector('meta[name="_csrf_header"]')
-    )?.content;
-    if (token && header && header !== 'undefined' && token !== 'undefined') {
-        headers[header] = token;
-    }
-    return headers;
+    return krtCsrf.headers(base);
 }
 
 /**
@@ -104,9 +87,7 @@ export function initDownloadButtons() {
             /** @type {string} */ (button.getAttribute('data-download-url')),
             button.getAttribute('data-filename') || 'report.pdf',
             (message) => {
-                if (typeof showFrontendErrorToast === 'function') {
-                    showFrontendErrorToast(message);
-                }
+                showFrontendErrorToast(message);
             },
         ).finally(() => {
             button.disabled = false;

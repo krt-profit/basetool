@@ -48,7 +48,7 @@ export function showError(form, field, message) {
     if (slot) {
         slot.textContent = message;
         slot.classList.add('visible');
-    } else if (typeof showFrontendErrorToast === 'function') {
+    } else {
         showFrontendErrorToast(message);
     }
 }

@@ -65,7 +65,7 @@ function updateMovementJustification(form) {
             input.required =
                 !!option && option.getAttribute('data-requires-justification') === 'true';
         } else {
-            const meta = krtBankAccountMeta || {};
+            const meta = krtBankAccountMeta;
             input.required = !!source.value && meta[source.value] === true;
         }
     } else {

@@ -26,7 +26,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
  * @returns {HTMLElement} the open modal dialog, else the body
  */
 function toastLayer() {
-    return krtModal ? krtModal.layerRoot() : document.body;
+    return krtModal.layerRoot();
 }
 
 function initToasts() {

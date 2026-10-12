@@ -168,9 +168,7 @@ const syncSocket = (function () {
                 window.clearTimeout(reconnectTimer);
                 reconnectTimer = null;
             }
-            if (krtTermsGate) {
-                krtTermsGate.redirect(ev.reason);
-            }
+            krtTermsGate.redirect(ev.reason);
             return;
         }
         if (ev && ev.code === SOCKET_CAP_CLOSE_CODE) {

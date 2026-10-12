@@ -58,13 +58,11 @@ document.addEventListener('input', (event) => {
 
 /** Binds the bookings pager of the holder detail to an in-place fragment swap. */
 function bindBankHolderBookingsPager() {
-    if (krtFetch) {
-        krtFetch.bindSwap({
-            container: '#bank-holder-bookings-results',
-            fragmentValue: 'holderBookings',
-            history: true,
-        });
-    }
+    krtFetch.bindSwap({
+        container: '#bank-holder-bookings-results',
+        fragmentValue: 'holderBookings',
+        history: true,
+    });
 }
 document.addEventListener('DOMContentLoaded', bindBankHolderBookingsPager);
 document.addEventListener('krt:swapped', bindBankHolderBookingsPager);

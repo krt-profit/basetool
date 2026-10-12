@@ -28,9 +28,6 @@ const PERIOD_DAYS = { '30d': 30, '90d': 90 };
  * contained page or range link re-renders only that container's fragment (REQ-FE-002).
  */
 function bindDetailSwaps() {
-    if (!krtFetch) {
-        return;
-    }
     document.querySelectorAll('[data-bank-swap][id]').forEach((el) => {
         krtFetch.bindSwap({
             container: `#${el.id}`,
@@ -91,7 +88,7 @@ function historySwapUrl(form) {
  */
 function applyHistoryFilter(form) {
     const container = form.getAttribute('data-results');
-    if (!krtFetch || !container) {
+    if (!container) {
         return;
     }
     krtFetch.swap({
@@ -149,7 +146,7 @@ function applyPreset(form, preset) {
 document.addEventListener('submit', (event) => {
     const target = /** @type {Element | null} */ (event.target);
     const form = target && target.closest ? target.closest('form[data-bank-history-filter]') : null;
-    if (!form || !krtFetch) {
+    if (!form) {
         return;
     }
     event.preventDefault();

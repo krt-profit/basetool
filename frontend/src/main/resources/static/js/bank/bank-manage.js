@@ -105,13 +105,11 @@ document.addEventListener('input', (event) => {
 
 /** Binds the manage view's filters and pager to an in-place fragment swap. */
 function bindBankManageSwaps() {
-    if (krtFetch) {
-        krtFetch.bindSwap({
-            container: '#bank-manage-results',
-            fragmentValue: 'manageBody',
-            history: true,
-        });
-    }
+    krtFetch.bindSwap({
+        container: '#bank-manage-results',
+        fragmentValue: 'manageBody',
+        history: true,
+    });
 }
 document.addEventListener('DOMContentLoaded', bindBankManageSwaps);
 document.addEventListener('krt:swapped', bindBankManageSwaps);
