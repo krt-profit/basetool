@@ -1,6 +1,7 @@
 import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
 import de.greluc.krt.profit.basetool.conventions.OssLicensePolicy
+import de.greluc.krt.profit.basetool.conventions.backendModuleDirectories
 
 buildscript {
   dependencies {
@@ -28,7 +29,7 @@ val generatedContract = layout.buildDirectory.dir("generated/openapi")
 openApiGenerate {
   generatorName.set("java")
   inputSpec.set(
-    rootProject.layout.projectDirectory.file("backend/src/main/resources/api/openapi.json"),
+    layout.settingsDirectory.file("backend/src/main/resources/api/openapi.json"),
   )
   cleanupOutput.set(true)
   outputDir.set(generatedContract)
@@ -51,7 +52,7 @@ openApiGenerate {
 
 tasks.openApiGenerate.configure {
   inputs
-    .file(rootProject.layout.projectDirectory.file("backend/src/main/resources/api/openapi.json"))
+    .file(layout.settingsDirectory.file("backend/src/main/resources/api/openapi.json"))
     .withPropertyName("openapiSpecFile")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }
@@ -289,7 +290,7 @@ val generateOssLicenses =
 
 sourceSets.named("main") { resources.srcDir(generateOssLicenses) }
 
-val backendDtoMirrorDir = "backend/src/main/java"
+val backendDtoMirrorTrees = backendModuleDirectories().map { it.dir("src/main/java") }
 
 val updateSnapshots = providers.gradleProperty("updateSnapshots").map { "true" }.orElse("false")
 
@@ -297,31 +298,31 @@ tasks.named<Test>("test") {
   systemProperty("basetool.updateSnapshots", updateSnapshots.get())
 
   inputs
-    .files(rootProject.fileTree(backendDtoMirrorDir) { include("**/*.java") })
+    .files(backendDtoMirrorTrees.map { fileTree(it) { include("**/*.java") } })
     .withPropertyName("backendDtoMirrorSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
-    .file(rootProject.file("backend/src/main/resources/api/openapi.json"))
+    .file(layout.settingsDirectory.file("backend/src/main/resources/api/openapi.json"))
     .withPropertyName("backendOpenApiDocument")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
-    .file(rootProject.file("backend/src/main/resources/application-prod.yml"))
+    .file(layout.settingsDirectory.file("backend/src/main/resources/application-prod.yml"))
     .withPropertyName("backendProdConfig")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
-    .file(rootProject.file("docker/test-tls/basetool-test-backend.p12"))
+    .file(layout.settingsDirectory.file("docker/test-tls/basetool-test-backend.p12"))
     .withPropertyName("testTlsKeystore")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
     .files(
-      rootProject.file(
+      layout.settingsDirectory.file(
         "frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/E2eStackExtension.java",
       ),
-      rootProject.file("frontend/src/e2e/resources/realm-export.e2e.json"),
+      layout.settingsDirectory.file("frontend/src/e2e/resources/realm-export.e2e.json"),
     )
     .withPropertyName("e2eAudienceParitySources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -333,8 +334,8 @@ tasks.named<Test>("test") {
   inputs
     .files(
       fileTree("src/main/resources/static/fonts"),
-      rootProject.fileTree("backend/src/main/resources/fonts"),
-      rootProject.fileTree("keycloak-theme"),
+      fileTree(layout.settingsDirectory.dir("backend/src/main/resources/fonts")),
+      fileTree(layout.settingsDirectory.dir("keycloak-theme")),
       file("oss-bundled-components.json"),
     )
     .withPropertyName("ossBundledComponentSources")
@@ -631,7 +632,7 @@ tasks.register<NpxTask>("prettierApply") {
   ignoreExitValue.set(false)
 }
 
-val openApiSpec = rootProject.file("backend/src/main/resources/api/openapi.json")
+val openApiSpec = layout.settingsDirectory.file("backend/src/main/resources/api/openapi.json")
 val generatedApiTypes = layout.buildDirectory.file("generated/ts/api.d.ts")
 
 val generateApiTypesScript = layout.projectDirectory.file("scripts/gen-api-types.mjs")
@@ -643,7 +644,7 @@ val generateApiTypes =
       "Generates TypeScript types for the backend DTOs from the OpenAPI spec (build output)."
     dependsOn(tasks.named("npmSetup"))
     script.set(generateApiTypesScript.asFile)
-    args.set(listOf(openApiSpec.absolutePath, generatedApiTypes.get().asFile.absolutePath))
+    args.set(listOf(openApiSpec.asFile.absolutePath, generatedApiTypes.get().asFile.absolutePath))
     ignoreExitValue.set(false)
     inputs.file(openApiSpec)
     inputs.file(generateApiTypesScript)

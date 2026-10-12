@@ -4,7 +4,8 @@
 This is the git half of the decision (REQ-OPS-021, ADR-0210); the registry checks stay in the
 workflow. Image inputs are derived from ``docker/app/Dockerfile``'s context ``COPY`` sources:
 
-* ``${MODULE}`` sources and the paths in ``MODULE_OWN`` rebuild only their module;
+* ``${MODULE}`` sources, the paths in ``MODULE_OWN`` and the ``src/main`` tree of a library module
+  named ``<app>-<name>`` (``backend-exchange``) rebuild only their application;
 * every other COPY source, plus ``STATIC_SHARED``, rebuilds all three.
 
 A release commit (new dated CHANGELOG section) and anything unclear (unknown or non-ancestor base,
@@ -89,6 +90,25 @@ def copy_sources(dockerfile: str) -> list[str]:
     return sources
 
 
+def library_owner(src: str) -> str | None:
+    """Return the application that ships the library module whose sources ``src`` names.
+
+    A library module is named ``<app>-<name>`` and is compiled into that application's boot jar
+    only, so its ``src/main`` tree is an input of that application alone. Its build script and
+    settings stay shared, like every module's.
+
+    :param src: a build-context COPY source without a trailing slash.
+    :return: the application, or ``None`` when ``src`` is not such a source tree.
+    """
+    first, _, rest = src.partition("/")
+    if rest != "src/main" and not rest.startswith("src/main/"):
+        return None
+    for m in MODULES:
+        if first.startswith(m + "-") and len(first) > len(m) + 1:
+            return m
+    return None
+
+
 def input_sets(dockerfile: str) -> tuple[dict[str, list[str]], list[str]]:
     """Split the image inputs into each module's own inputs and the shared ones.
 
@@ -104,6 +124,8 @@ def input_sets(dockerfile: str) -> tuple[dict[str, list[str]], list[str]]:
                 own[m].append(re.sub(r"\$\{MODULE\}|\$MODULE\b", m, src))
         elif src in MODULE_OWN:
             own[MODULE_OWN[src]].append(src)
+        elif (owner := library_owner(src)) is not None:
+            own[owner].append(src)
         elif src not in shared:
             shared.append(src)
     return own, shared
@@ -410,6 +432,41 @@ def selftest() -> int:
     check("the Dockerfile, .dockerignore and the workflow are shared",
           all(p in shared for p in (APP_DOCKERFILE, ".dockerignore", ".github/workflows/release-images.yml")))
     check("a prefix match needs a path boundary", touched_inputs(["gradle.properties.bak", "gradlew.bat"], shared) == [])
+
+    library_dockerfile = (
+        dockerfile
+        + "COPY backend-exchange/build.gradle.kts backend-exchange/build-settings.properties backend-exchange/\n"
+        + "COPY backend-exchange/src/main/ backend-exchange/src/main/\n"
+        + "COPY backend-bank/src/main backend-bank/src/main\n"
+        + "COPY backendx/src/main/ backendx/src/main/\n"
+        + "COPY test-support/src/main/ test-support/src/main/\n"
+    )
+    lib_own, lib_shared = input_sets(library_dockerfile)
+    check("a <app>-<name> src/main tree is the application's own input",
+          {"backend-exchange/src/main", "backend-bank/src/main"} <= set(lib_own["backend"])
+          and not any(p.startswith("backend-") for p in lib_own["frontend"] + lib_own["ingest"]))
+    check("a library module's build script and settings stay shared",
+          "backend-exchange/build.gradle.kts" in lib_shared
+          and "backend-exchange/build-settings.properties" in lib_shared)
+    check("a name without the hyphen boundary, and test-support, stay shared",
+          "backendx/src/main" in lib_shared and "test-support/src/main" in lib_shared)
+    check("library_owner reads only <app>-<name>/src/main",
+          library_owner("backend-exchange/src/main/java") == "backend"
+          and library_owner("ingest-relay/src/main") == "ingest"
+          and library_owner("backend-exchange/src/test") is None
+          and library_owner("backend-/src/main") is None
+          and library_owner("backend/src/main") is None)
+    lib_decision = decide("a" * 40, "b" * 40, library_dockerfile,
+                          ["backend-exchange/src/main/java/A.java", "docs/a.md"],
+                          "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n",
+                          "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n", True)
+    check("a library module's source rebuilds its application only",
+          lib_decision["rebuild"] == ["backend"] and lib_decision["reuse"] == ["frontend", "ingest"])
+    lib_shared_decision = decide("a" * 40, "b" * 40, library_dockerfile,
+                                 ["backend-exchange/build.gradle.kts"],
+                                 "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n",
+                                 "## [v1.8.4](https://x/v1.8.4) - 2026-09-15\n", True)
+    check("a library module's build script rebuilds all three", lib_shared_decision["rebuild"] == list(MODULES))
 
     base, head = "a" * 40, "b" * 40
     cut = "## [v1.8.5](https://x/v1.8.5) - 2026-09-20\n"
