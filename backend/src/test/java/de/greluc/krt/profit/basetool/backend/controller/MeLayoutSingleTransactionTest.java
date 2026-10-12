@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.app.web.MeController;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.privacy.web.MeController;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.List;

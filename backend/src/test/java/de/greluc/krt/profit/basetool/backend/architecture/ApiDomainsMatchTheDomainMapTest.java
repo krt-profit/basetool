@@ -61,7 +61,10 @@ class ApiDomainsMatchTheDomainMapTest {
               + " the synced graph in the catalogue",
           "UexLocationController",
           "catalogue: the REST cut serves the UEX locations with the catalogue; the code"
-              + " serves the picker from the personal inventory");
+              + " serves the picker from the personal inventory",
+          "MeController",
+          "identity: the REST cut serves the caller's own context under identity; the code"
+              + " hosts the read across seven modules in the composition root");
 
   /** The controllers today; a smaller selection would check less. */
   private static final int CONTROLLER_FLOOR = 98;
