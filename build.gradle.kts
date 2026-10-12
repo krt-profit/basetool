@@ -2,6 +2,7 @@ buildscript {
   dependencies {
     constraints {
       classpath(libs.plexus.utils)
+      classpath(libs.jsoup)
       classpath(libs.jackson2.plugins.databind)
     }
   }

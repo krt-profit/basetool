@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.shell.model.ScLink;
+import de.greluc.krt.profit.basetool.frontend.shell.model.ScLinkCategory;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,6 +87,32 @@ class ScLinksPageControllerMvcTest {
     }
     assertThat(html.split("rel=\"noopener noreferrer\"", -1))
         .hasSizeGreaterThan(ScLink.values().length);
+  }
+
+  @Test
+  void everyCategoryIsAnOpenToggleControllingItsGridAndTheScriptLoads() throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/sc-links").with(oidcLogin()).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    for (ScLinkCategory category : ScLinkCategory.values()) {
+      String key = category.getKey();
+      assertThat(html)
+          .contains("data-testid=\"sc-links-toggle-" + key + "\"")
+          .contains("aria-controls=\"sc-links-grid-" + key + "\"")
+          .contains("data-category=\"" + key + "\"")
+          .contains("id=\"sc-links-grid-" + key + "\"");
+    }
+    assertThat(html.split("data-trigger=\"sc-links-toggle-category\"", -1))
+        .hasSize(ScLinkCategory.values().length + 1);
+    assertThat(html.split("aria-expanded=\"true\"", -1)).hasSizeGreaterThan(1);
+    assertThat(html)
+        .doesNotContainPattern("class=\"sc-links-grid\"[^>]*hidden")
+        .contains("/js/shell/sc-links.js");
   }
 
   @Test

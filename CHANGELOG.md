@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Star-Citizen-Links: Kategorien lassen sich einklappen.** Standardmäßig sind alle offen; deine Auswahl bleibt lokal im Browser gespeichert.
+- **Star-Citizen-Links: Lootmaster und VerseIntel.** Lootmaster (Crafting-Blueprints, Wikelo-Trades, Missionen) steht unter „Datenbanken & Crafting", VerseIntel (Wissensgraph zu Entwickleraussagen, Patch Notes und Bug-Reports) unter „Universum & Community".
 - **Ablehnungen nennen ihren Grund im Log.** Die WARN-Zeile einer 422 `PRODUCTION_ALLOCATION` trägt jetzt, welche der fünf Prüfungen abgelehnt hat, samt Material-/Lagerzeilen-ID und Mengen (`reason`, `materialId`, `consumed`, …) als abfragbare Felder in Loki – nie den Request-Body. Die Antwort an den Client bleibt unverändert.
 
 ### Fixed

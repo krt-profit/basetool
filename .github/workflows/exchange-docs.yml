@@ -60,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --prefix .github/tools/markdownlint --ignore-scripts --no-audit --no-fund
-          .github/tools/markdownlint/node_modules/.bin/markdownlint-cli2 "docs/exchange/**/*.md"
+          .github/tools/markdownlint/node_modules/.bin/markdownlint -c docs/exchange/.markdownlint.json "docs/exchange/**/*.md"
 
       - name: dpop-reference / Run the reference implementation's tests
         env:

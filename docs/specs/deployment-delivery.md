@@ -2356,7 +2356,7 @@ that has no entry at all, before it is used.
   launcher reaches PIT through the test runtime classpath ([`dependency-pins.md`](../dependency-pins.md)).
 - **Checksums only.** PGP signatures are not verified (ADR-0208 says why and when to revisit).
 - **The CI tools outside Gradle are pinned the same way** (CI-SEC-12): pip installs read
-  `--require-hashes` requirement files under `.github/requirements/`, markdownlint-cli2 is installed
+  `--require-hashes` requirement files under `.github/requirements/`, markdownlint-cli is installed
   with `npm ci` from `.github/tools/markdownlint/package-lock.json`, and the Ansible collections are
   exact versions. Galaxy publishes no hash a requirements file could pin, so the collections are
   version-pinned only.

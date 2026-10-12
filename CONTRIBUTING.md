@@ -434,7 +434,7 @@ packages come from `--require-hashes` requirement files in
 ansible-core with ansible-lint), regenerated with
 `uv pip compile <in> --universal --generate-hashes --python-version 3.12 --no-header --no-annotate -o .github/requirements/<name>.txt`
 from a one-line input such as `ansible-core==2.21.4` plus `ansible-lint==26.9.0`;
-markdownlint-cli2 comes from the lockfile in
+markdownlint-cli comes from the lockfile in
 [`.github/tools/markdownlint/`](.github/tools/markdownlint/) through `npm ci`
 (bump with `npm install --package-lock-only` there); the Ansible collections in
 `ansible/requirements.yml` are exact versions. No workflow runs `npx --yes`

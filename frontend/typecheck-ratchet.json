@@ -191,6 +191,9 @@
     ],
     "settings": [
       "settings/admin-settings.js"
+    ],
+    "shell": [
+      "shell/sc-links.js"
     ]
   },
   "migrated": [
@@ -215,6 +218,7 @@
     "personalinventory",
     "promotion",
     "refinery",
-    "settings"
+    "settings",
+    "shell"
   ]
 }
