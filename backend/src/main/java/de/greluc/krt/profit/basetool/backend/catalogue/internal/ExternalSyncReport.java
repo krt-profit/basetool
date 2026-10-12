@@ -36,6 +36,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One append-only row recording a finding of an external sync run.
@@ -86,6 +87,7 @@ public class ExternalSyncReport {
 
   /** The external asset UUID the event concerns, when applicable. */
   @Column(name = "external_uuid")
+  @Nullable
   private UUID externalUuid;
 
   /** The external integer id (UEX) the event concerns, when applicable. */
@@ -94,6 +96,7 @@ public class ExternalSyncReport {
 
   /** The external display name the event concerns, when applicable. */
   @Column(name = "external_name", length = 255)
+  @Nullable
   private String externalName;
 
   /** Free-form human-readable detail (the candidate names for a multi-match, etc.). */

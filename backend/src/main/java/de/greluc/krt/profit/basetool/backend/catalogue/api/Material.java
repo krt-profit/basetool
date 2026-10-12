@@ -37,6 +37,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /** Material JPA entity. */
 @Entity
@@ -50,6 +51,7 @@ public class Material extends AbstractEntity<UUID> {
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
+  @Setter(onParam_ = @__(@Nullable))
   private UUID id;
 
   @Column(name = "id_commodity", unique = true)
@@ -179,6 +181,7 @@ public class Material extends AbstractEntity<UUID> {
    * sync that sees the row again.
    */
   @Column(name = "scwiki_deleted_at")
+  @Nullable
   private Instant scwikiDeletedAt;
 
   /** Physical density in g/cc. Sourced from SC Wiki only — UEX does not expose density. */
@@ -213,11 +216,13 @@ public class Material extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "refined_material_id")
   @ToString.Exclude
+  @Nullable
   private Material refinedMaterial;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "category_id")
   @ToString.Exclude
+  @Nullable
   private MaterialCategory category;
 
   /**
@@ -234,6 +239,7 @@ public class Material extends AbstractEntity<UUID> {
    * exchange {@code locKey} (REQ-XCH-012).
    */
   @Column(name = "name_key", length = 200)
+  @Nullable
   private String nameKey;
 
   /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */

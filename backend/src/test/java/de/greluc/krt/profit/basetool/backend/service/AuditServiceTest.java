@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClie
 import de.greluc.krt.profit.basetool.backend.mapper.AuditEventMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
 import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;

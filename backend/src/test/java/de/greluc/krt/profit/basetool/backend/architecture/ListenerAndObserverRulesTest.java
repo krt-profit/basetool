@@ -35,8 +35,8 @@ import de.greluc.krt.profit.basetool.backend.architecture.fixture.ListenerAndObs
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.RequestScopeResolver;
 import java.util.ArrayDeque;
 import java.util.Deque;

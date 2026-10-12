@@ -27,7 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ProfitCalculationDto;
-import de.greluc.krt.profit.basetool.backend.service.ProfitCalculationService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ProfitCalculationService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.ProfitCalculationController;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

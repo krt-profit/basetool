@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.dashboard.web;
 
 import de.greluc.krt.profit.basetool.backend.dashboard.internal.Announcement;
-import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
+import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Announcement entities and DTOs. */

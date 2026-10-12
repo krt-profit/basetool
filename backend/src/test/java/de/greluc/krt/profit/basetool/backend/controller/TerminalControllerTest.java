@@ -25,9 +25,10 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.TerminalController;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.mapper.TerminalMapper;
-import de.greluc.krt.profit.basetool.backend.service.TerminalService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

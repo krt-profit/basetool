@@ -22,13 +22,14 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierSegment;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroup;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifierDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintDto;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;

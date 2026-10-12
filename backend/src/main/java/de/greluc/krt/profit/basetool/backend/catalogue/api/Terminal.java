@@ -32,6 +32,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /** Terminal JPA entity. */
 @Entity
@@ -104,10 +105,10 @@ public class Terminal extends AbstractEntity<UUID> {
   private Boolean isAvailable;
   private Boolean isVisible;
   private Boolean isJumpPoint;
-  private Boolean hasLoadingDock;
+  @Nullable private Boolean hasLoadingDock;
   private Boolean hasDockingPort;
   private Boolean hasFreightElevator;
-  private Boolean isAutoLoad;
+  @Nullable private Boolean isAutoLoad;
   private Boolean hidden = false;
 
   /**
@@ -132,6 +133,7 @@ public class Terminal extends AbstractEntity<UUID> {
    * {@code null} until a sync touches the row.
    */
   @Column(name = "uex_has_loading_dock")
+  @Nullable
   private Boolean uexHasLoadingDock;
 
   /**
@@ -140,6 +142,7 @@ public class Terminal extends AbstractEntity<UUID> {
    * flag, {@code null} until the first sweep populates it.
    */
   @Column(name = "uex_is_auto_load")
+  @Nullable
   private Boolean uexIsAutoLoad;
 
   /**

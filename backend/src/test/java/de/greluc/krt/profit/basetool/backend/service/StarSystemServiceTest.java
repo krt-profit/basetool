@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemService;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import java.util.Optional;
 import java.util.UUID;

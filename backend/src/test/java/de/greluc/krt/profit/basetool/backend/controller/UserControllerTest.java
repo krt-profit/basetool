@@ -67,7 +67,10 @@ class UserControllerTest {
   @Mock private UserService userService;
   @Mock private UserDeletionService userDeletionService;
   @Mock private UserMapper userMapper;
-  @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
+
+  @Mock
+  private de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService authHelperService;
+
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private UserSyncService userSyncService;
   @Mock private TaskMetrics taskMetrics;

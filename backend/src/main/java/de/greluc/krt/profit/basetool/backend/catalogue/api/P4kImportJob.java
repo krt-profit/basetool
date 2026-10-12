@@ -34,6 +34,7 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One asynchronous KRT P4K Reader catalog-import run, either a {@link P4kImportJobKind#PREVIEW
@@ -73,6 +74,7 @@ public class P4kImportJob extends AbstractEntity<UUID> {
 
   /** Original upload filename, for display in the job list (forensic; may be {@code null}). */
   @Column(name = "source_filename", length = 255)
+  @Nullable
   private String sourceFilename;
 
   /** Size of the uploaded catalog in bytes, for display (may be {@code null}). */

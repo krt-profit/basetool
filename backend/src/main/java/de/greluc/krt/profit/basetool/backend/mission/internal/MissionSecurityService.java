@@ -34,6 +34,7 @@ import java.util.Collection;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -186,7 +187,7 @@ public class MissionSecurityService {
    * @param authentication current Spring Security authentication
    * @return true if the caller may manage the mission
    */
-  public boolean canManageMission(UUID missionId, Authentication authentication) {
+  public boolean canManageMission(UUID missionId, @Nullable Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {
       return false;
     }
@@ -229,7 +230,7 @@ public class MissionSecurityService {
    * @param authentication current Spring Security authentication
    * @return true if the caller may edit the manager list
    */
-  public boolean canManageManagers(UUID missionId, Authentication authentication) {
+  public boolean canManageManagers(UUID missionId, @Nullable Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {
       log.debug("Authentication failed or missing for canManageManagers on mission {}", missionId);
       return false;

@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.blueprint.web;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintProductService;
-import de.greluc.krt.profit.basetool.backend.controller.BlueprintController;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.BlueprintController;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

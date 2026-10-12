@@ -44,6 +44,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
 /**
@@ -87,6 +88,7 @@ public class Blueprint extends AbstractEntity<UUID> {
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "output_item_id")
+  @Nullable
   private GameItem outputItem;
 
   /** Wiki display name of the output item (kept even when {@link #outputItem} is unresolved). */
@@ -133,6 +135,7 @@ public class Blueprint extends AbstractEntity<UUID> {
 
   /** Soft-delete marker: first run in which the Wiki stopped returning this blueprint. */
   @Column(name = "scwiki_deleted_at")
+  @Nullable
   private Instant scwikiDeletedAt;
 
   /**

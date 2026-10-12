@@ -30,7 +30,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAlias;
-import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.MaterialExternalAliasController;
 import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
 import java.util.List;
 import java.util.UUID;

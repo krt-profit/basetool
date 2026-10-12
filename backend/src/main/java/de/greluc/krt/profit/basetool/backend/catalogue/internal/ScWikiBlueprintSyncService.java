@@ -1,0 +1,647 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.catalogue.internal;
+
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintDismantleReturn;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierSegment;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroup;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifier;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintSummaryProperty;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasSource;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintIngredientDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintModifierDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintModifierSegmentDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintRequirementChildDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintRequirementGroupDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintSummaryPropertyDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
+import de.greluc.krt.profit.basetool.backend.kernel.Quality;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+/**
+ * Syncs SC Wiki blueprints into {@code blueprint} and its ingredient, dismantle-return,
+ * requirement-group, modifier and summary-property tables.
+ *
+ * <p>Lists all blueprints, fetches each detail (paced via {@link ScWikiClient#paceForRateLimit()})
+ * and upserts each in its own {@code REQUIRES_NEW} transaction. Unresolved ingredients keep their
+ * Wiki snapshot and are re-resolved on later runs. When the detail is unavailable, the flat
+ * ingredient list is used and existing group data is kept.
+ *
+ * <p>Gated by {@code krt.scwiki.blueprint-sync-enabled} (default {@code false}); an empty Wiki
+ * response skips the orphan sweep.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ScWikiBlueprintSyncService {
+
+  private final ScWikiClient scWikiClient;
+  private final ScWikiProperties properties;
+  private final BlueprintRepository blueprintRepository;
+  private final MaterialRepository materialRepository;
+  private final MaterialExternalAliasService aliasService;
+  private final GameItemRepository gameItemRepository;
+  private final SyncReportService syncReportService;
+
+  /**
+   * Curated corrections applied to each {@code output_name} before it is persisted; see {@link
+   * BlueprintOutputNameOverrides}.
+   */
+  private final BlueprintOutputNameOverrides outputNameOverrides;
+
+  /**
+   * Lazily resolved self proxy, so each per-blueprint write runs in its own {@code REQUIRES_NEW}
+   * transaction.
+   */
+  private final ObjectProvider<ScWikiBlueprintSyncService> self;
+
+  /**
+   * Runs the full blueprint sync; a no-op when the feature flag is off, and an empty list response
+   * skips the orphan sweep. Each detail is fetched outside a transaction and persisted via {@link
+   * #upsertBlueprintWithinTransaction(UUID, ScWikiBlueprintDto, UUID, Instant)}.
+   *
+   * @return the number of blueprints upserted, {@code 0} when disabled or empty, or the live
+   *     blueprint count ({@link BlueprintRepository#countLiveScwikiBlueprints()}) on {@code 304 Not
+   *     Modified}
+   */
+  public int syncBlueprints() {
+    if (!Boolean.TRUE.equals(properties.blueprintSyncEnabled())) {
+      log.info(
+          "SC Wiki blueprint sync invoked but disabled "
+              + "(krt.scwiki.blueprint-sync-enabled=false) — skipping.");
+      return 0;
+    }
+
+    log.info("Starting SC Wiki blueprint sync...");
+    ScWikiClient.FetchResult<ScWikiBlueprintDto> listResult =
+        scWikiClient.fetchAllPagesResult(
+            properties.blueprintsEndpoint(),
+            new ParameterizedTypeReference<ScWikiResponseDto<ScWikiBlueprintDto>>() {},
+            "blueprints");
+    if (listResult.notModified()) {
+      long live = blueprintRepository.countLiveScwikiBlueprints();
+      log.info(
+          "SC Wiki blueprint list unchanged since last sync (304) — reporting {} live blueprint"
+              + " row(s) instead of 0.",
+          live);
+      return (int) live;
+    }
+    List<ScWikiBlueprintDto> fetched = listResult.data();
+    if (fetched.isEmpty()) {
+      log.warn("No blueprints received from SC Wiki API. Aborting sync (no orphan sweep).");
+      return 0;
+    }
+
+    UUID runId = syncReportService.beginRun();
+    Instant now = Instant.now();
+    Set<UUID> seen = new HashSet<>();
+    int processed = 0;
+    int unresolvedLines = 0;
+    int detailMisses = 0;
+    Map<String, String> overrideKeysSeen = new LinkedHashMap<>();
+    Set<String> overrideKeysFired = new HashSet<>();
+
+    for (ScWikiBlueprintDto listDto : fetched) {
+      if (listDto.uuid() == null) {
+        continue;
+      }
+      try {
+        seen.add(listDto.uuid());
+        scWikiClient.paceForRateLimit();
+        ScWikiBlueprintDto detail =
+            scWikiClient.fetchOne(
+                properties.blueprintsEndpoint() + "/" + listDto.uuid(),
+                ScWikiBlueprintDto.class,
+                "blueprint");
+        if (detail == null) {
+          detailMisses++;
+        }
+        ScWikiBlueprintDto dto = detail != null ? detail : listDto;
+        if (outputNameOverrides.isRegistered(dto.key())) {
+          overrideKeysSeen.put(dto.key(), dto.outputName());
+          if (outputNameOverrides.fires(dto.key(), dto.outputName())) {
+            overrideKeysFired.add(dto.key());
+          }
+        }
+        unresolvedLines +=
+            self.getObject().upsertBlueprintWithinTransaction(listDto.uuid(), dto, runId, now);
+        processed++;
+      } catch (Exception e) {
+        log.error("Failed to process SC Wiki blueprint dto: {}", listDto.uuid(), e);
+      }
+    }
+
+    if (!seen.isEmpty() && !listResult.complete()) {
+      log.warn(
+          "Skipping the blueprint scwiki_deleted sweep: the Wiki blueprint page walk did not"
+              + " enumerate the whole feed this run, so the {} uuid(s) it saw are not a complete"
+              + " census and every row outside them would be tombstoned for never having been"
+              + " fetched.",
+          seen.size());
+    } else if (!seen.isEmpty()) {
+      int marked = self.getObject().markBlueprintOrphansWithinTransaction(seen, now);
+      if (marked > 0) {
+        log.info("Marked {} blueprint row(s) scwiki_deleted (no longer in Wiki feed)", marked);
+      }
+    }
+    int obsoleteOverrides =
+        self.getObject()
+            .reportObsoleteOverridesWithinTransaction(runId, overrideKeysSeen, overrideKeysFired);
+    syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
+    log.info(
+        "Finished SC Wiki blueprint sync: {} blueprints upserted, {} unresolved ingredient"
+            + " line(s), {} detail fetch miss(es), {} output-name override(s) applied, {} obsolete"
+            + " override(s) reported.",
+        processed,
+        unresolvedLines,
+        detailMisses,
+        overrideKeysFired.size(),
+        obsoleteOverrides);
+    return processed;
+  }
+
+  /**
+   * Persists one blueprint's recipe graph in its own {@code REQUIRES_NEW} transaction; call it via
+   * {@link #self}. Rebuilds the requirement-group graph from the detail when present, otherwise the
+   * flat ingredient list, keeping existing group data.
+   *
+   * @param scwikiUuid the Wiki blueprint UUID (the upsert key)
+   * @param dto the blueprint payload (detail when available, else the list row)
+   * @param runId the current run id for unresolved-ingredient events
+   * @param now the shared {@code scwiki_synced_at} timestamp
+   * @return the number of unresolved ingredient lines
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public int upsertBlueprintWithinTransaction(
+      UUID scwikiUuid, ScWikiBlueprintDto dto, UUID runId, Instant now) {
+    Blueprint bp = blueprintRepository.findByScwikiUuid(scwikiUuid).orElseGet(Blueprint::new);
+    bp.setScwikiUuid(scwikiUuid);
+    bp.setScwikiKey(dto.key());
+    bp.setOutputName(outputNameOverrides.correct(dto.key(), dto.outputName()));
+    bp.setCategoryUuid(dto.categoryUuid());
+    bp.setCraftTimeSeconds(dto.craftTimeSeconds());
+    bp.setIsAvailableByDefault(Boolean.TRUE.equals(dto.isAvailableByDefault()));
+    bp.setIngredientCount(dto.ingredientCount());
+    bp.setUnlockingMissionsCount(dto.unlockingMissionsCount());
+    bp.setGameVersionSeen(dto.gameVersion());
+    bp.setOutputItem(resolveGameItem(dto.outputItemUuid()));
+    applyDismantle(bp, dto);
+
+    int unresolved;
+    if (dto.requirementGroups() != null && !dto.requirementGroups().isEmpty()) {
+      unresolved = applyRequirementGraph(bp, dto, runId);
+    } else {
+      unresolved = applyIngredients(bp, dto, runId);
+    }
+    applyDismantleReturns(bp, dto, runId);
+    bp.setScwikiSyncedAt(now);
+    bp.setScwikiDeletedAt(null);
+    blueprintRepository.save(bp);
+    return unresolved;
+  }
+
+  /**
+   * Soft-deletes, in its own {@code REQUIRES_NEW} transaction, every blueprint whose {@code
+   * scwiki_uuid} was not seen this run; call it via {@link #self}.
+   *
+   * @param seenScwikiUuids the blueprint UUIDs processed this run
+   * @param now the soft-delete timestamp
+   * @return the number of rows marked {@code scwiki_deleted}
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public int markBlueprintOrphansWithinTransaction(Set<UUID> seenScwikiUuids, Instant now) {
+    return blueprintRepository.markScwikiDeleted(seenScwikiUuids, now);
+  }
+
+  /**
+   * Emits {@link SyncEventType#BLUEPRINT_NAME_OVERRIDE_OBSOLETE} for every override whose key was
+   * seen this run but whose guard did not fire, in its own {@code REQUIRES_NEW} transaction; call
+   * it via {@link #self}.
+   *
+   * @param runId the current run id
+   * @param seenOverrideKeyToIncomingName each override key seen this run, mapped to its upstream
+   *     name
+   * @param firedOverrideKeys the override keys whose guard matched
+   * @return the number of obsolete-override events emitted
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public int reportObsoleteOverridesWithinTransaction(
+      UUID runId,
+      Map<String, String> seenOverrideKeyToIncomingName,
+      Set<String> firedOverrideKeys) {
+    int obsolete = 0;
+    for (Map.Entry<String, String> entry : seenOverrideKeyToIncomingName.entrySet()) {
+      String key = entry.getKey();
+      if (firedOverrideKeys.contains(key)) {
+        continue;
+      }
+      var override = outputNameOverrides.findByKey(key);
+      if (override.isEmpty()) {
+        continue;
+      }
+      String currentUpstream = entry.getValue();
+      syncReportService.logScwikiEvent(
+          runId,
+          SyncEventType.BLUEPRINT_NAME_OVERRIDE_OBSOLETE,
+          "blueprint",
+          null,
+          override.get().correctedName(),
+          "Curated output-name override for scwiki_key '"
+              + key
+              + "' is obsolete: the feed now sends '"
+              + (currentUpstream == null ? "<null>" : currentUpstream)
+              + "', which no longer matches the expected wrong name '"
+              + override.get().expectedWrongName()
+              + "' (intended correction -> '"
+              + override.get().correctedName()
+              + "'). CIG appears to have changed the name; remove the override entry.");
+      obsolete++;
+    }
+    return obsolete;
+  }
+
+  /**
+   * Copies the detail's dismantle time / efficiency onto the blueprint. No-op when the detail omits
+   * the {@code dismantle} block (e.g. on a list-only fallback row).
+   *
+   * @param bp the managed blueprint
+   * @param dto the inbound blueprint DTO (detail or list fallback)
+   */
+  private void applyDismantle(Blueprint bp, ScWikiBlueprintDto dto) {
+    if (dto.dismantle() != null) {
+      bp.setDismantleTimeSeconds(dto.dismantle().timeSeconds());
+      bp.setDismantleEfficiency(dto.dismantle().efficiency());
+    }
+  }
+
+  /**
+   * Rebuilds the blueprint's requirement groups, ingredient lines (linked to their slot) and
+   * summary properties from the detail, clearing the owned collections first. Unresolved lines log
+   * {@link SyncEventType#UNRESOLVED_INGREDIENT}.
+   *
+   * @param bp the managed blueprint
+   * @param dto the blueprint detail; requirement groups non-empty
+   * @param runId current run id for unresolved-ingredient events
+   * @return number of unresolved ingredient lines
+   */
+  private int applyRequirementGraph(@NotNull Blueprint bp, ScWikiBlueprintDto dto, UUID runId) {
+    bp.clearIngredients();
+    bp.clearRequirementGroups();
+    bp.clearSummaryProperties();
+
+    int unresolved = 0;
+    int groupOrder = 0;
+    int ingredientOrder = 0;
+
+    for (ScWikiBlueprintRequirementGroupDto g : dto.requirementGroups()) {
+      BlueprintRequirementGroup group = new BlueprintRequirementGroup();
+      group.setOrderIndex(groupOrder++);
+      group.setGroupKey(g.key());
+      group.setName(g.name());
+      group.setKind(g.kind());
+      group.setRequiredCount(g.requiredCount());
+      bp.addRequirementGroup(group);
+
+      if (g.modifiers() != null) {
+        int modifierOrder = 0;
+        for (ScWikiBlueprintModifierDto m : g.modifiers()) {
+          BlueprintRequirementModifier modifier = new BlueprintRequirementModifier();
+          modifier.setOrderIndex(modifierOrder++);
+          modifier.setPropertyKey(m.propertyKey());
+          modifier.setLabel(m.label());
+          modifier.setBetterWhen(m.betterWhen());
+          if (m.qualityRange() != null) {
+            modifier.setQualityMin(
+                Quality.clampImported(m.qualityRange().min(), "blueprint modifier quality_min"));
+            modifier.setQualityMax(
+                Quality.clampImported(m.qualityRange().max(), "blueprint modifier quality_max"));
+          }
+          if (m.modifierRange() != null) {
+            modifier.setModifierAtMinQuality(m.modifierRange().atMinQuality());
+            modifier.setModifierAtMaxQuality(m.modifierRange().atMaxQuality());
+          }
+          modifier.setValueRangeType(m.valueRangeType());
+          if (m.valueSegments() != null) {
+            int segmentOrder = 0;
+            for (ScWikiBlueprintModifierSegmentDto seg : m.valueSegments()) {
+              BlueprintModifierSegment segment = new BlueprintModifierSegment();
+              segment.setOrderIndex(segmentOrder++);
+              segment.setQualityMin(
+                  Quality.clampImported(
+                      seg.qualityMin(), "blueprint modifier segment quality_min"));
+              segment.setQualityMax(
+                  Quality.clampImported(
+                      seg.qualityMax(), "blueprint modifier segment quality_max"));
+              segment.setModifierAtStart(seg.modifierAtStart());
+              segment.setModifierAtEnd(seg.modifierAtEnd());
+              modifier.addSegment(segment);
+            }
+          }
+          group.addModifier(modifier);
+        }
+      }
+
+      if (g.children() != null) {
+        for (ScWikiBlueprintRequirementChildDto child : g.children()) {
+          if (applyChild(bp, group, child, ingredientOrder++, dto.uuid(), runId)) {
+            unresolved++;
+          }
+        }
+      }
+    }
+
+    if (dto.summaryProperties() != null) {
+      int summaryOrder = 0;
+      for (ScWikiBlueprintSummaryPropertyDto sp : dto.summaryProperties()) {
+        BlueprintSummaryProperty summary = new BlueprintSummaryProperty();
+        summary.setOrderIndex(summaryOrder++);
+        summary.setPropertyKey(sp.propertyKey());
+        summary.setLabel(sp.label());
+        summary.setBetterWhen(sp.betterWhen());
+        bp.addSummaryProperty(summary);
+      }
+    }
+    return unresolved;
+  }
+
+  /**
+   * Builds one ingredient line from a requirement-group child, links it to its slot, resolves the
+   * material / game item reference, and appends it to the blueprint. Logs an unresolved event when
+   * the reference cannot be resolved.
+   *
+   * @param bp the managed blueprint
+   * @param group the owning requirement group (slot)
+   * @param child the inbound child line
+   * @param orderIndex the line's position within the blueprint's ingredient list
+   * @param blueprintUuid the owning blueprint's Wiki UUID (for the unresolved event)
+   * @param runId current run id for the unresolved event
+   * @return {@code true} if the line could not be resolved (so the caller increments its counter)
+   */
+  private boolean applyChild(
+      Blueprint bp,
+      BlueprintRequirementGroup group,
+      ScWikiBlueprintRequirementChildDto child,
+      int orderIndex,
+      UUID blueprintUuid,
+      UUID runId) {
+    BlueprintIngredient line = new BlueprintIngredient();
+    line.setOrderIndex(orderIndex);
+    line.setRequirementGroup(group);
+    line.setWikiNameSnapshot(child.name());
+    line.setMinQuality(
+        Quality.clampImported(child.minQuality(), "blueprint ingredient min_quality"));
+
+    boolean unresolved;
+    if ("item".equalsIgnoreCase(child.kind())) {
+      line.setKind(BlueprintIngredientKind.ITEM);
+      line.setWikiItemUuid(child.uuid());
+      line.setQuantityUnits(child.quantity());
+      GameItem resolved = resolveGameItem(child.uuid());
+      line.setGameItem(resolved);
+      unresolved = resolved == null;
+    } else {
+      line.setKind(BlueprintIngredientKind.RESOURCE);
+      line.setWikiResourceUuid(child.uuid());
+      line.setQuantityScu(child.quantityScu());
+      Material resolved = resolveMaterialForChild(child);
+      line.setMaterial(resolved);
+      unresolved = resolved == null;
+    }
+    bp.addIngredient(line);
+    if (unresolved) {
+      logUnresolved(runId, blueprintUuid, child.name());
+    }
+    return unresolved;
+  }
+
+  /**
+   * Reconciles the ingredient lines against the flat inbound list: reuses lines by index, appends
+   * new ones and drops trailing ones.
+   *
+   * @param bp the managed blueprint
+   * @param dto the inbound blueprint DTO
+   * @param runId current run id for unresolved-ingredient events
+   * @return number of unresolved ingredient lines
+   */
+  private int applyIngredients(Blueprint bp, @NotNull ScWikiBlueprintDto dto, UUID runId) {
+    List<ScWikiBlueprintIngredientDto> incoming =
+        dto.ingredients() == null ? List.of() : dto.ingredients();
+    List<BlueprintIngredient> lines = bp.getIngredients();
+    int unresolved = 0;
+
+    for (int i = 0; i < incoming.size(); i++) {
+      ScWikiBlueprintIngredientDto ing = incoming.get(i);
+      BlueprintIngredient line;
+      if (i < lines.size()) {
+        line = lines.get(i);
+      } else {
+        line = new BlueprintIngredient();
+        bp.addIngredient(line);
+      }
+      line.setOrderIndex(i);
+      line.setWikiResourceUuid(ing.resourceTypeUuid());
+      line.setWikiItemUuid(ing.itemUuid());
+      line.setWikiNameSnapshot(ing.name());
+
+      boolean isItem = "item".equalsIgnoreCase(ing.kind());
+      if (isItem) {
+        line.setKind(BlueprintIngredientKind.ITEM);
+        line.setQuantityUnits(ing.quantity());
+        line.setQuantityScu(null);
+        line.setMaterial(null);
+        GameItem resolved = resolveGameItem(ing.itemUuid());
+        line.setGameItem(resolved);
+        if (resolved == null) {
+          logUnresolved(runId, dto.uuid(), ing.name());
+          unresolved++;
+        }
+      } else {
+        line.setKind(BlueprintIngredientKind.RESOURCE);
+        line.setQuantityScu(ing.quantityScu());
+        line.setQuantityUnits(null);
+        line.setGameItem(null);
+        Material resolved = resolveMaterialForResource(ing);
+        line.setMaterial(resolved);
+        if (resolved == null) {
+          logUnresolved(runId, dto.uuid(), ing.name());
+          unresolved++;
+        }
+      }
+    }
+
+    while (lines.size() > incoming.size()) {
+      bp.removeLastIngredient();
+    }
+    return unresolved;
+  }
+
+  /**
+   * Reconciles a blueprint's dismantle-return lines (RESOURCE-only) against the inbound DTO, in the
+   * same reuse-by-index / drop-trailing manner as {@link #applyIngredients}.
+   *
+   * @param bp the managed blueprint
+   * @param dto the inbound blueprint DTO
+   * @param runId current run id for unresolved events
+   */
+  private void applyDismantleReturns(Blueprint bp, @NotNull ScWikiBlueprintDto dto, UUID runId) {
+    List<ScWikiBlueprintIngredientDto> incoming =
+        dto.dismantleReturns() == null ? List.of() : dto.dismantleReturns();
+    List<BlueprintDismantleReturn> lines = bp.getDismantleReturns();
+
+    for (int i = 0; i < incoming.size(); i++) {
+      ScWikiBlueprintIngredientDto ret = incoming.get(i);
+      BlueprintDismantleReturn line;
+      if (i < lines.size()) {
+        line = lines.get(i);
+      } else {
+        line = new BlueprintDismantleReturn();
+        bp.addDismantleReturn(line);
+      }
+      line.setOrderIndex(i);
+      line.setWikiResourceUuid(ret.resourceTypeUuid());
+      line.setWikiNameSnapshot(ret.name());
+      line.setQuantityScu(ret.quantityScu());
+      Material resolved = resolveMaterialForResource(ret);
+      line.setMaterial(resolved);
+      if (resolved == null) {
+        logUnresolved(runId, dto.uuid(), ret.name());
+      }
+    }
+
+    while (lines.size() > incoming.size()) {
+      bp.removeLastDismantleReturn();
+    }
+  }
+
+  /**
+   * Resolves a RESOURCE reference to a material via {@code scwiki_uuid}, then alias, then exact
+   * name.
+   *
+   * @param ref the inbound flat ingredient or return line
+   * @return the resolved material, or {@code null}
+   */
+  @Nullable
+  private Material resolveMaterialForResource(@NotNull ScWikiBlueprintIngredientDto ref) {
+    return resolveMaterial(ref.resourceTypeUuid(), ref.name());
+  }
+
+  /**
+   * Resolves a RESOURCE requirement-group child to a material like {@link
+   * #resolveMaterialForResource}.
+   *
+   * @param child the inbound requirement-group child line
+   * @return the resolved material, or {@code null}
+   */
+  @Nullable
+  private Material resolveMaterialForChild(@NotNull ScWikiBlueprintRequirementChildDto child) {
+    return resolveMaterial(child.uuid(), child.name());
+  }
+
+  /**
+   * Shared material resolution: {@code scwiki_uuid} → alias table → exact name. Returns {@code
+   * null} when none match.
+   *
+   * @param resourceTypeUuid the Wiki resource-type UUID, or {@code null}
+   * @param name the Wiki display name, or {@code null}
+   * @return the resolved material, or {@code null}
+   */
+  @Nullable
+  private Material resolveMaterial(UUID resourceTypeUuid, String name) {
+    if (resourceTypeUuid != null) {
+      var byUuid = materialRepository.findByScwikiUuid(resourceTypeUuid);
+      if (byUuid.isPresent()) {
+        return byUuid.orElseThrow();
+      }
+    }
+    Material byAlias =
+        aliasService.resolveMaterialByAlias(MaterialExternalAliasSource.SCWIKI, name);
+    if (byAlias != null) {
+      return byAlias;
+    }
+    if (StringUtils.hasText(name)) {
+      return materialRepository.findByName(name).orElse(null);
+    }
+    return null;
+  }
+
+  /**
+   * Resolves an ITEM reference (or a blueprint output) to a local game item by shared {@code
+   * external_uuid}.
+   *
+   * @param itemUuid the Wiki item UUID, or {@code null}
+   * @return the resolved game item, or {@code null}
+   */
+  @Contract("null -> null")
+  @Nullable
+  private GameItem resolveGameItem(UUID itemUuid) {
+    if (itemUuid == null) {
+      return null;
+    }
+    return gameItemRepository.findByExternalUuid(itemUuid).orElse(null);
+  }
+
+  /**
+   * Logs an {@link SyncEventType#UNRESOLVED_INGREDIENT} event for a line whose material / item
+   * reference could not be resolved this run.
+   *
+   * @param runId current run id
+   * @param blueprintUuid the owning blueprint's Wiki UUID
+   * @param ingredientName the Wiki ingredient name
+   */
+  private void logUnresolved(UUID runId, UUID blueprintUuid, String ingredientName) {
+    syncReportService.logScwikiEvent(
+        runId,
+        SyncEventType.UNRESOLVED_INGREDIENT,
+        "blueprint",
+        blueprintUuid,
+        ingredientName,
+        "Ingredient '"
+            + (ingredientName == null ? "?" : ingredientName)
+            + "' not resolvable to a material / game item — persisted via Wiki snapshot for "
+            + "re-resolution on a later run.");
+  }
+}

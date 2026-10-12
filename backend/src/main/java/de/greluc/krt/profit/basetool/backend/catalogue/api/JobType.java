@@ -37,6 +37,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /** Job Type JPA entity. */
 @Entity
@@ -50,6 +51,7 @@ public class JobType extends AbstractEntity<UUID> {
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
+  @Setter(onParam_ = @__(@Nullable))
   private UUID id;
 
   @Column(unique = true, nullable = false)
@@ -65,6 +67,7 @@ public class JobType extends AbstractEntity<UUID> {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "parent_id")
+  @Nullable
   private JobType parent;
 
   @Column(nullable = false)

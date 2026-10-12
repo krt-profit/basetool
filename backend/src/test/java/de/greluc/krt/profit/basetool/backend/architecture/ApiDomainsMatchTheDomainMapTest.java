@@ -145,7 +145,7 @@ class ApiDomainsMatchTheDomainMapTest {
   void aMistaggedControllerAndAStaleEntryAreReported() {
     DomainMap map = DomainMap.load();
     List<Class<?>> one =
-        List.of(de.greluc.krt.profit.basetool.backend.controller.CityController.class);
+        List.of(de.greluc.krt.profit.basetool.backend.catalogue.web.CityController.class);
 
     assertThat(disagreements(map, one, c -> "bank", Map.of(), Map.of()))
         .containsExactly(

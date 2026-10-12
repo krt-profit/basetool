@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
@@ -41,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderMapp
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.List;

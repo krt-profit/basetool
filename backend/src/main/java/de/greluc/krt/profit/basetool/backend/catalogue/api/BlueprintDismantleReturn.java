@@ -34,6 +34,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One dismantle-return line of a {@link Blueprint}: the commodity and SCU quantity recovered when
@@ -67,6 +68,7 @@ public class BlueprintDismantleReturn extends AbstractEntity<UUID> {
   /** Resolved commodity recovered on dismantle; {@code null} while unresolved. */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "material_id")
+  @Nullable
   private Material material;
 
   /** Raw Wiki resource UUID — kept for forensic re-resolution. */

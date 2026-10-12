@@ -24,8 +24,9 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
-import de.greluc.krt.profit.basetool.backend.mapper.MaterialCategoryMapper;
-import de.greluc.krt.profit.basetool.backend.service.MaterialCategoryService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.MaterialCategoryController;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

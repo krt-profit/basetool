@@ -25,9 +25,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.BlueprintController;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

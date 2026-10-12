@@ -34,6 +34,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Manufacturer JPA entity. Class-level {@code @BatchSize} batches the initialisation of lazy
@@ -119,10 +120,12 @@ public class Manufacturer extends AbstractEntity<UUID> {
    * marker; cleared on the next sync that sees it again.
    */
   @Column(name = "uex_deleted_at")
+  @Nullable
   private Instant uexDeletedAt;
 
   /** Soft-delete marker mirroring {@link #uexDeletedAt} for the SC Wiki side. */
   @Column(name = "scwiki_deleted_at")
+  @Nullable
   private Instant scwikiDeletedAt;
 
   /**

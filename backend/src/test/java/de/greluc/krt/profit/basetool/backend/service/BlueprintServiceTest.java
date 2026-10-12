@@ -26,9 +26,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintDto;
-import de.greluc.krt.profit.basetool.backend.mapper.BlueprintMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

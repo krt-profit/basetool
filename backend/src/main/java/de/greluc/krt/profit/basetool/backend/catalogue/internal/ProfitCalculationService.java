@@ -1,0 +1,215 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.catalogue.internal;
+
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPrice;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Computes the best per-material buy/sell margin for a chosen ship and optional star-system filter,
+ * from the lowest auto-load buy and highest auto-load sell price, naming the terminal of each.
+ * "Hull C"-class ships only get terminals with a loading dock.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class ProfitCalculationService {
+
+  /** Separator between the parts of a location label. */
+  private static final String LOCATION_SEPARATOR = " · ";
+
+  /** Breaks a price tie between terminals by terminal name, case-insensitively, nameless last. */
+  private static final Comparator<MaterialPrice> BY_TERMINAL_NAME =
+      Comparator.comparing(
+          (MaterialPrice p) -> p.getTerminal().getName(),
+          Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+
+  private final MaterialPriceRepository materialPriceRepository;
+  private final ShipTypeRepository shipTypeRepository;
+
+  /**
+   * Calculates the profit table for one ship across the chosen star systems. Materials without both
+   * a positive buy and sell price are dropped.
+   *
+   * @param shipId chosen ship type's id; supplies the SCU capacity
+   * @param starSystemNames optional star-system filter; null/empty means "all auto-load terminals"
+   * @return profit rows, one per material with both buy and sell sides; alphabetically sorted
+   * @throws IllegalArgumentException when {@code shipId} does not resolve to a ship type
+   */
+  @NotNull
+  public List<ProfitCalculationDto> calculateProfit(UUID shipId, List<String> starSystemNames) {
+    log.debug("Calculating profit for shipId: {} and starSystems: {}", shipId, starSystemNames);
+
+    ShipType ship =
+        shipTypeRepository
+            .findById(shipId)
+            .orElseThrow(() -> new IllegalArgumentException("ShipType not found: " + shipId));
+
+    int shipScu = ship.getScu() != null ? ship.getScu() : 0;
+    boolean isHullC = ship.getName() != null && ship.getName().toLowerCase().contains("hull c");
+
+    log.debug("Ship: {}, SCU: {}, isHullC: {}", ship.getName(), shipScu, isHullC);
+
+    List<MaterialPrice> prices;
+    if (starSystemNames == null || starSystemNames.isEmpty()) {
+      prices = materialPriceRepository.findAllAutoLoadPrices();
+    } else {
+      prices = materialPriceRepository.findAllAutoLoadPricesInSystems(starSystemNames);
+    }
+
+    log.debug("Found {} potential prices before Hull C filtering", prices.size());
+
+    if (isHullC) {
+      prices =
+          prices.stream()
+              .filter(
+                  p ->
+                      p.getTerminal().getHasLoadingDock() != null
+                          && p.getTerminal().getHasLoadingDock())
+              .toList();
+      log.debug("Hull C filtering reduced prices to {}", prices.size());
+    }
+
+    Map<Material, List<MaterialPrice>> pricesByMaterial =
+        prices.stream().collect(Collectors.groupingBy(MaterialPrice::getMaterial));
+
+    List<ProfitCalculationDto> results = new ArrayList<>();
+
+    for (Map.Entry<Material, List<MaterialPrice>> entry : pricesByMaterial.entrySet()) {
+      Material material = entry.getKey();
+      List<MaterialPrice> materialPrices = entry.getValue();
+
+      MaterialPrice bestBuy =
+          materialPrices.stream()
+              .filter(p -> isPositive(p.getPriceBuy()))
+              .min(Comparator.comparing(MaterialPrice::getPriceBuy).thenComparing(BY_TERMINAL_NAME))
+              .orElse(null);
+
+      MaterialPrice bestSell =
+          materialPrices.stream()
+              .filter(p -> isPositive(p.getPriceSell()))
+              .min(
+                  Comparator.comparing(MaterialPrice::getPriceSell, Comparator.reverseOrder())
+                      .thenComparing(BY_TERMINAL_NAME))
+              .orElse(null);
+
+      if (bestBuy != null && bestSell != null) {
+        BigDecimal minBuy = bestBuy.getPriceBuy();
+        BigDecimal maxSell = bestSell.getPriceSell();
+        BigDecimal profitPerScu = maxSell.subtract(minBuy);
+        BigDecimal marginPercent =
+            minBuy.compareTo(BigDecimal.ZERO) > 0
+                ? profitPerScu
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(minBuy, 4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        BigDecimal fullLoadCost = minBuy.multiply(BigDecimal.valueOf(shipScu));
+        BigDecimal maxProfitFullLoad = profitPerScu.multiply(BigDecimal.valueOf(shipScu));
+
+        results.add(
+            new ProfitCalculationDto(
+                material.getId(),
+                material.getName(),
+                minBuy,
+                maxSell,
+                profitPerScu,
+                marginPercent,
+                fullLoadCost,
+                maxProfitFullLoad,
+                bestBuy.getTerminal().getName(),
+                location(bestBuy.getTerminal()),
+                bestSell.getTerminal().getName(),
+                location(bestSell.getTerminal())));
+      }
+    }
+
+    results.sort(Comparator.comparing(ProfitCalculationDto::materialName));
+    log.debug("Calculation finished, returned {} results", results.size());
+    return results;
+  }
+
+  /**
+   * Whether a price is present and above zero; zero or absent means the side is not traded there.
+   *
+   * @param price the raw price
+   * @return {@code true} when the price is positive
+   */
+  private static boolean isPositive(@Nullable BigDecimal price) {
+    return price != null && price.compareTo(BigDecimal.ZERO) > 0;
+  }
+
+  /**
+   * The location label of a terminal: its planet, or its star system when it has none, then its
+   * city, station or outpost when that differs.
+   *
+   * @param terminal the terminal
+   * @return the label, or {@code null} when the terminal names no place
+   */
+  @Nullable
+  private static String location(@NotNull Terminal terminal) {
+    String region = firstPresent(terminal.getPlanetName(), terminal.getStarSystemName(), null);
+    String place =
+        firstPresent(
+            terminal.getCityName(), terminal.getSpaceStationName(), terminal.getOutpostName());
+    if (region == null) {
+      return place;
+    }
+    return place == null || place.equalsIgnoreCase(region)
+        ? region
+        : region + LOCATION_SEPARATOR + place;
+  }
+
+  /**
+   * The first non-blank of up to three values.
+   *
+   * @param first the preferred value
+   * @param second the first fallback
+   * @param third the second fallback
+   * @return the first non-blank value, or {@code null}
+   */
+  @Nullable
+  private static String firstPresent(
+      @Nullable String first, @Nullable String second, @Nullable String third) {
+    for (String value : new String[] {first, second, third}) {
+      if (value != null && !value.isBlank()) {
+        return value;
+      }
+    }
+    return null;
+  }
+}

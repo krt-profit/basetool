@@ -30,6 +30,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Reference row from UEX's {@code /categories} endpoint. Drives {@code UexItemSyncService}'s walk
@@ -84,5 +85,6 @@ public class UexCategory extends AbstractEntity<Integer> {
    * marker; cleared on the next sync that sees it again.
    */
   @Column(name = "uex_deleted_at")
+  @Nullable
   private Instant uexDeletedAt;
 }

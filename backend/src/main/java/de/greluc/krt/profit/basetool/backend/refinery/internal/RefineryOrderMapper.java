@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
-import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;

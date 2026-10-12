@@ -49,14 +49,14 @@ class PageCeilingTest {
    */
   private static final Set<String> REVIEWED_OPT_OUTS =
       Set.of(
-          "controller.CityController.getAllCities",
-          "controller.MaterialController.getMaterialMatrixItems",
-          "controller.MaterialController.getMaterialPriceOverview",
-          "controller.MaterialController.getMaterialPrices",
-          "controller.OutpostController.getAllOutposts",
-          "controller.PoiController.getAllPois",
-          "controller.SpaceStationController.getAllSpaceStations",
-          "controller.TerminalController.getAllTerminals");
+          "catalogue.web.CityController.getAllCities",
+          "catalogue.web.MaterialController.getMaterialMatrixItems",
+          "catalogue.web.MaterialController.getMaterialPriceOverview",
+          "catalogue.web.MaterialController.getMaterialPrices",
+          "catalogue.web.OutpostController.getAllOutposts",
+          "catalogue.web.PoiController.getAllPois",
+          "catalogue.web.SpaceStationController.getAllSpaceStations",
+          "catalogue.web.TerminalController.getAllTerminals");
 
   /**
    * Lists every method that reads {@link PageCeiling#LOAD_ALL}, relative to the backend package.

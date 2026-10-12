@@ -26,9 +26,10 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ShipTypeService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.ShipTypeController;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
-import de.greluc.krt.profit.basetool.backend.service.ShipTypeService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

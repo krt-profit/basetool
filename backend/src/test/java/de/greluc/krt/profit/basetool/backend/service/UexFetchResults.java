@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.integration.UexClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import java.util.List;
 
 /**

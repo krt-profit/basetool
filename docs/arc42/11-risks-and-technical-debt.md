@@ -345,15 +345,6 @@ since the go-live of 2026-09-28, so these risks hold now.
   the image pins name different Keycloak lines, and `ServiceRegistrationsTest` fails when one of the
   six service registrations no longer resolves, implements its SPI, instantiates or keeps its
   provider id. Neither runs the SPI inside Keycloak; that stays the sandbox smoke test's job.
-- **The catalogue's mappers, controllers and services cannot leave the layer packages yet**
-  (opened 2026-10-12; narrowed the same day). `AbstractEntity` and `PageResponse` lie in `kernel`,
-  and the 101 entities, enums, DTOs, repositories and validation types of the catalogue moved into
-  `catalogue.api` / `catalogue.internal`. The mappers, and the controllers and services that call
-  them, still name `CentralMapperConfig`, a platform class in the layer package `mapper` that 54
-  files name, and `mapper` is part of the cycle; `AdminP4kImportController` also uses
-  `P4kImportJobRunner`. The 23 UEX and SC Wiki classes wait for `AuthHelperService`, `CacheConfig`
-  and `ResponseSizeLimitInterceptor`, platform types that lie in layer packages too (plan §7.6,
-  P4-5).
 - **Three master-data caches still hold entities** (opened 2026-10-03 with thirty-two; the
   catalogue's twenty-nine closed 2026-10-12). `RoleService` and `SquadronService` share the cached
   instance, and their mutators are safe only because they load through self-invocation; a test runs

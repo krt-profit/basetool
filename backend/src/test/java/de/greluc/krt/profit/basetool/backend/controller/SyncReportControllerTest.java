@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ExternalSyncReport;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.SyncReportController;
 import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

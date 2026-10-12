@@ -3202,7 +3202,7 @@ raised:
 # — its permit-all chain enumerates the read endpoints only, so the write keeps the main gate.
 curl -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${ADMIN_TOKEN}" \
   -d '{"configuredLevel":"DEBUG"}' \
-  https://backend:11271/actuator/loggers/de.greluc.krt.profit.basetool.backend.integration.scwiki
+  https://backend:11271/actuator/loggers/de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient
 
 # frontend / ingest, in prod: read only — the write operation is not registered
 curl https://localhost:11272/actuator/loggers/de.greluc.krt.profit.basetool.ingest.edge

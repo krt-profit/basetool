@@ -37,6 +37,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Ship / vehicle catalogue entry, synced from UEX and SC Wiki.
@@ -64,6 +65,7 @@ public class ShipType extends AbstractEntity<UUID> {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "manufacturer_id")
+  @Nullable
   private Manufacturer manufacturer;
 
   private Integer scu;
@@ -100,10 +102,12 @@ public class ShipType extends AbstractEntity<UUID> {
 
   /** Minimum crew complement. */
   @Column(name = "crew_min")
+  @Nullable
   private Integer crewMin;
 
   /** Maximum crew complement. */
   @Column(name = "crew_max")
+  @Nullable
   private Integer crewMax;
 
   /** Hull mass (kg). */
@@ -166,146 +170,182 @@ public class ShipType extends AbstractEntity<UUID> {
 
   /** Add-on module to a parent ship (not a stand-alone vehicle). */
   @Column(name = "is_addon")
+  @Nullable
   private Boolean isAddon;
 
   /** Boarding-craft profile. */
   @Column(name = "is_boarding")
+  @Nullable
   private Boolean isBoarding;
 
   /** Bomber profile. */
   @Column(name = "is_bomber")
+  @Nullable
   private Boolean isBomber;
 
   /** Cargo-hauler profile. */
   @Column(name = "is_cargo")
+  @Nullable
   private Boolean isCargo;
 
   /** Carrier (can house sub-vessels). */
   @Column(name = "is_carrier")
+  @Nullable
   private Boolean isCarrier;
 
   /** Civilian (non-military) profile. */
   @Column(name = "is_civilian")
+  @Nullable
   private Boolean isCivilian;
 
   /** Concept ship — sold but not flyable. */
   @Column(name = "is_concept")
+  @Nullable
   private Boolean isConcept;
 
   /** Construction / industrial-bay-capable profile. */
   @Column(name = "is_construction")
+  @Nullable
   private Boolean isConstruction;
 
   /** Data-running / hacking profile. */
   @Column(name = "is_datarunner")
+  @Nullable
   private Boolean isDatarunner;
 
   /** Can dock with larger vessels. */
   @Column(name = "is_docking")
+  @Nullable
   private Boolean isDocking;
 
   /** Carries an EMP module. */
   @Column(name = "is_emp")
+  @Nullable
   private Boolean isEmp;
 
   /** Exploration profile. */
   @Column(name = "is_exploration")
+  @Nullable
   private Boolean isExploration;
 
   /** Ground vehicle (rover, tank, bike). */
   @Column(name = "is_ground_vehicle")
+  @Nullable
   private Boolean isGroundVehicle;
 
   /** Ships that act as hangars (can store other ships). */
   @Column(name = "is_hangar")
+  @Nullable
   private Boolean isHangar;
 
   /** Industrial profile (refinery / mining / construction lean). */
   @Column(name = "is_industrial")
+  @Nullable
   private Boolean isIndustrial;
 
   /** Quantum interdiction capability. */
   @Column(name = "is_interdiction")
+  @Nullable
   private Boolean isInterdiction;
 
   /** Has a loading dock (for cargo handling). */
   @Column(name = "is_loading_dock")
+  @Nullable
   private Boolean isLoadingDock;
 
   /** Medical / triage profile. */
   @Column(name = "is_medical")
+  @Nullable
   private Boolean isMedical;
 
   /** Military profile (UEE / faction-issued). */
   @Column(name = "is_military")
+  @Nullable
   private Boolean isMilitary;
 
   /** Mining capability. */
   @Column(name = "is_mining")
+  @Nullable
   private Boolean isMining;
 
   /** Passenger / transport profile. */
   @Column(name = "is_passenger")
+  @Nullable
   private Boolean isPassenger;
 
   /** Quantum enforcement device equipped. */
   @Column(name = "is_qed")
+  @Nullable
   private Boolean isQed;
 
   /** Quantum-travel capable (most ships). */
   @Column(name = "is_quantum_capable")
+  @Nullable
   private Boolean isQuantumCapable;
 
   /** Racing profile. */
   @Column(name = "is_racing")
+  @Nullable
   private Boolean isRacing;
 
   /** Refinery-capable ship. */
   @Column(name = "is_refinery")
+  @Nullable
   private Boolean isRefinery;
 
   /** Refuelling ship. */
   @Column(name = "is_refuel")
+  @Nullable
   private Boolean isRefuel;
 
   /** Field-repair ship. */
   @Column(name = "is_repair")
+  @Nullable
   private Boolean isRepair;
 
   /** Research / science profile. */
   @Column(name = "is_research")
+  @Nullable
   private Boolean isResearch;
 
   /** Salvage-capable ship. */
   @Column(name = "is_salvage")
+  @Nullable
   private Boolean isSalvage;
 
   /** Carries dedicated scanning gear. */
   @Column(name = "is_scanning")
+  @Nullable
   private Boolean isScanning;
 
   /** Science profile (overlaps research; UEX maintains both flags). */
   @Column(name = "is_science")
+  @Nullable
   private Boolean isScience;
 
   /** Tournament-prize / Showdown winner marker. */
   @Column(name = "is_showdown_winner")
+  @Nullable
   private Boolean isShowdownWinner;
 
   /** Atmosphere-capable spaceship (false for ground vehicles). */
   @Column(name = "is_spaceship")
+  @Nullable
   private Boolean isSpaceship;
 
   /** Starter-package eligible. */
   @Column(name = "is_starter")
+  @Nullable
   private Boolean isStarter;
 
   /** Stealth-profile ship. */
   @Column(name = "is_stealth")
+  @Nullable
   private Boolean isStealth;
 
   /** Tractor-beam-equipped. */
   @Column(name = "is_tractor_beam")
+  @Nullable
   private Boolean isTractorBeam;
 
   /** RSI pledge store URL. */
@@ -338,6 +378,7 @@ public class ShipType extends AbstractEntity<UUID> {
 
   /** German description (filled by R4 Wiki sync; UEX does not expose a DE field today). */
   @Column(name = "description_de", columnDefinition = "TEXT")
+  @Nullable
   private String descriptionDe;
 
   /** Last successful UEX sync touch. */
@@ -350,10 +391,12 @@ public class ShipType extends AbstractEntity<UUID> {
 
   /** UEX soft-delete marker. */
   @Column(name = "uex_deleted_at")
+  @Nullable
   private Instant uexDeletedAt;
 
   /** SC Wiki soft-delete marker. */
   @Column(name = "scwiki_deleted_at")
+  @Nullable
   private Instant scwikiDeletedAt;
 
   /** Which external catalogues have written; defaults to UEX_ONLY for R2 inserts. */
@@ -375,6 +418,7 @@ public class ShipType extends AbstractEntity<UUID> {
    * exchange {@code locKey} (REQ-XCH-012).
    */
   @Column(name = "name_key", length = 200)
+  @Nullable
   private String nameKey;
 
   /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */

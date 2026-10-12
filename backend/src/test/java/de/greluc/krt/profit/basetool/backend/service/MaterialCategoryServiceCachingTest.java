@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryService;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

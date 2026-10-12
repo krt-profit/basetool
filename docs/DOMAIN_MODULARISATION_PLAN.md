@@ -2333,6 +2333,64 @@ classes stay in their old test packages; they compile against the new packages. 
 classes remain in the layer packages: the mappers, controllers, services and the 23 of the UEX and
 SC Wiki side.
 
+**P4-5, part 3 — the catalogue's controllers, services, mappers and clients move into the module; three platform types move into `platform.api` — done 2026-10-12**
+1. *Re-probe* (ArchUnit dependencies over the compiled classes, one node per first package segment,
+   fixpoint; throwaway, deleted): of the 98 catalogue classes in the layer packages (80 sources and
+   the 18 generated `*Impl` mappers) 78 could move at once, the 20 UEX / SC Wiki classes could not.
+   The blockers were exactly three platform types in layer packages: `mapper.CentralMapperConfig`,
+   `config.ResponseSizeLimitInterceptor` (only the two clients use it) and
+   `service.AuthHelperService` (only `MaterialExternalAliasService` among the catalogue classes
+   uses it). `CacheConfig` is no blocker any more, and `P4kImportJobRunner` needed no SPI: it and
+   `AdminP4kImportController` both belong to the catalogue and move together. With the three types
+   in `platform` the probe moved all 98.
+2. *`CentralMapperConfig`: measured, platform.api.* Kernel: 54 files rewrite, one domain-map rule
+   changes (`class CentralMapperConfig platform` to `kernel`), no declaration changes. Platform.api:
+   the same 54 files, **no** domain-map change (the map assigns it to `platform` already) and no
+   declaration change either, because the 11 modules with a mapper of their own (admin, bank,
+   blueprint, dashboard, exchange, inventory, operation, orgchart, personalinventory, promotion,
+   refinery) and the catalogue already allow `platform::api`; the mappers still in `mapper` belong
+   to no declared module. Platform.api is smaller by the map rule and keeps the class where the map says it
+   belongs. `ResponseSizeLimitInterceptor` (4 files) and `AuthHelperService` (127 files, 57 main and
+   70 test; the bean name `authHelperService` the SpEL gates use is unchanged) went to `platform.api`
+   the same way. `ArchitectureTest` re-anchored its mapper layer on `UserMapper` and its service
+   layer on `AuditService`, both classes that stay in their layer packages.
+3. *Move*: 81 classes by `git mv` and script (371 files rewritten in the main pass, 190 imports
+   added): 21 controllers to `catalogue.web` (new `package-info`), 10 mappers and services that
+   other modules call (`MaterialMapper`, `LocationMapper`, `QualityTierService`, …) and everything an
+   `api` type uses to `catalogue.api` (six types moved over from `internal`), the rest, 50 classes,
+   to `catalogue.internal`. The `*Impl` mappers follow their interfaces. Nine tests followed their
+   subjects (the two clients' tests, `P4kImportServiceTest`, `UexItemSyncServiceTest`, …) because
+   they reach package-private members; `UexRefs`, their shared fixture, is public now.
+4. *Unchanged*: REST paths, `@PreAuthorize`, `@Transactional` boundaries, cache names, wire records,
+   schedules and metric names; `openapi.json` is byte-identical. The logger names of the moved
+   classes follow their packages (`…catalogue.internal.ScWikiClient` instead of
+   `…integration.scwiki`); `docs/specs/observability.md` shows the new one.
+5. *NullAway*: the moved sync, import and client code was never checked and raised 159 findings on
+   the first compile. Resolved without suppressions in code paths: about 100 `@Nullable`
+   annotations on entity fields and setter parameters (`@Setter(onParam_ = @__(@Nullable))` for the
+   `id` fields, so `getId()` stays non-null), on parameters, returns and record components, four
+   null-flow restructurings (`if (isNew)` became `if (x == null)` so the analysis sees the
+   assignment), and a `Objects.requireNonNull` in `MaterialClaimService`. One
+   `@SuppressWarnings("NullAway")`, on `ScWikiClient.fetchOne`: the `RestClient.exchange` lambda
+   returns `null` for 404 and 304, and Spring's generic return nullness is invisible to the
+   analysis. `P4kImportJobRunner.describe` falls back to the generic summary when a
+   `BadRequestException` carries no message, instead of returning `null`.
+6. *Gates*, set from the failing assertions or measured with a floor of 9999: the integration layer
+   is now the two clients and their nested classes (2 elements), the SC Wiki wiring rule selects the
+   five `ScWiki*SyncService` classes (5), and the layer floors rose to what the selections hold now:
+   controllers 99 to 104, mappers 100 to 106, services 495 to 510 (the old numbers were lower
+   bounds). The domain map lost five rules that assign no class any more (`package integration`
+   and four `name` rules). Module baseline 32 to 32.
+**Corrections:** (1) Part 1b's „159 follow once the two types are moved" and part 2's „part 3 needs
+`CentralMapperConfig` and `P4kImportJobRunner`" were both incomplete: `AuthHelperService` and
+`ResponseSizeLimitInterceptor` were the third and fourth blockers, and `P4kImportJobRunner` was none.
+(2) Annotating the `id` fields `@Nullable` first, as the setter check suggested, made `getId()`
+nullable in some twenty classes of other modules; the setter-only form is what `RefineryOrder` already used.
+(3) The script's name boundary now accepts `$`, so nested-class names in `@Query` strings were
+rewritten at once; the one string that is concatenated over two lines (`MaterialMapper`) was
+corrected by hand again. **Open:** `backend/build-settings.properties` points the mutation tests at
+`backend.service.*`, which holds fewer classes with every module move; not touched here.
+
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
 Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-logic` convention

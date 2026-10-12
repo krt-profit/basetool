@@ -25,9 +25,10 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.StarSystemController;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.mapper.StarSystemMapper;
-import de.greluc.krt.profit.basetool.backend.service.StarSystemService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

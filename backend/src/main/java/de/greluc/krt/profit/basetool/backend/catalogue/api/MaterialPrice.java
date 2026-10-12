@@ -37,6 +37,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /** Material Price JPA entity. */
 @Entity
@@ -73,5 +74,5 @@ public class MaterialPrice extends AbstractEntity<UUID> {
   private Boolean statusBuy;
   private Boolean statusSell;
 
-  private Instant dateModified;
+  @Nullable private Instant dateModified;
 }

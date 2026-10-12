@@ -1,0 +1,231 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.catalogue.internal;
+
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObserver;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
+import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Cached CRUD service for the {@code job_type} reference tree. Deletion is a soft delete ({@code
+ * active=false}) so referencing missions keep working; name uniqueness is case-insensitive and
+ * reported as a localized 409.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class JobTypeService {
+
+  private final JobTypeRepository jobTypeRepository;
+  private final JobTypeMapper jobTypeMapper;
+
+  /**
+   * Clears the derived mission-lead flag on participants whose job type loses the Einsatzleiter
+   * designation, so a stale flag cannot violate the single-lead unique index.
+   */
+  private final JobTypeDesignationObserver jobTypeDesignationObserver;
+
+  /**
+   * Returns the unpaged active job-type list for a dropdown, optionally filtered by archetype.
+   *
+   * @param archetype optional filter; null means "all active types"
+   * @return cached list of job type read models
+   */
+  @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
+  public List<JobTypeDto> getJobTypes(@Nullable JobTypeArchetype archetype) {
+    return (archetype == null
+            ? jobTypeRepository.findByActiveTrue()
+            : jobTypeRepository.findByArchetypeAndActiveTrue(archetype))
+        .stream().map(jobTypeMapper::toDto).toList();
+  }
+
+  /**
+   * Returns a page of job types for the admin list, optionally including soft-deleted entries.
+   *
+   * @param archetype optional archetype filter
+   * @param pageable page request
+   * @param includeInactive true to include soft-deleted rows
+   * @return cached page of job type read models
+   */
+  @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
+  public Page<JobTypeDto> getJobTypes(
+      @Nullable JobTypeArchetype archetype, @NotNull Pageable pageable, boolean includeInactive) {
+    Page<JobType> page;
+    if (archetype == null) {
+      page =
+          includeInactive
+              ? jobTypeRepository.findAll(pageable)
+              : jobTypeRepository.findByActiveTrue(pageable);
+    } else {
+      page =
+          includeInactive
+              ? jobTypeRepository.findByArchetype(archetype, pageable)
+              : jobTypeRepository.findByArchetypeAndActiveTrue(archetype, pageable);
+    }
+    return page.map(jobTypeMapper::toDto);
+  }
+
+  /**
+   * Persists a new job type, resolving the parent by id.
+   *
+   * @param jobType transient entity
+   * @return the persisted job type
+   * @throws DuplicateEntityException when the name collides with an existing row
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the parent id
+   *     does not resolve
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
+  public JobType createJobType(@NotNull JobType jobType) {
+    if (jobTypeRepository.existsByNameIgnoreCase(jobType.getName())) {
+      throw new DuplicateEntityException(
+          "A Job Type with the name '" + jobType.getName() + "' already exists.");
+    }
+    if (jobType.getParent() != null && jobType.getParent().getId() != null) {
+      JobType parent =
+          Entities.require(
+              jobTypeRepository.findById(jobType.getParent().getId()), "Parent JobType not found");
+      jobType.setParent(parent);
+    } else {
+      jobType.setParent(null);
+    }
+    applyMissionLeadDesignation(jobType, jobType.isMissionLead());
+    return jobTypeRepository.save(jobType);
+  }
+
+  /**
+   * Updates a job type with an explicit version check; the duplicate-name check ignores the row
+   * itself.
+   *
+   * @param id job type primary key
+   * @param jobTypeDto update payload
+   * @return the persisted job type
+   * @throws DuplicateEntityException when the new name collides with a different row
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
+  public JobType updateJobType(@NotNull UUID id, @NotNull JobTypeDto jobTypeDto) {
+    if (jobTypeRepository.existsByNameIgnoreCaseAndIdNot(jobTypeDto.name(), id)) {
+      throw new DuplicateEntityException(
+          "A Job Type with the name '" + jobTypeDto.name() + "' already exists.");
+    }
+    JobType jobType = Entities.require(jobTypeRepository.findById(id), "JobType not found");
+
+    OptimisticLock.check(jobType.getVersion(), jobTypeDto.version(), JobType.class, id);
+
+    jobType.setName(jobTypeDto.name());
+    jobType.setDescription(jobTypeDto.description());
+    jobType.setArchetype(jobTypeDto.archetype());
+    jobType.setLeadershipRole(jobTypeDto.isLeadershipRole());
+    applyMissionLeadDesignation(jobType, Boolean.TRUE.equals(jobTypeDto.isMissionLead()));
+
+    if (jobTypeDto.parentId() != null) {
+      JobType parent =
+          Entities.require(
+              jobTypeRepository.findById(jobTypeDto.parentId()), "Parent JobType not found");
+      jobType.setParent(parent);
+    } else {
+      jobType.setParent(null);
+    }
+
+    return jobTypeRepository.save(jobType);
+  }
+
+  /**
+   * Soft-deletes a job type by setting {@code active=false}, keeping referencing participants
+   * valid.
+   *
+   * @param id job type primary key
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
+  public void deleteJobType(@NotNull UUID id) {
+    JobType jobTypeToDeactivate =
+        Entities.require(jobTypeRepository.findById(id), "JobType not found");
+
+    jobTypeToDeactivate.setActive(false);
+    jobTypeRepository.save(jobTypeToDeactivate);
+  }
+
+  /**
+   * Reverses a soft-delete by flipping {@code active=true}. ADMIN-only at the controller layer.
+   *
+   * @param id job type primary key
+   */
+  @Transactional
+  @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
+  public void activateJobType(@NotNull UUID id) {
+    JobType jobTypeToActivate =
+        Entities.require(jobTypeRepository.findById(id), "JobType not found");
+
+    jobTypeToActivate.setActive(true);
+    jobTypeRepository.save(jobTypeToActivate);
+  }
+
+  /**
+   * Sets or clears the single Einsatzleiter designation on a job type. Setting it requires a {@link
+   * JobTypeArchetype#MISSION} leadership type and clears it from any other type first. Runs in the
+   * caller's transaction.
+   *
+   * @param jobType the job type being saved, archetype and leadership flag already set
+   * @param wants whether this job type should carry the designation
+   * @throws IllegalArgumentException when designating a non-MISSION or non-leadership job type
+   */
+  private void applyMissionLeadDesignation(@NotNull JobType jobType, boolean wants) {
+    if (!wants) {
+      jobType.setMissionLead(false);
+      if (jobType.getId() != null) {
+        jobTypeDesignationObserver.missionLeadRevoked(jobType.getId());
+      }
+      return;
+    }
+    if (jobType.getArchetype() != JobTypeArchetype.MISSION || !jobType.isLeadershipRole()) {
+      throw new IllegalArgumentException(
+          "Only a MISSION leadership role can be designated as the Einsatzleiter (mission lead).");
+    }
+    for (JobType current : jobTypeRepository.findAllMissionLead()) {
+      if (jobType.getId() == null || !jobType.getId().equals(current.getId())) {
+        current.setMissionLead(false);
+        jobTypeRepository.save(current);
+        jobTypeDesignationObserver.missionLeadRevoked(current.getId());
+      }
+    }
+    jobType.setMissionLead(true);
+  }
+}

@@ -28,6 +28,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -93,7 +94,11 @@ public class SyncReportService {
    * @param detail free-form human-readable detail (e.g. the ambiguous candidate names)
    */
   public void logCommodityEvent(
-      UUID runId, SyncEventType eventType, UUID externalUuid, String externalName, String detail) {
+      UUID runId,
+      SyncEventType eventType,
+      @Nullable UUID externalUuid,
+      @Nullable String externalName,
+      String detail) {
     logScwikiEvent(runId, eventType, "commodity", externalUuid, externalName, detail);
   }
 
@@ -112,8 +117,8 @@ public class SyncReportService {
       UUID runId,
       SyncEventType eventType,
       String aggregate,
-      UUID externalUuid,
-      String externalName,
+      @Nullable UUID externalUuid,
+      @Nullable String externalName,
       String detail) {
     repository.save(
         ExternalSyncReport.builder()
@@ -144,8 +149,8 @@ public class SyncReportService {
       UUID runId,
       SyncEventType eventType,
       String aggregate,
-      UUID externalUuid,
-      String externalName,
+      @Nullable UUID externalUuid,
+      @Nullable String externalName,
       String detail) {
     repository.save(
         ExternalSyncReport.builder()
@@ -176,8 +181,8 @@ public class SyncReportService {
       UUID runId,
       SyncEventType eventType,
       String aggregate,
-      UUID externalUuid,
-      String externalName,
+      @Nullable UUID externalUuid,
+      @Nullable String externalName,
       String detail) {
     repository.save(
         ExternalSyncReport.builder()
@@ -225,7 +230,7 @@ public class SyncReportService {
    * @throws IllegalArgumentException if {@code days} is less than 1
    */
   @Transactional
-  public int deleteOlderThan(SyncSourceSystem source, int days) {
+  public int deleteOlderThan(@Nullable SyncSourceSystem source, int days) {
     if (days < 1) {
       throw new IllegalArgumentException("days must be at least 1, was " + days);
     }
@@ -253,7 +258,7 @@ public class SyncReportService {
    * @return one page of events newest-first
    */
   @Transactional(readOnly = true)
-  public Page<ExternalSyncReport> findEvents(SyncSourceSystem source, Pageable pageable) {
+  public Page<ExternalSyncReport> findEvents(@Nullable SyncSourceSystem source, Pageable pageable) {
     if (source == null) {
       return repository.findAllByOrderByRanAtDesc(pageable);
     }

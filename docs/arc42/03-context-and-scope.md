@@ -33,7 +33,7 @@
 | **GitHub Pages** | out | The third-party documentation at <https://krt-profit.github.io/basetool/> (`docs/exchange/`, rendered OpenAPI reference, schemas), built by `exchange-docs.yml` and deployed from `main` only; the service document's `docsUrl` points there. A static site, no runtime unit — the schemas' permanent `$id`s stay on the ingest host (REQ-XCH-002, REQ-XCH-011) | Documentation hosting |
 | **Discord** | both | OAuth2 social login, guild membership, in-guild role and nickname — all asked by the Keycloak SPI, fail-closed; the applications never call Discord | An identity the organisation already uses; the tool does not own it |
 | **Keycloak** | — | *Inside* the boundary as a deployed component, but *outside* the applications: they never see a credential | See §5 |
-| **UEX** | out | Commodity and item prices, the universe's locations, vehicles, refinery methods and yields (`integration/UexClient`) | Third-party game-economy data |
+| **UEX** | out | Commodity and item prices, the universe's locations, vehicles, refinery methods and yields (`catalogue/internal/UexClient`) | Third-party game-economy data |
 | **Star Citizen wiki** | out | Reference data synchronised by the backend (`integration/scwiki`) | Third-party game data |
 | **SMTP relay** | out | Transactional account mails — approval and rejection notices (`REQ-NOTIF-013/-014`); a no-op unless `SPRING_MAIL_HOST` is set | Mail delivery is not something to host |
 | **Let's Encrypt** | out | ACME HTTP-01 for the four public names | Certificate authority |

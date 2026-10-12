@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ProfitCalculationDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ProfitCalculationService;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
