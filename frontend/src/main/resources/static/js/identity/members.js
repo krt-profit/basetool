@@ -18,7 +18,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_DELETE_TITLE, MSG_DELETE_CONFIRM, MSG_DELETE_LABEL, MSG_CANCEL_LABEL, MSG_DELETE_SUCCESS, MSG_DELETE_ERROR, MSG_SYNC_SUCCESS, MSG_SYNC_ERROR, MSG_CONSOLIDATE_SUCCESS, MSG_CONSOLIDATE_ERROR, MSG_CONSOLIDATE_NO_TARGET, krtAutocomplete */
+/* global MSG_DELETE_TITLE, MSG_DELETE_CONFIRM, MSG_DELETE_LABEL, MSG_CANCEL_LABEL, MSG_DELETE_SUCCESS, MSG_DELETE_ERROR, MSG_SYNC_SUCCESS, MSG_SYNC_ERROR, MSG_CONSOLIDATE_SUCCESS, MSG_CONSOLIDATE_ERROR, MSG_CONSOLIDATE_NO_TARGET */
+
+import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 
 const MEMBERS_SECTIONS = {
     roster: { container: '#members-results', fragmentValue: 'results' },

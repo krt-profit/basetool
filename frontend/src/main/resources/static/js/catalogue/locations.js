@@ -19,7 +19,9 @@
 
 // @ts-check
 
-/* global krtAutocomplete, LOCATION_MSG, LOCATION_CONFLICT */
+/* global LOCATION_MSG, LOCATION_CONFLICT */
+
+import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dataList = /** @type {HTMLDataListElement | null} */ (

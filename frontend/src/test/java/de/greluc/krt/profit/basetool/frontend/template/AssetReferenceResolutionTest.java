@@ -45,7 +45,7 @@ import org.junit.jupiter.api.io.TempDir;
 class AssetReferenceResolutionTest {
 
   /** Selection floor: asset links of all templates when the test was added. */
-  private static final int MIN_REFERENCES = 290;
+  private static final int MIN_REFERENCES = 283;
 
   private static final Path RESOURCES = AssetReferences.MAIN_RESOURCES;
 

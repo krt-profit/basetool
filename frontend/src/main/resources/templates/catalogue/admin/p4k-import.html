@@ -156,7 +156,7 @@
         jobs: /*[[${jobsUrl}]]*/ '/admin/p4k-import/jobs'
     };
 </script>
-<script th:src="@{/js/catalogue/p4k-import.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/catalogue/p4k-import.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

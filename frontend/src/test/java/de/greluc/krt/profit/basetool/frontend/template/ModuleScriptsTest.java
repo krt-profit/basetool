@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.ModuleImportMap;
 import de.greluc.krt.profit.basetool.frontend.support.AssetReferences;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -50,10 +51,10 @@ class ModuleScriptsTest {
   /**
    * The most classic scripts the manifest may list; lower it whenever a script becomes a module.
    */
-  private static final int CLASSIC_CEILING = 116;
+  private static final int CLASSIC_CEILING = 1;
 
   /** Selection floor: module scripts when the guard was added. */
-  private static final int MODULES_FLOOR = 24;
+  private static final int MODULES_FLOOR = 139;
 
   private static final Path SCRIPTS = AssetReferences.MAIN_RESOURCES.resolve("static/js");
 
@@ -111,6 +112,46 @@ class ModuleScriptsTest {
     assertThat(offenders)
         .as("a module is linked type=\"module\" without defer, a classic script without type")
         .isEmpty();
+  }
+
+  @Test
+  void everyPageMapsTheModulesItsOwnTemplateLinksAndTheirImports() throws IOException {
+    ModuleImportMap map = new ModuleImportMap(path -> path);
+    List<String> offenders = new ArrayList<>();
+    int pages = 0;
+    try (Stream<Path> tree = Files.walk(TEMPLATES)) {
+      for (Path template : tree.filter(p -> p.toString().endsWith(".html")).sorted().toList()) {
+        String source = Files.readString(template, StandardCharsets.UTF_8);
+        if (!source.contains("~{kernel/fragments/layout :: page(")) {
+          continue;
+        }
+        pages++;
+        String view =
+            TEMPLATES.relativize(template).toString().replace('\\', '/').replaceAll("\\.html$", "");
+        Set<String> linked = new TreeSet<>();
+        Matcher tag = SCRIPT_TAG.matcher(source);
+        while (tag.find()) {
+          Matcher src = SCRIPT_SRC.matcher(tag.group(1));
+          if (tag.group(1).contains("type=\"module\"") && src.find()) {
+            linked.add(src.group(1));
+          }
+        }
+        if (!map.entryModules(view).containsAll(linked)) {
+          offenders.add(view + " does not find its module scripts " + linked);
+        }
+        Set<String> mapped = new TreeSet<>();
+        Matcher json = Pattern.compile("\"(/js/[^\"]+)\":").matcher(map.json(view));
+        while (json.find()) {
+          mapped.add(json.group(1));
+        }
+        if (!mapped.equals(new TreeSet<>(map.importClosure(map.entryModules(view))))) {
+          offenders.add(view + " renders a map that differs from its import closure");
+        }
+      }
+    }
+
+    assertThat(pages).as("pages composed through the layout").isGreaterThanOrEqualTo(80);
+    assertThat(offenders).isEmpty();
   }
 
   @Test

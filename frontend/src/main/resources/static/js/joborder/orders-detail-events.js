@@ -19,7 +19,41 @@
 
 // @ts-check
 
-/* global ORDER_CONFLICT, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, updateStatus, _toggleBlueprintCounting, toggleInventory, unlinkInventoryItem, openClaimCreate, openClaimEdit, submitClaim, withdrawClaimAction, openHandoverModal, openProductionModal, bookProduction, _prodReconcile, _prodSyncPersonalForOwner, _prodRefreshOrgUnitPicker, _prodSyncPersonalAllocate, _odToggleDemandRow, downloadHandoverReport, downloadItemHandoverReport, cancelStatusChange, confirmStatusChange, addHandoverItemRow, previewHandoverReport, updateHandoverIndexes, _odControlById, _odElementById */
+/* global ORDER_CONFLICT, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast */
+
+import {
+    _toggleBlueprintCounting,
+    cancelStatusChange,
+    confirmStatusChange,
+    openClaimCreate,
+    openClaimEdit,
+    submitClaim,
+    updateStatus,
+    withdrawClaimAction,
+} from '/js/joborder/orders-detail-claims.js';
+import { unlinkInventoryItem } from '/js/joborder/orders-detail-edit.js';
+import {
+    _odToggleDemandRow,
+    _prodReconcile,
+    _prodRefreshOrgUnitPicker,
+    _prodSyncPersonalAllocate,
+    _prodSyncPersonalForOwner,
+    bookProduction,
+    openProductionModal,
+} from '/js/joborder/orders-detail-production.js';
+import {
+    downloadHandoverReport,
+    downloadItemHandoverReport,
+    previewHandoverReport,
+    toggleInventory,
+} from '/js/joborder/orders-detail-reports.js';
+import {
+    _odControlById,
+    _odElementById,
+    addHandoverItemRow,
+    openHandoverModal,
+    updateHandoverIndexes,
+} from '/js/joborder/orders-detail.js';
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'od-update-status', (el) => {

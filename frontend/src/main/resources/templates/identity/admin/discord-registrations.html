@@ -210,7 +210,7 @@
         reject: /*[[#{admin.discordRegistrations.reject}]]*/ 'Ablehnen'
     };
 </script>
-<script th:src="@{/js/identity/discord-registrations.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/identity/discord-registrations.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

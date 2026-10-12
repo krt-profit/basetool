@@ -172,6 +172,43 @@ await test('the modern-syntax rules report their shapes', async () => {
     }
 });
 
+await test('a module imports only its own domain and the kernel, by absolute path', async () => {
+    const own = "import { a } from '/js/bank/a.js';\nconsole.log(a);";
+    const kernel = "import { a } from '/js/kernel/a.js';\nconsole.log(a);";
+    assert.deepEqual(await rulesFor(own, 'bank/planted.js'), []);
+    assert.deepEqual(await rulesFor(kernel, 'bank/planted.js'), []);
+    for (const specifier of ['/js/mission/a.js', './a.js', '../mission/a.js', 'lodash']) {
+        const code = `import { a } from '${specifier}';\nconsole.log(a);`;
+        assert.ok(
+            (await rulesFor(code, 'bank/planted.js')).includes('no-restricted-imports'),
+            `${specifier} not rejected in a bank module`,
+        );
+    }
+    assert.ok(
+        (await rulesFor(own, 'kernel/planted.js')).includes('no-restricted-imports'),
+        'the kernel imports no domain module',
+    );
+    assert.ok(
+        (await rulesFor("export { a } from '/js/mission/a.js';", 'bank/planted.js')).includes(
+            'no-restricted-imports',
+        ),
+        'a re-export crosses the boundary too',
+    );
+});
+
+await test('a dynamic import is rejected, a classic script cannot import at all', async () => {
+    assert.ok(
+        (await rulesFor("import('/js/bank/a.js');", 'bank/planted.js')).includes(
+            'no-restricted-syntax',
+        ),
+    );
+    const classic = await rulesFor(
+        "import { a } from '/js/kernel/a.js';",
+        'kernel/krt-client-error.js',
+    );
+    assert.deepEqual(classic, [null]);
+});
+
 if (failures > 0) {
     console.error(`${failures} failed`);
     process.exit(1);

@@ -19,15 +19,20 @@
 
 // @ts-check
 
-/* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, showFrontendErrorToast, ORDER_HANDOVER_I18N, fillPlaceholders, validateHandoverAmounts, cachedInventoryItems */
-/* exported downloadHandoverReport, downloadItemHandoverReport, validateItemHandoverForm, previewHandoverReport, toggleInventory */
+/* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, showFrontendErrorToast, ORDER_HANDOVER_I18N */
+
+import {
+    cachedInventoryItems,
+    fillPlaceholders,
+    validateHandoverAmounts,
+} from '/js/joborder/orders-detail.js';
 
 /**
  * Downloads the PDF report of a material handover.
  *
  * @param {Element} btn the download button carrying the order, handover and handover time
  */
-async function downloadHandoverReport(btn) {
+export async function downloadHandoverReport(btn) {
     const orderId = btn.getAttribute('data-order-id');
     const handoverId = btn.getAttribute('data-handover-id');
     const handoverTimeRaw = btn.getAttribute('data-handover-time');
@@ -86,7 +91,7 @@ async function downloadHandoverReport(btn) {
  *
  * @param {Element} btn the download button carrying the order, handover and handover time
  */
-async function downloadItemHandoverReport(btn) {
+export async function downloadItemHandoverReport(btn) {
     const orderId = btn.getAttribute('data-order-id');
     const handoverId = btn.getAttribute('data-handover-id');
     const handoverTimeRaw = btn.getAttribute('data-handover-time');
@@ -145,7 +150,7 @@ async function downloadItemHandoverReport(btn) {
  *
  * @returns {boolean} true when the form can be submitted
  */
-function validateItemHandoverForm() {
+export function validateItemHandoverForm() {
     const inputs = /** @type {NodeListOf<HTMLInputElement>} */ (
         document.querySelectorAll('#item-handover-modal input[type="number"]')
     );
@@ -164,7 +169,7 @@ function validateItemHandoverForm() {
  *
  * @param {Element} btn the preview button carrying the order id
  */
-async function previewHandoverReport(btn) {
+export async function previewHandoverReport(btn) {
     const orderId = btn.getAttribute('data-order-id');
     const orderNumber =
         document.getElementById('order-display-id')?.getAttribute('data-order-number') ||
@@ -331,7 +336,7 @@ async function _loadStockAttribution(orderId, materialId, tierId) {
  *
  * @param {HTMLElement} row the material row
  */
-async function toggleInventory(row) {
+export async function toggleInventory(row) {
     const orderId = row.getAttribute('data-order-id');
     const materialId = row.getAttribute('data-material-id');
     const amountType = row.getAttribute('data-amount-type');

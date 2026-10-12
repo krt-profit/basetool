@@ -155,7 +155,6 @@
     </th:block>
 </div>
 
-<script th:src="@{/js/kernel/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var shipDataI18n = {
         saved:        /*[[#{notification.success.save}]]*/ 'Gespeichert.',
@@ -172,7 +171,7 @@
     };
     var shipDataResetUrl = /*[[@{/ship-data/reset-fitted}]]*/ '/ship-data/reset-fitted';
 </script>
-<script th:src="@{/js/catalogue/ship-data.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/catalogue/ship-data.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

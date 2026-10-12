@@ -355,13 +355,13 @@
         <th:block th:replace="~{kernel/fragments/mobile-nav :: tabbar}" />
         <th:block th:replace="~{kernel/fragments/palette :: palette}" />
     </th:block>
-    <script th:src="@{/js/kernel/sidebar.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/krt-palette.js}" defer th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
+    <script type="module" th:src="@{/js/kernel/sidebar.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-palette.js}" th:attr="nonce=${cspNonce}" sec:authorize="isAuthenticated()"></script>
     <th:block th:replace="~{kernel/fragments/toast :: toast}" />
     <th:block th:replace="~{kernel/fragments/unsaved-modal :: unsavedModal}" />
     <th:block th:replace="~{kernel/fragments/footer :: footer}" />
     <th:block th:replace="~{kernel/fragments/icons :: sprite}" />
-    <script th:src="@{/js/kernel/unsaved-changes.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/unsaved-changes.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

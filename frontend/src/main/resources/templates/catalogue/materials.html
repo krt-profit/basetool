@@ -61,8 +61,7 @@
     </div>
 </main>
 
-<script th:src="@{/js/kernel/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/catalogue/materials.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/catalogue/materials.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

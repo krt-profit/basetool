@@ -219,7 +219,7 @@
         vacateConfirm: /*[[#{orgChart.vacateLead.confirm}]]*/ 'Remove this command group\'s Kommandoleiter?'
     };
 </script>
-<script th:src="@{/js/orgchart/org-chart.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/orgchart/org-chart.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

@@ -44,7 +44,7 @@
         </form>
     </div>
 </main>
-<script th:if="${!registrationRejected and !registrationNoRole}" th:src="@{/js/identity/pending-approval.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:if="${!registrationRejected and !registrationNoRole}" th:src="@{/js/identity/pending-approval.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

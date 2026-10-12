@@ -1,13 +1,12 @@
 // @ts-check
 
-/* exported krtAutocomplete */
 /**
  * Initialize a custom autocomplete on an input element.
  * @param {HTMLInputElement} inp - The input element
  * @param {Array|Function} dataSource - Either an array of strings, or a function that takes a query and returns a Promise resolving to an array of strings.
  * @param {Object} options - Configuration options
  */
-function krtAutocomplete(inp, dataSource, options = {}) {
+export function krtAutocomplete(inp, dataSource, options = {}) {
     let currentFocus;
     let debounceTimer;
 

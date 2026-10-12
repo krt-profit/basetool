@@ -19,8 +19,18 @@
 
 // @ts-check
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, showFrontendErrorToast, showFrontendSuccessToast, ORDER_HANDOVER_I18N, validateHandoverAmounts, _serializeHandoverForm, isInventoryCached:writable, cachedInventoryItems:writable, handoverTierSuggestion:writable, _publishOrdersQueue, validateItemHandoverForm, _serializeItemHandoverForm, _odEditVersionInput, _odFieldValue */
-/* exported unlinkInventoryItem, isInventoryCached, cachedInventoryItems, handoverTierSuggestion */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, showFrontendErrorToast, showFrontendSuccessToast, ORDER_HANDOVER_I18N */
+
+import { validateItemHandoverForm } from '/js/joborder/orders-detail-reports.js';
+import {
+    _odEditVersionInput,
+    _odFieldValue,
+    _publishOrdersQueue,
+    _serializeHandoverForm,
+    _serializeItemHandoverForm,
+    resetInventoryCache,
+    validateHandoverAmounts,
+} from '/js/joborder/orders-detail.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const handoverForm = /** @type {HTMLFormElement | null} */ (
@@ -51,9 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (editVer && order && order.version != null) editVer.value = order.version;
                     const modal = document.getElementById('handover-modal');
                     if (modal) window.krtModal.close(modal);
-                    isInventoryCached = false;
-                    cachedInventoryItems = [];
-                    handoverTierSuggestion = new Map();
+                    resetInventoryCache();
                     const itemsContainer = document.getElementById('handover-items-container');
                     if (itemsContainer) itemsContainer.replaceChildren();
                     showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
@@ -297,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
  * @param {KrtWriteOpts} opts the write options
  * @returns {Promise<KrtWriteResult>} the outcome of the write
  */
-function krtOrderWrite(opts) {
+export function krtOrderWrite(opts) {
     return window.krtFetch.write(
         Object.assign({}, opts, {
             serialize: opts.serialize || 'order',
@@ -431,7 +439,7 @@ function _serializeEditForm() {
  * @param {KrtSectionRefreshOpts} [broadcastOpts] the live-sync broadcast options
  * @returns {Promise<boolean> | void} the swap outcome, absent when the section seam handled it
  */
-function _refreshMaterialsSection(orderId, broadcastOpts) {
+export function _refreshMaterialsSection(orderId, broadcastOpts) {
     if (window.krtRefreshOrderSection) {
         return window.krtRefreshOrderSection(['materials', 'aggregated', 'kpi'], broadcastOpts);
     }
@@ -459,7 +467,7 @@ function _refreshMaterialsSection(orderId, broadcastOpts) {
  * @param {KrtSectionRefreshOpts} [broadcastOpts] the live-sync broadcast options
  * @returns {Promise<boolean> | void} the swap outcome, absent when the section seam handled it
  */
-function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
+export function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
     if (window.krtRefreshOrderSection) {
         return window.krtRefreshOrderSection(fragmentValue, broadcastOpts);
     }
@@ -479,7 +487,7 @@ function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
  *
  * @param {Element} btn the unlink button carrying the order and entry ids
  */
-async function unlinkInventoryItem(btn) {
+export async function unlinkInventoryItem(btn) {
     const orderId = btn.getAttribute('data-order-id');
     const invId = btn.getAttribute('data-inventory-item-id');
     if (!orderId || !invId) return;

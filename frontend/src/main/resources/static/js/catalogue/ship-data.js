@@ -19,7 +19,9 @@
 
 // @ts-check
 
-/* global krtAutocomplete, shipDataI18n, shipDataConflict, shipDataResetUrl */
+/* global shipDataI18n, shipDataConflict, shipDataResetUrl */
+
+import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const shipTypesData = /** @type {HTMLDataListElement | null} */ (

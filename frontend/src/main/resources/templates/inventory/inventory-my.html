@@ -808,11 +808,10 @@
         error: /*[[#{notification.error.save}]]*/ 'Fehler.'
     };
 </script>
-<script th:src="@{/js/inventory/inventory-note-modal.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/inventory/inventory-herkunft.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/inventory/inventory-common.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/inventory/inventory-my.js}" defer th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/inventory/inventory-materialboerse.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/inventory/inventory-herkunft.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/inventory/inventory-common.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/inventory/inventory-my.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/inventory/inventory-materialboerse.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

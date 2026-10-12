@@ -29,7 +29,7 @@ let activeNoteButton = null;
  *
  * @param {HTMLElement} btn the note button that was activated
  */
-function openNoteModal(btn) {
+export function openNoteModal(btn) {
     activeNoteButton = btn;
     const modal = document.getElementById('noteModal');
     const ta = /** @type {HTMLTextAreaElement | null} */ (
@@ -45,13 +45,13 @@ function openNoteModal(btn) {
     }, 0);
 }
 
-function closeNoteModal() {
+export function closeNoteModal() {
     const modal = document.getElementById('noteModal');
     window.krtModal.close(modal);
     activeNoteButton = null;
 }
 
-function updateNoteCounter() {
+export function updateNoteCounter() {
     const ta = /** @type {HTMLTextAreaElement | null} */ (
         document.getElementById('noteModalTextarea')
     );
@@ -59,7 +59,7 @@ function updateNoteCounter() {
     if (ta && counter) counter.textContent = `${ta.value ? ta.value.length : 0} / 1000`;
 }
 
-function showInventoryToast(type, msg) {
+export function showInventoryToast(type, msg) {
     if (type === 'error') {
         if (typeof window.showFrontendErrorToast === 'function') {
             window.showFrontendErrorToast(msg);
@@ -69,7 +69,7 @@ function showInventoryToast(type, msg) {
     }
 }
 
-function saveNote() {
+export function saveNote() {
     if (!activeNoteButton) return;
     const ta = /** @type {HTMLTextAreaElement | null} */ (
         document.getElementById('noteModalTextarea')
@@ -78,7 +78,7 @@ function saveNote() {
     submitNoteUpdate(ta.value || '');
 }
 
-function removeNote() {
+export function removeNote() {
     if (!activeNoteButton) return;
     if (typeof window.showKrtConfirm !== 'function') {
         submitNoteUpdate('');
@@ -189,10 +189,3 @@ function runNoteUpdate(btn, id, noteValue) {
         },
     });
 }
-
-window.openNoteModal = openNoteModal;
-window.closeNoteModal = closeNoteModal;
-window.updateNoteCounter = updateNoteCounter;
-window.saveNote = saveNote;
-window.removeNote = removeNote;
-window.showInventoryToast = showInventoryToast;

@@ -583,6 +583,7 @@ val lintJs =
     inputs.files(fileTree("scripts") { include("**/*.mjs") })
     inputs.file("package.json")
     inputs.file("eslint.config.mjs")
+    inputs.file("module-ratchet.json")
   }
 
 val prettierCheck =
@@ -769,6 +770,7 @@ val testEslintBans =
     ignoreExitValue.set(false)
     inputs.file(layout.projectDirectory.file("scripts/eslint-bans.test.mjs"))
     inputs.file(layout.projectDirectory.file("eslint.config.mjs"))
+    inputs.file(layout.projectDirectory.file("module-ratchet.json"))
     inputs.file(layout.projectDirectory.file("package.json"))
     outputs.upToDateWhen { false }
   }

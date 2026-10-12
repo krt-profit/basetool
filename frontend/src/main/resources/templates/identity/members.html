@@ -134,7 +134,6 @@
         </th:block>
     </th:block>
 </main>
-<script th:src="@{/js/kernel/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const MSG_DELETE_TITLE = /*[[#{members.delete.title}]]*/ "";
     const MSG_DELETE_CONFIRM = /*[[#{members.delete_confirm}]]*/ "";
@@ -148,7 +147,7 @@
     const MSG_CONSOLIDATE_ERROR = /*[[#{error.user.consolidate}]]*/ "";
     const MSG_CONSOLIDATE_NO_TARGET = /*[[#{error.user.consolidate.no_target}]]*/ "";
 </script>
-<script th:src="@{/js/identity/members.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/identity/members.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

@@ -18,7 +18,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global bulkI18n, bulkRebookI18n, orgUnitChangeI18n, stolenMarkI18n, inventoryConflictI18n, umbuchenI18n, assocI18n, showInventoryToast, openNoteModal, closeNoteModal, updateNoteCounter, saveNote, removeNote */
+/* global bulkI18n, bulkRebookI18n, orgUnitChangeI18n, stolenMarkI18n, inventoryConflictI18n, umbuchenI18n, assocI18n */
+
+import {
+    closeNoteModal,
+    openNoteModal,
+    removeNote,
+    saveNote,
+    showInventoryToast,
+    updateNoteCounter,
+} from '/js/inventory/inventory-note-modal.js';
 
 const myLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-my',

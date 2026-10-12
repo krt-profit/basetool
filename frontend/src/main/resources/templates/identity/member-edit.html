@@ -242,7 +242,7 @@
         conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
     };
 </script>
-<script th:src="@{/js/identity/member-edit.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/identity/member-edit.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>
