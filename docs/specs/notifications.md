@@ -135,7 +135,7 @@ frontend renders `type` + `params` via `notifications.type.*` messages.
 - [x] The schema validates against the entity under `ddl-auto = validate` (V155).
 
 **Enforced by:** `NotificationRepositoryIntegrationTest`, `NotificationParamsCodecTest` ·
-**Code:** `model/Notification`, `model/NotificationType`, `notification/internal/NotificationParamsCodec`,
+**Code:** `notification/api/Notification`, `notification/api/NotificationType`, `notification/internal/NotificationParamsCodec`,
 `db/migration/V155__create_notification.sql`
 
 ### REQ-NOTIF-002 — Event-driven, after-commit production
@@ -154,8 +154,8 @@ source aggregate (no second `@Version` bump).
   write on the order.
 
 **Enforced by:** `NotificationCreationServiceTest`, `NotificationRuleEngineIntegrationTest`,
-`JobOrderServiceTest` · **Code:** `notification/api/events/NotificationEvent`, `service/NotificationEventListener`,
-`platform/api/AsyncConfig`, `service/NotificationCreationService`
+`JobOrderServiceTest` · **Code:** `notification/api/events/NotificationEvent`, `notification/internal/NotificationEventListener`,
+`platform/api/AsyncConfig`, `notification/internal/NotificationCreationService`
 
 ### REQ-NOTIF-003 — Extensibility without schema changes
 
@@ -168,7 +168,7 @@ no CHECK constraint and the engine is data-driven.
 
 - [x] Adding a producer needs no DDL change to `notification` or `notification_rule`.
 
-**Enforced by:** spec review · **Code:** `event/*`, `model/NotificationEventType`
+**Enforced by:** spec review · **Code:** `event/*`, `notification/api/NotificationEventType`
 
 ### REQ-NOTIF-004 — Per-user isolation (not org-unit scoped)
 
@@ -185,8 +185,8 @@ service whitelist (bank `REQ-BANK-008` precedent).
 - [x] `NotificationService` is absent from `ArchitectureTest`'s `staffelScopedServiceNames`.
 
 **Enforced by:** `NotificationServiceTest`, `NotificationRepositoryIntegrationTest`,
-`ArchitectureTest` · **Code:** `service/NotificationService`,
-`controller/NotificationController`
+`ArchitectureTest` · **Code:** `notification/api/NotificationService`,
+`notification/web/NotificationController`
 
 ### REQ-NOTIF-005 — User actions: read & delete
 
@@ -208,7 +208,7 @@ design-system `showKrtConfirm` modal, since it removes many rows at once.
 - [x] Deleting another user's notification returns 404 and removes nothing.
 
 **Enforced by:** `NotificationServiceTest`, `NotificationRepositoryIntegrationTest` ·
-**Code:** `controller/NotificationController`, `service/NotificationService`
+**Code:** `notification/web/NotificationController`, `notification/api/NotificationService`
 
 ### REQ-NOTIF-006 — Always-on unread indicator
 
@@ -269,9 +269,9 @@ enum code; an event-derived selector kind shows a hint instead of further fields
 re-swaps the rule table in place (REQ-FE-001) instead of reloading the page.
 
 **Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`, `NotificationRuleServiceTest` ·
-**Code:** `model/NotificationRule`, `model/NotificationRuleSelector`,
-`service/RuleEvaluationService`, `service/NotificationRuleService`,
-`controller/NotificationRuleController`, `db/migration/V156__create_notification_rule.sql`,
+**Code:** `notification/api/NotificationRule`, `notification/api/NotificationRuleSelector`,
+`notification/internal/RuleEvaluationService`, `notification/api/NotificationRuleService`,
+`notification/web/NotificationRuleController`, `db/migration/V156__create_notification_rule.sql`,
 frontend `notification/web/AdminNotificationRulePageController`,
 `templates/notification/admin/notification-rules.html`, `static/js/notification/notification-rules.js`
 
@@ -303,7 +303,7 @@ handover), rejecting it or deleting it publishes `JOB_ORDER_CLOSED`, which super
 `joborder/internal/JobOrderService#publishJobOrderCreated`,
 `joborder/internal/JobOrderService#publishJobOrderClosed`,
 `joborder/api/events/JobOrderCreatedEvent`, `joborder/api/events/JobOrderClosedEvent`,
-`service/RecipientResolutionService`
+`notification/internal/RecipientResolutionService`
 
 ### REQ-NOTIF-009 — Retention
 
@@ -361,8 +361,8 @@ which is the question a half that has quietly stopped raises (REQ-OBS-011).
 
 **Enforced by:** `NotificationRetentionTaskTest`, `NotificationRepositoryIntegrationTest`
 (`deleteReadOlderThan`, `deleteUnreadOlderThan`), `BackendPropertiesValidationTest` (the bounds) ·
-**Code:** `task/NotificationRetentionTask`, `notification/internal/NotificationRetentionProperties`,
-`service/NotificationService#purgeReadOlderThan` / `#purgeUnreadOlderThan`,
+**Code:** `notification/internal/NotificationRetentionTask`, `notification/internal/NotificationRetentionProperties`,
+`notification/api/NotificationService#purgeReadOlderThan` / `#purgeUnreadOlderThan`,
 `platform/api/ScheduledJob#NOTIFICATION_RETENTION`, `platform/api/MetricNames#NOTIFICATION_RETENTION_DELETED`
 
 ### REQ-NOTIF-021 — The `notification` event says what arrived
@@ -544,9 +544,9 @@ Hikari connection (#1152).
 events + clean timeout completion), `DisconnectedClientHandlingTest`,
 `AnonymousSurfaceSweepMvcTest#anonymousEventSourceGets401`,
 `NotificationStreamReconnectContractTest`, full build (bean wiring), frontend lint gate · **Code:**
-`service/NotificationStreamService`, `service/NotificationFanout` / `RedisNotificationFanout` /
+`notification/api/NotificationStreamService`, `notification/api/NotificationFanout` / `RedisNotificationFanout` /
 `LocalNotificationFanout`, `notification/internal/NotificationFanoutProperties`,
-`controller/NotificationController#stream`, frontend
+`notification/web/NotificationController#stream`, frontend
 `notification/web/NotificationPageController#stream`, `kernel/backend/BackendSideChannels#notificationStream`,
 `kernel/backend/WebClientConfig#sseWebClient`,
 `platform/api/GlobalExceptionHandler#handleDisconnectedClient`, `static/js/notification/notifications.js`
@@ -592,11 +592,11 @@ admin-editable at runtime.
 
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:**
 `bank/api/events/BankBookingRequest{Created,Confirmed,Rejected}Event`,
-`service/RecipientResolutionService#resolveAccountGrantHolders`,
-`service/RuleEvaluationService#resolveEventRecipient`,
+`notification/internal/RecipientResolutionService#resolveAccountGrantHolders`,
+`notification/internal/RuleEvaluationService#resolveEventRecipient`,
 `bank/internal/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
-`model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`,
-`model/NotificationEventType`, `model/NotificationType`,
+`notification/api/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`,
+`notification/api/NotificationEventType`, `notification/api/NotificationType`,
 `db/migration/V160__seed_bank_booking_request_notification_rule.sql`,
 `db/migration/V161__seed_bank_booking_request_decision_notification_rules.sql`,
 `db/migration/V194__seed_bank_booking_request_responsible_holder_notifications.sql` · **Issues:** #666
@@ -633,8 +633,8 @@ logged** (REQ-OBS).
 - [ ] Operator: the channel ships enabled; prod sets `SPRING_MAIL_HOST` (+ port/credentials) to start
   sending. With no host it stays a no-op; `APP_MAIL_ENABLED=false` hard-disables it.
 
-**Enforced by:** `SmtpMailServiceTest` · **Code:** `service/MailService`, `service/MailMessage`,
-`service/SmtpMailService`, `config/MailProperties`, `platform/api/AsyncConfig#MAIL_EXECUTOR`,
+**Enforced by:** `SmtpMailServiceTest` · **Code:** `notification/api/MailService`, `notification/api/MailMessage`,
+`notification/internal/SmtpMailService`, `notification/api/MailProperties`, `platform/api/AsyncConfig#MAIL_EXECUTOR`,
 `application.yml` (`spring.mail.*` / `app.mail.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
 ### REQ-NOTIF-016 — UC4: notify the Materialbörse offer owner on an interest registration
@@ -661,8 +661,8 @@ records the notification-engine consumer.
 **Enforced by:** `MaterialExchangeServiceTest`, `RuleEvaluationServiceTest`,
 `MessageBundleConsistencyTest` · **Code:**
 `materialexchange/api/events/MaterialExchangeInterestRegisteredEvent`,
-`service/MaterialExchangeService#registerInterestInNewTransaction`, `model/NotificationEventType`,
-`model/NotificationType`,
+`service/MaterialExchangeService#registerInterestInNewTransaction`, `notification/api/NotificationEventType`,
+`notification/api/NotificationType`,
 `db/migration/V211__seed_material_exchange_interest_notification_rule.sql` · **Issues:** #1187
 
 ### REQ-NOTIF-017 — UC5: notify the processing unit on a requester edit
@@ -690,7 +690,7 @@ never the editing member's personal name (no PII in params).
 
 **Enforced by:** `JobOrderServiceTest`, `MessageBundleConsistencyTest` · **Code:**
 `joborder/api/events/JobOrderUpdatedByRequesterEvent`, `joborder/internal/JobOrderService#publishJobOrderUpdatedByRequester`,
-`model/NotificationEventType`, `model/NotificationType`,
+`notification/api/NotificationEventType`, `notification/api/NotificationType`,
 `db/migration/V214__seed_job_order_requester_update_notification_rule.sql` · **Issues:** #1186
 
 ### REQ-NOTIF-018 — Superseding: clear stale "action needed" notifications on lifecycle close
@@ -756,11 +756,11 @@ is deleted, so no inbox keeps an order that is settled or a link that leads nowh
 **Enforced by:** `NotificationCreationServiceTest`, `NotificationRepositoryIntegrationTest`,
 `BankBookingRequestServiceTest` · **Code:** `notification/api/events/NotificationEvent#resolvesNotificationTypes`,
 `bank/api/events/BankBookingRequest{Confirmed,Rejected,Cancelled}Event`,
-`service/NotificationCreationService#removeSupersededNotifications`,
-`repository/NotificationRepository#{findRecipientUserIdsByTypeInAndEntity,deleteByTypeInAndEntity}`,
+`notification/internal/NotificationCreationService#removeSupersededNotifications`,
+`notification/api/NotificationRepository#{findRecipientUserIdsByTypeInAndEntity,deleteByTypeInAndEntity}`,
 `bank/internal/BankBookingRequestService#cancelOwn`, `privacy/api/events/AccountDeletionRequest{Declined,Resolved}Event`,
 `identity/api/events/DiscordRegistrationDecidedEvent`, `joborder/api/events/JobOrderClosedEvent`,
-`model/NotificationEventType` · **Also enforced by:** `NotificationLifecycleEventsTest`,
+`notification/api/NotificationEventType` · **Also enforced by:** `NotificationLifecycleEventsTest`,
 `NotificationRuleEngineIntegrationTest`, `UserRegistrationServiceTest`, `UserDeletionServiceTest`,
 `JobOrderServicePriorityAndStatusTest` · **Decision:**
 [ADR-0096](../adr/0096-notification-supersede-on-lifecycle-close.md) · **Issues:** #1252, #2413
@@ -813,7 +813,7 @@ slice), `NotificationServiceTest` (sort whitelist yields the stable `id` tiebrea
 `NotificationPageRenderMvcTest` (hint + load-more render only past one page),
 `MessageBundleConsistencyTest` (`notifications.loadMore` / `notifications.showingLatest` in every
 bundle) · **Code:** `frontend notification/web/NotificationPageController#page` / `#pageItems` /
-`#loadPage`, `notification/model/NotificationPageSliceDto`, `backend service/NotificationService`
+`#loadPage`, `notification/model/NotificationPageSliceDto`, `backend notification/api/NotificationService`
 (`SORTABLE_FIELDS` with `id`), `templates/notification/notifications.html`, `static/js/notification/notifications.js`
 (`loadMorePage` / `updatePageHint`) · **Issues:** — (ADR-0100 silent-truncation audit follow-up)
 
@@ -891,8 +891,8 @@ them, and the bank staff keep theirs untouched.
 `NotificationRepositoryIntegrationTest` (`supersedeForRecipients…`),
 `NotificationLifecycleEventsTest`, `OrgUnitBankResponsibilityServiceTest` · **Code:**
 `notification/api/events/NotificationEvent#reconcileRecipients`,
-`service/NotificationCreationService#reconcile`,
-`repository/NotificationRepository#deleteByTypeInAndEntityForRecipients`,
+`notification/internal/NotificationCreationService#reconcile`,
+`notification/api/NotificationRepository#deleteByTypeInAndEntityForRecipients`,
 `bank/api/events/BankBookingRequestNoticesReconciledEvent` · **Decision:**
 [ADR-0244](../adr/0244-a-notification-event-can-reconcile-a-notice-for-named-members.md) ·
 **Issues:** #2413
@@ -929,10 +929,10 @@ data only through its SPIs `MissionRecipientDirectory` and `ExchangeRecipientDir
 
 **Enforced by:** `RuleEvaluationServiceTest`, `RecipientDirectoriesTest`,
 `NotificationRecipientQueriesIntegrationTest`, `NotificationRuleServiceTest`,
-`AdminNotificationRuleOptionListsTest` · **Code:** `model/SelectorKind`, `model/OrgRelativeRole`,
+`AdminNotificationRuleOptionListsTest` · **Code:** `notification/api/SelectorKind`, `notification/api/OrgRelativeRole`,
 `notification/api/events/NotificationEvent`, `notification/api/MissionRecipientDirectory`,
-`notification/api/ExchangeRecipientDirectory`, `service/RuleEvaluationService`,
-`service/RecipientResolutionService` · **Decision:**
+`notification/api/ExchangeRecipientDirectory`, `notification/internal/RuleEvaluationService`,
+`notification/internal/RecipientResolutionService` · **Decision:**
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 
@@ -958,7 +958,7 @@ stays. With either set empty nothing is deleted. An event may combine this with 
 
 **Enforced by:** `NotificationCreationServiceTest` (`perRecipientSupersede…`) · **Code:**
 `notification/api/events/NotificationEvent#supersedeRecipients`,
-`service/NotificationCreationService#removeForRecipients` · **Decision:**
+`notification/internal/NotificationCreationService#removeForRecipients` · **Decision:**
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 
@@ -1003,9 +1003,9 @@ ready, a mission that was never ended. They come from **one scheduled producer**
 **Enforced by:** `NotificationTimedRunnerTest`, `NotificationTimedRunnerIntegrationTest`,
 `NotificationTimedTaskTest`, `MissionNoticeIntegrationTest`, `RefineryNoticeIntegrationTest`,
 `notification_timed_stale_test.yml` · **Code:**
-`notification/api/TimedNoticeProducer`, `service/NotificationTimedRunner`,
-`task/NotificationTimedTask`, `notification/internal/NotificationTimedProperties`,
-`repository/NotificationRepository#tryTimedProducerLock` · **Decision:**
+`notification/api/TimedNoticeProducer`, `notification/internal/NotificationTimedRunner`,
+`notification/internal/NotificationTimedTask`, `notification/internal/NotificationTimedProperties`,
+`notification/api/NotificationRepository#tryTimedProducerLock` · **Decision:**
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 
@@ -1054,8 +1054,8 @@ member's own decision; it changes nothing for anybody else and nothing about wha
 `NotificationCreationServiceTest`, `NotificationPreferenceGroupsTest`,
 `NotificationPreferenceWriteControllerTest`, `NotificationPreferenceProxyControllerTest`,
 `ProfileControllerMvcTest`, `GdprParticipantCoverageTest`, `UserAccountMergeCoverageTest` ·
-**Code:** `model/NotificationMute`, `model/NotificationType#isMutable`,
-`service/NotificationMuteService`, `controller/NotificationController#preferences`,
+**Code:** `notification/api/NotificationMute`, `notification/api/NotificationType#isMutable`,
+`notification/api/NotificationMuteService`, `notification/web/NotificationController#preferences`,
 `V271__create_notification_mute.sql`, frontend `NotificationPreferenceWriteController`,
 `NotificationPreferenceProxyController`, `notification/fragments/profile-notification-prefs.html`,
 `static/js/identity/profile-notification-prefs.js` · **Decision:**
@@ -1106,7 +1106,7 @@ that outlasts the limit (a stalled database) rejects the task; that is a lost no
 **Enforced by:** `NotificationBurstIntegrationTest`, `BackpressureRejectedExecutionHandlerTest`,
 `NotificationCreationServiceTest`, `notification_delivery_alerts_test.yml` · **Code:**
 `platform/api/AsyncConfig#notificationExecutor`, `platform/api/BackpressureRejectedExecutionHandler`,
-`service/NotificationCreationService#recordCreated`
+`notification/internal/NotificationCreationService#recordCreated`
 
 ## Out of scope (v1)
 

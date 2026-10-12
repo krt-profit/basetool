@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.api.events;
 
-import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import java.util.LinkedHashMap;
 import java.util.Map;

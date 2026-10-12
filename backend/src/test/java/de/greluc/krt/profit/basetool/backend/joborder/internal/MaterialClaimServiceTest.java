@@ -730,7 +730,7 @@ class MaterialClaimServiceTest {
           (de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent)
               captor.getValue();
       assertEquals(
-          de.greluc.krt.profit.basetool.backend.model.NotificationEventType
+          de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType
               .JOB_ORDER_CLAIM_WITHDRAWN,
           event.eventType());
       assertEquals(ada.getId(), event.contextRecipientUserId());

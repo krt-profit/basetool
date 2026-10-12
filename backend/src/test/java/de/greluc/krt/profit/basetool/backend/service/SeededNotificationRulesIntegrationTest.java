@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
-import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
-import de.greluc.krt.profit.basetool.backend.model.NotificationType;
-import de.greluc.krt.profit.basetool.backend.model.SelectorKind;
-import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRule;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRuleRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRuleSelector;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.SelectorKind;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;

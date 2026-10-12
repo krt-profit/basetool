@@ -1,0 +1,260 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.notification.api;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+/**
+ * Spring Data repository for {@link Notification}. Every non-admin lookup MUST filter by {@code
+ * recipientUserId} so a caller can never see another user's inbox (REQ-NOTIF-004); the bulk
+ * mutations are single atomic statements to avoid the optimistic-locking traps documented in {@code
+ * CLAUDE.md}.
+ */
+@Repository
+public interface NotificationRepository extends JpaRepository<Notification, UUID> {
+
+  /**
+   * Returns a recipient's notifications as a page (sorted by the {@link Pageable}).
+   *
+   * @param recipientUserId Keycloak {@code sub} of the caller
+   * @param pageable page request
+   * @return the matching page
+   */
+  Page<Notification> findAllByRecipientUserId(UUID recipientUserId, Pageable pageable);
+
+  /**
+   * Returns a recipient's most recent notifications first, capped by the {@link Pageable} size.
+   * Used by the bell dropdown which shows only the latest handful.
+   *
+   * @param recipientUserId Keycloak {@code sub} of the caller
+   * @param pageable page request supplying the cap (size) and offset
+   * @return the most-recent-first list
+   */
+  List<Notification> findByRecipientUserIdOrderByCreatedAtDesc(
+      UUID recipientUserId, Pageable pageable);
+
+  /**
+   * Returns one notification only if it belongs to the caller. The empty result is deliberately
+   * indistinguishable from "unknown id" so a caller cannot probe foreign ids.
+   *
+   * @param id notification primary key
+   * @param recipientUserId Keycloak {@code sub} of the caller
+   * @return the notification, or empty when missing or owned by someone else
+   */
+  Optional<Notification> findByIdAndRecipientUserId(UUID id, UUID recipientUserId);
+
+  /**
+   * Counts a recipient's unread notifications; backs the always-on unread badge.
+   *
+   * @param recipientUserId Keycloak {@code sub} of the caller
+   * @return the number of unread notifications
+   */
+  long countByRecipientUserIdAndReadFalse(UUID recipientUserId);
+
+  /**
+   * Returns the entity ids of a recipient's unread notifications of one type.
+   *
+   * @param recipientUserId the recipient
+   * @param type the notification type
+   * @return the entity ids, one per unread notification that carries one
+   */
+  @Query(
+      """
+      select n.entityId from Notification n
+      where n.recipientUserId = :recipientUserId and n.type = :type and n.read = false
+        and n.entityId is not null
+      """)
+  List<UUID> findUnreadEntityIds(
+      @Param("recipientUserId") UUID recipientUserId, @Param("type") NotificationType type);
+
+  /**
+   * Marks a recipient's unread notifications of one type about one entity read.
+   *
+   * @param recipientUserId the recipient
+   * @param type the notification type
+   * @param entityId the entity the notifications are about
+   * @param readAt the read time
+   * @return the number of notifications marked
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      """
+      update Notification n set n.read = true, n.readAt = :readAt
+      where n.recipientUserId = :recipientUserId and n.type = :type and n.entityId = :entityId
+        and n.read = false
+      """)
+  int markReadOfTypeAndEntity(
+      @Param("recipientUserId") UUID recipientUserId,
+      @Param("type") NotificationType type,
+      @Param("entityId") UUID entityId,
+      @Param("readAt") Instant readAt);
+
+  /**
+   * Marks every unread notification of a recipient read in one atomic statement, stamping {@code
+   * readAt}. Clears the persistence context so callers re-read fresh state.
+   *
+   * @param recipientUserId Keycloak {@code sub} of the caller
+   * @param readAt the read timestamp to stamp
+   * @return the number of rows updated
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      """
+      update Notification n set n.read = true, n.readAt = :readAt
+      where n.recipientUserId = :recipientUserId and n.read = false
+      """)
+  int markAllReadForRecipient(
+      @Param("recipientUserId") UUID recipientUserId, @Param("readAt") Instant readAt);
+
+  /**
+   * Deletes every <em>read</em> notification of a recipient in one atomic statement (the user's
+   * "clear read" action). Unread notifications are untouched.
+   *
+   * @param recipientUserId Keycloak {@code sub} of the caller
+   * @return the number of rows deleted
+   */
+  @Modifying(clearAutomatically = true)
+  @Query("delete from Notification n where n.recipientUserId = :recipientUserId and n.read = true")
+  int deleteAllReadForRecipient(@Param("recipientUserId") UUID recipientUserId);
+
+  /**
+   * Deletes read notifications whose read timestamp is older than the cutoff; backs the scheduled
+   * retention sweep (REQ-NOTIF-009).
+   *
+   * @param cutoff delete read notifications read before this instant
+   * @return the number of rows deleted
+   */
+  @Modifying
+  @Query("delete from Notification n where n.read = true and n.readAt < :cutoff")
+  int deleteReadOlderThan(@Param("cutoff") Instant cutoff);
+
+  /**
+   * Deletes <em>unread</em> notifications created before the cutoff; the second half of the
+   * scheduled retention sweep (REQ-NOTIF-009).
+   *
+   * @param cutoff delete unread notifications created before this instant
+   * @return the number of rows deleted
+   */
+  @Modifying
+  @Query("delete from Notification n where n.read = false and n.createdAt < :cutoff")
+  int deleteUnreadOlderThan(@Param("cutoff") Instant cutoff);
+
+  /**
+   * Deletes the complete notification history of one recipient, read and unread, as part of the
+   * hard account deletion (REQ-DATA-008).
+   *
+   * <p>Runs inside the user-deletion transaction and therefore does not clear the persistence
+   * context.
+   *
+   * @param recipientUserId Keycloak {@code sub} of the departing recipient (equal to {@code
+   *     app_user.id})
+   * @return the number of rows deleted, for the audit summary event
+   */
+  @Modifying
+  @Query("delete from Notification n where n.recipientUserId = :recipientUserId")
+  int deleteAllForRecipient(@Param("recipientUserId") UUID recipientUserId);
+
+  /**
+   * The recipient {@code sub}s holding an outstanding notification of one of the given types for a
+   * loose entity reference — collected <em>before</em> {@link #deleteByTypeInAndEntity} so the
+   * caller can push a live inbox/badge refresh to exactly those recipients once their now-stale
+   * items are removed (REQ-NOTIF-018).
+   *
+   * @param types the notification types to match (any-of)
+   * @param entityType the loose entity-type tag
+   * @param entityId the loose entity id
+   * @return the distinct recipient subs; empty when none match
+   */
+  @Query(
+      """
+      select distinct n.recipientUserId from Notification n
+      where n.type in :types and n.entityType = :entityType and n.entityId = :entityId
+      """)
+  List<UUID> findRecipientUserIdsByTypeInAndEntity(
+      @Param("types") Set<NotificationType> types,
+      @Param("entityType") String entityType,
+      @Param("entityId") UUID entityId);
+
+  /**
+   * Deletes every notification of one of the given types tagged with the loose entity reference in
+   * one atomic statement — clears the now-stale "action needed" items a lifecycle-terminating event
+   * supersedes (REQ-NOTIF-018). Clears the persistence context so callers re-read fresh state.
+   *
+   * @param types the notification types to delete (any-of)
+   * @param entityType the loose entity-type tag
+   * @param entityId the loose entity id
+   * @return the number of rows deleted
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      """
+      delete from Notification n
+      where n.type in :types and n.entityType = :entityType and n.entityId = :entityId
+      """)
+  int deleteByTypeInAndEntity(
+      @Param("types") Set<NotificationType> types,
+      @Param("entityType") String entityType,
+      @Param("entityId") UUID entityId);
+
+  /**
+   * Deletes the notifications of one of the given types tagged with the loose entity reference, but
+   * only those of the given recipients (REQ-NOTIF-023). Clears the persistence context so callers
+   * re-read fresh state.
+   *
+   * @param types the notification types to delete (any-of)
+   * @param entityType the loose entity-type tag
+   * @param entityId the loose entity id
+   * @param recipientUserIds the recipients whose notifications are deleted
+   * @return the number of rows deleted
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      """
+      delete from Notification n
+      where n.type in :types and n.entityType = :entityType and n.entityId = :entityId
+        and n.recipientUserId in :recipientUserIds
+      """)
+  int deleteByTypeInAndEntityForRecipients(
+      @Param("types") Set<NotificationType> types,
+      @Param("entityType") String entityType,
+      @Param("entityId") UUID entityId,
+      @Param("recipientUserIds") Set<UUID> recipientUserIds);
+
+  /**
+   * Tries to take the transaction-scoped advisory lock that lets one backend instance at a time
+   * raise the time-based notices (REQ-NOTIF-026); released at commit or rollback.
+   *
+   * @param key the lock key
+   * @return {@code true} when this transaction now holds the lock, {@code false} when another does
+   */
+  @Query(value = "SELECT pg_try_advisory_xact_lock(:key)", nativeQuery = true)
+  boolean tryTimedProducerLock(@Param("key") long key);
+}

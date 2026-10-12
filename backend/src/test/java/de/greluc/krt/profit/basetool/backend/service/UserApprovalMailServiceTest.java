@@ -25,8 +25,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.config.MailProperties;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.MailMessage;
+import de.greluc.krt.profit.basetool.backend.notification.api.MailProperties;
+import de.greluc.krt.profit.basetool.backend.notification.api.MailService;
 import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

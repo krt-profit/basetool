@@ -237,8 +237,8 @@ class JobOrderServicePriorityAndStatusTest {
           .filter(
               e ->
                   e.eventType()
-                      == de.greluc.krt.profit.basetool.backend.model.NotificationEventType
-                          .JOB_ORDER_FINISHED)
+                      == de.greluc.krt.profit.basetool.backend.notification.api
+                          .NotificationEventType.JOB_ORDER_FINISHED)
           .findFirst()
           .orElseThrow();
     }

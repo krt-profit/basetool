@@ -1103,9 +1103,9 @@ admin-editable at runtime.
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`,
 `NotificationCreationServiceTest` · **Code:**
 `bank/api/events/BankBookingRequest{Created,Confirmed,Rejected,Cancelled}Event`,
-`service/RecipientResolutionService#resolveAccountGrantHolders`,
+`notification/internal/RecipientResolutionService#resolveAccountGrantHolders`,
 `bank/internal/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
-`model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`, `db/migration/V160`,
+`notification/api/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`, `db/migration/V160`,
 `db/migration/V161`, `db/migration/V194`;
 lifecycle-close removal in REQ-NOTIF-018 · **Issues:** #666, #673, #1252
 

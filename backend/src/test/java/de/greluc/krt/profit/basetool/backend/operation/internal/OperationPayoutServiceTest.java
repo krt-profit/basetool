@@ -1214,7 +1214,8 @@ class OperationPayoutServiceTest {
       assertEquals(1, events.size());
       var event = events.get(0);
       assertEquals(
-          de.greluc.krt.profit.basetool.backend.model.NotificationEventType.OPERATION_PAYOUT_MARKED,
+          de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType
+              .OPERATION_PAYOUT_MARKED,
           event.eventType());
       assertEquals(alice.getId(), event.contextRecipientUserId());
       assertEquals("Officer Bob", event.renderParams().get("actor"));
@@ -1222,7 +1223,8 @@ class OperationPayoutServiceTest {
           event
               .resolvesNotificationTypes()
               .contains(
-                  de.greluc.krt.profit.basetool.backend.model.NotificationType.OPERATION_COMPLETED),
+                  de.greluc.krt.profit.basetool.backend.notification.api.NotificationType
+                      .OPERATION_COMPLETED),
           "the last open payout clears the managers' completion notice");
     }
 
@@ -1242,7 +1244,7 @@ class OperationPayoutServiceTest {
       var events = publishedEvents();
       assertEquals(1, events.size());
       assertEquals(
-          de.greluc.krt.profit.basetool.backend.model.NotificationEventType
+          de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType
               .OPERATION_PAYOUT_UNMARKED,
           events.get(0).eventType());
       assertEquals(java.util.Set.of(alice.getId()), events.get(0).supersedeRecipients());
@@ -1277,7 +1279,7 @@ class OperationPayoutServiceTest {
       assertEquals(1, events.size());
       var event = events.get(0);
       assertEquals(
-          de.greluc.krt.profit.basetool.backend.model.NotificationEventType
+          de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType
               .OPERATION_COMPLETED_UNOWNED,
           event.eventType(),
           "an operation without an owning unit falls back to the officers");

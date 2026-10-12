@@ -30,14 +30,14 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeBulkUnd
 import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeInstallationConnectedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.model.Notification;
-import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.NotificationMuteRepository;
-import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationCreationService;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.NotificationCreationService;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -163,7 +163,7 @@ class NotificationPreferencesControllerTest {
     assertThat(inbox(MEMBER)).hasSize(1);
 
     notificationMuteRepository.save(
-        de.greluc.krt.profit.basetool.backend.model.NotificationMute.builder()
+        de.greluc.krt.profit.basetool.backend.notification.api.NotificationMute.builder()
             .userId(MEMBER)
             .type(NotificationType.EXCHANGE_BULK_UNDO_APPLIED)
             .build());
@@ -179,7 +179,7 @@ class NotificationPreferencesControllerTest {
   @Test
   void theNewConnectionSignalIsDeliveredEvenWithAStrayMuteRow() {
     notificationMuteRepository.save(
-        de.greluc.krt.profit.basetool.backend.model.NotificationMute.builder()
+        de.greluc.krt.profit.basetool.backend.notification.api.NotificationMute.builder()
             .userId(MEMBER)
             .type(NotificationType.EXCHANGE_INSTALLATION_CONNECTED)
             .build());

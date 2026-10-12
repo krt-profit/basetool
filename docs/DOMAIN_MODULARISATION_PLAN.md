@@ -2738,6 +2738,20 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
 3. *Gates*: the domain-map rule `name ^(LiveSync|LocalLiveSync|RedisLiveSync)` assigns no class any more and left; no floor or baseline line changed.
 4. *Text scan*: source paths in `frontend-ajax-mutations.md`; nothing in code or resources.
 
+**Umbrella step 4 — the notification module's 47 classes move into `notification.api` / `notification.internal` / `notification.web` — done 2026-10-12**
+1. *Move* (161 files by script; 21 tests and the test fixtures `StubNotificationEvent` and the recipient-directory test follow, because they read
+   package-private members): the entities and enums (`Notification`, the rule and selector entities, `NotificationType`, `NotificationEventType`,
+   `NotificationContextRole`, `OrgRelativeRole`, `SelectorKind`), their repositories, mappers and DTOs, the mail types (`MailService`, `MailMessage`,
+   `MailProperties`), the notification, mute, rule and stream services to `notification.api` (33 types: what other modules and layer classes use, plus what
+   those depend on); the creation, event-listener, recipient, rule-evaluation and timed-runner services, the Redis wiring, the retention and timed tasks,
+   the SMTP implementation and the erasure participant to `notification.internal` (12); the two controllers to `notification.web`. The existing
+   `NotificationParamsCodec` moved from `internal` to `api`, because `NotificationMapper` names it in an annotation member.
+2. *NullAway*: `RedisNotificationFanout.onMessage` takes a `@Nullable` pattern (the Spring listener contract); nothing else.
+3. *Gates* from the failing assertions: service layer 495 → **489**, join-column selection 222 → **208**, `mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional`
+   498 → **492**; the domain-map name rule `^(Notification|LocalNotification|…)` assigns no class any more and left. Baseline unchanged.
+4. *Text scan*: source paths in `notifications.md`, `bank.md` and `materialboerse.md` rewritten; nothing in code or resources named the old packages.
+   Paths, bean names, cache names and metrics are unchanged.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2757,7 +2771,7 @@ before a decision.
         retention and handle-anonymisation participant, mapper, controller, task. The P4 slice-b entry
         records that the participant waits for the repository.
   - [x] **3.** done — `livesync` (9: controller, DTO, seven services).
-  - [ ] **4.** `notification` (47: entities and enums, rules, mail, recipient services, the GDPR
+  - [x] **4.** done — `notification` (47: entities and enums, rules, mail, recipient services, the GDPR
         participants that sit in `service`).
   - [x] **5.** done (5a `kernel`, 5b `platform`; owner decision 2026-10-12) — `kernel` (20 types in the layer packages `exception` and `validation`) and `platform`
         (65 in `config`, `filter`, `logging`, `metrics`, `web`, `exception`, `annotation`, `health`):

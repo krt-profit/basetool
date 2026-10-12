@@ -1,0 +1,148 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.notification.internal;
+
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.AccountRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.notification.api.ExchangeRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.notification.api.MissionRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
+import de.greluc.krt.profit.basetool.backend.notification.api.OrgUnitRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.stereotype.Service;
+
+/**
+ * Resolves a notification rule selector's recipient description into concrete user {@code sub}s
+ * through the recipient directories the owning modules implement (plan §5.3).
+ *
+ * <p>Officer role membership comes from the periodically synced {@code user_roles} mirror, so a
+ * fresh promotion becomes visible only after the next sync (REQ-NOTIF-008).
+ */
+@Service
+@RequiredArgsConstructor
+public class RecipientResolutionService {
+
+  /** Stable code of the global Officer role in {@code role.code}. */
+  static final String ROLE_OFFICER = Roles.OFFICER;
+
+  private final RoleRecipientDirectory roleRecipientDirectory;
+  private final OrgUnitRecipientDirectory orgUnitRecipientDirectory;
+  private final AccountRecipientDirectory accountRecipientDirectory;
+  private final MissionRecipientDirectory missionRecipientDirectory;
+  private final ExchangeRecipientDirectory exchangeRecipientDirectory;
+
+  /**
+   * Resolves every holder of a global role by its stable code.
+   *
+   * @param roleCode the role code (e.g. {@code ADMIN})
+   * @return the matching user subs; never {@code null}
+   */
+  @NotNull
+  public Set<UUID> resolveByRole(@NotNull String roleCode) {
+    return roleRecipientDirectory.holdersOfRole(roleCode);
+  }
+
+  /**
+   * Resolves a role evaluated relative to a specific org unit.
+   *
+   * @param role the org-relative role
+   * @param orgUnitId the context org unit
+   * @return the matching user subs; never {@code null}
+   */
+  @NotNull
+  public Set<UUID> resolveOrgRelative(@NotNull OrgRelativeRole role, @NotNull UUID orgUnitId) {
+    return switch (role) {
+      case OFFICER -> roleRecipientDirectory.holdersOfRoleInOrgUnit(ROLE_OFFICER, orgUnitId);
+      case LEAD -> orgUnitRecipientDirectory.leadsOf(orgUnitId);
+      case LOGISTICIAN -> orgUnitRecipientDirectory.logisticiansOf(orgUnitId);
+      case MISSION_MANAGER -> orgUnitRecipientDirectory.missionManagersOf(orgUnitId);
+      case UNIT_LEADERSHIP -> orgUnitRecipientDirectory.leadershipOf(orgUnitId);
+    };
+  }
+
+  /**
+   * Resolves every bank employee holding a {@code bank_account_grant} on the given account, the
+   * {@code ACCOUNT_GRANT} selector's recipients (REQ-BANK-026).
+   *
+   * @param accountId the bank account whose grant holders to notify
+   * @return the granted employees' user subs; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> resolveAccountGrantHolders(@NotNull UUID accountId) {
+    return accountRecipientDirectory.grantHoldersOf(accountId);
+  }
+
+  /**
+   * Resolves the responsible holders of the given bank account, the {@code ACCOUNT_RESPONSIBLE}
+   * selector's recipients (REQ-BANK-034).
+   *
+   * @param accountId the bank account whose responsible holder(s) to notify
+   * @return the responsible holders' user subs; never {@code null}, empty for a Sonderkonto or an
+   *     unlinked account
+   */
+  @NotNull
+  public Set<UUID> resolveAccountResponsibleHolders(@NotNull UUID accountId) {
+    return accountRecipientDirectory.responsibleHoldersOf(accountId);
+  }
+
+  /**
+   * Resolves the registered participants of a mission, the {@code MISSION_PARTICIPANTS} selector's
+   * recipients (REQ-NOTIF-024).
+   *
+   * @param missionId the mission
+   * @param onlyNotCheckedIn {@code true} to keep only participants who have not checked in
+   * @return the participants' user subs; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> resolveMissionParticipants(@NotNull UUID missionId, boolean onlyNotCheckedIn) {
+    return missionRecipientDirectory.participantsOf(missionId, onlyNotCheckedIn);
+  }
+
+  /**
+   * Resolves the owner and co-managers of a mission, the {@code MISSION_LEADERSHIP} selector's
+   * recipients (REQ-NOTIF-024).
+   *
+   * @param missionId the mission
+   * @return the leadership's user subs; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> resolveMissionLeadership(@NotNull UUID missionId) {
+    return missionRecipientDirectory.leadershipOf(missionId);
+  }
+
+  /**
+   * Resolves the holders of an exchange client's installations, the {@code EXCHANGE_CLIENT_HOLDERS}
+   * selector's recipients (REQ-NOTIF-024).
+   *
+   * @param clientId the registry client, or {@code null} for the holders of any client
+   * @return the holders' user subs; never {@code null}, possibly empty
+   */
+  @NotNull
+  public Set<UUID> resolveExchangeClientHolders(@Nullable UUID clientId) {
+    return clientId == null
+        ? exchangeRecipientDirectory.holdersOfAnyClient()
+        : exchangeRecipientDirectory.holdersOfClient(clientId);
+  }
+}

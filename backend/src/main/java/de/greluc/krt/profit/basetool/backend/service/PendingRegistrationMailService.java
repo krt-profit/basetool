@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.config.MailProperties;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.notification.api.MailMessage;
+import de.greluc.krt.profit.basetool.backend.notification.api.MailProperties;
+import de.greluc.krt.profit.basetool.backend.notification.api.MailService;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.List;
 import java.util.Locale;

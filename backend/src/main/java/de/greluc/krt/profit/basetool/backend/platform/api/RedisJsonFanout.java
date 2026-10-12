@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
 import de.greluc.krt.profit.basetool.backend.livesync.api.RedisLiveSyncFanout;
-import de.greluc.krt.profit.basetool.backend.service.RedisNotificationFanout;
+import de.greluc.krt.profit.basetool.backend.notification.api.RedisNotificationFanout;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;

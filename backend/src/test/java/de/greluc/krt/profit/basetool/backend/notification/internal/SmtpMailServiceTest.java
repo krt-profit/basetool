@@ -1,0 +1,141 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.notification.internal;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import de.greluc.krt.profit.basetool.backend.notification.api.MailMessage;
+import de.greluc.krt.profit.basetool.backend.notification.api.MailProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mail.MailSendException;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+
+/**
+ * Mockito unit tests for {@link SmtpMailService}: the three off-gates (disabled flag / blank host /
+ * absent sender) and the best-effort send path (envelope composition + swallowed delivery failure),
+ * each asserting the matching {@code basetool_mail_total{outcome}} increment on a real registry.
+ */
+@ExtendWith(MockitoExtension.class)
+class SmtpMailServiceTest {
+
+  private static final String HOST = "smtp.example.test";
+
+  @Mock private ObjectProvider<JavaMailSender> senderProvider;
+  @Mock private JavaMailSender javaMailSender;
+
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
+  private static final MailMessage MSG = new MailMessage("dest@example.test", "Subject", "Body");
+
+  /**
+   * Reads the {@code basetool_mail_total} value for one bounded {@code outcome}, or {@code 0} when
+   * that outcome's series has not been registered yet.
+   *
+   * @param outcome the bounded mail outcome tag value
+   * @return the counter value, or {@code 0.0} when no matching series exists
+   */
+  private double mailCount(String outcome) {
+    var counter = registry.find(MetricNames.MAIL).tag(MetricNames.TAG_OUTCOME, outcome).counter();
+    return counter == null ? 0.0 : counter.count();
+  }
+
+  private static MailProperties props(boolean enabled) {
+    MailProperties p =
+        new MailProperties(enabled, "no-reply@example.test", "Profit Basetool", "de");
+    return p;
+  }
+
+  @Test
+  void disabled_dropsMessageWithoutTouchingTheSender() {
+    SmtpMailService service = new SmtpMailService(props(false), senderProvider, registry, HOST);
+
+    service.send(MSG);
+
+    verify(senderProvider, never()).getIfAvailable();
+    verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
+    assertThat(mailCount(MetricNames.MAIL_DROPPED_DISABLED)).isEqualTo(1.0);
+  }
+
+  @Test
+  void enabledButBlankHost_dropsMessageWithoutTouchingTheSender() {
+    SmtpMailService service = new SmtpMailService(props(true), senderProvider, registry, "");
+
+    service.send(MSG);
+
+    verify(senderProvider, never()).getIfAvailable();
+    verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
+    assertThat(mailCount(MetricNames.MAIL_DROPPED_NO_HOST)).isEqualTo(1.0);
+  }
+
+  @Test
+  void enabledWithHostButNoSenderBean_dropsMessage() {
+    when(senderProvider.getIfAvailable()).thenReturn(null);
+    SmtpMailService service = new SmtpMailService(props(true), senderProvider, registry, HOST);
+
+    service.send(MSG);
+
+    verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
+    assertThat(mailCount(MetricNames.MAIL_DROPPED_NO_SENDER)).isEqualTo(1.0);
+  }
+
+  @Test
+  void enabledWithHostAndSender_sendsWithComposedEnvelope() {
+    when(senderProvider.getIfAvailable()).thenReturn(javaMailSender);
+    SmtpMailService service = new SmtpMailService(props(true), senderProvider, registry, HOST);
+
+    service.send(MSG);
+
+    ArgumentCaptor<SimpleMailMessage> sent = ArgumentCaptor.forClass(SimpleMailMessage.class);
+    verify(javaMailSender).send(sent.capture());
+    SimpleMailMessage mail = sent.getValue();
+    assertThat(mail.getFrom()).isEqualTo("Profit Basetool <no-reply@example.test>");
+    assertThat(mail.getTo()).containsExactly("dest@example.test");
+    assertThat(mail.getSubject()).isEqualTo("Subject");
+    assertThat(mail.getText()).isEqualTo("Body");
+    assertThat(mailCount(MetricNames.MAIL_SENT)).isEqualTo(1.0);
+  }
+
+  @Test
+  void deliveryFailure_isSwallowed() {
+    when(senderProvider.getIfAvailable()).thenReturn(javaMailSender);
+    doThrow(new MailSendException("smtp down"))
+        .when(javaMailSender)
+        .send(any(SimpleMailMessage.class));
+    SmtpMailService service = new SmtpMailService(props(true), senderProvider, registry, HOST);
+
+    service.send(MSG);
+
+    verify(javaMailSender).send(any(SimpleMailMessage.class));
+    assertThat(mailCount(MetricNames.MAIL_FAILED)).isEqualTo(1.0);
+  }
+}
