@@ -45,7 +45,6 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -91,7 +90,6 @@ public class JobOrderItemProductionService {
   private static final double QUANTITY_EPSILON = 1e-4;
 
   private final JobOrderRepository jobOrderRepository;
-  private final InventoryItemRepository inventoryItemRepository;
   private final StockCommands stockCommands;
   private final JobOrderItemService jobOrderItemService;
   private final AuditRecorder auditRecorder;
@@ -211,7 +209,7 @@ public class JobOrderItemProductionService {
     for (JobOrderItemProductionConsumptionDto c : dto.consumption()) {
       InventoryItem inventoryItem =
           Entities.require(
-              inventoryItemRepository.findByIdForUpdate(c.inventoryItemId()),
+              stockCommands.lockRow(c.inventoryItemId()),
               () -> "Inventory item not found: " + c.inventoryItemId());
 
       OptimisticLock.check(

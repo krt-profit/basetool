@@ -27,8 +27,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeQuant
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockLotDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeTombstoneDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository.ExchangeStockLotRow;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -66,7 +66,7 @@ public class ExchangeStockFeedService {
   /** The decimals an SCU amount carries. */
   private static final int SCU_SCALE = 3;
 
-  private final InventoryItemRepository inventoryRepository;
+  private final StockReads stockReads;
   private final ExchangeFeedReader feedReader;
 
   /**
@@ -104,8 +104,7 @@ public class ExchangeStockFeedService {
    */
   private @NotNull ExchangeStockPageDto snapshot(
       @NotNull UUID member, @NotNull ExchangeFeedPosition at, @NotNull UUID afterId, int size) {
-    List<ExchangeStockLotRow> rows =
-        inventoryRepository.findExchangeLots(member, afterId, size + 1);
+    List<ExchangeStockLotRow> rows = stockReads.exchangeLots(member, afterId, size + 1);
     boolean more = rows.size() > size;
     List<ExchangeStockLotRow> delivered = more ? rows.subList(0, size) : rows;
     String next =
@@ -132,7 +131,7 @@ public class ExchangeStockFeedService {
     Map<String, ExchangeStockLotRow> current =
         changes.keys().isEmpty()
             ? Map.of()
-            : inventoryRepository.findExchangeLotsByKeys(member, changes.keys()).stream()
+            : stockReads.exchangeLotsByKeys(member, changes.keys()).stream()
                 .collect(Collectors.toMap(ExchangeStockLotRow::getLotKey, Function.identity()));
     List<ExchangeStockLotDto> items = new ArrayList<>();
     List<ExchangeTombstoneDto> removed = new ArrayList<>();

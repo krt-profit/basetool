@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -39,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -118,7 +118,7 @@ public class ExchangeStockWriteService {
   private final GameItemRepository gameItemRepository;
   private final ExchangeLocationResolver locationResolver;
   private final LocationRepository locationRepository;
-  private final InventoryItemRepository inventoryRepository;
+  private final StockReads stockReads;
   private final StockCommands stockCommands;
   private final StockOfferLookup stockOfferLookup;
   private final InventoryProperties inventoryProperties;
@@ -738,7 +738,7 @@ public class ExchangeStockWriteService {
    * @return the number of lots
    */
   private long lotCount(@NotNull UUID member) {
-    return inventoryRepository.countExchangeLots(member);
+    return stockReads.countExchangeLots(member);
   }
 
   /**

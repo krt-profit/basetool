@@ -49,12 +49,12 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService.OrderLinkedStockIndex;
+import de.greluc.krt.profit.basetool.backend.service.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
@@ -90,7 +90,7 @@ class JobOrderMaterialDemandServiceTest {
   @Mock private MaterialClaimService materialClaimService;
   @Mock private MaterialMapper materialMapper;
   @Mock private SquadronMapper squadronMapper;
-  @Mock private InventoryItemRepository inventoryItemRepository;
+  @Mock private OrderLinkedStockRows orderLinkedStockRows;
   @Spy private QualityTierMapper qualityTierMapper = Mappers.getMapper(QualityTierMapper.class);
 
   /**
@@ -438,13 +438,13 @@ class JobOrderMaterialDemandServiceTest {
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             any(), eq(true), eq(null), any()))
         .thenReturn(List.of(order));
-    when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(List.of(order.getId())))
+    when(orderLinkedStockRows.materialStockOfOrders(List.of(order.getId())))
         .thenReturn(
             List.of(
                 new JobOrderMaterialStockRow(
                     order.getId(), UUID.randomUUID(), stileron.getId(), 681, 2.64)));
     OrderLinkedStockIndex realIndex =
-        new JobOrderStockProjectionService(inventoryItemRepository, null, null, null, null)
+        new JobOrderStockProjectionService(orderLinkedStockRows, null, null, null, null)
             .loadOrderLinkedStockIndex(List.of(order.getId()));
     when(jobOrderStockProjectionService.loadOrderLinkedStockIndex(any())).thenReturn(realIndex);
     when(materialClaimService.getClaimBucketsForOrders(anyList())).thenReturn(Map.of());

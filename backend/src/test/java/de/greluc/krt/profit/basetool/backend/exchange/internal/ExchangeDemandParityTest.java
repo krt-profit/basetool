@@ -30,6 +30,7 @@ import static org.mockito.Mockito.withSettings;
 
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandMaterialDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialDemandService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandGroupDto;
@@ -46,7 +47,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -94,7 +94,7 @@ class ExchangeDemandParityTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderMaterialRequirementResolver requirementResolver;
   @Mock private JobOrderStockProjectionService stockProjectionService;
-  @Mock private InventoryItemRepository inventoryRepository;
+  @Mock private StockReads stockReads;
   @Mock private MaterialRepository materialRepository;
   @Mock private PersonalBlueprintRepository blueprintRepository;
   @Mock private BlueprintVariantFamilyResolver familyResolver;
@@ -117,7 +117,7 @@ class ExchangeDemandParityTest {
             jobOrderRepository,
             requirementResolver,
             stockProjectionService,
-            inventoryRepository,
+            stockReads,
             materialRepository,
             blueprintRepository,
             familyResolver,

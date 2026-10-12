@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderGameItemStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
@@ -51,7 +50,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -76,7 +74,7 @@ public class JobOrderQueryService {
 
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
-  private final InventoryItemRepository inventoryItemRepository;
+  private final StockReads stockReads;
   private final OwnerScopeService ownerScopeService;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final JobOrderMapper jobOrderMapper;
@@ -84,7 +82,6 @@ public class JobOrderQueryService {
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderMaterialRequirementResolver materialRequirementResolver;
-  private final InventoryItemMapper inventoryItemMapper;
 
   /**
    * Paged list with an optional status filter, always constrained to the caller's visibility scope.
@@ -277,8 +274,7 @@ public class JobOrderQueryService {
   @NotNull
   private Map<UUID, Map<UUID, Double>> loadItemStockIndex(List<UUID> jobOrderIds) {
     Map<UUID, Map<UUID, Double>> index = new HashMap<>();
-    for (JobOrderGameItemStockRow row :
-        inventoryItemRepository.findGameItemStockRowsByJobOrderIds(jobOrderIds)) {
+    for (JobOrderGameItemStockRow row : stockReads.gameItemStockOfOrders(jobOrderIds)) {
       if (row.jobOrderId() == null || row.gameItemId() == null) {
         continue;
       }
@@ -360,8 +356,7 @@ public class JobOrderQueryService {
     Entities.require(
         materialRepository.findById(materialId), () -> "Material not found: " + materialId);
 
-    return inventoryItemRepository.findByJobOrderIdAndMaterialId(jobOrderId, materialId).stream()
-        .map(inventoryItemMapper::toDto)
+    return stockReads.rowsOfOrderForMaterial(jobOrderId, materialId).stream()
         .sorted(
             Comparator.comparing(
                     (InventoryItemDto item) ->
@@ -420,18 +415,6 @@ public class JobOrderQueryService {
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
     Set<UUID> requiredMaterials = jobOrderItemService.requiredMaterialIds(jobOrder);
     Set<UUID> requiredGameItems = jobOrderItemService.requiredGameItemIds(jobOrder);
-    return Stream.concat(
-            inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
-                .filter(
-                    item ->
-                        item.getMaterial() == null
-                            || !requiredMaterials.contains(item.getMaterial().getId())),
-            inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId).stream()
-                .filter(
-                    item ->
-                        item.getGameItem() == null
-                            || !requiredGameItems.contains(item.getGameItem().getId())))
-        .map(inventoryItemMapper::toDto)
-        .toList();
+    return stockReads.orphanedRowsOfOrder(jobOrderId, requiredMaterials, requiredGameItems);
   }
 }

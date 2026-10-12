@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -31,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -90,7 +90,7 @@ public class MaterialExchangeBoardService {
 
   private final MaterialExchangeOfferRepository offerRepository;
   private final MaterialExchangeInterestRepository interestRepository;
-  private final InventoryItemRepository inventoryItemRepository;
+  private final StockReads stockReads;
   private final AuthHelperService authHelperService;
   private final UserMapper userMapper;
 
@@ -236,12 +236,12 @@ public class MaterialExchangeBoardService {
     boolean includeMaterial = kind == null || kind == MaterialExchangeOfferKind.MATERIAL;
     boolean includeItem = kind == null || kind == MaterialExchangeOfferKind.ITEM;
     List<InventoryItem> items =
-        inventoryItemRepository.findReleasableForUser(
+        stockReads.releasableRows(
             viewerId,
             MaterialExchangeQueryParams.normalizeQuery(query),
             includeMaterial,
             includeItem,
-            PageRequest.of(0, PICKER_LIMIT));
+            PICKER_LIMIT);
     Set<UUID> released =
         releasedInventoryItemIds(items.stream().map(InventoryItem::getId).toList());
     return items.stream()
@@ -518,7 +518,7 @@ public class MaterialExchangeBoardService {
             .toList();
     Map<UUID, InventoryItem> rows = new HashMap<>();
     if (!ids.isEmpty()) {
-      for (InventoryItem row : inventoryItemRepository.findWithMaterialByIdIn(ids)) {
+      for (InventoryItem row : stockReads.findRowsWithMaterial(ids)) {
         rows.put(row.getId(), row);
       }
     }
@@ -535,7 +535,7 @@ public class MaterialExchangeBoardService {
   InventoryItem rowOf(MaterialExchangeOffer offer) {
     return offer.getInventoryItemId() == null
         ? null
-        : inventoryItemRepository.findById(offer.getInventoryItemId()).orElse(null);
+        : stockReads.findRow(offer.getInventoryItemId()).orElse(null);
   }
 
   /**

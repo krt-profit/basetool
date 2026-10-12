@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -54,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.service.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -87,6 +89,7 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
+  @Mock private OrderLinkedStockRows orderLinkedStockRows;
   @Mock private UserRepository userRepository;
   @Mock private SquadronRepository squadronRepository;
   @Mock private OwnerScopeService ownerScopeService;
@@ -123,7 +126,7 @@ class JobOrderServiceAssigneeAndListTest {
         new JobOrderService(
             jobOrderRepository,
             materialRepository,
-            inventoryItemRepository,
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper),
             new InventoryStockCommands(inventoryItemRepository, null, null, null, null, null, null),
             jobOrderAssigneeService,
             null,
@@ -142,15 +145,14 @@ class JobOrderServiceAssigneeAndListTest {
         new JobOrderQueryService(
             jobOrderRepository,
             materialRepository,
-            inventoryItemRepository,
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper),
             ownerScopeService,
             jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
             jobOrderItemService,
             jobOrderStockProjectionService,
-            null,
-            inventoryItemMapper);
+            null);
     lenient()
         .when(jobOrderMapper.toDto(any(JobOrder.class)))
         .thenAnswer(
@@ -178,9 +180,7 @@ class JobOrderServiceAssigneeAndListTest {
                   null,
                   false);
             });
-    lenient()
-        .when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(any()))
-        .thenReturn(List.of());
+    lenient().when(orderLinkedStockRows.materialStockOfOrders(any())).thenReturn(List.of());
     lenient().when(materialClaimService.getClaimBucketsForOrders(any())).thenReturn(Map.of());
   }
 
@@ -498,7 +498,7 @@ class JobOrderServiceAssigneeAndListTest {
 
       queryService.getAllJobOrders(null, pageable);
 
-      verify(inventoryItemRepository, times(1)).findMaterialStockRowsByJobOrderIds(any());
+      verify(orderLinkedStockRows, times(1)).materialStockOfOrders(any());
     }
 
     @Test
@@ -525,7 +525,7 @@ class JobOrderServiceAssigneeAndListTest {
                   order,
                   materialLine(matNoFloor, null, 100.0),
                   materialLine(matFloor650, 650, 100.0)));
-      when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(any()))
+      when(orderLinkedStockRows.materialStockOfOrders(any()))
           .thenReturn(
               List.of(
                   stockRow(orderId, matNoFloor, 300, 10.0),

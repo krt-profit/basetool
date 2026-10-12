@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -61,7 +62,8 @@ class JobOrderStockReadServiceTest {
   void setUp() {
     service =
         new JobOrderStockReadService(
-            inventoryItemRepository, jobOrderRepository, inventoryItemMapper);
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper),
+            jobOrderRepository);
   }
 
   @Test

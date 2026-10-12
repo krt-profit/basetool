@@ -55,6 +55,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -141,6 +142,12 @@ public class InventoryStockCommands implements StockCommands {
             .thenComparing(
                 InventoryItem::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder())));
     return rows;
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull Optional<InventoryItem> lockRow(@NotNull UUID rowId) {
+    return inventoryRepository.findByIdForUpdate(rowId);
   }
 
   @Override

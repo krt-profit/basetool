@@ -80,6 +80,7 @@ class JobOrderEarmark inventory what the Lager shows of an earmarked job order, 
 class MissionEarmark inventory what the Lager shows of an earmarked mission, in the layer for the Lager mapper's lookup seam
 class JobOrderMaterialStockRow inventory earmarked material stock row the Lager repository projects
 class JobOrderGameItemStockRow inventory earmarked game-item stock row the Lager repository projects
+class OrderLinkedStockRows inventory the Lager rows the job order's stock projection reads, a seam in the layer implemented by the Lager
 class QualityBucketAllocator joborder distributes order-linked stock across quality buckets (REQ-ORDERS-037)
 class LinkedStockAttributionDto joborder per-row quality-bucket attribution (REQ-ORDERS-037)
 class AggregatedMaterialDto joborder item-order material view row
