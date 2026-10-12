@@ -20,14 +20,23 @@
 package de.greluc.krt.profit.basetool.architecture.fixtures.web;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
+import java.util.Set;
 
-/** Planted violations: an eager to-one association and a {@code squadron_id} join column. */
+/**
+ * Planted violations: an eager to-one association, an eager to-many association and a {@code
+ * squadron_id} join column.
+ */
 @Entity
 public class FixtureEntity {
 
   @ManyToOne private FixtureEntity parent;
+
+  @ManyToMany(fetch = FetchType.EAGER)
+  private Set<FixtureEntity> peers;
 
   @ManyToOne
   @JoinColumn(name = "squadron_id")

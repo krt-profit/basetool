@@ -97,7 +97,8 @@ public interface MissionRepository
   List<MissionReferenceDto> findReferencesByIdIn(@Param("ids") Collection<UUID> ids);
 
   /**
-   * Loads a mission by id with its {@code participants} and their to-one associations fetched.
+   * Loads a mission by id with its {@code participants}, their to-one associations and their {@code
+   * orgUnits} fetched.
    *
    * <p>{@code assignedUnits} stays lazy to avoid a cartesian product; it batch-loads on first
    * access, which requires an open transaction.
@@ -111,7 +112,8 @@ public interface MissionRepository
         "participants",
         "participants.user",
         "participants.desiredMissionJobType",
-        "participants.plannedMissionJobType"
+        "participants.plannedMissionJobType",
+        "participants.orgUnits"
       })
   Optional<Mission> findById(UUID id);
 

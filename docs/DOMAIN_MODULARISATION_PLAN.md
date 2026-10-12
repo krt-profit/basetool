@@ -72,7 +72,7 @@ refuses code that reaches past that API. It is the report of a whole-repository 
 | D-17 | **Member settings move with their owner** (was O-08, decided 2026-10-01) | The payout-preference and blueprint-sharing columns move from the user table into tables of the owning modules, each with its own version, by a Flyway migration with data transfer in that domain's wave. |
 | D-18 | **Every API family classified; a kernel page policy** (was O-09, decided 2026-10-01) | Every family is classified explicitly as `no-store` or revalidatable, with a test that catches an unclassified one (REQ-SEC-031); a kernel page policy replaces the 100,000 ceiling with a lower default, set by measurement, and explicit, tested opt-outs. |
 | D-19 | **SpEL evaluation failures stay a fail-closed 400, counted and alerted** (was O-10, decided 2026-10-01) | A metric counts them and a Prometheus rule alerts on them; the problem-code contract is unchanged. |
-| D-20 | **`MissionParticipant.orgUnits` becomes lazy** (was O-11, decided 2026-10-01) | Loaded through an entity graph where it is needed, the load paths pinned by N+1 tests. |
+| D-20 | **`MissionParticipant.orgUnits` becomes lazy** (was O-11, decided 2026-10-01) | Loaded through an entity graph where it is needed, the load paths pinned by N+1 tests. **Done 2026-10-11 (§7.6).** |
 | D-21 | **CI reuses the configuration cache** (was O-12, decided 2026-10-01) | The owner adds the encryption key as a repository secret; pull requests read the cache, `main` writes it; the workflow change follows the secret. |
 | D-22 | **The raw evidence is kept** (was O-13, decided 2026-10-01) | Reports, finding data and scripts, sanitised, in [`docs/archive/domain-modularisation-audit-2026-09/`](archive/domain-modularisation-audit-2026-09/README.md). |
 | D-23 | **No soak before Phase 5** (decided 2026-10-04) | `exchange` and `bank` become Gradle modules right after Phases 2–4, without waiting for their package boundary to stay green for some releases; the Phase 0 guards and the frozen module baseline hold the boundary meanwhile (§7.7). |
@@ -1901,6 +1901,38 @@ stayed behind: the seven types and the scope fragment all moved. (6) `main` carr
 the asset move F5 (2 of 5): its path rewrite turned `hangar::api` into `hangar/hangar::api` in the
 `allowedDependencies` of nine backend modules, so `ModularityTest` failed with "no module found";
 the nine declarations read `hangar::api` again, in a commit of their own.
+**D-20 — `MissionParticipant.orgUnits` becomes lazy — done 2026-10-11** (O-11, §13).
+1. *Characterise*: `MissionParticipantOrgUnitsReadNoNPlusOneTest` drives the `MissionController`
+   bean with no test transaction, as in production with `open-in-view` off, on a mission of 3 and of
+   25 guest participants that carry one or two org units each. It pins the mission detail, the
+   unassigned roster, the peer-redacted detail, a participant update and the single-participant
+   payout endpoint: the same statement count for both sizes, and every participant DTO listing exactly
+   its stamped org units, Staffel first. Green on `53179e6e5` with the collection still `EAGER`:
+   **9, 4, 8, 10 and 7 statements**, flat in size.
+2. *Readers*: one. `MissionMapper.toDto(MissionParticipant)` is the only dereference of `getOrgUnits()`
+   in the code (`existsByOrgUnitId` is a JPQL join and needs no loaded collection); the GDPR export
+   sections, the viewer-access and policy classes and `MissionPeerRedactor` (which copies the DTO list)
+   never touch it. Every caller of the mapper is `MissionController`, which is `@Transactional` for
+   the class, so no read path maps outside a transaction.
+3. *Change*: the association is `fetch = LAZY`, still with `@BatchSize(50)`, and `@ToString.Exclude`
+   (the generated `toString` would otherwise initialise it). `MissionRepository.findById` adds
+   `participants.orgUnits` to its entity graph, so the collection arrives with the participants in
+   the one statement, and `MissionParticipantRepository.findById` graphs it for the check-in,
+   check-out and payout endpoints that load one participant. After: **8, 3, 7, 9 and 7 statements**,
+   still flat in size, and the DTOs are unchanged. No migration; `openapi.json`, audit rows and the
+   403/404 results are untouched.
+4. *Gate*: `ArchitectureTest.toManyAssociationsAreNeverFetchedEagerly` (floor 34) fails on any
+   `@OneToMany` / `@ManyToMany` declared `EAGER`, with a planted violation in
+   `ArchitectureRuleFailureTest`. `toOneAssociationsAreDeclaredLazy` and its floor of 146 are
+   unchanged. REQ-DATA-003 records the rule.
+**Corrections:** (1) The decision speaks of a collection that is "cross-domain"; it is an `OrgUnit`
+collection of a mission row, read by the mission module only, so the change needed no SPI. (2) The
+single-participant endpoints (`check-in`, `check-out`, `payout-preference`) do not load the mission
+through `MissionRepository.findById`: they find the participant by id and reach the roster through the
+lazy `Mission.participants`. The participant's own `findById` carries the graph so its org units
+stay part of that one join, as the eager mapping made them. (3) The mission-level graph made four paths one
+statement cheaper than the eager mapping had been, because the batch select that followed the
+participants' join is part of the join now.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
@@ -2356,7 +2388,7 @@ Full tables, per finding with status, evidence and verdict:
 | O-08 | Storage of member settings that move out of identity (payout preference, blueprint sharing) | **Decided 2026-10-01 as recommended — D-17** |
 | O-09 | `no-store` for the unlisted families and a lower page-size ceiling | **Decided 2026-10-01 as recommended — D-18** |
 | O-10 | SpEL evaluation failures | **Decided 2026-10-01 — D-19:** fail-closed 400, counted and alerted |
-| O-11 | `MissionParticipant.orgUnits` is the one eager cross-domain collection | **Decided 2026-10-01 as recommended — D-20** |
+| O-11 | `MissionParticipant.orgUnits` is the one eager cross-domain collection | **Decided 2026-10-01 as recommended — D-20;** done 2026-10-11 (§7.6) |
 | O-12 | CI configuration-cache reuse | **Decided 2026-10-01 as recommended — D-21** |
 | O-13 | Keep the raw evidence of this audit | **Decided 2026-10-01 — D-22:** kept in `docs/archive/` |
 | O-14 | Home of the 14 exchange-administration operations | **Decided 2026-10-01 — D-12:** `/api/v1/connected-apps/admin/**` |
