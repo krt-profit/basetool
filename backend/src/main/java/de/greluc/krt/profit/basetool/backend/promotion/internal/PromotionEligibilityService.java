@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;

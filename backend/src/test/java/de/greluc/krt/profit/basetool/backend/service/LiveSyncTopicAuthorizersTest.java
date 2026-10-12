@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessP
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationLiveSyncTopicAuthorizer;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryLiveSyncTopicAuthorizer;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -281,7 +281,7 @@ Moved to [`docs/specs/security-and-access.md`](docs/specs/security-and-access.md
 
 ### Multi-org-unit tenancy (CRITICAL)
 
-Moved to [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) (`REQ-ORG-*`): the four OrgUnit kinds (`OrgUnitKind`: `SQUADRON` / `SPECIAL_COMMAND` as the tenant units, `BEREICH` / `ORGANISATIONSLEITUNG` stacked above them) and the completed dual-write soak, service-layer scope via [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java) (the `ScopePredicate` triple + admin-pin semantics), the aggregate scope kinds (strict-staffel / `Mission` public-escape / `JobOrder` SK-public queue), the create-time stamping matrix, the admin-area + promotion carve-outs, the ArchUnit guards, the `orgUnitId` MDC field, and the active-context relay headers.
+Moved to [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) (`REQ-ORG-*`): the four OrgUnit kinds (`OrgUnitKind`: `SQUADRON` / `SPECIAL_COMMAND` as the tenant units, `BEREICH` / `ORGANISATIONSLEITUNG` stacked above them) and the completed dual-write soak, service-layer scope via [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java) (the `ScopePredicate` triple + admin-pin semantics), the aggregate scope kinds (strict-staffel / `Mission` public-escape / `JobOrder` SK-public queue), the create-time stamping matrix, the admin-area + promotion carve-outs, the ArchUnit guards, the `orgUnitId` MDC field, and the active-context relay headers.
 
 ### Database
 

@@ -146,6 +146,7 @@ import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationF
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
@@ -167,11 +168,10 @@ import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ScopeSpecifications;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
@@ -311,7 +311,7 @@ class ArchitectureTest {
 
   /** The repository layer: Spring Data repositories, their nested classes and the package. */
   static final DescribedPredicate<JavaClass> REPOSITORY_CODE =
-      layer("repository code", SPRING_DATA_REPOSITORIES, ScopeSpecifications.class);
+      layer("repository code", SPRING_DATA_REPOSITORIES, UserRepository.class);
 
   /** The model: JPA-managed types, their nested classes and the legacy model package tree. */
   static final DescribedPredicate<JavaClass> MODEL_CODE =
@@ -682,7 +682,7 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 510);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 508);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 
@@ -961,7 +961,7 @@ class ArchitectureTest {
   void controllerLayerShouldNotDependOnRepositoryLayer() {
     assertClassFloor("controllerLayerShouldNotDependOnRepositoryLayer", CONTROLLER_CODE, 99);
     assertClassFloor(
-        "controllerLayerShouldNotDependOnRepositoryLayer (targets)", REPOSITORY_CODE, 114);
+        "controllerLayerShouldNotDependOnRepositoryLayer (targets)", REPOSITORY_CODE, 113);
     controllerLayerShouldNotDependOnRepositoryLayerRule().check(CLASSES);
   }
 

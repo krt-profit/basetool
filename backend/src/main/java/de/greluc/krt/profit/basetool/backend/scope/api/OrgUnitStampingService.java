@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.scope.api;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -71,7 +70,8 @@ public class OrgUnitStampingService {
    * @throws BadRequestException when the user has no membership, the pick is foreign, several
    *     memberships lack a pick, or the resolved org unit is a Spezialkommando.
    */
-  public Squadron resolveSquadronForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
+  public Squadron resolveSquadronForPickerOutput(
+      @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
     List<OrgUnitMembership> allMemberships =
         orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId());
@@ -134,7 +134,8 @@ public class OrgUnitStampingService {
    * @throws OwnerOrgUnitRequiredException when several memberships lack both a pick and an
    *     honourable active-context pin (REQ-ORG-023).
    */
-  public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
+  public OrgUnit resolveOrgUnitForPickerOutput(
+      @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
     if (memberOrgUnitIds.isEmpty()) {
       throw new BadRequestException(
@@ -172,7 +173,7 @@ public class OrgUnitStampingService {
    */
   @Nullable
   public OrgUnit resolveOrgUnitForPickerOutputNullable(
-      @NotNull User targetUser, UUID owningOrgUnitId) {
+      @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
     if (memberOrgUnitIds.isEmpty()) {
       if (owningOrgUnitId == null) {
@@ -256,7 +257,8 @@ public class OrgUnitStampingService {
    *     honourable active-context pin (REQ-ORG-023).
    */
   @NotNull
-  private OrgUnit resolveStampedOrgUnit(@NotNull Set<UUID> memberOrgUnitIds, UUID owningOrgUnitId) {
+  private OrgUnit resolveStampedOrgUnit(
+      @NotNull Set<UUID> memberOrgUnitIds, @Nullable UUID owningOrgUnitId) {
     UUID stampedOrgUnitId;
     if (owningOrgUnitId == null) {
       if (memberOrgUnitIds.size() == 1) {

@@ -37,7 +37,7 @@ import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

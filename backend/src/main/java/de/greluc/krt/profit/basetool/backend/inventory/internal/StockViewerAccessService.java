@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
 import de.greluc.krt.profit.basetool.backend.mapper.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

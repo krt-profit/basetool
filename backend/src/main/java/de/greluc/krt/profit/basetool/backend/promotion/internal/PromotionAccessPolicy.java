@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;

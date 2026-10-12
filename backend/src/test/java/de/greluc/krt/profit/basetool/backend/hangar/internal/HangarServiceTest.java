@@ -44,8 +44,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -74,7 +74,7 @@ class HangarServiceTest {
   @Mock private ShipDeletionObserver shipDeletionObserver;
   @Mock private EntityManager entityManager;
   @Mock private de.greluc.krt.profit.basetool.backend.repository.UserRepository userRepository;
-  @Mock private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService ownerScopeService;
+  @Mock private de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService ownerScopeService;
   @Mock private ShipTypeMapper shipTypeMapper;
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;

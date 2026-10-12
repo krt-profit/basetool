@@ -1168,7 +1168,7 @@ foreign-Bereich exclusion, view-based request eligibility per REQ-BANK-039),
 `CanAccessBlueprintOverviewTests` Bereich/OL), `BankAccountServiceTest` (AREA→Bereich / CARTEL→OL
 creation + cardinality), `V168BankAreaCartelLinkageMigrationTest` (CHECK relax + one-account-per-org-unit),
 `ArchitectureTest` (both bank pins) · **Code:** `bank/internal/OrgUnitBankAccessService`,
-`service/OwnerScopeService#currentOversightScope` (the own-level scope was removed 2026-10-10, unused since REQ-BANK-039),
+`scope/api/OwnerScopeService#currentOversightScope` (the own-level scope was removed 2026-10-10, unused since REQ-BANK-039),
 `bank/internal/BankAccountService`, `db/migration/V168`, `controller/OrgUnitController#listActiveOrgUnitsAllKinds`,
 `templates/bank/bank-manage.html` + `static/js/bank/bank.js`, `templates/bank/org-unit-bank.html` ·
 **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md) · **Issues:** #692, #699.
@@ -1221,7 +1221,7 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
 `OwnerScopeServiceTest` (`CurrentUserHasAreaOrOlOversightTests`), `OrgUnitBankControllerTest`, frontend
 `OrgUnitBankPageControllerMvcTest`, `ArchitectureTest` (both bank pins) · **Code:**
 `bank/internal/OrgUnitBankAccessService#listOverseenOrgUnitBalances`,
-`service/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter`, `bank/internal/OrgUnitBankBalanceDto`, frontend
+`scope/api/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter`, `bank/internal/OrgUnitBankBalanceDto`, frontend
 `templates/bank/org-unit-bank.html` · **ADR:** [ADR-0028](../adr/0028-bank-bereich-ol-access-seam.md)
 (amendment) · **Issues:** #666, #692.
 
@@ -1599,7 +1599,7 @@ Two account groups have **fixed** (non-holder-configurable) visibility on the or
   **tightens** the prior REQ-BANK-028 rule (which granted SPECIAL to all Bereich oversight ranks):
   Bereichskoordinatoren/-operatoren and officers no longer auto-see Sonderkonten.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/OrgUnitBankAccessService#canView`, `service/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/OrgUnitBankAccessService#canView`, `scope/api/OwnerScopeService#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-038 — Read-only account drill-in (history + redacted statement)
 

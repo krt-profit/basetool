@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

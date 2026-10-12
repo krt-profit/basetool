@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

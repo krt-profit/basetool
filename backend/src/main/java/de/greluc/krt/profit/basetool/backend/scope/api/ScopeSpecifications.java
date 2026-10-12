@@ -17,18 +17,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.repository;
+package de.greluc.krt.profit.basetool.backend.scope.api;
 
 /**
  * Shared JPQL fragments for the org-unit scope-predicate triple (REQ-ORG-003): admin all-scope,
  * else the pinned {@code activeOrgUnitId}, else the {@code memberOrgUnitIds} (see {@code
- * de.greluc.krt.profit.basetool.backend.service.ScopePredicate}).
+ * de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}).
  *
  * <p>The fragments are compile-time constants so they can be spliced into {@code @Query} values;
  * one exists per aggregate because each bakes in its entity's alias. A query that needs more than
  * the triple starts with a text block, appends the constant and continues only with plain string
- * literals. The class is {@code public} because constant folding leaves no compiled reference to
- * it.
+ * literals. The class and its constants are {@code public} because the repositories that splice
+ * them lie in other packages and constant folding leaves no compiled reference to the class.
  *
  * <p>{@link #MISSION_SCOPE_PREDICATE} and {@link #JOB_ORDER_SCOPE_PREDICATE} include their
  * aggregate's visibility escapes; {@link #SHIP_SCOPE_TRIPLE} and {@link
@@ -43,7 +43,7 @@ public final class ScopeSpecifications {
    * Mission's scope predicate (alias {@code m}): the triple plus the public escape ({@code
    * isInternal = false}) and the ownerless-leadership escape (REQ-ORG-003).
    */
-  static final String MISSION_SCOPE_PREDICATE =
+  public static final String MISSION_SCOPE_PREDICATE =
       """
       (
         :isAdminAllScope = true
@@ -58,7 +58,7 @@ public final class ScopeSpecifications {
    * Ship's scope predicate (alias {@code s}): the plain triple; the hangar is strict-staffel
    * (REQ-ORG-003).
    */
-  static final String SHIP_SCOPE_TRIPLE =
+  public static final String SHIP_SCOPE_TRIPLE =
       """
       (
         :isAdminAllScope = true
@@ -85,7 +85,7 @@ public final class ScopeSpecifications {
    * not {@code owningOrgUnit}, plus the SK-public-queue escape that shows orders of a {@code
    * SpecialCommand} to every squadron (REQ-ORG-003).
    */
-  static final String JOB_ORDER_SCOPE_PREDICATE =
+  public static final String JOB_ORDER_SCOPE_PREDICATE =
       """
       (
         :isAdminAllScope = true

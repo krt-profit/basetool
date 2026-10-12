@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.scope.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
@@ -65,7 +66,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
@@ -2230,7 +2230,7 @@ class OwnerScopeServiceTest {
   /**
    * Verifies that {@link OwnerScopeService} feeds the {@link OrgUnitCascadeService} expansion into
    * the scope predicate without setting {@code adminAllScope} or reaching beyond the cascaded set
-   * (REQ-ORG-015); the expansion itself is tested in {@link OrgUnitCascadeServiceTest}.
+   * (REQ-ORG-015); the expansion itself is tested in {@code OrgUnitCascadeServiceTest}.
    */
   @Nested
   class CascadingScopeTests {

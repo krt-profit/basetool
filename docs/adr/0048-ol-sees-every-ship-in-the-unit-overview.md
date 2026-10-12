@@ -10,7 +10,7 @@
 The hangar overview at `/hangar/squadron` — renamed in the UI to **Org-Einheitsübersicht** ("org
 unit overview"; the "Org-" prefix sets it apart from the dynamic units created inside a mission) —
 aggregates the scoped fleet into one row per ship type. Its scope came from the general
-[`OwnerScopeService#currentScopePredicate()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java),
+[`OwnerScopeService#currentScopePredicate()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java),
 which for a non-admin returns the union of their org-unit memberships widened by the REQ-ORG-015
 leadership cascade: a plain member sees their own Staffeln/SKs, a Bereichsleitung the Staffeln/SKs of
 their Bereich, and an OL member **every org unit** — but as a *concrete, materialised id set*, never

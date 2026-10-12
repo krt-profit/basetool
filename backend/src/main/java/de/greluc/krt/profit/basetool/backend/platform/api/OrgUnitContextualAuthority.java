@@ -29,7 +29,7 @@ import org.springframework.security.core.GrantedAuthority;
  * ROLE_<NAME>@<orgUnitUuid>}; emitted alongside the flat {@code ROLE_*} authority.
  *
  * <p>When the org unit id is only known at runtime, use {@link
- * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#hasRoleInOrgUnit}.
+ * de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService#hasRoleInOrgUnit}.
  *
  * @param roleName the role, without the {@code ROLE_} prefix (e.g. {@code "LOGISTICIAN"}); not
  *     {@code null}

@@ -49,8 +49,8 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantReposi
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -79,7 +79,7 @@ class MissionServiceTest {
 
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
-  @Mock private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService ownerScopeService;
+  @Mock private de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService ownerScopeService;
 
   @Mock private de.greluc.krt.profit.basetool.backend.service.UserService userService;
 

@@ -24,7 +24,7 @@ import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;

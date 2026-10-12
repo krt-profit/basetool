@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;

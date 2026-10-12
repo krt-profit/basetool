@@ -62,7 +62,7 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | Package | What lives there |
 | --- | --- |
 | `controller` | REST endpoints, `@PreAuthorize`, `@Valid`, RFC 7807 problem responses |
-| `service` | Business rules, transactions, **scoping** (`OwnerScopeService`), audit recording |
+| `service` | Business rules, transactions, audit recording; the **scoping** hub (`OwnerScopeService`) lives in the `scope` module since P4-6 |
 | `repository` | Spring Data JPA; fetch strategies that keep the no-N+1 rule |
 | `model` | JPA entities, `@Version`, the OrgUnit hierarchy |
 | `dto` / `mapper` | Records on the boundary, MapStruct between them and entities |
@@ -253,6 +253,16 @@ preview, suggestion and status DTOs, the create request and response and `Bluepr
 the layer packages, because the exchange (feed, write, undo and demand services, the draft and resolve
 services) and the job order's blueprint-owner service read them directly (plan §7.6, P4-2).
 
+The scope kernel moved in part since P4-6 (plan §7.6). `scope.api` holds the request-scope kernel and
+the scope hub: `RequestScopeResolver`, `ScopePredicate`, `OrgUnitStampingService`,
+`ScopeSpecifications` (the JPQL scope fragments, all public now because the repositories that splice
+them lie in other packages), `OwnerScopeService` (bean `ownerScopeService`) and `AccessGateService`,
+beside the problem codes. `scope.internal` holds `ScopeActiveOrgUnitProvider`, which implements the
+`platform.api.ActiveOrgUnitProvider` SPI for the logging MDC. `OrgUnitCascadeService` moved to
+`orgunit.api` as a prerequisite, because the scope kernel calls it. `CustomJwtGrantedAuthoritiesConverter`
+stays in `service` until the identity module takes `UserReconciliationService`, which the converter
+calls to reconcile the user behind each token.
+
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
 
@@ -264,7 +274,7 @@ The platform modules reach the domains only through SPIs they own and the domain
 | `notification.api.OrgUnitRecipientDirectory` | the Lead, Logistician and Mission Manager flags of an org unit | orgunit (`OrgUnitMembershipRecipientDirectory`) |
 | `notification.api.AccountRecipientDirectory` | grant holders and responsible holders of a bank account | bank, org-unit side (`OrgUnitBankRecipientDirectory`) |
 | `livesync.api.LiveSyncTopicAuthorizer` | whether the caller may join a room, through the owning module's read gate; one implementation per kind, checked at startup | mission, operation, joborder, refinery, bank (`OrgUnitBankLiveSyncTopicAuthorizer`); the member and self rooms stay with livesync |
-| `service.ActiveOrgUnitProvider` (platform) | the org unit for the `orgUnitId` MDC field | scope (`ScopeActiveOrgUnitProvider`) |
+| `platform.api.ActiveOrgUnitProvider` (platform) | the org unit for the `orgUnitId` MDC field | scope (`ScopeActiveOrgUnitProvider`) |
 | `platform.api.ClientDirectory` | whether a client id is a configured ingest gateway or a registered exchange client, for the bounded client label | exchange (`ExchangeClientDirectory`) |
 | `platform.api.UserReassignmentParticipant` | a module's part of the admin account merge: the member-referencing columns it holds, those that follow the member (with their unique-key remainder) and those that stay with the act; it can refuse the merge, and the rows it moves feed the `USER_MERGED` audit row in participant order | inventory, hangar, refinery, personalinventory, blueprint, orgunit (two), orgchart, mission, joborder, materialexchange, bank, notification, promotion, exchange; audit, operation, identity declare staying columns only |
 | `orgunit.api.FirstMembershipObserver` | a member's first org-unit membership gained or last one lost, inside the membership change | inventory (`InventoryOrgUnitReconciler`, which re-stamps the member's shared Lager rows) |

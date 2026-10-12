@@ -47,8 +47,8 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipReposito
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;

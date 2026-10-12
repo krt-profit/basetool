@@ -705,7 +705,7 @@ centralised:
   its return type diverges (`Optional<T>` for a unique name, `List<GameItem>` for
   `GameItemRepository`, whose `name` is not unique), and a base interface method can only declare one
   return type.
-- **`repository.ScopeSpecifications`** holds one `static final String` JPQL fragment per aggregate
+- **`scope.api.ScopeSpecifications`** holds one `static final String` JPQL fragment per aggregate
   (`MISSION_SCOPE_PREDICATE`, `SHIP_SCOPE_TRIPLE`, `INVENTORY_ITEM_SCOPE_TRIPLE`,
   `JOB_ORDER_SCOPE_PREDICATE`; the refinery's `REFINERY_ORDER_SCOPE_TRIPLE` lives in
   `RefineryAccessPolicy` since P4-3 and the operation's `OPERATION_SCOPE_PREDICATE` in
@@ -734,7 +734,7 @@ checks; `ScopeSpecifications`' fragments are exercised by the existing scope-reg
 because the wire behaviour is unchanged.
 
 **Code:** `backend/src/main/java/.../backend/catalogue/internal/LookupTableRepository.java`,
-`backend/src/main/java/.../backend/repository/ScopeSpecifications.java`
+`backend/src/main/java/.../backend/scope/api/ScopeSpecifications.java`
 
 ### REQ-DATA-011 — Background sync sweeps evict the master-data caches they rewrite (CACHE-SYNC-EVICT-001)
 

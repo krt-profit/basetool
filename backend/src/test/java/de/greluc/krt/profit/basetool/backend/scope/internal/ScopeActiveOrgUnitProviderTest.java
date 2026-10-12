@@ -17,12 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.scope.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

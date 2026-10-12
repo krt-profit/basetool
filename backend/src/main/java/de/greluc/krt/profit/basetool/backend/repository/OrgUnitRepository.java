@@ -66,8 +66,8 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
 
   /**
    * Id-only projection of {@link #findByParentOrgUnitId(UUID)}, used by {@link
-   * de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService} to expand a Bereich to its
-   * units (REQ-ORG-015).
+   * de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService} to expand a Bereich to
+   * its units (REQ-ORG-015).
    *
    * @param parentOrgUnitId the parent org unit whose direct child ids to load; never {@code null}.
    * @return the direct child org-unit ids in arbitrary order; never {@code null}, possibly empty.
@@ -78,7 +78,7 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
   /**
    * Returns the id of every org unit of every kind, including parentless ones; the
    * Organisationsleitung reach in {@link
-   * de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService} (REQ-ORG-015).
+   * de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService} (REQ-ORG-015).
    *
    * <p>Materialised as concrete ids, never as an admin-all marker, so OL reach never inherits the
    * admin carve-outs.

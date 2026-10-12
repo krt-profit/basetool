@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationLiveSyn
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryLiveSyncTopicAuthorizer;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;

@@ -25,8 +25,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.ActiveOrgUnitProvider;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.ActiveOrgUnitProvider;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.testsupport.logging.CorrelationIdParity;
 import jakarta.servlet.DispatcherType;
