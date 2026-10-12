@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             if (!validateHandoverAmounts()) return;
             const orderId = handoverForm.getAttribute('data-order-id');
-            if (!orderId || !krtFetch || typeof krtOrderWrite !== 'function') {
+            if (!orderId || typeof krtOrderWrite !== 'function') {
                 handoverForm.submit();
                 return;
             }
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             if (!validateItemHandoverForm()) return;
             const orderId = itemHandoverForm.getAttribute('data-order-id');
-            if (!orderId || !krtFetch || typeof krtOrderWrite !== 'function') {
+            if (!orderId || typeof krtOrderWrite !== 'function') {
                 itemHandoverForm.submit();
                 return;
             }
@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
                     _swapOrderSection(orderId, 'order-kpi-results', 'kpi');
-                    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+                    if (typeof krtLiveSync.sendChanged === 'function') {
                         krtLiveSync.sendChanged('inventory', ['stock']);
                     }
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
@@ -247,9 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             materialsContainer.appendChild(fragment);
             const newRow = /** @type {Element} */ (materialsContainer.lastElementChild);
-            if (krtEnhanceComboboxes) {
-                krtEnhanceComboboxes(newRow);
-            }
+            krtEnhanceComboboxes(newRow);
             refreshEditMaterialUnit(newRow);
         });
 
@@ -339,7 +337,7 @@ function initOrdersDetailEdit() {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
-        if (!orderId || typeof showKrtConfirm !== 'function' || !krtFetch) {
+        if (!orderId) {
             form.submit();
             return;
         }
@@ -384,12 +382,7 @@ function _serializeEditForm() {
             row.querySelector('[name$=".amount"]')
         );
         const materialId = matSel ? matSel.value : '';
-        const amount =
-            amtInput && krtScuInput
-                ? krtScuInput.parse(amtInput.value)
-                : amtInput
-                  ? parseFloat(amtInput.value)
-                  : NaN;
+        const amount = amtInput ? krtScuInput.parse(amtInput.value) : NaN;
         if (!materialId || !(amount > 0)) return;
         materials.push({
             materialId,
@@ -412,7 +405,7 @@ function initOrdersDetailEdit2() {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
-        if (!orderId || !krtFetch) {
+        if (!orderId) {
             form.submit();
             return;
         }
@@ -462,7 +455,7 @@ export function _refreshMaterialsSection(orderId, broadcastOpts) {
     const mat = document.getElementById('order-materials-results');
     const agg = document.getElementById('order-aggregated-results');
     const container = mat || agg;
-    if (!orderId || !container || !krtFetch || !krtFetch.swap) return Promise.resolve(false);
+    if (!orderId || !container) return Promise.resolve(false);
     return krtFetch.swap({
         url: `/orders/${orderId}`,
         container,
@@ -486,7 +479,7 @@ export function _swapOrderSection(orderId, containerId, fragmentValue, broadcast
         return joborderHooks.refreshOrderSection(fragmentValue, broadcastOpts);
     }
     const c = document.getElementById(containerId);
-    if (!c || !orderId || !krtFetch || !krtFetch.swap) return Promise.resolve(false);
+    if (!c || !orderId) return Promise.resolve(false);
     return krtFetch.swap({
         url: `/orders/${orderId}`,
         container: c,

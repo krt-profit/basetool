@@ -155,7 +155,7 @@ function wireAdminMemberPersistence() {
  * still reloads.
  */
 function wireAdminSwap() {
-    if (!krtFetch || !document.getElementById('bp-results')) return;
+    if (!document.getElementById('bp-results')) return;
     /** @type {number | null} */
     let filterTimer = null;
     /**
@@ -329,9 +329,6 @@ function conflictObj() {
 }
 
 function reswapList() {
-    if (!krtFetch) {
-        return;
-    }
     if (!document.getElementById('krt-bp-list') && document.getElementById('bp-results')) {
         krtFetch.swap({
             url: window.location.pathname + window.location.search,
@@ -358,14 +355,14 @@ function blueprintTopic() {
 function afterListWrite() {
     reswapList();
     const topic = blueprintTopic();
-    if (topic && krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+    if (topic && typeof krtLiveSync.sendChanged === 'function') {
         krtLiveSync.sendChanged(topic, Object.keys(BLUEPRINT_SECTIONS));
     }
 }
 
 function wireLiveSync() {
     const topic = blueprintTopic();
-    if (!topic || !krtLiveSync || typeof krtLiveSync.createReceiver !== 'function') {
+    if (!topic) {
         return;
     }
     krtLiveSync.createReceiver({
@@ -408,7 +405,7 @@ function recountAndSync() {
 }
 
 function addSelected() {
-    if (staged.size === 0 || !krtFetch) {
+    if (staged.size === 0) {
         return;
     }
     const keys = Array.from(staged.keys());
@@ -432,9 +429,7 @@ function addSelected() {
                     i18n().skippedLabel,
                     'krtBlueprintsI18n.skippedLabel',
                 )}: ${(res.skippedAlreadyOwned || 0) + (res.skippedUnresolved || 0)}`;
-                if (showFrontendSuccessToast) {
-                    showFrontendSuccessToast(msg);
-                }
+                showFrontendSuccessToast(msg);
                 staged.clear();
                 renderStaging();
                 const addModal = $('krt-bp-add-modal');
@@ -460,7 +455,7 @@ function addSelected() {
  */
 function resolveUrl(template, id) {
     const raw = (template || '').replace('ID_PLACEHOLDER', encodeURIComponent(String(id)));
-    return safeSameOriginUrl ? safeSameOriginUrl(raw, raw) : raw;
+    return safeSameOriginUrl(raw, raw);
 }
 
 /**
@@ -539,7 +534,7 @@ function normalizeAcquired(value) {
  */
 function submitEditNote(e) {
     e.preventDefault();
-    if (!editForm || !krtFetch) {
+    if (!editForm) {
         return;
     }
     const noteEl = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (
@@ -653,7 +648,7 @@ function patchBlueprintRow(dto) {
  */
 function submitDeleteBp(e) {
     e.preventDefault();
-    if (!deleteForm || !krtFetch) {
+    if (!deleteForm) {
         return;
     }
     const submitBtn = /** @type {HTMLButtonElement | null} */ (
@@ -691,10 +686,7 @@ function submitDeleteAll(e) {
     if (!deleteAllForm) {
         return;
     }
-    if (!krtFetch) {
-        deleteAllForm.submit();
-        return;
-    }
+
     const submitBtn = /** @type {HTMLButtonElement | null} */ (
         deleteAllForm.querySelector('button[type="submit"]')
     );
@@ -709,7 +701,7 @@ function submitDeleteAll(e) {
             conflict: conflictObj(),
             onSuccess(body) {
                 const count = body && body.deleted != null ? body.deleted : 0;
-                if (showFrontendSuccessToast) {
+                {
                     const tpl = i18n().removedAllCount || '{0}';
                     showFrontendSuccessToast(String(tpl).replace('{0}', count));
                 }
@@ -730,11 +722,9 @@ if (document.readyState === 'loading') {
     init();
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'bp-open-edit', openEdit);
-    krtEvents.on('click', 'bp-close-edit', closeEdit);
-    krtEvents.on('click', 'bp-open-delete', openDelete);
-    krtEvents.on('click', 'bp-close-delete', closeDelete);
-    krtEvents.on('click', 'bp-open-delete-all', openDeleteAll);
-    krtEvents.on('click', 'bp-close-delete-all', closeDeleteAll);
-}
+krtEvents.on('click', 'bp-open-edit', openEdit);
+krtEvents.on('click', 'bp-close-edit', closeEdit);
+krtEvents.on('click', 'bp-open-delete', openDelete);
+krtEvents.on('click', 'bp-close-delete', closeDelete);
+krtEvents.on('click', 'bp-open-delete-all', openDeleteAll);
+krtEvents.on('click', 'bp-close-delete-all', closeDeleteAll);

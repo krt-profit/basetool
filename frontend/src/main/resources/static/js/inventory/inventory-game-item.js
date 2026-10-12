@@ -26,16 +26,8 @@ const INVENTORY_GAME_ITEM_SECTIONS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (krtFetch) {
-        krtFetch.bindSwap({ container: '#inventory-game-item-results', history: true });
-    }
-    if (
-        krtLiveSync &&
-        typeof krtLiveSync.createReceiver === 'function' &&
-        krtFetch &&
-        typeof krtFetch.swap === 'function' &&
-        document.getElementById('inventory-game-item-results')
-    ) {
+    krtFetch.bindSwap({ container: '#inventory-game-item-results', history: true });
+    if (document.getElementById('inventory-game-item-results')) {
         krtLiveSync.createReceiver({
             topic: 'inventory',
             sections: INVENTORY_GAME_ITEM_SECTIONS,

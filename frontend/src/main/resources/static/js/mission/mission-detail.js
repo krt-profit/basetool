@@ -54,7 +54,7 @@ const MISSION_SECTIONS = {
  */
 function crossPublishToParentOperation(keys) {
     const operationId = window.missionOperationId;
-    if (!operationId || !krtLiveSync || typeof krtLiveSync.sendChanged !== 'function') {
+    if (!operationId || typeof krtLiveSync.sendChanged !== 'function') {
         return;
     }
     const changed = Array.isArray(keys) ? keys : [keys];

@@ -55,7 +55,7 @@ function initMaterialboerseRelease() {
 
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const modal = /** @type {HTMLElement} */ (document.getElementById('mb-modal'));
-    if (!modal || !krtFetch) {
+    if (!modal) {
         return;
     }
 
@@ -222,9 +222,7 @@ function initMaterialboerseRelease() {
 
     /** Shows a transient client-side validation error toast. */
     function showError(message) {
-        if (typeof showFrontendErrorToast === 'function') {
-            showFrontendErrorToast(message || i18n.error || '');
-        }
+        showFrontendErrorToast(message || i18n.error || '');
     }
 
     function updateCharCount() {
@@ -700,9 +698,7 @@ function initMaterialboerseRelease() {
     }
 
     function notifyPeers() {
-        if (krtLiveSync) {
-            krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
-        }
+        krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
     }
 
     document.addEventListener('click', (e) => {

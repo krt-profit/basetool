@@ -241,8 +241,8 @@ function countActiveAdminInventoryFilters() {
 
 function filterInventory() {
     persistAdminInventoryFilters();
-    if (krtFilterPanel) krtFilterPanel.refresh('globalFilterPanel');
-    if (krtFilterChips) krtFilterChips.refresh();
+    krtFilterPanel.refresh('globalFilterPanel');
+    krtFilterChips.refresh();
     const itemsView = adminLager.lagerIsItemsView();
     const activeMats = adminLager.collectChecked('matCheck');
     const activeGameItems = adminLager.collectChecked('gameItemCheck');
@@ -311,17 +311,13 @@ const INVENTORY_ALL_SECTIONS = {
 };
 
 function broadcastInventoryAllChanged() {
-    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+    if (typeof krtLiveSync.sendChanged === 'function') {
         krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_ALL_SECTIONS));
     }
 }
 inventoryHooks.notifyChanged = broadcastInventoryAllChanged;
 
-if (
-    krtLiveSync &&
-    typeof krtLiveSync.createReceiver === 'function' &&
-    document.getElementById('tableContainer')
-) {
+if (document.getElementById('tableContainer')) {
     krtLiveSync.createReceiver({
         topic: 'inventory',
         sections: INVENTORY_ALL_SECTIONS,
@@ -336,11 +332,7 @@ const INVENTORY_ALL_ORDER_SECTIONS = {
     demand: { container: '#tableContainer' },
 };
 
-if (
-    krtLiveSync &&
-    typeof krtLiveSync.createReceiver === 'function' &&
-    document.getElementById('tableContainer')
-) {
+if (document.getElementById('tableContainer')) {
     krtLiveSync.createReceiver({
         topic: 'orders',
         sections: INVENTORY_ALL_ORDER_SECTIONS,
@@ -438,11 +430,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ) {
         adminLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
-    if (krtFilterPanel) {
-        krtFilterPanel.registerCounter('globalFilterPanel', countActiveAdminInventoryFilters);
-        krtFilterPanel.refresh('globalFilterPanel');
-    }
-    if (krtFilterChips) krtFilterChips.refresh();
+    krtFilterPanel.registerCounter('globalFilterPanel', countActiveAdminInventoryFilters);
+    krtFilterPanel.refresh('globalFilterPanel');
+    krtFilterChips.refresh();
     if (filtersRestored) filterInventory();
 });
 
@@ -594,7 +584,7 @@ function openUmbuchenModal(
     }
     adminLager.refreshUmbuchenTransferOrgUnitPicker();
     krtModal.open(modal);
-    if (krtHerkunft && id) {
+    if (id) {
         krtHerkunft.populate('umbuchen', id);
     }
 }
@@ -608,14 +598,14 @@ function openUmbuchenModal(
 function submitUmbuchen(event) {
     if (event && event.defaultPrevented) return;
     if (event) event.preventDefault();
-    if (adminUmbuchenInFlight || !krtFetch || !adminUmbuchenItemId) return;
+    if (adminUmbuchenInFlight || !adminUmbuchenItemId) return;
     const amountEl = adminUmbuchenInput('umbuchenAmount');
     const targetUserEl = adminUmbuchenInput('umbuchenTargetUserId');
     const targetLocationEl = adminUmbuchenInput('umbuchenTargetLocationId');
     const targetOrgUnitEl = adminUmbuchenInput('umbuchenTargetOwningOrgUnitId');
     const versionEl = adminUmbuchenInput('umbuchenVersion');
     if (!amountEl || !targetUserEl || !targetLocationEl || !targetOrgUnitEl || !versionEl) return;
-    const amount = krtScuInput ? krtScuInput.parse(amountEl.value) : parseFloat(amountEl.value);
+    const amount = krtScuInput.parse(amountEl.value);
     const submitBtn = /** @type {HTMLButtonElement | null} */ (
         document.getElementById('umbuchenSubmitBtn')
     );
@@ -626,20 +616,14 @@ function submitUmbuchen(event) {
         (targetUserId === null || targetUserId === adminUmbuchenSource.userId) &&
         (targetLocationId === null || targetLocationId === adminUmbuchenSource.locationId)
     ) {
-        if (typeof showFrontendErrorToast === 'function') {
-            showFrontendErrorToast(umbuchenI18n.unchanged);
-        }
+        showFrontendErrorToast(umbuchenI18n.unchanged);
         return;
     }
-    if (krtHerkunft && !krtHerkunft.isValid('umbuchen')) {
-        if (typeof showFrontendErrorToast === 'function') {
-            showFrontendErrorToast(assocI18n.overallocated);
-        }
+    if (!krtHerkunft.isValid('umbuchen')) {
+        showFrontendErrorToast(assocI18n.overallocated);
         return;
     }
-    const reductions = krtHerkunft
-        ? krtHerkunft.collect('umbuchen')
-        : { jobOrderReductions: null, missionReductions: null };
+    const reductions = krtHerkunft.collect('umbuchen');
     const payload = {
         amount,
         type: 'TRANSFER',
@@ -706,7 +690,6 @@ function initInventoryAdmin() {
     });
 
     confirmBtn.addEventListener('click', async () => {
-        if (!krtFetch) return;
         confirmBtn.disabled = true;
         cancelBtn.disabled = true;
         try {
@@ -732,50 +715,48 @@ function initInventoryAdmin() {
 
 initInventoryAdmin();
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'inv-admin-toggle-multi', (el) => {
-        adminLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
-    });
-    krtEvents.on('change', 'inv-admin-toggle-all', (el) => {
-        adminLager.toggleSelectAll(
-            el.getAttribute('data-all-id'),
-            el.getAttribute('data-check-class'),
-            el.getAttribute('data-header-id'),
-        );
-        filterInventory();
-    });
-    krtEvents.on('change', 'inv-admin-update-state', (el) => {
-        adminLager.updateSelectState(
-            el.getAttribute('data-all-id'),
-            el.getAttribute('data-check-class'),
-            el.getAttribute('data-header-id'),
-        );
-        filterInventory();
-    });
-    krtEvents.on('change', 'inv-admin-filter', filterInventory);
-    krtEvents.on('click', 'inv-admin-reset-filter', resetInventoryFilter);
-    krtEvents.on('click', 'inv-admin-umbuchen', (el) => {
-        openUmbuchenModal(
-            el.getAttribute('data-id'),
-            el.getAttribute('data-amount'),
-            el.getAttribute('data-version'),
-            el.getAttribute('data-material-id'),
-            el.getAttribute('data-user-id'),
-            el.getAttribute('data-user-name'),
-            el.getAttribute('data-location-id'),
-            el.getAttribute('data-location-name'),
-            el.getAttribute('data-quantity-type'),
-            el.getAttribute('data-owning-org-unit-id'),
-        );
-    });
-    krtEvents.on('click', 'inv-admin-open-note', (el) => {
-        openNoteModal(el);
-    });
-    krtEvents.on('click', 'inv-admin-close-note', closeNoteModal);
-    krtEvents.on('input', 'inv-admin-update-note-counter', updateNoteCounter);
-    krtEvents.on('click', 'inv-admin-save-note', saveNote);
-    krtEvents.on('click', 'inv-admin-remove-note', removeNote);
-}
+krtEvents.on('click', 'inv-admin-toggle-multi', (el) => {
+    adminLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
+});
+krtEvents.on('change', 'inv-admin-toggle-all', (el) => {
+    adminLager.toggleSelectAll(
+        el.getAttribute('data-all-id'),
+        el.getAttribute('data-check-class'),
+        el.getAttribute('data-header-id'),
+    );
+    filterInventory();
+});
+krtEvents.on('change', 'inv-admin-update-state', (el) => {
+    adminLager.updateSelectState(
+        el.getAttribute('data-all-id'),
+        el.getAttribute('data-check-class'),
+        el.getAttribute('data-header-id'),
+    );
+    filterInventory();
+});
+krtEvents.on('change', 'inv-admin-filter', filterInventory);
+krtEvents.on('click', 'inv-admin-reset-filter', resetInventoryFilter);
+krtEvents.on('click', 'inv-admin-umbuchen', (el) => {
+    openUmbuchenModal(
+        el.getAttribute('data-id'),
+        el.getAttribute('data-amount'),
+        el.getAttribute('data-version'),
+        el.getAttribute('data-material-id'),
+        el.getAttribute('data-user-id'),
+        el.getAttribute('data-user-name'),
+        el.getAttribute('data-location-id'),
+        el.getAttribute('data-location-name'),
+        el.getAttribute('data-quantity-type'),
+        el.getAttribute('data-owning-org-unit-id'),
+    );
+});
+krtEvents.on('click', 'inv-admin-open-note', (el) => {
+    openNoteModal(el);
+});
+krtEvents.on('click', 'inv-admin-close-note', closeNoteModal);
+krtEvents.on('input', 'inv-admin-update-note-counter', updateNoteCounter);
+krtEvents.on('click', 'inv-admin-save-note', saveNote);
+krtEvents.on('click', 'inv-admin-remove-note', removeNote);
 
 const adminUmbuchenFormEl = document.getElementById('umbuchenForm');
 if (adminUmbuchenFormEl) {

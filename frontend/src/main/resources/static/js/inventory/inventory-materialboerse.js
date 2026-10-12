@@ -21,7 +21,7 @@ import { krtHooks } from '/js/kernel/krt-hooks.js';
 function initInventoryMaterialboerse() {
     const i18n = window.materialboerseInventoryI18n || {};
     const release = krtHooks.materialRelease;
-    if (!krtEvents || !release || !krtFetch) {
+    if (!release) {
         return;
     }
 
@@ -66,9 +66,7 @@ function initInventoryMaterialboerse() {
             );
             return;
         }
-        if (!showKrtConfirm) {
-            return;
-        }
+
         showKrtConfirm(
             i18n.deactivateTitle,
             i18n.deactivateBody,
@@ -87,9 +85,7 @@ function initInventoryMaterialboerse() {
                 serialize: 'materialboerse',
                 onSuccess() {
                     setStatus(itemId, false);
-                    if (krtLiveSync) {
-                        krtLiveSync.sendChanged('materialboard', ['board']);
-                    }
+                    krtLiveSync.sendChanged('materialboard', ['board']);
                 },
                 onError() {
                     el.checked = true;

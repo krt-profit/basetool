@@ -143,16 +143,13 @@ function roundAmount(n, isPiece) {
 }
 
 /**
- * Parses an amount field, accepting "," and "." as decimal separator when krtScuInput is loaded.
+ * Parses an amount field, accepting "," and "." as decimal separator.
  *
  * @param {string} value the raw field value
  * @returns {number} the parsed number (NaN when unparseable)
  */
 function parseAmount(value) {
-    if (krtScuInput && typeof krtScuInput.parse === 'function') {
-        return krtScuInput.parse(value);
-    }
-    return parseFloat(value);
+    return krtScuInput.parse(value);
 }
 
 /**

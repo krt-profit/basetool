@@ -91,11 +91,9 @@ async function saveActualTimeInPlace(field, nowDate) {
         console.error(
             '[mission-detail] Schedule-Version nicht gefunden (mission-schedule-version input)',
         );
-        if (typeof showFrontendErrorToast === 'function') {
-            showFrontendErrorToast(
-                krtI18nText(window.MSG_MISSION_ACTUAL_TIME_ERROR, 'MSG_MISSION_ACTUAL_TIME_ERROR'),
-            );
-        }
+        showFrontendErrorToast(
+            krtI18nText(window.MSG_MISSION_ACTUAL_TIME_ERROR, 'MSG_MISSION_ACTUAL_TIME_ERROR'),
+        );
         return;
     }
 
@@ -490,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 missionHooks.modalClose(editForm.closest('.krt-modal-overlay'));
                 const dto = res.body;
-                if (dto && dto.version != null && krtFetch) {
+                if (dto && dto.version != null) {
                     document
                         .querySelectorAll(`.edit-finance-btn[data-id="${entryId}"]`)
                         .forEach((btn) => {
@@ -626,13 +624,6 @@ function openEditFinanceModal(id, note, type, amount, version) {
 }
 
 function registerMissionDetailEventHandlers() {
-    if (!krtEvents || typeof krtEvents.on !== 'function') {
-        console.error(
-            '[mission-detail] window.krtEvents missing — page click handlers not registered. ' +
-                'event-delegation.js must load before mission-detail body scripts.',
-        );
-        return;
-    }
     krtEvents.on('click', 'mission-set-now', (el) => {
         setNowToInput(/** @type {string} */ (el.getAttribute('data-input-id')));
     });

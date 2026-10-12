@@ -31,10 +31,10 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 
 function toastSuccess(msg) {
-    if (showFrontendSuccessToast) showFrontendSuccessToast(msg);
+    showFrontendSuccessToast(msg);
 }
 function toastError(msg) {
-    if (showFrontendErrorToast) showFrontendErrorToast(msg);
+    showFrontendErrorToast(msg);
 }
 
 /**
@@ -55,10 +55,6 @@ function openModal(id) {
 }
 
 function arRefresh() {
-    if (!krtFetch || typeof krtFetch.swap !== 'function') {
-        window.location.reload();
-        return Promise.resolve(false);
-    }
     return krtFetch.swap({
         url: '/promotion/admin/rank-requirements',
         container: '#ar-results',
@@ -103,10 +99,6 @@ function isValidSingleStep(fromVal, toVal) {
 }
 
 function apiCall(url, method, body) {
-    if (!krtFetch) {
-        toastError(MSG_ERROR);
-        return Promise.resolve(null);
-    }
     return krtFetch
         .write({
             method,
@@ -331,33 +323,31 @@ function applyFilter() {
 document.addEventListener('DOMContentLoaded', () => {
     rebuildCategoryDropdown(document.getElementById('cr-topic'));
 
-    if (krtEvents && typeof krtEvents.on === 'function') {
-        krtEvents.on('click', 'ar-open-create', () => {
-            openCreateModal(null);
-        });
-        krtEvents.on('click', 'ar-matrix-add', openCreateModal);
-        krtEvents.on('click', 'ar-matrix-show', showMatrixCell);
-        krtEvents.on('click', 'ar-open-edit', openEditModal);
-        krtEvents.on('click', 'ar-open-delete', (btn) => {
-            confirmAndDelete(btn.getAttribute('data-ar-id'));
-        });
-        krtEvents.on('click', 'ar-delete-group', (btn) => {
-            confirmAndDeleteGroup(
-                parseInt(btn.getAttribute('data-ar-from-rank') ?? '', 10),
-                parseInt(btn.getAttribute('data-ar-to-rank') ?? '', 10),
-            );
-        });
-        krtEvents.on('click', 'ar-close-create', () => {
-            closeModal('modal-create');
-        });
-        krtEvents.on('click', 'ar-close-edit', () => {
-            closeModal('modal-edit');
-        });
-        krtEvents.on('click', 'ar-submit-create', submitCreate);
-        krtEvents.on('click', 'ar-submit-edit', submitEdit);
-        krtEvents.on('change', 'ar-topic-change', rebuildCategoryDropdown);
-        krtEvents.on('input', 'ar-rank-from', syncToRank);
-    }
+    krtEvents.on('click', 'ar-open-create', () => {
+        openCreateModal(null);
+    });
+    krtEvents.on('click', 'ar-matrix-add', openCreateModal);
+    krtEvents.on('click', 'ar-matrix-show', showMatrixCell);
+    krtEvents.on('click', 'ar-open-edit', openEditModal);
+    krtEvents.on('click', 'ar-open-delete', (btn) => {
+        confirmAndDelete(btn.getAttribute('data-ar-id'));
+    });
+    krtEvents.on('click', 'ar-delete-group', (btn) => {
+        confirmAndDeleteGroup(
+            parseInt(btn.getAttribute('data-ar-from-rank') ?? '', 10),
+            parseInt(btn.getAttribute('data-ar-to-rank') ?? '', 10),
+        );
+    });
+    krtEvents.on('click', 'ar-close-create', () => {
+        closeModal('modal-create');
+    });
+    krtEvents.on('click', 'ar-close-edit', () => {
+        closeModal('modal-edit');
+    });
+    krtEvents.on('click', 'ar-submit-create', submitCreate);
+    krtEvents.on('click', 'ar-submit-edit', submitEdit);
+    krtEvents.on('change', 'ar-topic-change', rebuildCategoryDropdown);
+    krtEvents.on('input', 'ar-rank-from', syncToRank);
 
     document.querySelectorAll('.ar-rank-from').forEach((el) => {
         el.addEventListener('input', () => {

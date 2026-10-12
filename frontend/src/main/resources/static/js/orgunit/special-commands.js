@@ -107,7 +107,7 @@ const SC_FILTER_PREF_KEY = 'admin_special_commands_filter';
 const includeInactive = /** @type {HTMLInputElement | null} */ (
     document.getElementById('includeInactive')
 );
-if (includeInactive && krtFetch) {
+if (includeInactive) {
     const persistScFilter = function () {
         try {
             localStorage.setItem(
@@ -144,7 +144,6 @@ if (includeInactive && krtFetch) {
 }
 
 function reswapScResults() {
-    if (!krtFetch) return;
     const url = `/admin/special-commands${
         includeInactive && includeInactive.checked ? '?includeInactive=true' : ''
     }`;
@@ -169,20 +168,14 @@ function scWrite(theForm, successMessage, onSuccess) {
 if (form) {
     form.addEventListener('submit', (e) => {
         e.preventDefault();
-        if (!krtFetch) {
-            form.submit();
-            return;
-        }
+
         scWrite(form, SC_MSG.saved, closeModal);
     });
 }
 if (deleteForm) {
     deleteForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        if (!krtFetch) {
-            deleteForm.submit();
-            return;
-        }
+
         scWrite(deleteForm, SC_MSG.deleted, closeDelete);
     });
 }
@@ -194,9 +187,6 @@ document.addEventListener('submit', (e) => {
         return;
     }
     e.preventDefault();
-    if (!krtFetch) {
-        actForm.submit();
-        return;
-    }
+
     scWrite(actForm, SC_MSG.saved, null);
 });

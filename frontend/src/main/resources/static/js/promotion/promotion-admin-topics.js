@@ -31,10 +31,10 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 
 function toastSuccess(msg) {
-    if (showFrontendSuccessToast) showFrontendSuccessToast(msg);
+    showFrontendSuccessToast(msg);
 }
 function toastError(msg) {
-    if (showFrontendErrorToast) showFrontendErrorToast(msg);
+    showFrontendErrorToast(msg);
 }
 
 /**
@@ -64,10 +64,6 @@ function paTopicsUrl() {
 }
 
 function paRefreshTopics() {
-    if (!krtFetch || typeof krtFetch.swap !== 'function') {
-        window.location.reload();
-        return Promise.resolve(false);
-    }
     return krtFetch.swap({
         url: paTopicsUrl(),
         container: '#pa-topics-results',
@@ -142,10 +138,6 @@ function paOnTopicListKeydown(e) {
 }
 
 function apiCall(url, method, body) {
-    if (!krtFetch) {
-        toastError(MSG_ERROR);
-        return Promise.resolve(null);
-    }
     return krtFetch
         .write({
             method,
@@ -475,46 +467,44 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (krtEvents && typeof krtEvents.on === 'function') {
-        krtEvents.on('click', 'pa-open-create-topic', openCreateTopicModal);
-        krtEvents.on('click', 'pa-edit-topic', openEditTopicModal);
-        krtEvents.on('click', 'pa-delete-topic', deleteTopic);
-        krtEvents.on('click', 'pa-open-create-category', openCreateCategoryModal);
-        krtEvents.on('click', 'pa-edit-category', openEditCategoryModal);
-        krtEvents.on('click', 'pa-delete-category', deleteCategory);
+    krtEvents.on('click', 'pa-open-create-topic', openCreateTopicModal);
+    krtEvents.on('click', 'pa-edit-topic', openEditTopicModal);
+    krtEvents.on('click', 'pa-delete-topic', deleteTopic);
+    krtEvents.on('click', 'pa-open-create-category', openCreateCategoryModal);
+    krtEvents.on('click', 'pa-edit-category', openEditCategoryModal);
+    krtEvents.on('click', 'pa-delete-category', deleteCategory);
 
-        krtEvents.on('click', 'pa-create-topic', createTopic);
-        krtEvents.on('click', 'pa-update-topic', updateTopic);
-        krtEvents.on('click', 'pa-create-category', createCategory);
-        krtEvents.on('click', 'pa-update-category', updateCategory);
+    krtEvents.on('click', 'pa-create-topic', createTopic);
+    krtEvents.on('click', 'pa-update-topic', updateTopic);
+    krtEvents.on('click', 'pa-create-category', createCategory);
+    krtEvents.on('click', 'pa-update-category', updateCategory);
 
-        krtEvents.on('click', 'pa-close-modal', (btn) => {
-            const id = btn.getAttribute('data-pa-modal');
-            if (id) closeModal(id);
-        });
+    krtEvents.on('click', 'pa-close-modal', (btn) => {
+        const id = btn.getAttribute('data-pa-modal');
+        if (id) closeModal(id);
+    });
 
-        krtEvents.on('click', 'pa-move-topic-up', (btn) => {
-            moveTopic(btn, 'up');
-        });
-        krtEvents.on('click', 'pa-move-topic-down', (btn) => {
-            moveTopic(btn, 'down');
-        });
-        krtEvents.on('click', 'pa-move-cat-up', (btn) => {
-            moveCategory(btn, 'up');
-        });
-        krtEvents.on('click', 'pa-move-cat-down', (btn) => {
-            moveCategory(btn, 'down');
-        });
+    krtEvents.on('click', 'pa-move-topic-up', (btn) => {
+        moveTopic(btn, 'up');
+    });
+    krtEvents.on('click', 'pa-move-topic-down', (btn) => {
+        moveTopic(btn, 'down');
+    });
+    krtEvents.on('click', 'pa-move-cat-up', (btn) => {
+        moveCategory(btn, 'up');
+    });
+    krtEvents.on('click', 'pa-move-cat-down', (btn) => {
+        moveCategory(btn, 'down');
+    });
 
-        krtEvents.on('input', 'pa-level-dirty', paMarkDirty);
-        krtEvents.on('click', 'pa-save-level-content', paSaveLevelContentFromButton);
-        krtEvents.on('click', 'pa-save-all', paSaveAll);
-        krtEvents.on('click', 'pa-discard-all', paDiscardAll);
+    krtEvents.on('input', 'pa-level-dirty', paMarkDirty);
+    krtEvents.on('click', 'pa-save-level-content', paSaveLevelContentFromButton);
+    krtEvents.on('click', 'pa-save-all', paSaveAll);
+    krtEvents.on('click', 'pa-discard-all', paDiscardAll);
 
-        krtEvents.on('click', 'pa-select-topic', (row) => {
-            paSelectTopic(row.getAttribute('data-pa-select-topic'), false);
-        });
-    }
+    krtEvents.on('click', 'pa-select-topic', (row) => {
+        paSelectTopic(row.getAttribute('data-pa-select-topic'), false);
+    });
 
     document.addEventListener('keydown', paOnTopicListKeydown);
     paSyncSelectionFromDom();

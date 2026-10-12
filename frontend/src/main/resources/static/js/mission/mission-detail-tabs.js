@@ -84,7 +84,7 @@ function initMissionDetailTabs() {
         if (!validKeys.includes(key) || key === currentKey()) {
             return false;
         }
-        if (dirty && typeof showKrtConfirm === 'function') {
+        if (dirty) {
             const i18n = window.MISSION_TAB_I18N || {};
             const go = await showKrtConfirm(
                 krtI18nText(i18n['unsaved.title'], 'MISSION_TAB_I18N[unsaved.title]'),
@@ -238,29 +238,22 @@ function initMissionDetailTabs2() {
         Object.keys(map || {}).forEach((field) => {
             const slot = form.querySelector(`.field-error[data-error-for="${field}"]`);
             if (slot) slot.textContent = map[field];
-            else if (showFrontendErrorToast) showFrontendErrorToast(map[field]);
+            else showFrontendErrorToast(map[field]);
         });
     }
     function handleConflict(problem) {
         const code = problem && problem.code;
         if (code === 'OPTIMISTIC_LOCK' || code === 'PESSIMISTIC_LOCK') {
-            if (typeof showKrtConfirm === 'function') {
-                showKrtConfirm(
-                    msg('mission.conflict.toast.title'),
-                    msg('mission.conflict.action.reload.question'),
-                    msg('mission.conflict.action.reload'),
-                    msg('mission.conflict.action.dismiss'),
-                ).then((ok) => {
-                    if (ok) window.location.reload();
-                });
-            } else {
-                window.location.reload();
-            }
-        } else if (showFrontendErrorToast) {
-            const ownerRequired =
-                krtFetch && krtFetch.ownerOrgUnitRequiredMessage
-                    ? krtFetch.ownerOrgUnitRequiredMessage(problem)
-                    : null;
+            showKrtConfirm(
+                msg('mission.conflict.toast.title'),
+                msg('mission.conflict.action.reload.question'),
+                msg('mission.conflict.action.reload'),
+                msg('mission.conflict.action.dismiss'),
+            ).then((ok) => {
+                if (ok) window.location.reload();
+            });
+        } else {
+            const ownerRequired = krtFetch.ownerOrgUnitRequiredMessage(problem);
             showFrontendErrorToast(
                 ownerRequired ||
                     (problem && problem.detail) ||
@@ -314,10 +307,6 @@ function initMissionDetailTabs2() {
     }
 
     async function submitInPlace() {
-        if (!krtFetch) {
-            form.submit();
-            return;
-        }
         markDirtySections();
         await krtFetch.submitForm({
             form,

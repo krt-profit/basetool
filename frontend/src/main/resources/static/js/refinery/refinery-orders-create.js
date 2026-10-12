@@ -213,9 +213,7 @@ function addMaterialRow() {
     });
 
     container.appendChild(template);
-    if (krtEnhanceComboboxes) {
-        krtEnhanceComboboxes(template);
-    }
+    krtEnhanceComboboxes(template);
 }
 
 /**
@@ -376,87 +374,85 @@ function updateProfitPreview() {
     }
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
-    krtEvents.on('focusout', 'rfc-update-profit', (el) => {
-        const field = /** @type {HTMLInputElement} */ (el);
-        if (field.value.trim() === '') {
-            field.value = '0';
-            updateProfitPreview();
-        }
-    });
-    krtEvents.on('click', 'rfc-set-started-now', setStartedAtNow);
-    krtEvents.on('change', 'rfc-update-method', updateMethodRatings);
-    krtEvents.on('click', 'rfc-add-material', addMaterialRow);
-    krtEvents.on('click', 'rfc-remove-material', (el) => {
-        removeMaterialRow(el);
-    });
-    krtEvents.on('change', 'rfc-update-output', (el) => {
-        updateOutputMaterial(/** @type {KrtRefineryControl} */ (el));
-    });
-    krtEvents.on('change', 'rfc-location-change', (el) => {
-        krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
-    });
-    krtEvents.on('input', 'rfc-calc-scu', (el) => {
-        calcScu(el.getAttribute('data-index'));
-    });
-    krtEvents.on('click', 'rfc-import-pick', () => {
-        const fileInput = document.getElementById('refineryImportFile');
-        if (fileInput) fileInput.click();
-    });
-    krtEvents.on('change', 'rfc-import-file', (el) => {
-        const fileField = /** @type {HTMLInputElement} */ (el);
-        if (fileField.files && fileField.files.length > 0) {
-            const importForm = /** @type {HTMLFormElement | null} */ (
-                document.getElementById('refineryImportForm')
-            );
-            if (importForm) importForm.requestSubmit();
-        }
-    });
-    krtEvents.on('click', 'rfc-apply-suggestion', (el) => {
-        const materialId = el.getAttribute('data-material-id');
-        const materialName = el.getAttribute('data-material-name') || '';
-        const entry = el.closest('.material-entry');
-        const select = /** @type {KrtRefineryControl | null} */ (
-            entry ? entry.querySelector('[id^="inputMaterialId_"]') : null
+krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
+krtEvents.on('focusout', 'rfc-update-profit', (el) => {
+    const field = /** @type {HTMLInputElement} */ (el);
+    if (field.value.trim() === '') {
+        field.value = '0';
+        updateProfitPreview();
+    }
+});
+krtEvents.on('click', 'rfc-set-started-now', setStartedAtNow);
+krtEvents.on('change', 'rfc-update-method', updateMethodRatings);
+krtEvents.on('click', 'rfc-add-material', addMaterialRow);
+krtEvents.on('click', 'rfc-remove-material', (el) => {
+    removeMaterialRow(el);
+});
+krtEvents.on('change', 'rfc-update-output', (el) => {
+    updateOutputMaterial(/** @type {KrtRefineryControl} */ (el));
+});
+krtEvents.on('change', 'rfc-location-change', (el) => {
+    krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
+});
+krtEvents.on('input', 'rfc-calc-scu', (el) => {
+    calcScu(el.getAttribute('data-index'));
+});
+krtEvents.on('click', 'rfc-import-pick', () => {
+    const fileInput = document.getElementById('refineryImportFile');
+    if (fileInput) fileInput.click();
+});
+krtEvents.on('change', 'rfc-import-file', (el) => {
+    const fileField = /** @type {HTMLInputElement} */ (el);
+    if (fileField.files && fileField.files.length > 0) {
+        const importForm = /** @type {HTMLFormElement | null} */ (
+            document.getElementById('refineryImportForm')
         );
-        if (!select || !materialId) return;
-        /** @param {any} match the matched catalog row, or null when the lookup found none */
-        const applySuggestion = (match) => {
-            if (select.krtCombobox) {
-                if (match) {
-                    select.krtCombobox.setValue(materialId, match.name, {
-                        quantityType: match.quantityType || '',
-                        refinedId: (match.refinedMaterial && match.refinedMaterial.id) || '',
-                        refinedName: (match.refinedMaterial && match.refinedMaterial.name) || '',
-                    });
-                } else {
-                    select.krtCombobox.setValue(materialId, materialName);
-                }
+        if (importForm) importForm.requestSubmit();
+    }
+});
+krtEvents.on('click', 'rfc-apply-suggestion', (el) => {
+    const materialId = el.getAttribute('data-material-id');
+    const materialName = el.getAttribute('data-material-name') || '';
+    const entry = el.closest('.material-entry');
+    const select = /** @type {KrtRefineryControl | null} */ (
+        entry ? entry.querySelector('[id^="inputMaterialId_"]') : null
+    );
+    if (!select || !materialId) return;
+    /** @param {any} match the matched catalog row, or null when the lookup found none */
+    const applySuggestion = (match) => {
+        if (select.krtCombobox) {
+            if (match) {
+                select.krtCombobox.setValue(materialId, match.name, {
+                    quantityType: match.quantityType || '',
+                    refinedId: (match.refinedMaterial && match.refinedMaterial.id) || '',
+                    refinedName: (match.refinedMaterial && match.refinedMaterial.name) || '',
+                });
             } else {
-                select.value = materialId;
+                select.krtCombobox.setValue(materialId, materialName);
             }
-            select.dispatchEvent(new Event('change', { bubbles: true }));
-        };
-        krtFetch
-            .getJson(`/catalog/material-search?raw=true&q=${encodeURIComponent(materialName)}`)
-            .then((list) => {
-                const rows = Array.isArray(list) ? list : [];
-                const match =
-                    rows.find((m) => {
-                        return m.id === materialId;
-                    }) ||
-                    rows.find((m) => {
-                        return m.name === materialName;
-                    }) ||
-                    null;
-                applySuggestion(match);
-            })
-            .catch(() => {
-                applySuggestion(null);
-            });
-    });
-}
+        } else {
+            select.value = materialId;
+        }
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    krtFetch
+        .getJson(`/catalog/material-search?raw=true&q=${encodeURIComponent(materialName)}`)
+        .then((list) => {
+            const rows = Array.isArray(list) ? list : [];
+            const match =
+                rows.find((m) => {
+                    return m.id === materialId;
+                }) ||
+                rows.find((m) => {
+                    return m.name === materialName;
+                }) ||
+                null;
+            applySuggestion(match);
+        })
+        .catch(() => {
+            applySuggestion(null);
+        });
+});
 
 /**
  * Picks the toast for a failed in-place create; the mission-participant problem code (REQ-SEC-042)
@@ -480,23 +476,17 @@ function _refineryCreateErrorMessage(status, body) {
  * @param {HTMLElement | null} submitter the control that triggered the submit
  */
 function _submitRefineryCreate(form, submitter) {
-    if (!krtFetch) {
-        form.submit();
-        return;
-    }
     krtFetch.submitForm({
         form,
         submitter,
         toast: false,
         errorMessage: MSG_RFC_CREATE_FAILED,
         onError(status, body) {
-            if (showFrontendErrorToast) {
-                showFrontendErrorToast(_refineryCreateErrorMessage(status, body));
-            }
+            showFrontendErrorToast(_refineryCreateErrorMessage(status, body));
             return true;
         },
         onSuccess(body) {
-            if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
+            resetUnsavedChanges();
             if (body && body.targetUrl) window.location.assign(body.targetUrl);
             else window.location.reload();
         },
@@ -531,16 +521,11 @@ function _reinitRefineryForm(fromSwap) {
     ).forEach((select) => {
         if (select.value) updateOutputMaterial(select);
     });
-    if (krtRefineryYield) {
+    {
         const locationSelect = /** @type {KrtRefineryControl | null} */ (
             document.getElementById('locationId')
         );
-        if (
-            fromSwap &&
-            locationSelect &&
-            locationSelect.value &&
-            typeof krtRefineryYield.onLocationChange === 'function'
-        ) {
+        if (fromSwap && locationSelect && locationSelect.value) {
             krtRefineryYield.onLocationChange(locationSelect);
         } else {
             krtRefineryYield.refreshAll();
@@ -575,28 +560,24 @@ function _swapRefineryImportFragment(html) {
     }
     krtFetch.setTrustedHtml(container, html);
     document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
-    if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
+    resetUnsavedChanges();
 }
 
 function _applyRefineryImportResult(result) {
     if (!result.ok) return;
     if (result.redirected || typeof result.body !== 'string') {
-        if (showFrontendErrorToast) showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+        showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
         return;
     }
     _swapRefineryImportFragment(result.body);
 }
 
 function _refineryImportFailed() {
-    if (showFrontendErrorToast) showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+    showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
     return true;
 }
 
 function _submitRefineryImport(form) {
-    if (!krtFetch) {
-        form.submit();
-        return;
-    }
     krtFetch
         .submitForm({
             form,
@@ -628,7 +609,7 @@ function _loadRefineryHandoff() {
             window.history.replaceState(null, '', cleaned);
         }
     } catch (_e) {}
-    if (!krtFetch) return;
+
     krtFetch
         .write({
             method: 'POST',

@@ -36,11 +36,9 @@ function openDeleteModal(id) {
     krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'operations-open-delete', (el) => {
-        openDeleteModal(el.getAttribute('data-id'));
-    });
-}
+krtEvents.on('click', 'operations-open-delete', (el) => {
+    openDeleteModal(el.getAttribute('data-id'));
+});
 
 function opsConflictStrings() {
     return {
@@ -62,8 +60,6 @@ function reloadOperationsList() {
 }
 
 function initOperationsIndex() {
-    if (!krtFetch) return;
-
     const createForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('create-operation-form')
     );

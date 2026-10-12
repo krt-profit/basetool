@@ -34,9 +34,6 @@ const ORDERS_SECTIONS = {
 };
 
 function initOrdersIndex() {
-    if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
-        return;
-    }
     const ordersQueueSeam = krtFetch.sectionWrite({
         dict() {
             return {
@@ -52,35 +49,33 @@ function initOrdersIndex() {
             return window.location.pathname + window.location.search;
         },
         broadcast(keys) {
-            if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+            if (typeof krtLiveSync.sendChanged === 'function') {
                 krtLiveSync.sendChanged('orders', keys);
             }
         },
     });
     joborderHooks.refreshOrdersQueue = ordersQueueSeam.refresh;
 
-    if (krtLiveSync && krtLiveSync.createReceiver) {
-        krtLiveSync.createReceiver({
-            topic: 'orders',
-            sections: ORDERS_SECTIONS,
-            coalesceMs: 1500,
-            refresh(keys) {
-                if (joborderHooks.refreshOrdersQueue) {
-                    joborderHooks.refreshOrdersQueue(keys, { broadcast: false });
-                }
+    krtLiveSync.createReceiver({
+        topic: 'orders',
+        sections: ORDERS_SECTIONS,
+        coalesceMs: 1500,
+        refresh(keys) {
+            if (joborderHooks.refreshOrdersQueue) {
+                joborderHooks.refreshOrdersQueue(keys, { broadcast: false });
+            }
+        },
+        busyTest() {
+            return joborderHooks.ordersDragging === true;
+        },
+        pill: {
+            label() {
+                return typeof KRT_ORDERS_LIVESYNC_UPDATES !== 'undefined'
+                    ? KRT_ORDERS_LIVESYNC_UPDATES
+                    : undefined;
             },
-            busyTest() {
-                return joborderHooks.ordersDragging === true;
-            },
-            pill: {
-                label() {
-                    return typeof KRT_ORDERS_LIVESYNC_UPDATES !== 'undefined'
-                        ? KRT_ORDERS_LIVESYNC_UPDATES
-                        : undefined;
-                },
-            },
-        });
-    }
+        },
+    });
 }
 
 initOrdersIndex();
@@ -249,7 +244,7 @@ function applyOrdersFilter() {
         document.getElementById('orders-filter-form')
     );
     const resultsContainer = document.getElementById('orders-results');
-    if (!filterForm || !resultsContainer || !krtFetch) return;
+    if (!filterForm || !resultsContainer) return;
     const data = new FormData(filterForm);
     const params = new URLSearchParams();
     for (const [key, value] of data.entries()) {
@@ -430,19 +425,15 @@ function countActiveOrdersFilters() {
 }
 
 function refreshOrdersFilterBadge() {
-    if (krtFilterPanel) krtFilterPanel.refresh('orders-filter-panel');
+    krtFilterPanel.refresh('orders-filter-panel');
 }
 
-if (krtFilterPanel && typeof krtFilterPanel.registerCounter === 'function') {
-    krtFilterPanel.registerCounter('orders-filter-panel', countActiveOrdersFilters);
-}
+krtFilterPanel.registerCounter('orders-filter-panel', countActiveOrdersFilters);
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'ord-toggle-materials', toggleOrderMaterials);
-    krtEvents.on('click', 'ord-toggle-squadron-multi', toggleSquadronMulti);
-    krtEvents.on('change', 'ord-toggle-squadron-all', toggleSquadronAll);
-    krtEvents.on('change', 'ord-update-squadron-state', updateSquadronState);
-}
+krtEvents.on('click', 'ord-toggle-materials', toggleOrderMaterials);
+krtEvents.on('click', 'ord-toggle-squadron-multi', toggleSquadronMulti);
+krtEvents.on('change', 'ord-toggle-squadron-all', toggleSquadronAll);
+krtEvents.on('change', 'ord-update-squadron-state', updateSquadronState);
 
 document.addEventListener('click', (e) => {
     if (!(/** @type {Element} */ (e.target).closest('.multi-select-container'))) {
@@ -459,11 +450,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusDiffers = restoreStatusFilter();
     const squadronDiffers = restoreSquadronFilter();
     refreshOrdersFilterBadge();
-    if (krtFilterChips) krtFilterChips.refresh();
-    if ((scopeDiffers || statusDiffers || squadronDiffers) && krtFetch) applyOrdersFilter();
+    krtFilterChips.refresh();
+    if (scopeDiffers || statusDiffers || squadronDiffers) applyOrdersFilter();
 
     const filterForm = document.getElementById('orders-filter-form');
-    if (filterForm && krtFetch) {
+    if (filterForm) {
         filterForm.addEventListener('submit', (event) => {
             event.preventDefault();
             applyOrdersFilter();

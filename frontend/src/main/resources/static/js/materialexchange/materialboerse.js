@@ -31,7 +31,7 @@ import { krtHooks } from '/js/kernel/krt-hooks.js';
 function initMaterialboerse() {
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const gi18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
-    if (!krtFetch || !document.getElementById('mb-board')) {
+    if (!document.getElementById('mb-board')) {
         return;
     }
 
@@ -251,12 +251,10 @@ function initMaterialboerse() {
 
     /** Re-renders the filter chips and the filter badge after a programmatic change. */
     function refreshFilterUi() {
-        if (krtFilterChips && form) {
+        if (form) {
             krtFilterChips.refresh(form);
         }
-        if (krtFilterPanel) {
-            krtFilterPanel.refresh(FILTER_PANEL_ID);
-        }
+        krtFilterPanel.refresh(FILTER_PANEL_ID);
     }
 
     function params() {
@@ -382,9 +380,7 @@ function initMaterialboerse() {
             btn.classList.toggle('active', on);
             btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
-        if (krtOverflowMenu) {
-            krtOverflowMenu.closeAll();
-        }
+        krtOverflowMenu.closeAll();
         document.querySelectorAll('[data-mb-cta-group]').forEach((group) => {
             /** @type {HTMLElement} */ (group).hidden =
                 group.getAttribute('data-mb-cta-group') !== mode;
@@ -524,9 +520,6 @@ function initMaterialboerse() {
     }
 
     function deactivateOffer(id) {
-        if (!showKrtConfirm) {
-            return;
-        }
         showKrtConfirm(
             i18n.deactivateConfirmTitle,
             i18n.deactivateConfirmBody,
@@ -575,9 +568,6 @@ function initMaterialboerse() {
     }
 
     function deactivateRequest(id) {
-        if (!showKrtConfirm) {
-            return;
-        }
         showKrtConfirm(
             gi18n.deactivateConfirmTitle,
             gi18n.deactivateConfirmBody,
@@ -610,15 +600,11 @@ function initMaterialboerse() {
     }
 
     function notifyPeersBoard() {
-        if (krtLiveSync) {
-            krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
-        }
+        krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
     }
 
     function notifyPeersRequests() {
-        if (krtLiveSync) {
-            krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
-        }
+        krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
     }
 
     function handleAction(el) {
@@ -788,9 +774,7 @@ function initMaterialboerse() {
             }
         }, 400);
     }
-    if (krtLiveSync) {
-        krtLiveSync.subscribe(MATERIALBOARD_TOPIC, { onChanged: onPeerChanged });
-    }
+    krtLiveSync.subscribe(MATERIALBOARD_TOPIC, { onChanged: onPeerChanged });
 
     document.addEventListener('krt:swapped', () => {
         applyAgo(document);

@@ -54,9 +54,6 @@ function withOverview(keys) {
 }
 
 function initOperationDetail() {
-    if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
-        return;
-    }
     const operationSeam = krtFetch.sectionWrite({
         dict() {
             return { 'operation.section.refresh.error': OPS_DETAIL_MSG.sectionRefreshError };
@@ -67,11 +64,7 @@ function initOperationDetail() {
             return window.operationId ? `/operations/${window.operationId}` : null;
         },
         broadcast(keys) {
-            if (
-                window.operationId &&
-                krtLiveSync &&
-                typeof krtLiveSync.sendChanged === 'function'
-            ) {
+            if (window.operationId && typeof krtLiveSync.sendChanged === 'function') {
                 krtLiveSync.sendChanged(`operation:${window.operationId}`, keys);
             }
         },
@@ -79,7 +72,7 @@ function initOperationDetail() {
     operationHooks.refreshSection = operationSeam.refresh;
     operationHooks.notifyChanged = operationSeam.notify;
 
-    if (window.operationId && krtLiveSync && krtLiveSync.createReceiver) {
+    if (window.operationId) {
         krtLiveSync.createReceiver({
             topic: `operation:${window.operationId}`,
             sections: OPERATION_SECTIONS,
@@ -246,20 +239,16 @@ function openDeleteModal(id) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (krtFetch) {
-        krtFetch.bindSwap({
-            container: '#op-missions-results',
-            fragmentValue: 'missions',
-            history: true,
-        });
-    }
+    krtFetch.bindSwap({
+        container: '#op-missions-results',
+        fragmentValue: 'missions',
+        history: true,
+    });
 });
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'operation-open-delete', (el) => {
-        openDeleteModal(el.getAttribute('data-id'));
-    });
-}
+krtEvents.on('click', 'operation-open-delete', (el) => {
+    openDeleteModal(el.getAttribute('data-id'));
+});
 
 function initOperationDetail3() {
     const editor = document.getElementById('op-md-editor');
@@ -295,7 +284,7 @@ function initOperationDetail3() {
     function renderPreview() {
         if (!input || !preview) return;
         preview.textContent = '';
-        if (!krtFetch) return;
+
         krtFetch.write({
             method: 'POST',
             url: '/operations/markdown-preview',
@@ -385,9 +374,7 @@ function initOperationDetail3() {
                 form.reset();
             }
             showView('edit');
-            if (typeof resetUnsavedChanges === 'function') {
-                resetUnsavedChanges();
-            }
+            resetUnsavedChanges();
         });
     }
 }
@@ -426,8 +413,6 @@ function adoptOperationFormValues(form) {
 }
 
 function initOperationDetail4() {
-    if (!krtFetch) return;
-
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('operation-form'));
     if (form) {
         form.addEventListener('submit', (event) => {
@@ -587,20 +572,16 @@ async function handlePayoutPaidToggle(checkbox) {
             toast: false,
             onError(status) {
                 checkbox.checked = previous;
-                if (showFrontendErrorToast) {
-                    showFrontendErrorToast(
-                        status === 401 || status === 403
-                            ? MSG_PAYOUT_PAID_FORBIDDEN
-                            : MSG_PAYOUT_PAID_ERROR,
-                    );
-                }
+                showFrontendErrorToast(
+                    status === 401 || status === 403
+                        ? MSG_PAYOUT_PAID_FORBIDDEN
+                        : MSG_PAYOUT_PAID_ERROR,
+                );
                 return true;
             },
             onNetworkError() {
                 checkbox.checked = previous;
-                if (showFrontendErrorToast) {
-                    showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
-                }
+                showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
                 return true;
             },
         });

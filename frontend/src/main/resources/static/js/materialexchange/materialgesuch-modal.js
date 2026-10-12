@@ -53,7 +53,7 @@ function initMaterialgesuchModal() {
 
     const i18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
     const modal = /** @type {HTMLElement} */ (document.getElementById('mg-modal'));
-    if (!modal || !krtFetch) {
+    if (!modal) {
         return;
     }
 
@@ -122,9 +122,7 @@ function initMaterialgesuchModal() {
     }
 
     function showError(message) {
-        if (typeof showFrontendErrorToast === 'function') {
-            showFrontendErrorToast(message || i18n.error || '');
-        }
+        showFrontendErrorToast(message || i18n.error || '');
     }
 
     function updateCharCount() {
@@ -584,9 +582,7 @@ function initMaterialgesuchModal() {
     }
 
     function notifyPeers() {
-        if (krtLiveSync) {
-            krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
-        }
+        krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
     }
 
     document.addEventListener('click', (e) => {

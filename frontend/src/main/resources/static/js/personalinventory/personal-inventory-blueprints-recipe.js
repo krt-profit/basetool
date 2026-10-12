@@ -91,7 +91,7 @@ function clear(node) {
 
 function resolveUrl(template, id) {
     const raw = (template || '').replace('ID_PLACEHOLDER', encodeURIComponent(id));
-    return safeSameOriginUrl ? safeSameOriginUrl(raw, raw) : raw;
+    return safeSameOriginUrl(raw, raw);
 }
 
 function attr(row, name) {
@@ -626,9 +626,7 @@ function loadCraftability() {
         return;
     }
     const sep = url.indexOf('?') === -1 ? '?' : '&';
-    const target = safeSameOriginUrl
-        ? safeSameOriginUrl(`${url + sep}includeRefinery=true`, url)
-        : `${url + sep}includeRefinery=true`;
+    const target = safeSameOriginUrl(`${url + sep}includeRefinery=true`, url);
     krtFetch
         .getJson(target)
         .catch(() => null)

@@ -129,8 +129,7 @@ function buildItem(item, linkable) {
     li.setAttribute('data-notif-id', item.id);
     li.setAttribute('data-notif-read', item.read ? 'true' : 'false');
 
-    const href =
-        linkable && typeof safeSameOriginUrl === 'function' ? safeSameOriginUrl(item.href) : null;
+    const href = linkable ? safeSameOriginUrl(item.href) : null;
     const body = document.createElement('div');
     body.className = 'notification-item-body';
     const text = document.createElement(href ? 'span' : 'p');
@@ -321,9 +320,6 @@ function refreshEmptyState(list) {
 }
 
 function doMarkRead(id, submitter) {
-    if (!krtFetch) {
-        return;
-    }
     krtFetch
         .write({
             method: 'POST',
@@ -339,9 +335,6 @@ function doMarkRead(id, submitter) {
 }
 
 function doDelete(id, submitter) {
-    if (!krtFetch) {
-        return;
-    }
     krtFetch
         .write({
             method: 'DELETE',
@@ -357,9 +350,6 @@ function doDelete(id, submitter) {
 }
 
 function doMarkAll(submitter) {
-    if (!krtFetch) {
-        return;
-    }
     krtFetch
         .write({
             method: 'POST',
@@ -376,9 +366,6 @@ function doMarkAll(submitter) {
 }
 
 function doClearRead(submitter) {
-    if (!krtFetch) {
-        return;
-    }
     confirmThen(i18n.confirmClearTitle, i18n.confirmClearBody, () => {
         krtFetch
             .write({
@@ -444,15 +431,11 @@ function updatePageHint(list, total) {
 }
 
 function confirmThen(title, body, action) {
-    if (typeof showKrtConfirm === 'function') {
-        showKrtConfirm(title, body, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
-            if (ok) {
-                action();
-            }
-        });
-    } else {
-        action();
-    }
+    showKrtConfirm(title, body, i18n.confirmOk, i18n.confirmCancel).then((ok) => {
+        if (ok) {
+            action();
+        }
+    });
 }
 
 function onDocumentClick(event) {
@@ -667,9 +650,7 @@ function startSse() {
                 window.clearTimeout(sseReconnectTimer);
                 sseReconnectTimer = null;
             }
-            if (krtReauth) {
-                krtReauth.redirect(event && event.data ? event.data : null);
-            }
+            krtReauth.redirect(event && event.data ? event.data : null);
         });
         source.addEventListener('terms-gate', (event) => {
             sseStopped = true;
@@ -683,9 +664,7 @@ function startSse() {
             if (sseSource === source) {
                 sseSource = null;
             }
-            if (krtTermsGate) {
-                krtTermsGate.redirect(event && event.data ? event.data : null);
-            }
+            krtTermsGate.redirect(event && event.data ? event.data : null);
         });
         source.addEventListener('replaced', () => {
             sseStopped = true;

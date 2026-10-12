@@ -28,10 +28,7 @@ document.addEventListener('submit', (event) => {
         return;
     }
     event.preventDefault();
-    if (!krtFetch) {
-        form.submit();
-        return;
-    }
+
     const confirmInput = /** @type {HTMLInputElement | null} */ (
         form.querySelector('input[name="confirm"]')
     );
@@ -48,7 +45,7 @@ document.addEventListener('submit', (event) => {
             errorMessage: form.getAttribute('data-purge-error') || '',
             onSuccess(body) {
                 const count = body && body.deleted != null ? body.deleted : 0;
-                if (typeof showFrontendSuccessToast === 'function') {
+                {
                     const tpl = form.getAttribute('data-purge-success') || '{0}';
                     showFrontendSuccessToast(String(tpl).replace('{0}', count));
                 }
@@ -62,7 +59,7 @@ document.addEventListener('submit', (event) => {
                 if (confirmInput) {
                     confirmInput.value = '';
                 }
-                if (krtFetch.swap && document.getElementById('bp-results')) {
+                if (document.getElementById('bp-results')) {
                     krtFetch.swap({
                         url: window.location.pathname + window.location.search,
                         container: '#bp-results',

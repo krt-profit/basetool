@@ -33,28 +33,25 @@ import { joborderHooks } from '/js/joborder/joborder-hooks.js';
  */
 async function persistOrderReorder(orderId, targetPriority) {
     const container = document.getElementById('orders-results');
-    let res = { ok: false };
-    if (krtFetch) {
-        res = await krtFetch.write({
-            method: 'PUT',
-            url: `/orders/${orderId}/priority/ajax?priority=${targetPriority}`,
-            toast: false,
-            errorMessage: KRT_ORDERS_REORDER_I18N.error,
-            conflict: {
-                title: KRT_ORDERS_REORDER_I18N.conflict.title,
-                reloadLabel: KRT_ORDERS_REORDER_I18N.conflict.reloadLabel,
-                reloadQuestion: KRT_ORDERS_REORDER_I18N.conflict.reloadQuestion,
-                dismissLabel: KRT_ORDERS_REORDER_I18N.conflict.dismissLabel,
-                reloadDetailFallback: KRT_ORDERS_REORDER_I18N.conflict.detail,
-            },
-        });
-    }
+    const res = await krtFetch.write({
+        method: 'PUT',
+        url: `/orders/${orderId}/priority/ajax?priority=${targetPriority}`,
+        toast: false,
+        errorMessage: KRT_ORDERS_REORDER_I18N.error,
+        conflict: {
+            title: KRT_ORDERS_REORDER_I18N.conflict.title,
+            reloadLabel: KRT_ORDERS_REORDER_I18N.conflict.reloadLabel,
+            reloadQuestion: KRT_ORDERS_REORDER_I18N.conflict.reloadQuestion,
+            dismissLabel: KRT_ORDERS_REORDER_I18N.conflict.dismissLabel,
+            reloadDetailFallback: KRT_ORDERS_REORDER_I18N.conflict.detail,
+        },
+    });
     if (joborderHooks.refreshOrdersQueue) {
         await joborderHooks.refreshOrdersQueue(
             ['queue'],
             res.ok ? undefined : { broadcast: false },
         );
-    } else if (container && krtFetch && krtFetch.swap) {
+    } else if (container) {
         await krtFetch.swap({
             url: window.location.pathname + window.location.search,
             container,
@@ -63,7 +60,7 @@ async function persistOrderReorder(orderId, targetPriority) {
             preserveScroll: true,
         });
     }
-    if (res.ok && typeof showFrontendSuccessToast === 'function') {
+    if (res.ok) {
         showFrontendSuccessToast(KRT_ORDERS_REORDER_I18N.success);
     }
 }
