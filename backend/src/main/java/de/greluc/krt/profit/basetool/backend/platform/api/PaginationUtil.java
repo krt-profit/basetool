@@ -27,6 +27,7 @@ import java.util.regex.Pattern;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -93,9 +94,9 @@ public final class PaginationUtil {
    *     allowedSortFields}
    */
   public static Pageable createPageRequest(
-      Integer pageParam,
-      Integer sizeParam,
-      String sortParam,
+      @Nullable Integer pageParam,
+      @Nullable Integer sizeParam,
+      @Nullable String sortParam,
       Set<String> allowedSortFields,
       String defaultSortField) {
     return createPageRequest(
@@ -121,9 +122,9 @@ public final class PaginationUtil {
    *     allowedSortFields}
    */
   public static Pageable createPageRequest(
-      Integer pageParam,
-      Integer sizeParam,
-      String sortParam,
+      @Nullable Integer pageParam,
+      @Nullable Integer sizeParam,
+      @Nullable String sortParam,
       Set<String> allowedSortFields,
       String defaultSortField,
       @NotNull PageCeiling ceiling) {
@@ -145,7 +146,8 @@ public final class PaginationUtil {
    * @param sizeParam page size, may be {@code null}
    * @return an unsorted {@link Pageable} ready to hand to a custom-ordered repository query
    */
-  public static Pageable createUnsortedPageRequest(Integer pageParam, Integer sizeParam) {
+  public static Pageable createUnsortedPageRequest(
+      @Nullable Integer pageParam, @Nullable Integer sizeParam) {
     int page = pageParam == null || pageParam < 0 ? 0 : pageParam;
     return PageRequest.of(page, clampSize(sizeParam, PageCeiling.DEFAULT));
   }
@@ -158,7 +160,7 @@ public final class PaginationUtil {
    * @param ceiling the ceiling to clamp to
    * @return the effective page size
    */
-  private static int clampSize(Integer sizeParam, @NotNull PageCeiling ceiling) {
+  private static int clampSize(@Nullable Integer sizeParam, @NotNull PageCeiling ceiling) {
     return sizeParam == null || sizeParam <= 0
         ? DEFAULT_PAGE_SIZE
         : Math.min(sizeParam, ceiling.getMaxSize());
@@ -173,7 +175,8 @@ public final class PaginationUtil {
     return false;
   }
 
-  private static Sort resolveSort(String sortParam, Set<String> allowed, String defaultField) {
+  private static Sort resolveSort(
+      @Nullable String sortParam, Set<String> allowed, String defaultField) {
     if (sortParam == null || sortParam.isBlank()) {
       return Sort.by(defaultField).ascending();
     }

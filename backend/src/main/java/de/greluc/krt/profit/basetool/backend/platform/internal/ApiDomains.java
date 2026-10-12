@@ -103,6 +103,7 @@ public final class ApiDomains {
           Map.entry("MaterialExternalAliasController", "catalogue"),
           Map.entry("MaterialRequestController", "materialexchange"),
           Map.entry("MeController", "identity"),
+          Map.entry("MemberMembershipController", "identity"),
           Map.entry("MemberEvaluationController", "promotion"),
           Map.entry("MissionController", "mission"),
           Map.entry("MissionFinanceEntryController", "mission"),
@@ -145,7 +146,8 @@ public final class ApiDomains {
           Map.entry("TermsController", "identity"),
           Map.entry("TermsDocumentController", "identity"),
           Map.entry("UexLocationController", "catalogue"),
-          Map.entry("UserController", "identity"));
+          Map.entry("UserController", "identity"),
+          Map.entry("UserProfileController", "identity"));
 
   /** Not instantiable. */
   private ApiDomains() {}

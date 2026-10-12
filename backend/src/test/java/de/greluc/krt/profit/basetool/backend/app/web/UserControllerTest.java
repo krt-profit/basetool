@@ -32,26 +32,19 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserDirectoryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
@@ -69,11 +62,8 @@ class UserControllerTest {
   @Mock private UserService userService;
   @Mock private UserDeletionService userDeletionService;
   @Mock private UserMapper userMapper;
+  @Mock private UserDirectoryService userDirectoryService;
 
-  @Mock
-  private de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService authHelperService;
-
-  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private UserSyncService userSyncService;
   @Mock private MemberPayoutSettings memberPayoutSettings;
   @Mock private MemberBlueprintSharings memberBlueprintSharings;
@@ -83,25 +73,6 @@ class UserControllerTest {
   @InjectMocks private UserController controller;
 
   private static final UUID CALLER_ID = UUID.randomUUID();
-
-  @BeforeEach
-  void setUp() {
-    org.mockito.Mockito.lenient().when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-    org.mockito.Mockito.lenient().when(authHelperService.isAdmin()).thenReturn(true);
-  }
-
-  @Test
-  void getAllUsers_wrapsServicePageIntoPageResponse() {
-    User entity = new User();
-    UserDto dto = mockDto(UUID.randomUUID());
-    when(userService.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(entity)));
-    when(userMapper.toDto(entity)).thenReturn(dto);
-
-    PageResponse<UserDto> resp = controller.getAllUsers(0, 50, null);
-
-    assertEquals(1, resp.totalElements());
-    assertSame(dto, resp.content().getFirst());
-  }
 
   @Test
   void syncUsersNow_runsTheReconciliationThroughTaskMetricsAndReturnsTheCount() {
@@ -133,199 +104,6 @@ class UserControllerTest {
 
     assertSame(refs, result);
     verifyNoInteractions(userMapper);
-  }
-
-  @Test
-  void searchUsers_forwardsQueryToService() {
-    when(userService.searchByUsername(eq("ali"), any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of()));
-
-    controller.searchUsers("ali", null, null, null);
-
-    verify(userService).searchByUsername(eq("ali"), any(Pageable.class));
-  }
-
-  @Test
-  void searchUsers_nullQuery_matchesAllViaEmptyFilter() {
-    when(userService.searchByUsername(eq(""), any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of()));
-
-    controller.searchUsers(null, null, null, null);
-
-    verify(userService).searchByUsername(eq(""), any(Pageable.class));
-  }
-
-  @Test
-  void searchUsers_wrapsServicePageIntoPageResponse() {
-    User entity = new User();
-    UserDto dto = mockDto(UUID.randomUUID());
-    when(userService.searchByUsername(any(), any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of(entity)));
-    when(userMapper.toDto(entity)).thenReturn(dto);
-
-    PageResponse<UserDto> resp = controller.searchUsers("x", 0, 50, null);
-
-    assertEquals(1, resp.content().size());
-  }
-
-  @Test
-  void getUserById_delegatesAndMaps() {
-    UUID id = UUID.randomUUID();
-    User entity = new User();
-    UserDto dto = mockDto(id);
-    when(userService.findById(id)).thenReturn(entity);
-    when(userMapper.toDto(entity)).thenReturn(dto);
-
-    UserDto result = controller.getUserById(id);
-
-    assertSame(dto, result);
-  }
-
-  @Test
-  void getUserById_nonOfficerCaller_redactsPii() {
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-    UUID id = UUID.randomUUID();
-    User entity = new User();
-    UserDto fullDto = fullPiiUserDto(id);
-    when(userService.findById(id)).thenReturn(entity);
-    when(userMapper.toDto(entity)).thenReturn(fullDto);
-
-    UserDto result = controller.getUserById(id);
-
-    assertNotSame(fullDto, result);
-    assertEquals(id, result.id());
-    assertEquals("bob.callsign", result.username());
-    assertEquals("Bob Display", result.displayName());
-    assertNull(result.email(), "peer view must not expose email");
-    assertNull(result.roles(), "peer view must not expose roles");
-    assertNull(result.permissions(), "peer view must not expose permissions");
-  }
-
-  @Test
-  void searchUsers_nonOfficerCaller_redactsEveryRowPii() {
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-    UUID id = UUID.randomUUID();
-    User entity = new User();
-    UserDto fullDto = fullPiiUserDto(id);
-    when(userService.searchByUsername(any(), any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of(entity)));
-    when(userMapper.toDto(entity)).thenReturn(fullDto);
-
-    PageResponse<UserDto> resp = controller.searchUsers("bob", 0, 50, null);
-
-    UserDto redacted = resp.content().getFirst();
-    assertNull(redacted.email());
-  }
-
-  @Test
-  void getUserById_officerFromForeignSquadron_redactsPii() {
-    UUID userId = UUID.randomUUID();
-    when(userService.isCrossSquadronForNonAdmin(userId)).thenReturn(true);
-
-    User entity = new User();
-    entity.setId(userId);
-    UserDto fullDto = fullPiiUserDto(userId);
-    when(userService.findById(userId)).thenReturn(entity);
-    when(userMapper.toDto(entity)).thenReturn(fullDto);
-
-    UserDto result = controller.getUserById(userId);
-
-    assertEquals("bob.callsign", result.username());
-    assertNull(result.email(), "cross-squadron non-admin must not see email");
-    assertNull(result.joinDate(), "cross-squadron non-admin must not see joinDate");
-  }
-
-  @Test
-  void getUserById_unassignedUser_redactsPiiForNonAdmin() {
-    UUID userId = UUID.randomUUID();
-    User entity = new User();
-    entity.setId(userId);
-    when(userService.isCrossSquadronForNonAdmin(userId)).thenReturn(true);
-    UserDto fullDto = fullPiiUserDto(userId);
-    when(userService.findById(userId)).thenReturn(entity);
-    when(userMapper.toDto(entity)).thenReturn(fullDto);
-
-    UserDto result = controller.getUserById(userId);
-
-    assertNull(result.email());
-  }
-
-  @Test
-  void getUserById_sameSquadronOfficer_keepsPii() {
-    UUID userId = UUID.randomUUID();
-    when(userService.isCrossSquadronForNonAdmin(userId)).thenReturn(false);
-
-    User entity = new User();
-    entity.setId(userId);
-    UserDto fullDto = fullPiiUserDto(userId);
-    when(userService.findById(userId)).thenReturn(entity);
-    when(userMapper.toDto(entity)).thenReturn(fullDto);
-
-    UserDto result = controller.getUserById(userId);
-
-    assertSame(fullDto, result, "same-squadron officer must see the original DTO unredacted");
-  }
-
-  private static UserDto fullPiiUserDto(UUID id) {
-    return new UserDto(
-        id,
-        "bob.callsign",
-        "Bob Display",
-        "Bob",
-        "bob@example.invalid",
-        5,
-        "some desc",
-        java.util.Set.of("ROLE_KRT_MEMBER"),
-        java.util.Set.of(),
-        null,
-        false,
-        false,
-        true,
-        null,
-        java.util.List.of(),
-        1L,
-        null,
-        false);
-  }
-
-  @Test
-  void getCurrentUser_resolvesIdFromJwt_neverFromURL() {
-    User entity = new User();
-    entity.setEmail("me@example.invalid");
-    UserDto dto = mockDto(CALLER_ID);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    when(userService.findById(CALLER_ID)).thenReturn(entity);
-    when(userMapper.toDto(entity)).thenReturn(dto);
-
-    UserDto result = controller.getCurrentUser(jwt);
-
-    assertNotNull(result);
-    assertEquals(CALLER_ID, result.id());
-    assertEquals("me@example.invalid", result.email());
-    verify(userService).getUserIdFromJwt(jwt);
-    verify(userService).findById(CALLER_ID);
-  }
-
-  @Test
-  void updateMyDescription_resolvesIdFromJwt_andForwardsAllFields() {
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-
-    UserController.UserDescriptionRequest req =
-        new UserController.UserDescriptionRequest("Pilot extraordinaire", "Ace", 2L);
-
-    User updated = new User();
-    updated.setEmail("me@example.invalid");
-    UserDto dto = mockDto(CALLER_ID);
-    when(userService.updateUserDescription(CALLER_ID, "Pilot extraordinaire", "Ace", 2L))
-        .thenReturn(updated);
-    when(userMapper.toDto(updated)).thenReturn(dto);
-
-    UserDto result = controller.updateMyDescription(jwt, req);
-
-    assertNotNull(result);
-    assertEquals(CALLER_ID, result.id());
-    assertEquals("me@example.invalid", result.email());
-    verify(userService).updateUserDescription(CALLER_ID, "Pilot extraordinaire", "Ace", 2L);
   }
 
   @Test
@@ -416,40 +194,6 @@ class UserControllerTest {
   }
 
   @Test
-  void updateUserAttributes_forwardsAllFieldsToService() {
-    UUID id = UUID.randomUUID();
-
-    UserController.UserAttributesRequest req =
-        new UserController.UserAttributesRequest(7, "desc", "name", 3L, LocalDate.of(2024, 1, 15));
-
-    User updated = new User();
-    UserDto dto = mockDto(id);
-    when(userService.updateUserAttributes(id, 7, "desc", "name", 3L, LocalDate.of(2024, 1, 15)))
-        .thenReturn(updated);
-    when(userMapper.toDto(updated)).thenReturn(dto);
-
-    UserDto result = controller.updateUserAttributes(id, req);
-
-    assertSame(dto, result);
-    verify(userService).updateUserAttributes(id, 7, "desc", "name", 3L, LocalDate.of(2024, 1, 15));
-  }
-
-  @Test
-  void updateUserAttributes_withNullJoinDate_forwardsNull() {
-    UUID id = UUID.randomUUID();
-    UserController.UserAttributesRequest req =
-        new UserController.UserAttributesRequest(3, null, null, 1L, null);
-
-    when(userService.updateUserAttributes(eq(id), eq(3), any(), any(), eq(1L), eq(null)))
-        .thenReturn(new User());
-    when(userMapper.toDto(any())).thenReturn(mockDto(id));
-
-    controller.updateUserAttributes(id, req);
-
-    verify(userService).updateUserAttributes(id, 3, null, null, 1L, null);
-  }
-
-  @Test
   void deleteUser_delegatesIdToService() {
     UUID id = UUID.randomUUID();
 
@@ -457,59 +201,6 @@ class UserControllerTest {
 
     verify(userDeletionService).deleteUser(id);
     verifyNoMoreInteractions(userService, userDeletionService, userMapper);
-  }
-
-  @Test
-  void getUserMemberships_delegatesToService() {
-    UUID userId = UUID.randomUUID();
-    OrgUnitMembershipOptionDto option =
-        new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "IRIDIUM", "IRI", OrgUnitKind.SQUADRON, false);
-    when(orgUnitMembershipQueryService.listOptionsForUser(userId)).thenReturn(List.of(option));
-
-    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false);
-
-    assertEquals(1, result.size());
-    assertSame(option, result.getFirst());
-    verify(orgUnitMembershipQueryService).listOptionsForUser(userId);
-  }
-
-  @Test
-  void getUserMemberships_allKinds_delegatesToDirectMembershipOptions() {
-    UUID userId = UUID.randomUUID();
-    OrgUnitMembershipOptionDto bereich =
-        new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "Bereich Logistik", "LOG", OrgUnitKind.BEREICH, false);
-    when(orgUnitMembershipQueryService.listDirectMembershipOptions(userId))
-        .thenReturn(List.of(bereich));
-
-    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, true);
-
-    assertSame(bereich, result.getFirst());
-    verify(orgUnitMembershipQueryService).listDirectMembershipOptions(userId);
-  }
-
-  @Test
-  void getUserMemberships_emptyResult_returnsEmptyList() {
-    UUID userId = UUID.randomUUID();
-    when(orgUnitMembershipQueryService.listOptionsForUser(userId)).thenReturn(List.of());
-
-    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false);
-
-    assertTrue(result.isEmpty());
-  }
-
-  @Test
-  void getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService() {
-    java.util.Set<UUID> ids = java.util.Set.of(UUID.randomUUID(), UUID.randomUUID());
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    when(orgUnitMembershipQueryService.findDirectMembershipOrgUnitIds(CALLER_ID)).thenReturn(ids);
-
-    java.util.Set<UUID> result = controller.getMyOrgUnitIds(jwt);
-
-    assertSame(ids, result);
-    verify(userService).getUserIdFromJwt(jwt);
-    verify(orgUnitMembershipQueryService).findDirectMembershipOrgUnitIds(CALLER_ID);
   }
 
   private static UserDto mockDto(UUID id) {

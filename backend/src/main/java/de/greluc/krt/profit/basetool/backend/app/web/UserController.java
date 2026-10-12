@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.app.web;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
-import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
@@ -32,11 +31,8 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipDeltaResponse;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserDirectoryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
@@ -45,15 +41,12 @@ import de.greluc.krt.profit.basetool.backend.privacy.api.AccountConsolidationSer
 import de.greluc.krt.profit.basetool.backend.privacy.api.ConsolidateAccountRequest;
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Size;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -62,7 +55,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -84,8 +76,6 @@ import org.springframework.web.bind.annotation.RestController;
 @Transactional
 public class UserController {
 
-  private static final Set<String> ALLOWED_SORT = Set.of("username", "email", "rank", "id");
-
   /**
    * Sort whitelist of the reference searches: the projected columns only ({@code email} is not part
    * of the reference projection, so it is not offered).
@@ -95,8 +85,7 @@ public class UserController {
   private final UserService userService;
   private final UserDeletionService userDeletionService;
   private final UserMapper userMapper;
-  private final AuthHelperService authHelperService;
-  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
+  private final UserDirectoryService userDirectoryService;
   private final UserSyncService userSyncService;
   private final MemberPayoutSettings memberPayoutSettings;
   private final MemberBlueprintSharings memberBlueprintSharings;
@@ -128,27 +117,6 @@ public class UserController {
   }
 
   /**
-   * Paged user list. Open to every authenticated member because the participant pickers in the
-   * mission editor consume it.
-   *
-   * @return paged user DTOs
-   */
-  @GetMapping("/users")
-  @PreAuthorize(
-      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
-  @Transactional(readOnly = true)
-  public PageResponse<UserDto> getAllUsers(
-      @RequestParam(required = false) Integer page,
-      @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
-    Pageable pageable =
-        PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
-    Page<User> p = userService.findAll(pageable);
-    userMapper.primeStaffelMemberships(p.getContent());
-    return PageResponse.of(p.map(userMapper::toDto).map(this::redactForPeerIfNeeded));
-  }
-
-  /**
    * Lightweight typeahead projection (id, username, displayName) of all users, also available to
    * {@code BANK_MANAGEMENT} and {@code BANK_EMPLOYEE} without an org role (REQ-BANK-009,
    * REQ-BANK-044).
@@ -172,26 +140,9 @@ public class UserController {
   }
 
   /**
-   * Paged username/displayName substring search.
-   *
-   * @return paged user DTOs
-   */
-  @GetMapping("/users/search")
-  @PreAuthorize(
-      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
-  @Transactional(readOnly = true)
-  public PageResponse<UserDto> searchUsers(
-      @RequestParam(required = false) String query,
-      @RequestParam(required = false) Integer page,
-      @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
-    return runSearch(query, page, size, sort);
-  }
-
-  /**
-   * Bank-audience twin of {@link #searchUsers} for the bank grantee/holder pickers: identical
-   * query, scope and projection, with the role gate widened to {@code BANK_EMPLOYEE}
-   * (REQ-BANK-008/009/044).
+   * Bank-audience twin of the member search {@code GET /users/search} for the bank grantee/holder
+   * pickers: identical query, scope and projection, with the role gate widened to {@code
+   * BANK_EMPLOYEE} (REQ-BANK-008/009/044).
    *
    * @return paged user DTOs, peer-redacted for non-elevated callers
    */
@@ -212,11 +163,11 @@ public class UserController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
-    return runSearch(query, page, size, sort);
+    return userDirectoryService.search(query, page, size, sort);
   }
 
   /**
-   * Slim paged picker search with the same query, scope and role gate as {@link #searchUsers},
+   * Slim paged picker search with the same query, scope and role gate as {@code GET /users/search},
    * returning SQL-projected {@link
    * de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto} rows for the {@code
    * remote-users} comboboxes.
@@ -276,7 +227,7 @@ public class UserController {
   /**
    * Shared body of the two reference-search endpoints: resolves the page request against {@link
    * #REFERENCE_SORT} and runs the squadron-scoped projection. A {@code null} query (the browse-mode
-   * empty {@code ?query=}) is normalised to the match-all empty string, as in {@link #runSearch}.
+   * empty {@code ?query=}) is normalised to the match-all empty string, as in the member search.
    *
    * @param query free-text filter, or {@code null}/blank to match all
    * @param page requested page index, or {@code null}
@@ -290,174 +241,6 @@ public class UserController {
         PaginationUtil.createPageRequest(page, size, sort, REFERENCE_SORT, "username");
     return PageResponse.of(
         userService.searchReferencesByUsername(query == null ? "" : query, pageable));
-  }
-
-  /**
-   * Shared body of {@link #searchUsers} and {@link #searchUsersForBank}: runs the squadron-scoped
-   * username/displayName search with whitelisted sort and applies peer redaction.
-   *
-   * <p>A {@code null} query is treated as match-all.
-   *
-   * @param query free-text username/displayName filter, or {@code null}/blank to match all.
-   * @param page requested page index, or {@code null} for the first page.
-   * @param size requested page size, or {@code null} for the default.
-   * @param sort requested sort expression, or {@code null} for the username default.
-   * @return the paged, peer-redacted search result.
-   */
-  private PageResponse<UserDto> runSearch(String query, Integer page, Integer size, String sort) {
-    Pageable pageable =
-        PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
-    Page<User> p = userService.searchByUsername(query == null ? "" : query, pageable);
-    userMapper.primeStaffelMemberships(p.getContent());
-    return PageResponse.of(p.map(userMapper::toDto).map(this::redactForPeerIfNeeded));
-  }
-
-  /**
-   * Returns a user by id; a non-admin caller asking for a user outside their squadrons always gets
-   * the peer-redacted shape, regardless of role.
-   *
-   * @param id user id
-   * @return the user DTO, peer-redacted for cross-squadron non-admin callers
-   */
-  @GetMapping("/users/{id}")
-  @PreAuthorize(
-      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
-  @Transactional(readOnly = true)
-  public UserDto getUserById(@PathVariable @NotNull UUID id) {
-    User user = userService.findById(id);
-    UserDto dto = userMapper.toDto(user);
-    if (userService.isCrossSquadronForNonAdmin(user.getId())) {
-      return redactToPeerShape(dto);
-    }
-    return redactForPeerIfNeeded(dto);
-  }
-
-  /**
-   * Lists the org units a user belongs to as picker-optimised {@link OrgUnitMembershipOptionDto}
-   * rows for the owner picker.
-   *
-   * <p>Open to every authenticated member and {@code BANK_EMPLOYEE} (REQ-BANK-044); the response
-   * carries only org-unit names and shorthands, no personal data.
-   *
-   * @param id the user id whose memberships to list; never {@code null}.
-   * @param allKinds {@code true} to include all four org-unit kinds (Staffel, SK, Bereich,
-   *     Organisationsleitung); {@code false} for Staffel and SK only.
-   * @return option DTOs sorted Staffel-first then SK alphabetical, or top-down by kind when {@code
-   *     allKinds=true}; never {@code null}, possibly empty.
-   */
-  @GetMapping("/org-units/members/{id}/memberships")
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.KRT_MEMBER
-          + "', '"
-          + Roles.BANK_EMPLOYEE
-          + "')")
-  @Transactional(readOnly = true)
-  public List<OrgUnitMembershipOptionDto> getUserMemberships(
-      @PathVariable @NotNull UUID id,
-      @RequestParam(required = false, defaultValue = "false") boolean allKinds) {
-    return allKinds
-        ? orgUnitMembershipQueryService.listDirectMembershipOptions(id)
-        : orgUnitMembershipQueryService.listOptionsForUser(id);
-  }
-
-  /**
-   * Returns the calling user's own record, derived from the JWT subject.
-   *
-   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}
-   * @return the user DTO
-   */
-  @NotNull
-  @GetMapping("/users/me")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public UserDto getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
-    User me = userService.findById(userService.getUserIdFromJwt(jwt));
-    return withSelfEmail(userMapper.toDto(me), me);
-  }
-
-  /**
-   * Returns the calling user's pickable owning-org-unit options for create forms: direct
-   * memberships plus the units reachable through leadership (REQ-ORG-016, REQ-ORG-018).
-   *
-   * <p>Resolved for the caller only; for an ordinary member it equals their direct memberships.
-   *
-   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
-   * @return the caller's pickable org-unit options across all reachable kinds; never {@code null}.
-   */
-  @GetMapping("/org-units/me/pickable")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public List<OrgUnitMembershipOptionDto> getMyPickableOrgUnits(@AuthenticationPrincipal Jwt jwt) {
-    return orgUnitMembershipQueryService.listPickerOptionsWithDescendants(
-        userService.getUserIdFromJwt(jwt));
-  }
-
-  /**
-   * Lists the org units the calling user is a direct member of, as {@link
-   * OrgUnitMembershipOptionDto} rows; the JWT-resolved twin of {@code GET /{id}/memberships}.
-   *
-   * <p>Open to every authenticated caller; no memberships yield an empty list, not 403.
-   *
-   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
-   * @param allKinds {@code true} to include all four org-unit kinds (Staffel, SK, Bereich,
-   *     Organisationsleitung); {@code false} for Staffel and SK only.
-   * @return option DTOs, sorted as the sibling endpoint sorts them; never {@code null}, possibly
-   *     empty.
-   */
-  @GetMapping("/org-units/me/memberships")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public List<OrgUnitMembershipOptionDto> getMyMemberships(
-      @AuthenticationPrincipal Jwt jwt,
-      @RequestParam(required = false, defaultValue = "false") boolean allKinds) {
-    UUID callerId = userService.getUserIdFromJwt(jwt);
-    return allKinds
-        ? orgUnitMembershipQueryService.listDirectMembershipOptions(callerId)
-        : orgUnitMembershipQueryService.listOptionsForUser(callerId);
-  }
-
-  /**
-   * Returns the ids of every org unit the calling user is a direct member of, across all kinds and
-   * without leadership cascade (REQ-MISSION-012).
-   *
-   * <p>Open to every authenticated caller; no memberships yield an empty set.
-   *
-   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
-   * @return the caller's direct org-unit ids; never {@code null}, possibly empty.
-   */
-  @GetMapping("/org-units/me/ids")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public Set<UUID> getMyOrgUnitIds(@AuthenticationPrincipal Jwt jwt) {
-    return orgUnitMembershipQueryService.findDirectMembershipOrgUnitIds(
-        userService.getUserIdFromJwt(jwt));
-  }
-
-  /**
-   * Updates the calling user's own description + displayName. The JWT identifies the row — no
-   * impersonation possible.
-   *
-   * @param request update payload (carries the expected version)
-   * @return the persisted DTO
-   */
-  @NotNull
-  @PutMapping("/users/me/description")
-  @PreAuthorize("isAuthenticated()")
-  public UserDto updateMyDescription(
-      @AuthenticationPrincipal Jwt jwt,
-      @NotNull @RequestBody @Valid UserDescriptionRequest request) {
-    User me =
-        userService.updateUserDescription(
-            userService.getUserIdFromJwt(jwt),
-            request.description(),
-            request.displayName(),
-            request.version());
-    return withSelfEmail(userMapper.toDto(me), me);
   }
 
   /**
@@ -609,68 +392,7 @@ public class UserController {
   public UserDto updateReadAnnouncement(
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
     User me = userService.updateReadAnnouncement(userService.getUserIdFromJwt(jwt), id);
-    return withSelfEmail(userMapper.toDto(me), me);
-  }
-
-  /**
-   * Admin/officer-only: edits an arbitrary user's attributes (rank, description, displayName,
-   * joinDate). Carries optimistic-lock version in the body so concurrent admin edits surface a 409
-   * instead of silently overwriting.
-   *
-   * @param id user id
-   * @param request typed body (NOT query params — keeps user values out of access logs)
-   * @return the persisted DTO
-   */
-  @PutMapping("/users/{id}/attributes")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public UserDto updateUserAttributes(
-      @PathVariable @NotNull UUID id, @NotNull @RequestBody @Valid UserAttributesRequest request) {
-    return userMapper.toDto(
-        userService.updateUserAttributes(
-            id,
-            request.rank(),
-            request.description(),
-            request.displayName(),
-            request.version(),
-            request.joinDate()));
-  }
-
-  /**
-   * Applies a membership delta (Staffel assignments, flag toggles, SK add/remove/patch) for a user
-   * in one atomic transaction.
-   *
-   * <p>Each change carries its own {@code version}; one stale row rolls back the whole batch with
-   * 409.
-   *
-   * @param id user primary key.
-   * @param request the delta to apply; never {@code null}, but both halves may be {@code null} /
-   *     empty.
-   * @return the user's complete post-write membership list.
-   */
-  @NotNull
-  @PatchMapping("/org-units/members/{id}/memberships")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public MembershipDeltaResponse patchMemberships(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid MembershipDeltaRequest request) {
-    userService.applyMembershipDelta(id, request);
-    return new MembershipDeltaResponse(
-        orgUnitMembershipQueryService.findAllMembershipDtosForUser(id));
-  }
-
-  /**
-   * Returns the user's complete membership set as full DTOs with per-membership flags and {@code
-   * version}, backing the admin member-edit form (ADMIN only).
-   *
-   * @param id user primary key.
-   * @return the user's memberships (Staffel + every SK) as full {@link OrgUnitMembershipDto}s,
-   *     wrapped in the same response shape the membership-delta PATCH returns.
-   */
-  @NotNull
-  @GetMapping("/org-units/members/{id}/memberships/detail")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public MembershipDeltaResponse getMembershipsDetail(@PathVariable @NotNull UUID id) {
-    return new MembershipDeltaResponse(
-        orgUnitMembershipQueryService.findAllMembershipDtosForUser(id));
+    return UserDtoRedaction.withSelfEmail(userMapper.toDto(me), me);
   }
 
   /**
@@ -707,34 +429,6 @@ public class UserController {
         accountConsolidationService.consolidate(
             id, body.targetUserId(), body.version(), adminUserId));
   }
-
-  /**
-   * Body for {@link #updateUserAttributes}.
-   *
-   * @param rank the member's rank
-   * @param description the profile description
-   * @param displayName the display name
-   * @param version the user row's expected version
-   * @param joinDate the join date, or {@code null} to clear it
-   */
-  public record UserAttributesRequest(
-      @jakarta.validation.constraints.NotNull Integer rank,
-      @Size(max = 10_000) String description,
-      @Size(max = 255) String displayName,
-      @jakarta.validation.constraints.NotNull Long version,
-      @Nullable LocalDate joinDate) {}
-
-  /**
-   * Body for {@link #updateMyDescription}.
-   *
-   * @param description the profile description
-   * @param displayName the display name
-   * @param version the user row's expected version
-   */
-  public record UserDescriptionRequest(
-      @Size(max = 10_000) String description,
-      @Size(max = 255) String displayName,
-      @jakarta.validation.constraints.NotNull Long version) {}
 
   /**
    * Response for {@link #getMyPayoutPreference} / {@link #updateMyPayoutPreference}: the user's
@@ -808,64 +502,4 @@ public class UserController {
    * @param rsiHandle the stored handle, or {@code null} when none is stored.
    */
   public record UserRsiHandleResponse(@Nullable String rsiHandle) {}
-
-  /**
-   * Reduces a user DTO to the peer shape for callers below logistician; logisticians and above get
-   * it unchanged.
-   *
-   * <p>Email is never present here, since {@link UserMapper#toDto(User)} omits it.
-   *
-   * @param dto the persisted user DTO
-   * @return the redacted DTO for non-elevated callers, otherwise the original
-   */
-  private UserDto redactForPeerIfNeeded(UserDto dto) {
-    if (dto == null || authHelperService.isLogisticianOrAbove()) {
-      return dto;
-    }
-    return redactToPeerShape(dto);
-  }
-
-  /**
-   * Returns the slim peer view of {@code dto} unconditionally, regardless of the caller's role.
-   *
-   * @param dto persisted user DTO; never {@code null}
-   * @return the slim peer-view DTO
-   */
-  private UserDto redactToPeerShape(@NotNull UserDto dto) {
-    return UserDtoRedaction.toPeerShape(dto);
-  }
-
-  /**
-   * Re-attaches the caller's own {@code email} to a DTO produced by {@link UserMapper#toDto(User)},
-   * which deliberately omits it. Used only by the {@code /me*} self endpoints: a user may always
-   * see their own email in their own profile, while {@code toDto} keeps it {@code null} for every
-   * other (peer / list / admin) projection so a user's email never reaches anyone else. All
-   * non-email fields are copied straight from {@code dto}.
-   *
-   * @param dto the email-free DTO from the mapper; never {@code null}
-   * @param user the caller's own entity, the source of the email; never {@code null}
-   * @return a copy of {@code dto} with {@code email} populated from {@code user}
-   */
-  @NotNull
-  private UserDto withSelfEmail(@NotNull UserDto dto, @NotNull User user) {
-    return new UserDto(
-        dto.id(),
-        dto.username(),
-        dto.displayName(),
-        dto.effectiveName(),
-        user.getEmail(),
-        dto.rank(),
-        dto.description(),
-        dto.roles(),
-        dto.permissions(),
-        dto.lastReadAnnouncementId(),
-        dto.isLogistician(),
-        dto.isMissionManager(),
-        dto.inKeycloak(),
-        dto.squadron(),
-        dto.squadrons(),
-        dto.version(),
-        dto.joinDate(),
-        dto.discordLinked());
-  }
 }

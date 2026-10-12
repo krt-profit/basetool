@@ -67,7 +67,13 @@ class ApiDomainsMatchTheDomainMapTest {
               + " hosts the read across seven modules in the composition root",
           "UserController",
           "identity: the REST cut serves the member endpoints under identity; the code hosts"
-              + " them across eight modules in the composition root");
+              + " them across eight modules in the composition root",
+          "UserProfileController",
+          "identity: the REST cut serves the user list, search and profile under identity; the"
+              + " code needs the user mapper of the org-unit module",
+          "MemberMembershipController",
+          "identity: the REST cut serves the member memberships under identity; the code keeps"
+              + " them with the org-unit module");
 
   /** The controllers today; a smaller selection would check less. */
   private static final int CONTROLLER_FLOOR = 98;
