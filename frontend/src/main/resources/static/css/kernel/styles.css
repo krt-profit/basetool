@@ -565,7 +565,7 @@
     }
 
     .tree-table {
-        width: max-content;
+        width: 100%;
         min-width: 100%;
         border: var(--border-hairline);
         background-color: var(--color-bg-dark-gray);
@@ -1042,6 +1042,10 @@
     }
 
     @media (width <= 1024px) {
+        .tree-table {
+            width: max-content;
+        }
+
         .tree-row--leaf {
             grid-template-columns: 1fr auto;
             row-gap: 0.2rem;
@@ -2290,6 +2294,21 @@
 
     .card + .card {
         margin-top: 1rem;
+    }
+
+    :is(
+            .grid-auto-cards,
+            .grid-auto,
+            .kpi-grid,
+            .home-grid,
+            .pane-grid-2,
+            .pane-grid-fin,
+            .bank-chart-grid,
+            .sc-links-grid
+        )
+        > .card
+        + .card {
+        margin-top: 0;
     }
 
     .chip {
