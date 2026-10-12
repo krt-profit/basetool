@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
-import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

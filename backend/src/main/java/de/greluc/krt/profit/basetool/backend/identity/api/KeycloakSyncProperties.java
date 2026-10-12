@@ -30,7 +30,7 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Configuration of the scheduled Keycloak user sync under {@code app.keycloak.sync.*}, used by
- * {@link de.greluc.krt.profit.basetool.backend.task.UserSyncTask}.
+ * {@link de.greluc.krt.profit.basetool.backend.identity.internal.UserSyncTask}.
  *
  * <p>Validated at startup; {@link #toString()} redacts the client secret.
  *

@@ -38,10 +38,10 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.SquadronShipOvervie
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

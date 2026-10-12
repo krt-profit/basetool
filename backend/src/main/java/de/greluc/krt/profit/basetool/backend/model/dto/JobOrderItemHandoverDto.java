@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

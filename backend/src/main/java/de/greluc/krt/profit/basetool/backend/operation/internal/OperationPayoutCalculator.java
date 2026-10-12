@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderFigures;
 import java.math.BigDecimal;
 import java.time.Duration;

@@ -27,15 +27,17 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapperImpl;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.HashSet;
@@ -58,15 +60,15 @@ class JobOrderMapperTest {
         userMapper,
         "membershipRepository",
         org.mockito.Mockito.mock(
-            de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository.class));
+            de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository.class));
     ReflectionTestUtils.setField(
         userMapper,
         "staffelMembershipResolver",
         new de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver(
             org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class),
+                de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository.class),
             org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
+                de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository.class)));
     var materialMapper = new MaterialMapperImpl(new MaterialCategoryMapperImpl());
     var squadronMapper = Mappers.getMapper(SquadronMapper.class);
     var handoverMapper = new JobOrderHandoverMapperImpl(materialMapper, userMapper, squadronMapper);

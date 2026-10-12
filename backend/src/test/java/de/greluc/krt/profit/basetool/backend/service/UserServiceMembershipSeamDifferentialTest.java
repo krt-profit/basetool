@@ -23,22 +23,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEvent;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest;
+import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest.SpecialCommandChange;
+import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest.SpecialCommandChange.Action;
+import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest.StaffelChange;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange;
-import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange.Action;
-import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.StaffelChange;
-import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipFlagsPatchRequest;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -359,7 +361,8 @@ class UserServiceMembershipSeamDifferentialTest {
     entityManager.flush();
     entityManager.clear();
     return membershipRepository
-        .findById(new de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId(userId, skId))
+        .findById(
+            new de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId(userId, skId))
         .map(OrgUnitMembership::getVersion)
         .orElse(0L);
   }

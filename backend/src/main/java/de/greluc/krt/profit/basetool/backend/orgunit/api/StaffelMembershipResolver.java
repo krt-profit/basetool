@@ -19,11 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;

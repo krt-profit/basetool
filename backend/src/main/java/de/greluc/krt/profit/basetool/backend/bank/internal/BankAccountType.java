@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 
 /**
  * The organizational layer a {@link BankAccount} belongs to (REQ-BANK-001). There is deliberately

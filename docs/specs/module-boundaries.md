@@ -146,6 +146,12 @@ it held 33 in 7, and after plan §7.6 P4-1 part 1 (the org-unit module's members
 blueprint's controllers, services, mappers, default-blueprint data layer and participants move into
 `blueprint.web` / `blueprint.internal`) removed no edge and added none: no layer class names a moved type.
 
+After the identity slices the file held 26 edges; after plan §7.6 umbrella steps 6 and 7 (the org-unit module and the identity remainder leave the layer packages) it is
+**empty**. Twelve edges were resolved by the moves (`UserMapper`, `UserDto`, `MembershipDeltaRequest`, `OrgUnitKind` and `SquadronReferenceDto` changed module, and
+`UserDtoRedaction` no longer names a job-order type). Fourteen left because the domain map assigns the five classes still awaiting their host module (`UserController`,
+`MeController`, `DiscordRegistrationAdminController`, `RejectedRegistrationRetentionService` and its task) to the transitional `privacy` module; they are not resolved. An empty baseline is
+valid, and the planted-fixture tests keep proving that the rule fires.
+
 **Acceptance**
 
 - [x] The backend's frozen baseline equals the rule's current violations.

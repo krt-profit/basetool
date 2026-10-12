@@ -49,7 +49,7 @@ Bereich's leadership is told as well, once per Bereich. The departed member is n
 **Enforced by:** `OrgNoticeIntegrationTest`, `OrgUnitSeatNotifierTest`, `OrgUnitDepartureNotifierTest`,
 `OrgUnitMembershipServiceTest`, `UserReconciliationServiceTest`, `SeededNotificationRulesIntegrationTest`,
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `orgunit/api/events/OrgNotices`,
-`service/OrgUnitSeatNotifier`, `service/OrgUnitDepartureNotifier`, `service/OrgUnitMembershipService`,
-`identity/api/UserReconciliationService`, `identity/api/RolesChangedObserver`, `repository/OrgUnitMembershipRepository#existsLeadershipSeat`,
-`repository/UserRepository#hasAnyRoleCode`, `V279__seed_organisation_notification_rules.sql` ·
+`orgunit/api/OrgUnitSeatNotifier`, `orgunit/internal/OrgUnitDepartureNotifier`, `orgunit/api/OrgUnitMembershipService`,
+`identity/api/UserReconciliationService`, `identity/api/RolesChangedObserver`, `orgunit/api/OrgUnitMembershipRepository#existsLeadershipSeat`,
+`identity/api/UserRepository#hasAnyRoleCode`, `V279__seed_organisation_notification_rules.sql` ·
 **Issues:** #2414

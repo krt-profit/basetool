@@ -22,9 +22,10 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.greluc.krt.profit.basetool.backend.model.TermsAcceptance;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.TermsAcceptanceStatusDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.internal.TermsAcceptance;
+import de.greluc.krt.profit.basetool.backend.identity.internal.TermsAcceptanceRepository;
+import de.greluc.krt.profit.basetool.backend.identity.internal.TermsAcceptanceStatusDto;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;

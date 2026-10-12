@@ -43,6 +43,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
@@ -50,13 +52,11 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCo
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import java.util.Collections;
@@ -465,8 +465,8 @@ class RefineryOrderServiceTest {
     @Test
     void threadsItemOwningOrgUnitIdIntoResolver_andStampsResolvedOrgUnit() {
       stubLookupsForSingleItem();
-      de.greluc.krt.profit.basetool.backend.model.Squadron resolved =
-          new de.greluc.krt.profit.basetool.backend.model.Squadron();
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
+          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
       resolved.setId(OWNING_OU_ID);
       when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, OWNING_OU_ID))
           .thenReturn(resolved);
@@ -1104,8 +1104,8 @@ class RefineryOrderServiceTest {
       user.setId(userId);
       when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-      de.greluc.krt.profit.basetool.backend.model.Squadron resolved =
-          new de.greluc.krt.profit.basetool.backend.model.Squadron();
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
+          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
       resolved.setId(pickedOrgUnitId);
       when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, pickedOrgUnitId))
           .thenReturn(resolved);

@@ -42,6 +42,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
@@ -60,14 +62,12 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -543,8 +543,8 @@ class InventoryItemServiceBookOutTest {
 
       InventoryItem source = newItem(10.0, 1L);
 
-      de.greluc.krt.profit.basetool.backend.model.Squadron orgA =
-          new de.greluc.krt.profit.basetool.backend.model.Squadron();
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron orgA =
+          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
       orgA.setId(UUID.randomUUID());
       InventoryItem foreignOrgTarget = new InventoryItem();
       foreignOrgTarget.setId(UUID.randomUUID());
@@ -556,8 +556,8 @@ class InventoryItemServiceBookOutTest {
       foreignOrgTarget.setAmount(6.0);
       foreignOrgTarget.setOwningOrgUnit(orgA);
 
-      de.greluc.krt.profit.basetool.backend.model.Squadron orgB =
-          new de.greluc.krt.profit.basetool.backend.model.Squadron();
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron orgB =
+          new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
       orgB.setId(UUID.randomUUID());
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(source));
@@ -1622,14 +1622,14 @@ class InventoryItemServiceBookOutTest {
     UUID targetUserId = UUID.randomUUID();
     UUID pickedOrgUnitId = UUID.randomUUID();
 
-    de.greluc.krt.profit.basetool.backend.model.User owner =
-        new de.greluc.krt.profit.basetool.backend.model.User();
+    de.greluc.krt.profit.basetool.backend.identity.api.User owner =
+        new de.greluc.krt.profit.basetool.backend.identity.api.User();
     owner.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.model.User targetUser =
-        new de.greluc.krt.profit.basetool.backend.model.User();
+    de.greluc.krt.profit.basetool.backend.identity.api.User targetUser =
+        new de.greluc.krt.profit.basetool.backend.identity.api.User();
     targetUser.setId(targetUserId);
-    de.greluc.krt.profit.basetool.backend.model.Squadron picked =
-        new de.greluc.krt.profit.basetool.backend.model.Squadron();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron picked =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     picked.setId(pickedOrgUnitId);
 
     de.greluc.krt.profit.basetool.backend.model.InventoryItem item =

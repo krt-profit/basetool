@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import org.jetbrains.annotations.Nullable;
 
 /**

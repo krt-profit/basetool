@@ -19,9 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAssigneeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
-import java.util.List;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
@@ -68,23 +65,6 @@ public final class UserDtoRedaction {
         dto.version(),
         null,
         null);
-  }
-
-  /**
-   * Peer-shapes every assignee's nested user record of a job order.
-   *
-   * @param assignees the assignee rows as mapped, or {@code null}.
-   * @return the same rows with peer-shaped users, or {@code null} for a {@code null} input.
-   */
-  @Contract("null -> null; !null -> !null")
-  public static @Nullable List<JobOrderAssigneeDto> toPeerShapedAssignees(
-      @Nullable List<JobOrderAssigneeDto> assignees) {
-    if (assignees == null) {
-      return null;
-    }
-    return assignees.stream()
-        .map(a -> new JobOrderAssigneeDto(toPeerShape(a.user()), a.note(), a.version()))
-        .toList();
   }
 
   /**

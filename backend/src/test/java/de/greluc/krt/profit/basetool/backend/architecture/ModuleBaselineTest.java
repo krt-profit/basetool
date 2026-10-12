@@ -63,7 +63,6 @@ class ModuleBaselineTest {
     freeze(rule, store).check(CLASSES);
 
     List<String> actual = sortedDetails(rule.evaluate(CLASSES));
-    assertThat(actual).isNotEmpty();
     assertThat(Files.readAllLines(store.fileFor(rule), StandardCharsets.UTF_8))
         .as("the frozen baseline lists exactly today's violations")
         .isEqualTo(actual);

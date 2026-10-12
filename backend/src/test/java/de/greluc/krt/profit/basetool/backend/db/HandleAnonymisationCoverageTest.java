@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.backend.db;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.HandleAnonymisationParticipant;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage.Disposition;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.MentionSourceDeclarations;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.service.HandleAnonymisationService;
 import java.util.ArrayList;
 import java.util.HashSet;

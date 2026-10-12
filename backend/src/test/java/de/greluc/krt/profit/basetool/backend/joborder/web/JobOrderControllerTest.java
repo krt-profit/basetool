@@ -50,12 +50,12 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandOve
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
+import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -284,7 +284,7 @@ class JobOrderControllerTest {
     assertThat(result.withAssignees(dto.assignees())).isEqualTo(dto);
     if (dto.assignees() != null) {
       for (int i = 0; i < dto.assignees().size(); i++) {
-        de.greluc.krt.profit.basetool.backend.model.dto.UserDto shaped =
+        de.greluc.krt.profit.basetool.backend.identity.api.UserDto shaped =
             result.assignees().get(i).user();
         if (shaped != null) {
           assertThat(shaped.roles()).isNull();

@@ -4809,8 +4809,8 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 - [x] `UserDeletionUnfinished` fires past seven days and not on a count that merely stays non-zero.
 
 **Enforced by:** `OrphanedAccountRepositoryIntegrationTest`, `UserReconciliationServiceTest`,
-`BusinessMetricsCollectorTest` · **Code:** `model/User#keycloakAbsentSince`,
-`repository/UserRepository#markMissingUsers` / `#countOrphanedMemberAccounts` /
+`BusinessMetricsCollectorTest` · **Code:** `identity/api/User#keycloakAbsentSince`,
+`identity/api/UserRepository#markMissingUsers` / `#countOrphanedMemberAccounts` /
 `#findOldestOrphanedMemberAbsenceStamp`, `identity/api/UserReconciliationService#syncUser`,
 `task/BusinessMetricsCollector`, `platform/api/MetricNames#USERS_PENDING_DELETION`,
 `db/migration/V241`, `monitoring/prometheus/alerts/business.yml`,

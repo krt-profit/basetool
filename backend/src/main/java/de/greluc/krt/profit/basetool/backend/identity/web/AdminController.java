@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.web;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleDto;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleMapper;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import jakarta.validation.Valid;
 import java.util.Set;

@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;

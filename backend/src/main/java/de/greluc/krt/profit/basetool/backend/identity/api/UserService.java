@@ -30,14 +30,9 @@ import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
@@ -416,7 +411,7 @@ public class UserService {
 
   /**
    * Squadron-scoped substring search projected to {@link
-   * de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto}s for the user pickers,
+   * de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto}s for the user pickers,
    * without loading entities.
    *
    * @param query free-text filter; blank matches every user in scope

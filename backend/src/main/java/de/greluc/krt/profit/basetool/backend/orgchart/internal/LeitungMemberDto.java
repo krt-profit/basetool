@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import java.util.UUID;
 
 /**

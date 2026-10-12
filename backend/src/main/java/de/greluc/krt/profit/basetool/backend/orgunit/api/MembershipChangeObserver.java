@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
-import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
-import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.platform.api.ObserverSpi;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;

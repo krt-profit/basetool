@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;

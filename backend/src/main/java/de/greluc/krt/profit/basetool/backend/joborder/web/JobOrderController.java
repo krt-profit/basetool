@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAssigneeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
@@ -73,7 +74,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -568,7 +571,7 @@ public class JobOrderController {
   public JobOrderDto getJobOrderById(@PathVariable UUID id) {
     JobOrderDto dto = jobOrderQueryService.getJobOrderById(id);
     JobOrderDto tiered = dto.redacted() ? cleanupJobOrderForRequester(dto) : dto;
-    return tiered.withAssignees(UserDtoRedaction.toPeerShapedAssignees(tiered.assignees()));
+    return tiered.withAssignees(toPeerShapedAssignees(tiered.assignees()));
   }
 
   /**
@@ -1088,4 +1091,24 @@ public class JobOrderController {
    */
   public record AssigneeNoteRequest(
       @Size(max = JobOrderAssignee.NOTE_MAX_LENGTH) String note, Long version) {}
+
+  /**
+   * Peer-shapes every assignee's nested user record of a job order.
+   *
+   * @param assignees the assignee rows as mapped, or {@code null}
+   * @return the same rows with peer-shaped users, or {@code null} for a {@code null} input
+   */
+  @Contract("null -> null; !null -> !null")
+  private static @Nullable List<JobOrderAssigneeDto> toPeerShapedAssignees(
+      @Nullable List<JobOrderAssigneeDto> assignees) {
+    if (assignees == null) {
+      return null;
+    }
+    return assignees.stream()
+        .map(
+            a ->
+                new JobOrderAssigneeDto(
+                    UserDtoRedaction.toPeerShape(a.user()), a.note(), a.version()))
+        .toList();
+  }
 }

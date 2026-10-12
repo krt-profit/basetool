@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

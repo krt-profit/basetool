@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.Department;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

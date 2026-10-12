@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import jakarta.validation.ConstraintViolationException;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

@@ -26,10 +26,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver.ParticipantTarget;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

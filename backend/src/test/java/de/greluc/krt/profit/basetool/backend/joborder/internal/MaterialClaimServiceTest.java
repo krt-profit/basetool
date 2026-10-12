@@ -39,10 +39,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapperImpl;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
@@ -50,17 +50,17 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
@@ -700,9 +700,9 @@ class MaterialClaimServiceTest {
       verify(materialClaimRepository).deleteAll(claims);
     }
 
-    private de.greluc.krt.profit.basetool.backend.model.User member(String name) {
-      de.greluc.krt.profit.basetool.backend.model.User member =
-          new de.greluc.krt.profit.basetool.backend.model.User();
+    private de.greluc.krt.profit.basetool.backend.identity.api.User member(String name) {
+      de.greluc.krt.profit.basetool.backend.identity.api.User member =
+          new de.greluc.krt.profit.basetool.backend.identity.api.User();
       member.setId(UUID.randomUUID());
       member.setUsername(name);
       return member;
@@ -711,7 +711,7 @@ class MaterialClaimServiceTest {
     @Test
     void withdrawAllForOrder_tellsEachClaimantThatTheOrderWasDeEscalated() {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      de.greluc.krt.profit.basetool.backend.model.User ada = member("ada");
+      de.greluc.krt.profit.basetool.backend.identity.api.User ada = member("ada");
       MaterialClaim byAda = claim(order, GOOD, squadronA, 3.0);
       byAda.setClaimedByUser(ada);
       MaterialClaim anonymous = claim(order, GOOD, squadronB, 2.0);
@@ -742,7 +742,7 @@ class MaterialClaimServiceTest {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       MaterialClaim live = claim(order, GOOD, squadronA, 3.0);
       MaterialClaim orphan = claim(order, NONE, squadronB, 2.0);
-      de.greluc.krt.profit.basetool.backend.model.User bob = member("bob");
+      de.greluc.krt.profit.basetool.backend.identity.api.User bob = member("bob");
       orphan.setClaimedByUser(bob);
       when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
           .thenReturn(List.of(live, orphan));

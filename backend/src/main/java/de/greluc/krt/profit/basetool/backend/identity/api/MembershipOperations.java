@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.model.User;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;

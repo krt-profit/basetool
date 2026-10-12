@@ -19,29 +19,29 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ConsolidateAccountRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipDeltaResponse;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.AccountConsolidationService;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
-import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
@@ -105,7 +105,7 @@ public class UserController {
   /**
    * Runs the Keycloak user sync on demand for the member-management "Sync now" button, publishing
    * the same {@code user_sync} meters as {@link
-   * de.greluc.krt.profit.basetool.backend.task.UserSyncTask} via {@link
+   * de.greluc.krt.profit.basetool.backend.identity.internal.UserSyncTask} via {@link
    * TaskMetrics#recordCountingRethrow}.
    *
    * <p>Runs {@code NOT_SUPPORTED} so each user reconciliation opens its own transaction.
@@ -214,7 +214,7 @@ public class UserController {
   /**
    * Slim paged picker search with the same query, scope and role gate as {@link #searchUsers},
    * returning SQL-projected {@link
-   * de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto} rows for the {@code
+   * de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto} rows for the {@code
    * remote-users} comboboxes.
    *
    * <p>No peer redaction applies; the projection already is the peer field set.

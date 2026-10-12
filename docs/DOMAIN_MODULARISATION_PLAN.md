@@ -2752,6 +2752,36 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
 4. *Text scan*: source paths in `notifications.md`, `bank.md` and `materialboerse.md` rewritten; nothing in code or resources named the old packages.
    Paths, bean names, cache names and metrics are unchanged.
 
+**Umbrella steps 6 and 7 — the org-unit module and the identity remainder leave the layer packages — done 2026-10-12**
+1. *Probe*: assigning the whole `orgunit` and `identity` census to its module closes cycles through the layer packages that still hold other domains
+   (`model`, `mapper`, `repository`, `service`). Four things had to be placed differently from the domain map before the block closed no cycle at
+   top level (**derived from the existing calls, not individually reviewed by the owner**): `OrgUnitKind` and `SquadronReferenceDto` go to `kernel`
+   (§7.3 already names `OrgUnitKind` as the precondition of a kernel `OrgUnitRef`; `SquadronReferenceDto` is a three-field record `UserDto` embeds);
+   `MembershipDeltaRequest` goes to `identity.api`, because `UserService` takes it and `orgunit` may depend on `identity` but not the reverse;
+   `UserMapper` goes to `orgunit.api`, because it reads memberships, squadrons and `StaffelMembershipResolver`. Each is a class rule in the domain map.
+2. *Move* (636 files by `git mv` and the import script, plus a pass for wildcard imports in 14 tests): `orgunit.api` 48 types (entities, enums, repositories,
+   DTOs, mappers and the services other modules call), `orgunit.internal` 3 (`OrgUnitDepartureNotifier`, `OrgUnitMembershipOperations`,
+   `OrgUnitMembershipRecipientDirectory`), `orgunit.web` the eight controllers; `identity.api` 14 (`User`, `Role`, `UserApprovalEvent`, `ApprovalStatus`,
+   `ApprovalDecision`, `PayoutPreference`, the repositories, `UserDto`, `UserReferenceDto`, `MembershipDeltaRequest`, `UserSyncService`),
+   `identity.internal` 9 (terms-acceptance data, the two mail services and listeners, the sync task, the plain-lookup fragment), `identity.web`
+   `MyRegistrationStatusController`. `OrgUnitLabels` moved from `orgunit.internal` to `orgunit.api` because the services call it. 29 tests followed their subjects.
+   Entity and table names, bean names, SpEL bean references, REST paths and `openapi.json` are unchanged.
+3. *Left behind on purpose*: `UserController`, `MeController`, `DiscordRegistrationAdminController`, `RejectedRegistrationRetentionService` and its task stay in
+   `controller` / `service`. They call the GDPR services (`UserDeletionService`, `AccountConsolidationService`, `UserAccountMergeService`), which are rank 13, and
+   `MeController` reaches the inventory properties and `OwnerScopeService`; their host module is the REST-surface and GDPR step. The domain map assigns the five to the
+   transitional `privacy` module (class rules), so their 14 upward edges leave the baseline **by reclassification, not by being resolved** (the other 12 of the 26 were resolved by the moves).
+4. *Gates*: the module baseline went **26 → 0** and `ModuleBaselineTest` no longer asserts a non-empty selection (the planted-fixture tests still prove the rule fires);
+   the two domain-map name rules for `orgunit` and the one for `identity` assign no class any more and left. `UserDto`, `UserReferenceDto` and
+   `SquadronReferenceDto` joined the leaf helpers (the rule let leaf helpers depend on the legacy `model` package, which they left). Floors from the failing
+   assertions: service layer 489 → **486**, join-column selection 208 → **180**, `mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional` 492 → **489**, controller targets 113 → **111**.
+5. *NullAway* (the `api` packages and the whole `identity` tree are checked): `User.displayName`, `User.email`, `UserApprovalEvent.id`, `OrgUnit.description` / `department` / `parent`,
+   `Organisationsleitung.grandAdmiral*`, `OrgUnitMembership.kommandoGroup` and five `UserDto` components carry `@Nullable`; `User.username` takes a nullable setter argument only
+   (the column is mandatory); the seven scope parameters of `UserRepository`, `JobOrderReferenceDto.requestingOrgUnit`, `UserMapper.resolveSquadron`
+   and the version parameter of `assertVersionMatches` too; the plain-lookup fragment takes its `EntityManager` by constructor; `OrgUnitMembershipService` unwraps the group with
+   `Objects.requireNonNull` (the same `NullPointerException` as before). No suppression. `UserDtoRedaction.toPeerShapedAssignees` went to `JobOrderController`, its only caller.
+6. *Text scan* of all tracked files: source paths in `bank.md`, `discord-integration.md`, `org-notifications.md` and `security-and-access.md` rewritten; nothing in code, resources
+   or `monitoring/` names the old packages. `compileJava --rerun` shows 0 warnings.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2777,12 +2807,14 @@ before a decision.
         (65 in `config`, `filter`, `logging`, `metrics`, `web`, `exception`, `annotation`, `health`):
         the domain map assigns whole layer packages to them and no plan step says they must move.
 - Foundation modules (§5.2 publishes their entities in `api`):
-  - [ ] **6.** `orgunit` (61: the org-unit entities and enums, 7 repositories, 12 services, 4 mappers,
+  - [x] **6.** done — `orgunit` (61: the org-unit entities and enums, 7 repositories, 12 services, 4 mappers,
         8 controllers). Prerequisite for the `User` entity (`OrgUnitMembership.user`).
-  - [ ] **7.** `identity` remainder (29): `User`, `Role`, `TermsAcceptance`, `UserApprovalEvent`,
+  - [x] **7.** done except five classes — `identity` remainder (29): `User`, `Role`, `TermsAcceptance`, `UserApprovalEvent`,
         `PayoutPreference` (deferred "with `User`", §7.3), `UserRepository` (279 files name it),
         `UserMapper`/`UserDto`/`UserReferenceDto`, `UserController`, `MeController`, the mail services,
         `UserSyncService`/`UserSyncTask`, the rejected-registration retention.
+        Open: `UserController`, `MeController`, `DiscordRegistrationAdminController`, `RejectedRegistrationRetentionService` and its task wait for their
+        host module (the REST-surface placement and the GDPR step); `UserMapper` went to `orgunit.api` (see the entry above).
   - [ ] **8.** `privacy` (23): the GDPR orchestration classes (§5.1 rank 13) into `privacy`, then
         dissolved into identity as §5.1 and §7.6 say.
 - Business core leftovers (the entities other modules still hold):

@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

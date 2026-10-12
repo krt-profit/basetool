@@ -31,12 +31,12 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -338,7 +338,8 @@ class MissionParticipantServiceValidationTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(userRepository.findAllByUsernameIgnoreCaseOrDisplayNameIgnoreCase(
             "Bob Officer", "Bob Officer"))
-        .thenReturn(java.util.List.of(new de.greluc.krt.profit.basetool.backend.model.User()));
+        .thenReturn(
+            java.util.List.of(new de.greluc.krt.profit.basetool.backend.identity.api.User()));
 
     assertThrows(
         de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,

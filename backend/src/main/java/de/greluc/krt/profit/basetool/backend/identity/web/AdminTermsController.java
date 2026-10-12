@@ -20,9 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.identity.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.internal.TermsAcceptanceService;
+import de.greluc.krt.profit.basetool.backend.identity.internal.TermsAcceptanceStatusDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.dto.TermsAcceptanceStatusDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;

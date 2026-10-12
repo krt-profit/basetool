@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -33,9 +35,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialRequestFulfillmentSignalledEvent;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
 import java.util.UUID;
@@ -86,9 +86,10 @@ public class MaterialRequestService {
   private final BlueprintProducts blueprintProductService;
 
   /**
-   * Resolves the acting member's active {@link de.greluc.krt.profit.basetool.backend.model.OrgUnit}
-   * to stamp on a request's squadron badge — a request has no source Lager row to copy from, so the
-   * badge is stamped from the requester (exactly as a free-stated item offer stamps its owner).
+   * Resolves the acting member's active {@link
+   * de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit} to stamp on a request's squadron
+   * badge — a request has no source Lager row to copy from, so the badge is stamped from the
+   * requester (exactly as a free-stated item offer stamps its owner).
    */
   private final OwnerScopeService ownerScopeService;
 

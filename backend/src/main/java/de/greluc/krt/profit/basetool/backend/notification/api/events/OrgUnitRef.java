@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.api.events;
 
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.util.UUID;
 
 /**

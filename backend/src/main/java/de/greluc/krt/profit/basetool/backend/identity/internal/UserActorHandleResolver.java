@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.identity.internal;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.ActorHandleResolver;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

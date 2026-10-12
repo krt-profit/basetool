@@ -24,11 +24,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleDto;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleMapper;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.Role;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;

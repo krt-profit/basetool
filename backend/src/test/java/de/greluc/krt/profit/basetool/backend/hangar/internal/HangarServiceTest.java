@@ -37,10 +37,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
@@ -73,7 +73,7 @@ class HangarServiceTest {
   @Mock private LocationRepository locationRepository;
   @Mock private ShipDeletionObserver shipDeletionObserver;
   @Mock private EntityManager entityManager;
-  @Mock private de.greluc.krt.profit.basetool.backend.repository.UserRepository userRepository;
+  @Mock private de.greluc.krt.profit.basetool.backend.identity.api.UserRepository userRepository;
   @Mock private de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService ownerScopeService;
   @Mock private ShipTypeMapper shipTypeMapper;
   @Mock private AuditService auditService;
@@ -377,16 +377,16 @@ class HangarServiceTest {
     java.util.UUID shipTypeId = java.util.UUID.randomUUID();
     java.util.UUID pickedOrgUnitId = java.util.UUID.randomUUID();
 
-    de.greluc.krt.profit.basetool.backend.model.User user =
-        new de.greluc.krt.profit.basetool.backend.model.User();
+    de.greluc.krt.profit.basetool.backend.identity.api.User user =
+        new de.greluc.krt.profit.basetool.backend.identity.api.User();
     user.setId(userId);
 
     de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType shipType =
         new de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType();
     shipType.setId(shipTypeId);
 
-    de.greluc.krt.profit.basetool.backend.model.Squadron resolved =
-        new de.greluc.krt.profit.basetool.backend.model.Squadron();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron resolved =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     resolved.setId(pickedOrgUnitId);
 
     org.mockito.Mockito.when(userRepository.findPlainById(userId))
@@ -414,8 +414,8 @@ class HangarServiceTest {
   void addShip_membershiplessUser_savesOwnerlessShip() {
     UUID userId = UUID.randomUUID();
     UUID shipTypeId = UUID.randomUUID();
-    de.greluc.krt.profit.basetool.backend.model.User user =
-        new de.greluc.krt.profit.basetool.backend.model.User();
+    de.greluc.krt.profit.basetool.backend.identity.api.User user =
+        new de.greluc.krt.profit.basetool.backend.identity.api.User();
     user.setId(userId);
     de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType shipType =
         new de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType();

@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandoverEntry;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverEntryDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;

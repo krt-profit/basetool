@@ -24,6 +24,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -33,9 +35,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
 import java.util.Objects;
@@ -87,10 +87,10 @@ public class MaterialExchangeService {
   private final BlueprintProducts blueprintProductService;
 
   /**
-   * Resolves the acting member's active {@link de.greluc.krt.profit.basetool.backend.model.OrgUnit}
-   * to stamp on an item offer's squadron badge — the item-offer counterpart of copying {@code
-   * inventoryItem.getOwningOrgUnit()} for a material offer (an item offer has no source Lager row
-   * to copy from).
+   * Resolves the acting member's active {@link
+   * de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit} to stamp on an item offer's squadron
+   * badge — the item-offer counterpart of copying {@code inventoryItem.getOwningOrgUnit()} for a
+   * material offer (an item offer has no source Lager row to copy from).
    */
   private final OwnerScopeService ownerScopeService;
 

@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

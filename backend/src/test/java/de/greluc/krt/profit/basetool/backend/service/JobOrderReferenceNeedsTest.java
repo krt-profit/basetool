@@ -99,7 +99,7 @@ class JobOrderReferenceNeedsTest {
 
   @Mock private JobOrderMapper jobOrderMapper;
 
-  @Mock private de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper squadronMapper;
+  @Mock private de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper squadronMapper;
 
   @Mock private JobOrderItemService jobOrderItemService;
 

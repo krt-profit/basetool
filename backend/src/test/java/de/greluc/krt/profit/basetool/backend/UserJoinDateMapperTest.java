@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapperImpl;
-import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapperImpl;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +49,7 @@ class UserJoinDateMapperTest {
         new de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver(
             Mockito.mock(SquadronRepository.class),
             Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
+                de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository.class)));
   }
 
   @Test

@@ -34,26 +34,28 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
-import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
@@ -63,9 +65,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
@@ -103,7 +103,7 @@ class OwnerScopeServiceTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository orgUnitRepository;
+  private de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository orgUnitRepository;
 
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
 
@@ -481,7 +481,7 @@ class OwnerScopeServiceTest {
   class CanSeeJobOrderBlueprintOwnersTests {
 
     private JobOrder orderResponsibleTo(
-        de.greluc.krt.profit.basetool.backend.model.OrgUnit responsible) {
+        de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit responsible) {
       return JobOrder.builder().id(UUID.randomUUID()).responsibleOrgUnit(responsible).build();
     }
 
@@ -566,7 +566,7 @@ class OwnerScopeServiceTest {
   class CanSeeJobOrderInventoryOwnersTests {
 
     private JobOrder orderResponsibleTo(
-        de.greluc.krt.profit.basetool.backend.model.OrgUnit responsible) {
+        de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit responsible) {
       return JobOrder.builder().id(UUID.randomUUID()).responsibleOrgUnit(responsible).build();
     }
 
@@ -1727,8 +1727,8 @@ class OwnerScopeServiceTest {
     user.setId(UUID.randomUUID());
 
     UUID skId = UUID.randomUUID();
-    de.greluc.krt.profit.basetool.backend.model.SpecialCommand sk =
-        new de.greluc.krt.profit.basetool.backend.model.SpecialCommand();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand sk =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand();
     sk.setId(skId);
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
         .thenReturn(
@@ -1754,7 +1754,7 @@ class OwnerScopeServiceTest {
         .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
     when(orgUnitRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
 
-    de.greluc.krt.profit.basetool.backend.model.OrgUnit result =
+    de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit result =
         service.resolveOrgUnitForPickerOutput(user, null);
 
     assertSame(homeStaffel, result);
@@ -1768,8 +1768,8 @@ class OwnerScopeServiceTest {
     user.setId(UUID.randomUUID());
 
     UUID skId = UUID.randomUUID();
-    de.greluc.krt.profit.basetool.backend.model.SpecialCommand sk =
-        new de.greluc.krt.profit.basetool.backend.model.SpecialCommand();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand sk =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand();
     sk.setId(skId);
     sk.setName("Alpha");
 
@@ -1779,7 +1779,7 @@ class OwnerScopeServiceTest {
                 staffelMembership(user.getId(), homeStaffelId), skMembership(user.getId(), skId)));
     when(orgUnitRepository.findById(skId)).thenReturn(Optional.of(sk));
 
-    de.greluc.krt.profit.basetool.backend.model.OrgUnit result =
+    de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit result =
         service.resolveOrgUnitForPickerOutput(user, skId);
 
     assertSame(sk, result);
@@ -2184,7 +2184,7 @@ class OwnerScopeServiceTest {
 
   /** Builds a {@link JobOrder} responsible to the given org unit (Squadron or SpecialCommand). */
   private static de.greluc.krt.profit.basetool.backend.model.JobOrder jobOrderResponsibleTo(
-      UUID id, de.greluc.krt.profit.basetool.backend.model.OrgUnit responsible) {
+      UUID id, de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit responsible) {
     de.greluc.krt.profit.basetool.backend.model.JobOrder o =
         new de.greluc.krt.profit.basetool.backend.model.JobOrder();
     o.setId(id);
@@ -2319,9 +2319,9 @@ class OwnerScopeServiceTest {
     private static final UUID DESCENDANT_STAFFEL_ID = UUID.randomUUID();
     private static final UUID OL_ID = UUID.randomUUID();
 
-    private de.greluc.krt.profit.basetool.backend.model.Bereich newBereich() {
-      de.greluc.krt.profit.basetool.backend.model.Bereich b =
-          new de.greluc.krt.profit.basetool.backend.model.Bereich();
+    private de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich newBereich() {
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich b =
+          new de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich();
       b.setId(BEREICH_ID);
       b.setShorthand("PRF");
       return b;
@@ -2346,7 +2346,7 @@ class OwnerScopeServiceTest {
     void leaderStampsOwnBereich_resolvesToBereichOrgUnit() {
       User leader = new User();
       leader.setId(UUID.randomUUID());
-      de.greluc.krt.profit.basetool.backend.model.Bereich bereich = newBereich();
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich bereich = newBereich();
       when(orgUnitMembershipRepository.findAllByIdUserId(leader.getId()))
           .thenReturn(List.of(bereichLeadMembership(leader.getId())));
       when(orgUnitRepository.findById(BEREICH_ID)).thenReturn(Optional.of(bereich));
@@ -2409,8 +2409,8 @@ class OwnerScopeServiceTest {
     void leaderStampsOwnOrganisationsleitung_resolvesToOlOrgUnit() {
       User olLeader = new User();
       olLeader.setId(UUID.randomUUID());
-      de.greluc.krt.profit.basetool.backend.model.Organisationsleitung ol =
-          new de.greluc.krt.profit.basetool.backend.model.Organisationsleitung();
+      de.greluc.krt.profit.basetool.backend.orgunit.api.Organisationsleitung ol =
+          new de.greluc.krt.profit.basetool.backend.orgunit.api.Organisationsleitung();
       ol.setId(OL_ID);
       ol.setShorthand("OL");
       when(orgUnitMembershipRepository.findAllByIdUserId(olLeader.getId()))

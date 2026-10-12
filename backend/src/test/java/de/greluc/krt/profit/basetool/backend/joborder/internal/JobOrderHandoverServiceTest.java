@@ -39,9 +39,9 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipService;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -67,7 +67,7 @@ class JobOrderHandoverServiceTest {
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository orgUnitRepository;
+  private de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository orgUnitRepository;
 
   @Mock private AuditService auditService;
   @InjectMocks private JobOrderHandoverService service;
@@ -595,12 +595,12 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldSucceed_whenInventoryItemBelongsToForeignSquadron() {
-    de.greluc.krt.profit.basetool.backend.model.Squadron squadronA =
-        new de.greluc.krt.profit.basetool.backend.model.Squadron();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron squadronA =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     squadronA.setId(UUID.randomUUID());
     squadronA.setShorthand("ALF");
-    de.greluc.krt.profit.basetool.backend.model.Squadron squadronB =
-        new de.greluc.krt.profit.basetool.backend.model.Squadron();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron squadronB =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     squadronB.setId(UUID.randomUUID());
     squadronB.setShorthand("BRV");
 

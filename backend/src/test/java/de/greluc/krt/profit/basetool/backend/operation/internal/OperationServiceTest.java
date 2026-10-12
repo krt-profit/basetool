@@ -35,12 +35,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -110,11 +110,11 @@ class OperationServiceTest {
     operation.setName("Picker Op");
     operation.setStatus(OperationStatus.PLANNED);
 
-    de.greluc.krt.profit.basetool.backend.model.User caller =
-        new de.greluc.krt.profit.basetool.backend.model.User();
+    de.greluc.krt.profit.basetool.backend.identity.api.User caller =
+        new de.greluc.krt.profit.basetool.backend.identity.api.User();
     caller.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.model.Squadron picked =
-        new de.greluc.krt.profit.basetool.backend.model.Squadron();
+    de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron picked =
+        new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     picked.setId(UUID.randomUUID());
     UUID pickedOrgUnitId = picked.getId();
 

@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.privacy.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource.Target;
 import java.util.List;
 import java.util.Set;

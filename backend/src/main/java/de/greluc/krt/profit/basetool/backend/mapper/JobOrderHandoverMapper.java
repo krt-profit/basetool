@@ -24,6 +24,8 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverItemDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -38,7 +40,7 @@ public interface JobOrderHandoverMapper {
    * Maps a {@link JobOrderHandover} entity to its DTO, flattening the parent job-order id and
    * projecting the executing-user + squadron audit snapshot through their reference mappers (slim
    * payload — the handover detail view never needs the full {@link
-   * de.greluc.krt.profit.basetool.backend.model.User} aggregate).
+   * de.greluc.krt.profit.basetool.backend.identity.api.User} aggregate).
    */
   @Mapping(source = "jobOrder.id", target = "jobOrderId")
   @Mapping(source = "executingUser", target = "executingUser")

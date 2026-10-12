@@ -269,14 +269,22 @@ client (`KeycloakService`, `KeycloakTrustSupport`, `KeycloakUserDto`), the two a
 registration request and result records beside the events; `identity.web` holds the role, terms and
 Discord-existence controllers, `identity.internal` their services, mappers and DTOs. `RestClientConfig`
 lies in `platform.api`, which `KeycloakTrustSupport` needs. `UserService`, `UserRegistrationService`,
-`UserReconciliationService` now lie in `identity.api` (P4-7 slice c); the `User` entity and `UserRepository` stay
-in the layer packages. The calls out of the identity module are inverted through identity-owned SPIs:  `UserService` reaches the org-unit
+`UserReconciliationService` now lie in `identity.api` (P4-7 slice c); `User`, `Role`, their repositories and `UserDto` / `UserReferenceDto`
+followed with the org-unit module (umbrella steps 6 and 7). The calls out of the identity module are inverted through identity-owned SPIs:  `UserService` reaches the org-unit
 membership services only through `identity.api.MembershipOperations`, which
-`service.OrgUnitMembershipOperations` implements as a pass-through (it also sets the initial flags of a
+`orgunit.internal.OrgUnitMembershipOperations` implements as a pass-through (it also sets the initial flags of a
 new Spezialkommando member; the seam names no org-unit type and has no type parameter),
 `identity.api.AccountErasure` (the registration flow's deletion, implemented by the GDPR orchestrator) and
 `identity.api.SquadronVisibility` (the two scope questions of the user queries, implemented by
 `OwnerScopeService`). `CustomJwtGrantedAuthoritiesConverter` lies in `scope.api`, because the exchange calls it.
+
+The org-unit module (rank 4) owns the Staffeln, Spezialkommandos, Bereiche, the Organisationsleitung, Kommandogruppen and the memberships:
+the entities, repositories, DTOs and services other modules call lie in `orgunit.api`, the departure notifier, the membership operations
+and the recipient directory in `orgunit.internal`, the eight controllers in `orgunit.web`. Two placements follow the dependency direction
+rather than the names: `UserMapper` lies in `orgunit.api` (it reads memberships, and `orgunit` may depend on `identity`, not the reverse),
+and `OrgUnitKind` and `SquadronReferenceDto` lie in the kernel, which lets `notification` and `identity` name them. `UserController`, `MeController`,
+`DiscordRegistrationAdminController` and the rejected-registration retention stay in the layer packages until their host module exists;
+the domain map assigns them to the transitional `privacy` module, so the module baseline is empty.
 
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:

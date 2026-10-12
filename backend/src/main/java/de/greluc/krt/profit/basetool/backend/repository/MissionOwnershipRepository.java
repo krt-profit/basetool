@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.model.MissionOwnership;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -36,8 +36,8 @@ public interface MissionOwnershipRepository extends JpaRepository<MissionOwnersh
   /**
    * Reassigns every {@code mission_ownership} row owned by {@code oldUser} to {@code newUser},
    * alongside {@link
-   * MissionRepository#updateOwner(de.greluc.krt.profit.basetool.backend.model.User,
-   * de.greluc.krt.profit.basetool.backend.model.User)}, so the user can be deleted.
+   * MissionRepository#updateOwner(de.greluc.krt.profit.basetool.backend.identity.api.User,
+   * de.greluc.krt.profit.basetool.backend.identity.api.User)}, so the user can be deleted.
    *
    * <p>Does not bump {@code version}.
    *

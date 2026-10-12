@@ -28,9 +28,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapperImpl;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,15 +50,15 @@ class ShipMapperTest {
         userMapper,
         "membershipRepository",
         org.mockito.Mockito.mock(
-            de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository.class));
+            de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository.class));
     ReflectionTestUtils.setField(
         userMapper,
         "staffelMembershipResolver",
         new de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver(
             org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class),
+                de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository.class),
             org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
+                de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository.class)));
     mapper =
         new ShipMapperImpl(
             userMapper,

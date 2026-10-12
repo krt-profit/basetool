@@ -29,6 +29,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverCreateDto;
@@ -38,9 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -66,7 +66,7 @@ class JobOrderHandoverCompletionIntegrationTest {
   @Autowired private QualityTierRepository qualityTierRepository;
 
   @Autowired
-  private de.greluc.krt.profit.basetool.backend.repository.SquadronRepository squadronRepository;
+  private de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository squadronRepository;
 
   @Autowired private TransactionTemplate transactionTemplate;
 
@@ -98,11 +98,13 @@ class JobOrderHandoverCompletionIntegrationTest {
               JobOrder.builder()
                   .responsibleOrgUnit(
                       squadronRepository
-                          .findById(de.greluc.krt.profit.basetool.backend.model.Squadron.IRIDIUM_ID)
+                          .findById(
+                              de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
                           .orElseThrow())
                   .requestingOrgUnit(
                       squadronRepository
-                          .findById(de.greluc.krt.profit.basetool.backend.model.Squadron.IRIDIUM_ID)
+                          .findById(
+                              de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
                           .orElseThrow())
                   .handle("requester")
                   .status(JobOrderStatus.OPEN)
@@ -121,7 +123,7 @@ class JobOrderHandoverCompletionIntegrationTest {
 
           inv1.setOwningOrgUnit(
               squadronRepository
-                  .findById(de.greluc.krt.profit.basetool.backend.model.Squadron.IRIDIUM_ID)
+                  .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
                   .orElseThrow());
           inv1.setUser(user);
           inv1.setLocation(location);
@@ -135,7 +137,7 @@ class JobOrderHandoverCompletionIntegrationTest {
 
           inv2.setOwningOrgUnit(
               squadronRepository
-                  .findById(de.greluc.krt.profit.basetool.backend.model.Squadron.IRIDIUM_ID)
+                  .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
                   .orElseThrow());
           inv2.setUser(user);
           inv2.setLocation(location);

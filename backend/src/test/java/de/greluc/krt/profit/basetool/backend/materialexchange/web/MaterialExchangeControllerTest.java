@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeBoardService;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeCountsDto;
@@ -36,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialE
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeService;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
