@@ -36,6 +36,9 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "keycloak/keycloak"
+      - dependency-name: "quay.io/keycloak/keycloak"
     labels:
       - dependencies
       - docker
