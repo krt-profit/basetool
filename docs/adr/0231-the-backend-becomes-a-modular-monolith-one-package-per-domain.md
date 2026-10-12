@@ -73,7 +73,8 @@ only for the exchange and the bank.
 5. **Only the eight business → business JPA associations become id references**; associations into
    identity, org units and the catalogue stay. One schema, one Flyway location and one global
    `V<n>` sequence stay in `backend`.
-6. **Gradle modules only for `exchange` and `bank`**, after the foundation phase and only once each
+6. **Gradle modules only for `exchange` and `bank`** (amended 2026-10-12: not implemented, by decision of the owner, because
+   an extraction that compiles against the whole `backend` gives no compile-time isolation; see plan §5.8), after the foundation phase and only once each
    package boundary has stayed green for some releases: `backend-exchange` makes the exchange's
    reduced authority structural, `backend-bank` its org-unit blindness. Their prerequisites are a
    `build-logic` included build with convention plugins, typed per-module build settings, and a

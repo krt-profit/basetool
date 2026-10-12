@@ -414,6 +414,9 @@ lives in strings (the last row), which is why the targeted tests are part of the
 
 ### 5.8 Gradle modules for exchange and bank
 
+> [!important] Not implemented, by decision of the owner on 2026-10-12
+> P5-c (`backend-exchange`) and P5-d (`backend-bank`) are not done and not scheduled. An extraction that compiles against the whole `backend` (the only shape a spike found, `compileOnly(project(":backend"))` in the library and `runtimeOnly` in the application, because `implementation` is a task cycle) gives no compile-time isolation: the library still sees everything. The promise below needs the api packages the extracted module uses to be Gradle modules of their own first. The P5-a and P5-b preparation stays. The text below is the original intent, and the entry "Umbrella steps 18 and 19" in §7.6 records the spike.
+
 After Phase 4, and only once the package boundary of each has been green for some releases:
 
 - **`backend-exchange`** — the adapter through which external clients write. Only eleven class edges
@@ -2907,7 +2910,7 @@ The question for the owner: A, B or C.
    the promotion repositories; `HandleErasureCoverage.of` returns `@Nullable`; `AndroidClientProperties.releasesUrl` reads the override once; eleven dereferences of a value that is non-null by the surrounding rule are wrapped in `Objects.requireNonNull`
    (the same `NullPointerException`). `OrgUnitMembershipService.patchFlags` got an overload on the plain values, which the `MembershipOperations` SPI calls, because the SPI's version may be `null` (an ADD or REMOVE carries none) and the request record
    cannot say so without two conflicting nullness annotations; a `null` version still ends in the same 409.
-4. *Open*: `bank`, `exchange`, `kernel` and `app` stay on the `api`-only list; `bank` and `exchange` get their own conventions when P5-c and P5-d extract them.
+4. *Open*: `bank`, `exchange`, `kernel` and `app` stay on the `api`-only list.
 
 **Umbrella step 17 — requirement status, arc42 and the CLAUDE.md files — done 2026-10-12, partly**
 1. *Plan §14 status*: REQ-XCH-009/011 need nothing but the rewritten source paths; REQ-DATA-010 waits for the access-policy decision of step 12 (the six scope fragments are still `ScopeSpecifications`);
@@ -2981,8 +2984,7 @@ UPDATE app_user u SET share_blueprints_globally =
 A) the module internals, `de.greluc.krt.profit.basetool.backend.*.internal.*Service` with the tests of the same names (most of the old target's content); B) `*.internal.*` and `*.api.*Service` together (many more classes, a much longer run);
 C) retire the target until a module extraction gives it a natural place. Not decided here.
 
-*Steps 18 and 19 — `backend-exchange` and `backend-bank`.* §5.8 starts them "only once the package boundary of each has been green for some releases". Both packages became real modules, with the Modulith and rank gates, on this branch within days,
-and NullAway does not cover them yet (69 and 44 findings). Extracting them now would also move their tests, their JaCoCo and PIT settings and the OpenAPI generator's classpath in the same change. Not started.
+*Steps 18 and 19 — `backend-exchange` and `backend-bank`.* Decided by the owner on 2026-10-12: not implemented (entry "Umbrella steps 18 and 19" below).
 
 
 **Umbrella step 12 — built: the org-unit and user gates are named policies in `scope.api` — done 2026-10-12 (option A, confirmed by the owner 2026-10-12)**
@@ -3016,6 +3018,13 @@ and NullAway does not cover them yet (69 and 44 findings). Extracting them now w
    (`*.internal.*Test`, `*.api.*Test`) and the legacy `backend.service.*Test`, which still holds tests of moved classes. The old target matched nothing since the last class left `service`. The mutation run covers many more classes, so it takes much longer.
    `help` runs with the configuration cache twice (the second reuses the entry); `:backend:pitest --dry-run` resolves.
 2. *Step 15 (struck by the owner 2026-10-12).* P3-11, "the per-command audit contract", was named in the plan and never defined, and is not implemented. REQ-AUDIT-001 keeps its text; its status in §14 no longer says it waits for it.
+
+**Umbrella steps 18 and 19 — P5-c and P5-d are not implemented, by decision of the owner 2026-10-12**
+1. *What a spike showed.* `backend-exchange` (178 main files) builds as a Gradle module with `compileOnly(project(":backend"))` plus the Spring starters it uses, `runtimeOnly(project(":backend-exchange"))` and `testImplementation` in `backend`
+   (`implementation` would be a task cycle), three javadoc-only imports in `identity` and `platform` replaced, and `META-INF/spring.factories` moved. `backend:compileJava`, `compileTestJava` and `bootJar` succeed.
+2. *Why it is not done.* The module compiles against all of `backend`, so it sees every class there: nothing is isolated at compile time, which is the one thing §5.8 promises. The isolation needs the api packages the extracted module uses as Gradle modules
+   of their own, which is a different and much larger cut. The same holds for `backend-bank`. The P5-a and P5-b preparation (the included `build-logic`, the `<app>-<name>` rules of the image-reuse and SBOM scripts, the JaCoCo aggregation) stays; the spike is
+   discarded (its stash was `064ec3b0be5a549fef5a21948e66ca7d98a9e87e`, "p5c-exchange-spike"). ADR-0249 and ADR-0231 carry an amendment; nothing in the repository says the extraction is scheduled any more.
 
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
@@ -3079,7 +3088,7 @@ before a decision.
   - [x] **17.** partly done, REQ-DATA-010 waits — Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
         REQ-XCH-009/011; arc42 §5.2/§5.3 per module; CLAUDE.md files.
 - Gradle extraction, last (they move whole source trees):
-  - [ ] **18.** `Q` P5-c `backend-exchange`, then **19.** P5-d `backend-bank` (§5.8; P5-a and P5-b are done): not started, §5.8 asks for the package boundary to be green for some releases first (entry above).
+  - [x] **18.** and **19.** P5-c `backend-exchange` and P5-d `backend-bank`: **not implemented, by decision of the owner 2026-10-12** (§5.8, entry above). P5-a and P5-b stay.
 - Not in this branch:
   - [x] The ES-module step of F5 (§7.8) was built on its own branch, `claude/mod-f5-es-modules`, and merged into this branch on 2026-10-12 (ADR-0250, REQ-FE-035).
   - `Q` The REST API cut (§7.9, waves on `claude/api-cut` and `claude/api-cut-w1` … `w6`, the
@@ -3098,7 +3107,7 @@ domain stays a package.
 | --- | --- |
 | P5-a — **done 2026-10-11** | `build-logic` as an included build of precompiled convention plugins, the typed `basetool { }` settings, and the verification metadata for it; no module is extracted yet |
 | P5-b — **done 2026-10-12** | The remaining prerequisites of §5.8: the 32 `rootProject` references of the module scripts, prefix rules in the image-reuse and SBOM scripts, JaCoCo aggregation, the context-shape test (already in place since Phase 0) |
-| P5-c, P5-d | `backend-exchange`, then `backend-bank` |
+| P5-c, P5-d | `backend-exchange`, then `backend-bank` — **not implemented, by decision of the owner 2026-10-12** (§5.8) |
 
 *P5-a as built (2026-10-11).* The included build `build-logic/` (`pluginManagement {
 includeBuild("build-logic") }`; ADR-0248, REQ-OPS-046) carries everything the root
@@ -3204,7 +3213,7 @@ the OWASP suppression file) are the root project's own and stay; `rootDir` in `w
 `args(rootDir…)` stays too, since it is the build's directory and no access to another project.
 (3) Gradle's `jacoco-report-aggregation` plugin was rejected: it takes every project dependency of the
 application, `logging-support` included, whose classes have no tests and would enter the floors at
-zero. (4) Still bound to the extraction itself, and so left to P5-c: the Dockerfile lists each module's
+zero. (4) Bound to an extraction itself, which is not scheduled (P5-c and P5-d are not implemented, §5.8): the Dockerfile lists each module's
 build script and `src/main` by name; the `sandbox-images.yml` path filter, the `docker-compose.build.yml`
 watch paths, `check_exchange_e2e_label.py`'s backend prefix, the `pitest.yml` module matrix and
 `CODEOWNERS`; the PIT target patterns of a library; and the test classes that read a backend source file

@@ -308,7 +308,7 @@ it; after a change there run the checks above (`help --configuration-cache` twic
 
 **A module script names repository files with `layout.settingsDirectory.file|dir(…)`**, never
 `rootProject`; `scripts/check-gradle-input-paths.py` (`repo-lint.yml`) fails a script that does. A
-library module of an application is named `<app>-<name>` (`backend-exchange`): the image-reuse plan
+library module of an application is named `<app>-<name>` (none exists; the extraction of `backend-exchange` is not implemented, plan §5.8): the image-reuse plan
 counts its `src/main` as an input of `<app>` only, the SBOM check counts it as shipped inside `<app>`
 (which must declare it as an `implementation` project dependency), and `<app>`'s JaCoCo report and floors
 include its classes and tests (REQ-OPS-047).

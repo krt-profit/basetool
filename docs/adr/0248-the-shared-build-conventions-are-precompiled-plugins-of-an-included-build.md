@@ -11,8 +11,8 @@ Everything the modules share lived in the root `build.gradle.kts` as `subproject
 plugins.withId(...) }` blocks: the toolchain, the Lombok and JetBrains wiring, the Mockito agent, the
 `Test` and `JavaCompile` conventions, Checkstyle, Spotless, JaCoCo, PIT, SpotBugs with FindSecBugs,
 CycloneDX and Licensee, plus the licence tables the frontend read back through `rootProject.extra`.
-That worked for six modules and has three costs the extraction of `backend-exchange` and
-`backend-bank` (plan §5.8) would multiply:
+That worked for six modules and has three costs that a further library module would multiply (the extraction of `backend-exchange` and
+`backend-bank`, plan §5.8, is not implemented, by decision of the owner on 2026-10-12):
 
 - **A module gets conventions only for the plugins it remembers to apply**, and only because the root
   reaches into it. A module carved out of `backend` is configured from outside, by name, with no place
