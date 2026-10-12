@@ -26,6 +26,7 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const ORDERS_SECTIONS = {
     queue: { container: '#orders-results', fragmentValue: 'results' },
@@ -199,8 +200,8 @@ function updateSquadronHeaderText() {
     const boxes = squadronBoxes();
     if (!header || !textEl || boxes.length === 0) return;
     const checked = boxes.filter((b) => b.checked);
-    const dataAll = window.krtI18nText(header.getAttribute('data-all'), 'data-all');
-    const dataSelected = window.krtI18nText(header.getAttribute('data-selected'), 'data-selected');
+    const dataAll = krtI18nText(header.getAttribute('data-all'), 'data-all');
+    const dataSelected = krtI18nText(header.getAttribute('data-selected'), 'data-selected');
     if (checked.length === boxes.length) {
         textEl.textContent = dataAll;
     } else if (checked.length === 1) {

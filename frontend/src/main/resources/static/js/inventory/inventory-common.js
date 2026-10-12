@@ -29,6 +29,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const ASSOC_EPS = 0.0005;
 
@@ -468,11 +469,11 @@ function createLager(cfg) {
         }
         const active = count > 0 && count < checkboxes.length;
         if (!active) {
-            headerSpan.innerText = window.krtI18nText(header.getAttribute('data-all'), 'data-all');
+            headerSpan.innerText = krtI18nText(header.getAttribute('data-all'), 'data-all');
         } else if (count === 1) {
             headerSpan.innerText = firstChecked || '';
         } else {
-            headerSpan.innerText = `${count} ${window.krtI18nText(
+            headerSpan.innerText = `${count} ${krtI18nText(
                 header.getAttribute('data-selected'),
                 'data-selected',
             )}`;

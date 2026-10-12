@@ -24,6 +24,7 @@
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const MISSION_SECTIONS = {
     crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
@@ -208,7 +209,7 @@ krtLiveSync.createReceiver({
         id: 'mission-livesync-pill',
         label() {
             const dict = window.MISSION_LIVESYNC_I18N || {};
-            return window.krtI18nText(
+            return krtI18nText(
                 dict['mission.livesync.updates_available'],
                 'MISSION_LIVESYNC_I18N[mission.livesync.updates_available]',
             );
@@ -262,7 +263,7 @@ function addStep(_btn) {
     if (stepsVersion() === null) {
         return;
     }
-    const title = window.krtI18nText(
+    const title = krtI18nText(
         window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.default_title,
         'MISSION_STEP_I18N.default_title',
     );
@@ -303,19 +304,19 @@ async function deleteStep(btn) {
     if (!sid || stepsVersion() === null) {
         return;
     }
-    const msg = window.krtI18nText(
+    const msg = krtI18nText(
         window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.delete_confirm,
         'MISSION_STEP_I18N.delete_confirm',
     );
     const ok = await showKrtConfirm?.(
         msg,
         msg,
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
             'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
         ),
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
             'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
@@ -494,7 +495,7 @@ document.addEventListener('dragend', () => {
         if (objectivesVersion() === null) {
             return;
         }
-        const title = window.krtI18nText(
+        const title = krtI18nText(
             window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.default_title,
             'MISSION_OBJECTIVE_I18N.default_title',
         );
@@ -535,19 +536,19 @@ document.addEventListener('dragend', () => {
         if (!oid || objectivesVersion() === null) {
             return;
         }
-        const msg = window.krtI18nText(
+        const msg = krtI18nText(
             window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.delete_confirm,
             'MISSION_OBJECTIVE_I18N.delete_confirm',
         );
         const ok = await showKrtConfirm?.(
             msg,
             msg,
-            window.krtI18nText(
+            krtI18nText(
                 window.MISSION_SUBRES_I18N &&
                     window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
                 'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
             ),
-            window.krtI18nText(
+            krtI18nText(
                 window.MISSION_SUBRES_I18N &&
                     window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
                 'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',

@@ -21,6 +21,7 @@
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 (function () {
     const tabs = /** @type {HTMLElement[]} */ (
@@ -85,10 +86,10 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
         if (dirty && typeof showKrtConfirm === 'function') {
             const i18n = window.MISSION_TAB_I18N || {};
             const go = await showKrtConfirm(
-                window.krtI18nText(i18n['unsaved.title'], 'MISSION_TAB_I18N[unsaved.title]'),
-                window.krtI18nText(i18n['unsaved.message'], 'MISSION_TAB_I18N[unsaved.message]'),
-                window.krtI18nText(i18n['unsaved.continue'], 'MISSION_TAB_I18N[unsaved.continue]'),
-                window.krtI18nText(i18n['unsaved.cancel'], 'MISSION_TAB_I18N[unsaved.cancel]'),
+                krtI18nText(i18n['unsaved.title'], 'MISSION_TAB_I18N[unsaved.title]'),
+                krtI18nText(i18n['unsaved.message'], 'MISSION_TAB_I18N[unsaved.message]'),
+                krtI18nText(i18n['unsaved.continue'], 'MISSION_TAB_I18N[unsaved.continue]'),
+                krtI18nText(i18n['unsaved.cancel'], 'MISSION_TAB_I18N[unsaved.cancel]'),
             );
             if (!go) return false;
             dirty = false;
@@ -208,7 +209,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
      * @returns {string} the localized string
      */
     function msg(key) {
-        return window.krtI18nText(D[key], `MISSION_SUBRES_I18N[${key}]`);
+        return krtI18nText(D[key], `MISSION_SUBRES_I18N[${key}]`);
     }
     const SAVED = msg('mission.save.section.ok');
     const FAILED = msg('mission.save.section.error');

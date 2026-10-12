@@ -20,6 +20,7 @@
 // @ts-check
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 (function () {
     const BASE = '/connected-apps/confirm';
@@ -38,7 +39,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
         /** @param {string} key */
         const text = function (key) {
             const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-            return window.krtI18nText(data[key], attribute);
+            return krtI18nText(data[key], attribute);
         };
         return {
             error: text('error'),

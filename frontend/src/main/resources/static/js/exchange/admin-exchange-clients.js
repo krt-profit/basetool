@@ -23,6 +23,7 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const EXCHANGE_CLIENTS_SECTIONS = {
     registry: { container: '#xc-registry-host', fragmentValue: 'registry' },
@@ -114,7 +115,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             /** @param {string} key */
             const text = function (key) {
                 const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-                return window.krtI18nText(data[key], attribute);
+                return krtI18nText(data[key], attribute);
             };
             return {
                 saved: text('saved'),
@@ -475,7 +476,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
              */
             const text = function (source, key) {
                 const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-                return window.krtI18nText(source[key], attribute);
+                return krtI18nText(source[key], attribute);
             };
             return {
                 started: text(data, 'started'),

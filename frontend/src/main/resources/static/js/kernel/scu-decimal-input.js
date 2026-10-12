@@ -1,5 +1,7 @@
 // @ts-check
 
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
 const SELECTOR = 'input[data-scu-decimal]';
 const MAX_DECIMALS = 3;
 
@@ -157,8 +159,8 @@ function validityMessage(el) {
     }
     const i18n = window.krtScuI18n || {};
     return isIntegerMode(el)
-        ? window.krtI18nText(i18n.piece, 'krtScuI18n.piece')
-        : window.krtI18nText(i18n.scu, 'krtScuI18n.scu');
+        ? krtI18nText(i18n.piece, 'krtScuI18n.piece')
+        : krtI18nText(i18n.scu, 'krtScuI18n.scu');
 }
 
 /**

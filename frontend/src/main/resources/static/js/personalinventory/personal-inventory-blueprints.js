@@ -7,6 +7,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /** @type {HTMLInputElement | null} */
 let searchInput = null;
@@ -201,7 +202,7 @@ function runSearch() {
     resultsEl.hidden = false;
     krtHtml.set(
         resultsEl,
-        krtHtml`<div class="krt-pi-typeahead-loading">${window.krtI18nText(
+        krtHtml`<div class="krt-pi-typeahead-loading">${krtI18nText(
             i18n().searching,
             'krtBlueprintsI18n.searching',
         )}</div>`,
@@ -224,7 +225,7 @@ function renderResults(items) {
     if (!items || items.length === 0) {
         krtHtml.set(
             resultsEl,
-            krtHtml`<div class="krt-pi-typeahead-empty">${window.krtI18nText(
+            krtHtml`<div class="krt-pi-typeahead-empty">${krtI18nText(
                 i18n().noResults,
                 'krtBlueprintsI18n.noResults',
             )}</div>`,
@@ -239,9 +240,9 @@ function renderResults(items) {
         }${isStaged ? ' krt-bp-result-staged' : ''}`;
         let meta = it.manufacturerName || '';
         if (blocked) {
-            meta = window.krtI18nText(i18n().owned, 'krtBlueprintsI18n.owned');
+            meta = krtI18nText(i18n().owned, 'krtBlueprintsI18n.owned');
         } else if (it.variantCount && it.variantCount > 1) {
-            meta = `${it.variantCount} ${window.krtI18nText(
+            meta = `${it.variantCount} ${krtI18nText(
                 i18n().variants,
                 'krtBlueprintsI18n.variants',
             )}`;
@@ -294,7 +295,7 @@ function renderStaging() {
             }</span>`,
         );
     } else {
-        const removeLabel = window.krtI18nText(i18n().chipRemove, 'krtBlueprintsI18n.chipRemove');
+        const removeLabel = krtI18nText(i18n().chipRemove, 'krtBlueprintsI18n.chipRemove');
         /** @type {KrtHtml[]} */
         const html = [];
         staged.forEach((name, key) => {
@@ -424,10 +425,10 @@ function addSelected() {
             conflict: conflictObj(),
             onSuccess(result) {
                 const res = result || {};
-                const msg = `${window.krtI18nText(
+                const msg = `${krtI18nText(
                     i18n().addedLabel,
                     'krtBlueprintsI18n.addedLabel',
-                )}: ${res.added || 0}, ${window.krtI18nText(
+                )}: ${res.added || 0}, ${krtI18nText(
                     i18n().skippedLabel,
                     'krtBlueprintsI18n.skippedLabel',
                 )}: ${(res.skippedAlreadyOwned || 0) + (res.skippedUnresolved || 0)}`;

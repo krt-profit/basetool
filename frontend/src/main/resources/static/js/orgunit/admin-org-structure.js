@@ -21,6 +21,7 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const ORG_STRUCTURE_SECTIONS = {
     units: { container: '#org-structure-units', fragmentValue: 'units' },
@@ -88,8 +89,8 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         const holder = document.getElementById('os-i18n');
         const data = holder ? holder.dataset : {};
         return {
-            saved: window.krtI18nText(data.saved, 'data-saved'),
-            error: window.krtI18nText(data.error, 'data-error'),
+            saved: krtI18nText(data.saved, 'data-saved'),
+            error: krtI18nText(data.error, 'data-error'),
             refreshError: data.refreshError || '',
         };
     }

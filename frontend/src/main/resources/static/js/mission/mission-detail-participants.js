@@ -21,6 +21,7 @@
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     (function wireParticipantAjax() {
@@ -291,10 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const hint = document.createElement('div');
         hint.className = 'autocomplete-notice';
         hint.setAttribute('aria-disabled', 'true');
-        hint.textContent = window.krtI18nText(
-            (window.krtComboboxI18n || {}).hint,
-            'krtComboboxI18n.hint',
-        );
+        hint.textContent = krtI18nText((window.krtComboboxI18n || {}).hint, 'krtComboboxI18n.hint');
         container.appendChild(hint);
     }
 

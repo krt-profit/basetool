@@ -2,6 +2,7 @@
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const RESULTS_ID = 'bp-overview-results';
 const CHIP_LIMIT = 4;
@@ -89,7 +90,7 @@ function ownerChip(owner) {
             el(
                 'span',
                 'visually-hidden',
-                ` (${window.krtI18nText(i18n().notMember, 'krtBlueprintOverview.i18n.notMember')})`,
+                ` (${krtI18nText(i18n().notMember, 'krtBlueprintOverview.i18n.notMember')})`,
             ),
         );
     }
@@ -119,11 +120,7 @@ function renderChips(cell, owners) {
     cell.setAttribute('data-loaded', 'true');
     if (owners.length === 0) {
         cell.appendChild(
-            el(
-                'span',
-                'bpo-note',
-                window.krtI18nText(i18n().empty, 'krtBlueprintOverview.i18n.empty'),
-            ),
+            el('span', 'bpo-note', krtI18nText(i18n().empty, 'krtBlueprintOverview.i18n.empty')),
         );
         return;
     }
@@ -144,9 +141,10 @@ function renderChips(cell, owners) {
         });
         panel.appendChild(list);
     }
-    const moreLabel = window
-        .krtI18nText(i18n().more, 'krtBlueprintOverview.i18n.more')
-        .replace('{0}', String(rest.length));
+    const moreLabel = krtI18nText(i18n().more, 'krtBlueprintOverview.i18n.more').replace(
+        '{0}',
+        String(rest.length),
+    );
     const toggle = /** @type {HTMLButtonElement} */ (
         el('button', 'chip chip--primary bpo-more', moreLabel)
     );
@@ -159,7 +157,7 @@ function renderChips(cell, owners) {
         detailsRow.classList.toggle('bp-expanded', open);
         toggle.setAttribute('aria-expanded', String(open));
         toggle.textContent = open
-            ? window.krtI18nText(i18n().less, 'krtBlueprintOverview.i18n.less')
+            ? krtI18nText(i18n().less, 'krtBlueprintOverview.i18n.less')
             : moreLabel;
     });
     cell.appendChild(toggle);
@@ -179,7 +177,7 @@ function renderState(cell, state) {
         el(
             'span',
             state === 'error' ? 'bpo-note bpo-note--error' : 'bpo-note',
-            window.krtI18nText(i18n()[state], `krtBlueprintOverview.i18n.${state}`),
+            krtI18nText(i18n()[state], `krtBlueprintOverview.i18n.${state}`),
         ),
     );
 }

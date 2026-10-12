@@ -116,6 +116,7 @@
       "kernel/krt-filter-chips.js",
       "kernel/krt-filter-panel.js",
       "kernel/krt-html.js",
+      "kernel/krt-i18n.js",
       "kernel/krt-list-count.js",
       "kernel/krt-live-sync.js",
       "kernel/krt-modal.js",

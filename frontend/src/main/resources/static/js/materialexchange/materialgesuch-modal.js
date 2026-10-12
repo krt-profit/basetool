@@ -18,6 +18,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 (function () {
     /**
@@ -131,7 +132,7 @@ import { krtHtml } from '/js/kernel/krt-html.js';
         const counter = q('[data-mg-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
-                window.krtI18nText(i18n.charCounter, 'materialgesuchModalI18n.charCounter'),
+                krtI18nText(i18n.charCounter, 'materialgesuchModalI18n.charCounter'),
                 ta.value.length.toLocaleString('de-DE'),
             );
         }
@@ -145,7 +146,7 @@ import { krtHtml } from '/js/kernel/krt-html.js';
         const input = q('[data-mg-qty]');
         if (unit) {
             unit.textContent = isPiece
-                ? window.krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
+                ? krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
                 : i18n.unitScu || 'SCU';
         }
         if (input) {
@@ -355,7 +356,7 @@ import { krtHtml } from '/js/kernel/krt-html.js';
         const html = materialItems.map((it) => {
             const unit =
                 it.quantityType === 'PIECE'
-                    ? window.krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
+                    ? krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
                     : i18n.unitScu || 'SCU';
             return krtHtml`<li class="krt-combobox__option" role="option" data-material-id="${
                 it.id

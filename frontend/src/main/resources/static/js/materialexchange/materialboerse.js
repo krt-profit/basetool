@@ -25,6 +25,7 @@ import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtOverflowMenu } from '/js/kernel/krt-overflow-menu.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 (function () {
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
@@ -355,15 +356,15 @@ import { krtOverflowMenu } from '/js/kernel/krt-overflow-menu.js';
             const hours = Math.floor((Date.now() - then) / 3600000);
             let text;
             if (hours < 1) {
-                text = window.krtI18nText(i18n.agoNow, 'materialboerseI18n.agoNow');
+                text = krtI18nText(i18n.agoNow, 'materialboerseI18n.agoNow');
             } else if (hours < 24) {
-                text = fmt(window.krtI18nText(i18n.agoHours, 'materialboerseI18n.agoHours'), hours);
+                text = fmt(krtI18nText(i18n.agoHours, 'materialboerseI18n.agoHours'), hours);
             } else {
                 const days = Math.round(hours / 24);
                 text =
                     days === 1
-                        ? window.krtI18nText(i18n.agoDayOne, 'materialboerseI18n.agoDayOne')
-                        : fmt(window.krtI18nText(i18n.agoDays, 'materialboerseI18n.agoDays'), days);
+                        ? krtI18nText(i18n.agoDayOne, 'materialboerseI18n.agoDayOne')
+                        : fmt(krtI18nText(i18n.agoDays, 'materialboerseI18n.agoDays'), days);
             }
             el.textContent = text;
         });

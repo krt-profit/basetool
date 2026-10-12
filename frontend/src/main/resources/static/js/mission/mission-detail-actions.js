@@ -25,6 +25,7 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /**
  * Fills a date-time input (plain or split into date and time parts) with the current local time;
@@ -91,10 +92,7 @@ async function saveActualTimeInPlace(field, nowDate) {
         );
         if (typeof showFrontendErrorToast === 'function') {
             showFrontendErrorToast(
-                window.krtI18nText(
-                    window.MSG_MISSION_ACTUAL_TIME_ERROR,
-                    'MSG_MISSION_ACTUAL_TIME_ERROR',
-                ),
+                krtI18nText(window.MSG_MISSION_ACTUAL_TIME_ERROR, 'MSG_MISSION_ACTUAL_TIME_ERROR'),
             );
         }
         return;
@@ -139,21 +137,19 @@ async function saveActualTimeInPlace(field, nowDate) {
 async function changeMissionOwner() {
     const userId = /** @type {HTMLSelectElement} */ (document.getElementById('new-owner-id')).value;
     if (!userId || userId.trim() === '') {
-        showFrontendErrorToast(
-            window.krtI18nText(MSG_ERROR_USER_REQUIRED, 'MSG_ERROR_USER_REQUIRED'),
-        );
+        showFrontendErrorToast(krtI18nText(MSG_ERROR_USER_REQUIRED, 'MSG_ERROR_USER_REQUIRED'));
         return;
     }
 
     const ownerConfirmed = await showKrtConfirm?.(
         MSG_CONFIRM_OWNER_CHANGE,
         MSG_CONFIRM_OWNER_CHANGE,
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
             'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
         ),
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
             'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
@@ -201,9 +197,7 @@ async function changeMissionOwner() {
             },
         });
     } catch (_err) {
-        showFrontendErrorToast(
-            window.krtI18nText(MSG_ERROR_OWNER_CHANGE, 'MSG_ERROR_OWNER_CHANGE'),
-        );
+        showFrontendErrorToast(krtI18nText(MSG_ERROR_OWNER_CHANGE, 'MSG_ERROR_OWNER_CHANGE'));
     }
 }
 
@@ -247,12 +241,12 @@ async function changeMissionOwningOrgUnit() {
     const confirmed = await showKrtConfirm?.(
         MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
         MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
             'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
         ),
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
             'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
@@ -300,10 +294,7 @@ async function changeMissionOwningOrgUnit() {
         });
     } catch (_err) {
         showFrontendErrorToast(
-            window.krtI18nText(
-                MSG_ERROR_OWNING_ORG_UNIT_CHANGE,
-                'MSG_ERROR_OWNING_ORG_UNIT_CHANGE',
-            ),
+            krtI18nText(MSG_ERROR_OWNING_ORG_UNIT_CHANGE, 'MSG_ERROR_OWNING_ORG_UNIT_CHANGE'),
         );
     }
 }
@@ -316,14 +307,14 @@ async function changeMissionOwningOrgUnit() {
  */
 async function removeMissionManager(userId) {
     const removeConfirmed = await showKrtConfirm?.(
-        window.krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
-        window.krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
-        window.krtI18nText(
+        krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
+        krtI18nText(MSG_CONFIRM_MANAGER_REMOVE, 'MSG_CONFIRM_MANAGER_REMOVE'),
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
             'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
         ),
-        window.krtI18nText(
+        krtI18nText(
             window.MISSION_SUBRES_I18N &&
                 window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
             'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
@@ -356,9 +347,7 @@ async function addMissionManager() {
     const userId = /** @type {HTMLSelectElement} */ (document.getElementById('new-manager-id'))
         .value;
     if (!userId || userId.trim() === '') {
-        showFrontendErrorToast(
-            window.krtI18nText(MSG_ERROR_USER_REQUIRED, 'MSG_ERROR_USER_REQUIRED'),
-        );
+        showFrontendErrorToast(krtI18nText(MSG_ERROR_USER_REQUIRED, 'MSG_ERROR_USER_REQUIRED'));
         return;
     }
     try {
@@ -401,7 +390,7 @@ async function updatePayoutPreference(selectElement) {
         payload: { preference: value },
         serialize: 'section:participant',
         toast: false,
-        errorMessage: window.krtI18nText(MSG_ERROR_PAYOUT_UPDATE, 'MSG_ERROR_PAYOUT_UPDATE'),
+        errorMessage: krtI18nText(MSG_ERROR_PAYOUT_UPDATE, 'MSG_ERROR_PAYOUT_UPDATE'),
     });
     if (!result.ok) {
         selectElement.value = selectElement.getAttribute('data-original-value') || 'PAYOUT';

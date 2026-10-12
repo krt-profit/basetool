@@ -21,6 +21,7 @@
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch, krtReauth, krtTermsGate } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const POLL_INTERVAL_FAST_MS = 60000;
 const POLL_INTERVAL_SLOW_MS = 300000;
@@ -37,18 +38,18 @@ function readMessages() {
     const holder = document.getElementById('notification-i18n');
     const data = holder ? holder.dataset : {};
     return {
-        loading: window.krtI18nText(data.loading, 'data-loading'),
-        empty: window.krtI18nText(data.empty, 'data-empty'),
-        markRead: window.krtI18nText(data.markRead, 'data-mark-read'),
-        deleteLabel: window.krtI18nText(data.delete, 'data-delete'),
-        deleted: window.krtI18nText(data.deleted, 'data-deleted'),
-        allRead: window.krtI18nText(data.allRead, 'data-all-read'),
-        cleared: window.krtI18nText(data.cleared, 'data-cleared'),
-        confirmClearTitle: window.krtI18nText(data.confirmClearTitle, 'data-confirm-clear-title'),
-        confirmClearBody: window.krtI18nText(data.confirmClearBody, 'data-confirm-clear-body'),
-        confirmOk: window.krtI18nText(data.confirmOk, 'data-confirm-ok'),
-        confirmCancel: window.krtI18nText(data.confirmCancel, 'data-confirm-cancel'),
-        error: window.krtI18nText(data.error, 'data-error'),
+        loading: krtI18nText(data.loading, 'data-loading'),
+        empty: krtI18nText(data.empty, 'data-empty'),
+        markRead: krtI18nText(data.markRead, 'data-mark-read'),
+        deleteLabel: krtI18nText(data.delete, 'data-delete'),
+        deleted: krtI18nText(data.deleted, 'data-deleted'),
+        allRead: krtI18nText(data.allRead, 'data-all-read'),
+        cleared: krtI18nText(data.cleared, 'data-cleared'),
+        confirmClearTitle: krtI18nText(data.confirmClearTitle, 'data-confirm-clear-title'),
+        confirmClearBody: krtI18nText(data.confirmClearBody, 'data-confirm-clear-body'),
+        confirmOk: krtI18nText(data.confirmOk, 'data-confirm-ok'),
+        confirmCancel: krtI18nText(data.confirmCancel, 'data-confirm-cancel'),
+        error: krtI18nText(data.error, 'data-error'),
     };
 }
 

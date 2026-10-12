@@ -5,6 +5,7 @@ import {
     showFrontendSuccessToast,
     showKrtConfirm,
 } from '/js/kernel/toast.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const fragmentPolicy =
     window.trustedTypes && typeof window.trustedTypes.createPolicy === 'function'
@@ -34,9 +35,7 @@ function trustedFragment(markup) {
  * @returns {string} the string to show
  */
 function text(value, fallbackValue, key) {
-    return typeof value === 'string' && value !== ''
-        ? value
-        : window.krtI18nText(fallbackValue, key);
+    return typeof value === 'string' && value !== '' ? value : krtI18nText(fallbackValue, key);
 }
 
 /**
@@ -552,7 +551,7 @@ function ownerOrgUnitRequiredMessage(problem) {
         return null;
     }
     const i18n = window.krtOwnerPickerI18n;
-    return window.krtI18nText(i18n && i18n.required, 'krtOwnerPickerI18n.required');
+    return krtI18nText(i18n && i18n.required, 'krtOwnerPickerI18n.required');
 }
 
 /**
@@ -1021,7 +1020,7 @@ function sectionWrite(config) {
              */
             function t(key) {
                 if (!key) return undefined;
-                return window.krtI18nText(dict[key], `${config.dictName || 'dict'}[${key}]`);
+                return krtI18nText(dict[key], `${config.dictName || 'dict'}[${key}]`);
             }
             const key = opts.sectionKey || '';
             const k = config.keys;

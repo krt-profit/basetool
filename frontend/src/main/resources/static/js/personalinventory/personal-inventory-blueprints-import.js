@@ -5,6 +5,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
@@ -94,7 +95,7 @@ function loadHandoff() {
 function handoffNotFound() {
     if (showFrontendErrorToast) {
         showFrontendErrorToast(
-            window.krtI18nText(
+            krtI18nText(
                 i18n().handoffNotFound || i18n().error,
                 'krtBlueprintsImportI18n.handoffNotFound',
             ),
@@ -133,19 +134,19 @@ function uploadPreview(file) {
 function renderPreview(preview) {
     if (!bodyEl) return;
     if (summaryEl) {
-        summaryEl.textContent = `${window.krtI18nText(
+        summaryEl.textContent = `${krtI18nText(
             i18n().summary,
             'krtBlueprintsImportI18n.summary',
-        )}: ${preview.total || 0} · ${window.krtI18nText(
+        )}: ${preview.total || 0} · ${krtI18nText(
             i18n().groupMatched,
             'krtBlueprintsImportI18n.groupMatched',
-        )}: ${(preview.matched || 0) + (preview.matchedByAlias || 0)} · ${window.krtI18nText(
+        )}: ${(preview.matched || 0) + (preview.matchedByAlias || 0)} · ${krtI18nText(
             i18n().groupSuggested,
             'krtBlueprintsImportI18n.groupSuggested',
-        )}: ${preview.suggested || 0} · ${window.krtI18nText(
+        )}: ${preview.suggested || 0} · ${krtI18nText(
             i18n().groupUnmatched,
             'krtBlueprintsImportI18n.groupUnmatched',
-        )}: ${preview.unmatched || 0} · ${window.krtI18nText(
+        )}: ${preview.unmatched || 0} · ${krtI18nText(
             i18n().groupOwned,
             'krtBlueprintsImportI18n.groupOwned',
         )}: ${preview.alreadyOwned || 0}`;
@@ -212,7 +213,7 @@ function renderPreview(preview) {
             html.push(krtHtml`<span class="krt-bp-imp-product">${entry.productName || ''}</span>`);
         } else if (isOwned) {
             html.push(
-                krtHtml`<span class="krt-bp-imp-owned">${window.krtI18nText(
+                krtHtml`<span class="krt-bp-imp-owned">${krtI18nText(
                     i18n().ownedLabel,
                     'krtBlueprintsImportI18n.ownedLabel',
                 )}</span>`,
@@ -241,7 +242,7 @@ function renderPreview(preview) {
         html.push(
             krtHtml`<span class="krt-bp-imp-search-wrap"><input type="text" class="krt-bp-imp-search" autocomplete="off" value="${
                 suggestions.length > 0 ? suggestions[0].productName : ''
-            }" placeholder="${window.krtI18nText(
+            }" placeholder="${krtI18nText(
                 i18n().searchPlaceholder,
                 'krtBlueprintsImportI18n.searchPlaceholder',
             )}"><div class="krt-bp-imp-results krt-pi-typeahead-results" hidden></div>`,
@@ -265,7 +266,7 @@ function renderPreview(preview) {
     appendGroup(i18n().groupOwned, owned, 'owned');
     if (!html.length)
         html.push(
-            krtHtml`<p class="krt-bp-staging-empty">${window.krtI18nText(
+            krtHtml`<p class="krt-bp-staging-empty">${krtI18nText(
                 i18n().nothing,
                 'krtBlueprintsImportI18n.nothing',
             )}</p>`,
@@ -325,7 +326,7 @@ function renderRowResults(results, row, items) {
     if (!items || items.length === 0) {
         krtHtml.set(
             results,
-            krtHtml`<div class="krt-pi-typeahead-empty">${window.krtI18nText(
+            krtHtml`<div class="krt-pi-typeahead-empty">${krtI18nText(
                 i18n().noResults,
                 'krtBlueprintsImportI18n.noResults',
             )}</div>`,
@@ -412,19 +413,19 @@ function apply() {
             errorMessage: i18n().error,
             onSuccess(result) {
                 const res = result || {};
-                const msg = `${window.krtI18nText(
+                const msg = `${krtI18nText(
                     i18n().applied,
                     'krtBlueprintsImportI18n.applied',
-                )} ${window.krtI18nText(
+                )} ${krtI18nText(
                     i18n().addedLabel,
                     'krtBlueprintsImportI18n.addedLabel',
-                )}: ${res.added || 0}, ${window.krtI18nText(
+                )}: ${res.added || 0}, ${krtI18nText(
                     i18n().updatedLabel,
                     'krtBlueprintsImportI18n.updatedLabel',
-                )}: ${res.acquiredAtUpdated || 0}, ${window.krtI18nText(
+                )}: ${res.acquiredAtUpdated || 0}, ${krtI18nText(
                     i18n().aliasesLabel,
                     'krtBlueprintsImportI18n.aliasesLabel',
-                )}: ${res.aliasesLearned || 0}, ${window.krtI18nText(
+                )}: ${res.aliasesLearned || 0}, ${krtI18nText(
                     i18n().skippedLabel,
                     'krtBlueprintsImportI18n.skippedLabel',
                 )}: ${res.skipped || 0}`;
@@ -454,7 +455,7 @@ function applyError() {
 
 function toastError() {
     if (showFrontendErrorToast)
-        showFrontendErrorToast(window.krtI18nText(i18n().error, 'krtBlueprintsImportI18n.error'));
+        showFrontendErrorToast(krtI18nText(i18n().error, 'krtBlueprintsImportI18n.error'));
 }
 
 function openModal() {

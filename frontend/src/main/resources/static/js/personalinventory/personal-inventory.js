@@ -6,6 +6,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const SEARCH_LIMIT = 2000;
 
@@ -195,7 +196,7 @@ function submitItemForm() {
     if (!uexId) {
         if (showFrontendErrorToast) {
             showFrontendErrorToast(
-                window.krtI18nText(
+                krtI18nText(
                     i18n.locationRequired || i18n.errorCreate,
                     'krtPersonalInventoryI18n.locationRequired',
                 ),
@@ -452,7 +453,7 @@ function runSearch() {
     resultsEl.hidden = false;
     krtHtml.set(
         resultsEl,
-        krtHtml`<div class="krt-pi-typeahead-loading">${window.krtI18nText(
+        krtHtml`<div class="krt-pi-typeahead-loading">${krtI18nText(
             (window.krtPersonalInventoryI18n || {}).searching,
             'krtPersonalInventoryI18n.searching',
         )}</div>`,
@@ -475,7 +476,7 @@ function renderResults(items) {
     if (!items || items.length === 0) {
         krtHtml.set(
             resultsEl,
-            krtHtml`<div class="krt-pi-typeahead-empty">${window.krtI18nText(
+            krtHtml`<div class="krt-pi-typeahead-empty">${krtI18nText(
                 (window.krtPersonalInventoryI18n || {}).noResults,
                 'krtPersonalInventoryI18n.noResults',
             )}</div>`,
@@ -497,7 +498,7 @@ function renderResults(items) {
     });
     if (items.length >= SEARCH_LIMIT) {
         html.push(
-            krtHtml`<div class="krt-pi-typeahead-more">${window.krtI18nText(
+            krtHtml`<div class="krt-pi-typeahead-more">${krtI18nText(
                 (window.krtPersonalInventoryI18n || {}).moreResults,
                 'krtPersonalInventoryI18n.moreResults',
             )}</div>`,

@@ -2,6 +2,7 @@
 /* exported krtSearchableSelect */
 
 import { krtComboboxRemoteSources } from '/js/kernel/krt-combobox-sources.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 let comboboxSeq = 0;
 
@@ -130,10 +131,7 @@ function krtSearchableSelect(select, config) {
         noResults:
             opts.noResultsText ||
             data.comboboxNoResults ||
-            window.krtI18nText(
-                (window.krtComboboxI18n || {}).noResults,
-                'krtComboboxI18n.noResults',
-            ),
+            krtI18nText((window.krtComboboxI18n || {}).noResults, 'krtComboboxI18n.noResults'),
         hint: opts.hintText || data.comboboxHint || '',
         invalid: opts.invalidText || data.comboboxInvalid || '',
         loading: opts.loadingText || data.comboboxLoading || '',

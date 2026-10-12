@@ -3,6 +3,7 @@
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
@@ -77,7 +78,7 @@ function gateTookOver() {
 
 function toastError() {
     if (showFrontendErrorToast)
-        showFrontendErrorToast(window.krtI18nText(i18n().error, 'krtP4kImportI18n.error'));
+        showFrontendErrorToast(krtI18nText(i18n().error, 'krtP4kImportI18n.error'));
 }
 
 function toastOk(msg) {
@@ -155,9 +156,7 @@ function upload() {
     const file = selectedFile();
     if (!file) {
         if (showFrontendErrorToast)
-            showFrontendErrorToast(
-                window.krtI18nText(i18n().pickFirst, 'krtP4kImportI18n.pickFirst'),
-            );
+            showFrontendErrorToast(krtI18nText(i18n().pickFirst, 'krtP4kImportI18n.pickFirst'));
         return;
     }
     if (!krtFetch) return;
@@ -188,7 +187,7 @@ function upload() {
                 if (result.ok && !gated) toastError();
                 return;
             }
-            toastOk(window.krtI18nText(i18n().toastUploaded, 'krtP4kImportI18n.toastUploaded'));
+            toastOk(krtI18nText(i18n().toastUploaded, 'krtP4kImportI18n.toastUploaded'));
             resetFile();
             loadJobs();
         });
@@ -257,8 +256,8 @@ function renderJobs(jobs) {
     if (jobsEmptyEl) jobsEmptyEl.hidden = jobs.length > 0;
     const tableWrap = jobsBody.closest('[data-p4k-jobs-table]');
     if (tableWrap instanceof HTMLElement) tableWrap.hidden = jobs.length === 0;
-    const kindHeader = window.krtI18nText(i18n().colKind, 'krtP4kImportI18n.colKind');
-    const summaryHeader = window.krtI18nText(i18n().colSummary, 'krtP4kImportI18n.colSummary');
+    const kindHeader = krtI18nText(i18n().colKind, 'krtP4kImportI18n.colKind');
+    const summaryHeader = krtI18nText(i18n().colSummary, 'krtP4kImportI18n.colSummary');
     /** @type {KrtHtml[]} */
     const html = [];
     jobs.forEach((job) => {
@@ -277,16 +276,13 @@ function renderJobs(jobs) {
             html.push(
                 krtHtml`<button type="button" class="btn btn-ghost btn-xs" data-action="view" data-job-id="${
                     job.id
-                }">${window.krtI18nText(i18n().actionView, 'krtP4kImportI18n.actionView')}</button>`,
+                }">${krtI18nText(i18n().actionView, 'krtP4kImportI18n.actionView')}</button>`,
             );
             if (job.kind === 'PREVIEW') {
                 html.push(
                     krtHtml` <button type="button" class="btn btn-success btn-xs" data-action="apply" data-job-id="${
                         job.id
-                    }">${window.krtI18nText(
-                        i18n().actionApply,
-                        'krtP4kImportI18n.actionApply',
-                    )}</button>`,
+                    }">${krtI18nText(i18n().actionApply, 'krtP4kImportI18n.actionApply')}</button>`,
                 );
             }
         }
@@ -297,20 +293,20 @@ function renderJobs(jobs) {
 
 function kindLabel(job) {
     return job.kind === 'APPLY'
-        ? window.krtI18nText(i18n().kindApply, 'krtP4kImportI18n.kindApply')
-        : window.krtI18nText(i18n().kindPreview, 'krtP4kImportI18n.kindPreview');
+        ? krtI18nText(i18n().kindApply, 'krtP4kImportI18n.kindApply')
+        : krtI18nText(i18n().kindPreview, 'krtP4kImportI18n.kindPreview');
 }
 
 function statusLabel(job) {
     switch (job.status) {
         case 'PENDING':
-            return window.krtI18nText(i18n().statusPending, 'krtP4kImportI18n.statusPending');
+            return krtI18nText(i18n().statusPending, 'krtP4kImportI18n.statusPending');
         case 'RUNNING':
-            return window.krtI18nText(i18n().statusRunning, 'krtP4kImportI18n.statusRunning');
+            return krtI18nText(i18n().statusRunning, 'krtP4kImportI18n.statusRunning');
         case 'SUCCEEDED':
-            return window.krtI18nText(i18n().statusSucceeded, 'krtP4kImportI18n.statusSucceeded');
+            return krtI18nText(i18n().statusSucceeded, 'krtP4kImportI18n.statusSucceeded');
         case 'FAILED':
-            return window.krtI18nText(i18n().statusFailed, 'krtP4kImportI18n.statusFailed');
+            return krtI18nText(i18n().statusFailed, 'krtP4kImportI18n.statusFailed');
         default:
             return job.status || '';
     }
@@ -341,15 +337,14 @@ function createdTotal(result) {
 function summaryText(job) {
     if (job.status === 'FAILED')
         return (
-            job.errorMessage ||
-            window.krtI18nText(i18n().statusFailed, 'krtP4kImportI18n.statusFailed')
+            job.errorMessage || krtI18nText(i18n().statusFailed, 'krtP4kImportI18n.statusFailed')
         );
     if (job.status === 'SUCCEEDED')
-        return `${String(createdTotal(job.result))} ${window.krtI18nText(
+        return `${String(createdTotal(job.result))} ${krtI18nText(
             i18n().colCreated,
             'krtP4kImportI18n.colCreated',
         )}`;
-    return window.krtI18nText(i18n().summaryRunning, 'krtP4kImportI18n.summaryRunning');
+    return krtI18nText(i18n().summaryRunning, 'krtP4kImportI18n.summaryRunning');
 }
 
 function findJob(id) {
@@ -389,29 +384,23 @@ function renderResult(result) {
     const modeEl = $('krt-p4k-mode');
     if (modeEl)
         modeEl.textContent = result.dryRun
-            ? window.krtI18nText(i18n().modeDryRun, 'krtP4kImportI18n.modeDryRun')
-            : window.krtI18nText(i18n().modeApplied, 'krtP4kImportI18n.modeApplied');
+            ? krtI18nText(i18n().modeDryRun, 'krtP4kImportI18n.modeDryRun')
+            : krtI18nText(i18n().modeApplied, 'krtP4kImportI18n.modeApplied');
     const seedingEl = $('krt-p4k-seeding');
     if (seedingEl)
         seedingEl.textContent = result.seedingEnabled
-            ? window.krtI18nText(i18n().seedingOn, 'krtP4kImportI18n.seedingOn')
-            : window.krtI18nText(i18n().seedingOff, 'krtP4kImportI18n.seedingOff');
+            ? krtI18nText(i18n().seedingOn, 'krtP4kImportI18n.seedingOn')
+            : krtI18nText(i18n().seedingOff, 'krtP4kImportI18n.seedingOff');
 
     const rows = [
         [
-            window.krtI18nText(i18n().rowManufacturers, 'krtP4kImportI18n.rowManufacturers'),
+            krtI18nText(i18n().rowManufacturers, 'krtP4kImportI18n.rowManufacturers'),
             result.manufacturers,
         ],
-        [window.krtI18nText(i18n().rowItems, 'krtP4kImportI18n.rowItems'), result.items],
-        [window.krtI18nText(i18n().rowShips, 'krtP4kImportI18n.rowShips'), result.ships],
-        [
-            window.krtI18nText(i18n().rowCommodities, 'krtP4kImportI18n.rowCommodities'),
-            result.commodities,
-        ],
-        [
-            window.krtI18nText(i18n().rowBlueprints, 'krtP4kImportI18n.rowBlueprints'),
-            result.blueprints,
-        ],
+        [krtI18nText(i18n().rowItems, 'krtP4kImportI18n.rowItems'), result.items],
+        [krtI18nText(i18n().rowShips, 'krtP4kImportI18n.rowShips'), result.ships],
+        [krtI18nText(i18n().rowCommodities, 'krtP4kImportI18n.rowCommodities'), result.commodities],
+        [krtI18nText(i18n().rowBlueprints, 'krtP4kImportI18n.rowBlueprints'), result.blueprints],
     ];
     const body = $('krt-p4k-rows');
     const html = rows.map((pair) => {
@@ -494,9 +483,7 @@ function confirmApply() {
                 if (result.ok && !gated) toastError();
                 return;
             }
-            toastOk(
-                window.krtI18nText(i18n().toastApplyStarted, 'krtP4kImportI18n.toastApplyStarted'),
-            );
+            toastOk(krtI18nText(i18n().toastApplyStarted, 'krtP4kImportI18n.toastApplyStarted'));
             if (applyPanelEl) applyPanelEl.hidden = true;
             applyTargetId = null;
             loadJobs();

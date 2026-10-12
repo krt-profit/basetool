@@ -1,6 +1,7 @@
 // @ts-check
 
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const HEARTBEAT_MS = 60000;
 const SECTION_SELECTOR = '[data-panel-key]';
@@ -30,7 +31,7 @@ const SECTION_SELECTOR = '[data-panel-key]';
  */
 function i18n(key) {
     const dict = window.MISSION_PRESENCE_I18N || {};
-    return window.krtI18nText(dict[key], `MISSION_PRESENCE_I18N[${key}]`);
+    return krtI18nText(dict[key], `MISSION_PRESENCE_I18N[${key}]`);
 }
 
 /**

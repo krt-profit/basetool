@@ -2,6 +2,7 @@
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /** @type {HTMLElement | null} */
 let mdEl = null;
@@ -199,13 +200,10 @@ function describeSource(source, clientId, clientName) {
     }
     const client = clientName || clientId;
     const dict = i18n();
-    const label = window.krtI18nText(dict.sourceLabel, 'krtBlueprintsRecipeI18n.sourceLabel');
-    const name = window.krtI18nText(
-        dict[`source${source}`],
-        `krtBlueprintsRecipeI18n.source${source}`,
-    );
+    const label = krtI18nText(dict.sourceLabel, 'krtBlueprintsRecipeI18n.sourceLabel');
+    const name = krtI18nText(dict[`source${source}`], `krtBlueprintsRecipeI18n.source${source}`);
     const via = client
-        ? ` ${window.krtI18nText(dict.sourceVia, 'krtBlueprintsRecipeI18n.sourceVia')} ${client}`
+        ? ` ${krtI18nText(dict.sourceVia, 'krtBlueprintsRecipeI18n.sourceVia')} ${client}`
         : '';
     return `${label}: ${name}${via}`;
 }
@@ -223,10 +221,7 @@ function sourceChipText(source, clientId, clientName) {
         return '';
     }
     const client = clientName || clientId;
-    const name = window.krtI18nText(
-        i18n()[`source${source}`],
-        `krtBlueprintsRecipeI18n.source${source}`,
-    );
+    const name = krtI18nText(i18n()[`source${source}`], `krtBlueprintsRecipeI18n.source${source}`);
     return client ? `${name} · ${client}` : name;
 }
 
@@ -249,7 +244,7 @@ function renderDetailHead(row) {
     nameEl.textContent = name;
     const formatted = formatAcquired(acquired, false);
     acquiredEl.textContent = formatted
-        ? `${window.krtI18nText(
+        ? `${krtI18nText(
               i18n().acquiredLabel,
               'krtBlueprintsRecipeI18n.acquiredLabel',
           )} ${formatted}`
@@ -302,7 +297,7 @@ function loadRecipe(id) {
         el(
             'div',
             'krt-bp-recipe-loading',
-            window.krtI18nText(i18n().loading, 'krtBlueprintsRecipeI18n.loading'),
+            krtI18nText(i18n().loading, 'krtBlueprintsRecipeI18n.loading'),
         ),
     );
     krtFetch
@@ -331,7 +326,7 @@ function showError() {
         el(
             'div',
             'krt-bp-recipe-error',
-            window.krtI18nText(i18n().error, 'krtBlueprintsRecipeI18n.error'),
+            krtI18nText(i18n().error, 'krtBlueprintsRecipeI18n.error'),
         ),
     );
 }
@@ -348,17 +343,17 @@ function renderRecipe(recipe) {
             el(
                 'div',
                 'krt-bp-recipe-empty',
-                window.krtI18nText(i18n().empty, 'krtBlueprintsRecipeI18n.empty'),
+                krtI18nText(i18n().empty, 'krtBlueprintsRecipeI18n.empty'),
             ),
         );
         return;
     }
 
     if (recipe.variantCount > 1) {
-        const hint = `${recipe.variantCount} ${window.krtI18nText(
+        const hint = `${recipe.variantCount} ${krtI18nText(
             i18n().variants,
             'krtBlueprintsRecipeI18n.variants',
-        )} · ${window.krtI18nText(i18n().exampleRecipe, 'krtBlueprintsRecipeI18n.exampleRecipe')}`;
+        )} · ${krtI18nText(i18n().exampleRecipe, 'krtBlueprintsRecipeI18n.exampleRecipe')}`;
         recipeEl.appendChild(el('p', 'krt-bp-recipe-variants', hint));
     }
 
@@ -468,7 +463,7 @@ function renderQualityBlock(group, groupIndex) {
         range.value = String(defaultQ);
         range.setAttribute(
             'aria-label',
-            window.krtI18nText(i18n().qualityAria, 'krtBlueprintsRecipeI18n.qualityAria') +
+            krtI18nText(i18n().qualityAria, 'krtBlueprintsRecipeI18n.qualityAria') +
                 (firstIngredientName ? ` ${firstIngredientName}` : ''),
         );
         qrow.appendChild(range);
@@ -537,7 +532,7 @@ function renderIngredientLine(ing) {
     }
     if (ing.minQuality != null) {
         metaParts.push(
-            `${window.krtI18nText(i18n().minQuality, 'krtBlueprintsRecipeI18n.minQuality')} ${
+            `${krtI18nText(i18n().minQuality, 'krtBlueprintsRecipeI18n.minQuality')} ${
                 ing.minQuality
             }`,
         );
@@ -552,13 +547,13 @@ function renderIngredientLine(ing) {
 
 function betterWhenText(bw) {
     if (bw === 'higher') {
-        return window.krtI18nText(i18n().betterHigher, 'krtBlueprintsRecipeI18n.betterHigher');
+        return krtI18nText(i18n().betterHigher, 'krtBlueprintsRecipeI18n.betterHigher');
     }
     if (bw === 'lower') {
-        return window.krtI18nText(i18n().betterLower, 'krtBlueprintsRecipeI18n.betterLower');
+        return krtI18nText(i18n().betterLower, 'krtBlueprintsRecipeI18n.betterLower');
     }
     if (bw === 'neutral') {
-        return window.krtI18nText(i18n().betterNeutral, 'krtBlueprintsRecipeI18n.betterNeutral');
+        return krtI18nText(i18n().betterNeutral, 'krtBlueprintsRecipeI18n.betterNeutral');
     }
     return null;
 }
@@ -614,7 +609,7 @@ function fmtScu(value) {
 
 function unitLabel(quantityType) {
     return quantityType === 'PIECE'
-        ? window.krtI18nText(i18n().unitPiece, 'krtBlueprintsRecipeI18n.unitPiece')
+        ? krtI18nText(i18n().unitPiece, 'krtBlueprintsRecipeI18n.unitPiece')
         : i18n().unitScu || 'SCU';
 }
 
@@ -702,7 +697,7 @@ function craftCount(data) {
  * @returns {string} the formatted count
  */
 function countText(count) {
-    const tpl = window.krtI18nText(i18n().countTemplate, 'krtBlueprintsRecipeI18n.countTemplate');
+    const tpl = krtI18nText(i18n().countTemplate, 'krtBlueprintsRecipeI18n.countTemplate');
     return tpl.replace('{0}', String(count));
 }
 
@@ -715,15 +710,15 @@ function countText(count) {
 function stateLabel(state) {
     const dict = i18n();
     if (state === 'ok') {
-        return window.krtI18nText(dict.craftableLabel, 'krtBlueprintsRecipeI18n.craftableLabel');
+        return krtI18nText(dict.craftableLabel, 'krtBlueprintsRecipeI18n.craftableLabel');
     }
     if (state === 'limited') {
-        return window.krtI18nText(dict.limitedState, 'krtBlueprintsRecipeI18n.limitedState');
+        return krtI18nText(dict.limitedState, 'krtBlueprintsRecipeI18n.limitedState');
     }
     if (state === 'none') {
-        return window.krtI18nText(dict.notCraftable, 'krtBlueprintsRecipeI18n.notCraftable');
+        return krtI18nText(dict.notCraftable, 'krtBlueprintsRecipeI18n.notCraftable');
     }
-    return window.krtI18nText(dict.notEvaluated, 'krtBlueprintsRecipeI18n.notEvaluated');
+    return krtI18nText(dict.notEvaluated, 'krtBlueprintsRecipeI18n.notEvaluated');
 }
 
 function decorateRows() {
@@ -785,8 +780,8 @@ function renderKpi(data) {
         kpi.appendChild(el('span', 'krt-bp-kpi__value', '–'));
         body.appendChild(el('span', 'krt-bp-kpi__label', stateLabel(state)));
         const reason = !data.recipeResolved
-            ? window.krtI18nText(dict.noRecipe, 'krtBlueprintsRecipeI18n.noRecipe')
-            : window.krtI18nText(dict.itemNotEvaluated, 'krtBlueprintsRecipeI18n.itemNotEvaluated');
+            ? krtI18nText(dict.noRecipe, 'krtBlueprintsRecipeI18n.noRecipe')
+            : krtI18nText(dict.itemNotEvaluated, 'krtBlueprintsRecipeI18n.itemNotEvaluated');
         body.appendChild(el('span', 'krt-bp-kpi__sub', reason));
         kpi.appendChild(body);
         return kpi;
@@ -798,29 +793,24 @@ function renderKpi(data) {
             'span',
             'krt-bp-kpi__label',
             count > 0
-                ? window.krtI18nText(dict.craftableLabel, 'krtBlueprintsRecipeI18n.craftableLabel')
-                : window.krtI18nText(dict.notCraftable, 'krtBlueprintsRecipeI18n.notCraftable'),
+                ? krtI18nText(dict.craftableLabel, 'krtBlueprintsRecipeI18n.craftableLabel')
+                : krtI18nText(dict.notCraftable, 'krtBlueprintsRecipeI18n.notCraftable'),
         ),
     );
     const parts = [];
     const limit = refineryOn ? data.limitingMaterialNameWithRefinery : data.limitingMaterialName;
     if (limit) {
-        parts.push(
-            `${window.krtI18nText(dict.limitedBy, 'krtBlueprintsRecipeI18n.limitedBy')} ${limit}`,
-        );
+        parts.push(`${krtI18nText(dict.limitedBy, 'krtBlueprintsRecipeI18n.limitedBy')} ${limit}`);
     }
     if (refineryOn) {
         parts.push(
             data.craftableWithRefinery > data.craftable && data.craftable === 0
-                ? window.krtI18nText(dict.viaRefinery, 'krtBlueprintsRecipeI18n.viaRefinery')
-                : window.krtI18nText(
-                      dict.refineryIncluded,
-                      'krtBlueprintsRecipeI18n.refineryIncluded',
-                  ),
+                ? krtI18nText(dict.viaRefinery, 'krtBlueprintsRecipeI18n.viaRefinery')
+                : krtI18nText(dict.refineryIncluded, 'krtBlueprintsRecipeI18n.refineryIncluded'),
         );
     }
     if (data.hasItemIngredients) {
-        parts.push(window.krtI18nText(dict.itemHint, 'krtBlueprintsRecipeI18n.itemHint'));
+        parts.push(krtI18nText(dict.itemHint, 'krtBlueprintsRecipeI18n.itemHint'));
     }
     if (parts.length > 0) {
         body.appendChild(el('span', 'krt-bp-kpi__sub', parts.join(' · ')));
@@ -848,7 +838,7 @@ function renderIngredients(data) {
         el(
             'h3',
             'krt-bp-section-head',
-            window.krtI18nText(dict.ingredients, 'krtBlueprintsRecipeI18n.ingredients'),
+            krtI18nText(dict.ingredients, 'krtBlueprintsRecipeI18n.ingredients'),
         ),
     );
     const table = el('table', 'data-table data-table--stack krt-bp-ing-table');
@@ -856,18 +846,18 @@ function renderIngredients(data) {
     const head = el('thead');
     const headRow = el('tr');
     headRow.appendChild(
-        el('th', null, window.krtI18nText(dict.colMaterial, 'krtBlueprintsRecipeI18n.colMaterial')),
+        el('th', null, krtI18nText(dict.colMaterial, 'krtBlueprintsRecipeI18n.colMaterial')),
     );
     headRow.appendChild(
-        el('th', 'num', window.krtI18nText(dict.colNeed, 'krtBlueprintsRecipeI18n.colNeed')),
+        el('th', 'num', krtI18nText(dict.colNeed, 'krtBlueprintsRecipeI18n.colNeed')),
     );
     headRow.appendChild(
-        el('th', 'num', window.krtI18nText(dict.colStock, 'krtBlueprintsRecipeI18n.colStock')),
+        el('th', 'num', krtI18nText(dict.colStock, 'krtBlueprintsRecipeI18n.colStock')),
     );
     const qualityHead = el(
         'th',
         'krt-bp-ing-quality',
-        window.krtI18nText(dict.colQuality, 'krtBlueprintsRecipeI18n.colQuality'),
+        krtI18nText(dict.colQuality, 'krtBlueprintsRecipeI18n.colQuality'),
     );
     qualityHead.title = dict.qualityHint || '';
     headRow.appendChild(qualityHead);
@@ -894,9 +884,10 @@ function renderIngredients(data) {
         const stock = el('td', `num krt-bp-ing-stock ${stockState}`, fmtAmount(avail, qt) + unit);
         stock.setAttribute('data-label', dict.colStock || '');
         if (missing > 0) {
-            const missingText = window
-                .krtI18nText(dict.missing, 'krtBlueprintsRecipeI18n.missing')
-                .replace('{0}', fmtAmount(missing, qt) + unit);
+            const missingText = krtI18nText(
+                dict.missing,
+                'krtBlueprintsRecipeI18n.missing',
+            ).replace('{0}', fmtAmount(missing, qt) + unit);
             stock.appendChild(el('span', 'krt-bp-ing-missing', missingText));
         }
         row.appendChild(stock);

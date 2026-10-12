@@ -20,6 +20,7 @@
 
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtChrome } from '/js/kernel/krt-chrome.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const RECENT_KEY = 'krt.recent';
@@ -106,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const createHref = data.createOrderHref;
         if (createHref) {
             out.push({
-                label: window.krtI18nText(data.actionCreateOrder, 'data-action-create-order'),
+                label: krtI18nText(data.actionCreateOrder, 'data-action-create-order'),
                 crumb,
                 icon: 'plus',
                 run() {
@@ -117,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const select = document.getElementById('squadron-switcher-select');
         if (select) {
             out.push({
-                label: window.krtI18nText(data.actionOuSwitch, 'data-action-ou-switch'),
+                label: krtI18nText(data.actionOuSwitch, 'data-action-ou-switch'),
                 crumb,
                 icon: 'swap',
                 run() {
@@ -128,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const logoutForm = document.getElementById('nav-logout-form');
         if (logoutForm instanceof HTMLFormElement) {
             out.push({
-                label: window.krtI18nText(data.actionLogout, 'data-action-logout'),
+                label: krtI18nText(data.actionLogout, 'data-action-logout'),
                 crumb,
                 icon: 'logout',
                 run() {
@@ -199,13 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (recent.length) {
                 groups.push({
-                    label: window.krtI18nText(data.recent, 'data-recent'),
+                    label: krtI18nText(data.recent, 'data-recent'),
                     items: recent,
                 });
             }
             if (actions.length) {
                 groups.push({
-                    label: window.krtI18nText(data.actions, 'data-actions'),
+                    label: krtI18nText(data.actions, 'data-actions'),
                     items: actions,
                 });
             }
@@ -229,10 +230,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return a.label.toLowerCase().includes(q);
         });
         if (pages.length) {
-            groups.push({ label: window.krtI18nText(data.pages, 'data-pages'), items: pages });
+            groups.push({ label: krtI18nText(data.pages, 'data-pages'), items: pages });
         }
         if (acts.length) {
-            groups.push({ label: window.krtI18nText(data.actions, 'data-actions'), items: acts });
+            groups.push({ label: krtI18nText(data.actions, 'data-actions'), items: acts });
         }
         return groups;
     };

@@ -1,5 +1,7 @@
 // @ts-check
 
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
+
 /**
  * Splits each `.datetime-split-group` into local date and time inputs backed by a hidden UTC value;
  * the one place forms convert between UTC and browser-local time.
@@ -124,7 +126,7 @@ function initGroup(group) {
 
             if (group.getAttribute('data-validate-not-past') === 'true') {
                 if (selectedDate < currentDate) {
-                    errorDiv.textContent = window.krtI18nText(
+                    errorDiv.textContent = krtI18nText(
                         group.getAttribute('data-error-past'),
                         'data-error-past',
                     );
@@ -140,7 +142,7 @@ function initGroup(group) {
                 if (targetHidden && targetHidden.value) {
                     const targetDate = new Date(targetHidden.value);
                     if (selectedDate <= targetDate) {
-                        errorDiv.textContent = window.krtI18nText(
+                        errorDiv.textContent = krtI18nText(
                             group.getAttribute('data-error-after'),
                             'data-error-after',
                         );

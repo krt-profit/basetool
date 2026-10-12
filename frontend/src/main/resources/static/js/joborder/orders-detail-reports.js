@@ -30,6 +30,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /**
  * Downloads the PDF report of a material handover.
@@ -490,7 +491,7 @@ export async function toggleInventory(row) {
             detailsRow,
             krtHtml`
                 <td colspan="5" class="od-inv-cell">
-                    <div class="text-danger">${window.krtI18nText(MSG_INVENTORY_LOAD_ERROR, 'MSG_INVENTORY_LOAD_ERROR')}</div>
+                    <div class="text-danger">${krtI18nText(MSG_INVENTORY_LOAD_ERROR, 'MSG_INVENTORY_LOAD_ERROR')}</div>
                 </td>
             `,
         );

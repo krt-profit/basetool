@@ -20,6 +20,7 @@
 // @ts-check
 
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 /**
  * @typedef {object} HerkunftTag
@@ -69,14 +70,14 @@ const registry = {};
 function i18n() {
     const d = window.herkunftI18n || {};
     return {
-        order: window.krtI18nText(d.order, 'herkunftI18n.order'),
-        mission: window.krtI18nText(d.mission, 'herkunftI18n.mission'),
-        rest: window.krtI18nText(d.rest, 'herkunftI18n.rest'),
-        min: window.krtI18nText(d.min, 'herkunftI18n.min'),
-        proceedsTitle: window.krtI18nText(d.proceedsTitle, 'herkunftI18n.proceedsTitle'),
-        personal: window.krtI18nText(d.personal, 'herkunftI18n.personal'),
-        auec: window.krtI18nText(d.auec, 'herkunftI18n.auec'),
-        auto: window.krtI18nText(d.auto, 'herkunftI18n.auto'),
+        order: krtI18nText(d.order, 'herkunftI18n.order'),
+        mission: krtI18nText(d.mission, 'herkunftI18n.mission'),
+        rest: krtI18nText(d.rest, 'herkunftI18n.rest'),
+        min: krtI18nText(d.min, 'herkunftI18n.min'),
+        proceedsTitle: krtI18nText(d.proceedsTitle, 'herkunftI18n.proceedsTitle'),
+        personal: krtI18nText(d.personal, 'herkunftI18n.personal'),
+        auec: krtI18nText(d.auec, 'herkunftI18n.auec'),
+        auto: krtI18nText(d.auto, 'herkunftI18n.auto'),
     };
 }
 

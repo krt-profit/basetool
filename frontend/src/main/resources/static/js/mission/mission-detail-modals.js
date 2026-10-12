@@ -24,6 +24,7 @@ import { krtSyncDatetimeSplitGroup } from '/js/kernel/datetime-splitter.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 (function () {
     const objectiveList = document.getElementById('mission-create-objective-list');
@@ -576,19 +577,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!fid) {
                 return;
             }
-            const msg = window.krtI18nText(
-                dict.delete_confirm,
-                'MISSION_CUSTOM_FREQ_I18N.delete_confirm',
-            );
+            const msg = krtI18nText(dict.delete_confirm, 'MISSION_CUSTOM_FREQ_I18N.delete_confirm');
             const ok = await showKrtConfirm?.(
                 msg,
                 msg,
-                window.krtI18nText(
+                krtI18nText(
                     window.MISSION_SUBRES_I18N &&
                         window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
                     'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
                 ),
-                window.krtI18nText(
+                krtI18nText(
                     window.MISSION_SUBRES_I18N &&
                         window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
                     'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',

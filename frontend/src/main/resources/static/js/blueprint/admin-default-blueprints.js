@@ -22,6 +22,7 @@
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const cfg = window.krtDefaultBlueprints || {};
 /** @type {KrtI18nDict} */
@@ -154,7 +155,7 @@ function renderResults(items) {
         return;
     }
     if (!items || items.length === 0) {
-        renderMessage(window.krtI18nText(i18n.noResults, 'krtDefaultBlueprints.i18n.noResults'));
+        renderMessage(krtI18nText(i18n.noResults, 'krtDefaultBlueprints.i18n.noResults'));
         return;
     }
     const host = resultsEl;
@@ -174,7 +175,7 @@ function renderResults(items) {
         if (item.variantCount != null && item.variantCount > 1) {
             const variants = document.createElement('span');
             variants.className = 'krt-pi-typeahead-variants';
-            variants.textContent = ` (${item.variantCount} ${window.krtI18nText(
+            variants.textContent = ` (${item.variantCount} ${krtI18nText(
                 i18n.variants,
                 'krtDefaultBlueprints.i18n.variants',
             )})`;
@@ -185,7 +186,7 @@ function renderResults(items) {
         const tag = document.createElement('span');
         tag.className = 'krt-pi-typeahead-tag';
         if (isDefault) {
-            tag.textContent = ` · ${window.krtI18nText(
+            tag.textContent = ` · ${krtI18nText(
                 i18n.alreadyDefault,
                 'krtDefaultBlueprints.i18n.alreadyDefault',
             )}`;
@@ -206,15 +207,13 @@ function runSearch(q) {
         hideResults();
         return;
     }
-    renderMessage(window.krtI18nText(i18n.searching, 'krtDefaultBlueprints.i18n.searching'));
+    renderMessage(krtI18nText(i18n.searching, 'krtDefaultBlueprints.i18n.searching'));
     const url = `${cfg.searchUrl}?q=${encodeURIComponent(q.trim())}&limit=25`;
     krtFetch
         .getJson(url)
         .then(renderResults)
         .catch(() => {
-            renderMessage(
-                window.krtI18nText(i18n.noResults, 'krtDefaultBlueprints.i18n.noResults'),
-            );
+            renderMessage(krtI18nText(i18n.noResults, 'krtDefaultBlueprints.i18n.noResults'));
         });
 }
 
@@ -342,7 +341,7 @@ function openDeleteModal(formId, name) {
         ? /** @type {HTMLFormElement | null} */ (document.getElementById(formId))
         : null;
     if (deleteMessage) {
-        const base = window.krtI18nText(i18n.removeBody, 'krtDefaultBlueprints.i18n.removeBody');
+        const base = krtI18nText(i18n.removeBody, 'krtDefaultBlueprints.i18n.removeBody');
         deleteMessage.textContent = name ? `${base} (${name})` : base;
     }
     krtModal.open(deleteModal);

@@ -54,7 +54,7 @@ class ModuleScriptsTest {
   private static final int CLASSIC_CEILING = 1;
 
   /** Selection floor: module scripts when the guard was added. */
-  private static final int MODULES_FLOOR = 141;
+  private static final int MODULES_FLOOR = 142;
 
   private static final Path SCRIPTS = AssetReferences.MAIN_RESOURCES.resolve("static/js");
 

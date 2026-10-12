@@ -20,6 +20,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 (function () {
     /**
@@ -92,14 +93,8 @@ import { krtHtml } from '/js/kernel/krt-html.js';
 
     const DATA_URL = config.getAttribute('data-data-url') || '';
     const I18N = {
-        material: window.krtI18nText(
-            config.getAttribute('data-label-material'),
-            'data-label-material',
-        ),
-        unsorted: window.krtI18nText(
-            config.getAttribute('data-label-unsorted'),
-            'data-label-unsorted',
-        ),
+        material: krtI18nText(config.getAttribute('data-label-material'), 'data-label-material'),
+        unsorted: krtI18nText(config.getAttribute('data-label-unsorted'), 'data-label-unsorted'),
         unsortedSentinel: 'Unsortiert',
         illegal: config.getAttribute('data-label-illegal') || '',
         volatileQt: config.getAttribute('data-label-volatile-qt') || '',

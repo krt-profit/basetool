@@ -22,6 +22,7 @@
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 (function () {
     const BASE = '/connected-apps';
@@ -42,7 +43,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
         /** @param {string} key */
         const text = function (key) {
             const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-            return window.krtI18nText(data[key], attribute);
+            return krtI18nText(data[key], attribute);
         };
         return {
             disconnected: text('disconnected'),
@@ -62,7 +63,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
         /** @param {string} key */
         const text = function (key) {
             const attribute = `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-            return window.krtI18nText(data[key], attribute);
+            return krtI18nText(data[key], attribute);
         };
         return {
             done: text('done'),

@@ -22,6 +22,7 @@
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 (function () {
     const form = document.getElementById('rule-form');
@@ -100,19 +101,16 @@ import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
             const holder = document.getElementById('rule-i18n');
             const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});
             return {
-                confirmDeleteTitle: window.krtI18nText(
+                confirmDeleteTitle: krtI18nText(
                     data.confirmDeleteTitle,
                     'data-confirm-delete-title',
                 ),
-                confirmDeleteBody: window.krtI18nText(
-                    data.confirmDeleteBody,
-                    'data-confirm-delete-body',
-                ),
-                confirmOk: window.krtI18nText(data.confirmOk, 'data-confirm-ok'),
-                confirmCancel: window.krtI18nText(data.confirmCancel, 'data-confirm-cancel'),
-                saved: window.krtI18nText(data.saved, 'data-saved'),
-                deleted: window.krtI18nText(data.deleted, 'data-deleted'),
-                error: window.krtI18nText(data.error, 'data-error'),
+                confirmDeleteBody: krtI18nText(data.confirmDeleteBody, 'data-confirm-delete-body'),
+                confirmOk: krtI18nText(data.confirmOk, 'data-confirm-ok'),
+                confirmCancel: krtI18nText(data.confirmCancel, 'data-confirm-cancel'),
+                saved: krtI18nText(data.saved, 'data-saved'),
+                deleted: krtI18nText(data.deleted, 'data-deleted'),
+                error: krtI18nText(data.error, 'data-error'),
                 unknownValue: data.unknownValue || '{0}',
             };
         }

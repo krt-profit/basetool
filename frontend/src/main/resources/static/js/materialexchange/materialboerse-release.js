@@ -18,6 +18,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 (function () {
     /**
@@ -135,7 +136,7 @@ import { krtHtml } from '/js/kernel/krt-html.js';
             return String(amount);
         }
         if (quantityType === 'PIECE') {
-            return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} ${window.krtI18nText(
+            return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} ${krtI18nText(
                 i18n.unitPiece,
                 'materialboerseModalI18n.unitPiece',
             )}`;
@@ -168,7 +169,7 @@ import { krtHtml } from '/js/kernel/krt-html.js';
         state.available = isNaN(maxNum) ? null : maxNum;
         if (unit) {
             unit.textContent = isPiece
-                ? window.krtI18nText(i18n.unitPiece, 'materialboerseModalI18n.unitPiece')
+                ? krtI18nText(i18n.unitPiece, 'materialboerseModalI18n.unitPiece')
                 : i18n.unitScu || 'SCU';
         }
         if (input) {
@@ -187,7 +188,7 @@ import { krtHtml } from '/js/kernel/krt-html.js';
             hint.textContent =
                 state.available != null
                     ? fmt(
-                          window.krtI18nText(i18n.amountMax, 'materialboerseModalI18n.amountMax'),
+                          krtI18nText(i18n.amountMax, 'materialboerseModalI18n.amountMax'),
                           formatAmount(state.available, state.quantityType),
                       )
                     : '';
@@ -231,7 +232,7 @@ import { krtHtml } from '/js/kernel/krt-html.js';
         const counter = q('[data-mb-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
-                window.krtI18nText(i18n.charCounter, 'materialboerseModalI18n.charCounter'),
+                krtI18nText(i18n.charCounter, 'materialboerseModalI18n.charCounter'),
                 ta.value.length.toLocaleString('de-DE'),
             );
         }
