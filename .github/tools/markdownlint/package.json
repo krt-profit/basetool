@@ -1,8 +1,13 @@
 {
   "name": "basetool-markdownlint",
   "private": true,
-  "description": "Pinned markdownlint-cli2 for the exchange-docs workflow, installed with npm ci from the lockfile.",
+  "description": "Pinned markdownlint-cli for the exchange-docs workflow, installed with npm ci from the lockfile.",
   "devDependencies": {
-    "markdownlint-cli2": "0.23.3"
+    "markdownlint-cli": "0.49.1"
+  },
+  "overrides": {
+    "js-yaml": "5.4.1",
+    "katex": "0.18.2",
+    "smol-toml": "1.9.0"
   }
 }

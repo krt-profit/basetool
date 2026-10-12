@@ -58,6 +58,8 @@ mockito = "5.24.0"
 protobuf3 = "3.25.9"
 handlebars = "4.5.5"
 plexusUtils = "3.6.1"
+jsoup = "1.23.2"
+kotlinGradlePlugin = "2.4.20"
 commonsLang3 = "3.21.0"
 jackson2 = "2.22.3"
 jackson2Plugins = "2.22.3"
@@ -105,6 +107,8 @@ jboss-logmanager = { module = "org.jboss.logmanager:jboss-logmanager", version.r
 protobuf3-bom = { module = "com.google.protobuf:protobuf-bom", version.ref = "protobuf3" }
 handlebars = { module = "com.github.jknack:handlebars", version.ref = "handlebars" }
 plexus-utils = { module = "org.codehaus.plexus:plexus-utils", version.ref = "plexusUtils" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlinGradlePlugin" }
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commonsLang3" }
 jackson2-plugins-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson2Plugins" }
 jackson3-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson3" }
