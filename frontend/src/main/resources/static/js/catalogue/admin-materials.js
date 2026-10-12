@@ -19,7 +19,9 @@
 
 // @ts-check
 
-/* global CAT_MSG, CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR, krtAutocomplete */
+/* global CAT_MSG, CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR */
+
+import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 
 /** @type {string[]} */
 const materialNames = [];

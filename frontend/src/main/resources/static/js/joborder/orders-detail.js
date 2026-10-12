@@ -20,14 +20,21 @@
 // @ts-check
 
 /* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, showFrontendErrorToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_HANDOVER_I18N */
-/* exported openHandoverModal, addHandoverItemRow, validateHandoverAmounts, updateHandoverIndexes */
 
 /** @type {any[]} */
-// eslint-disable-next-line prefer-const
-let cachedInventoryItems = [];
+export let cachedInventoryItems = [];
 let isInventoryCached = false;
 /** @type {Map<string, string>} */
 let handoverTierSuggestion = new Map();
+
+/**
+ * Forgets the inventory fetched for the handover dialog, so the next opening loads it again.
+ */
+export function resetInventoryCache() {
+    isInventoryCached = false;
+    cachedInventoryItems = [];
+    handoverTierSuggestion = new Map();
+}
 
 const ORDER_SECTIONS = {
     header: { container: '#order-header-results', fragmentValue: 'header' },
@@ -103,7 +110,7 @@ const ORDER_SECTIONS = {
     }
 })();
 
-function _publishOrdersQueue() {
+export function _publishOrdersQueue() {
     if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
         window.krtLiveSync.sendChanged('orders', ['queue', 'demand']);
     }
@@ -115,7 +122,7 @@ function _publishOrdersQueue() {
  * @param {string} id the control's element id
  * @returns {string} the control's value, or an empty string when it is missing or empty
  */
-function _odFieldValue(id) {
+export function _odFieldValue(id) {
     const field = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
         document.getElementById(id)
     );
@@ -128,7 +135,7 @@ function _odFieldValue(id) {
  * @param {string} id the element id
  * @returns {HTMLElement} the element; dereferencing it throws when the page lacks it
  */
-function _odElementById(id) {
+export function _odElementById(id) {
     return /** @type {HTMLElement} */ (document.getElementById(id));
 }
 
@@ -139,7 +146,7 @@ function _odElementById(id) {
  * @returns {HTMLInputElement | HTMLSelectElement} the control; dereferencing it throws when the
  *     page lacks it
  */
-function _odControlById(id) {
+export function _odControlById(id) {
     return /** @type {HTMLInputElement | HTMLSelectElement} */ (document.getElementById(id));
 }
 
@@ -148,7 +155,7 @@ function _odControlById(id) {
  *
  * @returns {HTMLInputElement | null} the input, or null when the page has none
  */
-function _odEditVersionInput() {
+export function _odEditVersionInput() {
     return /** @type {HTMLInputElement | null} */ (
         document.querySelector('#edit-modal input[name="version"]')
     );
@@ -164,7 +171,7 @@ function _odEditVersionInput() {
  *
  * @returns {{handoverTime: string, recipientHandle: string, recipientSquadron: string, items: OdHandoverItem[]}} the body
  */
-function _serializeHandoverForm() {
+export function _serializeHandoverForm() {
     /** @type {OdHandoverItem[]} */
     const items = [];
     document.querySelectorAll('#handover-items-container .handover-item-row').forEach((row) => {
@@ -210,7 +217,7 @@ function _serializeHandoverForm() {
  *
  * @returns {{handoverTime: string, recipientHandle: string, entries: Array<{jobOrderItemId: string, amount: number}>}} the body
  */
-function _serializeItemHandoverForm() {
+export function _serializeItemHandoverForm() {
     /** @type {Array<{jobOrderItemId: string, amount: number}>} */
     const entries = [];
     document.querySelectorAll('#item-handover-modal .item-handover-line').forEach((line) => {
@@ -363,7 +370,7 @@ function _refreshHandoverTierChoice(row, inv) {
     holder.classList.toggle('is-hidden', eligible.length === 0);
 }
 
-async function openHandoverModal() {
+export async function openHandoverModal() {
     window.krtModal.open(document.getElementById('handover-modal'));
     if (!isInventoryCached) {
         try {
@@ -413,14 +420,14 @@ async function openHandoverModal() {
  * @param {Array<unknown>} values the values for {0}, {1}, …
  * @returns {string} the filled-in text
  */
-function fillPlaceholders(template, values) {
+export function fillPlaceholders(template, values) {
     return values.reduce((/** @type {string} */ text, value, i) => {
         return text.split(`{${i}}`).join(value == null ? '' : String(value));
     }, template);
 }
 
 /** Appends a handover row with the inventory entry, amount and tier controls. */
-function addHandoverItemRow() {
+export function addHandoverItemRow() {
     const container = document.getElementById('handover-items-container');
     if (!container) return;
     const index = container.children.length;
@@ -670,7 +677,7 @@ function _collectHandoverMissionReductions(row) {
  *
  * @returns {boolean} true when all rows are valid
  */
-function validateHandoverAmounts() {
+export function validateHandoverAmounts() {
     const rows = document.querySelectorAll('#handover-items-container .handover-item-row');
     for (const row of rows) {
         const sel = row.querySelector('select');
@@ -720,7 +727,7 @@ function validateHandoverAmounts() {
     return true;
 }
 
-function updateHandoverIndexes() {
+export function updateHandoverIndexes() {
     const rows = document.querySelectorAll('.handover-item-row');
     rows.forEach((row, index) => {
         const select = row.querySelector('select');

@@ -19,7 +19,7 @@
 
 // @ts-check
 
-/* global krtAutocomplete */
+import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dataEl = /** @type {HTMLDataListElement | null} */ (

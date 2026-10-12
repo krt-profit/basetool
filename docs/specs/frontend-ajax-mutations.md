@@ -1787,8 +1787,9 @@ ADR-0106 · **Issues:** —
 
 The hand-written scripts under `static/js` are **statically type-checked** by the TypeScript
 compiler running in checker-only mode (`tsc --noEmit`, `frontend/tsconfig.json`). This is a
-*checking* requirement, not a language one: the sources stay JavaScript, stay classic non-module
-`<script>` tags sharing one global scope (ADR-0069), and nothing is compiled, bundled or renamed.
+*checking* requirement, not a language one: the sources stay JavaScript, stay ES modules served as
+they are (ADR-0250, REQ-FE-035; classic non-module tags sharing one global scope until 2026-10-12), and
+nothing is compiled, bundled or renamed.
 The decision and its rejected alternatives are ADR-0125.
 
 **The gate.** `:frontend:typecheckJs` runs strictly (`ignoreExitValue = false`) and is wired into
@@ -2189,7 +2190,8 @@ compression instead (`gzip_types` for JavaScript, CSS and JSON, PR #2021).
 **Acceptance**
 
 - [x] Every `<script src>` in the templates is `defer` except `krt-client-error.js`, which is the
-  head's first script and synchronous.
+  head's first script and synchronous. Since 2026-10-12 (REQ-FE-035) a page module is
+  `type="module"` instead, which is deferred too.
 - [x] No inline page script makes a top-level call other than element look-ups, listener and
   `krtEvents` registrations, and no inline page script is an immediately invoked function.
 - [x] On every core page, after load, the shared globals exist, the `krtEvents` stub is replaced, no
@@ -2572,6 +2574,9 @@ what it needs; the parameters start with `page` so that they cannot collide with
 **Enforced by:** `PageChromeSnapshotTest`, `ChromeNeutraliserTest`, `PageLayoutCompositionTest` ·
 **Code:** `templates/kernel/fragments/layout.html` · **Related:** REQ-UI-026, REQ-FE-023, REQ-UI-023
 
+> **Amended (2026-10-12):** the head now also renders the page's import map (REQ-FE-035), so the
+> head's fixed part changed once in the golden file.
+
 ### REQ-FE-034 — Templates, scripts and stylesheets live in their domain's folder
 
 Since 2026-10-11 (plan §5.9, F5) the frontend's templates and static assets are laid out like its
@@ -2618,6 +2623,57 @@ Java packages: the folder is the domain, and the domains are the packages of the
 `StaticResourceHandlerMappingTest#everyAssetATemplateLinksIsServedAtItsContentHashedUrl`,
 `ViewNameResolutionTest`, `:frontend:testTypecheckRatchet` · **Related:** REQ-FE-018, REQ-FE-032,
 REQ-FE-033, REQ-UI-023, REQ-OPS-038
+
+### REQ-FE-035 — Scripts are ES modules behind a per-page import map
+
+Since 2026-10-12 (plan §8.2, F5, ADR-0250) every script under `static/js` is an ES module except the
+ones `frontend/module-ratchet.json` lists as classic — today only `kernel/krt-client-error.js`, the
+head's first, synchronous script. The list only shrinks.
+
+- **Linking.** A module is `<script type="module" th:src="@{/js/<domain>/<file>.js}"
+  th:attr="nonce=${cspNonce}">` and carries no `defer` (a module is deferred and runs in document order
+  with the other deferred scripts, so REQ-FE-023's load order is unchanged). A classic script is linked
+  without `type`.
+- **Imports are static, absolute and bounded.** `import … from '/js/<domain>/<file>.js'` and
+  `export … from` name an absolute asset path of the module's own domain or of the kernel. A relative
+  path, a bare specifier, a dynamic `import()`, an import of another domain and an import cycle are
+  rejected. The kernel API stays `window.krt*`; only module-to-module dependencies are imports.
+- **Every page renders an import map.** `kernel/fragments/head.html` renders, before its first module
+  script and with the request's CSP nonce, `<script type="importmap">` mapping each module the page's
+  module scripts import — transitively, the entry scripts themselves excluded unless imported — to the
+  content-hashed URL `ResourceUrlProvider` gives it, i.e. the URL a `@{…}` link to it produces. The
+  assets are cached for a year as `immutable`; the map is what makes a changed module a new URL. The
+  CSP is unchanged: `script-src 'nonce-…' 'strict-dynamic'` admits the static imports of a nonced
+  module and the nonced map.
+- **The map is found by scanning**, not declared: the page template, `kernel/fragments/layout` and every
+  fragment they include by a literal `~{template :: name}` reference are searched for module
+  scripts. A module a page loads through a construct the scan cannot follow would be requested under
+  its plain URL; there is none today.
+- **`bank.js` is an entry module** that calls the `init…` functions of 16 modules in the order the
+  former single function registered its document listeners (REQ-BANK-* behaviour, REQ-FE-005, REQ-FE-015
+  unchanged).
+
+**Acceptance**
+
+- [x] 139 of 140 scripts are modules; the order of the document listeners, their handler bodies and the
+  live-sync receivers of the split `bank.js` is identical to the former file's when recorded against a
+  stub document (2026-10-12).
+- [x] A rendered page carries the import map before its first module script, with the hashed URL of an
+  imported bank module; every entry of a page's map equals the resource chain's URL for its key and is
+  served; every page finds its own module scripts and renders exactly its import closure.
+- [x] A module linked as a classic script, a classic script linked as a module, a module with a
+  `defer`, an import outside the boundary, a dynamic import and a cycle are each reported; the classic
+  list cannot grow.
+- [x] The two rendered pages checked in a browser under the real CSP (`org-unit-bank`, `inventory-admin`)
+  load every module without a violation or script error.
+
+**Enforced by:** `ModuleScriptsTest`, `ModuleImportMapTest`,
+`StaticResourceHandlerMappingTest#everyImportMapEntryIsTheContentHashedUrlAndIsServed`,
+`OrgUnitBankPageControllerMvcTest#orgUnitBank_rendersTheImportMapBeforeItsModuleScripts`,
+`:frontend:testEslintBans`, `:frontend:lintJs` (`no-restricted-imports` per domain),
+`InlineScriptLoadOrderTest` · **Code:** `kernel/layout/ModuleImportMap.java`,
+`templates/kernel/fragments/head.html`, `module-ratchet.json` · **Related:** REQ-FE-018, REQ-FE-023,
+REQ-FE-033, REQ-FE-034, ADR-0250
 
 ## Out of scope
 

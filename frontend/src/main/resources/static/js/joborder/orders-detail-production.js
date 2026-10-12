@@ -19,8 +19,9 @@
 
 // @ts-check
 
-/* global MSG_STOLEN, MSG_QUALITY, MSG_INVENTORY_BELOW_FLOOR, MSG_PRODUCTION_COUNTED_HIGHER, showFrontendErrorToast, showFrontendSuccessToast, PRODUCTION_I18N, krtOrderWrite */
-/* exported openProductionModal, bookProduction */
+/* global MSG_STOLEN, MSG_QUALITY, MSG_INVENTORY_BELOW_FLOOR, MSG_PRODUCTION_COUNTED_HIGHER, showFrontendErrorToast, showFrontendSuccessToast, PRODUCTION_I18N */
+
+import { krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
 
 (function () {
     const nav = /** @type {HTMLElement | null} */ (
@@ -316,7 +317,7 @@ function _prodDemand(mat, k) {
  *
  * @param {HTMLElement | null} control the expand control
  */
-function _odToggleDemandRow(control) {
+export function _odToggleDemandRow(control) {
     if (!control) {
         return;
     }
@@ -334,7 +335,7 @@ function _odToggleDemandRow(control) {
  *
  * @param {HTMLElement} button the record-production button carrying the line's data attributes
  */
-function openProductionModal(button) {
+export function openProductionModal(button) {
     const orderId = button.getAttribute('data-order-id');
     const itemId = button.getAttribute('data-item-id');
     const itemName = button.getAttribute('data-item-name') || '';
@@ -684,7 +685,7 @@ function _prodResetBookIn() {
 }
 
 /** Keeps the allocate-to-order checkbox opposite to the personal checkbox. */
-function _prodSyncPersonalAllocate() {
+export function _prodSyncPersonalAllocate() {
     const personalCb = _prodInput('production-personal');
     const allocateCb = _prodInput('production-allocate');
     if (!allocateCb) {
@@ -696,7 +697,7 @@ function _prodSyncPersonalAllocate() {
 }
 
 /** Disables the personal checkbox while the booking is made for another owner. */
-function _prodSyncPersonalForOwner() {
+export function _prodSyncPersonalForOwner() {
     const personalCb = _prodInput('production-personal');
     if (!personalCb) {
         return;
@@ -712,7 +713,7 @@ function _prodSyncPersonalForOwner() {
 }
 
 /** Reloads the owning org-unit choices for the chosen owner and shows or hides the picker. */
-function _prodRefreshOrgUnitPicker() {
+export function _prodRefreshOrgUnitPicker() {
     const wrapper = document.getElementById('production-orgunit-wrapper');
     const select = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('production-orgunit')
@@ -785,7 +786,7 @@ function _prodCollectBookIn() {
 }
 
 /** Recomputes each material card's reconcile chip and the book button's enabled state. */
-function _prodReconcile() {
+export function _prodReconcile() {
     if (!_prodContext) {
         return;
     }
@@ -851,7 +852,7 @@ function _prodReconcile() {
 }
 
 /** Validates the allocations and books the production of the open order line. */
-function bookProduction() {
+export function bookProduction() {
     if (!_prodContext) {
         return;
     }

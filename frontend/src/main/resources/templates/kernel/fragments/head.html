@@ -18,6 +18,7 @@
     <link rel="preload" th:href="@{/fonts/Lato-Regular.woff2}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" th:href="@{/css/kernel/styles.css}">
     <script th:src="@{/js/kernel/krt-client-error.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="importmap" th:with="importMapJson=${@moduleImportMap.json(#execInfo.processedTemplateName)}" th:attr="nonce=${cspNonce}" th:utext="${importMapJson}"></script>
     <script th:attr="nonce=${cspNonce}">
         window.krtEvents = window.krtEvents || (function () {
             var queue = [];
@@ -45,13 +46,13 @@
             piece: /*[[#{material.piece.validation.positive}]]*/ 'Enter a whole number greater than 0.'
         };
     </script>
-    <script th:src="@{/js/kernel/krt-html.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/safe-url.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/event-delegation.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/common-handlers.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/krt-modal.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/krt-fetch.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/krt-live-sync.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-html.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/safe-url.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/event-delegation.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/common-handlers.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-modal.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-fetch.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-live-sync.js}" th:attr="nonce=${cspNonce}"></script>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtLiveSyncI18n = {
             updatesAvailable: /*[[#{livesync.updates_available}]]*/ 'Updates available'
@@ -117,19 +118,19 @@
             }
         };
     </script>
-    <script th:src="@{/js/kernel/krt-user-search.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/krt-catalog-search.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/krt-bank-account-search.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/krt-searchable-select.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/notification/notifications.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/datetime-splitter.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/scu-decimal-input.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/inline-style-apply.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-user-search.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-catalog-search.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-bank-account-search.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-searchable-select.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/notification/notifications.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/datetime-splitter.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/scu-decimal-input.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/inline-style-apply.js}" th:attr="nonce=${cspNonce}"></script>
 
-    <script th:src="@{/js/kernel/krt-filter-panel.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/krt-overflow-menu.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/krt-filter-chips.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <script th:src="@{/js/kernel/krt-list-count.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-filter-panel.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-overflow-menu.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-filter-chips.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/krt-list-count.js}" th:attr="nonce=${cspNonce}"></script>
 
     <title th:replace="${titleContent}"></title>
     <th:block th:if="${additionalLinks != null}">

@@ -67,7 +67,7 @@
             confirm: /*[[#{general.confirm}]]*/ 'Bestätigen'
         };
     </script>
-    <script th:src="@{/js/kernel/toast.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/kernel/toast.js}" th:attr="nonce=${cspNonce}"></script>
 
     <link rel="stylesheet" th:href="@{/css/pages/kernel/toast.css}">
 </th:block>

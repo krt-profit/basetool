@@ -108,7 +108,7 @@
     const MSG_ERROR_GENERIC   = /*[[#{item.collection.toast.error}]]*/ 'Fehler beim Speichern.';
     window.orderId = /*[[${jobOrderId}]]*/ null;
 </script>
-<script th:src="@{/js/joborder/item-collection.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/joborder/item-collection.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

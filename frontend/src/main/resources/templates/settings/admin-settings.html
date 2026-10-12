@@ -194,7 +194,7 @@
         reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
 </script>
-<script th:src="@{/js/settings/admin-settings.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/settings/admin-settings.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

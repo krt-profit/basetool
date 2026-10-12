@@ -12,10 +12,10 @@
     "",
     "moduleDetection MUST stay `legacy`: package.json declares `type: module`,",
     "so under the default `auto` TypeScript would classify every .js file as an",
-    "ES module and give each its own scope. The scripts are loaded as classic",
-    "<script> tags sharing ONE global lexical environment (ADR-0069) — `legacy`",
-    "reproduces that, and is what lets the checker see cross-file globals and",
-    "cross-file redeclaration collisions."
+    "ES module. A script is a module only when it has an import or export (the",
+    "others, and the classic krt-client-error.js, are checked as global scripts",
+    "sharing one lexical environment) — `legacy` reproduces that. `paths` maps the",
+    "absolute /js/ specifiers of the modules (ADR-0250) to the script folder."
   ],
   "compilerOptions": {
     "allowJs": true,
@@ -30,6 +30,11 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "moduleDetection": "legacy",
+    "paths": {
+      "/js/*": [
+        "./src/main/resources/static/js/*"
+      ]
+    },
     "strict": true,
     "noImplicitAny": false,
     "useUnknownInCatchVariables": false,

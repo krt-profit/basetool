@@ -30,10 +30,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.ModuleImportMap;
 import de.greluc.krt.profit.basetool.frontend.support.AssetReferences;
 import java.io.IOException;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,6 +75,8 @@ class StaticResourceHandlerMappingTest {
   @Autowired private WebApplicationContext context;
 
   @Autowired private ResourceUrlProvider resourceUrlProvider;
+
+  @Autowired private ModuleImportMap moduleImportMap;
 
   @MockitoBean private WebClient webClient;
 
@@ -244,5 +248,30 @@ class StaticResourceHandlerMappingTest {
           () -> url + " must resolve to a content-hashed URL, got " + resolved);
       mockMvc.perform(get(resolved)).andExpect(status().isOk());
     }
+  }
+
+  /**
+   * Every entry of a page's import map is the content-hashed URL the resource chain produces for
+   * its key, and that URL is served (REQ-FE-035).
+   *
+   * @throws Exception if a request cannot be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void everyImportMapEntryIsTheContentHashedUrlAndIsServed() throws Exception {
+    Matcher entry =
+        Pattern.compile("\"(/js/[^\"]+)\":\"(/js/[^\"]+)\"")
+            .matcher(moduleImportMap.json("bank/bank-dashboard"));
+    int entries = 0;
+    while (entry.find()) {
+      entries++;
+      String key = entry.group(1);
+      String hashed = entry.group(2);
+      assertEquals(resourceUrlProvider.getForLookupPath(key), hashed);
+      assertTrue(CONTENT_HASHED.matcher(hashed).matches(), () -> key + " maps to " + hashed);
+      mockMvc.perform(get(hashed)).andExpect(status().isOk());
+    }
+    int found = entries;
+    assertTrue(found >= 10, () -> "selection floor: import map entries, got " + found);
   }
 }

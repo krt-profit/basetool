@@ -219,7 +219,7 @@
 </th:block>
 </th:block>
 <th:block th:fragment="pageTail">
-<script th:src="@{/js/personalinventory/admin-personal-blueprints-purge.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/personalinventory/admin-personal-blueprints-purge.js}" th:attr="nonce=${cspNonce}"></script>
 <th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtBlueprintsI18n = {
@@ -264,9 +264,9 @@
             importApply:   /*[[@{/admin/personal-blueprints/{sub}/import/apply(sub=${selectedUserSub})}]]*/   '/admin/personal-blueprints/x/import/apply'
         };
     </script>
-    <script th:src="@{/js/personalinventory/personal-inventory-blueprints-import.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script type="module" th:src="@{/js/personalinventory/personal-inventory-blueprints-import.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
-<script th:src="@{/js/personalinventory/personal-inventory-blueprints.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/personalinventory/personal-inventory-blueprints.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

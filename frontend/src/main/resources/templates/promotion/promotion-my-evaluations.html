@@ -184,7 +184,7 @@
 </main>
 </th:block>
 <th:block th:fragment="pageTail">
-<script th:src="@{/js/promotion/promotion-my-evaluations.js}" defer th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
+<script type="module" th:src="@{/js/promotion/promotion-my-evaluations.js}" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
 </th:block>
 </body>
 </html>

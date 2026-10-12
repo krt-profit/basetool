@@ -761,7 +761,6 @@ interface Window {
 
     showFrontendErrorToast?: (message: string) => void;
     showFrontendSuccessToast?: (message: string) => void;
-    showInventoryToast?: (message: string, isError?: boolean) => void;
     /**
      * KRT-styled confirmation modal replacing the native `window.confirm`; resolves true when the
      * user confirmed. Omitted labels fall back to their `krtToastI18n` defaults.
@@ -943,11 +942,6 @@ interface Window {
     __ordersDragging?: boolean;
     resetUnsavedChanges?: () => void;
     filterTable?: (...args: any[]) => void;
-    openNoteModal?: (...args: any[]) => void;
-    closeNoteModal?: (...args: any[]) => void;
-    saveNote?: (...args: any[]) => void;
-    removeNote?: (...args: any[]) => void;
-    updateNoteCounter?: (...args: any[]) => void;
     confirmRemoveMaterial?: (...args: any[]) => void;
     materialRowToDelete?: Element | null;
 }

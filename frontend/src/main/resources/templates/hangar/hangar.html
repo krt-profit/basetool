@@ -429,9 +429,9 @@
         reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
 </script>
-<script th:src="@{/js/hangar/hangar.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/hangar/hangar.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
-<script th:if="${activeTab == 'unit'}" th:src="@{/js/hangar/hangar-squadron.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:if="${activeTab == 'unit'}" th:src="@{/js/hangar/hangar-squadron.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

@@ -139,7 +139,7 @@
     <p class="mtx-hint" th:text="#{materials.matrix.hint}">Obere Zahl Verkauf (+), untere Einkauf (−), aUEC je SCU.</p>
 </main>
 
-<script th:src="@{/js/catalogue/materials-matrix.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/catalogue/materials-matrix.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>
