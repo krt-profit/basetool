@@ -601,7 +601,7 @@ dropped to one:
   Bewertungsmatrix scope by the caller's **Staffel set** (`currentUserListScopeSquadronIds()`):
   unpinned, a two-Staffel officer sees the members of **both**; a pin narrows to the pinned one.
 - **Authorisation gates** OR across **all** of a target's Staffeln — the full-PII gate
-  (`UserController#isCrossSquadronNonAdmin`) and the member-evaluation gate grant when the caller
+  (`UserService#isCrossSquadronForNonAdmin`, used by `UserDirectoryService#get`) and the member-evaluation gate grant when the caller
   shares **any** of the target's Staffeln; an officer's own-Staffel **oversight scope** includes
   every Staffel they belong to.
 - **Order-aligned audit** — a Job-Order handover's `executingSquadron` snapshot records the executor's

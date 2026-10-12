@@ -1076,7 +1076,7 @@ in `reconcile`, global `enhanceWithin` on
 `DOMContentLoaded` + `krt:swapped`, `id`/`data-*` passthrough, `setValue` API,
 `window.krtEnhanceComboboxes`), `krt-user-search.js`
 (the `remote-users` / `remote-bank-users` `window.krtComboboxRemoteSources` entries),
-`kernel/fragments/head.html` (global load + `window.krtComboboxI18n`), `UserController.searchUsersForBank` /
+`kernel/fragments/head.html` (global load + `window.krtComboboxI18n`), `BankMemberSearchController.searchUsersForBank` /
 `UserProxyController`, and the converted templates/selects · **ADR:** ADR-0053, ADR-0089
 
 ### REQ-FE-012 — A user's own back-to-back writes to one lock scope never self-collide

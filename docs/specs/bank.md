@@ -2143,13 +2143,13 @@ target + detail, transfers leave it null), `BankReportServiceTest` (Quell-/Zielk
 full and the redacted statement), `OrgUnitBankAccessServiceTest` (counterparty kept, Halter nulled
 for org-unit viewers), `OrgUnitMembershipQueryServiceTest` (`listDirectMembershipOptions` spans all four kinds; primary
 resolution), `BankBookingRequestServiceTest` (confirmed request records the requester + their primary
-org unit), `UserControllerTest`/`UserMembershipsSecurityTest` (`allKinds` delegation; `BANK_EMPLOYEE`
+org unit), `MemberMembershipControllerTest`/`UserMembershipsSecurityTest` (`allKinds` delegation; `BANK_EMPLOYEE`
 reaches `/memberships`) · **Code:**
 `bank/internal/BankTransaction`, `model/dto/request/Bank{Deposit,Withdrawal}Request`, `bank/internal/BankLedgerService`
 (`resolveCounterparty`), `bank/internal/BankBookingRequestService`,
 `orgunit/api/OrgUnitMembershipQueryService#listDirectMembershipOptions`, `bank/internal/BankBookingRow`,
 `bank/internal/BankPostingRepository`, `bank/internal/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
-`bank/internal/OrgUnitBankAccessService#redact`, `app/web/UserController`, `app/api/SecurityConfig`,
+`bank/internal/OrgUnitBankAccessService#redact`, `orgunit/web/MemberMembershipController`, `bank/web/BankMemberSearchController`, `app/api/SecurityConfig`,
 `db/migration/V197`, `db/migration/V205` (#994 constraint relax),
 `orgunit/api/OrgUnitMembershipQueryService#listAllActiveOrgUnitOptionsAllKinds` (#994),
 frontend `bank/web/BankPageController`, `bank/web/BankRequestQueuePageController`,

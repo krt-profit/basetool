@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.app.web;
+package de.greluc.krt.profit.basetool.backend.identity.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
@@ -50,11 +50,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the local {@code app_user} mirror.
+ * The user endpoints that need nothing beyond the identity module: the on-demand Keycloak sync, the
+ * reference lookup and search, and the RSI handle (own, and the admin read).
  *
- * <p>{@code /me} endpoints derive the user from the JWT, never from the URL; {@code /sync}, {@code
- * /attributes}, the membership write/detail endpoints and {@code DELETE} are admin-scoped. The
- * class-level {@link Transactional} keeps the session open for the {@link UserMapper} projection.
+ * <p>{@code /me} endpoints derive the user from the JWT, never from the URL; {@code /sync} and the
+ * RSI-handle read by id are admin-scoped.
  */
 @RestController
 @RequestMapping("/api/v1")

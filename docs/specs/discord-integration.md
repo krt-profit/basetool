@@ -119,7 +119,7 @@ design-system convention: linked → the Discord brand mark in the inherited lin
 - [x] `/members` renders a Discord column between "Rang" and "Status": a linked account
   shows the `krt-icon-discord` brand mark (neutral `currentColor`, with a localized title/aria-label),
   a non-linked account shows a muted em-dash.
-- [x] The peer redaction shapes (`UserController.redactToPeerShape` and the shared
+- [x] The peer redaction shapes (`UserDirectoryService` (through `UserDtoRedaction.toPeerShape`) and the shared
   `MissionPeerRedactor.cleanupUserForPeer`, used by both the mission and finance-ledger views) set
   `discordLinked = null`, so it is not exposed to non-admin viewers.
 - [x] The three message bundles (default/de/en) carry `members.discord`, `members.discord.linked`,

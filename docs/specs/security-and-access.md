@@ -3833,12 +3833,12 @@ narrowed against the allowlist the page itself renders, before it is relayed.
 |                      Relayed value                      |                    Bound as                    |                                                        Mirrors                                                         |
 |---------------------------------------------------------|------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
 | `from`, `to`, `before`                                  | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `AuditAdminController`, `BankAccountController`, `OrgUnitBankController`                                               |
-| `userSub`, `actorUserId`, `userId`                      | `UUID`                                         | `AdminPersonalInventoryController`, `AdminPersonalBlueprintController`, `MemberEvaluationController`, `UserController` |
+| `userSub`, `actorUserId`, `userId`                      | `UUID`                                         | `AdminPersonalInventoryController`, `AdminPersonalBlueprintController`, `MemberEvaluationController`, `UserProfileController`, `UserController` |
 | `eventType`, `clientId`, `source`, the board `sort` key | narrowed to the rendered option list           | the page's own `<select>`                                                                                              |
 | a Spring sort specification                             | `RelayParams.sortSpecOrNull`, relayed as a `{sort}` URI-template variable (the personal inventory listing did `URLEncoder.encode` first, so the comma went out as `%252C`) | REQ-API-005's backend field whitelist |
 | free text (`q`, the list pages' `search`)               | a `WebClient` URI-template variable            | REQ-FE-016                                                                                                             |
 | the mission / operation list period (`start`, `end`)    | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `MissionController#searchMissions`, `OperationController`                                                              |
-| an announcement id, a member id on the promotion eligibility fragment | `UUID`                           | `UserController#updateReadAnnouncement`, `PromotionEligibilityController`                                             |
+| an announcement id, a member id on the promotion eligibility fragment | `UUID`                           | `AnnouncementReadController#updateReadAnnouncement`, `PromotionEligibilityController`                                             |
 | a bank role bucket (`roleCode`), a default-blueprint id | `RelayParams.constantNameOrNull` (enum-literal shape, else `400`), `UUID` | `BankApprovalLimitService` role buckets, `AdminDefaultBlueprintController` |
 | the mission list `status`                               | narrowed to `PLANNED`/`ACTIVE`/`COMPLETED`/`CANCELLED` | the backend's mission status vocabulary                                                                          |
 | a star-system name (`starSystemNames`)                  | a `WebClient` URI-template variable            | REQ-UI-014's materials-matrix relay                                                                                    |
@@ -4270,7 +4270,7 @@ optimistic-lock version. Each is a `409`.
 it) · `UserRegistrationServiceTest` (the `PENDING` path passes the waiver) ·
 `MembersPageDiscordColumnRenderTest` (the action on every row + the dialog) · `DtoOpenApiContractTest`
 · `MessageBundleConsistencyTest` · **Code:** `AccountConsolidationService`,
-`UserController#consolidateAccount`, `ConsolidateAccountRequest` (backend + frontend),
+`AccountRemovalController#consolidateAccount`, `ConsolidateAccountRequest` (backend + frontend),
 `UserDeletionService.KeycloakPresenceCheck`, `MemberManagementController#consolidateMemberAjax`,
 `identity/members.html`, `messages*.properties` · **Issues:** #1827, #1828 · **Decision:**
 [ADR-0160](../adr/0160-a-duplicate-account-stays-consolidatable-after-approval.md)
