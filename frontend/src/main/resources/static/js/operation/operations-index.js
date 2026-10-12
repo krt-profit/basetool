@@ -60,7 +60,7 @@ function reloadOperationsList() {
     if (typeof window.krtOperationsReload === 'function') window.krtOperationsReload();
 }
 
-(function () {
+function initOperationsIndex() {
     if (!krtFetch) return;
 
     const createForm = /** @type {HTMLFormElement | null} */ (
@@ -134,4 +134,6 @@ function reloadOperationsList() {
                 });
         });
     }
-})();
+}
+
+initOperationsIndex();

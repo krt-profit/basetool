@@ -675,7 +675,7 @@ function submitUmbuchen(event) {
         });
 }
 
-(function () {
+function initInventoryAdmin() {
     const deleteBtn = document.getElementById('delete-all-global-inventory-btn');
     const modal = document.getElementById('delete-all-global-inventory-modal');
     const confirmBtn = /** @type {HTMLButtonElement | null} */ (
@@ -727,7 +727,9 @@ function submitUmbuchen(event) {
             cancelBtn.disabled = false;
         }
     });
-})();
+}
+
+initInventoryAdmin();
 
 if (krtEvents && typeof krtEvents.on === 'function') {
     krtEvents.on('click', 'inv-admin-toggle-multi', (el) => {

@@ -27,7 +27,7 @@ import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtOverflowMenu } from '/js/kernel/krt-overflow-menu.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
-(function () {
+function initMaterialboerse() {
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const gi18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
     if (!krtFetch || !document.getElementById('mb-board')) {
@@ -842,4 +842,6 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
     applyAgo(document);
     restoreFilters();
-})();
+}
+
+initMaterialboerse();

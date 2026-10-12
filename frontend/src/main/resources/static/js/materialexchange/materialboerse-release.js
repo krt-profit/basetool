@@ -20,7 +20,7 @@ import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
-(function () {
+function initMaterialboerseRelease() {
     /**
      * The seed values `open` takes from its caller; absent fields are blank.
      *
@@ -816,4 +816,6 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
     }
 
     window.krtMaterialRelease = { open, close: cancel };
-})();
+}
+
+initMaterialboerseRelease();

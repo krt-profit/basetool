@@ -26,7 +26,7 @@ const REFINERY_SECTIONS = {
     queue: { container: '#refinery-orders-results', fragmentValue: 'results' },
 };
 
-(function () {
+function initRefineryOrdersIndex() {
     const FILTER_PREF_KEY = 'refinery_orders_filter';
     const VIEWS = ['RUNNING', 'READY', 'COMPLETED', 'ALL'];
     const DEFAULT_VIEW = 'RUNNING';
@@ -353,4 +353,6 @@ const REFINERY_SECTIONS = {
     restore();
     tick();
     window.setInterval(tick, TICK_MS);
-})();
+}
+
+initRefineryOrdersIndex();

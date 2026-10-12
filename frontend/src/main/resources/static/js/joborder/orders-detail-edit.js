@@ -327,7 +327,7 @@ export function krtOrderWrite(opts) {
     );
 }
 
-(function () {
+function initOrdersDetailEdit() {
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('delete-order-form')
     );
@@ -357,7 +357,9 @@ export function krtOrderWrite(opts) {
             window.location.assign('/orders');
         }
     });
-})();
+}
+
+initOrdersDetailEdit();
 
 /**
  * Collects the order edit form into the request body.
@@ -400,7 +402,7 @@ function _serializeEditForm() {
         materials,
     };
 }
-(function () {
+function initOrdersDetailEdit2() {
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('edit-order-form'));
     if (!form) return;
     form.addEventListener('submit', async (e) => {
@@ -437,7 +439,9 @@ function _serializeEditForm() {
             },
         });
     });
-})();
+}
+
+initOrdersDetailEdit2();
 
 /**
  * Re-renders the materials, aggregated and KPI sections of the order in place.

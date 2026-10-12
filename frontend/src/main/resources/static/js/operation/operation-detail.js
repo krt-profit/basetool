@@ -52,7 +52,7 @@ function withOverview(keys) {
     return list;
 }
 
-(function () {
+function initOperationDetail() {
     if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
@@ -141,9 +141,11 @@ function withOverview(keys) {
         setText('op-kpi-donated', meta.getAttribute('data-kpi-donated'));
         setText('op-kpi-participants', meta.getAttribute('data-kpi-participants'));
     });
-})();
+}
 
-(function () {
+initOperationDetail();
+
+function initOperationDetail2() {
     const tabs = Array.from(
         /** @type {NodeListOf<HTMLElement>} */ (
             document.querySelectorAll('#operation-tabs > .tab[data-tab]')
@@ -225,7 +227,9 @@ function withOverview(keys) {
             : tabs[0].getAttribute('data-tab'),
         false,
     );
-})();
+}
+
+initOperationDetail2();
 
 /**
  * Points the delete form at the operation and opens the confirmation dialog.
@@ -256,7 +260,7 @@ if (krtEvents && typeof krtEvents.on === 'function') {
     });
 }
 
-(function () {
+function initOperationDetail3() {
     const editor = document.getElementById('op-md-editor');
     if (!editor) return;
     const input = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('op-desc'));
@@ -385,7 +389,9 @@ if (krtEvents && typeof krtEvents.on === 'function') {
             }
         });
     }
-})();
+}
+
+initOperationDetail3();
 
 /**
  * The conflict dialog strings of this page.
@@ -418,7 +424,7 @@ function adoptOperationFormValues(form) {
     });
 }
 
-(function () {
+function initOperationDetail4() {
     if (!krtFetch) return;
 
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('operation-form'));
@@ -483,7 +489,9 @@ function adoptOperationFormValues(form) {
             });
         });
     }
-})();
+}
+
+initOperationDetail4();
 
 /**
  * The page's paid-out write URL.
@@ -623,7 +631,7 @@ document.addEventListener('change', (ev) => {
     }
 });
 
-(function () {
+function initOperationDetail5() {
     const currentOperationId = window.operationId;
     if (!currentOperationId) return;
     const opId = currentOperationId;
@@ -671,4 +679,6 @@ document.addEventListener('change', (ev) => {
         },
         true,
     );
-})();
+}
+
+initOperationDetail5();

@@ -26,7 +26,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
-(function () {
+function initMissionDetailModals() {
     const objectiveList = document.getElementById('mission-create-objective-list');
     const stepList = document.getElementById('mission-create-step-list');
     if (!objectiveList && !stepList) {
@@ -197,7 +197,9 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
     hydrate(objectiveList, objectiveTemplate, objectivesJson);
     hydrate(stepList, stepTemplate, stepsJson);
-})();
+}
+
+initMissionDetailModals();
 
 window.krtModalOpen = function (overlay) {
     krtModal.open(overlay);

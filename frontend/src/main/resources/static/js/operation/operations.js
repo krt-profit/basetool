@@ -3,7 +3,7 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 
-(function () {
+function initOperations() {
     const filterForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('operations-filter-form')
     );
@@ -135,4 +135,6 @@ import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
     }
 
     restoreFilters();
-})();
+}
+
+initOperations();

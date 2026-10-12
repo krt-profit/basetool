@@ -17,7 +17,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
-(function () {
+function initInventoryMaterialboerse() {
     const i18n = window.materialboerseInventoryI18n || {};
     const release = window.krtMaterialRelease;
     if (!krtEvents || !release || !krtFetch) {
@@ -96,4 +96,6 @@ import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
             });
         });
     });
-})();
+}
+
+initInventoryMaterialboerse();

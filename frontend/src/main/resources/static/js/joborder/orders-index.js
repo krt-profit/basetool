@@ -32,7 +32,7 @@ const ORDERS_SECTIONS = {
     queue: { container: '#orders-results', fragmentValue: 'results' },
 };
 
-(function () {
+function initOrdersIndex() {
     if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
@@ -80,7 +80,9 @@ const ORDERS_SECTIONS = {
             },
         });
     }
-})();
+}
+
+initOrdersIndex();
 
 function colorOrderAges(root) {
     const now = new Date();

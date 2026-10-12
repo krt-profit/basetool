@@ -28,7 +28,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 
-(function () {
+function initOrdersDetailProduction() {
     const nav = /** @type {HTMLElement | null} */ (
         document.querySelector('.tab-nav[role="tablist"]')
     );
@@ -194,7 +194,9 @@ import { krtHtml } from '/js/kernel/krt-html.js';
         apply(resolveInitial(false));
     });
     apply(resolveInitial(true));
-})();
+}
+
+initOrdersDetailProduction();
 
 document.addEventListener('krt:swapped', (ev) => {
     const container = ev && ev.detail && ev.detail.container;

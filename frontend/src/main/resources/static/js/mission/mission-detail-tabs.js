@@ -23,7 +23,7 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
-(function () {
+function initMissionDetailTabs() {
     const tabs = /** @type {HTMLElement[]} */ (
         Array.from(document.querySelectorAll('.tab-nav .tab[data-tab]'))
     );
@@ -193,9 +193,11 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
     }
     window.addEventListener('resize', syncStickyOffset);
     syncStickyOffset();
-})();
+}
 
-(function () {
+initMissionDetailTabs();
+
+function initMissionDetailTabs2() {
     const missionForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('mission-form')
     );
@@ -348,9 +350,11 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
         e.preventDefault();
         submitInPlace();
     });
-})();
+}
 
-(function () {
+initMissionDetailTabs2();
+
+function initMissionDetailTabs3() {
     if (!window.missionCanEdit) {
         return;
     }
@@ -752,7 +756,9 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
             stopAutoScroll();
         }
     });
-})();
+}
+
+initMissionDetailTabs3();
 
 /**
  * Renders the element's `data-utc` epoch-millisecond value in the viewer's local time zone.

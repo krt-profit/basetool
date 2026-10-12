@@ -66,7 +66,7 @@ const ORDER_SECTIONS = {
     assignees: { container: '#order-assignees-results', fragmentValue: 'assignees' },
 };
 
-(function () {
+function initOrdersDetail() {
     if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
@@ -111,7 +111,9 @@ const ORDER_SECTIONS = {
             },
         });
     }
-})();
+}
+
+initOrdersDetail();
 
 export function _publishOrdersQueue() {
     if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {

@@ -462,7 +462,7 @@ document.addEventListener('dragend', () => {
     dragRow = null;
 });
 
-(function () {
+function initMissionDetail() {
     function mid() {
         return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
     }
@@ -682,4 +682,6 @@ document.addEventListener('dragend', () => {
         });
         dragRow = null;
     });
-})();
+}
+
+initMissionDetail();
