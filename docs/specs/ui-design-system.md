@@ -286,7 +286,11 @@ enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questi
 > the class state below; focus moves in on open (`[autofocus]`, else the first visible field, else
 > the frame — never a button, so Enter can not hit „Löschen") and returns to the opening control on
 > close; **Escape closes the topmost dialog** by clicking its own close control, so whatever the page
-> does on close still runs (a dialog may opt out with `data-modal-static`).
+> does on close still runs (a dialog may opt out with `data-modal-static`). **A press that started
+> inside the dialog frame never dismisses it:** a text selection dragged out of a field and released
+> over the scrim makes the browser fire the `click` on the `<dialog>` itself, so `krt-modal.js`
+> swallows a `click` on the overlay whose preceding `pointerdown` was inside `.krt-modal`, before any
+> page's backdrop-click handler sees it.
 >
 > **FE-SIMP-04b.** Every `.krt-modal-overlay` is a `<dialog>` element, and `krtModal.open` shows it
 > with `showModal()`: it goes to the top layer and the page behind it becomes inert — the focus trap

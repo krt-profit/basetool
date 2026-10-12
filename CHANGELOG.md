@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **Dialoge schließen sich nicht mehr beim Markieren per Ziehen.** Wer in einem Feld Text markiert und die Maustaste außerhalb des Dialogs loslässt, behält den Dialog offen (gilt für alle Dialoge, z. B. das Verkaufen im Lager).
+- **Lager: der Verkaufsbetrag ist beim Öffnen leer.** Das Feld wurde mit dem Wert des vorherigen Verkaufs vorbefüllt; es wird bei jedem Öffnen des Ausbuchen-Dialogs geleert.
 - **Mein Lager: die Tabelle scrollt am Desktop nicht mehr seitwärts.** Die Baumtabelle füllt wieder ihren Container; nur auf schmalen Bildschirmen (bis 1024 px) darf sie breiter als der Bildschirm sein.
 - **Kachel-Raster: alle Kacheln sind gleich ausgerichtet.** In der Material-Übersicht (und anderen Kachel-Rastern) saßen alle Kacheln außer der ersten um 1 rem tiefer, weil die Regel für aufeinanderfolgende Karten auch im Raster griff.
 - **Leitung: die Einheiten-Liste links ist einheitlich eingerückt.** Die Gruppen (Organisationsleitung, Bereiche, Staffeln, Spezialkommandos) saßen je nach Namenslänge unterschiedlich weit rechts; dasselbe Layout-Problem hatte das Inhaltsverzeichnis der Datenschutzerklärung.

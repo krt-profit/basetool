@@ -835,6 +835,8 @@ function createLager(cfg) {
         }
         const versionInput = input('version');
         if (versionInput) versionInput.value = version ?? '';
+        const sellAmountInput = input('sellAmount');
+        if (sellAmountInput) sellAmountInput.value = '';
         discardRadio.checked = true;
         toggleBookOutTypeFields();
 

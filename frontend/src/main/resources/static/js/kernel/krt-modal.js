@@ -196,6 +196,30 @@ document.addEventListener('keydown', (event) => {
     dismiss(top);
 });
 
+let pressStartedInsideFrame = false;
+
+document.addEventListener(
+    'pointerdown',
+    (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        pressStartedInsideFrame = !!target && !!target.closest('.krt-modal');
+    },
+    true,
+);
+
+document.addEventListener(
+    'click',
+    (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const startedInside = pressStartedInsideFrame;
+        pressStartedInsideFrame = false;
+        if (startedInside && target && target.classList.contains('krt-modal-overlay')) {
+            event.stopPropagation();
+        }
+    },
+    true,
+);
+
 document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     const dismiss = target ? target.closest('[data-modal-dismiss]') : null;
