@@ -425,7 +425,8 @@ After Phase 4, and only once the package boundary of each has been green for som
 
 Prerequisites: an included `build-logic` build with convention plugins (the root `subprojects {}`
 block and 22 cross-project `rootProject` accesses block Gradle's isolated projects and would silently
-give a new module default coverage floors), typed per-module build settings, prefix rules in the
+give a new module default coverage floors; the block is gone since 2026-10-11, §7.7 P5-a), typed
+per-module build settings (done, REQ-OPS-037), prefix rules in the
 image-reuse and SBOM scripts, JaCoCo aggregation, and a context-shape test (scheduled tasks, event
 listeners, controllers) so a module outside the scan root cannot lose beans silently. One image per
 application stays; Flyway stays in `backend`.
@@ -1978,6 +1979,73 @@ Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-l
 plugins, typed per-module settings, then `backend-exchange` and `backend-bank` (§5.8). Every other
 domain stays a package.
 
+| Step | Content |
+| --- | --- |
+| P5-a — **done 2026-10-11** | `build-logic` as an included build of precompiled convention plugins, the typed `basetool { }` settings, and the verification metadata for it; no module is extracted yet |
+| P5-b | The remaining prerequisites of §5.8: the 32 `rootProject` references of the module scripts, prefix rules in the image-reuse and SBOM scripts, JaCoCo aggregation, the context-shape test |
+| P5-c, P5-d | `backend-exchange`, then `backend-bank` |
+
+*P5-a as built (2026-10-11).* The included build `build-logic/` (`pluginManagement {
+includeBuild("build-logic") }`; ADR-0248, REQ-OPS-046) carries everything the root
+`subprojects { plugins.withId(…) }` blocks and the repeated per-module blocks carried, as sixteen
+precompiled script plugins, one per concern, applied by id from the module scripts:
+`basetool.java-conventions` (toolchain 25, Lombok and JetBrains annotations, the Mockito agent, the
+SEC-17 jar guard, `Test` and `JavaCompile` conventions, the `basetool { }` extension),
+`checkstyle-`, `spotless-`, `coverage-` (JaCoCo) and `spotbugs-conventions` with their aggregate
+`quality-conventions`, `mutation-` (PIT), `sbom-` and `licensee-conventions` with the aggregate
+`supply-chain-conventions`, `dependency-management-`, `spring-library-` and `spring-app-conventions`,
+`errorprone-` (Error Prone with NullAway), `javadoc-` and, for the root project only,
+`repository-format-conventions` (the Spotless formats of the non-Java files). A module script now
+lists its plugins and its dependencies and keeps only its own tasks; the root script falls from 620
+to 72 lines (group and version, the terms-version task, OWASP). The licence tables became the class
+`OssLicensePolicy`, which the frontend's `generateOssLicenses` reads in place of
+`rootProject.extra`. The catalog is imported by `build-logic/settings.gradle.kts`; plugin versions
+stay the catalog's `[plugins]` entries, put on the included build's classpath through their markers,
+and the security floors for their transitive jars moved from four `buildscript` blocks into
+`build-logic/build.gradle.kts`.
+1. *Proof of no behaviour change.* An init script (not committed) dumped, for each of the seven
+   projects, every task (type, enabled, group, description, dependencies, finalizers, ordering,
+   input property names, outputs), every configuration (flags, extends, declared dependencies,
+   attributes, constraints), the resolved `compileClasspath`, `runtimeClasspath`, annotation
+   processor, test, Error Prone, SpotBugs and Mockito-agent classpaths, the `JavaCompile` options
+   including Error Prone's and NullAway's package list, the `Test` JVM arguments and system
+   properties, and the Checkstyle, SpotBugs, JaCoCo, PIT and Spring Boot settings, once on the
+   parent commit and once on the branch. The two dumps differ in the `basetool` extension of each
+   module and in the two `ossLicense*` extras the root no longer carries. `build -m` (175 tasks),
+   `tasks --all` and `:backend:compileJava --dry-run` are identical; `help` and `build -m` run with the
+   configuration cache reuse their entry on the second run; the regenerated CycloneDX BOMs list the
+   components of the committed ones.
+2. *Verification.* The one `gradle/verification-metadata.xml` covers the included build (Gradle ignores
+   the metadata of an included build): 423 lines were added, all for the Kotlin DSL plugin, the Kotlin
+   compiler and their own transitive jars and parent POMs; nothing was removed. A cold Gradle user home
+   resolved `help`, `spotlessCheck`, every `compileJava` and `compileTestJava`, `compileE2eJava`,
+   `:backend:checkstyleMain`, `:backend:spotbugsMain`, `licensee` and a test under the strict file.
+3. *Around the build.* `check_sbom_coverage.py` reads the SBOM convention and each module's
+   application of it instead of the root block; both image Dockerfiles copy `build-logic/`, which the
+   image-reuse plan derives as a shared input (its self-test now names it); `build-logic/**` is a path
+   filter of the dependency-check and sandbox-image workflows; `CODEOWNERS` lists it.
+**Corrections:** (1) §5.8 and §8.4 spoke of typed per-module settings as a step still to take;
+they already existed (`build-settings.properties`, REQ-OPS-037), so this step moved their reader into
+the included build and added the `basetool { }` extension for the two values still passed inline
+(`javaRelease` of `keycloak-spi`, the NullAway packages of the backend). (2) Precompiled scripts
+cannot use the type-safe `libs.…` accessors; they read the catalog by alias (`Catalog.kt`). (3) A
+precompiled script's top-level `val` belongs to the script object, so a task action or provider
+lambda that captured one (the Licensee export's `rename`, the SBOM check) failed the configuration
+cache where the former closure's locals had not; seven sites copy the value into a local. (4) The
+root no longer declares Spotless, pitest, Licensee, SpotBugs or CycloneDX with `apply false`: a second
+copy on the root classpath would load every plugin twice, so the third-party plugins are applied only by
+their convention and the root applies Spotless through `repository-format-conventions`. (5) A few
+transitive jars of the plugins resolve to other versions now, because the plugins no longer share one
+classpath per module (`slf4j-api` is 2.0.18 in the included build where the backend and ingest had
+1.7.36; `httpclient5` is 5.6.4 on the root, `commons-codec` 1.11 on the frontend); all of it is
+build-time only, and the four security floors hold in the included build. (6) The plan
+counted 22 cross-project `rootProject` accesses; there are 32 in three module scripts, and they are
+P5-b. (7) A `.kt` file of `build-logic` is formatted by the same Spotless format as the `*.gradle.kts`
+files (ktfmt, Google style), so no new Spotless task appeared. (8) The helper package is
+`…basetool.conventions`, not `…basetool.build`: a directory named `build` is excluded by
+`.dockerignore` (`**/build`), which failed the first image builds with unresolved references, and by
+Spotless's vendored globs (`**/build/**`), which had left those files unformatted.
+
 ### 7.8 Frontend track
 
 | Step | Content |
@@ -2270,8 +2338,9 @@ JSpecify stays out for now (ADR-0192).
 
 ### 8.4 Gradle and CI
 
-Typed per-module build settings now; an included `build-logic` with convention plugins before the
-first Gradle extraction (it also prepares Gradle's isolated projects); `java-test-fixtures` for
+Typed per-module build settings now (done: `build-settings.properties` and the `basetool { }`
+extension); an included `build-logic` with convention plugins before the
+first Gradle extraction (done 2026-10-11, §7.7 P5-a; it also prepares Gradle's isolated projects); `java-test-fixtures` for
 module-owned test fixtures; the configuration cache on for local builds (done 2026-10-04, #2387); a decision whether CI reuses
 configuration-cache entries (it never does today, because `setup-gradle` gets no encryption key).
 

@@ -6,7 +6,7 @@
 - **Related:** ADR-0159 (members-only; the public surface is a list) ·
   [`docs/specs/ui-design-system.md`](../specs/ui-design-system.md) (`REQ-UI-021`) ·
   [`docs/specs/security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-052`) ·
-  root `build.gradle.kts` (the licence policy tables) · `frontend/oss-bundled-components.json` ·
+  `build-logic` (`OssLicensePolicy`, the licence policy tables; in the root `build.gradle.kts` until ADR-0248) · `frontend/oss-bundled-components.json` ·
   the Android app's `REQ-APP-SET-006`, which answers the same question for the APK
 
 ## Context
@@ -41,12 +41,12 @@ at licence URLs Licensee cannot map to an SPDX identifier (EDL, the Resilience4j
 1. **Every shipped JVM module runs Licensee** (`app.cash.licensee`, the same version as the Android
    app) against its `runtimeClasspath`, wired into `check`. One policy, in the root
    `build.gradle.kts`, applies to all four:
-   - `ossAllowedLicenses` — the SPDX identifiers that may ship: GPL-3.0-compatible **and** present.
+   - `allowedLicenses` — the SPDX identifiers that may ship: GPL-3.0-compatible **and** present.
      `EPL-2.0` on its own is deliberately absent; a dual-licensed POM needs only one allowed
      alternative, which is Maven's and Licensee's reading of a licence list.
-   - `ossLicenseUrlAliases` — POM licence URLs mapped to the SPDX identifier their text is. The gate
+   - `urlAliases` — POM licence URLs mapped to the SPDX identifier their text is. The gate
      allows a URL whose identifier is allowed; the page files the component under that identifier.
-   - `ossLicenseCoordinateOverrides` — coordinates whose POM names no usable licence (Spring
+   - `coordinateOverrides` — coordinates whose POM names no usable licence (Spring
      Session), pinned by version so a bump forces a re-read of the jar's licence file.
 2. **AspectJ is excluded, not allowed.** `spring-aspects` and `aspectjweaver` are excluded from the
    backend's data-JPA starter. Nothing needs them: no `@Aspect`, `@Configurable`, `@Timed`,
@@ -89,7 +89,7 @@ at licence URLs Licensee cannot map to an SPDX identifier (EDL, the Resilience4j
 ## Consequences
 
 - A dependency under a licence that is not on the list fails the build of the module that would
-  ship it. Adding a licence to the list is a deliberate, reviewed change to the root build script.
+  ship it. Adding a licence to the list is a deliberate, reviewed change to `OssLicensePolicy` in `build-logic`.
 - A Spring Boot bump that moves Spring Session fails `:frontend:licensee` until the pinned version
   in `ossLicenseCoordinateOverrides` moves — by design, after re-reading the jar's `LICENSE.txt`.
 - The frontend build now resolves the backend's, ingest's and keycloak-spi's runtime graphs (their

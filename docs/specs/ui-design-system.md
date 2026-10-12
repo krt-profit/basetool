@@ -1229,7 +1229,7 @@ this requirement is the user-facing one. The Android app has the same screen (`R
   muted chip per shipped module. A closing line names the generator. On a phone the section's count
   wraps under the licence name.
 - **Licences are named by SPDX.** A POM licence URL Licensee cannot map is filed under the
-  identifier its text actually is (`ossLicenseUrlAliases` in the root build), the same table the
+  identifier its text actually is (`OssLicensePolicy.urlAliases` in `build-logic`), the same table the
   build gate reads — so the page and the gate cannot disagree.
 - **No data, no backend call.** Read once at startup by `OssLicenseCatalog`. A missing or
   unreadable report renders „Das Lizenzverzeichnis kann gerade nicht angezeigt werden." instead of

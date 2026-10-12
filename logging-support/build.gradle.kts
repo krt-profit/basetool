@@ -1,19 +1,11 @@
 plugins {
   `java-library`
-  checkstyle
-  id("jacoco")
-  alias(libs.plugins.spring.dependency.management)
-  alias(libs.plugins.spotbugs.base)
-  id("com.diffplug.spotless")
+  id("basetool.java-conventions")
+  id("basetool.quality-conventions")
+  id("basetool.spring-library-conventions")
 }
 
 description = "logging-support"
-
-dependencyManagement {
-  imports {
-    mavenBom("org.springframework.boot:spring-boot-dependencies:${libs.versions.springBoot.get()}")
-  }
-}
 
 dependencies {
   api("ch.qos.logback:logback-classic")

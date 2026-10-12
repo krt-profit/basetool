@@ -21,7 +21,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 
 SETTINGS = REPO / "settings.gradle.kts"
-ROOT_BUILD = REPO / "build.gradle.kts"
+SBOM_CONVENTION = (
+    REPO / "build-logic" / "src" / "main" / "kotlin" / "basetool.sbom-conventions.gradle.kts"
+)
+SBOM_PLUGIN_IDS = ("basetool.sbom-conventions", "basetool.supply-chain-conventions")
 CI = REPO / ".github" / "workflows" / "ci.yml"
 PREPARE = REPO / ".github" / "workflows" / "release-prepare.yml"
 PUBLISH = REPO / ".github" / "workflows" / "release-publish.yml"
@@ -69,10 +72,11 @@ def check_module(module: str, prepare: str, publish: str) -> list[str]:
     problems: list[str] = []
     build = REPO / module / "build.gradle.kts"
 
-    if "libs.plugins.cyclonedx.bom" not in build.read_text(encoding="utf-8"):
+    build_text = build.read_text(encoding="utf-8")
+    if not any(f'id("{plugin}")' in build_text for plugin in SBOM_PLUGIN_IDS):
         problems.append(
-            f"{module}: {build.relative_to(REPO)} does not apply the CycloneDX plugin "
-            f"(add `alias(libs.plugins.cyclonedx.bom)` and a `cyclonedxBom` block writing "
+            f"{module}: {build.relative_to(REPO)} does not apply the CycloneDX convention "
+            f"(add `id(\"basetool.supply-chain-conventions\")`; it writes "
             f"docs/{module}-bom.json + .xml)"
         )
 
@@ -156,20 +160,17 @@ def check_fresh_generation(shipped: list[str], prepare: str, ci: str) -> list[st
     :return: one human-readable problem per missing piece; empty when all are in place.
     """
     problems: list[str] = []
-    root = ROOT_BUILD.read_text(encoding="utf-8")
-    block = re.search(
-        r'plugins\.withId\("org\.cyclonedx\.bom"\) \{(.*?)\n  plugins\.withId\(', root, re.DOTALL
-    )
-    if block is None:
+    convention = SBOM_CONVENTION.relative_to(REPO).as_posix()
+    if not SBOM_CONVENTION.is_file():
         problems.append(
-            'could not find the `plugins.withId("org.cyclonedx.bom")` block in build.gradle.kts '
-            "-- this checker needs updating alongside whatever replaced it"
+            f"could not find {convention} -- this checker needs updating alongside whatever "
+            f"replaced it"
         )
     else:
-        body = block.group(1)
+        body = SBOM_CONVENTION.read_text(encoding="utf-8")
         if body.count("doNotTrackState(") < 2:
             problems.append(
-                "build.gradle.kts: cyclonedxDirectBom and cyclonedxBom must both call "
+                f"{convention}: cyclonedxDirectBom and cyclonedxBom must both call "
                 "`doNotTrackState(...)` -- the plugin's inputs do not see project dependencies, "
                 "so a tracked task can be UP-TO-DATE or FROM-CACHE with a stale component list"
             )
@@ -177,7 +178,7 @@ def check_fresh_generation(shipped: list[str], prepare: str, ci: str) -> list[st
         registered = 'register("verifyCyclonedxBom")' in body
         if not (finalized and registered):
             problems.append(
-                "build.gradle.kts: `cyclonedxBom` must be finalized by a registered "
+                f"{convention}: `cyclonedxBom` must be finalized by a registered "
                 "`verifyCyclonedxBom`, the check that the BOM lists exactly the resolved "
                 "runtimeClasspath"
             )

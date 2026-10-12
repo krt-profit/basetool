@@ -1,16 +1,12 @@
 plugins {
-  java
-  checkstyle
-  id("jacoco")
-  alias(libs.plugins.cyclonedx.bom)
-  alias(libs.plugins.licensee)
-  alias(libs.plugins.spotbugs.base)
-  id("com.diffplug.spotless")
+  id("basetool.java-conventions")
+  id("basetool.quality-conventions")
+  id("basetool.supply-chain-conventions")
 }
 
 description = "keycloak-spi"
 
-tasks.withType<JavaCompile>().configureEach { options.release.set(21) }
+basetool { javaRelease = 21 }
 
 tasks.withType<Test>().configureEach { systemProperty("net.bytebuddy.experimental", "true") }
 

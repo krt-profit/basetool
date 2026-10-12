@@ -13,6 +13,7 @@
 
 /build.gradle.kts                   @greluc
 /settings.gradle.kts                @greluc
+/build-logic/                       @greluc
 /gradle/                            @greluc
 /gradlew                            @greluc
 /gradlew.bat                        @greluc
