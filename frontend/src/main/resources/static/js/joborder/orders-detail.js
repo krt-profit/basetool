@@ -22,6 +22,7 @@
 /* global labelPiece, labelScu, scuHintText, labelMenge, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_STOLEN, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, ORDER_HANDOVER_I18N */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 
 /** @type {any[]} */
 export let cachedInventoryItems = [];
@@ -185,8 +186,8 @@ export function _serializeHandoverForm() {
         );
         const inventoryItemId = sel ? sel.value : '';
         const amount =
-            amtInput && window.krtScuInput
-                ? window.krtScuInput.parse(amtInput.value)
+            amtInput && krtScuInput
+                ? krtScuInput.parse(amtInput.value)
                 : amtInput
                   ? parseFloat(amtInput.value)
                   : NaN;
@@ -541,8 +542,7 @@ function _refreshHandoverMissionPicker(row) {
     const missions = inv && Array.isArray(inv.missionAllocations) ? inv.missionAllocations : [];
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
     const isPiece = !!(inv && inv.material && inv.material.quantityType === 'PIECE');
-    const handed =
-        amtInput && window.krtScuInput ? window.krtScuInput.parse(amtInput.value) : Number.NaN;
+    const handed = amtInput && krtScuInput ? krtScuInput.parse(amtInput.value) : Number.NaN;
     const ambiguous = missions.length >= 2 && isFinite(handed) && handed > missionRest + 0.0005;
 
     let holder = /** @type {HTMLElement | null} */ (
@@ -625,9 +625,7 @@ function _updateHandoverMissionRest(row) {
     const inv = cachedInventoryItems.find((i) => i.id === sel.value);
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
     const isPiece = !!(inv && inv.material && inv.material.quantityType === 'PIECE');
-    const handed = window.krtScuInput
-        ? window.krtScuInput.parse(amtInput.value)
-        : parseFloat(amtInput.value);
+    const handed = krtScuInput ? krtScuInput.parse(amtInput.value) : parseFloat(amtInput.value);
     let assigned = 0;
     holder.querySelectorAll('[data-mission-input]').forEach((el) => {
         const v = parseFloat(/** @type {HTMLInputElement} */ (el).value);
@@ -690,7 +688,7 @@ export function validateHandoverAmounts() {
         const inv = cachedInventoryItems.find((i) => i.id === sel.value);
         if (!inv) continue;
         const isPiece = !!(inv.material && inv.material.quantityType === 'PIECE');
-        const entered = /** @type {KrtScuInputApi} */ (window.krtScuInput).parse(inp.value);
+        const entered = /** @type {KrtScuInputApi} */ (krtScuInput).parse(inp.value);
         const sliceMax = orderSliceAmount(inv);
         if (entered > sliceMax) {
             const available = _handoverFmtAmount(sliceMax, isPiece);

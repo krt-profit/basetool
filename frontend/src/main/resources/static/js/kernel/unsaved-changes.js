@@ -1,9 +1,17 @@
 // @ts-check
+let isDirty = false;
+
+/**
+ * Clears the unsaved-changes guard, for a save that did not submit a form.
+ */
+export function resetUnsavedChanges() {
+    isDirty = false;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     if (window.__unsavedChangesInitialized) return;
     window.__unsavedChangesInitialized = true;
 
-    let isDirty = false;
     /** @type {string | null} */
     let targetUrl = null;
 
@@ -43,10 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('input', markDirty, true);
     document.addEventListener('change', markDirty, true);
-
-    window.resetUnsavedChanges = function () {
-        isDirty = false;
-    };
 
     document.addEventListener('submit', () => {
         isDirty = false;

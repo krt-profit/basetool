@@ -23,6 +23,7 @@
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const shipTypesData = /** @type {HTMLDataListElement | null} */ (
@@ -85,8 +86,8 @@ function filterTable(tableId, query) {
  * @param {string | null} id the overlay id
  */
 function closeModal(id) {
-    if (typeof window.resetUnsavedChanges === 'function') {
-        window.resetUnsavedChanges();
+    if (typeof resetUnsavedChanges === 'function') {
+        resetUnsavedChanges();
     }
     window.krtModal.close(id);
 }

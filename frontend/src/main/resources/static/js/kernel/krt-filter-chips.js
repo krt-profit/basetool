@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtSyncDatetimeSplitGroup } from '/js/kernel/datetime-splitter.js';
+
 /**
  * One active filter, ready to render as a chip.
  *
@@ -168,8 +170,8 @@ function clear(filter) {
     } else {
         control.value = '';
         const group = control.closest('.datetime-split-group');
-        if (group && typeof window.krtSyncDatetimeSplitGroup === 'function') {
-            window.krtSyncDatetimeSplitGroup(group);
+        if (group && typeof krtSyncDatetimeSplitGroup === 'function') {
+            krtSyncDatetimeSplitGroup(group);
         }
     }
     control.dispatchEvent(new Event('input', { bubbles: true }));

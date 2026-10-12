@@ -1,6 +1,7 @@
 // @ts-check
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 
 const SEARCH_LIMIT = 2000;
 
@@ -218,7 +219,7 @@ function submitItemForm() {
     window.krtFetch
         .write({
             method: 'POST',
-            url: window.safeSameOriginUrl(action, action),
+            url: safeSameOriginUrl(action, action),
             payload,
             successMessage: isUpdate ? i18n.updated : i18n.created,
             errorMessage: isUpdate ? i18n.errorUpdate : i18n.errorCreate,
@@ -250,7 +251,7 @@ function submitDeleteForm() {
     window.krtFetch
         .write({
             method: 'POST',
-            url: window.safeSameOriginUrl(action, action),
+            url: safeSameOriginUrl(action, action),
             successMessage: i18n.deleted,
             errorMessage: i18n.errorDelete,
             conflict: conflictObj(),
@@ -355,7 +356,7 @@ function openCreate(btn) {
     if (!modal || !form) return;
     const i18n = window.krtPersonalInventoryI18n || {};
     if (titleEl && i18n.createTitle) titleEl.textContent = i18n.createTitle;
-    form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+    form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
     clearForm();
     window.krtModal.open(modal);
 }
@@ -369,7 +370,7 @@ function openEdit(btn) {
     if (!modal || !form) return;
     const i18n = window.krtPersonalInventoryI18n || {};
     if (titleEl && i18n.editTitle) titleEl.textContent = i18n.editTitle;
-    form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+    form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
     setField('id', btn.getAttribute('data-id'));
     setField('version', btn.getAttribute('data-version'));
     setField('name', btn.getAttribute('data-name'));
@@ -392,10 +393,7 @@ function closeModal() {
  */
 function openDelete(btn) {
     if (!deleteModal || !deleteForm) return;
-    deleteForm.action = window.safeSameOriginUrl(
-        btn.getAttribute('data-action'),
-        deleteForm.action,
-    );
+    deleteForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action);
     const msgEl = $('krt-pi-delete-message');
     const name = btn.getAttribute('data-name');
     if (msgEl && name) {

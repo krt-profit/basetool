@@ -763,8 +763,6 @@ interface Window {
 
     krtEnhanceComboboxes?: (root: ParentNode) => void;
     krtLocalizeDates: (root?: ParentNode | null) => void;
-    krtInitDatetimeSplitGroup?: (root: ParentNode) => void;
-    krtSyncDatetimeSplitGroup?: (root: ParentNode) => void;
     krtSearchableSelect?: (select: HTMLSelectElement, config: Record<string, unknown>) => unknown;
     krtComboboxRemoteSources?: Record<string, unknown>;
     krtSegSet: (targetId: string, value: string) => void;
@@ -819,15 +817,6 @@ interface Window {
     krtFetchI18n?: KrtI18nDict;
 
     /**
-     * Returns `url` when it is a same-origin absolute path, otherwise `fallback` (null when
-     * omitted). Installed by `safe-url.js` from the layout head, so every page has it.
-     */
-    safeSameOriginUrl: {
-        (url: unknown): string | null;
-        <T>(url: unknown, fallback: T): string | T;
-    };
-
-    /**
      * Whether a bank booking needs a justification, keyed by account id; filled as the remote
      * picker resolves accounts.
      */
@@ -851,7 +840,6 @@ interface Window {
     krtHerkunft?: KrtHerkunftApi;
     /** The shared Lager behaviour of the two inventory pages (`inventory-common.js`). */
     krtInventory?: KrtInventoryApi;
-    krtScuInput?: KrtScuInputApi;
     krtMaterialRelease?: KrtMaterialDialogApi;
     krtMaterialRequest?: KrtMaterialDialogApi;
     /**
@@ -921,7 +909,6 @@ interface Window {
     orderId?: string | null;
     __unsavedChangesInitialized?: boolean;
     __ordersDragging?: boolean;
-    resetUnsavedChanges?: () => void;
     filterTable?: (...args: any[]) => void;
     confirmRemoveMaterial?: (...args: any[]) => void;
     materialRowToDelete?: Element | null;

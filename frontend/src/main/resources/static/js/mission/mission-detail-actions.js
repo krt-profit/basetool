@@ -22,6 +22,7 @@
 /* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId */
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 
 /**
  * Fills a date-time input (plain or split into date and time parts) with the current local time;
@@ -617,7 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function openEditFinanceModal(id, note, type, amount, version) {
     const form = /** @type {HTMLFormElement} */ (document.getElementById('edit-finance-form'));
-    form.action = window.safeSameOriginUrl(
+    form.action = safeSameOriginUrl(
         `/missions/${window.missionId}/finance-entries/${id}/update`,
         form.action,
     );

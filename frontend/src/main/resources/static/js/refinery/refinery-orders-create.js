@@ -22,6 +22,7 @@
 /* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_MISSION_PARTICIPANT_REQUIRED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 
 window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
@@ -490,7 +491,7 @@ function _submitRefineryCreate(form, submitter) {
             return true;
         },
         onSuccess(body) {
-            if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+            if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
             if (body && body.targetUrl) window.location.assign(body.targetUrl);
             else window.location.reload();
         },
@@ -569,7 +570,7 @@ function _swapRefineryImportFragment(html) {
     }
     window.krtFetch.setTrustedHtml(container, html);
     document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
-    if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+    if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
 }
 
 function _applyRefineryImportResult(result) {

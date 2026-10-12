@@ -1,4 +1,7 @@
 // @ts-check
+
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+
 /** @type {HTMLElement | null} */
 let mdEl = null;
 /** @type {HTMLElement | null} */
@@ -86,7 +89,7 @@ function clear(node) {
 
 function resolveUrl(template, id) {
     const raw = (template || '').replace('ID_PLACEHOLDER', encodeURIComponent(id));
-    return window.safeSameOriginUrl ? window.safeSameOriginUrl(raw, raw) : raw;
+    return safeSameOriginUrl ? safeSameOriginUrl(raw, raw) : raw;
 }
 
 function attr(row, name) {
@@ -627,8 +630,8 @@ function loadCraftability() {
         return;
     }
     const sep = url.indexOf('?') === -1 ? '?' : '&';
-    const target = window.safeSameOriginUrl
-        ? window.safeSameOriginUrl(`${url + sep}includeRefinery=true`, url)
+    const target = safeSameOriginUrl
+        ? safeSameOriginUrl(`${url + sep}includeRefinery=true`, url)
         : `${url + sep}includeRefinery=true`;
     window.krtFetch
         .getJson(target)

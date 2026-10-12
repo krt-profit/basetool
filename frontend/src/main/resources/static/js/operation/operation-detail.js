@@ -22,6 +22,8 @@
 /* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
@@ -229,7 +231,7 @@ function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement} */ (
         document.getElementById('delete-operation-form')
     );
-    deleteForm.action = window.safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
+    deleteForm.action = safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
     window.krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
@@ -373,8 +375,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 form.reset();
             }
             showView('edit');
-            if (typeof window.resetUnsavedChanges === 'function') {
-                window.resetUnsavedChanges();
+            if (typeof resetUnsavedChanges === 'function') {
+                resetUnsavedChanges();
             }
         });
     }

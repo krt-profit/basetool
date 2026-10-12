@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     (function wireParticipantAjax() {
         if (!window.krtMissionWrite || !window.missionId) {
@@ -175,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (editCrewModal && editCrewForm && editCrewJobs) {
         window.krtOpenEditCrewModal = function (source) {
-            editCrewForm.action = window.safeSameOriginUrl(
+            editCrewForm.action = safeSameOriginUrl(
                 source.getAttribute('data-action') || '/missions',
                 editCrewForm.action,
             );

@@ -29,6 +29,7 @@ import {
     updateNoteCounter,
 } from '/js/inventory/inventory-note-modal.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 
 const myLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-my',
@@ -1156,9 +1157,7 @@ function submitUmbuchen(event) {
     );
     const mode = modeInput ? modeInput.value : 'LOCATION';
     const amountValue = myFieldValue('umbuchenAmount');
-    const amount = window.krtScuInput
-        ? window.krtScuInput.parse(amountValue)
-        : parseFloat(amountValue);
+    const amount = krtScuInput ? krtScuInput.parse(amountValue) : parseFloat(amountValue);
     const version = parseInt(myFieldValue('umbuchenVersion'), 10);
     const submitBtn = /** @type {HTMLButtonElement | null} */ (
         document.getElementById('umbuchenSubmitBtn')

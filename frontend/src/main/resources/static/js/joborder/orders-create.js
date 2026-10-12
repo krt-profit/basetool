@@ -22,6 +22,7 @@
 /* global materialIndex: writable, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_MATERIAL_LABEL, MSG_AMOUNT_LABEL, MSG_MINQUALITY_LABEL, SCU_HINT_TEXT, MSG_SCMDB_SUCCESS, MSG_SCMDB_SOME_UNKNOWN, MSG_SCMDB_NO_MATCH, MSG_SCMDB_NOT_FOUND, ITEM_I18N, EDIT_ITEMS, MSG_MATERIAL_INVALID, MSG_ITEM_INVALID, MSG_CREATE_FAILED, MSG_UPDATE_FAILED */
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 
 function buildScuHint() {
     const hint = document.createElement('span');
@@ -137,7 +138,7 @@ function refreshMaterialUnit(row) {
  * @returns {number} the amount, or NaN when it is not a number
  */
 function parseAmount(raw) {
-    if (window.krtScuInput) return window.krtScuInput.parse(raw);
+    if (krtScuInput) return krtScuInput.parse(raw);
     return parseFloat(String(raw).replace(',', '.'));
 }
 

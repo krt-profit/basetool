@@ -36,6 +36,7 @@ import {
     showFrontendSuccessToast,
     showKrtConfirm,
 } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const handoverForm = /** @type {HTMLFormElement | null} */ (
@@ -377,8 +378,8 @@ function _serializeEditForm() {
         );
         const materialId = matSel ? matSel.value : '';
         const amount =
-            amtInput && window.krtScuInput
-                ? window.krtScuInput.parse(amtInput.value)
+            amtInput && krtScuInput
+                ? krtScuInput.parse(amtInput.value)
                 : amtInput
                   ? parseFloat(amtInput.value)
                   : NaN;

@@ -21,12 +21,14 @@
 
 /* global OPS_MSG */
 
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+
 function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('delete-operation-form')
     );
     if (!deleteForm) return;
-    deleteForm.action = window.safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
+    deleteForm.action = safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
     window.krtModal.open(document.getElementById('delete-operation-modal'));
 }
 

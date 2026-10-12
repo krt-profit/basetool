@@ -22,6 +22,8 @@
 /* global hangarI18n, hangarConflict */
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
@@ -219,8 +221,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closeModal() {
-        if (typeof window.resetUnsavedChanges === 'function') {
-            window.resetUnsavedChanges();
+        if (typeof resetUnsavedChanges === 'function') {
+            resetUnsavedChanges();
         }
         window.krtModal.close(modal);
     }
@@ -247,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function openAddModal(btn) {
         modalTitle.textContent = form.getAttribute('data-title-add');
-        form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+        form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         shipField('ship-name').value = '';
         shipField('ship-type').value = '';
         setInsurance('');
@@ -265,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function openEditModal(btn) {
         modalTitle.textContent = form.getAttribute('data-title-edit');
-        form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+        form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         shipField('ship-name').value = btn.getAttribute('data-name') ?? '';
         shipField('ship-type').value = btn.getAttribute('data-type') ?? '';
         setInsurance(btn.getAttribute('data-ins'));
@@ -285,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     modalDeleteBtn.addEventListener('click', () => {
         if (!deleteForm) return;
-        deleteForm.action = window.safeSameOriginUrl(
+        deleteForm.action = safeSameOriginUrl(
             modalDeleteBtn.getAttribute('data-action'),
             deleteForm.action,
         );
@@ -310,10 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.krtFetch
                 .write({
                     method: 'POST',
-                    url: window.safeSameOriginUrl(
-                        deleteForm.getAttribute('action'),
-                        deleteForm.action,
-                    ),
+                    url: safeSameOriginUrl(deleteForm.getAttribute('action'), deleteForm.action),
                     successMessage: hangarI18n.deleteSuccess,
                     errorMessage: hangarI18n.deleteError,
                     conflict: hangarConflict,
@@ -582,10 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.krtFetch
                     .write({
                         method: 'POST',
-                        url: window.safeSameOriginUrl(
-                            homeForm.getAttribute('action'),
-                            homeForm.action,
-                        ),
+                        url: safeSameOriginUrl(homeForm.getAttribute('action'), homeForm.action),
                         payload: { locationId },
                         successMessage: hangarI18n.homeSuccess,
                         errorMessage: hangarI18n.homeError,
@@ -626,7 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.krtFetch
             .write({
                 method: 'POST',
-                url: window.safeSameOriginUrl(action, action),
+                url: safeSameOriginUrl(action, action),
                 payload,
                 successMessage: isUpdate ? hangarI18n.updateSuccess : hangarI18n.addSuccess,
                 errorMessage: isUpdate ? hangarI18n.updateError : hangarI18n.addError,

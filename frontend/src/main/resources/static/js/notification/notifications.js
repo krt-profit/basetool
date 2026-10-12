@@ -19,6 +19,7 @@
  */
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 
 const POLL_INTERVAL_FAST_MS = 60000;
 const POLL_INTERVAL_SLOW_MS = 300000;
@@ -127,9 +128,7 @@ function buildItem(item, linkable) {
     li.setAttribute('data-notif-read', item.read ? 'true' : 'false');
 
     const href =
-        linkable && typeof window.safeSameOriginUrl === 'function'
-            ? window.safeSameOriginUrl(item.href)
-            : null;
+        linkable && typeof safeSameOriginUrl === 'function' ? safeSameOriginUrl(item.href) : null;
     const body = document.createElement('div');
     body.className = 'notification-item-body';
     const text = document.createElement(href ? 'span' : 'p');

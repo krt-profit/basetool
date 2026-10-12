@@ -33,6 +33,7 @@ import {
     _publishOrdersQueue,
 } from '/js/joborder/orders-detail.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 
 /**
  * @typedef {object} OdClaimModalOptions
@@ -129,7 +130,7 @@ export function submitClaim() {
     const materialId = _odControlById('claim-material-id').value;
     const quality = _odControlById('claim-quality').value;
     const squadronId = _odControlById('claim-squadron').value;
-    const amount = /** @type {KrtScuInputApi} */ (window.krtScuInput).parse(
+    const amount = /** @type {KrtScuInputApi} */ (krtScuInput).parse(
         _odControlById('claim-amount').value,
     );
     const max = parseFloat(_odControlById('claim-max').value);

@@ -21,6 +21,8 @@
 
 /* global SC_MSG, SC_CONFLICT */
 
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+
 const modal = /** @type {HTMLElement} */ (document.getElementById('specialcommand-modal'));
 const form = /** @type {HTMLFormElement} */ (document.getElementById('sc-form'));
 const title = /** @type {HTMLElement} */ (document.getElementById('sc-modal-title'));
@@ -41,7 +43,7 @@ function openCreate() {
 
 function openEdit(btn) {
     title.textContent = SC_MSG.editTitle;
-    form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+    form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
     versionInput.value = btn.getAttribute('data-version') || '0';
     nameInput.value = btn.getAttribute('data-name') || '';
     shorthandInput.value = btn.getAttribute('data-shorthand') || '';
@@ -61,10 +63,7 @@ const deleteNameEl = document.getElementById('sc-delete-name');
 
 function openDelete(btn) {
     if (!deleteModal || !deleteForm) return;
-    deleteForm.action = window.safeSameOriginUrl(
-        btn.getAttribute('data-action'),
-        deleteForm.action,
-    );
+    deleteForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action);
     if (deleteNameEl) deleteNameEl.textContent = btn.getAttribute('data-name') || '';
     window.krtModal.open(deleteModal);
 }

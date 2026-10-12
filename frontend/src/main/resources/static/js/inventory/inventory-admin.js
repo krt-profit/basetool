@@ -29,6 +29,7 @@ import {
     updateNoteCounter,
 } from '/js/inventory/inventory-note-modal.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 
 const adminLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-admin',
@@ -608,9 +609,7 @@ function submitUmbuchen(event) {
     const targetOrgUnitEl = adminUmbuchenInput('umbuchenTargetOwningOrgUnitId');
     const versionEl = adminUmbuchenInput('umbuchenVersion');
     if (!amountEl || !targetUserEl || !targetLocationEl || !targetOrgUnitEl || !versionEl) return;
-    const amount = window.krtScuInput
-        ? window.krtScuInput.parse(amountEl.value)
-        : parseFloat(amountEl.value);
+    const amount = krtScuInput ? krtScuInput.parse(amountEl.value) : parseFloat(amountEl.value);
     const submitBtn = /** @type {HTMLButtonElement | null} */ (
         document.getElementById('umbuchenSubmitBtn')
     );

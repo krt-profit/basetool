@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+
 (function () {
     if (!window.krtFetch) {
         return;
@@ -197,8 +199,8 @@
             return isDirty(entry.form);
         });
         bar.hidden = dirty.length === 0;
-        if (!dirty.length && !saving && typeof window.resetUnsavedChanges === 'function') {
-            window.resetUnsavedChanges();
+        if (!dirty.length && !saving && typeof resetUnsavedChanges === 'function') {
+            resetUnsavedChanges();
         }
         if (summary) {
             const names = dirty.map((entry) => {
@@ -294,8 +296,8 @@
                 saveButton.disabled = false;
             }
         }
-        if (allSaved && typeof window.resetUnsavedChanges === 'function') {
-            window.resetUnsavedChanges();
+        if (allSaved && typeof resetUnsavedChanges === 'function') {
+            resetUnsavedChanges();
         }
         refreshBar();
     }
@@ -336,8 +338,8 @@
             });
         });
         updateCounter();
-        if (typeof window.resetUnsavedChanges === 'function') {
-            window.resetUnsavedChanges();
+        if (typeof resetUnsavedChanges === 'function') {
+            resetUnsavedChanges();
         }
         refreshBar();
     }

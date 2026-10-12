@@ -1,4 +1,7 @@
 // @ts-check
+
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+
 const RESULTS_ID = 'bp-overview-results';
 const CHIP_LIMIT = 4;
 const MAX_PARALLEL = 4;
@@ -64,7 +67,7 @@ function ownersUrl(productKey) {
     const base = config().ownersUrl || '';
     const sep = base.indexOf('?') === -1 ? '?' : '&';
     const url = `${base + sep}productKey=${encodeURIComponent(productKey)}`;
-    return window.safeSameOriginUrl ? window.safeSameOriginUrl(url, url) : url;
+    return safeSameOriginUrl ? safeSameOriginUrl(url, url) : url;
 }
 
 /**

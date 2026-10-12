@@ -1,6 +1,7 @@
 // @ts-check
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 
 /** @type {HTMLInputElement | null} */
 let searchInput = null;
@@ -453,7 +454,7 @@ function addSelected() {
  */
 function resolveUrl(template, id) {
     const raw = (template || '').replace('ID_PLACEHOLDER', encodeURIComponent(String(id)));
-    return window.safeSameOriginUrl ? window.safeSameOriginUrl(raw, raw) : raw;
+    return safeSameOriginUrl ? safeSameOriginUrl(raw, raw) : raw;
 }
 
 /**
@@ -554,7 +555,7 @@ function submitEditNote(e) {
     window.krtFetch
         .write({
             method: 'POST',
-            url: window.safeSameOriginUrl(editForm.getAttribute('action'), editForm.action),
+            url: safeSameOriginUrl(editForm.getAttribute('action'), editForm.action),
             payload,
             successMessage: i18n().noteUpdated,
             errorMessage: i18n().editError,
@@ -658,7 +659,7 @@ function submitDeleteBp(e) {
     window.krtFetch
         .write({
             method: 'POST',
-            url: window.safeSameOriginUrl(deleteForm.getAttribute('action'), deleteForm.action),
+            url: safeSameOriginUrl(deleteForm.getAttribute('action'), deleteForm.action),
             successMessage: i18n().removed,
             errorMessage: i18n().removeError,
             conflict: conflictObj(),

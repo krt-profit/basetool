@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+
 /**
  * @typedef {object} HerkunftTag
  * @property {string} targetId the job-order / mission id
@@ -146,8 +148,8 @@ function roundAmount(n, isPiece) {
  * @returns {number} the parsed number (NaN when unparseable)
  */
 function parseAmount(value) {
-    if (window.krtScuInput && typeof window.krtScuInput.parse === 'function') {
-        return window.krtScuInput.parse(value);
+    if (krtScuInput && typeof krtScuInput.parse === 'function') {
+        return krtScuInput.parse(value);
     }
     return parseFloat(value);
 }

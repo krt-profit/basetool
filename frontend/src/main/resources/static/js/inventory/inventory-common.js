@@ -21,6 +21,9 @@
 /* global stackEntriesI18n, bookOutI18n, inventoryConflictI18n, assocI18n, stolenMarkI18n */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 
 const ASSOC_EPS = 0.0005;
 
@@ -632,8 +635,8 @@ function createLager(cfg) {
         const source = input(sourceId);
         const other = input(otherId);
         const maxEl = input(maxId);
-        if (!source || !other || !maxEl || !window.krtScuInput) return;
-        const value = window.krtScuInput.parse(source.value);
+        if (!source || !other || !maxEl || !krtScuInput) return;
+        const value = krtScuInput.parse(source.value);
         const max = parseFloat(maxEl.value) || 0;
         if (!isNaN(value)) {
             other.value = String(Number(Math.max(0, max - value).toFixed(3)));
@@ -801,11 +804,8 @@ function createLager(cfg) {
             return;
         }
         bookOutItemId = id;
-        if (window.safeSameOriginUrl) {
-            bookOutForm.action = window.safeSameOriginUrl(
-                `/inventory/${id}/book-out`,
-                bookOutForm.action,
-            );
+        if (safeSameOriginUrl) {
+            bookOutForm.action = safeSameOriginUrl(`/inventory/${id}/book-out`, bookOutForm.action);
         }
         const isScu = quantityType !== 'PIECE';
         amountInput.setAttribute('step', isScu ? '0.001' : '1');
@@ -845,8 +845,8 @@ function createLager(cfg) {
 
     /** Closes the book-out modal and resets its unsaved-changes and Herkunft state. */
     function closeBookOutModal() {
-        if (typeof window.resetUnsavedChanges === 'function') {
-            window.resetUnsavedChanges();
+        if (typeof resetUnsavedChanges === 'function') {
+            resetUnsavedChanges();
         }
         if (window.krtHerkunft) {
             window.krtHerkunft.reset('bookout');
@@ -877,9 +877,7 @@ function createLager(cfg) {
         );
         const versionEl = input('version');
         if (!amountEl || !versionEl) return;
-        const amount = window.krtScuInput
-            ? window.krtScuInput.parse(amountEl.value)
-            : parseFloat(amountEl.value);
+        const amount = krtScuInput ? krtScuInput.parse(amountEl.value) : parseFloat(amountEl.value);
         if (window.krtHerkunft && !window.krtHerkunft.isValid('bookout')) {
             if (typeof showFrontendErrorToast === 'function') {
                 showFrontendErrorToast(assocI18n.overallocated);
@@ -1003,7 +1001,7 @@ function createLager(cfg) {
         if (stolenMarkInFlight || !window.krtFetch || !stolenMarkTarget.id) return;
         const amountInput = input('stolenMarkAmount');
         const raw = amountInput ? amountInput.value : '';
-        const amount = window.krtScuInput ? window.krtScuInput.parse(raw) : parseFloat(raw);
+        const amount = krtScuInput ? krtScuInput.parse(raw) : parseFloat(raw);
         const invalid =
             amount == null ||
             Number.isNaN(amount) ||
@@ -1050,7 +1048,7 @@ function createLager(cfg) {
 
     /** Closes the Umbuchen modal and resets its unsaved-changes and Herkunft state. */
     function closeUmbuchenModal() {
-        if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+        if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
         if (window.krtHerkunft) {
             window.krtHerkunft.reset('umbuchen');
         }

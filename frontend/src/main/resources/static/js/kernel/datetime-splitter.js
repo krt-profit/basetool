@@ -52,7 +52,7 @@ function syncGroup(group) {
     applyHiddenToParts(hidden, datePart, timePart);
 }
 
-window.krtSyncDatetimeSplitGroup = syncGroup;
+export { syncGroup as krtSyncDatetimeSplitGroup };
 
 /**
  * Initializes one `.datetime-split-group`: adds its error element, fills the visible parts from
@@ -158,8 +158,6 @@ function initGroup(group) {
     datePart.addEventListener('input', updateHidden);
     timePart.addEventListener('input', updateHidden);
 }
-
-window.krtInitDatetimeSplitGroup = initGroup;
 
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.datetime-split-group').forEach(initGroup);

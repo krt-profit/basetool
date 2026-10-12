@@ -22,6 +22,7 @@
 /* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG, INV_OWNER_PICKER_MSG */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const matSelect = /** @type {HTMLSelectElement | null} */ (
@@ -865,7 +866,7 @@ function updateAllocOver() {
     if (!overEl) return;
     const amountEl = /** @type {HTMLInputElement | null} */ (document.getElementById('amount'));
     const raw = amountEl ? amountEl.value : '';
-    const amount = window.krtScuInput && amountEl ? window.krtScuInput.parse(raw) : parseFloat(raw);
+    const amount = krtScuInput && amountEl ? krtScuInput.parse(raw) : parseFloat(raw);
     const total = isNaN(amount) ? 0 : amount;
     const over =
         allocDimensionSum('jobOrder') > total + 1e-6 || allocDimensionSum('mission') > total + 1e-6;

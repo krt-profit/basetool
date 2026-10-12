@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+
 /** How many of the newest notifications the home card lists. */
 const NOTIFICATION_LIMIT = 3;
 
@@ -63,8 +65,8 @@ function renderNotifications(items) {
         const li = document.createElement('li');
         li.className = `home-notif${item.read ? '' : ' is-unread'}`;
         const safe =
-            item.href && typeof window.safeSameOriginUrl === 'function'
-                ? window.safeSameOriginUrl(item.href)
+            item.href && typeof safeSameOriginUrl === 'function'
+                ? safeSameOriginUrl(item.href)
                 : null;
         const main = document.createElement(safe ? 'a' : 'div');
         main.className = 'home-notif__main';

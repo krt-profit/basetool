@@ -20,6 +20,8 @@
 // @ts-check
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtSyncDatetimeSplitGroup } from '/js/kernel/datetime-splitter.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 
 (function () {
     const objectiveList = document.getElementById('mission-create-objective-list');
@@ -260,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn.dataset.epBound) return;
                 btn.dataset.epBound = '1';
                 btn.addEventListener('click', function () {
-                    eForm.action = window.safeSameOriginUrl(
+                    eForm.action = safeSameOriginUrl(
                         this.getAttribute('data-action'),
                         eForm.action,
                     );
@@ -362,8 +364,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (eStartTimeUi) {
                         eStartTimeUi.value = startUtc;
-                        if (typeof window.krtSyncDatetimeSplitGroup === 'function') {
-                            window.krtSyncDatetimeSplitGroup(
+                        if (typeof krtSyncDatetimeSplitGroup === 'function') {
+                            krtSyncDatetimeSplitGroup(
                                 /** @type {ParentNode} */ (
                                     eStartTimeUi.closest('.datetime-split-group')
                                 ),
@@ -372,8 +374,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     if (eEndTimeUi) {
                         eEndTimeUi.value = endUtc;
-                        if (typeof window.krtSyncDatetimeSplitGroup === 'function') {
-                            window.krtSyncDatetimeSplitGroup(
+                        if (typeof krtSyncDatetimeSplitGroup === 'function') {
+                            krtSyncDatetimeSplitGroup(
                                 /** @type {ParentNode} */ (
                                     eEndTimeUi.closest('.datetime-split-group')
                                 ),
@@ -698,7 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn.dataset.delBound) return;
                 btn.dataset.delBound = '1';
                 btn.addEventListener('click', function () {
-                    deleteForm.action = window.safeSameOriginUrl(
+                    deleteForm.action = safeSameOriginUrl(
                         this.getAttribute('data-action'),
                         deleteForm.action,
                     );
@@ -761,7 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn.dataset.euBound) return;
                 btn.dataset.euBound = '1';
                 btn.addEventListener('click', function () {
-                    editUnitForm.action = window.safeSameOriginUrl(
+                    editUnitForm.action = safeSameOriginUrl(
                         this.getAttribute('data-action'),
                         editUnitForm.action,
                     );

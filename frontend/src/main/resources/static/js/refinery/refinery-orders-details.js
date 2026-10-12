@@ -21,6 +21,7 @@
 /* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, MSG_SAVING, MSG_REFINERY_UPDATE_FAILED, MSG_REFINERY_STORE_FAILED, MSG_REFINERY_CANCEL_FAILED, MSG_CANCEL_CONFIRM, MSG_CANCEL_TITLE, MSG_CANCEL_DISMISS, REFINERY_DETAIL_MSG, STORE_INHERITED_ORG_UNIT_ID, STORE_ORG_UNIT_PLACEHOLDER, RATING_LEVELS, SPEED_LEVELS */
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 
 /**
  * A form control of a material or store row, whose `id`, `name` and `value` the renumbering
@@ -152,8 +153,8 @@ function calcScu(index) {
 }
 
 function closeStoreModal() {
-    if (typeof window.resetUnsavedChanges === 'function') {
-        window.resetUnsavedChanges();
+    if (typeof resetUnsavedChanges === 'function') {
+        resetUnsavedChanges();
     }
     const modal = document.getElementById('storeModal');
     if (modal) window.krtModal.close(modal);
@@ -796,7 +797,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
  * Drops the unsaved edits of the order form by re-rendering its section from the server.
  */
 function discardRefineryEdits() {
-    if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+    if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
     if (refinerySeam) refinerySeam.refresh(['order'], { broadcast: false });
 }
 
@@ -807,7 +808,7 @@ function submitRefineryMainForm(form, submitter) {
         successMessage: REFINERY_DETAIL_MSG.updateSuccess,
         errorMessage: MSG_REFINERY_UPDATE_FAILED,
         onSuccess() {
-            if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+            if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
             return refinerySeam ? refinerySeam.refresh(['order', 'store']) : undefined;
         },
     });
@@ -850,7 +851,7 @@ async function submitRefineryCancelForm(form, submitter) {
         submitter,
         errorMessage: MSG_REFINERY_CANCEL_FAILED,
         onSuccess(body) {
-            if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+            if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
             if (refinerySeam) refinerySeam.notify(['order', 'store']);
             if (body && body.targetUrl) window.location.assign(body.targetUrl);
             else window.location.reload();

@@ -22,6 +22,7 @@
 /* global MISSION_MSG, MISSION_CONFLICT, MISSION_TITLES */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 
 const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
 
@@ -192,10 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (sqAddBtn) {
         sqAddBtn.onclick = () => {
-            sqForm.action = window.safeSameOriginUrl(
-                sqAddBtn.getAttribute('data-action'),
-                sqForm.action,
-            );
+            sqForm.action = safeSameOriginUrl(sqAddBtn.getAttribute('data-action'), sqForm.action);
             sqTitle.innerText = MISSION_TITLES.squadronCreate;
             dialogField('sq-name').value = '';
             dialogField('sq-shorthand').value = '';
@@ -208,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (e) => {
         const btn = /** @type {Element} */ (e.target).closest('.edit-squadron-btn');
         if (!btn) return;
-        sqForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), sqForm.action);
+        sqForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), sqForm.action);
         sqTitle.innerText = MISSION_TITLES.edit;
         dialogField('sq-name').value = btn.getAttribute('data-name') ?? '';
         dialogField('sq-shorthand').value = btn.getAttribute('data-shorthand') ?? '';
@@ -276,10 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (jtAddBtn) {
         jtAddBtn.onclick = () => {
-            jtForm.action = window.safeSameOriginUrl(
-                jtAddBtn.getAttribute('data-action'),
-                jtForm.action,
-            );
+            jtForm.action = safeSameOriginUrl(jtAddBtn.getAttribute('data-action'), jtForm.action);
             jtTitle.innerText = MISSION_TITLES.jobTypeCreate;
             dialogField('jt-name').value = '';
             dialogField('jt-desc').value = '';
@@ -295,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (e) => {
         const btn = /** @type {Element} */ (e.target).closest('.edit-jobtype-btn');
         if (!btn) return;
-        jtForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), jtForm.action);
+        jtForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), jtForm.action);
         jtTitle.innerText = MISSION_TITLES.edit;
         dialogField('jt-name').value = btn.getAttribute('data-name') ?? '';
         dialogField('jt-desc').value = btn.getAttribute('data-desc') ?? '';
@@ -319,10 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (ftAddBtn) {
         ftAddBtn.onclick = () => {
-            ftForm.action = window.safeSameOriginUrl(
-                ftAddBtn.getAttribute('data-action'),
-                ftForm.action,
-            );
+            ftForm.action = safeSameOriginUrl(ftAddBtn.getAttribute('data-action'), ftForm.action);
             ftTitle.innerText = MISSION_TITLES.freqTypeCreate;
             dialogField('ft-name').value = '';
             dialogField('ft-desc').value = '';
@@ -334,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (e) => {
         const btn = /** @type {Element} */ (e.target).closest('.edit-freqtype-btn');
         if (!btn) return;
-        ftForm.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), ftForm.action);
+        ftForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), ftForm.action);
         ftTitle.innerText = MISSION_TITLES.edit;
         dialogField('ft-name').value = btn.getAttribute('data-name') ?? '';
         dialogField('ft-desc').value = btn.getAttribute('data-desc') ?? '';
@@ -361,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('click', (e) => {
             const btn = /** @type {Element} */ (e.target).closest('.delete-btn');
             if (!btn || !deleteForm) return;
-            deleteForm.action = window.safeSameOriginUrl(
+            deleteForm.action = safeSameOriginUrl(
                 btn.getAttribute('data-action'),
                 deleteForm.action,
             );
