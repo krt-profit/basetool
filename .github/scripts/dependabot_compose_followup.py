@@ -19,12 +19,18 @@ REQ-OPS-035):
     ``docker-compose.yml`` pins for the same ``name:tag`` (REQ-OPS-035). An image the compose file
     does not pin is left alone; one it pins to more than one digest is left alone with a warning.
 
+``sync-sandbox-keycloak``
+    Moves the ``FROM quay.io/keycloak/keycloak:…`` pin of the sandbox Keycloak Dockerfile to the tag
+    and digest ``docker-compose.yml`` pins for that image. Left alone with a warning when the
+    compose file pins the image zero times, more than once, or to more than one digest.
+
 Exit codes: ``0`` done, ``1`` refused or self-test failed, ``2`` bad invocation.
 
 Usage:
     dependabot_compose_followup.py guard --base <sha>
     dependabot_compose_followup.py refresh-digests --base <sha>
     dependabot_compose_followup.py sync-test-images
+    dependabot_compose_followup.py sync-sandbox-keycloak
     dependabot_compose_followup.py --selftest
 """
 
@@ -63,6 +69,16 @@ JAVA_IMAGE_LITERAL = re.compile(
     r"\"(?P<name>[^\s\"@#:]+(?::\d+/[^\s\"@#:]+)?)"
     r":(?P<tag>[^\s\"@#]+)"
     r"@(?P<digest>sha256:[0-9a-f]{64})\""
+)
+
+
+SANDBOX_KEYCLOAK_DOCKERFILE = Path("docker/sandbox/keycloak/Dockerfile")
+
+KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak"
+
+KEYCLOAK_FROM_LINE = re.compile(
+    r"^(?P<lead>FROM\s+)" + re.escape(KEYCLOAK_IMAGE) + r":(?P<tag>[^\s@]+)"
+    r"@(?P<digest>sha256:[0-9a-f]{64})(?P<tail>.*)$"
 )
 
 
@@ -235,8 +251,55 @@ def sync_test_images(root: Path = REPO) -> int:
     return 0
 
 
+def sync_keycloak_from(dockerfile: str, pins: dict[str, set[str]]) -> tuple[str, list[str]]:
+    """Return ``dockerfile`` with its Keycloak ``FROM`` line moved to the compose file's single pin.
+
+    Args:
+        dockerfile: text of the sandbox Keycloak Dockerfile.
+        pins: the compose file's ``name:tag`` to digests map, as :func:`compose_pins` builds it.
+
+    Returns:
+        The rewritten text and one line per move or per ambiguity that left it unchanged.
+    """
+    refs = {ref: digests for ref, digests in pins.items() if ref.startswith(f"{KEYCLOAK_IMAGE}:")}
+    digests = {digest for found in refs.values() for digest in found}
+    if len(refs) != 1 or len(digests) != 1:
+        return dockerfile, [f"::warning title=dependabot-compose-followup::{TEST_IMAGES_COMPOSE} pins "
+                            f"{KEYCLOAK_IMAGE} {len(refs)} time(s) to {len(digests)} digest(s); "
+                            f"leaving {SANDBOX_KEYCLOAK_DOCKERFILE}"]
+    (ref,) = refs
+    (digest,) = digests
+    tag = ref.split(":", 1)[1]
+    notes: list[str] = []
+    lines = []
+    for line in dockerfile.splitlines(keepends=True):
+        body = line.rstrip("\r\n")
+        match = KEYCLOAK_FROM_LINE.match(body)
+        if match and (match["tag"], match["digest"]) != (tag, digest):
+            notes.append(f"{SANDBOX_KEYCLOAK_DOCKERFILE.name}: {match['tag']}@{match['digest'][:19]} "
+                         f"moved to {tag}@{digest[:19]}")
+            line = f"{match['lead']}{ref}@{digest}{match['tail']}{line[len(body):]}"
+        lines.append(line)
+    return "".join(lines), notes
+
+
+def sync_sandbox_keycloak(root: Path = REPO) -> int:
+    """Move the sandbox Keycloak Dockerfile's image pin to the one ``docker-compose.yml`` pins."""
+    pins = compose_pins((root / TEST_IMAGES_COMPOSE).read_bytes().decode("utf-8"))
+    path = root / SANDBOX_KEYCLOAK_DOCKERFILE
+    original = path.read_bytes().decode("utf-8")
+    text, notes = sync_keycloak_from(original, pins)
+    for note in notes:
+        print(note)
+    if text != original:
+        path.write_bytes(text.encode("utf-8"))
+    elif not notes:
+        print(f"{SANDBOX_KEYCLOAK_DOCKERFILE.name}: already matches {TEST_IMAGES_COMPOSE}")
+    return 0
+
+
 def selftest() -> int:
-    """Exercise the commit vetting, the diff parsing, the line rewrite and the constant sync."""
+    """Exercise the commit vetting, the diff parsing, the line rewrite and the pin syncs."""
     old = "sha256:" + "a" * 64
     new = "sha256:" + "b" * 64
     compose = (
@@ -299,6 +362,29 @@ def selftest() -> int:
         ("the real docker-compose.yml pins every TestImages reference once",
          all(len(real_pins.get(ref, set())) == 1 for ref in real_refs)),
     ]
+    kc_old = f"{KEYCLOAK_IMAGE}:26.8@{old}"
+    kc_new = f"{KEYCLOAK_IMAGE}:26.9@{new}"
+    kc_pins = {f"{KEYCLOAK_IMAGE}:26.9": {new}}
+    dockerfile = f"FROM eclipse-temurin:25-jdk-alpine@{old} AS spi\nRUN true\nFROM {kc_old}\nCOPY a b\n"
+    real_dockerfile = (REPO / SANDBOX_KEYCLOAK_DOCKERFILE).read_bytes().decode("utf-8")
+    cases += [
+        ("a moved compose pin moves only the Keycloak FROM line",
+         sync_keycloak_from(dockerfile, kc_pins)[0] == dockerfile.replace(kc_old, kc_new)
+         and len(sync_keycloak_from(dockerfile, kc_pins)[1]) == 1),
+        ("the Keycloak FROM line keeps CRLF and a stage name",
+         sync_keycloak_from(f"FROM {kc_old} AS kc\r\n", kc_pins)[0] == f"FROM {kc_new} AS kc\r\n"),
+        ("a matching Keycloak pin is left alone",
+         sync_keycloak_from(dockerfile.replace(kc_old, kc_new), kc_pins) == (dockerfile.replace(kc_old, kc_new), [])),
+        ("a compose file without the Keycloak image leaves the Dockerfile and warns",
+         sync_keycloak_from(dockerfile, {"redis:8-alpine": {old}})[0] == dockerfile
+         and "::warning" in sync_keycloak_from(dockerfile, {"redis:8-alpine": {old}})[1][0]),
+        ("two Keycloak digests leave the Dockerfile and warn",
+         sync_keycloak_from(dockerfile, {f"{KEYCLOAK_IMAGE}:26.9": {old, new}})[0] == dockerfile),
+        ("the real sandbox Dockerfile holds one Keycloak FROM line",
+         sum(1 for line in real_dockerfile.splitlines() if KEYCLOAK_FROM_LINE.match(line)) == 1),
+        ("the real docker-compose.yml pins Keycloak once",
+         len([ref for ref in real_pins if ref.startswith(f"{KEYCLOAK_IMAGE}:")]) == 1),
+    ]
     failures = 0
     for name, passed in cases:
         print(f"  {'ok  ' if passed else 'FAIL'} {name}")
@@ -308,15 +394,17 @@ def selftest() -> int:
 
 
 def main() -> int:
-    """Dispatch to the self-test or to one of the three subcommands."""
+    """Dispatch to the self-test or to one of the four subcommands."""
     if sys.argv[1:] == ["--selftest"]:
         return selftest()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=["guard", "refresh-digests", "sync-test-images"])
+    parser.add_argument("command", choices=["guard", "refresh-digests", "sync-test-images", "sync-sandbox-keycloak"])
     parser.add_argument("--base", help="The PR's base commit; required by guard and refresh-digests.")
     args = parser.parse_args()
     if args.command == "sync-test-images":
         return sync_test_images()
+    if args.command == "sync-sandbox-keycloak":
+        return sync_sandbox_keycloak()
     if not args.base:
         parser.error(f"{args.command} requires --base")
     if args.command == "guard":

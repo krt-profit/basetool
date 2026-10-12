@@ -108,3 +108,24 @@ therefore failed the backend tests until the constant was edited by hand. After 
 workflow now runs `dependabot_compose_followup.py sync-test-images`, which moves each constant to the
 single digest `docker-compose.yml` pins for its `name:tag`; the App's commit carries the change with
 the regenerated units. A `name:tag` pinned to more than one digest is left alone with a warning.
+
+## Amendment 2 (2026-10-12) — the sandbox Keycloak Dockerfile follows the bump
+
+The Keycloak image is pinned in three places: `docker-compose.yml` and, generated from it,
+`quadlet/systemd/keycloak.container`, plus the `FROM` line of `docker/sandbox/keycloak/Dockerfile`.
+`keycloak-version` (REQ-OPS-040) requires one tag and one digest in all of them. Dependabot watches
+the compose file and that directory through two ecosystems and opened one pull request for each when
+the 26.8 image was rebuilt in place (#2528, #2529); each left the other pins on the old digest and
+failed the gate.
+
+`dependabot_compose_followup.py sync-sandbox-keycloak` now moves the Dockerfile's `FROM` line to the
+tag and digest `docker-compose.yml` pins, in the App's commit with the regenerated units, and
+Dependabot's `docker` entry for `/docker/sandbox/keycloak` ignores the image, so the Dockerfile is no
+longer proposed separately. The guard is untouched: the Dockerfile change is the App's, never
+Dependabot's.
+
+Rejected: a `multi-ecosystem-groups` group for the two entries. Its pull request would carry a
+Dependabot commit that touches the Dockerfile, which the guard refuses by design, so the compose
+follow-up would fail on exactly the bump the group exists for; relaxing the guard would widen what a
+Dependabot-authored commit may change before code runs with the App's key. A group also needs
+`patterns` on the compose entry, whose effect on the other compose images is not documented.
