@@ -107,8 +107,7 @@ class BlueprintAccessPolicyDifferentialTest {
               mock(OrgUnitCascadeService.class),
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               new MockHttpServletRequest());
-      AccessGateService accessGateService =
-          new AccessGateService(resolver, authHelper, memberships);
+      AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       OwnerScopeService hub =
           new OwnerScopeService(
               resolver,

@@ -57,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
@@ -88,6 +89,7 @@ class JobOrderServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
 
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private OrgUnitAccessPolicy orgUnitAccessPolicy;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
   @Mock private SystemSettings systemSettings;
@@ -155,7 +157,7 @@ class JobOrderServiceTest {
             jobOrderStockProjectionService,
             jobOrderPriorityService,
             qualityTierService,
-            ownerScopeService,
+            orgUnitAccessPolicy,
             actingUserService());
     jobOrderQueryService =
         new JobOrderQueryService(
@@ -1603,7 +1605,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(ownerScopeService.canEditOrgUnit(currentId)).thenReturn(true);
+    when(orgUnitAccessPolicy.canEditOrgUnit(currentId)).thenReturn(true);
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
     when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class)))
@@ -1632,7 +1634,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(ownerScopeService.canEditOrgUnit(currentId)).thenReturn(true);
+    when(orgUnitAccessPolicy.canEditOrgUnit(currentId)).thenReturn(true);
 
     assertThrows(
         org.springframework.security.access.AccessDeniedException.class,
@@ -1657,7 +1659,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(ownerScopeService.canEditOrgUnit(currentId)).thenReturn(true);
+    when(orgUnitAccessPolicy.canEditOrgUnit(currentId)).thenReturn(true);
 
     assertThrows(
         org.springframework.security.access.AccessDeniedException.class,
@@ -1682,7 +1684,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(ownerScopeService.canEditOrgUnit(currentId)).thenReturn(false);
+    when(orgUnitAccessPolicy.canEditOrgUnit(currentId)).thenReturn(false);
 
     assertThrows(
         org.springframework.security.access.AccessDeniedException.class,

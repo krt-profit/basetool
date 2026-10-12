@@ -2986,6 +2986,16 @@ and NullAway does not cover them yet (69 and 44 findings). Extracting them now w
 
 *Step 15 — P3-11.* The plan names the per-command audit contract and nowhere defines it; nothing was invented.
 
+**Umbrella step 12 — built: the org-unit and user gates are named policies in `scope.api` — done 2026-10-12 (option A, confirmed by the owner 2026-10-12)**
+1. *Built as designed above.* `OrgUnitAccessPolicy` (bean `orgUnitAccessPolicy`: `canSeeOrgUnit`, `canEditOrgUnit`, both delegating to the scope kernel's `canSeeSquadron` / `canEditSquadron`) and `UserAccessPolicy` (bean `userAccessPolicy`:
+   `canActOnTargetUser`, the body of the former `AccessGateService` method). `OwnerScopeService` and `AccessGateService` lost the three methods; `AccessGateService` lost its `OrgUnitMembershipRepository`. The ten call sites changed receiver:
+   `JobOrderService` and `MaterialClaimService` ask `orgUnitAccessPolicy`, `InventoryAccessPolicy` and `RefineryAccessPolicy` ask `userAccessPolicy`, `OrgUnitStampingService` calls `canEditSquadron` directly. No expression names the methods,
+   so no SpEL bean name changed and the authorization matrix did not change. `JobOrderService` no longer holds an `OwnerScopeService`.
+2. *Proof.* `OrgUnitAndUserAccessPolicyDifferentialTest` compares the policies with a verbatim copy of the old methods over nine callers (admin unpinned and pinned to either unit; members of zero, one and two units; a member pinned to an own and to a
+   foreign unit; a Bereich lead reaching a child Staffel by cascade) against four org units and seven targets (members of one unit, of both, of the child, of none, an unknown account and the caller themselves), 189 verdicts. It was proven able to fail:
+   dropping the self shortcut from `UserAccessPolicy` turned it red. The existing policy differential tests, `OwnerScopeServiceTest`, `JobOrderService*Test` and `MaterialClaimServiceTest` follow the new constructors; `TenancyGuardTest` and the
+   architecture gates pass unchanged. `compileJava --rerun` shows 0 warnings.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -3031,7 +3041,7 @@ before a decision.
   - [x] **11.** done — `hangar` (6), `joborder` (45), `mission` (36): what the foreign modules no longer
         hold after steps 6, 7 and 9; of the eight association-to-id conversions of §5.6 seven are done,
         `MissionUnit.ship` is still an entity association.
-  - [ ] **12.** `Q` design written, waiting for the owner's choice of A, B or C (entry above) — Access policies left in the scope hub (§5.4): `OwnerScopeService` and
+  - [x] **12.** done, option A confirmed by the owner 2026-10-12 — Access policies left in the scope hub (§5.4): `OwnerScopeService` and
         `AccessGateService` keep the org-unit and user gates; `Q` the plan names no policy for them.
 - Persistence:
   - [ ] **13.** `Q` design and SQL written (entry above), waiting for the owner — D-17, member settings move with their owner: the payout-preference and

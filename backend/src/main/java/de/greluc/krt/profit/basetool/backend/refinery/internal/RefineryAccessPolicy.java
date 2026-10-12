@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -56,6 +57,7 @@ public class RefineryAccessPolicy {
 
   private final OwnerScopeService ownerScopeService;
   private final RefineryOrderRepository refineryOrderRepository;
+  private final UserAccessPolicy userAccessPolicy;
 
   /**
    * Checks whether the caller may read refinery order {@code orderId}, applying the owner escape
@@ -100,7 +102,7 @@ public class RefineryAccessPolicy {
    * @return {@code true} iff the caller may read the member's in-scope refinery orders
    */
   public boolean canViewUserRefineryOrders(@NotNull UUID targetUserId) {
-    return ownerScopeService.canActOnTargetUser(targetUserId, false);
+    return userAccessPolicy.canActOnTargetUser(targetUserId, false);
   }
 
   /**
@@ -111,6 +113,6 @@ public class RefineryAccessPolicy {
    * @return {@code true} iff the caller may create a refinery order on the member's behalf
    */
   public boolean canManageUserRefineryOrders(@NotNull UUID targetUserId) {
-    return ownerScopeService.canActOnTargetUser(targetUserId, true);
+    return userAccessPolicy.canActOnTargetUser(targetUserId, true);
   }
 }

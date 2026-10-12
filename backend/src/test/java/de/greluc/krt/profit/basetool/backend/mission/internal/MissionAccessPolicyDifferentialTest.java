@@ -248,8 +248,7 @@ class MissionAccessPolicyDifferentialTest {
               cascade,
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
-      AccessGateService accessGateService =
-          new AccessGateService(resolver, authHelper, memberships);
+      AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       OwnerScopeService ownerScopeService =
           new OwnerScopeService(
               resolver,

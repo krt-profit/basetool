@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -250,8 +251,7 @@ class RefineryAccessPolicyDifferentialTest {
               cascade,
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
-      AccessGateService accessGateService =
-          new AccessGateService(resolver, authHelper, memberships);
+      AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       OwnerScopeService ownerScopeService =
           new OwnerScopeService(
               resolver,
@@ -261,7 +261,11 @@ class RefineryAccessPolicyDifferentialTest {
       scopeHub =
           new ScopeHubRefineryGates(
               accessGateService, authHelper, resolver, repository, memberships);
-      policy = new RefineryAccessPolicy(ownerScopeService, repository);
+      policy =
+          new RefineryAccessPolicy(
+              ownerScopeService,
+              repository,
+              new UserAccessPolicy(accessGateService, authHelper, memberships));
     }
 
     private void order(RefineryOrderRepository repository, String label, UUID unit, UUID owner) {

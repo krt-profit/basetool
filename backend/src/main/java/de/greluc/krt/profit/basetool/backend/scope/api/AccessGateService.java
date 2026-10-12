@@ -21,12 +21,10 @@ package de.greluc.krt.profit.basetool.backend.scope.api;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -49,7 +47,6 @@ public class AccessGateService {
 
   private final RequestScopeResolver requestScopeResolver;
   private final AuthHelperService authHelper;
-  private final OrgUnitMembershipRepository orgUnitMembershipRepository;
 
   /**
    * Checks whether the caller may see data owned by the org unit {@code squadronId} (Staffel or
@@ -69,16 +66,6 @@ public class AccessGateService {
   }
 
   /**
-   * Alias for {@link #canSeeSquadron(UUID)} with an org-unit name.
-   *
-   * @param orgUnitId the org-unit id whose data the caller wants to read; never {@code null}
-   * @return {@code true} iff the caller may see the org unit's data
-   */
-  public boolean canSeeOrgUnit(@NotNull UUID orgUnitId) {
-    return canSeeSquadron(orgUnitId);
-  }
-
-  /**
    * Checks whether the caller may write data owned by {@code squadronId}; currently the same rule
    * as {@link #canSeeSquadron(UUID)}.
    *
@@ -87,16 +74,6 @@ public class AccessGateService {
    */
   public boolean canEditSquadron(@NotNull UUID squadronId) {
     return canSeeSquadron(squadronId);
-  }
-
-  /**
-   * Alias for {@link #canEditSquadron(UUID)} with an org-unit name.
-   *
-   * @param orgUnitId the org-unit id whose data the caller wants to write; never {@code null}
-   * @return {@code true} iff the caller may write the org unit's data
-   */
-  public boolean canEditOrgUnit(@NotNull UUID orgUnitId) {
-    return canEditSquadron(orgUnitId);
   }
 
   /**
@@ -169,40 +146,5 @@ public class AccessGateService {
         || (orgUnit == null
             ? canAccessOwnerlessPersonalRow(owner)
             : (edit ? canEditSquadron(orgUnit.getId()) : canSeeSquadron(orgUnit.getId())));
-  }
-
-  /**
-   * Coarse pre-check for acting on another member's rows: admin, then self, then whether {@link
-   * #canSeeSquadron(UUID)} or, with {@code edit}, {@link #canEditSquadron(UUID)} accepts any of the
-   * member's memberships. It does not bound individual rows.
-   *
-   * @param targetUserId the member being acted upon; never {@code null}
-   * @param edit {@code true} for the write check, {@code false} for the read check
-   * @return {@code true} iff the caller shares at least one in-scope org unit with the member
-   */
-  public boolean canActOnTargetUser(@NotNull UUID targetUserId, boolean edit) {
-    return canActOnTargetUserScoped(
-        targetUserId, edit ? this::canEditSquadron : this::canSeeSquadron);
-  }
-
-  /**
-   * Shared on-behalf check: admin, then self, then whether {@code unitScope} accepts any of the
-   * target user's memberships. It does not bound individual rows; callers must scope per row.
-   *
-   * @param targetUserId the user being acted upon; never {@code null}
-   * @param unitScope the per-unit scope check to apply; never {@code null}
-   * @return {@code true} iff the caller shares at least one in-scope org unit with the target
-   */
-  private boolean canActOnTargetUserScoped(
-      @NotNull UUID targetUserId, @NotNull Predicate<UUID> unitScope) {
-    if (authHelper.isAdmin()) {
-      return true;
-    }
-    if (authHelper.currentUserId().map(targetUserId::equals).orElse(false)) {
-      return true;
-    }
-    return orgUnitMembershipRepository.findAllByIdUserId(targetUserId).stream()
-        .map(m -> m.getId().getOrgUnitId())
-        .anyMatch(unitScope);
   }
 }

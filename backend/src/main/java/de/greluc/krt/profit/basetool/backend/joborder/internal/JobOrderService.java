@@ -57,7 +57,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitAccessPolicy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -106,7 +106,7 @@ public class JobOrderService {
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderPriorityService jobOrderPriorityService;
   private final QualityTierService qualityTierService;
-  private final OwnerScopeService ownerScopeService;
+  private final OrgUnitAccessPolicy orgUnitAccessPolicy;
 
   private final UserService userService;
 
@@ -1053,7 +1053,7 @@ public class JobOrderService {
    *   <li>Admins may reassign to any profit-eligible squadron or SK, in any direction.
    *   <li>A non-admin Logistician/Officer may only escalate a squadron-responsible order to an SK,
    *       and only if they may edit its current squadron ({@link
-   *       OwnerScopeService#canEditOrgUnit}).
+   *       OrgUnitAccessPolicy#canEditOrgUnit}).
    * </ul>
    *
    * @param id job order id
@@ -1087,7 +1087,8 @@ public class JobOrderService {
       OrgUnit current = jobOrder.getResponsibleOrgUnit();
       boolean currentIsSquadron = current != null && current.getKind() == OrgUnitKind.SQUADRON;
       boolean targetIsSpecialCommand = target.getKind() == OrgUnitKind.SPECIAL_COMMAND;
-      boolean mayEditCurrent = current != null && ownerScopeService.canEditOrgUnit(current.getId());
+      boolean mayEditCurrent =
+          current != null && orgUnitAccessPolicy.canEditOrgUnit(current.getId());
       if (!(currentIsSquadron && targetIsSpecialCommand && mayEditCurrent)) {
         throw new AccessDeniedException(
             "Only an admin may reassign freely; a squadron logistician/officer may only escalate"

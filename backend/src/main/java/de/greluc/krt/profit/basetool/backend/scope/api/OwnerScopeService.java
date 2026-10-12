@@ -360,17 +360,6 @@ public class OwnerScopeService implements SquadronVisibility {
   }
 
   /**
-   * Delegates to {@link AccessGateService#canSeeOrgUnit(UUID)}: the plan-aligned alias of {@link
-   * #canSeeSquadron(UUID)}.
-   *
-   * @param orgUnitId the org-unit id whose data the caller wants to read; never {@code null}.
-   * @return {@code true} iff the caller may see the given org unit's data.
-   */
-  public boolean canSeeOrgUnit(@NotNull UUID orgUnitId) {
-    return accessGateService.canSeeOrgUnit(orgUnitId);
-  }
-
-  /**
    * Delegates to {@link AccessGateService#canEditSquadron(UUID)}: whether the caller may write data
    * owned by {@code squadronId}.
    *
@@ -379,17 +368,6 @@ public class OwnerScopeService implements SquadronVisibility {
    */
   public boolean canEditSquadron(@NotNull UUID squadronId) {
     return accessGateService.canEditSquadron(squadronId);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canEditOrgUnit(UUID)}: the plan-aligned alias of {@link
-   * #canEditSquadron(UUID)}.
-   *
-   * @param orgUnitId the org-unit id whose data the caller wants to write; never {@code null}.
-   * @return {@code true} iff the caller may write to the given org unit's data.
-   */
-  public boolean canEditOrgUnit(@NotNull UUID orgUnitId) {
-    return accessGateService.canEditOrgUnit(orgUnitId);
   }
 
   /**
@@ -415,17 +393,5 @@ public class OwnerScopeService implements SquadronVisibility {
    */
   public boolean permitsOwnedRow(@Nullable User owner, @Nullable OrgUnit orgUnit, boolean edit) {
     return accessGateService.permitsOwnedRow(owner, orgUnit, edit);
-  }
-
-  /**
-   * Delegates to {@link AccessGateService#canActOnTargetUser}: the scope kernel's coarse on-behalf
-   * pre-check, for the module access policies (plan §5.4).
-   *
-   * @param targetUserId the member being acted upon; never {@code null}
-   * @param edit {@code true} for the write check, {@code false} for the read check
-   * @return {@code true} iff the caller shares at least one in-scope org unit with the member
-   */
-  public boolean canActOnTargetUser(@NotNull UUID targetUserId, boolean edit) {
-    return accessGateService.canActOnTargetUser(targetUserId, edit);
   }
 }

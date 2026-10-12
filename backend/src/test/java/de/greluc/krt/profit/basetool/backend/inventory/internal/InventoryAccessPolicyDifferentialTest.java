@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -255,8 +256,7 @@ class InventoryAccessPolicyDifferentialTest {
               cascade,
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
-      AccessGateService accessGateService =
-          new AccessGateService(resolver, authHelper, memberships);
+      AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       OwnerScopeService ownerScopeService =
           new OwnerScopeService(
               resolver,
@@ -266,7 +266,11 @@ class InventoryAccessPolicyDifferentialTest {
       scopeHub =
           new ScopeHubInventoryGates(
               accessGateService, authHelper, resolver, repository, memberships);
-      policy = new InventoryAccessPolicy(ownerScopeService, repository);
+      policy =
+          new InventoryAccessPolicy(
+              ownerScopeService,
+              repository,
+              new UserAccessPolicy(accessGateService, authHelper, memberships));
     }
 
     private void row(InventoryItemRepository repository, String label, UUID unit, UUID owner) {

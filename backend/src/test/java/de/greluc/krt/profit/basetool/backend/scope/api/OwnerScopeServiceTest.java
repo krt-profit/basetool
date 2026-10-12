@@ -187,8 +187,7 @@ class OwnerScopeServiceTest {
             orgUnitCascadeService,
             staffelMembershipResolver,
             request);
-    AccessGateService accessGateService =
-        new AccessGateService(requestScopeResolver, authHelper, orgUnitMembershipRepository);
+    AccessGateService accessGateService = new AccessGateService(requestScopeResolver, authHelper);
     OrgUnitStampingService orgUnitStampingService =
         new OrgUnitStampingService(
             requestScopeResolver,
@@ -199,9 +198,11 @@ class OwnerScopeServiceTest {
     service =
         new OwnerScopeService(requestScopeResolver, accessGateService, orgUnitStampingService);
     operationPolicy = new OperationAccessPolicy(service, authHelper, operationRepository);
-    refineryPolicy = new RefineryAccessPolicy(service, refineryOrderRepository);
+    UserAccessPolicy userAccessPolicy =
+        new UserAccessPolicy(accessGateService, authHelper, orgUnitMembershipRepository);
+    refineryPolicy = new RefineryAccessPolicy(service, refineryOrderRepository, userAccessPolicy);
     missionPolicy = new MissionAccessPolicy(service, authHelper, missionRepository);
-    inventoryPolicy = new InventoryAccessPolicy(service, inventoryItemRepository);
+    inventoryPolicy = new InventoryAccessPolicy(service, inventoryItemRepository, userAccessPolicy);
     hangarPolicy = new HangarAccessPolicy(service, shipRepository);
     jobOrderPolicy =
         new JobOrderAccessPolicy(
@@ -2261,7 +2262,7 @@ class OwnerScopeServiceTest {
 
       assertTrue(service.canSeeSquadron(DESCENDANT_STAFFEL_ID));
       assertTrue(service.canEditSquadron(DESCENDANT_STAFFEL_ID));
-      assertTrue(service.canSeeOrgUnit(BEREICH_A_ID));
+      assertTrue(service.canSeeSquadron(BEREICH_A_ID));
     }
 
     @Test

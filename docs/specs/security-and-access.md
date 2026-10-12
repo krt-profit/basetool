@@ -373,7 +373,7 @@ authoritative in [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
 `LOGISTICIAN` and `MISSION_MANAGER` are granted contextually via `is_logistician` /
 `is_mission_manager` flags on `org_unit_membership` rows; the flag on *any* membership
 yields the flat authority via `CustomJwtGrantedAuthoritiesConverter`, with per-OrgUnit
-scoping enforced by `@PreAuthorize` SpEL against `OwnerScopeService.canEditOrgUnit(...)`.
+scoping enforced by `@PreAuthorize` SpEL against `OrgUnitAccessPolicy.canEditOrgUnit(...)`.
 An SK `is_lead` membership additionally grants both roles (flat + contextual
 `LOGISTICIAN@skId` / `MISSION_MANAGER@skId`) on that SK. Legacy `app_user.is_logistician`
 / `is_mission_manager` are read only as a fallback for users with no membership row;

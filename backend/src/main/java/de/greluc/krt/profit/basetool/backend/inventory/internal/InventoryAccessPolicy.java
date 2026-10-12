@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -45,6 +46,7 @@ public class InventoryAccessPolicy implements BookInPolicy {
 
   private final OwnerScopeService ownerScopeService;
   private final InventoryItemRepository inventoryItemRepository;
+  private final UserAccessPolicy userAccessPolicy;
 
   /**
    * Checks whether the caller may read Lager row {@code itemId}, applying the owner escape
@@ -82,7 +84,7 @@ public class InventoryAccessPolicy implements BookInPolicy {
    * @return {@code true} iff the caller may create Lager rows in that member's name
    */
   public boolean canManageUserInventory(@NotNull UUID targetUserId) {
-    return ownerScopeService.canActOnTargetUser(targetUserId, true);
+    return userAccessPolicy.canActOnTargetUser(targetUserId, true);
   }
 
   @Override
