@@ -23,6 +23,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakPresence;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -63,7 +65,7 @@ import org.springframework.web.client.RestClientException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class UserDeletionService {
+public class UserDeletionService implements AccountErasure {
 
   /**
    * I18n key of the 400 detail for deleting an account that still exists in Keycloak — by the
@@ -307,6 +309,37 @@ public class UserDeletionService {
         ruleSelectorsDeleted,
         evaluationsDeleted,
         admin.getId());
+  }
+
+  /**
+   * Deletes {@code userId} for the identity module's registration flow; maps the identity-owned
+   * presence mode onto {@link KeycloakPresenceCheck} and runs {@link #deleteUser(UUID,
+   * KeycloakPresenceCheck)}.
+   *
+   * @param userId user to delete
+   * @param presence whether the Keycloak presence probe applies
+   * @throws NoSuchElementException as {@link #deleteUser(UUID, KeycloakPresenceCheck)}
+   * @throws BadRequestException as {@link #deleteUser(UUID, KeycloakPresenceCheck)}
+   * @throws IllegalStateException as {@link #deleteUser(UUID, KeycloakPresenceCheck)}
+   */
+  @Override
+  @Transactional
+  public void deleteAccount(@NotNull UUID userId, @NotNull KeycloakPresence presence) {
+    deleteUser(userId, toCheck(presence));
+  }
+
+  /**
+   * Maps the identity-owned presence mode onto this orchestrator's own.
+   *
+   * @param presence the mode the identity module passes
+   * @return the matching {@link KeycloakPresenceCheck}
+   */
+  static @NotNull KeycloakPresenceCheck toCheck(@NotNull KeycloakPresence presence) {
+    return switch (presence) {
+      case ENFORCED -> KeycloakPresenceCheck.ENFORCED;
+      case WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER ->
+          KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER;
+    };
   }
 
   /**

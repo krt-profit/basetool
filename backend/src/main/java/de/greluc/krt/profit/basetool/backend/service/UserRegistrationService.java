@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakPresence;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
@@ -70,7 +72,7 @@ public class UserRegistrationService {
   private final UserApprovalEventRepository userApprovalEventRepository;
   private final ApplicationEventPublisher eventPublisher;
   private final KeycloakService keycloakService;
-  private final UserDeletionService userDeletionService;
+  private final AccountErasure accountErasure;
 
   /**
    * Lazy self-reference so {@link #linkRegistrationToExistingAccount} can call {@link
@@ -388,10 +390,10 @@ public class UserRegistrationService {
    * the self-proxy.
    *
    * <p>Deletes the throwaway {@code app_user} first, freeing the unique {@code discord_user_id},
-   * via {@link UserDeletionService#deleteUser(UUID, UserDeletionService.KeycloakPresenceCheck)}
-   * with the presence probe waived, then stamps the target's {@code discord_user_id} and guild
-   * nickname and writes the {@link ApprovalDecision#LINKED} audit row. On a retry where the
-   * throwaway row is already gone, the delete is skipped.
+   * via {@link AccountErasure#deleteAccount(UUID, KeycloakPresence)} with the presence probe
+   * waived, then stamps the target's {@code discord_user_id} and guild nickname and writes the
+   * {@link ApprovalDecision#LINKED} audit row. On a retry where the throwaway row is already gone,
+   * the delete is skipped.
    *
    * @param pendingId the throwaway pending registration to delete (may already be gone on a retry)
    * @param targetUserId the surviving account to stamp with the Discord link
@@ -415,10 +417,8 @@ public class UserRegistrationService {
             pending -> {
               pending.setInKeycloak(false);
               userRepository.saveAndFlush(pending);
-              userDeletionService.deleteUser(
-                  pendingId,
-                  UserDeletionService.KeycloakPresenceCheck
-                      .WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+              accountErasure.deleteAccount(
+                  pendingId, KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
             });
 
     User target =

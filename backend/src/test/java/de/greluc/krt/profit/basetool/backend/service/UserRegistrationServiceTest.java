@@ -35,6 +35,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakPresence;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
@@ -76,7 +78,7 @@ class UserRegistrationServiceTest {
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private KeycloakService keycloakService;
-  @Mock private UserDeletionService userDeletionService;
+  @Mock private AccountErasure accountErasure;
   @Mock private ObjectProvider<UserRegistrationService> selfProvider;
 
   @InjectMocks private UserRegistrationService userRegistrationService;
@@ -275,14 +277,12 @@ class UserRegistrationServiceTest {
           userRegistrationService.linkRegistrationToExistingAccount(
               USER_ID, TARGET_ID, 0L, ADMIN_ID);
 
-      InOrder order = inOrder(keycloakService, userDeletionService);
+      InOrder order = inOrder(keycloakService, accountErasure);
       order.verify(keycloakService).unlinkDiscordIdentity(USER_ID);
       order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "examplehandle4711");
       order
-          .verify(userDeletionService)
-          .deleteUser(
-              USER_ID,
-              UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+          .verify(accountErasure)
+          .deleteAccount(USER_ID, KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
       order.verify(keycloakService).deleteUser(USER_ID);
       assertFalse(pending.isInKeycloak());
       assertEquals(SNOWFLAKE, result.getDiscordUserId());
@@ -312,10 +312,8 @@ class UserRegistrationServiceTest {
 
       verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "examplehandle4711");
       verify(keycloakService).deleteUser(USER_ID);
-      verify(userDeletionService)
-          .deleteUser(
-              USER_ID,
-              UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+      verify(accountErasure)
+          .deleteAccount(USER_ID, KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
       assertEquals(SNOWFLAKE, result.getDiscordUserId());
       ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
       verify(userApprovalEventRepository).save(audit.capture());
