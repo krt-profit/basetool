@@ -237,7 +237,7 @@ request and read DTOs. `inventory.api` publishes what other modules use: `StockC
 Materialbörse offers), `StockItemCatalogue`, `InventoryItemDto` with its two allocation DTOs and the
 projection rows. The three entities (`InventoryItem` and the two allocations) lie in `inventory.api` too (umbrella step 9), because
 seven classes of the exchange, the job order and the Materialbörse hold the row; no foreign module writes it (`StockWriteOwnershipTest`),
-and the conversion to a record plus id commands that would let the entity move into `internal` is still open (plan §7.6, P4-1). Four more
+and the conversion to a record plus id commands that would let the entity move into `internal` is open and waits for the owner's choice between three designs (plan §7.6, entry "Umbrella follow-ups that wait for the owner"). Four more
 seams lie in `inventory.api` as well: `StockViewerAccess` (the caller's `canEdit`, read by `JobOrderMapper`), `OrderLinkedStockRows` (the material rows
 the job order's stock projection reads), and the records the job-order and mission repositories return, `JobOrderEarmark` and `MissionEarmark`.
 
@@ -255,8 +255,8 @@ behind a read API (plan §7.6).
 
 The scope kernel moved in part since P4-6 (plan §7.6). `scope.api` holds the request-scope kernel and
 the scope hub: `RequestScopeResolver`, `ScopePredicate`, `OrgUnitStampingService`,
-`ScopeSpecifications` (the JPQL scope fragments, all public now because the repositories that splice
-them lie in other packages), `OwnerScopeService` (bean `ownerScopeService`) and `AccessGateService`,
+`ScopeSpecifications` (the four JPQL scope fragments that have not moved into a module, all public because the repositories that splice
+them lie in other packages; their move waits for the owner, same plan entry), `OwnerScopeService` (bean `ownerScopeService`) and `AccessGateService`,
 beside the problem codes. `scope.internal` holds `ScopeActiveOrgUnitProvider`, which implements the
 `platform.api.ActiveOrgUnitProvider` SPI for the logging MDC. `OrgUnitCascadeService` moved to
 `orgunit.api` as a prerequisite, because the scope kernel calls it. `CustomJwtGrantedAuthoritiesConverter`

@@ -402,3 +402,8 @@ and forms live in `<domain>.web` and `<domain>.model` beside the typed clients, 
 eight `kernel.*` packages. The cross-domain references between domains are page composition and no
 frontend rule bounds them yet; the kernel's ten reaches into `orgunit`, `identity` and `catalogue`
 (§5.3) are frozen by `KernelDomainReachTest` and may only shrink.
+
+Status 2026-10-12 (umbrella pull request #2552): every domain class lies in a module package, the module baseline is empty and
+NullAway checks every module as a whole tree. The Gradle extraction of the exchange and the bank is struck (plan §5.8). Two items wait
+for the owner and are recorded in the plan: the Lager row as a record plus id commands (P4-1 part 3) and the four scope fragments
+still in `ScopeSpecifications` (REQ-DATA-010).

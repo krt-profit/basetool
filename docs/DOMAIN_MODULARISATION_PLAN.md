@@ -2911,7 +2911,7 @@ The question for the owner: A, B or C.
 4. *Open — then done (entry "Umbrella follow-up: NullAway checks bank, exchange, kernel and app" below)*: `bank`, `exchange`, `kernel` and `app` stayed on the `api`-only list.
 
 **Umbrella step 17 — requirement status, arc42 and the CLAUDE.md files — done 2026-10-12, partly**
-1. *Plan §14 status*: REQ-XCH-009/011 need nothing but the rewritten source paths; REQ-DATA-010 waits for the access-policy decision of step 12 (the six scope fragments are still `ScopeSpecifications`);
+1. *Plan §14 status*: REQ-XCH-009/011 need nothing but the rewritten source paths; REQ-DATA-010 waits for the access-policy decision of step 12 (four of the six scope fragments are still `ScopeSpecifications`; the other two sit in their policies);
    REQ-AUDIT-001 is not waiting for anything; P3-11 is struck (umbrella step 15).
 2. *arc42 §5*: the layer-package table is marked as the roles the layers had; the audit paragraph no longer says its classes sit in the layer packages; the per-module paragraphs were extended with every step.
 3. *CLAUDE.md*: the root file describes the backend as a modular monolith with `api` / `internal` / `web`; `backend/CLAUDE.md` gained three landmines found in this pull request (fragment implementation beside its
@@ -3044,6 +3044,17 @@ The owner did not accept the empty module baseline of steps 6 and 7: five classe
 4. *Enabled*: `bank`, `exchange`, `kernel` and `app` join `nullAwayPackages` as whole trees; with them every module is checked as a whole tree.
 5. *Not individually reviewed*: the choice of `@Nullable` versus `requireNonNull` at each site follows the surrounding rule and is flagged for review.
 
+**Umbrella follow-ups that wait for the owner (2026-10-12): the Lager row and the scope fragments**
+1. *P4-1 part 3 — the Lager row as a record plus id commands.* Probed, not built: the design is not dictated by the existing calls.
+   - *Facts.* Six foreign classes hold the entity (`ExchangeStockWriteService`, `JobOrderHandoverService`, `JobOrderItemProductionService`, `JobOrderService`, `MaterialExchangeBoardService`, `MaterialExchangeService`) plus `StockCommands`, `StockReads`, `InventoryAllocations` and `InventoryAuditLabels` in `inventory.api`; about 25 test classes build or read it; the Materialbörse offer repository joins it by entity name in three queries. The foreign classes mostly read (`getAmount`, `getStolen`, `getMaterial`, `getLocation`, `getQuality`, `getUser`, `getOwningOrgUnit`, `getVersion`) and hand the row back to a command, so a record and id commands are derivable. **But the exchange relies on the in-place mutation**: `ExchangeStockWriteService.execute` filters `change.rows()` by `getStolen()` after `markRows` has set the flag on whole rows through `StockCommands.markStolen`, and `bookOut` sums `free(rows)` row by row between commands. A snapshot record would read stale state there.
+   - *Options.* **A1** an immutable `StockRow` record, every command returns the post-command rows, the callers re-read after each command (faithful to the plan's words; touches six classes and the 25 tests, and each re-read is a behaviour risk in the lock-ordered exchange write). **A2** a read-only live view `StockRow` (getters only) that the entity implements, published in `inventory.api`; commands take ids; the three entities move to `inventory.internal`. The foreign code reads the same managed instance, so the in-place semantics, the locks and the optimistic version stay identical; it deviates from the word "record". **A3** keep the entity published in `inventory.api` and amend this plan's text (the stated reason: nothing writes it from outside, `StockWriteOwnershipTest`).
+   - *Recommendation.* A2, with a differential test that runs the old and the new exchange write over one fixture matrix.
+2. *REQ-DATA-010 and the four scope fragments in `ScopeSpecifications`.*
+   - *Facts.* The requirement text and its acceptance already hold: `scope.api.ScopeSpecifications` carries one fragment per aggregate. What is waiting is the plan's wish (§5.4, §14) that each policy owns the fragment beside the per-row gate. Two of the six fragments already sit in their policy (`RefineryAccessPolicy`, `OperationAccessPolicy`, whose repositories are `internal`). The other four (`MISSION_SCOPE_PREDICATE`, `SHIP_SCOPE_TRIPLE`, `INVENTORY_ITEM_SCOPE_TRIPLE`, `JOB_ORDER_SCOPE_PREDICATE`) are spliced into `@Query` values by `MissionRepository`, `ShipRepository` and `JobOrderRepository` (published in `api`), by `InventoryItemRepository`, and by `MaterialExchangeOfferRepository` (a foreign module joins the Lager row). An annotation value needs a compile-time constant, and the policy beans are `internal`, which an `api` repository must not import.
+   - *Options.* **B1** one small public constant holder per owning module in its `api` (`mission.api.MissionScope`, `hangar.api.ShipScope`, `joborder.api.JobOrderScope`, `inventory.api.InventoryScope`), the same strings with the alias baked in; the policy bean cites and tests it; `ScopeSpecifications` goes. Tests: a golden file of the six JPQL texts captured before the move (byte-identical), and one parity test per aggregate that runs the list query and the per-row gate over the existing fixture matrix against the real schema and requires the same visible set. **B2** make the four policy classes public in `api` and put the constant on them (a bean full of internals becomes published surface). **B3** declare the requirement met as it stands and amend the plan's wish.
+   - *Recommendation.* B1.
+3. Both are recorded as open in the checklist (items 9 and 17), not as done.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -3071,7 +3082,7 @@ before a decision.
 - Foundation modules (§5.2 publishes their entities in `api`):
   - [x] **6.** done — `orgunit` (61: the org-unit entities and enums, 7 repositories, 12 services, 4 mappers,
         8 controllers). Prerequisite for the `User` entity (`OrgUnitMembership.user`).
-  - [x] **7.** done except five classes — `identity` remainder (29): `User`, `Role`, `TermsAcceptance`, `UserApprovalEvent`,
+  - [x] **7.** done — `identity` remainder (29): `User`, `Role`, `TermsAcceptance`, `UserApprovalEvent`,
         `PayoutPreference` (deferred "with `User`", §7.3), `UserRepository` (279 files name it),
         `UserMapper`/`UserDto`/`UserReferenceDto`, `UserController`, `MeController`, the mail services,
         `UserSyncService`/`UserSyncTask`, the rejected-registration retention.
@@ -3081,7 +3092,7 @@ before a decision.
   - [x] **8.** done — `privacy` (23, 28 with the identity leftovers): the GDPR orchestration classes (§5.1 rank 13) into `privacy`, then
         dissolved into identity as §5.1 and §7.6 say.
 - Business core leftovers (the entities other modules still hold):
-  - [x] **9.** moved, conversion open — P4-1 part 3, inventory: the Lager row becomes a record plus id commands, then
+  - [ ] **9.** moved, conversion open, waits for the owner (entry "Umbrella follow-ups that wait for the owner") — P4-1 part 3, inventory: the Lager row becomes a record plus id commands, then
         `InventoryItem` and the two allocations move into `inventory.internal`; with them
         `InventoryGameItemReferenceDto`, `JobOrderEarmark`/`MissionEarmark`, `JobOrderMaterialStockRow`
         and `StockViewerAccess`.
@@ -3102,7 +3113,7 @@ before a decision.
   - [x] **15.** struck by the owner 2026-10-12 — P3-11, the per-command audit contract: it was never defined and is not implemented.
 - Quality gates:
   - [x] **16.** done — NullAway to the whole tree of every module (`bank`, `exchange`, `kernel` and `app` last, see the follow-up entry).
-  - [x] **17.** partly done, REQ-DATA-010 waits — Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
+  - [ ] **17.** partly done, REQ-DATA-010 waits for the owner (same entry) — Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
         REQ-XCH-009/011; arc42 §5.2/§5.3 per module; CLAUDE.md files.
 - Gradle extraction, last (they move whole source trees):
   - [x] **18.** and **19.** P5-c `backend-exchange` and P5-d `backend-bank`: **not implemented, by decision of the owner 2026-10-12** (§5.8, entry above). P5-a and P5-b stay.
@@ -3724,7 +3735,7 @@ Full tables, per finding with status, evidence and verdict:
   (the fragment per aggregate moves into each module with its repository, Phase 3), REQ-XCH-009/011 (they name the domain APIs the exchange calls,
   which exist when blueprint, inventory and hangar publish theirs, Phase 3). REQ-AUDIT-001 keeps its text; the "per-command contract" (P3-11) is not a status of it, see the entry of umbrella step 15.
   **Status 2026-10-12 (umbrella step 17):** the three modules publish their entities and repositories in `api` since steps 9, 10 and 11a; that did not change what REQ-XCH-009/011 say, only the
-  source paths in the specs, which the text scans rewrote. REQ-DATA-010 stays waiting: `ScopeSpecifications` still holds the six scope fragments in `scope.api` (§5.4, step 12). REQ-AUDIT-001 is not waiting for anything: P3-11 is struck (umbrella step 15).
+  source paths in the specs, which the text scans rewrote. REQ-DATA-010 stays waiting: `ScopeSpecifications` still holds four of the six scope fragments in `scope.api` (§5.4, step 12; the owner decides, see the follow-up entry). REQ-AUDIT-001 is not waiting for anything: P3-11 is struck (umbrella step 15).
 - **arc42:** §4.1, §4.2, §5.3 and §5.5 (corrected with this plan), §5.2 and §5.3 rewritten per
   module as the moves land, §8 (module rules, interaction styles — §8.14, done 2026-10-02), §11.9
   (the domain coupling as debt, opened with this plan; its decisions linked 2026-10-02).
