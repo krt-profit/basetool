@@ -548,7 +548,7 @@ design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this expor
 > (`bank.dashboard.subtitle.*`) is the eyebrow, the title „Kartellbank", the actions the ghost
 > „3-Monats-Report" (management only) and the CTA „Kontobewegung" — and a toolbar below it holds the
 > account-name filter, the two view options and a „Stand <Zeit>" note. The view options render as
-> `.switch` toggles instead of checkboxes; their state, storage and `layout` / `group` swap are
+> `.krt-switch` toggles instead of checkboxes; their state, storage and `layout` / `group` swap are
 > unchanged.
 
 The bank landing page (`/bank`) is a **dashboard** in the design system's **D1 card
@@ -584,7 +584,7 @@ per-account N+1 (REQ-DATA-003).
 - [x] Dashboard renders correctly on all four device classes (REQ-UI responsive rules).
 - [x] A client-side account-name live filter sits beside the view-option checkboxes and hides
   non-matching cards as the user types (REQ-BANK-046).
-- [x] The two view options render as independent toggles (`.switch` since 2026-10-03; both off = the
+- [x] The two view options render as independent toggles (`.krt-switch` since 2026-10-03; both off = the
   default card grid A→Z); the header carries the direct-booking Kontobewegung CTA + modal (when an active account
   exists) and no longer the Verwaltung / Berechtigungen links (frontend `BankDashboardFilterMvcTest`).
 
