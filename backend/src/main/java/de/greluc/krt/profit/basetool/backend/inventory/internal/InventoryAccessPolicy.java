@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.UUID;
@@ -32,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
  * The inventory module's access policy: the read and edit gates of a Lager row and the on-behalf
  * book-in pre-check, evaluated on the scope kernel (plan §5.4, ADR-0236). It also answers the other
  * modules' book-in checks ({@link BookInPolicy}).
+ *
+ * <p>The list-side half of the rule is {@link InventoryScope#TRIPLE}; both widen together.
  *
  * <p>Invoked from SpEL as {@code @inventoryAccessPolicy}. Unknown ids are refused. Read-only
  * transactional.

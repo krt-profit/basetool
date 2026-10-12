@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipScope;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The hangar module's access policy: the read and edit gates of a ship, evaluated on the scope
  * kernel (plan §5.4, ADR-0236).
+ *
+ * <p>The list-side half of the rule is {@link ShipScope#TRIPLE}; both widen together.
  *
  * <p>Invoked from SpEL as {@code @hangarAccessPolicy}. Unknown ids are refused. Read-only
  * transactional.

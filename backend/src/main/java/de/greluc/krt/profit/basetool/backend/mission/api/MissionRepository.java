@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.mission.api;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
-import de.greluc.krt.profit.basetool.backend.scope.api.ScopeSpecifications;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -74,7 +73,7 @@ public interface MissionRepository
         OR (m.status IN ('COMPLETED', 'CANCELLED') AND m.plannedStartTime >= :cutoff)
       ) AND
       """
-          + ScopeSpecifications.MISSION_SCOPE_PREDICATE
+          + MissionScope.PREDICATE
           + " ORDER BY m.plannedStartTime DESC NULLS LAST, m.name ASC")
   List<MissionReferenceDto> findAllActiveReference(
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -191,7 +190,7 @@ public interface MissionRepository
   @EntityGraph(attributePaths = {"owningOrgUnit"})
   @Query(
       "SELECT m FROM Mission m WHERE "
-          + ScopeSpecifications.MISSION_SCOPE_PREDICATE
+          + MissionScope.PREDICATE
           + " AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
           + " string), '%') ESCAPE '\\' OR CAST(m.description AS string) ILIKE CONCAT('%',"
           + " CAST(:query AS string), '%') ESCAPE '\\') AND (CAST(:start AS timestamp) IS NULL OR"

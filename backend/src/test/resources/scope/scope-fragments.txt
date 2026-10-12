@@ -1,0 +1,48 @@
+=== MISSION_SCOPE_PREDICATE
+(
+  :isAdminAllScope = true
+  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)
+  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)
+  OR m.isInternal = false
+  OR (m.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)
+ )
+=== end
+=== SHIP_SCOPE_TRIPLE
+(
+  :isAdminAllScope = true
+  OR (:activeOrgUnitId IS NOT NULL AND s.owningOrgUnit.id = :activeOrgUnitId)
+  OR (:activeOrgUnitId IS NULL AND s.owningOrgUnit.id IN :memberOrgUnitIds)
+ )
+=== end
+=== INVENTORY_ITEM_SCOPE_TRIPLE
+(
+  :isAdminAllScope = true
+  OR (:activeOrgUnitId IS NOT NULL AND i.owningOrgUnit.id = :activeOrgUnitId)
+  OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)
+ )
+=== end
+=== JOB_ORDER_SCOPE_PREDICATE
+(
+  :isAdminAllScope = true
+  OR TYPE(o.responsibleOrgUnit) = SpecialCommand
+  OR (:activeOrgUnitId IS NOT NULL AND o.responsibleOrgUnit.id = :activeOrgUnitId)
+  OR (:activeOrgUnitId IS NULL AND o.responsibleOrgUnit.id IN :memberOrgUnitIds)
+ )
+=== end
+=== REFINERY_ORDER_SCOPE_TRIPLE
+(
+  :isAdminAllScope = true
+  OR (:activeOrgUnitId IS NOT NULL AND r.owningOrgUnit.id = :activeOrgUnitId)
+  OR (:activeOrgUnitId IS NULL AND r.owningOrgUnit.id IN :memberOrgUnitIds)
+ )
+=== end
+=== OPERATION_SCOPE_PREDICATE
+(
+  :isAdminAllScope = true
+  OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)
+  OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :memberOrgUnitIds)
+  OR (o.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)
+  OR (:viewerUserId IS NOT NULL AND EXISTS (SELECT p.id FROM MissionParticipant p
+   WHERE p.mission.operationId = o.id AND p.user.id = :viewerUserId))
+ )
+=== end

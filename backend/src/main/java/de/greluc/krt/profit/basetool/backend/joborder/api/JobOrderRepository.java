@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
-import de.greluc.krt.profit.basetool.backend.scope.api.ScopeSpecifications;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -162,7 +161,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       })
   @Query(
       "SELECT o FROM JobOrder o WHERE "
-          + ScopeSpecifications.JOB_ORDER_SCOPE_PREDICATE
+          + JobOrderScope.PREDICATE
           + " AND o.status IN :statuses ORDER BY o.displayId ASC")
   List<JobOrder> findScopedOrdersWithMaterialRequirements(
       @Param("statuses") Collection<JobOrderStatus> statuses,
@@ -202,7 +201,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
       "SELECT o FROM JobOrder o WHERE "
-          + ScopeSpecifications.JOB_ORDER_SCOPE_PREDICATE
+          + JobOrderScope.PREDICATE
           + " AND o.status IN :statuses AND (:noSquadronFilter = TRUE OR o.responsibleOrgUnit.id IN"
           + " :squadronIds OR o.requestingOrgUnit.id IN :squadronIds) AND (:processingFilter ="
           + " FALSE OR (o.responsibleOrgUnit.id IN :processingOrgUnitIds AND"

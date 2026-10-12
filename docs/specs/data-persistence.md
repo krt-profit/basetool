@@ -705,11 +705,7 @@ centralised:
   its return type diverges (`Optional<T>` for a unique name, `List<GameItem>` for
   `GameItemRepository`, whose `name` is not unique), and a base interface method can only declare one
   return type.
-- **`scope.api.ScopeSpecifications`** holds one `static final String` JPQL fragment per aggregate
-  (`MISSION_SCOPE_PREDICATE`, `SHIP_SCOPE_TRIPLE`, `INVENTORY_ITEM_SCOPE_TRIPLE`,
-  `JOB_ORDER_SCOPE_PREDICATE`; the refinery's `REFINERY_ORDER_SCOPE_TRIPLE` lives in
-  `RefineryAccessPolicy` since P4-3 and the operation's `OPERATION_SCOPE_PREDICATE` in
-  `OperationAccessPolicy` since P4-4),
+- **One `static final String` JPQL fragment per aggregate, beside the aggregate's repository** (since 2026-10-12, option B1 confirmed by the owner): `mission.api.MissionScope#PREDICATE`, `hangar.api.ShipScope#TRIPLE`, `joborder.api.JobOrderScope#PREDICATE` and `inventory.api.InventoryScope#TRIPLE` (the Materialbörse's offer repository splices the Lager's, so it is published), and `RefineryAccessPolicy#REFINERY_ORDER_SCOPE_TRIPLE` and `OperationAccessPolicy#OPERATION_SCOPE_PREDICATE` inside their access policies (their repositories are `internal`). `ScopeSpecifications` is gone. The fragments are
   referenced from each repository's `@Query` value via compile-time constant-expression concatenation
   (JLS 15.28/4.12.4 — the same technique REQ-SEC-002a's `Roles.X` constants use inside
   `@PreAuthorize`, since an annotation value cannot invoke a method). The alias is baked into each
@@ -719,6 +715,7 @@ centralised:
   ownerless-leadership + mission-participant escapes, Mission's cross-staffel public escape, JobOrder's
   SK-public-queue escape — REQ-ORG-003) carry the tail baked into their own constant; the three
   strict-staffel aggregates (Ship, RefineryOrder, InventoryItem) use the plain triple unchanged.
+  The module's access policy cites its fragment, so the list query and the per-row gate sit next to each other (plan section 5.4).
 
 Both are **read-only, wire-format-preserving refactors**: every migrated `@Query` value is
 byte-for-byte the same JPQL the compiler previously inlined, so the multi-tenant scope semantics of
@@ -728,13 +725,15 @@ to switch.
 
 **Acceptance**: `LookupTableRepository`'s exists-pair is exercised by every existing
 `*RepositoryTest`/service test that already covered the 8 migrated repositories' duplicate-name
-checks; `ScopeSpecifications`' fragments are exercised by the existing scope-regression suite
-(`RefineryOrderRepositoryScopedTest` against the real Postgres schema, plus the Mockito-level
-`OwnerScopeServiceTest` and the per-aggregate service lifecycle tests) — no new tests were needed
-because the wire behaviour is unchanged.
+checks. The six scope fragments are pinned byte for byte by `ScopeFragmentsGoldenTest` against
+`scope/scope-fragments.txt`, which was recorded before the fragments moved. For each of the six aggregates a parity test
+(`ShipScopeParityTest`, `InventoryScopeParityTest`, `RefineryScopeParityTest`, `OperationScopeParityTest`, `MissionScopeParityTest`,
+`JobOrderScopeParityTest`) runs the list query against the real schema and the row gate over the nine callers of the access-policy
+differential tests (`ScopeParityCallers`): the list never shows a row the gate refuses, and the two agree on every row another member
+owns in a unit (for Mission, Operation and JobOrder on every row). `RefineryOrderRepositoryScopedTest` and `OwnerScopeServiceTest` still cover the scoped queries.
 
 **Code:** `backend/src/main/java/.../backend/catalogue/internal/LookupTableRepository.java`,
-`backend/src/main/java/.../backend/scope/api/ScopeSpecifications.java`
+`mission/api/MissionScope.java`, `hangar/api/ShipScope.java`, `joborder/api/JobOrderScope.java`, `inventory/api/InventoryScope.java`
 
 ### REQ-DATA-011 — Background sync sweeps evict the master-data caches they rewrite (CACHE-SYNC-EVICT-001)
 

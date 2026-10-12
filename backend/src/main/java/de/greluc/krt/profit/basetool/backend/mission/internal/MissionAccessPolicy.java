@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionScope;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.UUID;
@@ -33,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
  * The mission module's access policy: the read and edit gates of a mission, evaluated on the scope
  * kernel (plan §5.4, ADR-0236). The finer write gates (manage, owner change, participant access)
  * stay with {@link MissionSecurityService}, which asks this policy for the edit scope.
+ *
+ * <p>The list-side half of the rule is {@link MissionScope#PREDICATE}; both widen together.
  *
  * <p>Invoked from SpEL as {@code @missionAccessPolicy}. Unknown ids are refused. Read-only
  * transactional, so the parent chain loads lazily.

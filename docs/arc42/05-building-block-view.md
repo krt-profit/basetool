@@ -255,8 +255,7 @@ behind a read API (plan §7.6).
 
 The scope kernel moved in part since P4-6 (plan §7.6). `scope.api` holds the request-scope kernel and
 the scope hub: `RequestScopeResolver`, `ScopePredicate`, `OrgUnitStampingService`,
-`ScopeSpecifications` (the four JPQL scope fragments that have not moved into a module, all public because the repositories that splice
-them lie in other packages; their move waits for the owner, same plan entry), `OwnerScopeService` (bean `ownerScopeService`) and `AccessGateService`,
+the scope kernel's JPQL fragments no longer live here: each aggregate's fragment sits beside its repository in the module's `api` (`MissionScope`, `ShipScope`, `JobOrderScope`, `InventoryScope`) or in its access policy (refinery, operation), and `ScopeFragmentsGoldenTest` pins all six, `OwnerScopeService` (bean `ownerScopeService`) and `AccessGateService`,
 beside the problem codes. `scope.internal` holds `ScopeActiveOrgUnitProvider`, which implements the
 `platform.api.ActiveOrgUnitProvider` SPI for the logging MDC. `OrgUnitCascadeService` moved to
 `orgunit.api` as a prerequisite, because the scope kernel calls it. `CustomJwtGrantedAuthoritiesConverter`

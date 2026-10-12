@@ -77,7 +77,7 @@ REQ-ORDERS-027 / REQ-UI-017 idiom) and re-applied on load **and after every frag
 live-sync refresh never closes what the user opened.
 
 **Scope and gating.** The page MUST show only orders within the caller's visibility scope. The scope
-is pushed into SQL through the shared `ScopeSpecifications.JOB_ORDER_SCOPE_PREDICATE` — including the
+is pushed into SQL through the job order's `JobOrderScope.PREDICATE` — including the
 SK-public escape — rather than filtered row-by-row afterwards, and the viewer-side profit gate
 (`canViewJobOrders`) is applied first, so a caller outside the order workflow gets the empty state
 rather than a partial aggregate. The nav entry is gated on the same capability as the order queue. The page states no

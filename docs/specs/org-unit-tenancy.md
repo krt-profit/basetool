@@ -55,7 +55,7 @@ non-admins see the union of their memberships unless they pin one.
 ### REQ-ORG-003 — Aggregate scope kinds
 
 > The JPQL implementing every scope-predicate triple/escape below is centralised in
-> `scope.api.ScopeSpecifications` (one compile-time-constant fragment per aggregate) rather than
+> the owning module's `api` (`MissionScope`, `ShipScope`, `JobOrderScope`, `InventoryScope`; the refinery's and the operation's sit in their access policies; one compile-time-constant fragment per aggregate) rather than
 > hand-copied per query — see [`data-persistence.md`](data-persistence.md) REQ-DATA-010. This is an
 > implementation detail; the scope semantics documented here are unchanged.
 >

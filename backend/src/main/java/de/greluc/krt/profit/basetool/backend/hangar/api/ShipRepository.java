@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.hangar.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
-import de.greluc.krt.profit.basetool.backend.scope.api.ScopeSpecifications;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
@@ -116,9 +115,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @return how many fitted ships were cleared; ships already unfitted are not counted
    */
   @Modifying(clearAutomatically = true)
-  @Query(
-      "UPDATE Ship s SET s.fitted = false WHERE s.fitted = true AND "
-          + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
+  @Query("UPDATE Ship s SET s.fitted = false WHERE s.fitted = true AND " + ShipScope.TRIPLE)
   int resetAllFittedScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
@@ -135,7 +132,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    */
   @Query(
       "SELECT s.owner.id AS ownerId, COUNT(s) AS shipCount FROM Ship s WHERE s.fitted = true AND "
-          + ScopeSpecifications.SHIP_SCOPE_TRIPLE
+          + ShipScope.TRIPLE
           + " GROUP BY s.owner.id")
   List<OwnerShipCount> countFittedByOwnerScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -351,7 +348,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * owner} via {@code @EntityGraph}.
    */
   @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
-  @Query("SELECT s FROM Ship s WHERE " + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
+  @Query("SELECT s FROM Ship s WHERE " + ShipScope.TRIPLE)
   Page<Ship> findAllScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
@@ -379,7 +376,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           FROM Ship s LEFT JOIN s.shipType.manufacturer m
           WHERE
           """
-              + ScopeSpecifications.SHIP_SCOPE_TRIPLE
+              + ShipScope.TRIPLE
               + " AND (cast(:query as string) IS NULL  OR LOWER(s.shipType.name) LIKE"
               + " LOWER(CONCAT('%', cast(:query as string), '%')) ESCAPE '\\'  OR LOWER(m.name)"
               + " LIKE LOWER(CONCAT('%', cast(:query as string), '%')) ESCAPE '\\' ) GROUP BY"
@@ -390,7 +387,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           FROM Ship s LEFT JOIN s.shipType.manufacturer m
           WHERE
           """
-              + ScopeSpecifications.SHIP_SCOPE_TRIPLE
+              + ShipScope.TRIPLE
               + " AND (cast(:query as string) IS NULL  OR LOWER(s.shipType.name) LIKE"
               + " LOWER(CONCAT('%', cast(:query as string), '%')) ESCAPE '\\'  OR LOWER(m.name)"
               + " LIKE LOWER(CONCAT('%', cast(:query as string), '%')) ESCAPE '\\' )")
@@ -414,9 +411,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @return the scoped ships of those types
    */
   @EntityGraph(attributePaths = {"owner", "location", "owningOrgUnit"})
-  @Query(
-      "SELECT s FROM Ship s WHERE s.shipType IN :shipTypes AND "
-          + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
+  @Query("SELECT s FROM Ship s WHERE s.shipType IN :shipTypes AND " + ShipScope.TRIPLE)
   List<Ship> findByShipTypeInScoped(
       @Param("shipTypes") List<ShipType> shipTypes,
       @Param("isAdminAllScope") boolean isAdminAllScope,
