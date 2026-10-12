@@ -78,7 +78,6 @@ target|PROMOTION|promotion_topic|name|id|null
 target|PROMOTION|rank_requirement|description|id|null
 target|REGISTRATION|user_approval_event|reason|id|null
 exempt-column|app_user.approval_status
-exempt-column|app_user.default_payout_preference
 exempt-column|app_user.discord_user_id
 exempt-column|audit_event.client_id
 exempt-column|audit_event.domain
@@ -176,6 +175,7 @@ exempt-column|material_external_alias.external_key
 exempt-column|material_external_alias.external_name
 exempt-column|material_external_alias.source_system
 exempt-column|member_evaluation.assigned_level
+exempt-column|member_payout_setting.default_payout_preference
 exempt-column|mission.calendar_link
 exempt-column|mission.status
 exempt-column|mission_finance_entry.type

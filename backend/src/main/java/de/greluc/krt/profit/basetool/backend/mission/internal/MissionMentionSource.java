@@ -55,6 +55,7 @@ public class MissionMentionSource implements PersonMentionSource {
     return Set.of(
         "mission.calendar_link",
         "mission.status",
+        "member_payout_setting.default_payout_preference",
         "mission_finance_entry.type",
         "mission_frequency.created_by",
         "mission_frequency.updated_by",

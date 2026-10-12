@@ -19,9 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -106,26 +104,6 @@ public class User extends AbstractEntity<UUID> {
   @Nullable
   @Column(name = "join_date")
   private LocalDate joinDate;
-
-  /**
-   * The user's default payout preference, pre-filled into the participant's {@code
-   * payoutPreference} on mission sign-up (see {@link
-   * de.greluc.krt.profit.basetool.backend.mission.internal.MissionService#addParticipant}). {@code
-   * null} means no choice, falling back to {@link PayoutPreference#PAYOUT}; changes never rewrite
-   * existing {@link MissionParticipant} rows (REQ-MISSION-002).
-   */
-  @Nullable
-  @Enumerated(EnumType.STRING)
-  @Column(name = "default_payout_preference")
-  private PayoutPreference defaultPayoutPreference;
-
-  /**
-   * Opt-in flag: when {@code true}, the user's {@link PersonalBlueprint} rows count in the
-   * blueprint availability and coverage views of every org unit, not only their own. Read-only
-   * widening that exposes the owner by display name only (REQ-INV-018).
-   */
-  @Column(name = "share_blueprints_globally", nullable = false)
-  private boolean shareBlueprintsGlobally = false;
 
   /**
    * The linked Discord account id (a numeric snowflake as text), persisted from the {@code

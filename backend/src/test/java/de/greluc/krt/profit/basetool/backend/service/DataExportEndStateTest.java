@@ -432,6 +432,13 @@ class DataExportEndStateTest {
         owned,
         other.getId());
     jdbc.update(
+        "INSERT INTO member_payout_setting (user_id, default_payout_preference) VALUES (?,"
+            + " 'DONATE')",
+        subject.getId());
+    jdbc.update(
+        "INSERT INTO member_blueprint_sharing (user_id, share_globally) VALUES (?, TRUE)",
+        subject.getId());
+    jdbc.update(
         "INSERT INTO mission_managers (mission_id, user_id) VALUES (?, ?)", owned, subject.getId());
     jdbc.update(
         "INSERT INTO mission_managers (mission_id, user_id) VALUES (?, ?)", owned, other.getId());

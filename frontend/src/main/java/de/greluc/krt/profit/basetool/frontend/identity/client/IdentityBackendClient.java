@@ -168,17 +168,24 @@ public class IdentityBackendClient {
    *
    * @param update the preference and the user-row version
    */
-  public void updateMyPayoutPreference(@NotNull MyPayoutPreferenceRequest update) {
-    backendApiClient.put("/api/v1/missions/me/payout-preference", update, Void.class);
+  @Nullable
+  public MyPayoutPreferenceResponse updateMyPayoutPreference(
+      @NotNull MyPayoutPreferenceRequest update) {
+    return backendApiClient.put(
+        "/api/v1/missions/me/payout-preference", update, MyPayoutPreferenceResponse.class);
   }
 
   /**
    * Saves the caller's global blueprint-sharing flag.
    *
-   * @param update the flag and the user-row version
+   * @param update the flag and the setting's version
+   * @return the saved flag with its new version, or {@code null} when the backend sent no body
    */
-  public void updateMyBlueprintSharing(@NotNull MyBlueprintSharingRequest update) {
-    backendApiClient.put("/api/v1/blueprints/me/sharing", update, Void.class);
+  @Nullable
+  public MyBlueprintSharingResponse updateMyBlueprintSharing(
+      @NotNull MyBlueprintSharingRequest update) {
+    return backendApiClient.put(
+        "/api/v1/blueprints/me/sharing", update, MyBlueprintSharingResponse.class);
   }
 
   /**

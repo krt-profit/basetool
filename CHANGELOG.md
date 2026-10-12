@@ -15,6 +15,7 @@
 
 ### Changed
 
+- **Profil: Auszahlungsart und Blaupausen-Freigabe sind entkoppelt.** Beide Einstellungen liegen in eigenen Tabellen (Migration V283) mit eigener Version; Speichern der einen macht Profil, RSI-Handle und die andere Karte nicht mehr veraltet. Die alten Spalten bleiben bis zu einer späteren Version.
 - **Lesbarere Bedienelemente (Design-System 2026-10).** Buttons, Eingabefelder, Auswahlen und Seitenzahlen haben eine Füllung und einen sichtbaren Rand (mindestens 3:1); Umschalter wie „Kommend / Vergangen / Alle“ oder „Globales / Mein Lager“ sind ein gemeinsames Segment-Element, Ein/Aus-Optionen ein Schalter; Listen-Seiten liegen mit Toolbar, Tabelle und Seitenzahlen auf einer Fläche, der Filter-Button zeigt aktive Filter mit eckigem Zähler.
 
 ## [v1.15.0](https://github.com/krt-profit/basetool/releases/tag/v1.15.0) - 2026-10-11

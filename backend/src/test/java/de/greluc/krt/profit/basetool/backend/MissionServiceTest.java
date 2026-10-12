@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantCount;
@@ -74,6 +75,7 @@ class MissionServiceTest {
   @Mock private MissionRepository missionRepository;
 
   @Mock private UserRepository userRepository;
+  @Mock private MemberPayoutSettings memberPayoutSettings;
 
   @Mock private SquadronRepository squadronRepository;
 
@@ -271,10 +273,10 @@ class MissionServiceTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("donator");
-    user.setDefaultPayoutPreference(PayoutPreference.DONATE);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(memberPayoutSettings.defaultFor(userId)).thenReturn(Optional.of(PayoutPreference.DONATE));
     when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result = missionService.addParticipant(missionId, userId, null, null, "No comment");
@@ -320,7 +322,6 @@ class MissionServiceTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("explicit-chooser");
-    user.setDefaultPayoutPreference(PayoutPreference.DONATE);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));

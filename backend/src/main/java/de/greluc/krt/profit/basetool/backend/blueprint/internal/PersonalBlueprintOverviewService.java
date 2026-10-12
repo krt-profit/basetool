@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -69,6 +70,7 @@ public class PersonalBlueprintOverviewService {
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final UserRepository userRepository;
+  private final MemberBlueprintSharings memberBlueprintSharings;
   private final BlueprintVariantFamilyResolver familyResolver;
   private final BlueprintVariantFamilyCatalog familyCatalog;
 
@@ -223,7 +225,7 @@ public class PersonalBlueprintOverviewService {
    */
   @NotNull
   private Set<UUID> globalSharerSubs() {
-    return new LinkedHashSet<>(userRepository.findIdsBySharingBlueprintsGlobally());
+    return new LinkedHashSet<>(memberBlueprintSharings.userIdsSharingGlobally());
   }
 
   /**

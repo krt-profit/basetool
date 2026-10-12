@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.privacy.web;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -30,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
@@ -96,6 +98,8 @@ public class UserController {
   private final AuthHelperService authHelperService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final UserSyncService userSyncService;
+  private final MemberPayoutSettings memberPayoutSettings;
+  private final MemberBlueprintSharings memberBlueprintSharings;
 
   /** The consolidate action's orchestrator (REQ-SEC-055): duplicate in, survivor out. */
   private final AccountConsolidationService accountConsolidationService;
@@ -472,8 +476,9 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public MyPayoutPreferenceResponse getMyPayoutPreference(@AuthenticationPrincipal Jwt jwt) {
-    User me = userService.findById(userService.getUserIdFromJwt(jwt));
-    return new MyPayoutPreferenceResponse(me.getDefaultPayoutPreference(), me.getVersion());
+    MemberPayoutSettings.Snapshot setting =
+        memberPayoutSettings.snapshotOf(userService.getUserIdFromJwt(jwt));
+    return new MyPayoutPreferenceResponse(setting.preference(), setting.version());
   }
 
   /**
@@ -492,10 +497,10 @@ public class UserController {
   public MyPayoutPreferenceResponse updateMyPayoutPreference(
       @AuthenticationPrincipal Jwt jwt,
       @NotNull @RequestBody @Valid MyPayoutPreferenceRequest request) {
-    User me =
-        userService.updateUserDefaultPayoutPreference(
+    MemberPayoutSettings.Snapshot setting =
+        memberPayoutSettings.update(
             userService.getUserIdFromJwt(jwt), request.preference(), request.version());
-    return new MyPayoutPreferenceResponse(me.getDefaultPayoutPreference(), me.getVersion());
+    return new MyPayoutPreferenceResponse(setting.preference(), setting.version());
   }
 
   /**
@@ -511,8 +516,9 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public MyBlueprintSharingResponse getMyBlueprintSharing(@AuthenticationPrincipal Jwt jwt) {
-    User me = userService.findById(userService.getUserIdFromJwt(jwt));
-    return new MyBlueprintSharingResponse(me.isShareBlueprintsGlobally(), me.getVersion());
+    MemberBlueprintSharings.Snapshot sharing =
+        memberBlueprintSharings.snapshotOf(userService.getUserIdFromJwt(jwt));
+    return new MyBlueprintSharingResponse(sharing.shareGlobally(), sharing.version());
   }
 
   /**
@@ -532,12 +538,12 @@ public class UserController {
   public MyBlueprintSharingResponse updateMyBlueprintSharing(
       @AuthenticationPrincipal Jwt jwt,
       @NotNull @RequestBody @Valid MyBlueprintSharingRequest request) {
-    User me =
-        userService.updateUserShareBlueprintsGlobally(
+    MemberBlueprintSharings.Snapshot sharing =
+        memberBlueprintSharings.update(
             userService.getUserIdFromJwt(jwt),
             request.shareBlueprintsGlobally(),
             request.version());
-    return new MyBlueprintSharingResponse(me.isShareBlueprintsGlobally(), me.getVersion());
+    return new MyBlueprintSharingResponse(sharing.shareGlobally(), sharing.version());
   }
 
   /**

@@ -1,4 +1,4 @@
-1|account|ART_15_20|9a70f421f5e59b77|description|discord_guild_nickname,display_name,email,rsi_handle,username
+1|account|ART_15_20|a36061f8edf0b637|description|discord_guild_nickname,display_name,email,rsi_handle,username
 2|termsAcceptances|ART_15|0e7b186f52eeb50b||
 3|registrationDecisions|ART_15|e91ccfa2d07acc6a|reason|
 4|deletionRequests|ART_15|a6eeefd6ec197b9d|decision_note|
@@ -43,3 +43,5 @@
 43|auditActionsOnMember|ART_15|7135dd606c8f87a1||
 44|bankAuditActionsByMember|ART_15|26d875f46064b29a||
 45|bankAuditActionsOnMember|ART_15|09668c132366e434||
+46|payoutPreference|ART_15_20|c2551d2dbd6dce66||
+47|blueprintSharing|ART_15_20|61c70ab961a6406a||

@@ -44,8 +44,7 @@ public class IdentityExportSections implements PersonalDataExportSection {
                 "Provided at registration and on the profile page.",
                 """
                 SELECT id, username, display_name, email, description, user_rank, join_date,
-                       discord_user_id, discord_guild_nickname, rsi_handle, default_payout_preference,
-                       share_blueprints_globally, approval_status, approved_at, created_at, updated_at
+                       discord_user_id, discord_guild_nickname, rsi_handle, approval_status, approved_at, created_at, updated_at
                 FROM app_user WHERE id = :userId
                 """)
             .scrubbing("description")

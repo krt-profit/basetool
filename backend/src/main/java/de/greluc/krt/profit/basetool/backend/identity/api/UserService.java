@@ -19,9 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -77,7 +74,6 @@ public class UserService {
   private static final String RSI_HANDLE_TAKEN = "error.user.rsiHandle.taken";
 
   private final UserRepository userRepository;
-  private final AuditRecorder auditRecorder;
   private final AuthHelperService authHelperService;
   private final SquadronVisibility squadronVisibility;
   private final MembershipOperations membershipOperations;
@@ -229,26 +225,6 @@ public class UserService {
   }
 
   /**
-   * Sets the caller's default payout preference, pre-filled at mission sign-up ({@link
-   * MissionService#addParticipant}). Existing participations are not changed.
-   *
-   * @param id the caller's id from the JWT; never {@code null}
-   * @param preference the new default payout preference; never {@code null}
-   * @param version the version the caller last read; {@code null} skips the check
-   * @return the persisted user
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
-   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
-   */
-  @Transactional
-  public User updateUserDefaultPayoutPreference(
-      @NotNull UUID id, @NotNull PayoutPreference preference, @Nullable Long version) {
-    User user = Entities.require(userRepository.findById(id), "User not found");
-    OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
-    user.setDefaultPayoutPreference(preference);
-    return userRepository.saveAndFlush(user);
-  }
-
-  /**
    * Sets or clears the caller's RSI handle (REQ-SEC-072); a blank value clears it.
    *
    * <p>The handle is refused when another account already answers to it as username, display name
@@ -286,36 +262,6 @@ public class UserService {
     } catch (DataIntegrityViolationException _) {
       throw new DuplicateEntityException(RSI_HANDLE_TAKEN);
     }
-  }
-
-  /**
-   * Sets the caller's opt-in for global blueprint sharing, which counts their blueprints in the
-   * availability views of every org unit (REQ-INV-018).
-   *
-   * @param id the caller's id from the JWT; never {@code null}
-   * @param shareBlueprintsGlobally the new opt-in value
-   * @param version the version the caller last read; {@code null} skips the check
-   * @return the persisted user
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
-   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
-   */
-  @Transactional
-  public User updateUserShareBlueprintsGlobally(
-      @NotNull UUID id, boolean shareBlueprintsGlobally, @Nullable Long version) {
-    User user = Entities.require(userRepository.findById(id), "User not found");
-    OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
-    boolean changed = user.isShareBlueprintsGlobally() != shareBlueprintsGlobally;
-    user.setShareBlueprintsGlobally(shareBlueprintsGlobally);
-    User saved = userRepository.saveAndFlush(user);
-    if (changed) {
-      auditRecorder.record(
-          AuditEventType.BLUEPRINT_SHARING_CHANGED,
-          null,
-          null,
-          id,
-          AuditDetails.of("enabled", shareBlueprintsGlobally));
-    }
-    return saved;
   }
 
   /**

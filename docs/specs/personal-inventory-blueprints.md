@@ -226,7 +226,7 @@ By default a user's owned `personal_blueprint` rows count toward the leadership
 blueprint-availability overview (REQ-INV-012) and the item-order blueprint-coverage view
 (REQ-ORDERS-015) **only for the org units the user is a member of**. A user MAY opt in, via a
 toggle on their profile page, to share their blueprints **globally**: while
-`app_user.share_blueprints_globally` is `true`, the user is counted in **both** views for
+a `member_blueprint_sharing` row with `share_globally = true` exists for the user (before `V283`: `app_user.share_blueprints_globally`), the user is counted in **both** views for
 **every** org unit, even when org-unit membership would otherwise exclude them — so a Staffel
 member's blueprint can satisfy an SK order's coverage across org-unit boundaries.
 
@@ -270,11 +270,11 @@ and a global sharer is counted once.
 - [ ] Given a user who never opts in, then they are counted only in their own org units
   (unchanged behaviour).
 
-**Code links:** [`UserService#updateUserShareBlueprintsGlobally`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/identity/api/UserService.java),
+**Code links:** [`MemberBlueprintSharings`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/api/MemberBlueprintSharings.java),
 [`UserController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/privacy/web/UserController.java) (`/me/blueprint-sharing`),
 [`PersonalBlueprintOverviewService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintOverviewService.java),
 [`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/joborder/internal/JobOrderItemBlueprintOwnersService.java),
-[`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql).
+[`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql) and [`V283__create_member_payout_setting_and_blueprint_sharing.sql`](../../backend/src/main/resources/db/migration/V283__create_member_payout_setting_and_blueprint_sharing.sql).
 
 ### REQ-INV-048 — Craftability of own blueprints from "My Inventory" stock
 

@@ -2995,6 +2995,22 @@ and NullAway does not cover them yet (69 and 44 findings). Extracting them now w
    dropping the self shortcut from `UserAccessPolicy` turned it red. The existing policy differential tests, `OwnerScopeServiceTest`, `JobOrderService*Test` and `MaterialClaimServiceTest` follow the new constructors; `TenancyGuardTest` and the
    architecture gates pass unchanged. `compileJava --rerun` shows 0 warnings.
 
+**Umbrella step 13 — built: D-17, the member settings leave `app_user` — done 2026-10-12 (design approved by the owner 2026-10-12), pushed after the final SQL was reported and the owner said yes**
+1. *Migration* `V283__create_member_payout_setting_and_blueprint_sharing.sql` as designed, with named foreign keys, `ON CONFLICT (user_id) DO NOTHING` on the two copies (so a re-run changes nothing) and `COMMENT ON` for the tables and their key
+   columns; the old `app_user` columns stay (phase 2 is a later release). The version number is claimed at push time by re-grepping `origin/main` and the open pull requests. Applied to a real PostgreSQL by the suite and validated against the
+   entities (`ddl-auto: validate`).
+2. *Code.* `mission.api`: `MemberPayoutSetting`, its repository and `MemberPayoutSettings` (`snapshotOf`, `defaultFor`, `update`). `blueprint.api`: `MemberBlueprintSharing`, its repository and `MemberBlueprintSharings` (`snapshotOf`,
+   `userIdsSharingGlobally`, `update`, which records `BLUEPRINT_SHARING_CHANGED` on a change). Both read a member without a row at version 0 and accept version 0 for the first write. `User`, `UserService` and `UserRepository` lost the two
+   fields, the two update methods and the sharers query; `MissionParticipantService`, `PersonalBlueprintOverviewService`, `JobOrderItemBlueprintOwnersService` and `UserController` use the new services. The account export no longer selects the
+   two columns; each owning module has an Art. 15 section (positions 460 and 470), the payout column is exempt in the mission mention source, the account merge leaves both rows with the emptied source account (`staysWithTheAct`, as the columns did),
+   erasure is the foreign key's cascade, and `table-ownership.txt` names the owners.
+3. *Frontend.* The profile page seeds the payout and sharing forms with the version of their own endpoint (it seeded all four from `/users/me`); the client returns the PUT answer, the two AJAX endpoints answer with that version, and `profile.js`
+   writes a fresh user-row version only into the description and RSI-handle forms and a setting's own version only into its own form. The REST paths, the field names and the OpenAPI document are unchanged.
+4. *Proof.* `V283MemberSettingsMigrationTest` runs the data-transfer statements read from the migration file over members the old columns describe: the runbook's counts agree, nobody else gets a row, a second run changes nothing, and the rollback
+   statements restore the old columns from the new tables. `MemberPayoutSettingsTest` and `MemberBlueprintSharingsTest` pin the absent row, the own version, the lock and the audit event. The GDPR gates (`GdprParticipantCoverageTest`,
+   `UserAccountMergeCoverageTest`, `PersonalDataExportCatalogueTest`, `PersonMentionCatalogueTest`, `DataExportEndStateTest`, `TableOwnershipTest`) hold with the two new tables; the committed export catalogue, the mention catalogue and the end-state document
+   changed for them. Whether the Android app needs a release is for the owner to settle with the app repository.
+
 **Umbrella steps 1 and 15 — the mutation target and the struck P3-11 — done 2026-10-12**
 1. *Step 1 (option B, chosen by the owner 2026-10-12).* `backend/build-settings.properties` aims PIT at the module internals and the published services, `backend.*.internal.*` and `backend.*.api.*Service`, with the tests of the same packages
    (`*.internal.*Test`, `*.api.*Test`) and the legacy `backend.service.*Test`, which still holds tests of moved classes. The old target matched nothing since the last class left `service`. The mutation run covers many more classes, so it takes much longer.
@@ -3049,7 +3065,7 @@ before a decision.
   - [x] **12.** done, option A confirmed by the owner 2026-10-12 — Access policies left in the scope hub (§5.4): `OwnerScopeService` and
         `AccessGateService` keep the org-unit and user gates; `Q` the plan names no policy for them.
 - Persistence:
-  - [ ] **13.** `Q` design and SQL written (entry above), waiting for the owner — D-17, member settings move with their owner: the payout-preference and
+  - [x] **13.** done, approved by the owner 2026-10-12 — D-17, member settings move with their owner: the payout-preference and
         blueprint-sharing columns into tables of the owning modules, each with its own version, by a
         Flyway migration with data transfer. The api-cut notes say the columns stay in the cut, so this
         step comes after the path moves; its SQL and rollback go to the owner before they are pushed.
