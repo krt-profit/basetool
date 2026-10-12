@@ -2368,6 +2368,55 @@
       ]
     },
     {
+      "id": 85,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 152
+      },
+      "type": "timeseries",
+      "title": "Browser CSP violations/hour by directive",
+      "description": "A csp_violation split by the violated Content-Security-Policy directive (basetool_client_csp_violation_total, directive = the CSP directive name, or other). require-trusted-types-for / trusted-types is the report-only Trusted Types policy: a DOM sink written without a policy value. script-src-* / style-src-* / img-src / connect-src is the enforced policy: an inline script or style without the nonce, or a host the policy does not allow; browser extensions that inject code land here as background. Read it beside panel 43 when ClientErrorSpike fires on csp_violation.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (directive) (rate(basetool_client_csp_violation_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{directive}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
       "id": 44,
       "gridPos": {
         "h": 8,

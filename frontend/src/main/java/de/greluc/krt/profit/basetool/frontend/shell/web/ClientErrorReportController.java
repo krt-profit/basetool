@@ -41,7 +41,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Receives the browser error beacon from {@code krt-client-error.js} and records it as the {@code
- * basetool_client_error_total{kind}} counter plus a DEBUG log line.
+ * basetool_client_error_total{kind}} counter plus a DEBUG log line; a {@code csp_violation} is also
+ * counted by directive in {@code basetool_client_csp_violation_total{directive}}.
  *
  * <p>The payload is untrusted: only the five {@link ClientErrorReport} fields are bound, free text
  * is sanitised via {@link LogSafe#text(String, int)}, {@code source} loses its query and fragment,
@@ -75,6 +76,36 @@ public class ClientErrorReportController {
           MetricNames.CLIENT_ERROR_RESOURCE_ERROR,
           MetricNames.CLIENT_ERROR_CSP_VIOLATION,
           MetricNames.CLIENT_ERROR_I18N_MISSING);
+
+  /**
+   * The Content-Security-Policy directive names that become a {@code directive} tag value on a
+   * {@code csp_violation} report; any other first word is counted as {@code other}, so the client
+   * cannot choose a label.
+   */
+  static final Set<String> CSP_DIRECTIVES =
+      Set.of(
+          "default-src",
+          "script-src",
+          "script-src-elem",
+          "script-src-attr",
+          "style-src",
+          "style-src-elem",
+          "style-src-attr",
+          "img-src",
+          "font-src",
+          "connect-src",
+          "media-src",
+          "object-src",
+          "child-src",
+          "frame-src",
+          "worker-src",
+          "manifest-src",
+          "base-uri",
+          "form-action",
+          "frame-ancestors",
+          "sandbox",
+          "require-trusted-types-for",
+          "trusted-types");
 
   private final MeterRegistry meterRegistry;
 
@@ -113,6 +144,14 @@ public class ClientErrorReportController {
       return ResponseEntity.badRequest().build();
     }
     meterRegistry.counter(MetricNames.CLIENT_ERROR, MetricNames.TAG_KIND, kind).increment();
+    if (MetricNames.CLIENT_ERROR_CSP_VIOLATION.equals(kind)) {
+      meterRegistry
+          .counter(
+              MetricNames.CLIENT_CSP_VIOLATION,
+              MetricNames.TAG_DIRECTIVE,
+              directiveOf(report.message()))
+          .increment();
+    }
     log.debug(
         "Client error reported [kind={}, message={}, source={}, line={}, column={}]",
         kind,
@@ -141,6 +180,23 @@ public class ClientErrorReportController {
   public ResponseEntity<Void> handleUnreadableBody(@NotNull Exception e) {
     log.debug("Unreadable client error report body [exception={}]", e.getClass().getSimpleName());
     return ResponseEntity.badRequest().build();
+  }
+
+  /**
+   * Resolves the violated directive of a {@code csp_violation} report: the first word of its
+   * message when that is a name in {@link #CSP_DIRECTIVES}.
+   *
+   * @param message the reported message, possibly {@code null}
+   * @return the allow-listed directive name, or {@link MetricNames#DIRECTIVE_OTHER}
+   */
+  static @NotNull String directiveOf(@Nullable String message) {
+    if (message == null) {
+      return MetricNames.DIRECTIVE_OTHER;
+    }
+    String stripped = message.strip();
+    int space = stripped.indexOf(' ');
+    String first = space < 0 ? stripped : stripped.substring(0, space);
+    return CSP_DIRECTIVES.contains(first) ? first : MetricNames.DIRECTIVE_OTHER;
   }
 
   /**

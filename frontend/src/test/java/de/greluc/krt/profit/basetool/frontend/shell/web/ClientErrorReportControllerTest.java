@@ -42,6 +42,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -253,6 +254,57 @@ class ClientErrorReportControllerTest {
     assertThat(counterFor(MetricNames.CLIENT_ERROR_CSP_VIOLATION)).isEqualTo(1.0d);
   }
 
+  @ParameterizedTest
+  @CsvSource({
+    "script-src-elem, script-src-elem",
+    "style-src-attr, style-src-attr",
+    "require-trusted-types-for Element innerHTML, require-trusted-types-for",
+    "trusted-types, trusted-types",
+    "made-up-src, other",
+    "SCRIPT-SRC, other"
+  })
+  void cspViolation_isCountedByAllowListedDirective(String message, String directive) {
+    controller.report(
+        new ClientErrorReport(
+            message, "inline", null, null, MetricNames.CLIENT_ERROR_CSP_VIOLATION));
+
+    assertThat(directiveCount(directive)).isEqualTo(1.0d);
+    assertThat(meterRegistry.find(MetricNames.CLIENT_CSP_VIOLATION).counters()).hasSize(1);
+  }
+
+  @Test
+  void cspViolationWithoutMessage_isCountedAsOtherDirective() {
+    controller.report(
+        new ClientErrorReport(null, null, null, null, MetricNames.CLIENT_ERROR_CSP_VIOLATION));
+
+    assertThat(directiveCount(MetricNames.DIRECTIVE_OTHER)).isEqualTo(1.0d);
+  }
+
+  @Test
+  void otherKinds_createNoDirectiveSeries() {
+    controller.report(
+        new ClientErrorReport(
+            "script-src", null, null, null, MetricNames.CLIENT_ERROR_SCRIPT_ERROR));
+
+    assertThat(meterRegistry.find(MetricNames.CLIENT_CSP_VIOLATION).counters()).isEmpty();
+  }
+
+  @Test
+  void hostileDirective_cannotMintAnUnboundedSeries() {
+    for (int i = 0; i < 50; i++) {
+      controller.report(
+          new ClientErrorReport(
+              "member-" + i + " img-src",
+              null,
+              null,
+              null,
+              MetricNames.CLIENT_ERROR_CSP_VIOLATION));
+    }
+
+    assertThat(meterRegistry.find(MetricNames.CLIENT_CSP_VIOLATION).counters()).hasSize(1);
+    assertThat(directiveCount(MetricNames.DIRECTIVE_OTHER)).isEqualTo(50.0d);
+  }
+
   @Test
   void i18nMissingReport_isCountedUnderItsOwnKind() {
     ResponseEntity<Void> response =
@@ -300,6 +352,16 @@ class ClientErrorReportControllerTest {
   private double counterFor(String kind) {
     Counter counter =
         meterRegistry.find(MetricNames.CLIENT_ERROR).tag(MetricNames.TAG_KIND, kind).counter();
+    assertThat(counter).isNotNull();
+    return counter.count();
+  }
+
+  private double directiveCount(String directive) {
+    Counter counter =
+        meterRegistry
+            .find(MetricNames.CLIENT_CSP_VIOLATION)
+            .tag(MetricNames.TAG_DIRECTIVE, directive)
+            .counter();
     assertThat(counter).isNotNull();
     return counter.count();
   }
