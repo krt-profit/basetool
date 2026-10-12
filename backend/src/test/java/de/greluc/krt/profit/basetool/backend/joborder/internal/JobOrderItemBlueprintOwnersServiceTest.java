@@ -30,14 +30,14 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintVariantAliasOverrides;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintVariantFamilyResolver;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;

@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
-import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

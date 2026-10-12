@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintRequirementGroupDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintRequirementIngredientDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroupDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementIngredientDto;
 import java.util.List;
 
 /**

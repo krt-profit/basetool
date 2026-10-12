@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
-import de.greluc.krt.profit.basetool.backend.model.dto.ManufacturerDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;

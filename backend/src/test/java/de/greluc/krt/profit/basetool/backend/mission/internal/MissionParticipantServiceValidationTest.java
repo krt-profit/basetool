@@ -27,12 +27,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.model.JobType;
-import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;

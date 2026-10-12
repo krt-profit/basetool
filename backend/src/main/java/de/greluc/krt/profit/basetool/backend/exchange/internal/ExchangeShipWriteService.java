@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
@@ -29,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResol
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;

@@ -23,8 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover;

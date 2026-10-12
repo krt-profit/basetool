@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
-import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

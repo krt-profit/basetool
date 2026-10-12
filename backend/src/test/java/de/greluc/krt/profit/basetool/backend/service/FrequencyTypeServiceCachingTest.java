@@ -23,10 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
-import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
-import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

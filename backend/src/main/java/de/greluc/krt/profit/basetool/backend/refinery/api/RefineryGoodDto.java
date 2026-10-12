@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.api;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

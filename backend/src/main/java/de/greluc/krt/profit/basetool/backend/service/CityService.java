@@ -19,13 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.CityMapper;
-import de.greluc.krt.profit.basetool.backend.model.City;
-import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;

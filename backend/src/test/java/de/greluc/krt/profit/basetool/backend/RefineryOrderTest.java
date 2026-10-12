@@ -26,6 +26,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;

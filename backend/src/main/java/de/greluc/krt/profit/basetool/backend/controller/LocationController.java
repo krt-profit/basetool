@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.service.LocationService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;

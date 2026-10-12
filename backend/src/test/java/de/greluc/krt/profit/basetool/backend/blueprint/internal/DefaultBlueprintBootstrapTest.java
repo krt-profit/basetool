@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
-import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

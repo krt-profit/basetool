@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationUsage;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
@@ -27,10 +31,6 @@ import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;

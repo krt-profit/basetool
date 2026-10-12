@@ -26,7 +26,7 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import de.greluc.krt.profit.basetool.backend.model.City;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import jakarta.persistence.EntityManager;

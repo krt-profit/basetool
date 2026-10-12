@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.backend.migration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
-import de.greluc.krt.profit.basetool.backend.model.GameItemKind;
-import de.greluc.krt.profit.basetool.backend.model.GameItemSourceSystem;
-import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
-import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

@@ -30,23 +30,23 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPriceOverviewDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCreateDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
-import de.greluc.krt.profit.basetool.backend.model.MaterialSourceSystem;
-import de.greluc.krt.profit.basetool.backend.model.MaterialType;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -119,7 +119,7 @@ class MaterialServiceTest {
         new MaterialPriceOverviewDto(
             UUID.randomUUID(),
             "Gold",
-            new de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto(
+            new de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto(
                 UUID.randomUUID(), "Mineral", 0L),
             false,
             false,

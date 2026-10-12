@@ -21,10 +21,13 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import java.util.List;
 import java.util.Set;

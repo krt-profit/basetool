@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.model.JobType;
-import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;

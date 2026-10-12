@@ -26,7 +26,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -37,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationReposit
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;

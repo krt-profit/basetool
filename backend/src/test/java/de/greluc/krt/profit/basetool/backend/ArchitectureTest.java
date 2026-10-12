@@ -69,6 +69,11 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankViewUserDt
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibilityService;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
@@ -352,6 +357,11 @@ class ArchitectureTest {
           KnownExchangeClients.class,
           LikePatterns.class,
           LiveSyncAuthorization.class,
+          LocationReferenceDto.class,
+          MaterialCategoryDto.class,
+          MaterialDto.class,
+          MaterialReferenceDto.class,
+          QuantityType.class,
           LiveSyncFanoutProperties.class,
           LiveSyncTopic.class,
           LiveSyncTopicClass.class,
@@ -1101,7 +1111,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 60);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 69);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);
@@ -1276,7 +1286,7 @@ class ArchitectureTest {
 
   @Test
   void validationLayerMustStayADependencyLeaf() {
-    assertClassFloor("validationLayerMustStayADependencyLeaf", VALIDATION_CODE, 8);
+    assertClassFloor("validationLayerMustStayADependencyLeaf", VALIDATION_CODE, 7);
     validationLayerMustStayADependencyLeafRule(VALIDATION_CODE).check(CLASSES);
   }
 
@@ -1660,7 +1670,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 272);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 239);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.backend.model.JobType;
-import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;

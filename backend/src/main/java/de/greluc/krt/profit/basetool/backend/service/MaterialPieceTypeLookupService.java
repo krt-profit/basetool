@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.validation.MaterialPieceTypeLookup;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPieceTypeLookup;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import java.util.UUID;
 
 /** Data transfer record carrying Ship payload. */

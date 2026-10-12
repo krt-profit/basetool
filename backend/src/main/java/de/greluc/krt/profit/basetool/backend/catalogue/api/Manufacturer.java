@@ -1,0 +1,144 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.catalogue.api;
+
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompany;
+import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import java.time.Instant;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.hibernate.annotations.BatchSize;
+
+/**
+ * Manufacturer JPA entity. Class-level {@code @BatchSize} batches the initialisation of lazy
+ * manufacturer proxies when Lager item views are mapped (REQ-INV-029).
+ */
+@Entity
+@Getter
+@Setter
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+@BatchSize(size = 50)
+public class Manufacturer extends AbstractEntity<UUID> {
+
+  @Getter(onMethod_ = @__(@Override))
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
+
+  @Column(nullable = false, unique = true)
+  private String name;
+
+  /**
+   * Short display code (e.g. {@code "AEGS"}). Not unique: several UEX company records of one brand
+   * reduce to the same code and are merged onto one row (ADR-0023). Identity lives on {@link
+   * #uexCompanyId} / {@link #scwikiUuid} / {@link #name}.
+   */
+  @Column(nullable = false)
+  private String abbreviation;
+
+  @Column private String nickname;
+
+  @Column private String wiki;
+
+  @Column(columnDefinition = "TEXT")
+  private String description;
+
+  private boolean hidden = false;
+
+  /**
+   * The canonical (lowest) UEX company id of this brand; unique. All of the brand's UEX company ids
+   * map to this row through {@link ManufacturerUexCompany}, which the syncs resolve against
+   * (ADR-0023).
+   */
+  @Column(name = "uex_company_id", unique = true)
+  private Integer uexCompanyId;
+
+  /**
+   * SC Wiki manufacturer UUID. Populated by the R6 manufacturer reconciliation. UNIQUE so the same
+   * Wiki entity cannot be linked to two local manufacturers.
+   */
+  @Column(name = "scwiki_uuid", unique = true)
+  private UUID scwikiUuid;
+
+  /** SC Wiki manufacturer short code (e.g. {@code "RSI"}, {@code "AEGS"}). */
+  @Column(name = "scwiki_code")
+  private String scwikiCode;
+
+  /** Industry / sector label exposed by UEX (e.g. {@code "Aerospace"}, {@code "Fashion"}). */
+  @Column(name = "industry")
+  private String industry;
+
+  /** Whether UEX flags this company as an item manufacturer; {@code null} until the first sync. */
+  @Column(name = "is_item_manufacturer")
+  private Boolean isItemManufacturer;
+
+  /**
+   * Whether UEX flags this company as a vehicle manufacturer; {@code null} until the first sync.
+   */
+  @Column(name = "is_vehicle_manufacturer")
+  private Boolean isVehicleManufacturer;
+
+  /** Timestamp of the most recent successful UEX sync touch. */
+  @Column(name = "uex_synced_at")
+  private Instant uexSyncedAt;
+
+  /** Timestamp of the most recent successful SC Wiki sync touch (R6+). */
+  @Column(name = "scwiki_synced_at")
+  private Instant scwikiSyncedAt;
+
+  /**
+   * Timestamp of the first sync run in which UEX no longer returned this manufacturer. Soft-delete
+   * marker; cleared on the next sync that sees it again.
+   */
+  @Column(name = "uex_deleted_at")
+  private Instant uexDeletedAt;
+
+  /** Soft-delete marker mirroring {@link #uexDeletedAt} for the SC Wiki side. */
+  @Column(name = "scwiki_deleted_at")
+  private Instant scwikiDeletedAt;
+
+  /**
+   * DataForge {@code __ref} manufacturer GUID observed by the KRT P4K Reader import. Kept alongside
+   * (not in place of) {@link #scwikiUuid}: the importer backfills {@code scwiki_uuid} only when it
+   * is null and unclaimed, but always records the P4K-observed GUID here so a UUID disagreement
+   * stays auditable. Not UNIQUE.
+   */
+  @Column(name = "p4k_uuid")
+  private UUID p4kUuid;
+
+  /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */
+  @Column(name = "p4k_synced_at")
+  private Instant p4kSyncedAt;
+
+  /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
+  @Column(name = "p4k_deleted_at")
+  private Instant p4kDeletedAt;
+}

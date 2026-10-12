@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
-import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
-import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

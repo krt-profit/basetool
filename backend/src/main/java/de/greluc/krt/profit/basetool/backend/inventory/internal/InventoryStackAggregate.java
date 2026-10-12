@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
 

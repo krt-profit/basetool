@@ -24,9 +24,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

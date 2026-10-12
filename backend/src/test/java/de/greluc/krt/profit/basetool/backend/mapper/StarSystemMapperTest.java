@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
-import de.greluc.krt.profit.basetool.backend.model.StarSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;

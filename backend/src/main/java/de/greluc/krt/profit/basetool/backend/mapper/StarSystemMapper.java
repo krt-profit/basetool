@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.mapper;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
-import de.greluc.krt.profit.basetool.backend.model.StarSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

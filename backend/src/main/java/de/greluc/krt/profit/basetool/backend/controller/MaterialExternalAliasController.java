@@ -50,7 +50,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Admin-only CRUD for the table mapping external commodity names (UEX, SC Wiki) onto local {@link
- * de.greluc.krt.profit.basetool.backend.model.Material} rows.
+ * de.greluc.krt.profit.basetool.backend.catalogue.api.Material} rows.
  *
  * <p>Lookups go through {@link MaterialExternalAliasService#resolveMaterialByAlias}, not HTTP.
  */

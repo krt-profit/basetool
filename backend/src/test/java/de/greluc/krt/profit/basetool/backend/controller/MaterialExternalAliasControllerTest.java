@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAlias;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAlias;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
 import java.util.List;
@@ -135,10 +135,10 @@ class MaterialExternalAliasControllerTest {
     persisted.setId(UUID.randomUUID());
     persisted.setVersion(0L);
     persisted.setSourceSystem(
-        de.greluc.krt.profit.basetool.backend.model.MaterialExternalAliasSource.SCWIKI);
+        de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasSource.SCWIKI);
     persisted.setExternalName("Raw Silicon");
-    de.greluc.krt.profit.basetool.backend.model.Material material =
-        new de.greluc.krt.profit.basetool.backend.model.Material();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.Material material =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material.setId(materialId);
     material.setName("Silicon (Raw)");
     persisted.setMaterial(material);
@@ -170,10 +170,11 @@ class MaterialExternalAliasControllerTest {
     persisted.setId(UUID.randomUUID());
     persisted.setVersion(0L);
     persisted.setSourceSystem(
-        de.greluc.krt.profit.basetool.backend.model.MaterialExternalAliasSource.REFINERY_SCREEN);
+        de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasSource
+            .REFINERY_SCREEN);
     persisted.setExternalName("UCTION SALVAGE");
-    de.greluc.krt.profit.basetool.backend.model.Material material =
-        new de.greluc.krt.profit.basetool.backend.model.Material();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.Material material =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material.setId(materialId);
     material.setName("Construction Salvage");
     persisted.setMaterial(material);

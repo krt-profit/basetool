@@ -23,8 +23,8 @@ import java.util.UUID;
 
 /**
  * One pooled stock slice for the blueprint craftability calculation: the caller's available SCU of
- * one {@link de.greluc.krt.profit.basetool.backend.model.Material} at one quality tier, summed
- * across locations.
+ * one {@link de.greluc.krt.profit.basetool.backend.catalogue.api.Material} at one quality tier,
+ * summed across locations.
  *
  * <p>Slices come from the caller's {@link
  * de.greluc.krt.profit.basetool.backend.model.InventoryItem} stock and, optionally, the yield of

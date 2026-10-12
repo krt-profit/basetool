@@ -109,7 +109,7 @@ reference, so bean validation cannot reach them).
 - [ ] A fractional book-out / rebook amount on a `PIECE`-material row or a game-item row is rejected server-side.
 
 **Enforced by:** `ValidQuantityAmountValidatorTest`, `MaterialAmountRoundingTest`. **Code:**
-`backend/.../validation/ValidQuantityAmount*`,
+`backend/.../catalogue/api/ValidQuantityAmount*`,
 `backend/.../model/{InventoryItem,InventoryJobOrderAllocation,InventoryMissionAllocation,JobOrderMaterial,MaterialClaim,JobOrderHandoverItem}` (`roundAmountToScuScale`).
 **Issues:** PR #465.
 

@@ -26,9 +26,9 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

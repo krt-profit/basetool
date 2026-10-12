@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
 import java.math.BigDecimal;
 import java.util.UUID;
 

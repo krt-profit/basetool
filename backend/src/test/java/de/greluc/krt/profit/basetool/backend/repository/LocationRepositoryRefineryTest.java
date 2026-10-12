@@ -22,9 +22,12 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.backend.model.City;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import java.time.Instant;

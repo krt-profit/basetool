@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

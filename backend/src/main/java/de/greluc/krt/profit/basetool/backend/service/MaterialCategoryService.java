@@ -19,13 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialCategoryMapper;
-import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

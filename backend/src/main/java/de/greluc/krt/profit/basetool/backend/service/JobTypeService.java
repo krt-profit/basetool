@@ -19,16 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObserver;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mapper.JobTypeMapper;
-import de.greluc.krt.profit.basetool.backend.model.JobType;
-import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
-import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

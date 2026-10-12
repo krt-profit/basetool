@@ -25,10 +25,10 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

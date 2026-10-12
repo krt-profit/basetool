@@ -30,6 +30,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
@@ -37,13 +44,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiIte
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
-import de.greluc.krt.profit.basetool.backend.model.GameItemKind;
-import de.greluc.krt.profit.basetool.backend.model.GameItemSourceSystem;
-import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
-import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.HashMap;

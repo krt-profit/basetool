@@ -24,7 +24,28 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Faction;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.FactionRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Jurisdiction;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.JurisdictionRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Moon;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MoonRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Orbit;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.OrbitRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Outpost;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.OutpostRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Planet;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.PlanetRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Poi;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexFactionDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexJurisdictionDto;
@@ -36,16 +57,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexPoiDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexSpaceStationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexTerminalDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
-import de.greluc.krt.profit.basetool.backend.model.City;
-import de.greluc.krt.profit.basetool.backend.model.Faction;
-import de.greluc.krt.profit.basetool.backend.model.Jurisdiction;
-import de.greluc.krt.profit.basetool.backend.model.Moon;
-import de.greluc.krt.profit.basetool.backend.model.Orbit;
-import de.greluc.krt.profit.basetool.backend.model.Outpost;
-import de.greluc.krt.profit.basetool.backend.model.Planet;
-import de.greluc.krt.profit.basetool.backend.model.Poi;
-import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
-import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.List;
 import java.util.Optional;
@@ -96,8 +107,8 @@ class UexUniverseSyncServiceTest {
               return c;
             });
 
-    de.greluc.krt.profit.basetool.backend.model.Location mockLocation =
-        new de.greluc.krt.profit.basetool.backend.model.Location();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.Location mockLocation =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.Location();
     when(locationRepository.findByCityId(any())).thenReturn(Optional.of(mockLocation));
     when(locationRepository.save(any())).thenReturn(mockLocation);
 

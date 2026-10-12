@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import jakarta.persistence.Column;

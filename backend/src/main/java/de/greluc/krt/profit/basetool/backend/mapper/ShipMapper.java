@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

@@ -30,9 +30,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportResultDto;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.model.P4kImportJobKind;
-import de.greluc.krt.profit.basetool.backend.model.dto.P4kImportResultDto;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

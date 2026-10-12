@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
-import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

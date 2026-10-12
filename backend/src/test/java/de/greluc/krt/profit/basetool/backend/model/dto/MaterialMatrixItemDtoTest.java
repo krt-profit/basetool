@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialMatrixItemDto;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

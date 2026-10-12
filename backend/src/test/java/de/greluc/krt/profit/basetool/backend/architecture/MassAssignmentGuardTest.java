@@ -31,6 +31,11 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankWithdrawalRequest
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankAccountRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
@@ -51,11 +56,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwnin
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateRequest;

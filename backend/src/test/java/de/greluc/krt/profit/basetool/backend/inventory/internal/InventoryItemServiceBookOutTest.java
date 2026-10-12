@@ -34,6 +34,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
@@ -48,21 +54,15 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTrans
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
@@ -1638,11 +1638,11 @@ class InventoryItemServiceBookOutTest {
     item.setVersion(1L);
     item.setAmount(10.0);
     item.setUser(owner);
-    de.greluc.krt.profit.basetool.backend.model.Location loc =
-        new de.greluc.krt.profit.basetool.backend.model.Location();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.Location loc =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.Location();
     loc.setId(UUID.randomUUID());
     item.setLocation(loc);
-    item.setMaterial(new de.greluc.krt.profit.basetool.backend.model.Material());
+    item.setMaterial(new de.greluc.krt.profit.basetool.backend.catalogue.api.Material());
     item.setPersonal(false);
 
     org.mockito.Mockito.when(inventoryItemRepository.findById(itemId))

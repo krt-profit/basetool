@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;

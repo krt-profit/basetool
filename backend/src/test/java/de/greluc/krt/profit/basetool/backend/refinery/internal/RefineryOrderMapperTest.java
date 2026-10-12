@@ -21,15 +21,15 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.mapper.LocationMapperImpl;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialCategoryMapperImpl;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapperImpl;
 import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapperImpl;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;

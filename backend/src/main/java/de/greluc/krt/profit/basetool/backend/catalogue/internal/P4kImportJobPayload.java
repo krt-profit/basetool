@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.P4kImportJob;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;

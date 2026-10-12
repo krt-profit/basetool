@@ -24,11 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;

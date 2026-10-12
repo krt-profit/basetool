@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 
 /**
  * Discriminator for the two kinds of {@link MaterialExchangeRequest} (REQ-MARKET-015): a {@link

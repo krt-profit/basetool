@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.Poi;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.model.Poi;
-import de.greluc.krt.profit.basetool.backend.repository.PoiRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

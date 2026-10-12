@@ -30,20 +30,20 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
-import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -381,8 +381,8 @@ class HangarServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.User();
     user.setId(userId);
 
-    de.greluc.krt.profit.basetool.backend.model.ShipType shipType =
-        new de.greluc.krt.profit.basetool.backend.model.ShipType();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType shipType =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType();
     shipType.setId(shipTypeId);
 
     de.greluc.krt.profit.basetool.backend.model.Squadron resolved =
@@ -417,8 +417,8 @@ class HangarServiceTest {
     de.greluc.krt.profit.basetool.backend.model.User user =
         new de.greluc.krt.profit.basetool.backend.model.User();
     user.setId(userId);
-    de.greluc.krt.profit.basetool.backend.model.ShipType shipType =
-        new de.greluc.krt.profit.basetool.backend.model.ShipType();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType shipType =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType();
     shipType.setId(shipTypeId);
 
     org.mockito.Mockito.when(userRepository.findPlainById(userId))

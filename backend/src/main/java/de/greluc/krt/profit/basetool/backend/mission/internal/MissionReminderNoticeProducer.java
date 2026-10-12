@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.mission.api.events.MissionNotices;
-import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;

@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
-import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;

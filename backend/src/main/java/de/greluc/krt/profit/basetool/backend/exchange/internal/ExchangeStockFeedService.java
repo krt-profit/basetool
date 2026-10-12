@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationDto;
@@ -29,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStock
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeTombstoneDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;

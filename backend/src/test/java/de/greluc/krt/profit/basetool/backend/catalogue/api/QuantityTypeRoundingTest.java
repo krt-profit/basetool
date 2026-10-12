@@ -23,8 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import org.junit.jupiter.api.Test;
 
 /**

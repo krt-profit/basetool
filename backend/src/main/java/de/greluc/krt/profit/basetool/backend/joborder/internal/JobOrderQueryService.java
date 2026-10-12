@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
@@ -33,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver.MaterialRequirement;

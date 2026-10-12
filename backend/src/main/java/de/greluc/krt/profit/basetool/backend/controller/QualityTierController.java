@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.service.QualityTierService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

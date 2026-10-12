@@ -21,10 +21,12 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
@@ -32,8 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.NotificationCreationService;

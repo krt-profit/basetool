@@ -23,12 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.Role;

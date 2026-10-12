@@ -30,11 +30,11 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;

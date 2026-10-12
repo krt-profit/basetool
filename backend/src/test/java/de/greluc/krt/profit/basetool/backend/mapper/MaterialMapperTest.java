@@ -21,12 +21,12 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
-import de.greluc.krt.profit.basetool.backend.model.MaterialSourceSystem;
-import de.greluc.krt.profit.basetool.backend.model.MaterialType;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 

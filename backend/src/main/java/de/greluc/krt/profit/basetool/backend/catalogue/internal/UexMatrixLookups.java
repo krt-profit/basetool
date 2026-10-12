@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.PairKeyRef;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

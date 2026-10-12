@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
@@ -35,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -78,7 +78,7 @@ class JobOrderHandoverServiceTest {
   private UUID materialId;
   private JobOrder order;
   private InventoryItem inventoryItem;
-  private de.greluc.krt.profit.basetool.backend.model.Material material;
+  private de.greluc.krt.profit.basetool.backend.catalogue.api.Material material;
   private de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial;
 
   @BeforeEach
@@ -94,7 +94,7 @@ class JobOrderHandoverServiceTest {
     order = new JobOrder();
     order.setId(orderId);
 
-    material = new de.greluc.krt.profit.basetool.backend.model.Material();
+    material = new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material.setId(materialId);
 
     jobOrderMaterial = new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
@@ -333,8 +333,8 @@ class JobOrderHandoverServiceTest {
     UUID inventoryId2 = UUID.randomUUID();
     UUID materialId2 = UUID.randomUUID();
 
-    de.greluc.krt.profit.basetool.backend.model.Material material2 =
-        new de.greluc.krt.profit.basetool.backend.model.Material();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.Material material2 =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material2.setId(materialId2);
 
     de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
@@ -394,8 +394,8 @@ class JobOrderHandoverServiceTest {
     UUID inventoryId2 = UUID.randomUUID();
     UUID materialId2 = UUID.randomUUID();
 
-    de.greluc.krt.profit.basetool.backend.model.Material material2 =
-        new de.greluc.krt.profit.basetool.backend.model.Material();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.Material material2 =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material2.setId(materialId2);
 
     de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
@@ -636,8 +636,8 @@ class JobOrderHandoverServiceTest {
     UUID inventoryId2 = UUID.randomUUID();
     UUID materialId2 = UUID.randomUUID();
 
-    de.greluc.krt.profit.basetool.backend.model.Material material2 =
-        new de.greluc.krt.profit.basetool.backend.model.Material();
+    de.greluc.krt.profit.basetool.backend.catalogue.api.Material material2 =
+        new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material2.setId(materialId2);
 
     de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =

@@ -24,14 +24,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.sql.Connection;

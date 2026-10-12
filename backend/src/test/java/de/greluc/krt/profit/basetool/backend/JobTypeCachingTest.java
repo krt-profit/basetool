@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
-import de.greluc.krt.profit.basetool.backend.model.JobType;
-import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
-import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.service.JobTypeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

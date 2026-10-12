@@ -25,6 +25,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddCrewRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddExternalParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;

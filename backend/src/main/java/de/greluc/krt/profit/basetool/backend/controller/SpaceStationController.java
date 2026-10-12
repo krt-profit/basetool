@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SpaceStationDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.SpaceStationMapper;
-import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.service.SpaceStationService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil.PageCeiling;

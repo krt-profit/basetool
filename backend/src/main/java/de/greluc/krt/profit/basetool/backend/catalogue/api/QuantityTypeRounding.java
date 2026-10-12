@@ -19,9 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 

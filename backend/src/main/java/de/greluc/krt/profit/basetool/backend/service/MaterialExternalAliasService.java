@@ -19,16 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAlias;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasSource;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAlias;
-import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAliasSource;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialExternalAliasRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

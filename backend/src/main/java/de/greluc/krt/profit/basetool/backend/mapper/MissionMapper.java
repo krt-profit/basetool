@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
-import de.greluc.krt.profit.basetool.backend.model.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
@@ -32,8 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionCrewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;

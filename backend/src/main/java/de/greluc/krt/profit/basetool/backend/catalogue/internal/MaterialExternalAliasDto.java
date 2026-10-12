@@ -23,7 +23,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Response DTO for {@link de.greluc.krt.profit.basetool.backend.model.MaterialExternalAlias}.
+ * Response DTO for {@link
+ * de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAlias}.
  *
  * @param id alias UUID
  * @param version optimistic-lock token, echoed back on update

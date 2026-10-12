@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import org.junit.jupiter.api.Test;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;

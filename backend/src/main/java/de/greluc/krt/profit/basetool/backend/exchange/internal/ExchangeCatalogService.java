@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository.ExchangeLocationRow;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationListDto;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository.ExchangeLocationRow;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

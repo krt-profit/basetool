@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -26,8 +28,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver;

@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierDto;
+
 /**
  * One resolved material requirement in an item-order derivation preview: the material, the quantity
  * needed for the previewed amount (unit from {@code material.quantityType}), and the quality tier

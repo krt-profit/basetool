@@ -25,10 +25,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintDto;
 import de.greluc.krt.profit.basetool.backend.mapper.BlueprintMapper;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintDto;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
-import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

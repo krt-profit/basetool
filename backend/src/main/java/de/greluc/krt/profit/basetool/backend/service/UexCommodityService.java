@@ -19,19 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPrice;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexMatrixLookups;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.MaterialPrice;
-import de.greluc.krt.profit.basetool.backend.model.MaterialSourceSystem;
-import de.greluc.krt.profit.basetool.backend.model.MaterialType;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.util.ArrayList;
 import java.util.HashSet;

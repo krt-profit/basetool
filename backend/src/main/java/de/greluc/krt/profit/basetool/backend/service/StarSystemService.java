@@ -20,12 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.mapper.StarSystemMapper;
-import de.greluc.krt.profit.basetool.backend.model.StarSystem;
-import de.greluc.krt.profit.basetool.backend.repository.StarSystemRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

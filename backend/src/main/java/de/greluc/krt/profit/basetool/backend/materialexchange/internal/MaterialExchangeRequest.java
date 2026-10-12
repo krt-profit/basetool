@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
-import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import jakarta.persistence.Column;

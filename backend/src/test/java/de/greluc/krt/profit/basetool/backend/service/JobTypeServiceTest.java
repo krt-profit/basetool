@@ -26,11 +26,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObserver;
-import de.greluc.krt.profit.basetool.backend.model.JobType;
-import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
-import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

@@ -21,16 +21,20 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPrice;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPriceOverviewDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.MaterialPrice;
-import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.Terminal;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;

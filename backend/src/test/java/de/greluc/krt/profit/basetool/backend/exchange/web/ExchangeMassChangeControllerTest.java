@@ -25,7 +25,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -36,9 +38,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClie
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
-import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.sql.Timestamp;

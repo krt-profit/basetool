@@ -25,6 +25,7 @@ import static de.greluc.krt.profit.basetool.backend.mission.internal.MissionSect
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
@@ -43,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount;
-import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;

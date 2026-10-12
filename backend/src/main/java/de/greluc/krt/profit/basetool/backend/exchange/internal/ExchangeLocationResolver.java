@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationRef;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;

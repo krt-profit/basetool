@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.JobTypeMapper;
-import de.greluc.krt.profit.basetool.backend.model.JobType;
-import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.service.JobTypeService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
