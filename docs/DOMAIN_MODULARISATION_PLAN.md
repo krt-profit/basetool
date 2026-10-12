@@ -2782,6 +2782,21 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
 6. *Text scan* of all tracked files: source paths in `bank.md`, `discord-integration.md`, `org-notifications.md` and `security-and-access.md` rewritten; nothing in code, resources
    or `monitoring/` names the old packages. `compileJava --rerun` shows 0 warnings.
 
+**Umbrella step 8 — the transitional privacy module leaves the layer packages — done 2026-10-12**
+1. *Probe*: the 28 classes the domain map assigns to `privacy` (the 23 of the census plus the five identity classes step 7 left behind) close no cycle at top level.
+2. *Move* (82 files; 16 tests follow): `privacy.api` 18 types (the deletion-request, data-export, person-search, merge and consolidation services and their
+   DTOs, the entity and its repository), `privacy.web` the eight controllers (`UserController`, `MeController` and `DiscordRegistrationAdminController` among them, paths unchanged),
+   `privacy.internal` the rejected-registration retention service and its task. The layer rule and `ModularityTest` then moved three existing `privacy.internal` types the api services take
+   (`PersonMentionRegistry`, `PersonalDataExportRegistry`, `HandleSpellings`) to `privacy.api` and `RejectedRegistrationRetentionProperties` from `identity.internal` to `identity.api`
+   (the task reads it). `DataExportPdfFormat` lost its `service.pdf` subpackage.
+3. *NullAway*: `DeletionRequest.id` carries `@Nullable` (the constructor does not set it), `DataExportService` and `PersonSearchService` take their `EntityManager` by constructor
+   instead of `@PersistenceContext` (`PersonSearchServiceAuditTest` passes a mock), `DataExportReportService.label` wraps the nullable message lookup in `Objects.requireNonNullElse`
+   with the key as the fallback it already used. No suppression.
+4. *Gates* from the failing assertions: service layer 486 -> **485**, join-column selection 180 -> **173**, read-only mutation rule 489 -> **488**. The module baseline stays empty.
+   `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: source paths in `bank.md`, `personal-inventory-blueprints.md` and `security-and-access.md` rewritten; one test javadoc named the old package of a moved test.
+   The module stays transitional (§5.1 rank 13); dissolving it into `identity` is the REST-surface and GDPR-SPI work, not this step.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2813,9 +2828,9 @@ before a decision.
         `PayoutPreference` (deferred "with `User`", §7.3), `UserRepository` (279 files name it),
         `UserMapper`/`UserDto`/`UserReferenceDto`, `UserController`, `MeController`, the mail services,
         `UserSyncService`/`UserSyncTask`, the rejected-registration retention.
-        Open: `UserController`, `MeController`, `DiscordRegistrationAdminController`, `RejectedRegistrationRetentionService` and its task wait for their
-        host module (the REST-surface placement and the GDPR step); `UserMapper` went to `orgunit.api` (see the entry above).
-  - [ ] **8.** `privacy` (23): the GDPR orchestration classes (§5.1 rank 13) into `privacy`, then
+        `UserController`, `MeController`, `DiscordRegistrationAdminController`, `RejectedRegistrationRetentionService` and its task moved into the transitional
+        `privacy` module in step 8, until their host module exists; `UserMapper` went to `orgunit.api` (see the entry above).
+  - [x] **8.** done — `privacy` (23, 28 with the identity leftovers): the GDPR orchestration classes (§5.1 rank 13) into `privacy`, then
         dissolved into identity as §5.1 and §7.6 say.
 - Business core leftovers (the entities other modules still hold):
   - [ ] **9.** P4-1 part 3, inventory: the Lager row becomes a record plus id commands, then

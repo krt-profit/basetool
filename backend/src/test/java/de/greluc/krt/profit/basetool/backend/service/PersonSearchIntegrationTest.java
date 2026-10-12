@@ -23,7 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
+import de.greluc.krt.profit.basetool.backend.privacy.api.PersonSearchHitDto;
+import de.greluc.krt.profit.basetool.backend.privacy.api.PersonSearchService;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;

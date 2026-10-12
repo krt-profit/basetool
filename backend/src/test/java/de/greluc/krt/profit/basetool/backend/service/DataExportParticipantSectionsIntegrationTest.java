@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
 import java.math.BigDecimal;
 import java.util.List;

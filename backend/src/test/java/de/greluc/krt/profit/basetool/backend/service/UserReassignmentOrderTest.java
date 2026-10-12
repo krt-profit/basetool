@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRows;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserReassignmentParticipant;
+import de.greluc.krt.profit.basetool.backend.privacy.api.UserAccountMergeService;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

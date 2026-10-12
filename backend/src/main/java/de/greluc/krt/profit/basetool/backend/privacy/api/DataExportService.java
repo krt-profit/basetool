@@ -1,0 +1,220 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.privacy.api;
+
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
+import jakarta.persistence.Tuple;
+import jakarta.persistence.TupleElement;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Assembles a member's Art. 15 / Art. 20 data export (REQ-SEC-058).
+ *
+ * <p>The statements of the {@link PersonalDataExportRegistry} sections select only the requester's
+ * own columns; free text the requester wrote is passed through {@link HandleScrubber}. Each section
+ * carries its legal basis, so the Art. 20 portable subset is identifiable.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class DataExportService {
+
+  /** Rows returned per section, so one very active member cannot produce an unbounded document. */
+  public static final int MAX_ROWS_PER_SECTION = 5000;
+
+  private final UserRepository userRepository;
+  private final AuditRecorder auditRecorder;
+  private final PersonalDataExportRegistry exportRegistry;
+
+  private final EntityManager entityManager;
+
+  /**
+   * One section of an assembled export.
+   *
+   * @param key the stable machine key, also the label key
+   * @param legalBasis {@code ART_15} or {@code ART_15_20}
+   * @param rows the rows, each a column-name to value map in the statement's own column order
+   * @param truncated whether {@link #MAX_ROWS_PER_SECTION} was reached
+   */
+  public record ExportSection(
+      String key, String legalBasis, List<Map<String, Object>> rows, boolean truncated) {}
+
+  /**
+   * A complete export.
+   *
+   * @param subjectId the member the export is about
+   * @param subjectHandle their effective name, so the document names its own subject
+   * @param generatedAt when it was assembled
+   * @param thirdPartyHandlesRemoved whether any third-party handle was scrubbed from free text,
+   *     which tells the admin whether the Art. 15(4) read-through has anything to look for
+   * @param outOfScope surfaces deliberately not covered, stated in the document itself
+   * @param sections the sections, in reading order
+   */
+  public record DataExport(
+      UUID subjectId,
+      String subjectHandle,
+      Instant generatedAt,
+      boolean thirdPartyHandlesRemoved,
+      List<String> outOfScope,
+      List<ExportSection> sections) {
+
+    /**
+     * The total number of rows across every section.
+     *
+     * @return the row count
+     */
+    public int totalRows() {
+      return sections.stream().mapToInt(s -> s.rows().size()).sum();
+    }
+  }
+
+  /**
+   * Surfaces the export deliberately does not cover. Stated in the document rather than left
+   * implicit, and kept in step with {@code docs/privacy/data-subject-requests.md}.
+   */
+  private static final List<String> OUT_OF_SCOPE =
+      List.of("platformLogsMetricsTraces", "backups", "keycloakAccountRecord");
+
+  /**
+   * Assembles the export for one member.
+   *
+   * @param userId the member
+   * @return the assembled export
+   * @throws NotFoundException when no such member exists
+   */
+  @Transactional(readOnly = true)
+  public @NotNull DataExport export(@NotNull UUID userId) {
+    User subject =
+        Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
+
+    HandleScrubber scrubber = scrubberForOthers(userId);
+
+    List<Section> declared = exportRegistry.sections();
+    List<ExportSection> sections = new ArrayList<>(declared.size());
+    boolean scrubbed = false;
+    for (Section section : declared) {
+      Query query =
+          entityManager
+              .createNativeQuery(section.sql(), Tuple.class)
+              .setParameter("userId", userId);
+      query.setMaxResults(MAX_ROWS_PER_SECTION + 1);
+      List<?> raw = query.getResultList();
+      boolean truncated = raw.size() > MAX_ROWS_PER_SECTION;
+
+      List<Map<String, Object>> rows = new ArrayList<>(Math.min(raw.size(), MAX_ROWS_PER_SECTION));
+      boolean sectionHasProse = scrubber.isActive();
+      for (Object item : raw.subList(0, Math.min(raw.size(), MAX_ROWS_PER_SECTION))) {
+        Tuple tuple = (Tuple) item;
+        Map<String, Object> row = new LinkedHashMap<>();
+        for (TupleElement<?> element : tuple.getElements()) {
+          String name = element.getAlias();
+          Object value = tuple.get(name);
+          if (sectionHasProse && section.scrubs(name) && value instanceof String text) {
+            String cleaned = scrubber.scrub(text);
+            if (cleaned != null && !cleaned.equals(text)) {
+              scrubbed = true;
+            }
+            value = cleaned;
+          }
+          row.put(name, value);
+        }
+        rows.add(row);
+      }
+      sections.add(new ExportSection(section.key(), section.legalBasis().name(), rows, truncated));
+    }
+
+    DataExport export =
+        new DataExport(
+            userId, subject.getEffectiveName(), Instant.now(), scrubbed, OUT_OF_SCOPE, sections);
+    log.info(
+        "Assembled data export for {}: {} section(s), {} row(s){}",
+        userId,
+        sections.size(),
+        export.totalRows(),
+        scrubbed ? ", third-party handles removed from free text" : "");
+    return export;
+  }
+
+  /**
+   * Appends the audit row for one served export in its own writable transaction (REQ-SEC-058,
+   * REQ-AUDIT-001). The payload names only the format and the row count.
+   *
+   * @param userId the member the export was about, recorded as subject and target
+   * @param format {@code json} or {@code pdf}
+   * @param rows the served export's {@link DataExport#totalRows()}
+   * @param bySelf whether the subject exported their own data rather than an admin
+   */
+  @Transactional
+  public void recordExport(@NotNull UUID userId, @NotNull String format, int rows, boolean bySelf) {
+    auditRecorder.record(
+        AuditEventType.PERSONAL_DATA_EXPORTED,
+        userId,
+        null,
+        userId,
+        AuditDetails.of("format", format).with("rows", rows).with("bySelf", bySelf));
+  }
+
+  /**
+   * Builds a scrubber that replaces every spelling (username, display name, Discord nickname) of
+   * every member except the subject.
+   *
+   * <p>The subject's spellings are passed as protected terms, so a shorter third-party handle that
+   * is a prefix of the subject's name cannot be spliced into it.
+   *
+   * @param subjectId the member the export is about
+   * @return the scrubber
+   */
+  private @NotNull HandleScrubber scrubberForOthers(@NotNull UUID subjectId) {
+    List<User> roster = userRepository.findAll();
+    List<String> others =
+        roster.stream()
+            .filter(u -> !u.getId().equals(subjectId))
+            .flatMap(HandleSpellings::of)
+            .filter(h -> h != null && !h.isBlank())
+            .toList();
+    List<String> own =
+        roster.stream()
+            .filter(u -> u.getId().equals(subjectId))
+            .flatMap(HandleSpellings::of)
+            .filter(h -> h != null && !h.isBlank())
+            .toList();
+    return new HandleScrubber(others, own);
+  }
+}

@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

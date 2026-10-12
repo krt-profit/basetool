@@ -271,7 +271,7 @@ and a global sharer is counted once.
   (unchanged behaviour).
 
 **Code links:** [`UserService#updateUserShareBlueprintsGlobally`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/identity/api/UserService.java),
-[`UserController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/UserController.java) (`/me/blueprint-sharing`),
+[`UserController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/privacy/web/UserController.java) (`/me/blueprint-sharing`),
 [`PersonalBlueprintOverviewService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintOverviewService.java),
 [`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/joborder/internal/JobOrderItemBlueprintOwnersService.java),
 [`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql).

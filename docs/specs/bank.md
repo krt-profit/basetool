@@ -1523,7 +1523,7 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > other recipient is left alone. A holder change with no added holder (only a departure) tells nobody
 > and only reconciles.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit + assignment and reconcile events), `NotificationCreationServiceTest` (reconcile), `NotificationRuleEngineIntegrationTest` (V269 rule), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `bank/internal/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `orgunit/api/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserDeletionService#deleteUser`, `orgunit/api/BereichRepository#findByDepartment`, `bank/internal/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit + assignment and reconcile events), `NotificationCreationServiceTest` (reconcile), `NotificationRuleEngineIntegrationTest` (V269 rule), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `bank/internal/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `orgunit/api/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `privacy/api/UserDeletionService#deleteUser`, `orgunit/api/BereichRepository#findByDepartment`, `bank/internal/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
 
 ### REQ-BANK-035 — Configurable balance visibility
 
@@ -2149,7 +2149,7 @@ reaches `/memberships`) · **Code:**
 (`resolveCounterparty`), `bank/internal/BankBookingRequestService`,
 `orgunit/api/OrgUnitMembershipQueryService#listDirectMembershipOptions`, `bank/internal/BankBookingRow`,
 `bank/internal/BankPostingRepository`, `bank/internal/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
-`bank/internal/OrgUnitBankAccessService#redact`, `controller/UserController`, `config/SecurityConfig`,
+`bank/internal/OrgUnitBankAccessService#redact`, `privacy/web/UserController`, `config/SecurityConfig`,
 `db/migration/V197`, `db/migration/V205` (#994 constraint relax),
 `orgunit/api/OrgUnitMembershipQueryService#listAllActiveOrgUnitOptionsAllKinds` (#994),
 frontend `bank/web/BankPageController`, `bank/web/BankRequestQueuePageController`,

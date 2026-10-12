@@ -56,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedE
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatNotifier;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
+import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;

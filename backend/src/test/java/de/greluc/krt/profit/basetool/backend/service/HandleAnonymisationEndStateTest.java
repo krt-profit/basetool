@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.privacy.api.HandleAnonymisationService;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import jakarta.persistence.EntityManager;
 import java.util.Arrays;

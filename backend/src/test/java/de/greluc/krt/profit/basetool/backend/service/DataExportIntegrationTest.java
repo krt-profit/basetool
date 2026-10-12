@@ -32,6 +32,8 @@ import de.greluc.krt.profit.basetool.backend.personalinventory.internal.Personal
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportReportService;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
 import java.time.Instant;
 import java.util.HashSet;

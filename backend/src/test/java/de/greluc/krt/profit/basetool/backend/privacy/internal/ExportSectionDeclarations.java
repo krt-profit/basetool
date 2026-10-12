@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.privacy.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
+import de.greluc.krt.profit.basetool.backend.privacy.api.PersonalDataExportRegistry;
 import java.lang.reflect.Constructor;
 import java.util.Comparator;
 import java.util.List;

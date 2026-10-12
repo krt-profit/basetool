@@ -4705,9 +4705,9 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 `DataExportControllerSecurityTest`, `PersonalDataExportCatalogueTest`,
 `DataExportEndStateTest`, `PersonalDataExportOwnershipTest`, `PersonalDataExportRegistryTest` ·
 **Code:** `platform/api/PersonalDataExportSection`, `privacy/internal/PersonalDataExportRegistry`,
-the `*ExportSections` of the modules, `kernel/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
-`service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
-`controller/AdminDataExportController`, frontend `identity/web/DataExportProxyController`,
+the `*ExportSections` of the modules, `kernel/HandleScrubber`, `privacy/api/DataExportService`, `privacy/api/DataExportReportService`,
+`privacy/api/DataExportPdfFormat`, `privacy/web/DataExportController`,
+`privacy/web/AdminDataExportController`, frontend `identity/web/DataExportProxyController`,
 `templates/identity/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
 links, beside the separate deletion card) · **Decision:**
 [ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md) ·
@@ -4928,8 +4928,8 @@ aggregates.
 `PersonSearchEndStateTest`, `PersonMentionOwnershipTest`, `PersonMentionRegistryTest`,
 `AdminPersonSearchControllerSecurityTest` · **Code:**
 `platform/api/PersonMentionSource`, `privacy/internal/PersonMentionRegistry`, the
-`*MentionSource` classes of the modules, `service/PersonSearchService`,
-`controller/AdminPersonSearchController`, `model/dto/PersonSearchHitDto`,
+`*MentionSource` classes of the modules, `privacy/api/PersonSearchService`,
+`privacy/web/AdminPersonSearchController`, `privacy/api/PersonSearchHitDto`,
 `frontend/identity/web/AdminPersonSearchPageController`, `templates/identity/admin/person-search.html`,
 `static/js/identity/admin-person-search.js` · **Decision:**
 [ADR-0184](../adr/0184-the-person-search-is-a-checked-registry-not-a-schema-sweep.md) ·
@@ -5030,10 +5030,10 @@ from a statute rather than from operational taste.
   management are all refused.
 
 **Enforced by:** `DeletionRequestServiceTest`, `DeletionRequestControllerSecurityTest`,
-`BusinessMetricsCollectorTest` · **Code:** `model/DeletionRequest`,
-`model/DeletionRequestStatus`, `repository/DeletionRequestRepository`,
-`service/DeletionRequestService`, `controller/DeletionRequestController`,
-`controller/AdminDeletionRequestController`, `privacy/api/events/AccountDeletionRequestedEvent`,
+`BusinessMetricsCollectorTest` · **Code:** `privacy/api/DeletionRequest`,
+`privacy/api/DeletionRequestStatus`, `privacy/api/DeletionRequestRepository`,
+`privacy/api/DeletionRequestService`, `privacy/web/DeletionRequestController`,
+`privacy/web/AdminDeletionRequestController`, `privacy/api/events/AccountDeletionRequestedEvent`,
 `privacy/api/events/AccountDeletionRequestDeclinedEvent`, `db/migration/V242`, `db/migration/V243`,
 `frontend/identity/web/DeletionRequestProxyController`,
 `frontend/identity/web/AdminDeletionRequestsPageController`,
@@ -5173,7 +5173,7 @@ it.
 **Enforced by:** `HandleAnonymisationEndStateTest` (real Postgres: every covered column, the rows
 that must stay, the counts and both marker rows), `HandleAnonymisationServiceTest`,
 `HandleErasureCoverageTest`, `HandleAnonymisationCoverageTest` · **Code:**
-`service/HandleAnonymisationService`, `platform/api/HandleAnonymisationParticipant`,
+`privacy/api/HandleAnonymisationService`, `platform/api/HandleAnonymisationParticipant`,
 `audit/internal/AuditHandleAnonymisation`, `bank/internal/BankHandleAnonymisation`,
 `joborder/internal/JobOrderHandleAnonymisation`, `kernel/HandleAnonymisation`,
 `privacy/internal/HandleErasureCoverage`,

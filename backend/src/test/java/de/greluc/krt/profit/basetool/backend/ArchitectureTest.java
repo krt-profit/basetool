@@ -93,12 +93,12 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
+import de.greluc.krt.profit.basetool.backend.identity.api.RejectedRegistrationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
-import de.greluc.krt.profit.basetool.backend.identity.internal.RejectedRegistrationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.identity.web.DiscordAccountExistenceController;
 import de.greluc.krt.profit.basetool.backend.identity.web.TermsDocumentController;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
@@ -167,8 +167,8 @@ import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.platform.api.RequestBodyLimitProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageListenerContainer;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
+import de.greluc.krt.profit.basetool.backend.privacy.api.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
-import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
@@ -685,7 +685,7 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 486);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 485);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 
@@ -1333,7 +1333,7 @@ class ArchitectureTest {
     assertClassFloor(
         "mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional",
         SERVICE_CODE.or(EXCHANGE_NON_WEB).or(BANK_NON_WEB),
-        489);
+        488);
     mutatingServiceMethodsInReadOnlyClassesRule().check(CLASSES);
   }
 
@@ -1682,7 +1682,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 180);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 173);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.Hand
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransaction;
-import de.greluc.krt.profit.basetool.backend.controller.UserController;
 import de.greluc.krt.profit.basetool.backend.exchange.web.ConnectedAppsController;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.web.HangarController;
@@ -63,6 +62,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityS
 import de.greluc.krt.profit.basetool.backend.orgunit.web.SpecialCommandController;
 import de.greluc.krt.profit.basetool.backend.orgunit.web.SpecialCommandMembershipController;
 import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
+import de.greluc.krt.profit.basetool.backend.privacy.web.UserController;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirement;
 import de.greluc.krt.profit.basetool.backend.promotion.web.MemberEvaluationController;

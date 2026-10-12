@@ -35,6 +35,8 @@ import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSect
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
+import de.greluc.krt.profit.basetool.backend.privacy.api.UserAccountMergeService;
+import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
@@ -42,8 +44,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipReposito
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.service.UserAccountMergeService;
-import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;

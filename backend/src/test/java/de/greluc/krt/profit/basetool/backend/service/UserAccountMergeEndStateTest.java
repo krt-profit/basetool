@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.privacy.api.UserAccountMergeService;
 import jakarta.persistence.EntityManager;
 import java.util.LinkedHashMap;
 import java.util.Map;

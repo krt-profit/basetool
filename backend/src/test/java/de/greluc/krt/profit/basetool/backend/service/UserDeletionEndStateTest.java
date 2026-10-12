@@ -60,6 +60,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationType;
+import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
