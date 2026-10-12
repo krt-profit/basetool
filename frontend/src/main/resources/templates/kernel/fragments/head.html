@@ -18,6 +18,7 @@
     <link rel="preload" th:href="@{/fonts/Lato-Regular.woff2}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" th:href="@{/css/kernel/styles.css}">
     <script th:src="@{/js/kernel/krt-client-error.js}" th:attr="nonce=${cspNonce}"></script>
+    <script type="importmap" th:with="importMapJson=${@moduleImportMap.json(#execInfo.processedTemplateName)}" th:attr="nonce=${cspNonce}" th:utext="${importMapJson}"></script>
     <script th:attr="nonce=${cspNonce}">
         window.krtEvents = window.krtEvents || (function () {
             var queue = [];

@@ -397,33 +397,42 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank.js", "BANK_ACCOUNT_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "BANK_ACCOUNT_SECTIONS");
     assertThat(jsKeys)
-        .as("BANK_ACCOUNT_SECTIONS keys in bank.js vs LiveSyncTopicClass.BANK_ACCOUNT whitelist")
+        .as(
+            "BANK_ACCOUNT_SECTIONS keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT"
+                + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
   }
 
   @Test
   void orgUnitAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank.js", "ORGUNIT_ACCOUNT_SECTIONS");
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/bank/bank-livesync.js", "ORGUNIT_ACCOUNT_SECTIONS");
     assertThat(jsKeys)
-        .as("ORGUNIT_ACCOUNT_SECTIONS keys in bank.js vs LiveSyncTopicClass.BANK_ACCOUNT whitelist")
+        .as(
+            "ORGUNIT_ACCOUNT_SECTIONS keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT"
+                + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
   }
 
   @Test
   void bankStaffSeamMap_matchesTheBankStaffTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank.js", "BANK_STAFF_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "BANK_STAFF_SECTIONS");
     assertThat(jsKeys)
-        .as("BANK_STAFF_SECTIONS keys in bank.js vs LiveSyncTopicClass.BANK_STAFF whitelist")
+        .as(
+            "BANK_STAFF_SECTIONS keys in bank-livesync.js vs LiveSyncTopicClass.BANK_STAFF"
+                + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_STAFF.allowedSections());
   }
 
   @Test
   void orgUnitBankSeamMap_matchesTheOrgUnitBankTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank.js", "ORGUNIT_BANK_SECTIONS");
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "ORGUNIT_BANK_SECTIONS");
     assertThat(jsKeys)
-        .as("ORGUNIT_BANK_SECTIONS keys in bank.js vs LiveSyncTopicClass.ORGUNIT_BANK whitelist")
+        .as(
+            "ORGUNIT_BANK_SECTIONS keys in bank-livesync.js vs LiveSyncTopicClass.ORGUNIT_BANK"
+                + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
   }
 

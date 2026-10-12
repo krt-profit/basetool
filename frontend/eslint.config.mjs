@@ -1,8 +1,27 @@
+import { readdirSync, readFileSync } from "node:fs";
 import js from "@eslint/js";
 import globals from "globals";
 import nounsanitized from "eslint-plugin-no-unsanitized";
 
 const ECMA_VERSION = 2025;
+
+const SCRIPT_ROOT = "src/main/resources/static/js";
+
+const CLASSIC_SCRIPTS = JSON.parse(
+  readFileSync(new URL("./module-ratchet.json", import.meta.url), "utf8"),
+).classic.map((script) => `${SCRIPT_ROOT}/${script}`);
+
+const SCRIPT_DOMAINS = readdirSync(new URL(`./${SCRIPT_ROOT}`, import.meta.url), {
+  withFileTypes: true,
+})
+  .filter((entry) => entry.isDirectory() && entry.name !== "vendor")
+  .map((entry) => entry.name);
+
+const IMPORT_BOUNDARY_MESSAGE =
+  "A module imports only /js/<its domain>/<file>.js or /js/kernel/<file>.js, by that absolute path: the import map keys the content-hashed URLs by it (REQ-FE-035).";
+
+const IMPORT_EXPRESSION_MESSAGE =
+  "Dynamic import() is not in the import map's module graph; use a static import (REQ-FE-035).";
 
 const TRANSPORT_FILES = [
   "src/main/resources/static/js/kernel/krt-fetch.js",
@@ -82,6 +101,10 @@ const ALWAYS_BANNED_SINKS = [
     selector: "CallExpression[callee.name='krtHtml'], CallExpression[callee.property.name='krtHtml']",
     message: "krtHtml is a template tag: krtHtml`<li>${value}</li>` (ADR-0239).",
   },
+  {
+    selector: "ImportExpression",
+    message: IMPORT_EXPRESSION_MESSAGE,
+  },
 ];
 
 const MODERN_SYNTAX_RULES = {
@@ -145,6 +168,31 @@ export default [
       ],
     },
   },
+  {
+    files: [`${SCRIPT_ROOT}/**/*.js`],
+    ignores: CLASSIC_SCRIPTS,
+    languageOptions: { sourceType: "module" },
+  },
+  ...SCRIPT_DOMAINS.map((domain) => ({
+    files: [`${SCRIPT_ROOT}/${domain}/**/*.js`],
+    ignores: CLASSIC_SCRIPTS,
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex:
+                domain === "kernel"
+                  ? "^(?!/js/kernel/[a-z0-9-]+\\.js$)"
+                  : `^(?!/js/(?:${domain}|kernel)/[a-z0-9-]+\\.js$)`,
+              message: IMPORT_BOUNDARY_MESSAGE,
+            },
+          ],
+        },
+      ],
+    },
+  })),
   {
     files: ["src/main/resources/static/js/**/*.js"],
     plugins: { "no-unsanitized": nounsanitized },

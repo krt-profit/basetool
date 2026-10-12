@@ -30,6 +30,11 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "moduleDetection": "legacy",
+    "paths": {
+      "/js/*": [
+        "./src/main/resources/static/js/*"
+      ]
+    },
     "strict": true,
     "noImplicitAny": false,
     "useUnknownInCatchVariables": false,

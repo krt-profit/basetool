@@ -90,7 +90,7 @@ class InlineScriptLoadOrderTest {
         if (!attrs.contains("th:src=") && !attrs.contains(" src=")) {
           continue;
         }
-        boolean deferred = attrs.matches("(?s).*\\b(defer|async)\\b.*");
+        boolean deferred = attrs.matches("(?s).*(\\b(defer|async)\\b|type=\"module\").*");
         boolean beacon = attrs.contains(CLIENT_ERROR_BEACON);
         if (beacon == deferred) {
           offenders.add(template.getFileName() + " -> <script" + attrs + ">");
