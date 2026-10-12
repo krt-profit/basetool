@@ -27,18 +27,14 @@ import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.dto.BulkStolenMarkRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.BulkStolenMarkResultDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -226,7 +222,7 @@ public class InventoryStolenMarkService {
     if (requiresWholeUnits(item) && amount % 1 != 0) {
       throw new BadRequestException("error.inventory.stolen.wholeUnits");
     }
-    double remaining = InventoryItem.roundToScuScale(rowAmount - amount);
+    double remaining = ScuAmounts.roundToScuScale(rowAmount - amount);
     double offered = stockOfferLookup.activeOfferedAmount(item.getId());
     if (remaining + QUANTITY_EPSILON < offered) {
       throw new BusinessConflictException("error.inventory.stolen.belowOffer");
@@ -239,7 +235,7 @@ public class InventoryStolenMarkService {
     part.setGameItem(item.getGameItem());
     part.setLocation(item.getLocation());
     part.setQuality(item.getQuality());
-    part.setAmount(InventoryItem.roundToScuScale(amount));
+    part.setAmount(ScuAmounts.roundToScuScale(amount));
     part.setPersonal(item.getPersonal());
     part.setStolen(target);
     final InventoryItem savedPart = inventoryItemRepository.save(part);

@@ -142,7 +142,9 @@ ship and refinery repositories), the file held 36 class edges in 8 module pairs.
 mission embeds its own `MissionOperationDto`, so the operation's types move into `operation.internal`)
 it held 33 in 7, and after plan §7.6 P4-1 part 1 (the org-unit module's membership service asks its
 `orgunit.api.FirstMembershipObserver` SPI, which the Lager implements, instead of naming
-`InventoryOrgUnitReconciler`) it holds **32 class edges in 6 module pairs**.
+`InventoryOrgUnitReconciler`) it holds **32 class edges in 6 module pairs**. Plan §7.6 P4-2 (the
+blueprint's controllers, services, mappers, default-blueprint data layer and participants move into
+`blueprint.web` / `blueprint.internal`) removed no edge and added none: no layer class names a moved type.
 
 **Acceptance**
 
@@ -216,7 +218,7 @@ Every `<module>.web` and `<module>.internal` package is internal to its module.
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
 services, so `web` depends on `internal` and never the other way: the layers inside a module stay
 acyclic (ADR-0047) until the module API returns its own records (plan §5.2). `orgchart`, `admin`,
-`personalinventory`, `promotion`, `exchange`, `materialexchange`, `refinery`, `joborder` and `mission` are laid out this way; the exchange's frozen relay
+`personalinventory`, `promotion`, `exchange`, `materialexchange`, `refinery`, `joborder`, `mission` and `inventory` are laid out this way (the inventory publishes the DTOs the job order returns, `InventoryItemDto` and its allocation DTOs, in `inventory.api`); the exchange's frozen relay
 wire records sit in `exchange.internal.dto`.
 
 **Acceptance**

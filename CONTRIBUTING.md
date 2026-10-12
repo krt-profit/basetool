@@ -293,6 +293,19 @@ configuration time (use `providers.exec`). Check a build-script change with
 Repositories are declared only in `settings.gradle.kts`; a module script that
 declares one fails the build (`FAIL_ON_PROJECT_REPOS`).
 
+**The shared build conventions live in `build-logic/`**, an included build
+(`pluginManagement { includeBuild("build-logic") }`) of precompiled script plugins, one per
+concern (`basetool.java-conventions`, `basetool.quality-conventions`,
+`basetool.spring-app-conventions`, …; the full list is REQ-OPS-046). A module script applies the
+ones it needs by id in its `plugins {}` block and adds only its dependencies and its own tasks; the
+root build has no `subprojects {}` block, so a convention reaches a module only because the module
+applies it. Third-party Gradle plugins that a convention needs are applied by the convention, with
+their versions from the catalog's `[plugins]` entries; a precompiled script reads the catalog by
+alias (`Catalog.kt`), not through `libs.…`. The typed `basetool { }` block of a module sets
+`javaRelease` and `nullAwayPackages`. `build-logic/` is a shared image input and the Dockerfiles copy
+it; after a change there run the checks above (`help --configuration-cache` twice,
+`build -m --configuration-cache`) and `./gradlew spotlessApply`, which also formats its Kotlin.
+
 **Each module declares its own quality settings** in `<module>/build-settings.properties`:
 `test.maxHeap`, the JaCoCo floors `coverage.instruction` / `coverage.branch` and the PIT
 patterns `mutation.targetClasses` / `mutation.targetTests`, each required as soon as the
@@ -332,6 +345,11 @@ trust you are extending. The command only adds entries; to drop stale ones,
 delete the `<components>` element first and regenerate (optional; an unused
 entry does no harm).
 
+- **The included build `build-logic/` is covered by the same file** (Gradle uses the current
+  build's metadata and ignores any file of an included build). What its Kotlin DSL plugin and the
+  convention plugins' classpath resolve — the Kotlin compiler artifacts and the Gradle plugins with
+  their transitive jars — is written by the same command, and a bump of a plugin version in the
+  catalog's `[plugins]` section changes it.
 - **The Node.js archive is per operating system.** The file carries the
   `win-x64` and `linux-x64` entries. On another platform add yours once with
   `./gradlew --write-verification-metadata sha256 :frontend:nodeSetup`; after a

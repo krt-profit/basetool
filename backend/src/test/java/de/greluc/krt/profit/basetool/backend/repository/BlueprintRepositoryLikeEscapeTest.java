@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintProductRow;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;

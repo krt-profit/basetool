@@ -31,13 +31,13 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryEarmarkLookup;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
@@ -47,24 +47,9 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationDimension;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationInput;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -489,7 +474,7 @@ public class InventoryItemService {
     item.setGameItem(gameItem);
     item.setLocation(location);
     item.setQuality(dto.quality());
-    item.setAmount(InventoryItem.roundToScuScale(dto.amount()));
+    item.setAmount(ScuAmounts.roundToScuScale(dto.amount()));
     item.setPersonal(isPersonal);
     item.setStolen(isStolen);
     List<InventoryAllocationInput> jobAllocations =
@@ -514,7 +499,7 @@ public class InventoryItemService {
         assertMaterialRequiredByJobOrder(Objects.requireNonNull(material), allocation.targetId());
       }
       InventoryAllocations.addJobOrder(
-          item, allocation.targetId(), InventoryItem.roundToScuScale(allocation.amount()), false);
+          item, allocation.targetId(), ScuAmounts.roundToScuScale(allocation.amount()), false);
     }
     Set<UUID> seenMissions = new HashSet<>();
     for (InventoryAllocationInput allocation : missionAllocations) {
@@ -525,7 +510,7 @@ public class InventoryItemService {
       Entities.require(
           Optional.ofNullable(earmarkTargets.mission(allocation.targetId())), "Mission not found");
       InventoryAllocations.addMission(
-          item, allocation.targetId(), InventoryItem.roundToScuScale(allocation.amount()));
+          item, allocation.targetId(), ScuAmounts.roundToScuScale(allocation.amount()));
     }
     if (!InventoryAllocations.fits(item)) {
       throw new OverAllocationException();
@@ -874,7 +859,7 @@ public class InventoryItemService {
               ? "An item allocation amount must be a whole number"
               : "A PIECE allocation amount must be a whole number");
     }
-    return InventoryItem.roundToScuScale(raw);
+    return ScuAmounts.roundToScuScale(raw);
   }
 
   /**
@@ -887,7 +872,7 @@ public class InventoryItemService {
    *     #OVER_ALLOCATION_EPSILON}
    */
   private void assertFits(double proposedSum, double capacity) {
-    if (InventoryItem.roundToScuScale(proposedSum) - capacity > OVER_ALLOCATION_EPSILON) {
+    if (ScuAmounts.roundToScuScale(proposedSum) - capacity > OVER_ALLOCATION_EPSILON) {
       throw new OverAllocationException();
     }
   }

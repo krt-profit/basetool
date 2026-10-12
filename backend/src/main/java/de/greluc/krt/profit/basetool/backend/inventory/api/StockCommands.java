@@ -25,9 +25,9 @@ import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -61,6 +61,16 @@ public interface StockCommands {
    */
   @NotNull
   List<InventoryItem> lockLotRows(@NotNull UUID member, @NotNull StockLot lot);
+
+  /**
+   * Locks one row for a write that follows (a handover or a production consumption), with its
+   * material, owner, location and owning org unit loaded.
+   *
+   * @param rowId the row
+   * @return the row under a pessimistic write lock, or empty when unknown
+   */
+  @NotNull
+  Optional<InventoryItem> lockRow(@NotNull UUID rowId);
 
   /**
    * Books stock in as a new personal row without an org unit, which piece-counted stock then joins

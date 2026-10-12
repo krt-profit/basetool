@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.validation.QualityValue;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -35,8 +36,6 @@ import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.validation.constraints.Min;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -46,8 +45,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * One warehouse stock row, either a material row ({@link #material} and {@link #quality}) or a game
@@ -166,23 +163,6 @@ public class InventoryItem extends AbstractEntity<UUID> {
   @PrePersist
   @PreUpdate
   void roundAmountToScuScale() {
-    amount = roundToScuScale(amount);
-  }
-
-  /**
-   * Rounds an SCU amount to three decimals with {@link RoundingMode#HALF_UP}, leaving {@code null}
-   * untouched; the rounding {@link #roundAmountToScuScale()} applies.
-   *
-   * @param value the raw amount, possibly carrying floating-point noise
-   * @return {@code value} rounded to three decimals, or {@code null} when {@code value} is {@code
-   *     null}
-   */
-  @Contract("null -> null")
-  @Nullable
-  public static Double roundToScuScale(Double value) {
-    if (value == null) {
-      return null;
-    }
-    return BigDecimal.valueOf(value).setScale(3, RoundingMode.HALF_UP).doubleValue();
+    amount = ScuAmounts.roundToScuScale(amount);
   }
 }

@@ -82,13 +82,16 @@ public class MissionParticipant extends AbstractEntity<UUID> {
    * <p>For a registered user it is derived from their memberships; for an external participant it
    * is the caller-submitted selection, stored as submitted. Covered by the participant's own
    * {@code @Version}.
+   *
+   * <p>Lazy: a read that dereferences it fetches it, as {@code MissionRepository#findById} does.
    */
-  @ManyToMany(fetch = FetchType.EAGER)
+  @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "mission_participant_org_unit",
       joinColumns = @JoinColumn(name = "mission_participant_id"),
       inverseJoinColumns = @JoinColumn(name = "org_unit_id"))
   @BatchSize(size = 50)
+  @ToString.Exclude
   @Getter(AccessLevel.NONE)
   @Setter(AccessLevel.NONE)
   private Set<OrgUnit> orgUnits = new LinkedHashSet<>();

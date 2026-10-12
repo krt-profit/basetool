@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

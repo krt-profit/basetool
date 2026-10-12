@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintIdNameRow;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintProductRow;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIdNameRow;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import java.time.Instant;
@@ -212,7 +212,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id)
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id)
       FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m
       WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
       AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
@@ -228,7 +228,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintIdNameRow(b.id,
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIdNameRow(b.id,
       b.outputName) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS
       NOT NULL ORDER BY b.outputName ASC, b.scwikiKey ASC, b.id ASC
       """)

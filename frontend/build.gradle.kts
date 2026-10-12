@@ -1,5 +1,6 @@
 import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
+import de.greluc.krt.profit.basetool.conventions.OssLicensePolicy
 
 buildscript {
   dependencies {
@@ -12,16 +13,10 @@ buildscript {
 }
 
 plugins {
-  java
-  checkstyle
-  id("jacoco")
-  alias(libs.plugins.spring.boot)
-  alias(libs.plugins.spring.dependency.management)
-  alias(libs.plugins.cyclonedx.bom)
-  alias(libs.plugins.licensee)
-  alias(libs.plugins.spotbugs.base)
-  alias(libs.plugins.pitest)
-  id("com.diffplug.spotless")
+  id("basetool.spring-app-conventions")
+  id("basetool.quality-conventions")
+  id("basetool.mutation-conventions")
+  id("basetool.supply-chain-conventions")
   alias(libs.plugins.node.gradle)
   alias(libs.plugins.openapi.generator)
 }
@@ -176,11 +171,8 @@ val generateOssLicenses =
         tasks.named("exportLicenseeReport").map { it.outputs.files.asFileTree },
       )
     val bundledComponents = file("oss-bundled-components.json")
-    @Suppress("UNCHECKED_CAST")
-    val urlAliases = rootProject.extra["ossLicenseUrlAliases"] as Map<String, String>
-    @Suppress("UNCHECKED_CAST")
-    val coordinateOverrides =
-      rootProject.extra["ossLicenseCoordinateOverrides"] as Map<String, String>
+    val urlAliases = OssLicensePolicy.urlAliases
+    val coordinateOverrides = OssLicensePolicy.overrideLicenses
     val generator = "licensee ${libs.versions.licensee.get()}"
     val outputFile = generatedOssLicenses.map { it.file("oss/oss-licenses.json") }
 

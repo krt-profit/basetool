@@ -20,12 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -78,7 +79,7 @@ public final class AllocationReductions {
         jobOrderDimension
             ? InventoryAllocations.sumJobOrder(item)
             : InventoryAllocations.sumMission(item);
-    double rest = InventoryItem.roundToScuScale(amount - sumSlices);
+    double rest = ScuAmounts.roundToScuScale(amount - sumSlices);
 
     if (reductions == null) {
       return defaultReductionPlan(item, totalX, rest, jobOrderDimension);
@@ -141,7 +142,7 @@ public final class AllocationReductions {
   private static Map<UUID, Double> defaultReductionPlan(
       InventoryItem item, double totalX, double rest, boolean jobOrderDimension) {
     Map<UUID, Double> plan = new LinkedHashMap<>();
-    double forced = InventoryItem.roundToScuScale(totalX - rest);
+    double forced = ScuAmounts.roundToScuScale(totalX - rest);
     if (forced <= REDUCTION_EPSILON) {
       return plan;
     }
@@ -170,14 +171,14 @@ public final class AllocationReductions {
     for (int i = 0; i < targets.size(); i++) {
       double share;
       if (i == targets.size() - 1) {
-        share = InventoryItem.roundToScuScale(forced - assigned);
+        share = ScuAmounts.roundToScuScale(forced - assigned);
       } else {
-        share = InventoryItem.roundToScuScale(forced * (sliceAmounts.get(i) / totalSlice));
+        share = ScuAmounts.roundToScuScale(forced * (sliceAmounts.get(i) / totalSlice));
       }
       share = Math.min(share, sliceAmounts.get(i));
       if (share > 0.0) {
         plan.put(targets.get(i), share);
-        assigned = InventoryItem.roundToScuScale(assigned + share);
+        assigned = ScuAmounts.roundToScuScale(assigned + share);
       }
     }
     return plan;

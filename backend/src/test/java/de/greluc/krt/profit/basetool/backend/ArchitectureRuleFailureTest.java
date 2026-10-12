@@ -200,6 +200,7 @@ class ArchitectureRuleFailureTest {
   @Test
   void persistenceRulesFail() {
     assertReports(ArchitectureTest.toOneAssociationsAreDeclaredLazyRule(), WEB, "parent");
+    assertReports(ArchitectureTest.toManyAssociationsAreNeverFetchedEagerlyRule(), WEB, "peers");
     assertReports(
         ArchitectureTest.noSquadronIdJoinColumnRule(
             ArchitectureTest.nonInterfaces(ArchitectureTest.MODEL_CODE), Set.of()),

@@ -216,18 +216,34 @@ repository, the key projections and the integration properties sit in `catalogue
 Entities, repositories, mappers, controllers and the other DTOs stay in the layer packages until
 the kernel types `AbstractEntity` and `PageResponse` have left `model` (§11).
 
-The inventory (the Lager) moved in part since P4-1: `InventoryItemController` sits in `inventory.web`, and
+The inventory (the Lager) moved since P4-1: `InventoryItemController` sits in `inventory.web`, and
 `inventory.internal` holds the Lager services (item, aggregation, checkout, org-unit change, stolen
 mark), `InventoryAccessPolicy` (also the `BookInPolicy`), `InventoryStockCommands` (the `StockCommands`
-implementation), `InventoryEarmarkTargetCache`, `StockViewerAccessService`, `InventoryCraftableStock` (the
-blueprint's `CraftableStockSource`), `InventoryOrgUnitReconciler` (the org-unit module's
-`FirstMembershipObserver`) and its GDPR participants. The entities, the three repositories,
-`InventoryItemMapper`, the Lager DTOs and the projections still stay in the layer packages, because the
-exchange, the job order and the Materialbörse read the repository and the mapper directly and the job-order
-entities hold `InventoryItem` (plan §7.6, P4-1). The mapper's two seams sit beside it, as
-`MissionViewerAccess` does: `mapper.StockViewerAccess` (the caller's `canEdit`) and
-`mapper.InventoryEarmarkLookup` (the per-transaction memo of the earmark targets), and the earmark records
-and the earmarked-stock rows are in `model.projection`, so no layer class names `inventory.api`.
+implementation), `InventoryStockReads` (the `StockReads` implementation), `InventoryEarmarkTargetCache`,
+`StockViewerAccessService`, `InventoryCraftableStock` (the blueprint's `CraftableStockSource`),
+`InventoryOrgUnitReconciler` (the org-unit module's `FirstMembershipObserver`), its GDPR participants, the
+three repositories, `InventoryItemMapper`, `InventoryItemCatalogService` (the `StockItemCatalogue`) and the
+request and read DTOs. `inventory.api` publishes what other modules use: `StockCommands`, `StockReads`
+(the exchange's lots, the stock earmarked to a job order as `LinkedStockRow` or Lager DTOs, the rows the
+Materialbörse offers), `StockItemCatalogue`, `InventoryItemDto` with its two allocation DTOs and the
+projection rows. The three entities (`InventoryItem` and the two allocations) still stay in the layer
+package `model`, because seven classes of the exchange, the job order and the Materialbörse hold the row
+(plan §7.6, P4-1 part 2). Four layer types keep a seam beside the module, as `MissionViewerAccess`
+does: `mapper.StockViewerAccess` (the caller's `canEdit`, read by `JobOrderMapper`),
+`service.OrderLinkedStockRows` (the material rows the job order's stock projection reads), and the
+records the job-order and mission repositories return, `model.projection.JobOrderEarmark` and
+`MissionEarmark`, so the layer packages and the module stay acyclic.
+
+The blueprint moved in part since P4-2: the five controllers sit in `blueprint.web`, and
+`blueprint.internal` holds the personal and default blueprint services, the command service behind
+`PersonalBlueprintCommands`, the import, the craftability, the product resolution and the variant
+families, `BlueprintAccessPolicy`, the default-blueprint grant observer and provisioning task, the two
+mappers, the default-blueprint and alias entities and repositories, the DTOs only the blueprint
+controllers use, and its four GDPR participants. No layer class names any of them, so the move closed
+no package cycle. `PersonalBlueprint`, `PersonalBlueprintRepository`, `BlueprintSource`, the import
+preview, suggestion and status DTOs, the create request and response and `BlueprintOwnerProduct` stay in
+the layer packages, because the exchange (feed, write, undo and demand services, the draft and resolve
+services) and the job order's blueprint-owner service read them directly (plan §7.6, P4-2).
 
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
@@ -334,6 +350,12 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
   `IngestEndpointSurfaceTest`, which pins the gateway's routed surface to the exchange route table
   and fails on any mapping under `/v1`; and `ContextShape`, the bean count each application's
   `ContextShapeTest` ratchets (REQ-OPS-038).
+- **`build-logic`** — an included build, not a module of the product and never shipped: the
+  `basetool.*` precompiled convention plugins (toolchain, annotation wiring, test and compile
+  conventions, Checkstyle, Spotless, JaCoCo, PIT, SpotBugs, CycloneDX, Licensee, Spring Boot and
+  dependency management, Error Prone) that every module applies by id, the typed `basetool { }`
+  extension and the reader of each module's `build-settings.properties` (REQ-OPS-046, ADR-0248). It is
+  the place a Gradle module extracted later (plan §5.8) gets its conventions from.
 
 ### Inside `ingest`
 

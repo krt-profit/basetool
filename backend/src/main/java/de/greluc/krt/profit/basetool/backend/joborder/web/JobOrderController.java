@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
@@ -45,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderSta
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;

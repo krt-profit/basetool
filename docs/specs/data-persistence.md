@@ -132,6 +132,18 @@ open), so no lazy association outlives its session and nothing needs initialisin
 transaction, twice (cold and from the caches), and asserts that none costs more statements for
 twelve rows than for three.
 
+**No collection is `EAGER`** (D-20, 2026-10-11). `MissionParticipant.orgUnits` was the one
+`@ManyToMany(fetch = EAGER)` — every participant load dragged its affiliated org units along, in a
+follow-up batch select per page of participants — and it is `LAZY` now.
+`ArchitectureTest.toManyAssociationsAreNeverFetchedEagerly` fails the build on any `@OneToMany` /
+`@ManyToMany` declared `EAGER`. The reads that map the roster fetch the collection on purpose:
+`MissionRepository.findById` graphs `participants.orgUnits` next to the participant's to-ones, and
+`MissionParticipantRepository.findById` graphs `orgUnits` for the single-participant endpoints, so
+the mission detail, the unassigned roster, the peer-redacted detail and the participant update each
+cost one statement less than before, and the same number for 3 and for 25 participants
+(`MissionParticipantOrgUnitsReadNoNPlusOneTest`). Only `MissionMapper.toDto(MissionParticipant)`
+dereferences the collection, and every controller that calls it runs in its own `@Transactional`.
+
 **A foreign-key target is resolved without its graph.** `UserRepository.findById` graphs `roles` and
 `roles.permissions` for the authentication path and `/users/me`; a service that needs the user only
 as a foreign-key target or for a scalar uses `findPlainById` (an `EntityManager.find` fragment, the

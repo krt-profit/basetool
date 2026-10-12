@@ -27,12 +27,13 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -66,7 +67,7 @@ public class MaterialExchangeService {
 
   private final MaterialExchangeOfferRepository offerRepository;
   private final MaterialExchangeInterestRepository interestRepository;
-  private final InventoryItemRepository inventoryItemRepository;
+  private final StockReads stockReads;
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
   private final AuditRecorder auditRecorder;
@@ -126,7 +127,7 @@ public class MaterialExchangeService {
     UUID viewerId = requireViewerId();
     InventoryItem item =
         Entities.require(
-            inventoryItemRepository.findById(request.inventoryItemId()),
+            stockReads.findRow(request.inventoryItemId()),
             () -> "Inventory item not found: " + request.inventoryItemId());
     if (item.getUser() == null || !viewerId.equals(item.getUser().getId())) {
       throw new AccessDeniedException("Only the item's owner may release it to the Materialbörse.");
@@ -522,7 +523,7 @@ public class MaterialExchangeService {
     if (requested == null || requested <= 0.0) {
       throw new BadRequestException("The offered amount must be a positive quantity.");
     }
-    double offered = InventoryItem.roundToScuScale(requested);
+    double offered = ScuAmounts.roundToScuScale(requested);
     double available = item.getAmount() == null ? 0.0 : item.getAmount();
     if (offered <= 0.0) {
       throw new BadRequestException("The offered amount must be a positive quantity.");

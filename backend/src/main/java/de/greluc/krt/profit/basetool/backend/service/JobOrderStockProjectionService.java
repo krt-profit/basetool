@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver.MaterialRequirement;
 import de.greluc.krt.profit.basetool.backend.service.QualityBucketAllocator.Allocation;
 import de.greluc.krt.profit.basetool.backend.service.QualityBucketAllocator.Demand;
@@ -62,7 +61,7 @@ import org.springframework.stereotype.Service;
 public class JobOrderStockProjectionService {
 
   /** Loads the order-linked stock rows. */
-  private final InventoryItemRepository inventoryItemRepository;
+  private final OrderLinkedStockRows orderLinkedStockRows;
 
   /** Supplies the per-order / page-batched SK material-claim view. */
   private final ClaimBucketSource claimBucketSource;
@@ -125,7 +124,7 @@ public class JobOrderStockProjectionService {
       return new OrderLinkedStockIndex(Map.of());
     }
     return new OrderLinkedStockIndex(
-        inventoryItemRepository.findMaterialStockRowsByJobOrderIds(orderIds).stream()
+        orderLinkedStockRows.materialStockOfOrders(orderIds).stream()
             .collect(
                 Collectors.groupingBy(
                     JobOrderMaterialStockRow::jobOrderId,

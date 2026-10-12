@@ -34,6 +34,12 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankBookingRequ
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkOrgUnitChangeRequest;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookRequest;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemBookOutDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemCreateDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemOrgUnitChangeDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto.BookInDto;
@@ -44,14 +50,8 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRe
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwningOrgUnitRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemOrgUnitChangeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;

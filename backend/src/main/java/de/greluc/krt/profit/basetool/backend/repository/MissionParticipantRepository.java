@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -34,6 +35,17 @@ import org.springframework.data.repository.query.Param;
 
 /** Spring Data repository for Mission Participant. */
 public interface MissionParticipantRepository extends JpaRepository<MissionParticipant, UUID> {
+  /**
+   * Loads a participant by id with its {@code orgUnits} fetched, for the single-participant
+   * endpoints that map it.
+   *
+   * @param id the participant id
+   * @return the participant with its org units pre-loaded, or empty when none exists
+   */
+  @Override
+  @EntityGraph(attributePaths = "orgUnits")
+  Optional<MissionParticipant> findById(UUID id);
+
   /** Derived Spring-Data query - returns entities matching {@code MissionIdAndUserId}. */
   Optional<MissionParticipant> findByMissionIdAndUserId(UUID missionId, UUID userId);
 

@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDeman
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeQuantityDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
@@ -34,8 +36,6 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderGameItemStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -93,7 +93,7 @@ public class ExchangeDemandService {
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderMaterialRequirementResolver requirementResolver;
   private final JobOrderStockProjectionService stockProjectionService;
-  private final InventoryItemRepository inventoryRepository;
+  private final StockReads stockReads;
   private final MaterialRepository materialRepository;
   private final PersonalBlueprintRepository blueprintRepository;
   private final BlueprintFamilies familyResolver;
@@ -240,8 +240,7 @@ public class ExchangeDemandService {
     }
     Map<UUID, Map<UUID, Double>> earmarked = new HashMap<>();
     for (JobOrderGameItemStockRow row :
-        inventoryRepository.findGameItemStockRowsByJobOrderIds(
-            itemOrders.stream().map(JobOrder::getId).toList())) {
+        stockReads.gameItemStockOfOrders(itemOrders.stream().map(JobOrder::getId).toList())) {
       if (row.jobOrderId() != null && row.gameItemId() != null) {
         earmarked
             .computeIfAbsent(row.jobOrderId(), _ -> new HashMap<>())

@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
