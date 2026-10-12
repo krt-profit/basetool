@@ -2296,6 +2296,21 @@
         margin-top: 1rem;
     }
 
+    :is(
+            .grid-auto-cards,
+            .grid-auto,
+            .kpi-grid,
+            .home-grid,
+            .pane-grid-2,
+            .pane-grid-fin,
+            .bank-chart-grid,
+            .sc-links-grid
+        )
+        > .card
+        + .card {
+        margin-top: 0;
+    }
+
     .chip {
         display: inline-flex;
         align-items: center;
