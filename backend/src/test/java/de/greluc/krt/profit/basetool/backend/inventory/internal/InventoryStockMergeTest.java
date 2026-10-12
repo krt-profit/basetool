@@ -1,0 +1,319 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.inventory.internal;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.model.JobOrder;
+import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
+/**
+ * Unit tests for the write-time stock merge {@link InventoryCheckoutService#mergeStockIfRequested}
+ * (REQ-INV-026): a {@code PIECE} write merges matching rows automatically, an {@code SCU} write
+ * only on opt-in, and a row backing a Materialbörse offer never.
+ *
+ * <p>The merge key is the physical identity alone (REQ-INV-027); the survivor unions the victims'
+ * {@link InventoryJobOrderAllocation} and mission slices, summing per target and OR-combining the
+ * delivered marker.
+ */
+@ExtendWith(MockitoExtension.class)
+class InventoryStockMergeTest {
+
+  @Mock private InventoryItemRepository inventoryItemRepository;
+  @Mock private UserRepository userRepository;
+  @Mock private LocationRepository locationRepository;
+  @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
+  @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private StockOfferLookup stockOfferLookup;
+  @Mock private InventoryItemMapper inventoryItemMapper;
+  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private StockChangeObserver offerRatchet;
+  @Mock private AuditService auditService;
+  @Mock private ApplicationEventPublisher eventPublisher;
+  @InjectMocks private InventoryCheckoutService service;
+
+  private static final UUID USER_ID = UUID.randomUUID();
+  private static final UUID MATERIAL_ID = UUID.randomUUID();
+  private static final UUID LOCATION_ID = UUID.randomUUID();
+
+  /**
+   * Builds a managed-like inventory row sharing the fixed stock identity used across these tests
+   * (owner {@link #USER_ID}, material {@link #MATERIAL_ID}, location {@link #LOCATION_ID}, quality
+   * 100, non-personal, no owning org unit). The row starts with empty allocation collections — a
+   * test that needs an earmark appends a slice through {@link InventoryAllocations} after the row
+   * is built.
+   *
+   * @param id the row id.
+   * @param quantityType the material's quantity type.
+   * @param amount the row's amount.
+   * @param note the row's note (may be {@code null}).
+   * @return the assembled row.
+   */
+  private static InventoryItem row(UUID id, QuantityType quantityType, double amount, String note) {
+    User user = new User();
+    user.setId(USER_ID);
+    Material material = new Material();
+    material.setId(MATERIAL_ID);
+    material.setQuantityType(quantityType);
+    Location location = new Location();
+    location.setId(LOCATION_ID);
+    InventoryItem item = new InventoryItem();
+    item.setId(id);
+    item.setUser(user);
+    item.setMaterial(material);
+    item.setLocation(location);
+    item.setQuality(100);
+    item.setPersonal(false);
+    item.setAmount(amount);
+    item.setNote(note);
+    return item;
+  }
+
+  /**
+   * Builds a bare {@link JobOrder} carrying only {@code id}, enough for the merge's allocation
+   * union to match slices by job-order id.
+   *
+   * @param id the job-order id.
+   * @return the assembled job order.
+   */
+  private static JobOrder jobOrder(UUID id) {
+    JobOrder order = new JobOrder();
+    order.setId(id);
+    return order;
+  }
+
+  @Test
+  void pieceMaterial_foldsSiblings_sumsAmounts_mergesDistinctNotes_unionsAllocations() {
+    UUID survivorId = UUID.randomUUID();
+    JobOrder order = jobOrder(UUID.randomUUID());
+    InventoryItem survivor = row(survivorId, QuantityType.PIECE, 5.0, "note-a");
+    InventoryAllocations.addJobOrder(survivor, order.getId(), 5.0, false);
+    InventoryItem victim1 = row(UUID.randomUUID(), QuantityType.PIECE, 3.0, "note-b");
+    InventoryItem victim2 = row(UUID.randomUUID(), QuantityType.PIECE, 2.0, "note-a");
+    InventoryAllocations.addJobOrder(victim2, order.getId(), 2.0, true);
+
+    when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
+    when(inventoryItemRepository.findMergeGroupForUpdate(
+            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null))
+        .thenReturn(List.of(survivor, victim1, victim2));
+    when(inventoryItemRepository.saveAndFlush(survivor)).thenReturn(survivor);
+
+    InventoryItem result = service.mergeStockIfRequested(survivor, false);
+
+    assertSame(survivor, result, "the survivor is the passed-in row");
+    assertEquals(10.0, survivor.getAmount(), 1e-9, "amounts of all folded rows are summed");
+    assertEquals("note-a\nnote-b", survivor.getNote(), "distinct notes are concatenated in order");
+
+    assertEquals(1, survivor.getJobOrderAllocations().size(), "same-order slices fold into one");
+    InventoryJobOrderAllocation slice = survivor.getJobOrderAllocations().get(0);
+    assertEquals(
+        order.getId(), slice.getJobOrderId(), "the surviving slice keeps the shared job order");
+    assertEquals(7.0, slice.getAmount(), 1e-9, "the shared order's slice amount is summed");
+    assertTrue(slice.getDelivered(), "delivered is OR-combined across the folded slices");
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<InventoryItem>> deleted = ArgumentCaptor.forClass(List.class);
+    verify(inventoryItemRepository).deleteAll(deleted.capture());
+    assertEquals(
+        List.of(victim1, victim2), deleted.getValue(), "every non-survivor row is deleted");
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_ITEM_MERGED), eq(survivorId), any(), eq(USER_ID), any());
+  }
+
+  @Test
+  void scuMaterial_withoutOptIn_isNoOp() {
+    InventoryItem row = row(UUID.randomUUID(), QuantityType.SCU, 5.0, "n");
+
+    InventoryItem result = service.mergeStockIfRequested(row, false);
+
+    assertSame(row, result);
+    assertEquals(5.0, row.getAmount(), 1e-9, "the amount is untouched");
+    verifyNoInteractions(inventoryItemRepository, stockOfferLookup, auditService);
+  }
+
+  @Test
+  void scuMaterial_withOptIn_merges() {
+    UUID survivorId = UUID.randomUUID();
+    InventoryItem survivor = row(survivorId, QuantityType.SCU, 5.0, "x");
+    InventoryItem victim = row(UUID.randomUUID(), QuantityType.SCU, 2.0, "y");
+
+    when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
+    when(inventoryItemRepository.findMergeGroupForUpdate(
+            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null))
+        .thenReturn(List.of(survivor, victim));
+    when(inventoryItemRepository.saveAndFlush(survivor)).thenReturn(survivor);
+
+    InventoryItem result = service.mergeStockIfRequested(survivor, true);
+
+    assertSame(survivor, result);
+    assertEquals(7.0, survivor.getAmount(), 1e-9);
+    assertEquals("x\ny", survivor.getNote());
+    verify(inventoryItemRepository).deleteAll(any());
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_ITEM_MERGED), eq(survivorId), any(), eq(USER_ID), any());
+  }
+
+  @Test
+  void offerBackedRow_isNeverMerged() {
+    UUID rowId = UUID.randomUUID();
+    InventoryItem row = row(rowId, QuantityType.PIECE, 5.0, "n");
+
+    when(stockOfferLookup.isOffered(rowId)).thenReturn(true);
+
+    InventoryItem result = service.mergeStockIfRequested(row, false);
+
+    assertSame(row, result);
+    assertEquals(5.0, row.getAmount(), 1e-9, "an offer-backed row's amount is untouched");
+    verify(inventoryItemRepository, never())
+        .findMergeGroupForUpdate(any(), any(), any(), any(), any(), eq(false), any());
+    verifyNoInteractions(auditService);
+  }
+
+  @Test
+  void noMatchingSibling_isNoOp() {
+    UUID rowId = UUID.randomUUID();
+    InventoryItem row = row(rowId, QuantityType.PIECE, 5.0, "n");
+
+    when(stockOfferLookup.isOffered(rowId)).thenReturn(false);
+    when(inventoryItemRepository.findMergeGroupForUpdate(
+            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null))
+        .thenReturn(List.of(row));
+
+    InventoryItem result = service.mergeStockIfRequested(row, false);
+
+    assertSame(row, result);
+    assertEquals(5.0, row.getAmount(), 1e-9);
+    verify(inventoryItemRepository, never()).deleteAll(any());
+    verify(inventoryItemRepository, never()).saveAndFlush(any());
+    verifyNoInteractions(auditService);
+  }
+
+  /**
+   * Builds a game-item stock row with the fixed identity of {@link #row}, but in the item catalog
+   * shape (REQ-INV-029): game item set, material and quality {@code null}.
+   *
+   * @param id the row id.
+   * @param gameItem the stocked game item.
+   * @param amount the row's amount.
+   * @return the assembled item row.
+   */
+  private static InventoryItem itemRow(UUID id, GameItem gameItem, double amount) {
+    User user = new User();
+    user.setId(USER_ID);
+    Location location = new Location();
+    location.setId(LOCATION_ID);
+    InventoryItem item = new InventoryItem();
+    item.setId(id);
+    item.setUser(user);
+    item.setGameItem(gameItem);
+    item.setLocation(location);
+    item.setPersonal(false);
+    item.setAmount(amount);
+    return item;
+  }
+
+  @Test
+  void gameItemRow_alwaysAutoMerges_viaSevenArgumentNullBranchQuery() {
+    GameItem gameItem = new GameItem();
+    gameItem.setId(UUID.randomUUID());
+    gameItem.setName("Quantum Drive");
+    UUID survivorId = UUID.randomUUID();
+    InventoryItem survivor = itemRow(survivorId, gameItem, 3.0);
+    InventoryItem victim = itemRow(UUID.randomUUID(), gameItem, 2.0);
+    when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
+    when(inventoryItemRepository.findMergeGroupForUpdate(
+            USER_ID, null, gameItem.getId(), LOCATION_ID, null, false, false, null))
+        .thenReturn(List.of(survivor, victim));
+    when(inventoryItemRepository.saveAndFlush(survivor)).thenReturn(survivor);
+
+    InventoryItem result = service.mergeStockIfRequested(survivor, false);
+
+    assertSame(survivor, result);
+    assertEquals(5.0, survivor.getAmount(), 1e-9, "item amounts of all folded rows are summed");
+    ArgumentCaptor<UUID> materialKey = ArgumentCaptor.forClass(UUID.class);
+    ArgumentCaptor<Integer> qualityKey = ArgumentCaptor.forClass(Integer.class);
+    verify(inventoryItemRepository)
+        .findMergeGroupForUpdate(
+            eq(USER_ID),
+            materialKey.capture(),
+            eq(gameItem.getId()),
+            eq(LOCATION_ID),
+            qualityKey.capture(),
+            eq(false),
+            eq(false),
+            eq((UUID) null));
+    assertNull(materialKey.getValue(), "an item stack keys with materialId = null");
+    assertNull(qualityKey.getValue(), "an item stack keys with quality = null");
+    verify(inventoryItemRepository).deleteAll(List.of(victim));
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_ITEM_MERGED), eq(survivorId), any(), eq(USER_ID), any());
+  }
+
+  @Test
+  void nullMaterial_withOptIn_isNoOp() {
+    InventoryItem row = row(UUID.randomUUID(), QuantityType.SCU, 5.0, "n");
+    row.setMaterial(null);
+
+    InventoryItem result = service.mergeStockIfRequested(row, true);
+
+    assertSame(row, result);
+    assertEquals(5.0, row.getAmount(), 1e-9, "the amount is untouched");
+    verifyNoInteractions(inventoryItemRepository, stockOfferLookup, auditService);
+  }
+}

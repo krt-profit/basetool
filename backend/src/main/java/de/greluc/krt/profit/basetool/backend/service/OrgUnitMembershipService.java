@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchReque
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.FirstMembershipObserver;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserver;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
@@ -91,7 +92,7 @@ public class OrgUnitMembershipService {
   private final SquadronRepository squadronRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final KommandoGroupRepository kommandoGroupRepository;
-  private final InventoryOrgUnitReconciler inventoryReconciler;
+  private final FirstMembershipObserver firstMembershipObserver;
   private final AuditRecorder auditRecorder;
   private final MembershipChangeObserver membershipChangeObserver;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
@@ -130,7 +131,7 @@ public class OrgUnitMembershipService {
     OrgUnitMembership saved = membershipRepository.save(membership);
 
     if (wasMembershipless) {
-      inventoryReconciler.onUserGainedFirstOrgUnit(userId, sc);
+      firstMembershipObserver.onUserGainedFirstOrgUnit(userId, sc);
     }
     auditRecorder.record(
         AuditEventType.MEMBERSHIP_GRANTED,
@@ -163,7 +164,7 @@ public class OrgUnitMembershipService {
     membershipChangeObserver.onUnitMembershipRemoved(sc.getId(), userId);
 
     if (membershipRepository.countByIdUserId(userId) == 0) {
-      inventoryReconciler.onUserLostLastOrgUnit(userId);
+      firstMembershipObserver.onUserLostLastOrgUnit(userId);
     }
     auditRecorder.record(
         AuditEventType.MEMBERSHIP_REVOKED,
@@ -653,9 +654,9 @@ public class OrgUnitMembershipService {
           addedSquadrons.stream()
               .min(Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER))
               .orElseThrow();
-      inventoryReconciler.onUserGainedFirstOrgUnit(user.getId(), primaryAdded);
+      firstMembershipObserver.onUserGainedFirstOrgUnit(user.getId(), primaryAdded);
     } else if (membershipsBefore > 0 && membershipRepository.countByIdUserId(user.getId()) == 0) {
-      inventoryReconciler.onUserLostLastOrgUnit(user.getId());
+      firstMembershipObserver.onUserLostLastOrgUnit(user.getId());
     }
   }
 

@@ -19,8 +19,8 @@
 
 /**
  * The inventory module's published API: its problem codes, the over-allocation exception, the
- * allocation slice helpers and audit labels, the Lager settings and the stock viewer-access SPI
- * (plan §5.2, §5.5).
+ * allocation slice helpers and audit labels, the Lager settings and the stock commands with their
+ * observer and earmark-target SPIs (plan §5.2, §5.5).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.inventory.api;

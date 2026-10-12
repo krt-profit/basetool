@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
+import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
@@ -79,29 +81,5 @@ public final class EarmarkTargets {
      */
     @Nullable
     Set<UUID> requiredGameItemIds(@NotNull UUID jobOrderId);
-  }
-
-  /** The Lager-side lookup of the earmark targets, memoised for the running transaction. */
-  public interface Lookup {
-
-    /**
-     * Returns a mission the Lager's stock is earmarked to; the first miss in a transaction loads
-     * every mission the loaded Lager rows are earmarked to in one read.
-     *
-     * @param missionId the mission
-     * @return the mission, or {@code null} when it does not exist
-     */
-    @Nullable
-    MissionEarmark mission(@NotNull UUID missionId);
-
-    /**
-     * Returns a job order the Lager's stock is earmarked to; the first miss in a transaction loads
-     * every job order the loaded Lager rows are earmarked to in one read.
-     *
-     * @param jobOrderId the job order
-     * @return the job order, or {@code null} when it does not exist
-     */
-    @Nullable
-    JobOrderEarmark jobOrder(@NotNull UUID jobOrderId);
   }
 }

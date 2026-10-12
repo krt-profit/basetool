@@ -205,6 +205,19 @@ whether a location is in use through its own `catalogue.api.LocationUsage`, whic
 and the refinery (orders) implement, so it names neither repository. `RefineryAccessPolicy` owns
 the JPQL scope fragment of the order queries.
 
+The inventory (the Lager) moved in part since P4-1: `InventoryItemController` sits in `inventory.web`, and
+`inventory.internal` holds the Lager services (item, aggregation, checkout, org-unit change, stolen
+mark), `InventoryAccessPolicy` (also the `BookInPolicy`), `InventoryStockCommands` (the `StockCommands`
+implementation), `InventoryEarmarkTargetCache`, `StockViewerAccessService`, `InventoryCraftableStock` (the
+blueprint's `CraftableStockSource`), `InventoryOrgUnitReconciler` (the org-unit module's
+`FirstMembershipObserver`) and its GDPR participants. The entities, the three repositories,
+`InventoryItemMapper`, the Lager DTOs and the projections still stay in the layer packages, because the
+exchange, the job order and the Materialbörse read the repository and the mapper directly and the job-order
+entities hold `InventoryItem` (plan §7.6, P4-1). The mapper's two seams sit beside it, as
+`MissionViewerAccess` does: `mapper.StockViewerAccess` (the caller's `canEdit`) and
+`mapper.InventoryEarmarkLookup` (the per-transaction memo of the earmark targets), and the earmark records
+and the earmarked-stock rows are in `model.projection`, so no layer class names `inventory.api`.
+
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
 
@@ -219,6 +232,7 @@ The platform modules reach the domains only through SPIs they own and the domain
 | `service.ActiveOrgUnitProvider` (platform) | the org unit for the `orgUnitId` MDC field | scope (`ScopeActiveOrgUnitProvider`) |
 | `platform.api.ClientDirectory` | whether a client id is a configured ingest gateway or a registered exchange client, for the bounded client label | exchange (`ExchangeClientDirectory`) |
 | `platform.api.UserReassignmentParticipant` | a module's part of the admin account merge: the member-referencing columns it holds, those that follow the member (with their unique-key remainder) and those that stay with the act; it can refuse the merge, and the rows it moves feed the `USER_MERGED` audit row in participant order | inventory, hangar, refinery, personalinventory, blueprint, orgunit (two), orgchart, mission, joborder, materialexchange, bank, notification, promotion, exchange; audit, operation, identity declare staying columns only |
+| `orgunit.api.FirstMembershipObserver` | a member's first org-unit membership gained or last one lost, inside the membership change | inventory (`InventoryOrgUnitReconciler`, which re-stamps the member's shared Lager rows) |
 | `catalogue.api.LocationUsage` | whether any row of a module still references a location, so the catalogue refuses to delete it; the first usage by position that says yes names the refusal | hangar (`ShipLocationUsage`), refinery (`RefineryLocationUsage`) |
 | `platform.api.UserErasureParticipant` | a module's part of the account deletion: its rows removed, reassigned to the fallback admin or unlinked, by phase (`DELETE`, `REASSIGN`, `UNLINK`) and position, inside the deletion's one transaction; the counts it returns feed the deletion's audit rows | materialexchange, inventory, hangar, personalinventory, blueprint, notification, promotion (`DELETE`); mission, refinery (`REASSIGN`); mission, joborder (`UNLINK`) |
 | `platform.api.HandleAnonymisationParticipant` | a module's part of the granted Art. 17 handle anonymisation: the handle snapshots of its tables replaced by the sentinel, by position, inside the anonymisation's one transaction; the counts it returns feed the marker rows, and a participant records its own marker | audit (`AuditHandleAnonymisation`), bank (`BankHandleAnonymisation`), joborder (`JobOrderHandleAnonymisation`) |
