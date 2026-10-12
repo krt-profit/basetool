@@ -39,8 +39,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
@@ -49,7 +47,9 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookResultDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;

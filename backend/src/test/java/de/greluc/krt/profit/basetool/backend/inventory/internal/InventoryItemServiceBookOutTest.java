@@ -45,8 +45,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
@@ -1632,8 +1630,8 @@ class InventoryItemServiceBookOutTest {
         new de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron();
     picked.setId(pickedOrgUnitId);
 
-    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem item =
-        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem item =
+        new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem();
     item.setId(itemId);
     item.setVersion(1L);
     item.setAmount(10.0);
@@ -1652,13 +1650,14 @@ class InventoryItemServiceBookOutTest {
     org.mockito.Mockito.when(
             ownerScopeService.resolveOrgUnitForPickerOutputNullable(targetUser, pickedOrgUnitId))
         .thenReturn(picked);
-    org.mockito.ArgumentCaptor<de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem>
+    org.mockito.ArgumentCaptor<
+            de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem>
         captor =
             org.mockito.ArgumentCaptor.forClass(
-                de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem.class);
+                de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem.class);
     org.mockito.Mockito.when(
             inventoryItemRepository.save(
-                any(de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem.class)))
+                any(de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem.class)))
         .thenAnswer(i -> i.getArguments()[0]);
 
     InventoryItemBookOutDto dto =
@@ -1679,9 +1678,9 @@ class InventoryItemServiceBookOutTest {
 
     org.mockito.Mockito.verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce())
         .save(captor.capture());
-    java.util.List<de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem> saved =
+    java.util.List<de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem> saved =
         captor.getAllValues();
-    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem newRow =
+    de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem newRow =
         saved.stream()
             .filter(i -> i.getUser() == targetUser)
             .findFirst()

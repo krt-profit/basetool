@@ -22,8 +22,6 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;

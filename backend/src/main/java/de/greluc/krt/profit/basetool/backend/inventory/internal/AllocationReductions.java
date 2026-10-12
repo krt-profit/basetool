@@ -20,10 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;

@@ -43,11 +43,11 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
@@ -168,6 +168,9 @@ class JobOrderItemProductionServiceTest {
     lenient().when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     lenient()
         .when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    org.mockito.Mockito.lenient()
+        .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
     lenient()
         .when(jobOrderItemService.toItemDtos(any()))

@@ -109,8 +109,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.web.DiscordAccountExistenceController;
 import de.greluc.krt.profit.basetool.backend.identity.web.TermsDocumentController;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
@@ -119,6 +117,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialCollectionEnt
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAggregationService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;

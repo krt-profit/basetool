@@ -27,7 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import java.sql.ResultSet;
 import java.sql.Statement;

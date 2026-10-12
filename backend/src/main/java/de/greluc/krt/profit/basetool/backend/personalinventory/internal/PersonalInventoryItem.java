@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -38,7 +37,7 @@ import lombok.Setter;
 
 /**
  * A personal inventory entry owned by exactly one user ({@link #ownerUserId}); distinct from the
- * squadron stock in {@link InventoryItem}.
+ * squadron stock in {@code InventoryItem}.
  *
  * <p>The location is referenced by its UEX numeric id plus a {@link PersonalInventoryLocationType}
  * discriminator; its display name is denormalized into {@link #locationNameSnapshot} so the entry

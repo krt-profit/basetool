@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
@@ -157,7 +157,7 @@ public class MaterialExchangeBoardService {
             : interestRepository.findOfferIdsInterestedByViewer(viewerId, offerIds);
     Map<UUID, List<OrgUnitReferenceDto>> badges =
         ownerOrgUnitBadges(ownerIdsOf(offers.getContent()));
-    Map<UUID, InventoryItem> rows = rowsOf(offers.getContent());
+    Map<UUID, StockRow> rows = rowsOf(offers.getContent());
 
     Page<MaterialExchangeOfferDto> dtos =
         offers.map(
@@ -235,15 +235,14 @@ public class MaterialExchangeBoardService {
     UUID viewerId = requireViewerId();
     boolean includeMaterial = kind == null || kind == MaterialExchangeOfferKind.MATERIAL;
     boolean includeItem = kind == null || kind == MaterialExchangeOfferKind.ITEM;
-    List<InventoryItem> items =
+    List<StockRow> items =
         stockReads.releasableRows(
             viewerId,
             MaterialExchangeQueryParams.normalizeQuery(query),
             includeMaterial,
             includeItem,
             PICKER_LIMIT);
-    Set<UUID> released =
-        releasedInventoryItemIds(items.stream().map(InventoryItem::getId).toList());
+    Set<UUID> released = releasedInventoryItemIds(items.stream().map(StockRow::getId).toList());
     return items.stream()
         .map(item -> toReleasableDto(item, released.contains(item.getId())))
         .toList();
@@ -259,7 +258,7 @@ public class MaterialExchangeBoardService {
    */
   @NotNull
   private static MaterialExchangeReleasableItemDto toReleasableDto(
-      @NotNull InventoryItem item, boolean alreadyReleased) {
+      @NotNull StockRow item, boolean alreadyReleased) {
     boolean isItem = item.getGameItem() != null;
     String locationName = item.getLocation() == null ? null : item.getLocation().getName();
     if (isItem) {
@@ -331,7 +330,7 @@ public class MaterialExchangeBoardService {
   @NotNull
   private MaterialExchangeOfferDto toDto(
       MaterialExchangeOffer offer,
-      @Nullable InventoryItem item,
+      @Nullable StockRow item,
       @Nullable UUID viewerId,
       List<OrgUnitReferenceDto> ownerOrgUnits,
       int interestCount,
@@ -350,7 +349,7 @@ public class MaterialExchangeBoardService {
       itemQuantity = effectiveItemQuantity(offer, item);
       availableAmount = mine && item != null ? item.getAmount() : null;
     } else {
-      InventoryItem row = Objects.requireNonNull(item);
+      StockRow row = Objects.requireNonNull(item);
       Material mat = Objects.requireNonNull(row.getMaterial());
       material = new MaterialReferenceDto(mat.getId(), mat.getName(), mat.getQuantityType());
       quality = row.getQuality();
@@ -510,15 +509,15 @@ public class MaterialExchangeBoardService {
    * @param offers the offers
    * @return each offer's row by id
    */
-  private Map<UUID, InventoryItem> rowsOf(Collection<MaterialExchangeOffer> offers) {
+  private Map<UUID, StockRow> rowsOf(Collection<MaterialExchangeOffer> offers) {
     List<UUID> ids =
         offers.stream()
             .map(MaterialExchangeOffer::getInventoryItemId)
             .filter(Objects::nonNull)
             .toList();
-    Map<UUID, InventoryItem> rows = new HashMap<>();
+    Map<UUID, StockRow> rows = new HashMap<>();
     if (!ids.isEmpty()) {
-      for (InventoryItem row : stockReads.findRowsWithMaterial(ids)) {
+      for (StockRow row : stockReads.findRowsWithMaterial(ids)) {
         rows.put(row.getId(), row);
       }
     }
@@ -532,7 +531,7 @@ public class MaterialExchangeBoardService {
    * @return the row, or {@code null} for an offer without one
    */
   @Nullable
-  InventoryItem rowOf(MaterialExchangeOffer offer) {
+  StockRow rowOf(MaterialExchangeOffer offer) {
     return offer.getInventoryItemId() == null
         ? null
         : stockReads.findRow(offer.getInventoryItemId()).orElse(null);
@@ -547,7 +546,7 @@ public class MaterialExchangeBoardService {
    * @return the clamped offered quantity in SCU
    */
   private static double effectiveOfferedAmount(
-      @NotNull MaterialExchangeOffer offer, @NotNull InventoryItem item) {
+      @NotNull MaterialExchangeOffer offer, @NotNull StockRow item) {
     Double offered = offer.getOfferedAmount();
     Double stock = item.getAmount();
     double offeredValue = offered == null ? 0.0 : offered;
@@ -565,7 +564,7 @@ public class MaterialExchangeBoardService {
    */
   @Nullable
   private static Integer effectiveItemQuantity(
-      @NotNull MaterialExchangeOffer offer, @Nullable InventoryItem item) {
+      @NotNull MaterialExchangeOffer offer, @Nullable StockRow item) {
     Integer quantity = offer.getItemQuantity();
     if (quantity == null) {
       return null;

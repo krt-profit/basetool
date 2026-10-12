@@ -24,10 +24,9 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
@@ -154,7 +153,7 @@ public class JobOrderHandoverService {
   @Nullable
   private static String bookAgainstLines(
       @NotNull JobOrder jobOrder,
-      @NotNull InventoryItem inventoryItem,
+      @NotNull StockRow inventoryItem,
       double amount,
       @Nullable String tierCode) {
     UUID materialId = Objects.requireNonNull(inventoryItem.getMaterial()).getId();
@@ -261,11 +260,11 @@ public class JobOrderHandoverService {
     final List<HandedItem> handedItems = new ArrayList<>();
 
     for (JobOrderHandoverItemCreateDto itemDto : dto.items()) {
-      InventoryItem inventoryItem =
+      StockRow inventoryItem =
           Entities.require(
               stockCommands.lockRow(itemDto.inventoryItemId()), "Inventory item not found");
 
-      if (InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId) == null) {
+      if (!inventoryItem.isEarmarkedForJobOrder(jobOrderId)) {
         throw new BadRequestException(ERROR_ITEM_NOT_LINKED_TO_ORDER);
       }
 
@@ -279,9 +278,7 @@ public class JobOrderHandoverService {
       if (itemDto.amount() > inventoryItem.getAmount() + QUANTITY_EPSILON) {
         throw new BadRequestException("Cannot hand over more than the available amount");
       }
-      var orderSlice = InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId);
-      double orderSliceAmount =
-          orderSlice != null && orderSlice.getAmount() != null ? orderSlice.getAmount() : 0.0;
+      double orderSliceAmount = inventoryItem.jobOrderSliceAmount(jobOrderId);
       if (itemDto.amount() > orderSliceAmount + QUANTITY_EPSILON) {
         throw new BadRequestException(
             "Cannot hand over more than the amount earmarked to this job order");
@@ -322,7 +319,7 @@ public class JobOrderHandoverService {
               null));
 
       stockCommands.takeFromEarmarkedRow(
-          inventoryItem,
+          inventoryItem.getId(),
           jobOrderId,
           itemDto.amount(),
           itemDto.missionReductions(),

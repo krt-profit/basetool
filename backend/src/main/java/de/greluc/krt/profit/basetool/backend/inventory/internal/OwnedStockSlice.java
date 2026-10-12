@@ -27,9 +27,10 @@ import java.util.UUID;
  * summed across locations.
  *
  * <p>Slices come from the caller's {@link
- * de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem} stock and, optionally, the
- * yield of their open {@link de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryGood}
- * orders. The calculator consumes best-quality slices first.
+ * de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem} stock and, optionally,
+ * the yield of their open {@link
+ * de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryGood} orders. The calculator
+ * consumes best-quality slices first.
  *
  * @param materialId the commodity this slice holds; never {@code null}
  * @param quality the quality tier (0..1000) shared by every unit in this slice

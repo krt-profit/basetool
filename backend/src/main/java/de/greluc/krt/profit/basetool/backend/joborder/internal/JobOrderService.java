@@ -27,10 +27,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
@@ -948,16 +947,16 @@ public class JobOrderService {
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
 
-    InventoryItem item =
+    StockRow item =
         Entities.require(
             stockReads.findRow(inventoryItemId),
             () -> "InventoryItem not found: " + inventoryItemId);
 
-    if (InventoryAllocations.jobOrderSlice(item, jobOrderId) == null) {
+    if (!item.isEarmarkedForJobOrder(jobOrderId)) {
       throw new NotFoundException("InventoryItem not linked to job order: " + inventoryItemId);
     }
 
-    stockCommands.releaseJobOrderEarmark(item, jobOrderId);
+    stockCommands.releaseJobOrderEarmark(item.getId(), jobOrderId);
     auditRecorder.record(
         AuditEventType.JOB_ORDER_INVENTORY_UNLINKED,
         jobOrderId,

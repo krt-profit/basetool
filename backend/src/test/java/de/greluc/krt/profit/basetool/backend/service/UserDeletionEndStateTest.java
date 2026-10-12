@@ -42,7 +42,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;

@@ -28,11 +28,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
@@ -152,7 +151,7 @@ class StockRowViewCharacterisationTest {
   void aCommandIsSeenOnTheSameRowInstanceTheCallerAlreadyHolds() {
     var held = stockCommands.lockRow(row.getId()).orElseThrow();
 
-    stockCommands.releaseJobOrderEarmark(rowReference(held), orderId);
+    stockCommands.releaseJobOrderEarmark(held.getId(), orderId);
 
     assertThat(jobOrderReserved(held)).isZero();
     assertThat(jobOrderSliceAmount(held, orderId)).isNull();
@@ -160,20 +159,15 @@ class StockRowViewCharacterisationTest {
     assertThat(stockReads.findRow(row.getId()).orElseThrow()).isSameAs(held);
   }
 
-  private static double jobOrderReserved(InventoryItem item) {
-    return InventoryAllocations.sumJobOrder(item);
+  private static double jobOrderReserved(StockRow item) {
+    return item.jobOrderReserved();
   }
 
-  private static double missionReserved(InventoryItem item) {
-    return InventoryAllocations.sumMission(item);
+  private static double missionReserved(StockRow item) {
+    return item.missionReserved();
   }
 
-  private static Double jobOrderSliceAmount(InventoryItem item, UUID jobOrderId) {
-    var slice = InventoryAllocations.jobOrderSlice(item, jobOrderId);
-    return slice == null ? null : slice.getAmount();
-  }
-
-  private static InventoryItem rowReference(InventoryItem item) {
-    return item;
+  private static Double jobOrderSliceAmount(StockRow item, UUID jobOrderId) {
+    return item.isEarmarkedForJobOrder(jobOrderId) ? item.jobOrderSliceAmount(jobOrderId) : null;
   }
 }

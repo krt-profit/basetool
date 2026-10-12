@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

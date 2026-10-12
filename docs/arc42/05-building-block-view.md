@@ -128,7 +128,7 @@ request settings form the `platform` module (`platform.api`: `AuthenticatedSubje
 window, the resilient Redis listener container and the shared rate-limit, role-scope and
 authorities-cache settings; `platform.internal`: the metric client list and the body limit);
 every other helper sits in `<module>.internal`, or in `<module>.api` when another module uses it
-(for example `inventory.api.InventoryAllocations`, `livesync.api.LiveSyncTopic`,
+(for example `inventory.api.StockRow`, `livesync.api.LiveSyncTopic`,
 `catalogue.api.QuantityTypeRounding`, `orgunit.api.StaffelMembershipResolver`). `mission`
 publishes one command (`MissionCommands`); its section-version counters and peer redaction are
 internal, and the mapper's viewer-access seam `MissionViewerAccess` sits beside `MissionMapper` in
@@ -235,9 +235,7 @@ three repositories, `InventoryItemMapper`, `InventoryItemCatalogService` (the `S
 request and read DTOs. `inventory.api` publishes what other modules use: `StockCommands`, `StockReads`
 (the exchange's lots, the stock earmarked to a job order as `LinkedStockRow` or Lager DTOs, the rows the
 Materialbörse offers), `StockItemCatalogue`, `InventoryItemDto` with its two allocation DTOs and the
-projection rows. The three entities (`InventoryItem` and the two allocations) lie in `inventory.api` too (umbrella step 9), because
-seven classes of the exchange, the job order and the Materialbörse hold the row; no foreign module writes it (`StockWriteOwnershipTest`),
-and the conversion to a record plus id commands that would let the entity move into `internal` is open and waits for the owner's choice between three designs (plan §7.6, entry "Umbrella follow-ups that wait for the owner"). Four more
+projection rows. The other modules see a Lager row as `StockRow`, a read-only live view of the managed row (getters, the two reservation sums and the order slice), and change it only through `StockCommands`, which take the row's id and act on the managed instance the caller already holds, so locks, the persistence context and the optimistic version are the row's own. The three entities (`InventoryItem`, which implements `StockRow`, and the two allocations) lie in `inventory.internal` with `InventoryAllocations` and `InventoryAuditLabels` (P4-1 part 3, option A2, confirmed by the owner 2026-10-12; `StockWriteOwnershipTest`, `StockRowViewCharacterisationTest`, `ExchangeStockWritePathCharacterisationTest`). Four more
 seams lie in `inventory.api` as well: `StockViewerAccess` (the caller's `canEdit`, read by `JobOrderMapper`), `OrderLinkedStockRows` (the material rows
 the job order's stock projection reads), and the records the job-order and mission repositories return, `JobOrderEarmark` and `MissionEarmark`.
 

@@ -31,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;

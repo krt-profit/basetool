@@ -34,9 +34,9 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
@@ -125,6 +125,7 @@ class JobOrderHandoverQualityTierTest {
     lenient()
         .when(inventoryItemRepository.findByIdForUpdate(item.getId()))
         .thenReturn(Optional.of(item));
+    lenient().when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
     return item;
   }
 

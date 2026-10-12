@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.inventory.api;
+package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

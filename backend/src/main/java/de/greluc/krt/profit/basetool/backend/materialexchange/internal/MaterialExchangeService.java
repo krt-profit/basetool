@@ -26,8 +26,8 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -125,7 +125,7 @@ public class MaterialExchangeService {
   @Transactional
   public MaterialExchangeOfferDto release(MaterialExchangeReleaseRequest request) {
     UUID viewerId = requireViewerId();
-    InventoryItem item =
+    StockRow item =
         Entities.require(
             stockReads.findRow(request.inventoryItemId()),
             () -> "Inventory item not found: " + request.inventoryItemId());
@@ -184,7 +184,7 @@ public class MaterialExchangeService {
    *     or the item is not produced by any active blueprint
    */
   private MaterialExchangeOfferDto releaseFromItemStock(
-      InventoryItem item, @NotNull MaterialExchangeReleaseRequest request, UUID viewerId) {
+      StockRow item, @NotNull MaterialExchangeReleaseRequest request, UUID viewerId) {
     final int quantity = requireOfferableItemQuantity(request.offeredAmount(), item);
     ResolvedProduct product =
         blueprintProductService
@@ -301,7 +301,7 @@ public class MaterialExchangeService {
 
     AuditDetails details;
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
-      InventoryItem row = boardService.rowOf(offer);
+      StockRow row = boardService.rowOf(offer);
       int quantity =
           row != null
               ? requireOfferableItemQuantity(request.offeredAmount(), row)
@@ -519,7 +519,7 @@ public class MaterialExchangeService {
    * @return the offered quantity rounded to three-decimal SCU precision
    * @throws BadRequestException if the amount is not positive or exceeds the item's current stock
    */
-  private static double requireOfferableAmount(@Nullable Double requested, InventoryItem item) {
+  private static double requireOfferableAmount(@Nullable Double requested, StockRow item) {
     if (requested == null || requested <= 0.0) {
       throw new BadRequestException("The offered amount must be a positive quantity.");
     }
@@ -567,7 +567,7 @@ public class MaterialExchangeService {
    * @throws BadRequestException if the quantity is not a positive whole number or exceeds the row's
    *     current stock
    */
-  private static int requireOfferableItemQuantity(@Nullable Double requested, InventoryItem item) {
+  private static int requireOfferableItemQuantity(@Nullable Double requested, StockRow item) {
     int quantity = wholeItemQuantity(requested);
     double available = item.getAmount() == null ? 0.0 : item.getAmount();
     if (quantity > available) {

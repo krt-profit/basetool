@@ -39,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;

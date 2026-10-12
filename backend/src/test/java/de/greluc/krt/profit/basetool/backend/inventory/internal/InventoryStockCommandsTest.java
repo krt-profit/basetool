@@ -39,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import java.util.List;

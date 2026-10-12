@@ -404,4 +404,4 @@ frontend rule bounds them yet; the kernel's ten reaches into `orgunit`, `identit
 (§5.3) are frozen by `KernelDomainReachTest` and may only shrink.
 
 Status 2026-10-12 (umbrella pull request #2552): every domain class lies in a module package, the module baseline is empty and
-NullAway checks every module as a whole tree. The Gradle extraction of the exchange and the bank is struck (plan §5.8). The four scope fragments moved beside their repositories (REQ-DATA-010, option B1, confirmed by the owner 2026-10-12); the Lager row as a read-only view plus id commands (P4-1 part 3, option A2) is recorded in the plan.
+NullAway checks every module as a whole tree. The Gradle extraction of the exchange and the bank is struck (plan §5.8). The four scope fragments moved beside their repositories (REQ-DATA-010, option B1) and the Lager row became a read-only view with id commands, its entities in `inventory.internal` (P4-1 part 3, option A2), both confirmed by the owner 2026-10-12. No item of the plan's backend modularisation is left open.

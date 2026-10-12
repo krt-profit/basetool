@@ -34,8 +34,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.web.ConnectedAppsControlle
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.web.HangarController;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.web.InventoryItemController;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;

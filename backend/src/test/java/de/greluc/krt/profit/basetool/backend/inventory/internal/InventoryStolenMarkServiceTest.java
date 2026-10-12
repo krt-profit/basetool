@@ -35,8 +35,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;

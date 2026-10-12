@@ -26,8 +26,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;

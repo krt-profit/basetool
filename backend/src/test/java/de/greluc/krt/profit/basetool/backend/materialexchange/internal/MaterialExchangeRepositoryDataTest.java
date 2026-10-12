@@ -32,7 +32,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;

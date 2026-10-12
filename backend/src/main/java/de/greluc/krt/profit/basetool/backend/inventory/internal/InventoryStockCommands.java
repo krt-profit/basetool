@@ -30,15 +30,14 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockConsumption;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.nio.ByteBuffer;
@@ -117,7 +116,7 @@ public class InventoryStockCommands implements StockCommands {
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public @NotNull List<InventoryItem> lockLotRows(@NotNull UUID member, @NotNull StockLot lot) {
+  public @NotNull List<StockRow> lockLotRows(@NotNull UUID member, @NotNull StockLot lot) {
     List<InventoryItem> rows =
         new ArrayList<>(
             lot.material() != null
@@ -137,13 +136,29 @@ public class InventoryStockCommands implements StockCommands {
             .thenComparingInt(r -> r.getOwningOrgUnit() == null ? 0 : 1)
             .thenComparing(
                 InventoryItem::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder())));
-    return rows;
+    return new ArrayList<StockRow>(rows);
   }
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public @NotNull Optional<InventoryItem> lockRow(@NotNull UUID rowId) {
-    return inventoryRepository.findByIdForUpdate(rowId);
+  public @NotNull Optional<StockRow> lockRow(@NotNull UUID rowId) {
+    return inventoryRepository.findByIdForUpdate(rowId).map(StockRow.class::cast);
+  }
+
+  @Override
+  public void requireRowVersion(@NotNull UUID rowId, @Nullable Long clientVersion) {
+    OptimisticLock.check(managedRow(rowId).getVersion(), clientVersion, InventoryItem.class, rowId);
+  }
+
+  /**
+   * Returns the managed row of an id: the instance the caller's earlier lock or read put into the
+   * persistence context, so a command acts on the very row the caller holds.
+   *
+   * @param rowId the row
+   * @return the managed row
+   */
+  private @NotNull InventoryItem managedRow(@NotNull UUID rowId) {
+    return inventoryRepository.findById(rowId).orElseThrow();
   }
 
   @Override
@@ -175,7 +190,8 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull StockChangeEffects bookOutRow(
-      @NotNull UUID member, @NotNull InventoryItem row, double amount) {
+      @NotNull UUID member, @NotNull UUID rowId, double amount) {
+    InventoryItem row = managedRow(rowId);
     return checkoutService.bookOutForClient(
         row.getId(),
         new InventoryItemBookOutDto(
@@ -196,7 +212,8 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void markStolen(
-      @NotNull UUID member, @NotNull InventoryItem row, boolean stolen, @Nullable Double amount) {
+      @NotNull UUID member, @NotNull UUID rowId, boolean stolen, @Nullable Double amount) {
+    InventoryItem row = managedRow(rowId);
     stolenMarkService.mark(
         row.getId(),
         new InventoryItemStolenMarkDto(row.getVersion(), stolen, amount),
@@ -231,11 +248,12 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public boolean takeFromEarmarkedRow(
-      @NotNull InventoryItem row,
+      @NotNull UUID rowId,
       @NotNull UUID jobOrderId,
       double amount,
       @Nullable List<AllocationReductionDto> missionReductions,
       @NotNull StockChangeReason reason) {
+    InventoryItem row = managedRow(rowId);
     final double remainingAmount = row.getAmount() - amount;
     if (remainingAmount <= QUANTITY_EPSILON) {
       stockChangeObserver.beforeDelete(List.of(row.getId()), reason);
@@ -315,8 +333,8 @@ public class InventoryStockCommands implements StockCommands {
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void releaseJobOrderEarmark(@NotNull InventoryItem row, @NotNull UUID jobOrderId) {
-    row.getJobOrderAllocations().removeIf(a -> jobOrderId.equals(a.getJobOrderId()));
+  public void releaseJobOrderEarmark(@NotNull UUID rowId, @NotNull UUID jobOrderId) {
+    managedRow(rowId).getJobOrderAllocations().removeIf(a -> jobOrderId.equals(a.getJobOrderId()));
   }
 
   @Override

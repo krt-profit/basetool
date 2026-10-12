@@ -17,12 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.inventory.api;
+package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
@@ -51,6 +52,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -65,7 +67,7 @@ import org.jetbrains.annotations.Nullable;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
-public class InventoryItem extends AbstractEntity<UUID> {
+public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
 
   @Getter(onMethod_ = @__(@Override))
   @Id
@@ -179,5 +181,26 @@ public class InventoryItem extends AbstractEntity<UUID> {
     if (amount != null) {
       amount = ScuAmounts.roundToScuScale(amount.doubleValue());
     }
+  }
+
+  @Override
+  public double jobOrderReserved() {
+    return InventoryAllocations.sumJobOrder(this);
+  }
+
+  @Override
+  public double missionReserved() {
+    return InventoryAllocations.sumMission(this);
+  }
+
+  @Override
+  public boolean isEarmarkedForJobOrder(@NotNull UUID jobOrderId) {
+    return InventoryAllocations.jobOrderSlice(this, jobOrderId) != null;
+  }
+
+  @Override
+  public double jobOrderSliceAmount(@NotNull UUID jobOrderId) {
+    InventoryJobOrderAllocation slice = InventoryAllocations.jobOrderSlice(this, jobOrderId);
+    return slice == null || slice.getAmount() == null ? 0.0 : slice.getAmount();
   }
 }

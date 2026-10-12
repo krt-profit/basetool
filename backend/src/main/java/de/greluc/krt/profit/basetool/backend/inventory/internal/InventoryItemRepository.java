@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;

@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import org.junit.jupiter.api.Test;
 
 /**

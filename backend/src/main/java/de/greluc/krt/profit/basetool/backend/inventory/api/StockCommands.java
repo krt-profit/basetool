@@ -59,7 +59,7 @@ public interface StockCommands {
    * @return the rows, locked for this transaction
    */
   @NotNull
-  List<InventoryItem> lockLotRows(@NotNull UUID member, @NotNull StockLot lot);
+  List<StockRow> lockLotRows(@NotNull UUID member, @NotNull StockLot lot);
 
   /**
    * Locks one row for a write that follows (a handover or a production consumption), with its
@@ -69,7 +69,16 @@ public interface StockCommands {
    * @return the row under a pessimistic write lock, or empty when unknown
    */
   @NotNull
-  Optional<InventoryItem> lockRow(@NotNull UUID rowId);
+  Optional<StockRow> lockRow(@NotNull UUID rowId);
+
+  /**
+   * Refuses a client's stale view of a row: the version it last read must be the row's current one
+   * ({@code null} skips the check), else the optimistic-lock conflict of the Lager row is raised.
+   *
+   * @param rowId the row
+   * @param clientVersion the version the client last read, or {@code null}
+   */
+  void requireRowVersion(@NotNull UUID rowId, @Nullable Long clientVersion);
 
   /**
    * Books stock in as a new personal row without an org unit, which piece-counted stock then joins
@@ -86,24 +95,24 @@ public interface StockCommands {
    * every Materialbörse offer it lowers or removes.
    *
    * @param member the member, recorded as the actor
-   * @param row the locked row
+   * @param rowId the locked row
    * @param amount the amount to take
    * @return the offers the book-out lowered and removed
    */
   @NotNull
-  StockChangeEffects bookOutRow(@NotNull UUID member, @NotNull InventoryItem row, double amount);
+  StockChangeEffects bookOutRow(@NotNull UUID member, @NotNull UUID rowId, double amount);
 
   /**
    * Sets or clears the stolen marker of one row, the whole row or a part of it, through the Lager's
    * own stolen marking (REQ-INV-053).
    *
    * @param member the member, recorded as the actor
-   * @param row the row
+   * @param rowId the row
    * @param stolen the marker to set
    * @param amount the part to mark, or {@code null} for the whole row
    */
   void markStolen(
-      @NotNull UUID member, @NotNull InventoryItem row, boolean stolen, @Nullable Double amount);
+      @NotNull UUID member, @NotNull UUID rowId, boolean stolen, @Nullable Double amount);
 
   /**
    * Refuses a book-in the caller may not make, the one book-in rule of the Lager (APPSEC-01): no
@@ -130,7 +139,7 @@ public interface StockCommands {
    * deleted after its offers are told, any other is lowered with its order slice and the mission
    * slices the reductions name.
    *
-   * @param row the locked row
+   * @param rowId the locked row
    * @param jobOrderId the order the amount is taken for
    * @param amount the amount
    * @param missionReductions the mission slices to reduce, or {@code null} for the default plan
@@ -138,7 +147,7 @@ public interface StockCommands {
    * @return whether the row was depleted and deleted
    */
   boolean takeFromEarmarkedRow(
-      @NotNull InventoryItem row,
+      @NotNull UUID rowId,
       @NotNull UUID jobOrderId,
       double amount,
       @Nullable List<AllocationReductionDto> missionReductions,
@@ -180,10 +189,10 @@ public interface StockCommands {
   /**
    * Releases a job order's earmark on one row.
    *
-   * @param row the row
+   * @param rowId the row
    * @param jobOrderId the order
    */
-  void releaseJobOrderEarmark(@NotNull InventoryItem row, @NotNull UUID jobOrderId);
+  void releaseJobOrderEarmark(@NotNull UUID rowId, @NotNull UUID jobOrderId);
 
   /**
    * Releases a job order's earmarks on the rows of one material.

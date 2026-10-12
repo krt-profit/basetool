@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.inventory.api;
+package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
@@ -43,26 +43,26 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One job-order slice of an {@link InventoryItem}'s quantity (REQ-INV-027), independent of the
- * mission split; each dimension's total must stay at or below the entry's amount.
+ * One mission slice of an {@link InventoryItem}'s quantity, the mission counterpart of {@link
+ * InventoryJobOrderAllocation} (REQ-INV-027).
  *
  * <p>The owning entry's {@code @Version} is the concurrency token for the whole split. Deleting the
- * entry or the job order removes the slice; the entry survives a job-order deletion.
+ * entry or the mission removes the slice; the entry survives a mission deletion.
  */
 @Entity
 @Table(
-    name = "inventory_item_job_order_allocation",
+    name = "inventory_item_mission_allocation",
     uniqueConstraints =
         @UniqueConstraint(
-            name = "uq_inv_job_order_alloc",
-            columnNames = {"inventory_item_id", "job_order_id"}))
+            name = "uq_inv_mission_alloc",
+            columnNames = {"inventory_item_id", "mission_id"}))
 @Getter
 @Setter
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class InventoryJobOrderAllocation extends AbstractEntity<UUID> {
+public class InventoryMissionAllocation extends AbstractEntity<UUID> {
 
   @Getter(onMethod_ = @__(@Override))
   @Id
@@ -74,20 +74,12 @@ public class InventoryJobOrderAllocation extends AbstractEntity<UUID> {
   @ToString.Exclude
   private InventoryItem inventoryItem;
 
-  @Column(name = "job_order_id", nullable = false)
-  private UUID jobOrderId;
+  @Column(name = "mission_id", nullable = false)
+  private UUID missionId;
 
   @Min(0)
   @Column(nullable = false)
   private Double amount;
-
-  /**
-   * Whether the stock earmarked to this job order has been delivered (REQ-INV-027), tracked per
-   * order so one entry can be delivered for one order and open for another.
-   */
-  @Builder.Default
-  @Column(nullable = false)
-  private Boolean delivered = false;
 
   /**
    * Rounds {@link #amount} to SCU storage precision (three decimals) before every {@code INSERT}
