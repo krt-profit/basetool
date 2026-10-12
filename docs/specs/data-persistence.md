@@ -930,7 +930,7 @@ subtract the seen ids in Java, and clear the remainder in fixed-size chunks
 matrix grows.
 
 Every voided census also keeps its own `WARN` and contributes to
-`basetool_external_fetch_errors_total{source}` at most once per client call (REQ-OBS-011): the
+`basetool_external_fetch_errors_total{source,reason="census"}` at most once per client call (REQ-OBS-011): the
 skipped sweep touches no meter of its own, so that counter is the only signal that orphan detection
 stood down.
 

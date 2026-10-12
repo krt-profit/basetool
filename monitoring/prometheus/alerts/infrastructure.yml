@@ -49,7 +49,7 @@ groups:
           description: "Filesystem {{ $labels.mountpoint }} has used over 90% of its inodes."
 
       - alert: SystemdUnitFailed
-        expr: node_systemd_unit_state{state="failed"} == 1
+        expr: node_systemd_unit_state{state="failed", name!="dnf-makecache.service"} == 1
         for: 5m
         labels:
           severity: critical

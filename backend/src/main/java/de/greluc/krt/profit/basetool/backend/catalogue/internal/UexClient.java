@@ -500,7 +500,12 @@ public class UexClient {
    */
   private void recordFetchError() {
     meterRegistry
-        .counter(MetricNames.EXTERNAL_FETCH_ERRORS, MetricNames.TAG_SOURCE, MetricNames.SOURCE_UEX)
+        .counter(
+            MetricNames.EXTERNAL_FETCH_ERRORS,
+            MetricNames.TAG_SOURCE,
+            MetricNames.SOURCE_UEX,
+            MetricNames.TAG_REASON,
+            MetricNames.REASON_FETCH)
         .increment();
   }
 

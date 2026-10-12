@@ -80,10 +80,11 @@ public final class MetricNames {
   public static final String SYNC_EVENTS = "basetool.sync.events";
 
   /**
-   * Counter {@code basetool_external_fetch_errors_total} — tag {@code source} ({@link #SOURCE_UEX}
-   * / {@link #SOURCE_SCWIKI}). Incremented where an upstream fetch/parse error is swallowed into an
-   * empty result, so a weeks-long catalogue outage is visible even though the sync job still
-   * "succeeds" (REQ-OBS-011).
+   * Counter {@code basetool_external_fetch_errors_total} — tags {@code source} ({@link #SOURCE_UEX}
+   * / {@link #SOURCE_SCWIKI}) and {@code reason} ({@link #REASON_FETCH} / {@link #REASON_CENSUS}).
+   * Incremented where an upstream fetch/parse error is swallowed into an empty result, or a page
+   * walk is flagged incomplete, so a weeks-long catalogue outage is visible even though the sync
+   * job still "succeeds" (REQ-OBS-011).
    */
   public static final String EXTERNAL_FETCH_ERRORS = "basetool.external.fetch.errors";
 
@@ -674,6 +675,18 @@ public final class MetricNames {
 
   /** Discord precheck outcome: the feature is unconfigured (blank secret), answered {@code 503}. */
   public static final String DISCORD_PRECHECK_DISABLED = "disabled";
+
+  /**
+   * {@link #TAG_REASON} value on {@link #EXTERNAL_FETCH_ERRORS}: a transport, decode or envelope
+   * failure.
+   */
+  public static final String REASON_FETCH = "fetch";
+
+  /**
+   * {@link #TAG_REASON} value on {@link #EXTERNAL_FETCH_ERRORS}: a page walk whose census could not
+   * be vouched for.
+   */
+  public static final String REASON_CENSUS = "census";
 
   /** {@code source} value for the UEX API client ({@link #EXTERNAL_FETCH_ERRORS}). */
   public static final String SOURCE_UEX = "uex";

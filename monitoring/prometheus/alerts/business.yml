@@ -67,13 +67,13 @@ groups:
           description: "The {{ $labels.task }} catalogue sync last succeeded more than 48 hours ago."
 
       - alert: ExternalFetchErrors
-        expr: sum by (source) (increase(basetool_external_fetch_errors_total[6h])) > 3
+        expr: sum by (source) (increase(basetool_external_fetch_errors_total{reason!="census"}[6h])) > 3
         for: 30m
         labels:
           severity: warning
         annotations:
           summary: "External fetch errors ({{ $labels.source }})"
-          description: "The {{ $labels.source }} client swallowed more than 3 fetch/parse errors in 6 hours — the catalogue sync may be silently importing nothing while still recording a success. Check the upstream API and the sync logs."
+          description: "The {{ $labels.source }} client swallowed more than 3 fetch/parse errors in 6 hours (incomplete page-walk censuses, reason=census, are excluded: they carry a standing per-run floor and are watched by ScWikiCensusIncompleteStreak) — the catalogue sync may be silently importing nothing while still recording a success. Check the upstream API and the sync logs."
 
       - alert: KeycloakSyncFetchFailing
         expr: sum(increase(basetool_keycloak_sync_fetch_failures_total[6h])) > 0

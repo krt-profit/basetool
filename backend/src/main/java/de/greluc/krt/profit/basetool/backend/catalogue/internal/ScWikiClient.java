@@ -124,18 +124,43 @@ public class ScWikiClient {
   }
 
   /**
-   * Increments {@link MetricNames#EXTERNAL_FETCH_ERRORS} for the {@code scwiki} source at most once
-   * per fetch (REQ-OBS-011).
+   * Records a transport, decode or status failure on {@link MetricNames#EXTERNAL_FETCH_ERRORS} with
+   * {@link MetricNames#REASON_FETCH}, at most once per fetch (REQ-OBS-011).
    *
    * @param latch the current fetch's latch; only the first call through it records
    */
   private void recordFetchErrorOnce(FetchErrorLatch latch) {
+    recordOnce(latch, MetricNames.REASON_FETCH);
+  }
+
+  /**
+   * Records an incomplete page-walk census on {@link MetricNames#EXTERNAL_FETCH_ERRORS} with {@link
+   * MetricNames#REASON_CENSUS}, at most once per fetch and not at all after a fetch failure the
+   * same walk already recorded (REQ-OBS-011).
+   *
+   * @param latch the current fetch's latch; only the first call through it records
+   */
+  private void recordCensusIncompleteOnce(FetchErrorLatch latch) {
+    recordOnce(latch, MetricNames.REASON_CENSUS);
+  }
+
+  /**
+   * Claims the latch and increments the counter under the given {@code reason}.
+   *
+   * @param latch the current fetch's latch
+   * @param reason the {@link MetricNames#TAG_REASON} value to record
+   */
+  private void recordOnce(FetchErrorLatch latch, String reason) {
     if (!latch.claim()) {
       return;
     }
     meterRegistry
         .counter(
-            MetricNames.EXTERNAL_FETCH_ERRORS, MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
+            MetricNames.EXTERNAL_FETCH_ERRORS,
+            MetricNames.TAG_SOURCE,
+            MetricNames.SOURCE_SCWIKI,
+            MetricNames.TAG_REASON,
+            reason)
         .increment();
   }
 
@@ -282,7 +307,7 @@ public class ScWikiClient {
                 + " never requested and must not be mistaken for deleted rows.",
             resourceLabel,
             accumulated.size());
-        recordFetchErrorOnce(errorLatch);
+        recordCensusIncompleteOnce(errorLatch);
         complete = false;
       }
     } else {
@@ -326,7 +351,7 @@ public class ScWikiClient {
           accumulated.size(),
           distinctRows,
           repeatedRows);
-      recordFetchErrorOnce(errorLatch);
+      recordCensusIncompleteOnce(errorLatch);
       complete = false;
     }
 
@@ -340,7 +365,7 @@ public class ScWikiClient {
           distinctRows,
           announcedTotal,
           announcedTotal - distinctRows);
-      recordFetchErrorOnce(errorLatch);
+      recordCensusIncompleteOnce(errorLatch);
       complete = false;
     } else if (announcedTotal != null && distinctRows > announcedTotal) {
       log.info(
@@ -364,7 +389,7 @@ public class ScWikiClient {
           lastPage,
           freshestMeta.lastPage(),
           freshestMeta.lastPage() - lastPage);
-      recordFetchErrorOnce(errorLatch);
+      recordCensusIncompleteOnce(errorLatch);
       complete = false;
     }
 
