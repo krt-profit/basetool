@@ -2678,6 +2678,75 @@ owner decided on 2026-10-12 to leave that as it is.
    changed. The tests of the moved classes stay in their packages and compile against the new ones.
    Four logger names follow the packages (`UserService`, `UserReconciliationService`, `UserRegistrationService`, the converter); nothing in `monitoring/` or the observability spec matches them.
 
+**The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
+Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
+on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
+after step 0 (census of the classes the domain map assigns to a module but that still lie in a layer
+package: `orgunit` 61, `platform` 65, `notification` 47, `joborder` 45, `mission` 36, `identity` 29,
+`privacy` 23, `kernel` 20, `audit` 12, `inventory` 10, `blueprint` 10, `livesync` 9, `hangar` 6, `app` 3).
+Every backend step begins with a throwaway probe on the current tree; a cycle that needs an SPI
+whose shape the plan does not give, a behaviour or contract change, or a production-data question
+ends the step with a question to the owner. Ticked as the steps land; `Q` marks a step that cannot start
+before a decision.
+
+- [x] **0.** P4-7 slice c (this pull request's first commit).
+- [ ] **1.** Housekeeping: `backend/build-settings.properties` aims the mutation tests at
+      `backend.service.*`, which shrinks with every move (P4-5 "Open").
+- Rank 0–1 modules leave the layer packages (nothing below depends on them being late):
+  - [ ] **2.** `audit` (12): `AuditEvent`, `AuditEventRepository`, `AuditService` and its report,
+        retention and handle-anonymisation participant, mapper, controller, task. The P4 slice-b entry
+        records that the participant waits for the repository.
+  - [ ] **3.** `livesync` (9: controller, DTO, seven services).
+  - [ ] **4.** `notification` (47: entities and enums, rules, mail, recipient services, the GDPR
+        participants that sit in `service`).
+  - [ ] **5.** `Q` `kernel` (20 types in the layer packages `exception` and `validation`) and `platform`
+        (65 in `config`, `filter`, `logging`, `metrics`, `web`, `exception`, `annotation`, `health`):
+        the domain map assigns whole layer packages to them and no plan step says they must move.
+- Foundation modules (§5.2 publishes their entities in `api`):
+  - [ ] **6.** `orgunit` (61: the org-unit entities and enums, 7 repositories, 12 services, 4 mappers,
+        8 controllers). Prerequisite for the `User` entity (`OrgUnitMembership.user`).
+  - [ ] **7.** `identity` remainder (29): `User`, `Role`, `TermsAcceptance`, `UserApprovalEvent`,
+        `PayoutPreference` (deferred "with `User`", §7.3), `UserRepository` (279 files name it),
+        `UserMapper`/`UserDto`/`UserReferenceDto`, `UserController`, `MeController`, the mail services,
+        `UserSyncService`/`UserSyncTask`, the rejected-registration retention.
+  - [ ] **8.** `privacy` (23): the GDPR orchestration classes (§5.1 rank 13) into `privacy`, then
+        dissolved into identity as §5.1 and §7.6 say.
+- Business core leftovers (the entities other modules still hold):
+  - [ ] **9.** P4-1 part 3, inventory: the Lager row becomes a record plus id commands, then
+        `InventoryItem` and the two allocations move into `inventory.internal`; with them
+        `InventoryGameItemReferenceDto`, `JobOrderEarmark`/`MissionEarmark`, `JobOrderMaterialStockRow`
+        and `StockViewerAccess`.
+  - [ ] **10.** P4-2 part 2, blueprint: a read API for the seven `PersonalBlueprintRepository` finders,
+        the data types the exchange names into `blueprint.api`, then the ten remaining types.
+  - [ ] **11.** `hangar` (6), `joborder` (45), `mission` (36): what the foreign modules no longer
+        hold after steps 6, 7 and 9; of the eight association-to-id conversions of §5.6 seven are done,
+        `MissionUnit.ship` is still an entity association.
+  - [ ] **12.** Access policies left in the scope hub (§5.4): `OwnerScopeService` and
+        `AccessGateService` keep the org-unit and user gates; `Q` the plan names no policy for them.
+- Persistence:
+  - [ ] **13.** `Q` D-17, member settings move with their owner: the payout-preference and
+        blueprint-sharing columns into tables of the owning modules, each with its own version, by a
+        Flyway migration with data transfer. The api-cut notes say the columns stay in the cut, so this
+        step comes after the path moves; its SQL and rollback go to the owner before they are pushed.
+  - [x] **14.** Table-ownership map (§5.6): done before this branch (`table-ownership.txt`,
+        `TableOwnershipTest`); each move updates the owner of the tables it moves, nothing else.
+  - [ ] **15.** P3-11, the per-command audit contract (REQ-AUDIT-001): waits for the moves above.
+- Quality gates:
+  - [ ] **16.** NullAway to the whole tree of every module as it becomes whole (today: `blueprint`,
+        `catalogue`, `hangar`, `identity`, `inventory`, `joborder`, `materialexchange`, `mission`,
+        `operation`, `refinery`, `scope`; the other modules' `api` packages only).
+  - [ ] **17.** Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
+        REQ-XCH-009/011; arc42 §5.2/§5.3 per module; CLAUDE.md files.
+- Gradle extraction, last (they move whole source trees):
+  - [ ] **18.** P5-c `backend-exchange`, then **19.** P5-d `backend-bank` (§5.8; P5-a and P5-b are done).
+- Not in this branch:
+  - The ES-module step of F5 (§7.8) is another agent's branch, `claude/mod-f5-es-modules`.
+  - `Q` The REST API cut (§7.9, waves on `claude/api-cut` and `claude/api-cut-w1` … `w6`, the
+    forced app update, T0/T1 breaks) and with it "identity's REST surface sheds the six domains" (wave 2):
+    these are path changes that need the owner's release decision and an app release.
+  - Phase −1 defects (§9): S-07 is done (#2299, verified in the code); C-03 is the owner's repository
+    setting; the two items of §9.4 are open investigations without a code change.
+
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
 Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-logic` convention
