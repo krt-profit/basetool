@@ -21,7 +21,7 @@
 /* global stackEntriesI18n, bookOutI18n, inventoryConflictI18n, assocI18n, stolenMarkI18n */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
-import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
@@ -809,7 +809,10 @@ function createLager(cfg) {
             return;
         }
         bookOutItemId = id;
-        bookOutForm.action = safeSameOriginUrl(`/inventory/${id}/book-out`, bookOutForm.action);
+        assignFormAction(
+            bookOutForm,
+            safeSameOriginUrl(`/inventory/${id}/book-out`, bookOutForm.action),
+        );
         const isScu = quantityType !== 'PIECE';
         amountInput.setAttribute('step', isScu ? '0.001' : '1');
         targetAmountInput.setAttribute('step', isScu ? '0.001' : '1');

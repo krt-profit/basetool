@@ -21,7 +21,7 @@
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtSyncDatetimeSplitGroup } from '/js/kernel/datetime-splitter.js';
-import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
@@ -268,9 +268,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn.dataset.epBound) return;
                 btn.dataset.epBound = '1';
                 btn.addEventListener('click', function () {
-                    eForm.action = safeSameOriginUrl(
-                        this.getAttribute('data-action'),
-                        eForm.action,
+                    assignFormAction(
+                        eForm,
+                        safeSameOriginUrl(this.getAttribute('data-action'), eForm.action),
                     );
                     eForm.setAttribute(
                         'data-participant-id',
@@ -697,9 +697,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn.dataset.delBound) return;
                 btn.dataset.delBound = '1';
                 btn.addEventListener('click', function () {
-                    deleteForm.action = safeSameOriginUrl(
-                        this.getAttribute('data-action'),
-                        deleteForm.action,
+                    assignFormAction(
+                        deleteForm,
+                        safeSameOriginUrl(this.getAttribute('data-action'), deleteForm.action),
                     );
                     const subSection = this.getAttribute('data-sub-section') || '';
                     let subId;
@@ -760,9 +760,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn.dataset.euBound) return;
                 btn.dataset.euBound = '1';
                 btn.addEventListener('click', function () {
-                    editUnitForm.action = safeSameOriginUrl(
-                        this.getAttribute('data-action'),
-                        editUnitForm.action,
+                    assignFormAction(
+                        editUnitForm,
+                        safeSameOriginUrl(this.getAttribute('data-action'), editUnitForm.action),
                     );
                     editUnitForm.setAttribute(
                         'data-unit-id',

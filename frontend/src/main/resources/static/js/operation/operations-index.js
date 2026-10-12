@@ -21,7 +21,7 @@
 
 /* global OPS_MSG */
 
-import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
@@ -32,7 +32,7 @@ function openDeleteModal(id) {
         document.getElementById('delete-operation-form')
     );
     if (!deleteForm) return;
-    deleteForm.action = safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
+    assignFormAction(deleteForm, safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action));
     krtModal.open(document.getElementById('delete-operation-modal'));
 }
 

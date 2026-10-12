@@ -2660,7 +2660,7 @@ head's first, synchronous script. The list only shrinks.
 - **A URL read from the DOM reaches a form `action` only through `safeSameOriginUrl`**, which accepts a
   same-origin absolute path and nothing else: one `/` first, no `//` or `/\` after it, no whitespace (a tab
   inside `/<tab>/host` is dropped by the URL parser and would make it `//host`), and a parsed origin equal to
-  the page's (`scripts/safe-url.test.mjs`, `:frontend:testSafeUrl`).
+  the page's. The assignment goes through `assignFormAction`, which percent-encodes `"`, `<` and `>` (a URL parser encodes them anyway) before it sets the `action`; the replacement is also the one step CodeQL's `js/xss-through-dom` models as a sanitizer (`scripts/safe-url.test.mjs`, `:frontend:testSafeUrl`).
 - **A script under its plain URL is revalidated.** `/js/**` answers `Cache-Control: no-cache`; only a
   content-hashed name answers `max-age=31536000, public, immutable`, so a module the scan missed is
   never held stale for a year.

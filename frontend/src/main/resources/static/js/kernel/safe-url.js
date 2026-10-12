@@ -45,3 +45,19 @@ export function safeSameOriginUrl(url, fallback) {
     }
     return url;
 }
+
+/**
+ * Sets the `action` of a form to a URL after percent-encoding the markup characters `"`, `<` and
+ * `>`, which a URL parser encodes anyway: the resulting action is the one a plain assignment would
+ * produce, and no raw markup character reaches the attribute.
+ *
+ * @param {HTMLFormElement} form the form to update
+ * @param {unknown} url the URL, normally the result of {@link safeSameOriginUrl}; converted to a
+ *     string as the DOM does
+ */
+export function assignFormAction(form, url) {
+    form.action = String(url).replace(
+        /["<>]/g,
+        (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+    );
+}

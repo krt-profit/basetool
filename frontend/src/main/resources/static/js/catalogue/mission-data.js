@@ -22,7 +22,7 @@
 /* global MISSION_MSG, MISSION_CONFLICT, MISSION_TITLES */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
-import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
@@ -196,7 +196,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (sqAddBtn) {
         sqAddBtn.onclick = () => {
-            sqForm.action = safeSameOriginUrl(sqAddBtn.getAttribute('data-action'), sqForm.action);
+            assignFormAction(
+                sqForm,
+                safeSameOriginUrl(sqAddBtn.getAttribute('data-action'), sqForm.action),
+            );
             sqTitle.innerText = MISSION_TITLES.squadronCreate;
             dialogField('sq-name').value = '';
             dialogField('sq-shorthand').value = '';
@@ -209,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (e) => {
         const btn = /** @type {Element} */ (e.target).closest('.edit-squadron-btn');
         if (!btn) return;
-        sqForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), sqForm.action);
+        assignFormAction(sqForm, safeSameOriginUrl(btn.getAttribute('data-action'), sqForm.action));
         sqTitle.innerText = MISSION_TITLES.edit;
         dialogField('sq-name').value = btn.getAttribute('data-name') ?? '';
         dialogField('sq-shorthand').value = btn.getAttribute('data-shorthand') ?? '';
@@ -277,7 +280,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (jtAddBtn) {
         jtAddBtn.onclick = () => {
-            jtForm.action = safeSameOriginUrl(jtAddBtn.getAttribute('data-action'), jtForm.action);
+            assignFormAction(
+                jtForm,
+                safeSameOriginUrl(jtAddBtn.getAttribute('data-action'), jtForm.action),
+            );
             jtTitle.innerText = MISSION_TITLES.jobTypeCreate;
             dialogField('jt-name').value = '';
             dialogField('jt-desc').value = '';
@@ -293,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (e) => {
         const btn = /** @type {Element} */ (e.target).closest('.edit-jobtype-btn');
         if (!btn) return;
-        jtForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), jtForm.action);
+        assignFormAction(jtForm, safeSameOriginUrl(btn.getAttribute('data-action'), jtForm.action));
         jtTitle.innerText = MISSION_TITLES.edit;
         dialogField('jt-name').value = btn.getAttribute('data-name') ?? '';
         dialogField('jt-desc').value = btn.getAttribute('data-desc') ?? '';
@@ -317,7 +323,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (ftAddBtn) {
         ftAddBtn.onclick = () => {
-            ftForm.action = safeSameOriginUrl(ftAddBtn.getAttribute('data-action'), ftForm.action);
+            assignFormAction(
+                ftForm,
+                safeSameOriginUrl(ftAddBtn.getAttribute('data-action'), ftForm.action),
+            );
             ftTitle.innerText = MISSION_TITLES.freqTypeCreate;
             dialogField('ft-name').value = '';
             dialogField('ft-desc').value = '';
@@ -329,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (e) => {
         const btn = /** @type {Element} */ (e.target).closest('.edit-freqtype-btn');
         if (!btn) return;
-        ftForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), ftForm.action);
+        assignFormAction(ftForm, safeSameOriginUrl(btn.getAttribute('data-action'), ftForm.action));
         ftTitle.innerText = MISSION_TITLES.edit;
         dialogField('ft-name').value = btn.getAttribute('data-name') ?? '';
         dialogField('ft-desc').value = btn.getAttribute('data-desc') ?? '';
@@ -356,9 +365,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('click', (e) => {
             const btn = /** @type {Element} */ (e.target).closest('.delete-btn');
             if (!btn || !deleteForm) return;
-            deleteForm.action = safeSameOriginUrl(
-                btn.getAttribute('data-action'),
-                deleteForm.action,
+            assignFormAction(
+                deleteForm,
+                safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action),
             );
             krtModal.open(deleteModal);
         });

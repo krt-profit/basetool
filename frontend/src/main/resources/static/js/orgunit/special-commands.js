@@ -21,7 +21,7 @@
 
 /* global SC_MSG, SC_CONFLICT */
 
-import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
@@ -45,7 +45,7 @@ function openCreate() {
 
 function openEdit(btn) {
     title.textContent = SC_MSG.editTitle;
-    form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+    assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
     versionInput.value = btn.getAttribute('data-version') || '0';
     nameInput.value = btn.getAttribute('data-name') || '';
     shorthandInput.value = btn.getAttribute('data-shorthand') || '';
@@ -65,7 +65,10 @@ const deleteNameEl = document.getElementById('sc-delete-name');
 
 function openDelete(btn) {
     if (!deleteModal || !deleteForm) return;
-    deleteForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action);
+    assignFormAction(
+        deleteForm,
+        safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action),
+    );
     if (deleteNameEl) deleteNameEl.textContent = btn.getAttribute('data-name') || '';
     krtModal.open(deleteModal);
 }

@@ -19,7 +19,7 @@
 
 // @ts-check
 
-import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { missionHooks } from '/js/mission/mission-hooks.js';
@@ -175,9 +175,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (editCrewModal && editCrewForm && editCrewJobs) {
         missionHooks.openEditCrewModal = function (source) {
-            editCrewForm.action = safeSameOriginUrl(
-                source.getAttribute('data-action') || '/missions',
-                editCrewForm.action,
+            assignFormAction(
+                editCrewForm,
+                safeSameOriginUrl(
+                    source.getAttribute('data-action') || '/missions',
+                    editCrewForm.action,
+                ),
             );
             editCrewForm.setAttribute(
                 'data-ajax-action',

@@ -22,7 +22,7 @@
 /* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId */
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
-import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
@@ -608,9 +608,12 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function openEditFinanceModal(id, note, type, amount, version) {
     const form = /** @type {HTMLFormElement} */ (document.getElementById('edit-finance-form'));
-    form.action = safeSameOriginUrl(
-        `/missions/${window.missionId}/finance-entries/${id}/update`,
-        form.action,
+    assignFormAction(
+        form,
+        safeSameOriginUrl(
+            `/missions/${window.missionId}/finance-entries/${id}/update`,
+            form.action,
+        ),
     );
     form.setAttribute('data-entry-id', /** @type {string} */ (id));
     /** @type {HTMLTextAreaElement} */ (document.getElementById('edit-finance-note')).value =

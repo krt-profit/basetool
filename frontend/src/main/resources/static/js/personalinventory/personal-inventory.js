@@ -1,7 +1,7 @@
 // @ts-check
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
-import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
@@ -356,7 +356,7 @@ function openCreate(btn) {
     if (!modal || !form) return;
     const i18n = window.krtPersonalInventoryI18n || {};
     if (titleEl && i18n.createTitle) titleEl.textContent = i18n.createTitle;
-    form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+    assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
     clearForm();
     krtModal.open(modal);
 }
@@ -370,7 +370,7 @@ function openEdit(btn) {
     if (!modal || !form) return;
     const i18n = window.krtPersonalInventoryI18n || {};
     if (titleEl && i18n.editTitle) titleEl.textContent = i18n.editTitle;
-    form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+    assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
     setField('id', btn.getAttribute('data-id'));
     setField('version', btn.getAttribute('data-version'));
     setField('name', btn.getAttribute('data-name'));
@@ -393,7 +393,10 @@ function closeModal() {
  */
 function openDelete(btn) {
     if (!deleteModal || !deleteForm) return;
-    deleteForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action);
+    assignFormAction(
+        deleteForm,
+        safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action),
+    );
     const msgEl = $('krt-pi-delete-message');
     const name = btn.getAttribute('data-name');
     if (msgEl && name) {

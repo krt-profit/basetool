@@ -22,7 +22,7 @@
 /* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
-import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -234,7 +234,7 @@ function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement} */ (
         document.getElementById('delete-operation-form')
     );
-    deleteForm.action = safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
+    assignFormAction(deleteForm, safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action));
     krtModal.open(document.getElementById('delete-operation-modal'));
 }
 

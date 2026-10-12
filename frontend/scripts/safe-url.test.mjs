@@ -30,6 +30,7 @@ const ORIGIN = 'https://app.example';
 const context = vm.createContext({ window: { location: { origin: ORIGIN } }, URL });
 vm.runInContext(flattenModule('kernel/safe-url.js'), context);
 const safeSameOriginUrl = vm.runInContext('safeSameOriginUrl', context);
+const assignFormAction = vm.runInContext('assignFormAction', context);
 
 let failures = 0;
 
@@ -84,6 +85,36 @@ test('a value that is not a string is rejected', () => {
     for (const value of [null, undefined, 42, {}, ['/a']]) {
         assert.equal(safeSameOriginUrl(value, '/fallback'), '/fallback');
     }
+});
+
+test('assignFormAction encodes only the markup characters a URL parser encodes anyway', () => {
+    const cases = [
+        ['/orders/1', '/orders/1'],
+        ['/bank?view=a&x=1', '/bank?view=a&x=1'],
+        ['/bank?x="1"', '/bank?x=%221%22'],
+        ['/a<b>c', '/a%3Cb%3Ec'],
+        ["/o'brien?q=%3C", "/o'brien?q=%3C"],
+    ];
+    for (const [url, expected] of cases) {
+        const form = { action: '/before' };
+        assignFormAction(form, url);
+        assert.equal(form.action, expected, url);
+        assert.equal(new URL(form.action, ORIGIN).href, new URL(url, ORIGIN).href, url);
+    }
+});
+
+test('assignFormAction converts a non-string the way the DOM does', () => {
+    for (const value of [null, undefined, 42]) {
+        const form = { action: '/before' };
+        assignFormAction(form, value);
+        assert.equal(form.action, String(value));
+    }
+});
+
+test('assignFormAction keeps a rejected URL at the fallback', () => {
+    const form = { action: '/current' };
+    assignFormAction(form, safeSameOriginUrl('//evil.example/x', form.action));
+    assert.equal(form.action, '/current');
 });
 
 if (failures > 0) {

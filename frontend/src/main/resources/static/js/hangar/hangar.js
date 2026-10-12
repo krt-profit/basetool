@@ -22,7 +22,7 @@
 /* global hangarI18n, hangarConflict */
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
-import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function openAddModal(btn) {
         modalTitle.textContent = form.getAttribute('data-title-add');
-        form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+        assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
         shipField('ship-name').value = '';
         shipField('ship-type').value = '';
         setInsurance('');
@@ -259,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function openEditModal(btn) {
         modalTitle.textContent = form.getAttribute('data-title-edit');
-        form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+        assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
         shipField('ship-name').value = btn.getAttribute('data-name') ?? '';
         shipField('ship-type').value = btn.getAttribute('data-type') ?? '';
         setInsurance(btn.getAttribute('data-ins'));
@@ -277,9 +277,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     modalDeleteBtn.addEventListener('click', () => {
         if (!deleteForm) return;
-        deleteForm.action = safeSameOriginUrl(
-            modalDeleteBtn.getAttribute('data-action'),
-            deleteForm.action,
+        assignFormAction(
+            deleteForm,
+            safeSameOriginUrl(modalDeleteBtn.getAttribute('data-action'), deleteForm.action),
         );
         krtModal.open(deleteModal);
     });
