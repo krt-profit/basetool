@@ -2909,6 +2909,13 @@ The question for the owner: A, B or C.
    cannot say so without two conflicting nullness annotations; a `null` version still ends in the same 409.
 4. *Open*: `bank`, `exchange`, `kernel` and `app` stay on the `api`-only list; `bank` and `exchange` get their own conventions when P5-c and P5-d extract them.
 
+**Umbrella step 17 — requirement status, arc42 and the CLAUDE.md files — done 2026-10-12, partly**
+1. *Plan §14 status*: REQ-XCH-009/011 need nothing but the rewritten source paths; REQ-DATA-010 waits for the access-policy decision of step 12 (the six scope fragments are still `ScopeSpecifications`);
+   REQ-AUDIT-001 waits for P3-11, which the plan names and nowhere defines (question to the owner).
+2. *arc42 §5*: the layer-package table is marked as the roles the layers had; the audit paragraph no longer says its classes sit in the layer packages; the per-module paragraphs were extended with every step.
+3. *CLAUDE.md*: the root file describes the backend as a modular monolith with `api` / `internal` / `web`; `backend/CLAUDE.md` gained three landmines found in this pull request (fragment implementation beside its
+   interface, no field injection of another module's type, tests that read backend sources by path).
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2963,12 +2970,12 @@ before a decision.
         step comes after the path moves; its SQL and rollback go to the owner before they are pushed.
   - [x] **14.** Table-ownership map (§5.6): done before this branch (`table-ownership.txt`,
         `TableOwnershipTest`); each move updates the owner of the tables it moves, nothing else.
-  - [ ] **15.** P3-11, the per-command audit contract (REQ-AUDIT-001): waits for the moves above.
+  - [ ] **15.** `Q` P3-11, the per-command audit contract (REQ-AUDIT-001): the moves it waited for are done, but the plan names it and does not define it; waiting for the owner to say what the contract is.
 - Quality gates:
   - [x] **16.** partly done, `bank`, `exchange`, `kernel`, `app` open — NullAway to the whole tree of every module as it becomes whole (today: `blueprint`,
         `catalogue`, `hangar`, `identity`, `inventory`, `joborder`, `materialexchange`, `mission`,
         `operation`, `refinery`, `scope`; the other modules' `api` packages only).
-  - [ ] **17.** Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
+  - [x] **17.** partly done, REQ-DATA-010 and REQ-AUDIT-001 wait — Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
         REQ-XCH-009/011; arc42 §5.2/§5.3 per module; CLAUDE.md files.
 - Gradle extraction, last (they move whole source trees):
   - [ ] **18.** P5-c `backend-exchange`, then **19.** P5-d `backend-bank` (§5.8; P5-a and P5-b are done).
@@ -3590,6 +3597,9 @@ Full tables, per finding with status, evidence and verdict:
   (the fragment per aggregate moves into each module with its repository, Phase 3), REQ-AUDIT-001
   (the per-command contract, P3-11), REQ-XCH-009/011 (they name the domain APIs the exchange calls,
   which exist when blueprint, inventory and hangar publish theirs, Phase 3).
+  **Status 2026-10-12 (umbrella step 17):** the three modules publish their entities and repositories in `api` since steps 9, 10 and 11a; that did not change what REQ-XCH-009/011 say, only the
+  source paths in the specs, which the text scans rewrote. REQ-DATA-010 stays waiting: `ScopeSpecifications` still holds the six scope fragments in `scope.api` (§5.4, step 12). REQ-AUDIT-001 stays waiting for P3-11,
+  which the plan does not define beyond its name (question to the owner).
 - **arc42:** §4.1, §4.2, §5.3 and §5.5 (corrected with this plan), §5.2 and §5.3 rewritten per
   module as the moves land, §8 (module rules, interaction styles — §8.14, done 2026-10-02), §11.9
   (the domain coupling as debt, opened with this plan; its decisions linked 2026-10-02).

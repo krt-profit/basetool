@@ -265,7 +265,7 @@ for anything that writes, a recipe is documentation and never permission.
 
 ### Module split
 
-- **`backend`** — REST API only. Layered: `controller` → `service` → `repository` → `model` (JPA entities), with `dto` records and MapStruct `mapper`s.
+- **`backend`** — REST API only. A modular monolith: one package per domain (`orgunit`, `identity`, `mission`, `inventory`, …) with `api` (what other modules use), `internal` and `web` (controllers); the domain map and the Modulith declarations fix who may depend on whom ([`docs/specs/module-boundaries.md`](docs/specs/module-boundaries.md)). Inside a module the layers are `web` → `internal` services → repositories → JPA entities, with `dto` records and MapStruct mappers.
 - **`frontend`** — Thymeleaf server-rendered UI that calls the backend via WebClient. No business logic of its own; `kernel.backend.BackendApiClient` is the single seam. Persistent state across frontend restarts goes in Redis (Spring Session).
 - **`ingest`** — the internet-facing gateway the desktop SC extractor posts to; owns no database and relays to the backend over the internal network ([`docs/specs/desktop-ingest.md`](docs/specs/desktop-ingest.md), `REQ-INGEST-*`).
 - **`keycloak-spi`** — Keycloak provider JAR (Discord federation + the first-login membership gate); a plain library compiled against the Keycloak SPIs, emitting Java-21 bytecode, logging through `@JBossLog`.

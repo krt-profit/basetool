@@ -71,8 +71,10 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
 | `filter` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
 
-These layer packages are being cut into domain modules (the
-[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md), §5.1). Until a class has moved, the
+These layer packages were cut into domain modules (the
+[domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md), §5.1); since 2026-10-12 every domain
+class lies in a module package and the table above describes the roles the layers had. One class,
+`BusinessMetricsCollector`, is still in `task` (see the `app` module below). The
 **domain map** [`backend/src/test/resources/architecture/domain-map.txt`](../../backend/src/test/resources/architecture/domain-map.txt)
 is the source of truth for its target module and that module's rank: every class is assigned there
 by the first matching rule, and a class no rule assigns fails the build
@@ -82,8 +84,8 @@ The first module package is `audit.api`, the audit module's published interface 
 `AuditRecorder` every other module records through, and the vocabulary `AuditEventType`,
 `AuditDomain` and `AuditDetails`. Recording stays a direct call inside the business transaction
 (`MANDATORY`), never an event. The recorder's implementation `AuditService`, the `AuditEvent`
-entity, its repository, the viewer and the retention purge are the module's internals and still sit
-in the layer packages.
+entity, its repository, the viewer and the retention purge lie in the module's `api`, `internal` and
+`web` packages (umbrella step 2).
 
 The domain events live in their publisher's `<module>.api.events` package (plan §5.2, §5.3); there
 is no central `event` package. Every listener runs after commit (`@TransactionalEventListener`),
