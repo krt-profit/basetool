@@ -20,6 +20,7 @@
  */
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const cfg = window.krtDefaultBlueprints || {};
 /** @type {KrtI18nDict} */
@@ -343,12 +344,12 @@ function openDeleteModal(formId, name) {
         const base = window.krtI18nText(i18n.removeBody, 'krtDefaultBlueprints.i18n.removeBody');
         deleteMessage.textContent = name ? `${base} (${name})` : base;
     }
-    window.krtModal.open(deleteModal);
+    krtModal.open(deleteModal);
 }
 
 function closeDeleteModal() {
     if (deleteModal) {
-        window.krtModal.close(deleteModal);
+        krtModal.close(deleteModal);
     }
 }
 

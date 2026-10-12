@@ -26,6 +26,7 @@ import {
     showFrontendSuccessToast,
     showKrtConfirm,
 } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const MEMBERS_SECTIONS = {
     roster: { container: '#members-results', fragmentValue: 'results' },
@@ -170,7 +171,7 @@ let consolidateSource = null;
  */
 function openConsolidate(el) {
     const modal = document.getElementById('consolidate-modal');
-    if (!modal || !window.krtModal) return;
+    if (!modal || !krtModal) return;
     consolidateSource = {
         id: el.getAttribute('data-user-id'),
         version: el.getAttribute('data-user-version'),
@@ -182,13 +183,13 @@ function openConsolidate(el) {
         picker.value = '';
         if (picker.krtComboboxReset) picker.krtComboboxReset();
     }
-    window.krtModal.open(modal);
+    krtModal.open(modal);
 }
 
 /** Forgets the source member and closes the consolidation dialog. */
 function closeConsolidate() {
     consolidateSource = null;
-    if (window.krtModal) window.krtModal.close('consolidate-modal');
+    if (krtModal) krtModal.close('consolidate-modal');
 }
 
 /** Consolidates the source member into the picked target member. */

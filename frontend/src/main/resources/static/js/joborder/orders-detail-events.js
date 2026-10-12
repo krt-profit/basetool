@@ -55,6 +55,7 @@ import {
     updateHandoverIndexes,
 } from '/js/joborder/orders-detail.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'od-update-status', (el) => {
@@ -256,7 +257,7 @@ function oaOpenNote(el) {
     ta.value = note;
     _odElementById('assignee-note-for').textContent = I18N_NOTE_FOR.replace('{0}', userName);
     oaUpdateCounter();
-    window.krtModal.open(document.getElementById('assignee-note-modal'));
+    krtModal.open(document.getElementById('assignee-note-modal'));
     ta.focus();
 }
 
@@ -273,7 +274,7 @@ function oaSaveNote() {
         json: payload,
         successMsg: I18N_NOTE_SAVED,
     }).then((ok) => {
-        if (ok) window.krtModal.close(document.getElementById('assignee-note-modal'));
+        if (ok) krtModal.close(document.getElementById('assignee-note-modal'));
     });
 }
 

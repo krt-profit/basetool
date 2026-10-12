@@ -1,6 +1,7 @@
 // @ts-check
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
@@ -454,11 +455,11 @@ function toastError() {
 }
 
 function openModal() {
-    if (modal) window.krtModal.open(modal);
+    if (modal) krtModal.open(modal);
 }
 
 function closeModal() {
-    if (modal) window.krtModal.close(modal);
+    if (modal) krtModal.close(modal);
 }
 
 if (document.readyState === 'loading') {

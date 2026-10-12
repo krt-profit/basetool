@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtModal } from '/js/kernel/krt-modal.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const RECENT_KEY = 'krt.recent';
     const RECENT_MAX = 4;
@@ -306,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {PaletteItem} item the chosen row
      */
     const choose = function (item) {
-        window.krtModal.close(dialog);
+        krtModal.close(dialog);
         if (item.run) {
             item.run();
         } else if (item.href) {
@@ -373,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const open = function (prefill) {
         paletteInput.value = prefill || '';
         render();
-        window.krtModal.open(dialog, { focus: paletteInput });
+        krtModal.open(dialog, { focus: paletteInput });
         const end = paletteInput.value.length;
         paletteInput.setSelectionRange(end, end);
     };
@@ -398,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
     dialog.addEventListener('click', (e) => {
         const target = e.target instanceof Element ? e.target : null;
         if (target === dialog || (target && target.closest('.palette-cancel'))) {
-            window.krtModal.close(dialog);
+            krtModal.close(dialog);
         }
     });
 
@@ -416,10 +418,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (e) => {
         if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
         if (e.key !== 'k' && e.key !== 'K') return;
-        const top = window.krtModal.topmost();
+        const top = krtModal.topmost();
         if (top && top !== dialog) return;
         e.preventDefault();
-        if (window.krtModal.isOpen(dialog)) {
+        if (krtModal.isOpen(dialog)) {
             paletteInput.focus();
             paletteInput.select();
             return;

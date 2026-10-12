@@ -23,6 +23,7 @@
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /** @type {any[]} */
 export let cachedInventoryItems = [];
@@ -374,7 +375,7 @@ function _refreshHandoverTierChoice(row, inv) {
 }
 
 export async function openHandoverModal() {
-    window.krtModal.open(document.getElementById('handover-modal'));
+    krtModal.open(document.getElementById('handover-modal'));
     if (!isInventoryCached) {
         try {
             /** @type {Map<string, HTMLElement>} */

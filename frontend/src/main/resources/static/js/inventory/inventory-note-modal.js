@@ -26,6 +26,7 @@ import {
     showFrontendSuccessToast,
     showKrtConfirm,
 } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /** @type {HTMLElement | null} */
 let activeNoteButton = null;
@@ -45,7 +46,7 @@ export function openNoteModal(btn) {
     const note = btn.getAttribute('data-note') || '';
     ta.value = note;
     updateNoteCounter();
-    window.krtModal.open(modal);
+    krtModal.open(modal);
     setTimeout(() => {
         ta.focus();
     }, 0);
@@ -53,7 +54,7 @@ export function openNoteModal(btn) {
 
 export function closeNoteModal() {
     const modal = document.getElementById('noteModal');
-    window.krtModal.close(modal);
+    krtModal.close(modal);
     activeNoteButton = null;
 }
 

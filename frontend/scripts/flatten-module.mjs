@@ -27,6 +27,17 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+/**
+ * Stand-ins for the modules that touch the DOM when they load: the transport only calls them, so a
+ * node test replaces them with inert functions of the same names.
+ */
+export const UI_STUBS = {
+    '/js/kernel/krt-modal.js':
+        'const krtModal = { open() {}, close() {}, isOpen() { return false; }, topmost() { return null; }, layerRoot() { return null; } };',
+    '/js/kernel/toast.js':
+        'function showFrontendErrorToast() {}\nfunction showFrontendSuccessToast() {}\nfunction showKrtConfirm() { return Promise.resolve(true); }',
+};
+
 const ROOT = fileURLToPath(new URL('../src/main/resources/static/', import.meta.url));
 
 const FROM_IMPORT = /^import\b[^;'"]*?\bfrom\s*(['"])(\/js\/[^'"]+)\1;?[ \t]*\n/gm;
@@ -64,9 +75,10 @@ function importsOf(source) {
  * Flattens a module and its imports into one classic script.
  *
  * @param {string} entry the entry module, relative to `static/js`, such as `kernel/krt-fetch.js`
+ * @param {Record<string, string>} [stubs] source text to use instead of a module, keyed by its path
  * @returns {string} the script text, dependencies first
  */
-export function flattenModule(entry) {
+export function flattenModule(entry, stubs = {}) {
     const seen = new Set();
     const parts = [];
     const visit = (path) => {
@@ -74,6 +86,10 @@ export function flattenModule(entry) {
             return;
         }
         seen.add(path);
+        if (path in stubs) {
+            parts.push(stubs[path]);
+            return;
+        }
         const source = read(path);
         importsOf(source).forEach(visit);
         parts.push(

@@ -20,6 +20,7 @@
 // @ts-check
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const EXCHANGE_CLIENTS_SECTIONS = {
     registry: { container: '#xc-registry-host', fragmentValue: 'registry' },
@@ -614,7 +615,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             }
             resetCheck();
             loadInstallations();
-            window.krtModal.open('xc-undo-modal');
+            krtModal.open('xc-undo-modal');
         }
 
         /** Asks the backend what the scope reaches and allows the start once it reaches anything. */
@@ -662,7 +663,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                     errorMessage: i18n.error,
                     submitter: submit,
                     onSuccess() {
-                        window.krtModal.close('xc-undo-modal');
+                        krtModal.close('xc-undo-modal');
                         broadcastUndoStart();
                         return Promise.all([refreshRegistry(), refreshRuns()]);
                     },
@@ -783,7 +784,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
                             body.appendChild(more);
                         }
                     }
-                    window.krtModal.open('xc-undo-run-modal');
+                    krtModal.open('xc-undo-run-modal');
                 })
                 .catch(() => {
                     if (typeof showFrontendErrorToast === 'function') {

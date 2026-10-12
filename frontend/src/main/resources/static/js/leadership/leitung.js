@@ -7,6 +7,7 @@
  */
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /** @type {Record<string, any>} */
 const i18n = /** @type {any} */ (window).leitungI18n || {};
@@ -597,7 +598,7 @@ function openModal(trigger) {
             }
         }
     }
-    window.krtModal.open(modal);
+    krtModal.open(modal);
     if (user) {
         const box = user.closest('.krt-combobox');
         const focusTarget = /** @type {HTMLElement | null} */ (
@@ -612,7 +613,7 @@ function openModal(trigger) {
 /** Closes the add-member dialog. */
 function closeModal() {
     if (modal) {
-        window.krtModal.close(modal);
+        krtModal.close(modal);
     }
     modalContext = null;
 }

@@ -1,5 +1,7 @@
 // @ts-check
 
+import { krtModal } from '/js/kernel/krt-modal.js';
+
 const form = /** @type {HTMLFormElement | null} */ (document.getElementById('audit-filter-form'));
 const resultsContainer = document.getElementById('audit-results');
 const resetLink = document.getElementById('audit-filter-reset');
@@ -167,7 +169,7 @@ const downloadBlob = async function (url, filename, onError) {
     const a = document.createElement('a');
     a.href = objectUrl;
     a.download = filename;
-    window.krtModal.layerRoot().appendChild(a);
+    krtModal.layerRoot().appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(objectUrl);

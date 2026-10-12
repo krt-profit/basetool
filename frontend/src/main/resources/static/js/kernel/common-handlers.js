@@ -1,5 +1,7 @@
 // @ts-check
 
+import { krtModal } from '/js/kernel/krt-modal.js';
+
 (function () {
     window.addEventListener('pageshow', (event) => {
         if (event.persisted) {
@@ -188,7 +190,7 @@
         const id = el.getAttribute('data-modal-id');
         if (!id || !document.getElementById(id)) return;
         event.preventDefault();
-        window.krtModal.open(id);
+        krtModal.open(id);
     });
 
     /**
@@ -198,6 +200,6 @@
         const id = el.getAttribute('data-modal-id');
         if (!id || !document.getElementById(id)) return;
         event.preventDefault();
-        window.krtModal.close(id);
+        krtModal.close(id);
     });
 })();

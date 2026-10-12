@@ -2,6 +2,7 @@
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /** @type {HTMLInputElement | null} */
 let searchInput = null;
@@ -433,7 +434,7 @@ function addSelected() {
                 renderStaging();
                 const addModal = $('krt-bp-add-modal');
                 if (addModal) {
-                    window.krtModal.close(addModal);
+                    krtModal.close(addModal);
                 }
                 afterListWrite();
             },
@@ -470,11 +471,11 @@ function openEdit(btn) {
     setValue('krt-bp-edit-note', btn.getAttribute('data-note'));
     const productEl = $('krt-bp-edit-product');
     if (productEl) productEl.textContent = btn.getAttribute('data-name') || '';
-    window.krtModal.open(editModal);
+    krtModal.open(editModal);
 }
 
 function closeEdit() {
-    if (editModal) window.krtModal.close(editModal);
+    if (editModal) krtModal.close(editModal);
 }
 
 /**
@@ -490,19 +491,19 @@ function openDelete(btn) {
     if (msgEl && name) {
         msgEl.textContent = `${i18n().removeBody || msgEl.textContent} (${name})`;
     }
-    window.krtModal.open(deleteModal);
+    krtModal.open(deleteModal);
 }
 
 function closeDelete() {
-    if (deleteModal) window.krtModal.close(deleteModal);
+    if (deleteModal) krtModal.close(deleteModal);
 }
 
 function openDeleteAll() {
-    if (deleteAllModal) window.krtModal.open(deleteAllModal);
+    if (deleteAllModal) krtModal.open(deleteAllModal);
 }
 
 function closeDeleteAll() {
-    if (deleteAllModal) window.krtModal.close(deleteAllModal);
+    if (deleteAllModal) krtModal.close(deleteAllModal);
 }
 
 /**

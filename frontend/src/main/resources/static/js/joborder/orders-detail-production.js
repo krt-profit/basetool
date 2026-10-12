@@ -23,6 +23,7 @@
 
 import { krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 (function () {
     const nav = /** @type {HTMLElement | null} */ (
@@ -375,7 +376,7 @@ export function openProductionModal(button) {
 
     _prodResetBookIn();
 
-    window.krtModal.open('production-modal');
+    krtModal.open('production-modal');
 
     const row = button.closest('tr');
     const demandLis = row ? row.querySelectorAll('.od-production-demand li') : [];
@@ -926,7 +927,7 @@ export function bookProduction() {
         toast: false,
         errorMessage: PRODUCTION_I18N.allocError,
         onSuccess() {
-            window.krtModal.close('production-modal');
+            krtModal.close('production-modal');
             showFrontendSuccessToast(PRODUCTION_I18N.booked);
             if (window.krtRefreshOrderSection) {
                 window.krtRefreshOrderSection([

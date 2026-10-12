@@ -22,6 +22,7 @@
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtSyncDatetimeSplitGroup } from '/js/kernel/datetime-splitter.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 (function () {
     const objectiveList = document.getElementById('mission-create-objective-list');
@@ -197,10 +198,10 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 })();
 
 window.krtModalOpen = function (overlay) {
-    window.krtModal.open(overlay);
+    krtModal.open(overlay);
 };
 window.krtModalClose = function (overlay) {
-    window.krtModal.close(overlay);
+    krtModal.close(overlay);
 };
 window.krtSegSet = function (targetId, value) {
     const seg = document.querySelector(`.seg[data-seg-target="${targetId}"]`);

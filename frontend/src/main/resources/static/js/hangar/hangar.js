@@ -24,6 +24,7 @@
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
@@ -217,14 +218,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (insuranceMonths) insuranceMonths.addEventListener('input', syncInsurance);
 
     function openModal() {
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     }
 
     function closeModal() {
         if (typeof resetUnsavedChanges === 'function') {
             resetUnsavedChanges();
         }
-        window.krtModal.close(modal);
+        krtModal.close(modal);
     }
 
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
@@ -237,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
-        if (deleteModal && e.target === deleteModal) window.krtModal.close(deleteModal);
+        if (deleteModal && e.target === deleteModal) krtModal.close(deleteModal);
     });
 
     const modalDeleteBtn = /** @type {HTMLElement} */ (document.getElementById('modal-delete-btn'));
@@ -291,13 +292,13 @@ document.addEventListener('DOMContentLoaded', () => {
             modalDeleteBtn.getAttribute('data-action'),
             deleteForm.action,
         );
-        window.krtModal.open(deleteModal);
+        krtModal.open(deleteModal);
     });
 
     if (deleteModal) {
         closeDeleteBtns.forEach((btn) => {
             btn.addEventListener('click', () => {
-                window.krtModal.close(deleteModal);
+                krtModal.close(deleteModal);
             });
         });
     }
@@ -317,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     errorMessage: hangarI18n.deleteError,
                     conflict: hangarConflict,
                     onSuccess() {
-                        if (deleteModal) window.krtModal.close(deleteModal);
+                        if (deleteModal) krtModal.close(deleteModal);
                         closeModal();
                         afterHangarWrite();
                     },
@@ -389,13 +390,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             dupSection.hidden = !hasDuplicates;
 
-            window.krtModal.open(resultModal);
+            krtModal.open(resultModal);
         }
 
         [closeResultBtn, closeResultX].forEach((btn) => {
             if (!btn) return;
             btn.addEventListener('click', () => {
-                window.krtModal.close(resultModal);
+                krtModal.close(resultModal);
                 if (resultElement('import-res-imported').textContent !== '0') {
                     afterHangarWrite();
                 }
@@ -404,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         window.addEventListener('click', (e) => {
             if (e.target === resultModal) {
-                window.krtModal.close(resultModal);
+                krtModal.close(resultModal);
             }
         });
 
@@ -484,16 +485,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         deleteAllBtn.addEventListener('click', () => {
             if (deleteAllBtn.disabled) return;
-            window.krtModal.open(deleteAllModal);
+            krtModal.open(deleteAllModal);
         });
 
         deleteAllCancelBtn.addEventListener('click', () => {
-            window.krtModal.close(deleteAllModal);
+            krtModal.close(deleteAllModal);
         });
 
         window.addEventListener('click', (e) => {
             if (e.target === deleteAllModal) {
-                window.krtModal.close(deleteAllModal);
+                krtModal.close(deleteAllModal);
             }
         });
 
@@ -511,7 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ),
                     conflict: hangarConflict,
                     onSuccess() {
-                        window.krtModal.close(deleteAllModal);
+                        krtModal.close(deleteAllModal);
                         afterHangarWrite();
                         if (showFrontendSuccessToast) {
                             showFrontendSuccessToast(
@@ -532,7 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!homeModal) return;
 
         function closeHome() {
-            window.krtModal.close(homeModal);
+            krtModal.close(homeModal);
         }
 
         function refreshHomeBody() {
@@ -548,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.krtEvents.on('click', 'hangar-open-home', (btn) => {
                 if (btn && /** @type {HTMLButtonElement} */ (btn).disabled) return;
                 refreshHomeBody();
-                window.krtModal.open(homeModal);
+                krtModal.open(homeModal);
             });
         }
 

@@ -22,6 +22,7 @@
 /* global OPS_MSG */
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement | null} */ (
@@ -29,7 +30,7 @@ function openDeleteModal(id) {
     );
     if (!deleteForm) return;
     deleteForm.action = safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
-    window.krtModal.open(document.getElementById('delete-operation-modal'));
+    krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
@@ -50,7 +51,7 @@ function opsConflictStrings() {
 
 function closeOperationModal(id) {
     const modal = document.getElementById(id);
-    if (modal) window.krtModal.close(modal);
+    if (modal) krtModal.close(modal);
 }
 
 function reloadOperationsList() {

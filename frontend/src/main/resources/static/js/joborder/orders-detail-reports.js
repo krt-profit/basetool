@@ -27,6 +27,7 @@ import {
     validateHandoverAmounts,
 } from '/js/joborder/orders-detail.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /**
  * Downloads the PDF report of a material handover.
@@ -78,7 +79,7 @@ export async function downloadHandoverReport(btn) {
         a.href = url;
         a.target = '_blank';
         a.download = filename;
-        window.krtModal.layerRoot().appendChild(a);
+        krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
@@ -137,7 +138,7 @@ export async function downloadItemHandoverReport(btn) {
         a.href = url;
         a.target = '_blank';
         a.download = filename;
-        window.krtModal.layerRoot().appendChild(a);
+        krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
@@ -288,7 +289,7 @@ export async function previewHandoverReport(btn) {
             previewDate,
             previewTime,
         ]);
-        window.krtModal.layerRoot().appendChild(a);
+        krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);

@@ -21,6 +21,7 @@
 /* global QT_MSG, QT_CONFLICT */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 (function () {
     const PAGE_URL = '/admin/quality-tiers';
@@ -129,7 +130,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
         versionInput.value = '';
         setActive(true);
         applyBaseLock(false);
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     }
 
     /** @param {HTMLElement} btn */
@@ -159,7 +160,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
         sortInput.value = btn.dataset.sortOrder || '0';
         setActive(btn.dataset.active === 'true');
         applyBaseLock(btn.dataset.base === 'true');
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     }
 
     /** @param {HTMLElement} btn */
@@ -168,7 +169,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
         if (deleteCode) {
             deleteCode.textContent = btn.dataset.code || '';
         }
-        window.krtModal.open(deleteModal);
+        krtModal.open(deleteModal);
     }
 
     /** @returns {Promise<boolean>} */
@@ -234,7 +235,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
             conflict: QT_CONFLICT,
             onError: refusalHandler(false),
             onSuccess() {
-                window.krtModal.close(modal);
+                krtModal.close(modal);
                 return refreshTable();
             },
         });
@@ -256,7 +257,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
                 onError: refusalHandler(true),
                 onSuccess() {
                     pendingDeleteId = null;
-                    window.krtModal.close(deleteModal);
+                    krtModal.close(deleteModal);
                     return refreshTable();
                 },
             });

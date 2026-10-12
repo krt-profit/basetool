@@ -34,6 +34,7 @@ import {
 } from '/js/joborder/orders-detail.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /**
  * @typedef {object} OdClaimModalOptions
@@ -84,7 +85,7 @@ function _openClaimModal(opts) {
     }
     const claimScuHint = document.getElementById('claim-scu-hint');
     if (claimScuHint) claimScuHint.classList.toggle('is-hidden', opts.quantityType === 'PIECE');
-    window.krtModal.open(document.getElementById('claim-modal'));
+    krtModal.open(document.getElementById('claim-modal'));
 }
 
 /**
@@ -158,7 +159,7 @@ export function submitClaim() {
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
         onSuccess() {
-            window.krtModal.close(document.getElementById('claim-modal'));
+            krtModal.close(document.getElementById('claim-modal'));
             showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
             _refreshMaterialsSection();
         },
@@ -178,7 +179,7 @@ export function withdrawClaimAction() {
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
         onSuccess() {
-            window.krtModal.close(document.getElementById('claim-modal'));
+            krtModal.close(document.getElementById('claim-modal'));
             showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS);
             _refreshMaterialsSection();
         },
@@ -217,7 +218,7 @@ export function updateStatus(selectElement) {
     if (newStatus === 'COMPLETED' || newStatus === 'REJECTED') {
         _pendingStatus = newStatus;
         _previousStatus = _knownStatus(selectElement);
-        window.krtModal.open(document.getElementById('status-warning-modal'));
+        krtModal.open(document.getElementById('status-warning-modal'));
     } else {
         _doStatusUpdate(selectElement.dataset.orderId, newStatus, selectElement);
     }
@@ -225,7 +226,7 @@ export function updateStatus(selectElement) {
 
 /** Dismisses the terminal-status warning and restores the previous status. */
 export function cancelStatusChange() {
-    window.krtModal.close(document.getElementById('status-warning-modal'));
+    krtModal.close(document.getElementById('status-warning-modal'));
     const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('status-select'));
     if (sel && _previousStatus) {
         sel.value = _previousStatus;
@@ -236,7 +237,7 @@ export function cancelStatusChange() {
 
 /** Confirms the terminal-status warning and saves the pending status. */
 export function confirmStatusChange() {
-    window.krtModal.close(document.getElementById('status-warning-modal'));
+    krtModal.close(document.getElementById('status-warning-modal'));
     const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('status-select'));
     if (!sel || !_pendingStatus) return;
     _doStatusUpdate(sel.dataset.orderId, _pendingStatus, sel);

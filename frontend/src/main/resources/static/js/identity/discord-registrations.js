@@ -22,6 +22,7 @@
 /* global DISCORD_MSG */
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!window.krtFetch) {
@@ -284,11 +285,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (reasonInput) {
             reasonInput.value = '';
         }
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     }
 
     function closeReject() {
-        window.krtModal.close(modal);
+        krtModal.close(modal);
         rejectTarget = null;
     }
 
@@ -298,11 +299,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (picker && picker.krtCombobox) {
             picker.krtCombobox.setValue('');
         }
-        window.krtModal.open(linkModal);
+        krtModal.open(linkModal);
     }
 
     function closeLink() {
-        window.krtModal.close(linkModal);
+        krtModal.close(linkModal);
         linkTarget = null;
     }
 
@@ -312,11 +313,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (picker && picker.krtCombobox) {
             picker.krtCombobox.setValue('');
         }
-        window.krtModal.open(mergeModal);
+        krtModal.open(mergeModal);
     }
 
     function closeMerge() {
-        window.krtModal.close(mergeModal);
+        krtModal.close(mergeModal);
         mergeTarget = null;
     }
 
@@ -325,11 +326,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (reopenReasonInput) {
             reopenReasonInput.value = '';
         }
-        window.krtModal.open(reopenModal);
+        krtModal.open(reopenModal);
     }
 
     function closeReopen() {
-        window.krtModal.close(reopenModal);
+        krtModal.close(reopenModal);
         reopenTarget = null;
     }
 

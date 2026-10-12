@@ -23,6 +23,7 @@
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 function buildScuHint() {
     const hint = document.createElement('span');
@@ -374,8 +375,8 @@ async function importFromScmdb() {
         importField.value = '';
         syncMaterialRemoveButtons();
         updateMaterialSummary();
-        if (window.krtModal) {
-            window.krtModal.close('orders-scmdb-modal');
+        if (krtModal) {
+            krtModal.close('orders-scmdb-modal');
         }
         let successMsg = MSG_SCMDB_SUCCESS;
         if (unknownMaterials.length > 0) {

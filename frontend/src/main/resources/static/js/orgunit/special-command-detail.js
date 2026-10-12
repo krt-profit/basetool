@@ -21,6 +21,7 @@
 /* global MEMBER_MSG, MEMBER_CONFLICT */
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const SERIALIZE_KEY = 'sk-roster';
 
@@ -286,16 +287,16 @@ const openBtn = document.getElementById('add-member-btn');
 const closeBtn = document.querySelector('#add-member-modal .close-add-member-modal');
 if (modal && openBtn) {
     openBtn.addEventListener('click', () => {
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     });
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
-            window.krtModal.close(modal);
+            krtModal.close(modal);
         });
     }
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
-            window.krtModal.close(modal);
+            krtModal.close(modal);
         }
     });
     const addForm = modal.querySelector('form');
@@ -313,7 +314,7 @@ if (modal && openBtn) {
                 conflict: MEMBER_CONFLICT,
                 serialize: SERIALIZE_KEY,
                 onSuccess() {
-                    window.krtModal.close(modal);
+                    krtModal.close(modal);
                     addForm.reset();
                     return reswapMembers();
                 },

@@ -19,6 +19,7 @@
  */
 
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 (function () {
     if (!window.krtFetch) {
@@ -443,7 +444,7 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
                 successMessage: i18n.deletionRequested,
                 errorMessage: i18n.deletionError,
                 onSuccess() {
-                    window.krtModal.close('profile-deletion-modal');
+                    krtModal.close('profile-deletion-modal');
                     if (eraseHistory) {
                         eraseHistory.checked = false;
                     }

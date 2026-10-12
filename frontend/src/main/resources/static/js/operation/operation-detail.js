@@ -24,6 +24,7 @@
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
@@ -232,7 +233,7 @@ function openDeleteModal(id) {
         document.getElementById('delete-operation-form')
     );
     deleteForm.action = safeSameOriginUrl(`/operations/${id}/delete`, deleteForm.action);
-    window.krtModal.open(document.getElementById('delete-operation-modal'));
+    krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -450,7 +451,7 @@ function adoptOperationFormValues(form) {
                         versionInput.value = body.version;
                     }
                     adoptOperationFormValues(form);
-                    window.krtModal.close('edit-operation-modal');
+                    krtModal.close('edit-operation-modal');
                     if (window.opRefreshSection) {
                         window.opRefreshSection('overview');
                     }

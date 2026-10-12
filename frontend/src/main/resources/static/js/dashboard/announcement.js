@@ -21,6 +21,8 @@
 
 /* global ANNOUNCE_MSG, ANNOUNCE_CONFLICT */
 
+import { krtModal } from '/js/kernel/krt-modal.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     const deleteModal = document.getElementById('delete-confirm-modal');
     const triggerDeleteBtn = /** @type {HTMLButtonElement | null} */ (
@@ -57,12 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closeDeleteModal() {
-        if (deleteModal) window.krtModal.close(deleteModal);
+        if (deleteModal) krtModal.close(deleteModal);
     }
 
     if (triggerDeleteBtn && deleteModal) {
         triggerDeleteBtn.onclick = function () {
-            window.krtModal.open(deleteModal);
+            krtModal.open(deleteModal);
         };
     }
 

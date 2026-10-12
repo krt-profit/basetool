@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { krtModal } from '/js/kernel/krt-modal.js';
+
 (function () {
     if (!window.krtFetch) {
         return;
@@ -63,12 +65,12 @@
      * @param {string} id
      */
     function openModal(id) {
-        window.krtModal.open(id);
+        krtModal.open(id);
     }
 
     /** @param {string} id */
     function closeModal(id) {
-        window.krtModal.close(id);
+        krtModal.close(id);
     }
 
     /**

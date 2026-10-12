@@ -24,6 +24,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const ASSOC_EPS = 0.0005;
 
@@ -837,7 +838,7 @@ function createLager(cfg) {
         if (sellNotPossibleReason) sellNotPossibleReason.hidden = true;
         loadSellTerminals(materialId, terminalSelect, sellRadio, sellNotPossibleReason);
 
-        window.krtModal.open(modal);
+        krtModal.open(modal);
         if (window.krtHerkunft && id) {
             window.krtHerkunft.populate('bookout', id);
         }
@@ -852,7 +853,7 @@ function createLager(cfg) {
             window.krtHerkunft.reset('bookout');
         }
         const modal = document.getElementById('bookOutModal');
-        if (modal) window.krtModal.close(modal);
+        if (modal) krtModal.close(modal);
     }
 
     /**
@@ -975,13 +976,13 @@ function createLager(cfg) {
                 String(stolenMarkTarget.max),
             );
         }
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     }
 
     /** Closes the mark / unmark dialog. */
     function closeStolenMarkModal() {
         const modal = document.getElementById('stolenMarkModal');
-        if (modal) window.krtModal.close(modal);
+        if (modal) krtModal.close(modal);
     }
 
     /** Presets the amount of the mark / unmark dialog to the whole row. */
@@ -1053,7 +1054,7 @@ function createLager(cfg) {
             window.krtHerkunft.reset('umbuchen');
         }
         const modal = document.getElementById('umbuchenModal');
-        if (modal) window.krtModal.close(modal);
+        if (modal) krtModal.close(modal);
     }
 
     /**
@@ -1581,7 +1582,7 @@ function createLager(cfg) {
         window.onclick = function (event) {
             const modal = document.getElementById('bookOutModal');
             if (modal && event.target === modal) {
-                window.krtModal.close(modal);
+                krtModal.close(modal);
             }
         };
     }

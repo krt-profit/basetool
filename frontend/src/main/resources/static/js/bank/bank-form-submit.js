@@ -22,6 +22,7 @@ import { approvalRequestFiledMessage, genericError } from '/js/bank/bank-message
 import { clearErrors, showError } from '/js/bank/bank-form-errors.js';
 import { publishBankLiveSync } from '/js/bank/bank-livesync.js';
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /** Form field names serialized as JSON numbers instead of strings. */
 const NUMBER_FIELDS = [
@@ -191,7 +192,7 @@ async function submitBankForm(form) {
 function handleBankSuccess(form) {
     const modal = form.closest('.krt-modal-overlay');
     if (modal) {
-        window.krtModal.close(modal);
+        krtModal.close(modal);
     }
     const main = document.querySelector('main[data-bank-saved]');
     const savedMessage = main ? main.getAttribute('data-bank-saved') : null;

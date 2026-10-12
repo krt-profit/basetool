@@ -30,6 +30,7 @@ import {
 } from '/js/inventory/inventory-note-modal.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const adminLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-admin',
@@ -587,7 +588,7 @@ function openUmbuchenModal(
         umbuchenLocation.value = locationId ?? '';
     }
     adminLager.refreshUmbuchenTransferOrgUnitPicker();
-    window.krtModal.open(modal);
+    krtModal.open(modal);
     if (window.krtHerkunft && id) {
         window.krtHerkunft.populate('umbuchen', id);
     }
@@ -684,11 +685,11 @@ function submitUmbuchen(event) {
 
     const dialog = modal;
     function closeModal() {
-        window.krtModal.close(dialog);
+        krtModal.close(dialog);
     }
 
     deleteBtn.addEventListener('click', () => {
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     });
 
     cancelBtn.addEventListener('click', closeModal);

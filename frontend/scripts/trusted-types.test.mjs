@@ -25,9 +25,9 @@
 
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { flattenModule } from './flatten-module.mjs';
+import { flattenModule, UI_STUBS } from './flatten-module.mjs';
 
-const source = flattenModule;
+const source = (entry) => flattenModule(entry, UI_STUBS);
 
 const KRT_HTML = source('kernel/krt-html.js');
 const KRT_FETCH = source('kernel/krt-fetch.js');

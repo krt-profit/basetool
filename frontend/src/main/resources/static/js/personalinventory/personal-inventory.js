@@ -2,6 +2,7 @@
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const SEARCH_LIMIT = 2000;
 
@@ -358,7 +359,7 @@ function openCreate(btn) {
     if (titleEl && i18n.createTitle) titleEl.textContent = i18n.createTitle;
     form.action = safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
     clearForm();
-    window.krtModal.open(modal);
+    krtModal.open(modal);
 }
 
 /**
@@ -379,11 +380,11 @@ function openEdit(btn) {
     if (hiddenUexId) hiddenUexId.value = btn.getAttribute('data-location-uex-id') || '';
     if (hiddenLocationType) hiddenLocationType.value = btn.getAttribute('data-location-type') || '';
     if (searchInput) searchInput.value = btn.getAttribute('data-location-name') || '';
-    window.krtModal.open(modal);
+    krtModal.open(modal);
 }
 
 function closeModal() {
-    if (modal) window.krtModal.close(modal);
+    if (modal) krtModal.close(modal);
 }
 
 /**
@@ -402,11 +403,11 @@ function openDelete(btn) {
                 ? `${window.krtPersonalInventoryI18n.confirmBody} (${name})`
                 : msgEl.textContent;
     }
-    window.krtModal.open(deleteModal);
+    krtModal.open(deleteModal);
 }
 
 function closeDelete() {
-    if (deleteModal) window.krtModal.close(deleteModal);
+    if (deleteModal) krtModal.close(deleteModal);
 }
 
 /**

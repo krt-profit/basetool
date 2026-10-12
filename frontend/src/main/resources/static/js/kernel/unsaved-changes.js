@@ -1,4 +1,7 @@
 // @ts-check
+
+import { krtModal } from '/js/kernel/krt-modal.js';
+
 let isDirty = false;
 
 /**
@@ -75,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
             targetUrl = a.href;
 
             if (modal) {
-                window.krtModal.open(modal);
+                krtModal.open(modal);
             }
         }
     });
@@ -83,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     [stayBtn, closeBtn].forEach((btn) => {
         if (!btn) return;
         btn.addEventListener('click', () => {
-            if (modal) window.krtModal.close(modal);
+            if (modal) krtModal.close(modal);
             targetUrl = null;
         });
     });
@@ -101,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modal) {
         window.addEventListener('click', (event) => {
             if (event.target === modal) {
-                window.krtModal.close(modal);
+                krtModal.close(modal);
                 targetUrl = null;
             }
         });

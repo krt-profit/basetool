@@ -23,6 +23,7 @@
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /** @type {string[]} */
 const materialNames = [];
@@ -353,13 +354,13 @@ function openCreateMaterialModal() {
     createMaterialCheckbox('cm-illegal').checked = false;
     createMaterialCheckbox('cm-volatile-qt').checked = false;
     createMaterialCheckbox('cm-volatile-time').checked = false;
-    window.krtModal.open('modal-create-material', {
+    krtModal.open('modal-create-material', {
         focus: document.getElementById('cm-name'),
     });
 }
 /** Closes the create-material modal. */
 function closeCreateMaterialModal() {
-    window.krtModal.close('modal-create-material');
+    krtModal.close('modal-create-material');
 }
 /**
  * Creates a material from the modal's fields and refreshes the table on success.

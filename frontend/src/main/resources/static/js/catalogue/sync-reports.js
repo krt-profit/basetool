@@ -22,6 +22,7 @@
 /* global SYNC_MSG */
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.krtFetch) {
@@ -50,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const template = messageEl ? messageEl.getAttribute('data-template') || '' : '';
 
     function closeModal() {
-        window.krtModal.close(modal);
+        krtModal.close(modal);
     }
 
     function renderMessage() {
@@ -61,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     trigger.addEventListener('click', () => {
         renderMessage();
-        window.krtModal.open(modal);
+        krtModal.open(modal);
     });
     daysInput.addEventListener('input', renderMessage);
 

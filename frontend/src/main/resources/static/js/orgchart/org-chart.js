@@ -26,6 +26,7 @@ import {
     showFrontendSuccessToast,
     showKrtConfirm,
 } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const ORG_CHART_SECTIONS = {
     chart: { container: '#oc-chart', fragmentValue: 'chartBody' },
@@ -110,7 +111,7 @@ function closeModal() {
         return;
     }
     setBackgroundInert(false);
-    window.krtModal.close(modal);
+    krtModal.close(modal);
     if (lastTrigger && typeof lastTrigger.focus === 'function') {
         lastTrigger.focus();
     }
@@ -199,7 +200,7 @@ function openModal(mode, ctx) {
         submitBtn.textContent = needsName ? OC_I18N.save : OC_I18N.submit;
     }
 
-    window.krtModal.open(modal);
+    krtModal.open(modal);
     let focusEl;
     if (needsStaffType) {
         focusEl = document.getElementById('oc-stafftype');

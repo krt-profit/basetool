@@ -24,6 +24,7 @@
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const shipTypesData = /** @type {HTMLDataListElement | null} */ (
@@ -89,7 +90,7 @@ function closeModal(id) {
     if (typeof resetUnsavedChanges === 'function') {
         resetUnsavedChanges();
     }
-    window.krtModal.close(id);
+    krtModal.close(id);
 }
 
 window.filterTable = filterTable;
@@ -98,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.krt-modal-overlay').forEach((m) => {
         m.addEventListener('click', (e) => {
             if (e.target === m) {
-                window.krtModal.close(m);
+                krtModal.close(m);
             }
         });
     });

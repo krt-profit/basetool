@@ -18,13 +18,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtModal } from '/js/kernel/krt-modal.js';
+
 /**
  * Where a transient overlay must go to be seen and usable.
  *
  * @returns {HTMLElement} the open modal dialog, else the body
  */
 function toastLayer() {
-    return window.krtModal ? window.krtModal.layerRoot() : document.body;
+    return krtModal ? krtModal.layerRoot() : document.body;
 }
 
 function initToasts() {

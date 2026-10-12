@@ -21,6 +21,7 @@
 import { genericError } from '/js/bank/bank-messages.js';
 import { clearErrors, showError } from '/js/bank/bank-form-errors.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /**
  * Builds the JSON + CSRF request headers via the shared window.krtCsrf, falling back to reading
@@ -79,7 +80,7 @@ async function downloadBankPdf(url, filename, onError) {
     const a = document.createElement('a');
     a.href = objectUrl;
     a.download = filename;
-    window.krtModal.layerRoot().appendChild(a);
+    krtModal.layerRoot().appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(objectUrl);

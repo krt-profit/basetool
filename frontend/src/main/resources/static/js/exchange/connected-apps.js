@@ -20,6 +20,7 @@
 // @ts-check
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 (function () {
     const BASE = '/connected-apps';
@@ -130,7 +131,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
                 errorMessage: i18n.error,
                 submitter,
                 onSuccess(result) {
-                    window.krtModal.close('ca-undo-modal');
+                    krtModal.close('ca-undo-modal');
                     showUndoResult(result);
                     return refreshApps();
                 },
@@ -212,8 +213,8 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
         if (undoBtn) {
             const app = undoBtn.closest('[data-client-id]');
             undoClientId = app ? app.getAttribute('data-client-id') : null;
-            if (undoClientId && window.krtModal) {
-                window.krtModal.open('ca-undo-modal');
+            if (undoClientId && krtModal) {
+                krtModal.open('ca-undo-modal');
             }
             return;
         }

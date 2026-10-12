@@ -23,6 +23,7 @@
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
 
@@ -199,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dialogField('sq-shorthand').value = '';
             dialogField('sq-desc').value = '';
             dialogField('edit-squadron-version').value = '0';
-            window.krtModal.open(sqModal);
+            krtModal.open(sqModal);
         };
     }
 
@@ -212,10 +213,10 @@ document.addEventListener('DOMContentLoaded', () => {
         dialogField('sq-shorthand').value = btn.getAttribute('data-shorthand') ?? '';
         dialogField('sq-desc').value = btn.getAttribute('data-desc') ?? '';
         dialogField('edit-squadron-version').value = btn.getAttribute('data-version') ?? '';
-        window.krtModal.open(sqModal);
+        krtModal.open(sqModal);
     });
 
-    if (sqClose) sqClose.onclick = () => window.krtModal.close(sqModal);
+    if (sqClose) sqClose.onclick = () => krtModal.close(sqModal);
 
     const jtModal = document.getElementById('jobtype-modal');
     const jtForm = /** @type {HTMLFormElement} */ (document.getElementById('jobtype-form'));
@@ -283,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dialogField('jt-missionlead').checked = false;
             dialogField('edit-jobtype-version').value = '0';
             updateLeadershipVisibility();
-            window.krtModal.open(jtModal);
+            krtModal.open(jtModal);
         };
     }
 
@@ -299,10 +300,10 @@ document.addEventListener('DOMContentLoaded', () => {
         dialogField('jt-missionlead').checked = btn.getAttribute('data-mission-lead') === 'true';
         dialogField('edit-jobtype-version').value = btn.getAttribute('data-version') ?? '';
         updateLeadershipVisibility();
-        window.krtModal.open(jtModal);
+        krtModal.open(jtModal);
     });
 
-    if (jtClose) jtClose.onclick = () => window.krtModal.close(jtModal);
+    if (jtClose) jtClose.onclick = () => krtModal.close(jtModal);
 
     const ftModal = document.getElementById('frequency-type-modal');
     const ftForm = /** @type {HTMLFormElement} */ (document.getElementById('freqtype-form'));
@@ -319,7 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dialogField('ft-name').value = '';
             dialogField('ft-desc').value = '';
             dialogField('edit-freqtype-version').value = '0';
-            window.krtModal.open(ftModal);
+            krtModal.open(ftModal);
         };
     }
 
@@ -331,15 +332,15 @@ document.addEventListener('DOMContentLoaded', () => {
         dialogField('ft-name').value = btn.getAttribute('data-name') ?? '';
         dialogField('ft-desc').value = btn.getAttribute('data-desc') ?? '';
         dialogField('edit-freqtype-version').value = btn.getAttribute('data-version') ?? '';
-        window.krtModal.open(ftModal);
+        krtModal.open(ftModal);
     });
 
-    if (ftClose) ftClose.onclick = () => window.krtModal.close(ftModal);
+    if (ftClose) ftClose.onclick = () => krtModal.close(ftModal);
 
     window.onclick = function (event) {
-        if (event.target === sqModal) window.krtModal.close(sqModal);
-        if (event.target === jtModal) window.krtModal.close(jtModal);
-        if (event.target === ftModal) window.krtModal.close(ftModal);
+        if (event.target === sqModal) krtModal.close(sqModal);
+        if (event.target === jtModal) krtModal.close(jtModal);
+        if (event.target === ftModal) krtModal.close(ftModal);
     };
     const deleteModal = document.getElementById('delete-confirm-modal');
     const deleteForm = /** @type {HTMLFormElement | null} */ (
@@ -357,18 +358,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.getAttribute('data-action'),
                 deleteForm.action,
             );
-            window.krtModal.open(deleteModal);
+            krtModal.open(deleteModal);
         });
 
         deleteClose.forEach((btn) => {
             btn.onclick = function () {
-                window.krtModal.close(deleteModal);
+                krtModal.close(deleteModal);
             };
         });
 
         window.addEventListener('click', (event) => {
             if (event.target === deleteModal) {
-                window.krtModal.close(deleteModal);
+                krtModal.close(deleteModal);
             }
         });
     }
@@ -393,7 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             missionWrite(form, MISSION_MSG.saved, () => {
                 if (modal) {
-                    window.krtModal.close(modal);
+                    krtModal.close(modal);
                 }
             });
         });
@@ -411,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             missionWrite(deleteForm, MISSION_MSG.deleted, () => {
                 if (deleteModal) {
-                    window.krtModal.close(deleteModal);
+                    krtModal.close(deleteModal);
                 }
             });
         });

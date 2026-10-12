@@ -22,6 +22,7 @@
 /* global SC_MSG, SC_CONFLICT */
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 const modal = /** @type {HTMLElement} */ (document.getElementById('specialcommand-modal'));
 const form = /** @type {HTMLFormElement} */ (document.getElementById('sc-form'));
@@ -38,7 +39,7 @@ function openCreate() {
     nameInput.value = '';
     shorthandInput.value = '';
     descInput.value = '';
-    window.krtModal.open(modal);
+    krtModal.open(modal);
 }
 
 function openEdit(btn) {
@@ -48,11 +49,11 @@ function openEdit(btn) {
     nameInput.value = btn.getAttribute('data-name') || '';
     shorthandInput.value = btn.getAttribute('data-shorthand') || '';
     descInput.value = btn.getAttribute('data-desc') || '';
-    window.krtModal.open(modal);
+    krtModal.open(modal);
 }
 
 function closeModal() {
-    window.krtModal.close(modal);
+    krtModal.close(modal);
 }
 
 const deleteModal = document.getElementById('sc-delete-modal');
@@ -65,11 +66,11 @@ function openDelete(btn) {
     if (!deleteModal || !deleteForm) return;
     deleteForm.action = safeSameOriginUrl(btn.getAttribute('data-action'), deleteForm.action);
     if (deleteNameEl) deleteNameEl.textContent = btn.getAttribute('data-name') || '';
-    window.krtModal.open(deleteModal);
+    krtModal.open(deleteModal);
 }
 
 function closeDelete() {
-    if (deleteModal) window.krtModal.close(deleteModal);
+    if (deleteModal) krtModal.close(deleteModal);
 }
 
 /** @type {HTMLElement} */ (document.getElementById('add-sc-btn')).addEventListener(

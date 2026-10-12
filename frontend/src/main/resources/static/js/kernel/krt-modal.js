@@ -237,7 +237,9 @@ new MutationObserver((records) => {
     attributeFilter: ['style', 'class'],
 });
 
-window.krtModal = { open, close, isOpen, topmost, layerRoot };
+export const krtModal = /** @type {KrtModalApi} */ ({ open, close, isOpen, topmost, layerRoot });
+
+window.krtModal = krtModal;
 
 document.querySelectorAll('dialog.krt-modal-overlay.is-open').forEach((d) => {
     open(d);

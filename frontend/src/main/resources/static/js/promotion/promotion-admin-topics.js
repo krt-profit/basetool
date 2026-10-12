@@ -26,6 +26,7 @@ import {
     showFrontendSuccessToast,
     showKrtConfirm,
 } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 function toastSuccess(msg) {
     if (showFrontendSuccessToast) showFrontendSuccessToast(msg);
@@ -45,10 +46,10 @@ function paControl(id) {
 }
 
 function closeModal(id) {
-    window.krtModal.close(id);
+    krtModal.close(id);
 }
 function openModal(id) {
-    window.krtModal.open(id);
+    krtModal.open(id);
 }
 
 /** @type {string | null} */

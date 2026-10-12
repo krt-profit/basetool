@@ -14,6 +14,7 @@
 // @ts-check
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 (function () {
     /**
@@ -220,7 +221,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
         updateCharCount();
 
         lastFocused = /** @type {HTMLElement | null} */ (document.activeElement);
-        window.krtModal.open(modal);
+        krtModal.open(modal);
         const first = isEdit
             ? q('[data-mg-qty]')
             : state.kind === 'ITEM'
@@ -267,7 +268,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
     }
 
     function hide() {
-        window.krtModal.close(modal);
+        krtModal.close(modal);
         if (lastFocused && typeof lastFocused.focus === 'function') {
             lastFocused.focus();
         }

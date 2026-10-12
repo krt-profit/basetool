@@ -37,6 +37,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const handoverForm = /** @type {HTMLFormElement | null} */ (
@@ -66,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const editVer = _odEditVersionInput();
                     if (editVer && order && order.version != null) editVer.value = order.version;
                     const modal = document.getElementById('handover-modal');
-                    if (modal) window.krtModal.close(modal);
+                    if (modal) krtModal.close(modal);
                     resetInventoryCache();
                     const itemsContainer = document.getElementById('handover-items-container');
                     if (itemsContainer) itemsContainer.replaceChildren();
@@ -108,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const editVer = _odEditVersionInput();
                     if (editVer && order && order.version != null) editVer.value = order.version;
                     const modal = document.getElementById('item-handover-modal');
-                    if (modal) window.krtModal.close(modal);
+                    if (modal) krtModal.close(modal);
                     showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
                     _swapOrderSection(orderId, 'order-items-results', 'items');
                     _swapOrderSection(orderId, 'order-item-handovers-results', 'item-handovers');
@@ -265,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (removeBtn) {
                 const row = removeBtn.closest('.material-row');
                 if (materialsContainer.querySelectorAll('.material-row').length > 1) {
-                    window.krtModal.open(document.getElementById('material-delete-confirm-modal'));
+                    krtModal.open(document.getElementById('material-delete-confirm-modal'));
                     window.materialRowToDelete = row;
                 } else {
                     showFrontendErrorToast(ORDER_HANDOVER_I18N.keepOneMaterial);
@@ -279,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 reindexMaterials();
                 window.materialRowToDelete = null;
             }
-            window.krtModal.close(document.getElementById('material-delete-confirm-modal'));
+            krtModal.close(document.getElementById('material-delete-confirm-modal'));
         };
 
         /** Renumbers the names and ids of the material rows after a row was removed. */
@@ -428,7 +429,7 @@ function _serializeEditForm() {
                 const editVer = _odEditVersionInput();
                 if (editVer && dto && dto.version != null) editVer.value = dto.version;
                 const modal = document.getElementById('edit-modal');
-                if (modal) window.krtModal.close(modal);
+                if (modal) krtModal.close(modal);
                 showFrontendSuccessToast(MSG_UPDATE_SUCCESS);
                 _swapOrderSection(orderId, 'order-header-results', 'header');
                 _refreshMaterialsSection(orderId);

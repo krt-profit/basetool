@@ -22,6 +22,7 @@
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /**
  * A form control of a material or store row, whose `id`, `name` and `value` the renumbering
@@ -157,12 +158,12 @@ function closeStoreModal() {
         resetUnsavedChanges();
     }
     const modal = document.getElementById('storeModal');
-    if (modal) window.krtModal.close(modal);
+    if (modal) krtModal.close(modal);
 }
 
 function openStoreModal() {
     const modal = document.getElementById('storeModal');
-    if (modal) window.krtModal.open(modal);
+    if (modal) krtModal.open(modal);
 }
 
 function duplicateStoreItem(btn) {
