@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageTail=~{::pageTail})}">
 <head>
     <title th:text="#{scLinks.title} + ' - ' + ${appTitle}">Star-Citizen-Links - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
@@ -15,8 +15,16 @@
 
         <section class="sc-links-section" th:each="category : ${scLinkCategories}"
                  th:attr="data-testid='sc-links-' + ${category.key}">
-            <h2 class="section-title" th:text="#{${'scLinks.category.' + category.key}}">Organisation</h2>
-            <ul class="sc-links-grid">
+            <h2 class="section-title sc-links-head">
+                <button type="button" class="sc-links-toggle" data-trigger="sc-links-toggle-category"
+                        aria-expanded="true"
+                        th:attr="aria-controls='sc-links-grid-' + ${category.key},data-category=${category.key},data-testid='sc-links-toggle-' + ${category.key}">
+                    <svg class="krt-icon sc-links-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                    <span class="sc-links-name" th:text="#{${'scLinks.category.' + category.key}}">Organisation</span>
+                    <span class="chip chip--muted" th:text="${#lists.size(category.links())}">2</span>
+                </button>
+            </h2>
+            <ul class="sc-links-grid" th:id="'sc-links-grid-' + ${category.key}">
                 <li th:each="link : ${category.links()}">
                     <a class="card sc-link-card" th:href="${link.url}"
                        target="_blank" rel="noopener noreferrer"
@@ -37,6 +45,9 @@
         <p class="sc-links-disclaimer" th:text="#{scLinks.disclaimer}">Externe Angebote Dritter.</p>
     </div>
 </main>
+</th:block>
+<th:block th:fragment="pageTail">
+<script th:src="@{/js/shell/sc-links.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

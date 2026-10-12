@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="512" height="512" role="img" aria-label="Lootmaster">
+  <defs>
+    <linearGradient id="g" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f2c77e"/>
+      <stop offset="50%" stop-color="#e0a44a"/>
+      <stop offset="100%" stop-color="#5a3d0e"/>
+    </linearGradient>
+  </defs>
+  <polygon points="60,10 103,35 103,85 60,110 17,85 17,35" fill="none" stroke="url(#g)" stroke-width="8" stroke-linejoin="round"/>
+  <polygon points="60,26 89,43 89,77 60,94 31,77 31,43" fill="url(#g)"/>
+  <g stroke="#0d1338" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <polyline points="31,43 60,60 89,43"/>
+    <line x1="60" y1="60" x2="60" y2="94"/>
+    <polyline points="31,52 60,69 89,52" opacity="0.55"/>
+  </g>
+  <g fill="#0d1338">
+    <rect x="55.5" y="72" width="9" height="11" rx="1.6"/>
+  </g>
+  <g fill="#ffffff">
+    <path d="M0-6 1.5-1.5 6 0 1.5 1.5 0 6 -1.5 1.5 -6 0 -1.5-1.5Z" transform="translate(60,40)"/>
+  </g>
+</svg>

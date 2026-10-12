@@ -115,6 +115,7 @@ public enum ScLink {
   SCMDB("scmdb", "https://scmdb.net/", "scmdb.svg", ScLinkCategory.DATABASES),
   SC_CRAFT("scCraft", "https://sc-craft.tools/", "sc-craft.png", ScLinkCategory.DATABASES),
   VERSEKIT("versekit", "https://versekit.xharig.com/", "versekit.png", ScLinkCategory.DATABASES),
+  LOOTMASTER("lootmaster", "https://lootmaster.org/", "lootmaster.svg", ScLinkCategory.DATABASES),
   VERSEGUIDE("verseguide", "https://verseguide.com/", "verseguide.png", ScLinkCategory.UNIVERSE),
   UEEXI("ueexi", "https://ueexi.com/", "ueexi.svg", ScLinkCategory.UNIVERSE),
   SC_CHARACTERS(
@@ -137,7 +138,8 @@ public enum ScLink {
       "https://www.sc-deutsch-launcher.de/",
       "sc-deutsch-launcher.png",
       ScLinkCategory.UNIVERSE),
-  SC_LINKS_ORG("scLinksOrg", "https://sc-links.org/", "sc-links-org.png", ScLinkCategory.UNIVERSE);
+  SC_LINKS_ORG("scLinksOrg", "https://sc-links.org/", "sc-links-org.png", ScLinkCategory.UNIVERSE),
+  VERSEINTEL("verseintel", "https://verseintel.org/", "verseintel.svg", ScLinkCategory.UNIVERSE);
 
   /** Suffix of the message keys {@code scLinks.link.<key>.name} and {@code .description}. */
   @NotNull private final String key;

@@ -52,10 +52,11 @@ export const MIGRATED_FLOOR = [
     'promotion',
     'refinery',
     'settings',
+    'shell',
 ];
 
 /** The number of scripts carrying the `// @ts-check` pragma that may never fall. */
-export const CHECKED_FILES_FLOOR = 124;
+export const CHECKED_FILES_FLOOR = 125;
 
 const ALLOWED_EXCLUDES = ['src/main/resources/static/js/vendor/**', 'node_modules', 'build'];
 const EXCLUDED_DIRECTORIES = ['vendor/', 'node_modules/'];
