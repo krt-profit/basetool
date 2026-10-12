@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Ablehnungen nennen ihren Grund im Log.** Die WARN-Zeile einer 422 `PRODUCTION_ALLOCATION` trägt jetzt, welche der fünf Prüfungen abgelehnt hat, samt Material-/Lagerzeilen-ID und Mengen (`reason`, `materialId`, `consumed`, …) als abfragbare Felder in Loki – nie den Request-Body. Die Antwort an den Client bleibt unverändert.
+
 ### Fixed
 
 - **Monitoring: zwei Fehlalarme.** `ExternalFetchErrors` zählt unvollständige SC-Wiki-Seitendurchläufe nicht mehr mit (neues Label `reason`, Wert `census`; sie haben je Lauf einen festen Sockel und lösten bei Neustart oder Upstream-Umbau aus). `SystemdUnitFailed` ignoriert `dnf-makecache.service`, das bei einem 5xx des Spiegelservers beim nächsten Lauf von selbst heilt.

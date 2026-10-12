@@ -551,6 +551,20 @@ Keycloak SPI's `Brokered` record prints presence flags only, because the Keycloa
 `password` / `secret` / `token` / `apiKey`-named `String` or byte field must be on a reviewed list, and a listed class
 must declare its own, non-Lombok `toString()`.
 
+**A domain refusal explains itself with an allow-list, never with a payload.** The WARN line of a
+`DomainProblem` says which check refused and with which figures through `AppException.logExtra()`:
+a reason enum name and entity ids and numbers, named per exception, never free text, never the request
+body and no user identity beyond the `userId` MDC field. `ProblemSupport.logProblem` writes the map as
+logstash structured arguments, so the prod JSON appender emits each key as a top-level field that Loki
+queries by name (`| json | reason="OVER_STOCK"`), while the plain layouts print `key=value`. The reason
+reaches the log only, never the problem body, and no counter label carries it (REQ-OBS-006 keeps
+`basetool_http_error_total` on `code`). A new exception that wants a reason adds its keys to
+`logExtra()` and nothing else; `ProductionAllocationException` (REQ-ORDERS-025) is the first. Ranked in
+Loki over the 30 days to 2026-10-12, the backend's 4xx WARN lines were `ACCESS_DENIED` 26,
+`BAD_REQUEST` 4, `PRODUCTION_ALLOCATION` 4, `MASS_CHANGE_CONFIRMATION_REQUIRED` 2 and
+`OWNER_ORG_UNIT_REQUIRED` 1: no other refusal is frequent or ambiguous enough to need a reason.
+**Enforced by:** `DomainRefusalLogLineTest` and `DomainProblemContractTest`.
+
 **A session id is a token.** Whoever holds a Spring session id holds the session and the OAuth2
 tokens stored in it, so it is never logged verbatim either. Where a line needs to correlate the
 requests of one session, it logs `SessionIdFingerprint.of(…)` — the first 12 hex characters of the

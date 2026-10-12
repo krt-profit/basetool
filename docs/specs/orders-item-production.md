@@ -91,6 +91,11 @@ not want booked out of stock). The service:
   remaining (non-skipped) required material's demand (equal within an SCU floating-point epsilon) and
   MUST NOT name a material the line does not require or has skipped; either mismatch is a
   `ProductionAllocationException` → HTTP **422**.
+- **Each of the five `ProductionAllocationException` sites names its reason in the WARN line** (REQ-OBS-004,
+  not in the problem body): `AMOUNT_EXCEEDS_REMAINING` (`amount`, `remaining`), `DEMAND_MISMATCH`
+  (`materialId`, `demand`, `consumed`), `MATERIAL_NOT_REQUIRED` (`materialId`, `consumed`),
+  `OVER_ORDER_SLICE` (`materialId`, `inventoryItemId`, `consumed`, `slice`) and `OVER_STOCK`
+  (`materialId`, `inventoryItemId`, `consumed`, `stock`).
 - For **each consumption entry**, under a pessimistic write lock
   (`inventoryItemRepository.findByIdForUpdate`): checks the entry's own optimistic lock
   (`OptimisticLock.check`, stale → 409); requires the entry to be **earmarked to this order**
@@ -178,6 +183,8 @@ registry), and the receiver's apply map.
   (`PRODUCTION_ALLOCATION`).
 - [ ] A consumption plan that under- or over-covers any required material, or names a material the
   line does not require, is rejected with 422.
+- [ ] Every 422 `PRODUCTION_ALLOCATION` logs its reason and exactly the allow-listed fields of its
+  check, and no request body (`JobOrderItemProductionServiceTest`, `DomainRefusalLogLineTest`).
 - [ ] A material listed in `skippedMaterialIds` ("nicht ausbuchen") advances `manufacturedAmount`
   without any coverage requirement and without touching its linked stock (no
   `INVENTORY_CONSUMED_BY_PRODUCTION` event); naming a skipped material in `consumption` is rejected
