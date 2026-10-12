@@ -50,7 +50,7 @@ val exchangeBaseline = layout.buildDirectory.dir("exchange-baseline")
 
 tasks.test {
   inputs
-    .dir(layout.projectDirectory.dir("../docs/exchange"))
+    .dir(layout.settingsDirectory.dir("docs/exchange"))
     .withPropertyName("exchangeContractFixtures")
     .withPathSensitivity(PathSensitivity.RELATIVE)
   inputs

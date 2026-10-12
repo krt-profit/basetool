@@ -227,6 +227,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/app_version.py --selftest
 
+      - name: sbom-coverage / Self-test the module classification
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/check_sbom_coverage.py --selftest
+
       - name: sbom-coverage / Check SBOM coverage of every shipped module
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/check_sbom_coverage.py
