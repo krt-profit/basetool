@@ -145,7 +145,7 @@ document.addEventListener('change', (event) => {
     fetchView(state);
 });
 
-(function () {
+function initBankLayoutPrefs() {
     function toggleGroup() {
         return document.querySelector('[data-ou-view-toggles]');
     }
@@ -247,4 +247,6 @@ document.addEventListener('change', (event) => {
         writeSaved(layout);
         fetchView(layout);
     });
-})();
+}
+
+initBankLayoutPrefs();

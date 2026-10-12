@@ -3,7 +3,7 @@
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 
-(function () {
+function initCommonHandlers() {
     window.addEventListener('pageshow', (event) => {
         if (event.persisted) {
             window.location.reload();
@@ -203,4 +203,6 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
         event.preventDefault();
         krtModal.close(id);
     });
-})();
+}
+
+initCommonHandlers();
