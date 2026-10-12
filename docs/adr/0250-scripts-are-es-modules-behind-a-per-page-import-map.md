@@ -33,8 +33,10 @@ a nonced module.
    dynamic `import()`, no import of another domain. ESLint enforces it per domain folder with the
    built-in `no-restricted-imports` (no dependency was added), `ModuleScriptsTest` repeats it and
    rejects an import cycle, and `tsconfig.json` maps `/js/*` to the script folder so the type check
-   follows the imports. The kernel API stays `window.krt*` for now; only module-to-module
-   dependencies are imports.
+   follows the imports (`moduleDetection: force`, so every script is checked as a module). The
+   kernel API is imported, not read from `window`: every kernel script exports its API and its
+   consumers import it (2,000 reads in 100 modules); `window.<name>` is still set where something
+   outside the module graph needs it (see *Consequences*).
 3. **Each page renders an import map in its head** (`kernel/fragments/head.html`), produced by the
    `moduleImportMap` bean: the content-hashed URL of every module the page's module scripts import,
    transitively, keyed by the absolute path. The bean finds a page's scripts by scanning the page
@@ -49,24 +51,48 @@ a nonced module.
    event type — which decides which handler sees a change first — is unchanged.
 5. **`krt-client-error.js` and the head's `krtEvents` stub stay classic** because they must run
    before, and without, the module graph.
+6. **A script under its plain URL is revalidated.** `/js/**` answers `Cache-Control: no-cache`, and
+   only a content-hashed name (`*-` plus 32 characters, `.js`) answers `max-age=31536000, public,
+   immutable`, so a module reached outside the import map can never be cached stale for a year.
+7. **Wrappers go where it is provably neutral.** A top-level immediately invoked function around a
+   module body is removed when it has no `return`, `await`, `this` or `arguments` of its own, no
+   name that collides with another top-level name of the file, and removing it leaves the set of
+   global names the file reads unchanged; the `'use strict'` directive goes everywhere but in the
+   classic beacon.
 
 ## Consequences
 
 - A changed module is a new URL and a stale cached copy cannot be loaded: every import of a page is
   in its map. A module imported through a template construct the scan cannot follow would be
-  requested under its plain URL and cached as `immutable` for a year; `ModuleScriptsTest` pins that
-  every page finds its own module scripts and renders exactly its import closure, and there is no
-  dynamic fragment inclusion that carries a script today.
+  requested under its plain URL, which is revalidated, not immutable; `ModuleScriptsTest` pins that
+  every page finds its own module scripts and renders exactly its import closure.
 - Module code is strict. The scripts without their own `'use strict'` now run strictly; `no-undef` as a module
   (ESLint) and the type check found nothing, and the browser check of two rendered pages under the
   real CSP showed no violation. The end-to-end suite, which loads every page route
   (`ScriptLoadOrderE2eTest`), is the remaining check.
-- A module graph loads in two round trips (entry, then its imports) where the classic tags loaded in
-  parallel. Only `bank.js` has a fan-out today; `modulepreload` links derived from the same closure
-  are the follow-up when a measurement asks for them.
-- The scripts that publish to `window` (`window.krtFetch`, `window.krtModal`, …) keep doing so; the
-  node tests that run `krt-fetch.js`, `krt-live-sync.js` and `krt-html.js` in a `vm` context still
-  pass because a module without `import` or `export` is also a valid classic script.
+- **`modulepreload` was measured and is not used.** `<link rel="modulepreload">` for the import
+  closure works under `script-src 'nonce-…' 'strict-dynamic'` only with the page's nonce on the link
+  (without it the preload is blocked and every module is fetched twice: 971 ms against 520 ms to
+  `DOMContentLoaded` for the bank page), and it must come after the import map (before it the map is
+  ignored). With the nonce and the right order the bank page (28 module scripts, a graph five
+  levels deep) took 518, 547 and 1,035 ms (the first, cold load) against 516, 517 and 570 ms without,
+  over HTTP/1.1 with 50 ms per script, where Chromium's six connections per host, not the depth, set the time. HTTP/2 could not
+  be measured (the browser pane does not trust a local certificate). The expected gain is the depth of
+  the graph in round trips on a cold cache only, since a warm module is not fetched at all.
+- A kernel script that something outside the module graph reads keeps its `window` property, and
+  each is recorded with its reader: `krtFetch` and `krtCsrf` (Playwright sources and the node tests),
+  `krtLiveSync` (ten Playwright sources and the node test), `krtModal`, `krtSearchableSelect`,
+  `krtHtml` and `krtComboboxRemoteSources` (Playwright sources, and the Trusted Types node test for
+  `krtHtml`), `krtEvents` (the head stub that `event-delegation.js` replaces and its five second
+  check), `krtI18nText` (the classic beacon is its owner; modules import a one-line facade). The
+  node tests run a module graph as one classic script (`scripts/flatten-module.mjs`).
+- The drawer and the palette, which are optional to each other, meet in a registry module
+  (`krt-chrome.js`), which also keeps their imports acyclic.
+- Not converted: 23 `window.<name>` seams between the parts of one page or between a page and a
+  shared module (the mission, order, operation and inventory parts, `krtMaterialRelease` and
+  `krtMaterialRequest` read by Playwright and another domain, `filterTable` read by the kernel). They
+  are late-bound on purpose: the parts evaluate in tag order, and an import would make a part
+  evaluate its dependency first.
 
 ## Rejected
 

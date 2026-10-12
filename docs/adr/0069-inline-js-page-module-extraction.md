@@ -144,6 +144,9 @@ fires; the order among them changes only where they are independent.
 [ADR-0250](0250-scripts-are-es-modules-behind-a-per-page-import-map.md) turned every script but
 `krt-client-error.js` into an ES module behind a per-page import map. Inline scripts are still data
 bootstraps (a classic inline `const` is readable from a module through the global lexical
-environment), the page modules keep `window.krt*` as the shared API, and the cross-file bare names
+environment), the cross-file bare names
 that the shared global scope allowed (`krtAutocomplete`, the inventory note dialog, the order detail
-parts) are imports now.
+parts) are imports now, and so is the kernel API (`krtFetch`, `krtModal`, the toasts, …): a
+module has no hidden shared scope. 48 immediately invoked wrappers were removed from modules where
+that was provably neutral; 49 stay because they guard with an early `return` (46) or because two
+wrappers of one file declare the same names (3).
