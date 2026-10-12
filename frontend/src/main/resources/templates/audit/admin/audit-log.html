@@ -42,6 +42,7 @@
     <div th:if="${error != null}" class="alert alert-danger" role="alert" data-testid="audit-error"
          th:text="#{${error}}">Fehler beim Laden.</div>
 
+    <section class="list-panel">
     <form id="audit-filter-form" method="get" th:action="@{/admin/audit-log}" class="no-track">
         <input type="hidden" name="domain" th:value="${activeDomain}">
         <div class="toolbar">
@@ -133,6 +134,7 @@
         <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${events}, baseUrl=${paginationBaseUrl})}"></th:block>
         </th:block>
     </div>
+    </section>
 
     <div th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='audit-export-modal', titleKey='admin.audit.export.title', variant=null, body=~{::.audit-download-form})}">
         <form class="audit-download-form no-track"

@@ -65,9 +65,8 @@
                             {value: 'craftable', labelKey: 'personalInventory.blueprints.craft.craftableLabel', count: '–'}} })}"></th:block>
             <span class="toolbar__spacer"></span>
             <span class="krt-bp-refinery">
-                <label class="switch" for="krt-bp-refinery-toggle" th:title="#{personalInventory.blueprints.craft.refineryHint}">
-                    <input type="checkbox" id="krt-bp-refinery-toggle">
-                    <span class="switch__track" aria-hidden="true"></span>
+                <label class="krt-switch" for="krt-bp-refinery-toggle" th:title="#{personalInventory.blueprints.craft.refineryHint}">
+                    <input type="checkbox" role="switch" id="krt-bp-refinery-toggle">
                     <span th:text="#{personalInventory.blueprints.craft.refinerySwitch}">Raffinerie einrechnen</span>
                 </label>
                 <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('personalInventory.blueprints.craft.refineryHint')}"></th:block>

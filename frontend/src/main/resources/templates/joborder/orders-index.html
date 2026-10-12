@@ -17,6 +17,7 @@
         </th:block>
     </th:block>
 
+    <section class="list-panel">
     <form id="orders-filter-form" class="no-track" method="get" th:action="@{/orders}">
         <div class="toolbar orders-toolbar">
             <th:block th:if="${scopeChoice and mineScopeOffered}">
@@ -205,6 +206,7 @@
         <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
     </div>
+    </section>
 </main>
 </th:block>
 <th:block th:fragment="pageTail">

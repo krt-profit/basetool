@@ -215,7 +215,7 @@ class AdminQualityTiersPageControllerMvcTest {
         .contains("id=\"qt-label-en\"")
         .contains("id=\"qt-sort-order\"")
         .contains("id=\"qt-base-hint\"")
-        .contains("class=\"segmented segmented--block segmented--lg\"")
+        .contains("class=\"krt-segmented krt-segmented--block\"")
         .contains("data-testid=\"segment-active-true\"")
         .contains("data-testid=\"segment-active-false\"")
         .containsPattern("name=\"active\" value=\"true\" checked")

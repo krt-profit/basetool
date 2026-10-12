@@ -24,9 +24,8 @@
                 <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
             </datalist>
         </div>
-        <label class="switch" data-testid="materials-group-switch">
-            <input type="checkbox" id="groupByCategory" data-trigger="materials-toggle-grouping" checked>
-            <span class="switch__track" aria-hidden="true"></span>
+        <label class="krt-switch" data-testid="materials-group-switch">
+            <input type="checkbox" role="switch" id="groupByCategory" data-trigger="materials-toggle-grouping" checked>
             <span th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</span>
         </label>
     </div>

@@ -404,11 +404,11 @@
         setText('[data-mb-mode="requests"] .tab-count', data.requestsAll);
         const requests = activeMode() === 'requests';
         setText(
-            '[data-testid="segment-scope-all"] .seg-count',
+            '[data-testid="segment-scope-all"] .krt-segmented__count',
             requests ? data.requestsAll : data.offersAll,
         );
         setText(
-            '[data-testid="segment-scope-mine"] .seg-count',
+            '[data-testid="segment-scope-mine"] .krt-segmented__count',
             requests ? data.requestsMine : data.offersMine,
         );
     }

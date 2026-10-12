@@ -98,7 +98,7 @@ class PagePatternFragmentsRenderTest {
     assertThat(head).contains("class=\"page-head\"");
     assertThat(head).containsPattern("<span class=\"page-eyebrow\"[^>]*>Filter</span>");
     assertThat(head).contains("<h1>HEAD-TITLE</h1>");
-    assertThat(head).containsPattern("class=\"chip chip--muted\"[^>]*>24</span>");
+    assertThat(head).containsPattern("class=\"count-badge count-badge--sm\"[^>]*>24</span>");
     assertThat(head).contains("<div class=\"page-actions\">");
     assertThat(head).contains("data-testid=\"page-head-primary\"");
   }
@@ -165,7 +165,7 @@ class PagePatternFragmentsRenderTest {
   @Test
   void segmentedRendersRadiosWithSelectionAndCounts() {
     String group = tagWith(html, "role=\"radiogroup\"");
-    assertThat(group).contains("class=\"segmented\"").contains("aria-label=\"Filter\"");
+    assertThat(group).contains("class=\"krt-segmented\"").contains("aria-label=\"Filter\"");
     assertThat(html)
         .containsPattern(
             "data-testid=\"segment-scope-all\"> <input type=\"radio\" name=\"scope\" value=\"\""
@@ -174,7 +174,7 @@ class PagePatternFragmentsRenderTest {
         .containsPattern(
             "data-testid=\"segment-scope-mine\"> <input type=\"radio\" name=\"scope\""
                 + " value=\"MINE\" checked=\"checked\" />");
-    assertThat(html).containsPattern("<span class=\"seg-count\">3</span>");
+    assertThat(html).containsPattern("<span class=\"krt-segmented__count\">3</span>");
   }
 
   /** The chip bar starts hidden, names its form and carries the localized remove label. */

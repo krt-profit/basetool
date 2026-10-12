@@ -35,16 +35,16 @@
          th:attr="placeholder=#{__${placeholderKey}__},aria-label=#{__${placeholderKey}__}" />
 </div>
 
-<div th:fragment="segmented" class="segmented" role="radiogroup"
+<div th:fragment="segmented" class="krt-segmented" role="radiogroup"
      th:classappend="${variant}"
      th:attr="aria-label=${labelKey != null} ? #{__${labelKey}__} : null"
      th:data-segmented="${name}" data-filter-chip-ignore>
-  <label th:each="opt : ${options}" th:with="optValue=${opt['value'] == null ? '' : '' + opt['value']}"
+  <label class="krt-segmented__item" th:each="opt : ${options}" th:with="optValue=${opt['value'] == null ? '' : '' + opt['value']}"
          th:data-testid="${'segment-' + name + '-' + (optValue == '' ? 'all' : #strings.toLowerCase(optValue))}">
     <input type="radio" th:name="${name}" th:value="${optValue}" th:attr="form=${form}"
            th:checked="${optValue == (selected == null ? '' : '' + selected)}" />
     <span th:text="#{__${opt['labelKey']}__}">Option</span>
-    <span th:if="${opt['count'] != null}" class="seg-count" th:text="${opt['count']}">0</span>
+    <span th:if="${opt['count'] != null}" class="krt-segmented__count" th:text="${opt['count']}">0</span>
   </label>
 </div>
 
@@ -64,7 +64,7 @@
           th:attr="aria-controls=${panelId},data-testid=${testid}" aria-expanded="true">
     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"/></svg>
     <span th:text="#{filter.add}">Filter</span>
-    <span class="filter-badge filter-count" data-filter-count hidden th:data-label="#{filter.activeCount}">
+    <span class="filter-count" data-filter-count hidden th:data-label="#{filter.activeCount}">
       <span data-filter-count-value aria-hidden="true">0</span>
       <span data-filter-count-label class="visually-hidden"></span>
     </span>

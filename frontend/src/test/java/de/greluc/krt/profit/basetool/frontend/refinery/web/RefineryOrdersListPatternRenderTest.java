@@ -237,8 +237,8 @@ class RefineryOrdersListPatternRenderTest {
         .contains("data-testid=\"segment-view-completed\"")
         .contains("data-testid=\"segment-view-all\"")
         .containsPattern("name=\"view\" value=\"RUNNING\" checked=\"checked\"")
-        .containsPattern("class=\"seg-count\">2<")
-        .containsPattern("class=\"seg-count\">1<")
+        .containsPattern("class=\"krt-segmented__count\">2<")
+        .containsPattern("class=\"krt-segmented__count\">1<")
         .contains("data-testid=\"toolbar-search\"")
         .contains("id=\"refinery-only-mine\"");
     assertThat(html)

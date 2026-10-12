@@ -687,7 +687,7 @@ select[aria-invalid="true"],
     background-color: var(--color-bg-dark-gray) !important;
     background-image: none !important;
     color: var(--color-gray-1) !important;
-    border: 1px solid var(--color-gray-3) !important;
+    border: 1px solid var(--color-gray-2) !important;
     border-bottom: 2px solid var(--color-primary) !important;
     padding: 8px 15px !important;
     font-family: var(--font-body) !important;

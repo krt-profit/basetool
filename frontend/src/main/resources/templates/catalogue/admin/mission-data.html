@@ -51,9 +51,8 @@
                 <form th:action="@{/admin/mission-data}" method="get" id="squadron-filter-form" class="no-track md-filter">
                     <input type="hidden" name="includeInactiveJobTypes" th:value="${includeInactiveJobTypes}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
-                    <label class="switch" for="includeInactiveSquadrons">
-                        <input type="checkbox" id="includeInactiveSquadrons" name="includeInactiveSquadrons" th:checked="${includeInactiveSquadrons}">
-                        <span class="switch__track" aria-hidden="true"></span>
+                    <label class="krt-switch" for="includeInactiveSquadrons">
+                        <input type="checkbox" role="switch" id="includeInactiveSquadrons" name="includeInactiveSquadrons" th:checked="${includeInactiveSquadrons}">
                         <span th:text="#{admin.squadron.show_inactive}">Inaktive anzeigen</span>
                     </label>
                 </form>
@@ -122,9 +121,8 @@
                 <form th:action="@{/admin/mission-data}" method="get" id="jobtype-filter-form" class="no-track md-filter">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
-                    <label class="switch" for="includeInactiveJobTypes">
-                        <input type="checkbox" id="includeInactiveJobTypes" name="includeInactiveJobTypes" th:checked="${includeInactiveJobTypes}">
-                        <span class="switch__track" aria-hidden="true"></span>
+                    <label class="krt-switch" for="includeInactiveJobTypes">
+                        <input type="checkbox" role="switch" id="includeInactiveJobTypes" name="includeInactiveJobTypes" th:checked="${includeInactiveJobTypes}">
                         <span th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</span>
                     </label>
                 </form>
@@ -201,9 +199,8 @@
                 <form th:action="@{/admin/mission-data}" method="get" id="freqtype-filter-form" class="no-track md-filter">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveJobTypes" th:value="${includeInactiveJobTypes}">
-                    <label class="switch" for="includeInactiveFrequencyTypes">
-                        <input type="checkbox" id="includeInactiveFrequencyTypes" name="includeInactiveFrequencyTypes" th:checked="${includeInactiveFrequencyTypes}">
-                        <span class="switch__track" aria-hidden="true"></span>
+                    <label class="krt-switch" for="includeInactiveFrequencyTypes">
+                        <input type="checkbox" role="switch" id="includeInactiveFrequencyTypes" name="includeInactiveFrequencyTypes" th:checked="${includeInactiveFrequencyTypes}">
                         <span th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</span>
                     </label>
                 </form>

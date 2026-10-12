@@ -1041,7 +1041,7 @@
     }
 
     .bank-chart-axis-label {
-        fill: var(--color-gray-2);
+        fill: var(--color-gray-2-text);
         font-family: var(--font-body);
         font-size: 12px;
         dominant-baseline: middle;

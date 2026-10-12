@@ -21,6 +21,7 @@
         </th:block>
     </th:block>
 
+    <section class="list-panel">
     <form id="bank-requests-filter-form" method="get" th:action="@{/bank/requests}" class="no-track">
         <div class="toolbar">
             <th:block th:replace="~{kernel/fragments/components :: segmented(name='status', labelKey='bank.requests.filter.aria', selected=${selectedStatus}, options=${statusOptions})}"></th:block>
@@ -163,6 +164,7 @@
         </th:block>
         </th:block>
     </div>
+    </section>
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-confirm-request-modal', titleKey='bank.request.confirm.modal.title', body=~{::bank-confirm-request-modal-body})}">
         <th:block th:ref="bank-confirm-request-modal-body">

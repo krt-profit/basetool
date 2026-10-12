@@ -110,7 +110,7 @@
                     <div class="form-group" data-testid="qt-active">
                         <span class="form-label" aria-hidden="true" th:text="#{admin.qualityTiers.column.status}">Status</span>
                         <th:block th:replace="~{kernel/fragments/components :: segmented(name='active', labelKey='admin.qualityTiers.column.status', selected='true',
-                            variant='segmented--block segmented--lg',
+                            variant='krt-segmented--block',
                             options=${ {{value: 'true', labelKey: 'admin.qualityTiers.status.active'}, {value: 'false', labelKey: 'admin.qualityTiers.status.inactive'}} })}"></th:block>
                     </div>
                     <div class="span-all">

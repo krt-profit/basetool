@@ -27,7 +27,7 @@
         <fieldset class="form-section">
             <legend class="form-section__head" th:text="|1 · #{inventory.input.section.stock}|">1 · Bestand</legend>
             <th:block th:replace="~{kernel/fragments/components :: segmented(name='inventoryCatalogMode', labelKey='inventory.form.item.modeLabel',
-                variant='segmented--block segmented--lg',
+                variant='krt-segmented--block',
                 selected=${inventoryForm.gameItemId != null ? 'item' : 'material'},
                 options=${ {{value: 'material', labelKey: 'inventory.form.item.mode.material'}, {value: 'item', labelKey: 'inventory.form.item.mode.item'}} })}"></th:block>
 

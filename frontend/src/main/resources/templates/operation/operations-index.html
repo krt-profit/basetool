@@ -22,6 +22,7 @@
     <th:block th:replace="~{kernel/fragments/components :: alert(type='danger', msgKey=${errorMessage}, extraClass=null)}"></th:block>
     <th:block th:replace="~{kernel/fragments/components :: alert(type='danger', msgKey=${error}, extraClass=null)}"></th:block>
 
+    <section class="list-panel">
     <form id="operations-filter-form" method="get" th:action="@{/operations}" class="no-track">
         <div class="toolbar">
             <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('operation-search', 'search', ${search}, 'operation.search.placeholder')}"></th:block>
@@ -108,6 +109,7 @@
         <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${operationsPage}, baseUrl='/operations')}"></th:block>
         </th:block>
     </div>
+    </section>
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='create-operation-modal', titleKey='operation.create', variant='krt-modal--wide', body=~{::create-operation-modal-body})}">
         <th:block th:ref="create-operation-modal-body">

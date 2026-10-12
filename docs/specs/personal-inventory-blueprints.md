@@ -30,7 +30,7 @@ as a `.tab-nav`, both with a `.tab-count`.
 
 Below the tabs one toolbar carries the page's **only** search („In meinen Blueprints suchen …", an
 instant client-side row filter over the owned set), the segment **„Alle n · Craftbar n"** and, on
-the right, the `.switch` **„Raffinerie einrechnen"** with its explanation as `title` and `.scu-hint`
+the right, the `.krt-switch` **„Raffinerie einrechnen"** with its explanation as `title` and `.scu-hint`
 (REQ-INV-048). Submitting the search re-applies the client filter; a `?q=` in the address still
 narrows the server render. The collection renders as `.master-detail`: left a `.master-list`, one
 `.master-row` per blueprint (a craft-status dot, product name, ✎ marker when a note exists, the

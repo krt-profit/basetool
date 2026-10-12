@@ -23,9 +23,8 @@
 
     <form th:action="@{/admin/special-commands}" method="get" id="sc-filter-form" class="no-track">
         <div class="toolbar">
-            <label class="switch" for="includeInactive">
-                <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}">
-                <span class="switch__track" aria-hidden="true"></span>
+            <label class="krt-switch" for="includeInactive">
+                <input type="checkbox" role="switch" id="includeInactive" name="includeInactive" th:checked="${includeInactive}">
                 <span th:text="#{admin.specialcommands.show_inactive}">Inaktive anzeigen</span>
             </label>
         </div>
