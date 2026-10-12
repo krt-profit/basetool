@@ -61,6 +61,6 @@ tasks.test {
   jvmArgumentProviders.add(
     CommandLineArgumentProvider {
       listOf("-Dexchange.baseline=" + baseline.get().asFile.absolutePath)
-    }
+    },
   )
 }
