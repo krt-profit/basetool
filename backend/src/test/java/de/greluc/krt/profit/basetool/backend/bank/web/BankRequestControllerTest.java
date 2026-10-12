@@ -36,7 +36,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestSer
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.bank.internal.ConfirmBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.RejectBankBookingRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;

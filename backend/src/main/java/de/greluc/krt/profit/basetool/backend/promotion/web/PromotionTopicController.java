@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.web;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopicResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopicService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopicWriteRequest;

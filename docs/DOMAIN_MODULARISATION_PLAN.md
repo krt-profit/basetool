@@ -2249,6 +2249,43 @@ costs more; a read-only service call prepares nothing. (5) `RefiningMethodDto` l
 `catalogue.api` because `refinery.api` embeds it. (6) `UexMatrixLookups` is public now: the UEX
 services that stay in `service` build it.
 
+**P4-5, part 1b — `AbstractEntity` and `PageResponse` move to the kernel — done 2026-10-12**
+(the precondition recorded by part 1).
+1. *Move*: `model.AbstractEntity` and `model.dto.PageResponse` went to the `kernel` package with
+   `git mv`, same class names. §5.1 gives the backend kernel no sub-package, and `Roles`,
+   `Permissions` and `ScuAmounts` already lie in it. A script rewrote the imports of 188 files
+   (126 imported one of the two types, 62 same-package users gained an import). Nothing else
+   changed: `@MappedSuperclass`, `equals`/`hashCode`, the record components and
+   `PageResponse.of` are as they were, and `openapi.json` is byte-identical because the schema
+   names derive from the simple class name.
+2. *Gates*: the domain map lost its two `class … kernel` rules, which the `kernel` package rule
+   covers. The `model` layer of `ArchitectureTest` took `User` as its legacy-package anchor
+   instead of `AbstractEntity`; the mapped superclass is still selected by its role. The
+   join-column floor falls 273 → 272, set from the failing assertion. No module baseline line
+   changed (32 → 32), and the module declarations needed nothing: every module may use `kernel`.
+3. *Probe*: `jdeps`-style class graph over the compiled `main` classes (ArchUnit dependencies,
+   nested classes folded onto their source type, one node per first package segment), then the
+   catalogue classes in layer packages moved to `catalogue` in the model and a fixpoint removed
+   every class with an edge into a package of the cycle. Before this step the catalogue's
+   entities and controllers reached `model` through the two kernel types; they no longer do, and
+   **101 classes can move cycle-free now**: the 68 entities, enums and DTOs of `model`, the 29
+   repositories and the 4 validation types. The 23 classes of the UEX and SC Wiki side stay out
+   as before.
+4. *What blocks the mappers, controllers and services*: moving every remaining catalogue class
+   except the 23 together would close the cycle through exactly two targets and nothing else: `mapper.CentralMapperConfig`,
+   a platform class in the layer package `mapper` that the 18 catalogue mappers name (and `mapper`
+   is part of the cycle, because the other modules' mappers reach the catalogue), and
+   `service.P4kImportJobRunner`, which `AdminP4kImportController` uses and which waits with the
+   platform types. A controller or service is also held by the mapper it calls.
+**Corrections:** (1) Part 1 said 159 classes "follow once" the two types moved. They do not follow
+all at once: the mappers, and with them the controllers and services that call them, need
+`CentralMapperConfig` in `platform` first (the domain map assigns it there already), and
+`AdminP4kImportController` needs the runner. The entities, enums, DTOs and repositories do follow.
+(2) The join-column floor fell by one, not because `AbstractEntity` left `model` (its role still
+selects it) but because `PageResponse` left the `model.dto` package tree. (3) The probe counts 200
+classes in layer packages against the plan's 182, because it counts the 18 generated MapStruct
+`*Impl` classes as types of their own.
+
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
 Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-logic` convention

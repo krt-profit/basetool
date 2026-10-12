@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
-import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import jakarta.persistence.Column;

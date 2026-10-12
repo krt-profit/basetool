@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.blueprint.web;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintOverviewEntryDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintOverviewOwnerDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.web;
 
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialItemRequestCreateRequest;
@@ -27,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialR
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialRequestDto;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialRequestService;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialRequestUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

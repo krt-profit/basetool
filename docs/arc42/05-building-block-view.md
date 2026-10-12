@@ -213,8 +213,10 @@ modules call (`BlueprintNameNormalizer`, `MaterialNameCanonicalizer`) sit in `ca
 sync infrastructure (`SyncCoordinator`, `SyncChunkWriter`, `SyncReportService`), the UEX, SC Wiki
 and P4K feed records (`catalogue.internal.uex`, `.scwiki`, `.p4k`), the sync report entity and its
 repository, the key projections and the integration properties sit in `catalogue.internal`.
-Entities, repositories, mappers, controllers and the other DTOs stay in the layer packages until
-the kernel types `AbstractEntity` and `PageResponse` have left `model` (§11).
+Entities, repositories, mappers, controllers and the other DTOs stay in the layer packages. The
+kernel types `AbstractEntity` and `PageResponse` lie in `kernel` since 2026-10-12, so the entities,
+enums, DTOs and repositories can follow; the mappers, controllers and services wait for
+`CentralMapperConfig` to leave the `mapper` package (§11).
 
 The inventory (the Lager) moved since P4-1: `InventoryItemController` sits in `inventory.web`, and
 `inventory.internal` holds the Lager services (item, aggregation, checkout, org-unit change, stolen
