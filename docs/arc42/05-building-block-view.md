@@ -73,8 +73,7 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 
 These layer packages were cut into domain modules (the
 [domain modularisation plan](../DOMAIN_MODULARISATION_PLAN.md), §5.1); since 2026-10-12 every domain
-class lies in a module package and the table above describes the roles the layers had. One class,
-`BusinessMetricsCollector`, is still in `task` (see the `app` module below). The
+class lies in a module package and the table above describes the roles the layers had. The business gauges are published per module (`platform.api.BusinessGaugeSource`, one `…BusinessGauges` bean in each owning module's `internal`); `app.internal.BusinessMetricsCollector` only schedules them. The
 **domain map** [`backend/src/test/resources/architecture/domain-map.txt`](../../backend/src/test/resources/architecture/domain-map.txt)
 is the source of truth for its target module and that module's rank: every class is assigned there
 by the first matching rule, and a class no rule assigns fails the build

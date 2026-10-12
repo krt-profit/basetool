@@ -53,7 +53,7 @@ class ModuleBaselineTest {
 
   private static final DomainMap MAP = DomainMap.load();
 
-  private static final int MODULE_PAIR_FLOOR = 174;
+  private static final int MODULE_PAIR_FLOOR = 167;
 
   private static final String FIXTURE_DESCRIPTION = "fixture modules respect the ranks";
 

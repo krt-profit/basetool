@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.task;
+package de.greluc.krt.profit.basetool.backend.app.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -25,25 +25,41 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.internal.IdentityBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderBusinessGauges;
+import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequestRepository;
+import de.greluc.krt.profit.basetool.backend.operation.internal.OperationBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DeletionRequestRepository;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DeletionRequestStatus;
+import de.greluc.krt.profit.basetool.backend.privacy.internal.DeletionRequestBusinessGauges;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.TreeMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -77,15 +93,16 @@ class BusinessMetricsCollectorTest {
     collector =
         new BusinessMetricsCollector(
             registry,
-            userRepository,
-            deletionRequestRepository,
-            bankBookingRequestRepository,
-            jobOrderRepository,
-            operationRepository,
-            refineryOrderRepository,
-            p4kImportJobRepository,
-            materialExchangeOfferRepository,
-            materialExchangeRequestRepository,
+            List.of(
+                new IdentityBusinessGauges(userRepository),
+                new DeletionRequestBusinessGauges(deletionRequestRepository),
+                new BankBusinessGauges(bankBookingRequestRepository),
+                new JobOrderBusinessGauges(jobOrderRepository),
+                new OperationBusinessGauges(operationRepository),
+                new RefineryBusinessGauges(refineryOrderRepository),
+                new P4kImportBusinessGauges(p4kImportJobRepository),
+                new MaterialExchangeBusinessGauges(
+                    materialExchangeOfferRepository, materialExchangeRequestRepository)),
             new TaskMetrics(registry));
     collector.registerGauges();
   }
@@ -211,5 +228,32 @@ class BusinessMetricsCollectorTest {
         .tag(MetricNames.TAG_JOB, ScheduledJob.BUSINESS_METRICS.label())
         .gauge()
         .value();
+  }
+
+  @Test
+  void theRegisteredMeterSetIsTheOneTheDashboardsAndAlertRulesRead() throws IOException {
+    List<String> actual = new ArrayList<>();
+    for (Meter meter : registry.getMeters()) {
+      TreeMap<String, String> tags = new TreeMap<>();
+      for (Tag tag : meter.getId().getTags()) {
+        tags.put(tag.getKey(), tag.getValue());
+      }
+      actual.add(
+          meter.getId().getType()
+              + "|"
+              + meter.getId().getName()
+              + "|"
+              + tags
+              + "|"
+              + meter.getId().getBaseUnit());
+    }
+    Collections.sort(actual);
+
+    List<String> expected;
+    try (var in = getClass().getResourceAsStream("/monitoring/business-gauges.txt")) {
+      expected = List.of(new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\\R"));
+    }
+
+    assertThat(actual).isEqualTo(expected);
   }
 }

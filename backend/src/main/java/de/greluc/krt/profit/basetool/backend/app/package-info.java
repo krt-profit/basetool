@@ -18,9 +18,9 @@
  */
 
 /**
- * The composition root: the security filter chains, the caller's layout read, the development and
- * test data seeding (the business gauges stay in the task package until each module publishes its
- * own) (plan §5.1 rank 14).
+ * The composition root: the security filter chains, the caller's layout read, the schedule of the
+ * business gauges the modules publish, and the development and test data seeding (plan §5.1 rank
+ * 14).
  */
 @ApplicationModule(
     allowedDependencies = {
