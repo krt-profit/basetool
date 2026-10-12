@@ -232,10 +232,9 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       Pageable pageable);
 
   /**
-   * Org-unit-scoped variant of {@link #findByOwnerId(UUID, Pageable)} for the cross-user oversight
-   * endpoint: returns only the target user's refinery orders whose {@code owningOrgUnit} falls
-   * within the caller's scope (see {@link
-   * de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}).
+   * Org-unit-scoped variant of {@link #findByOwnerId(UUID)} for the cross-user oversight endpoint:
+   * returns only the target user's refinery orders whose {@code owningOrgUnit} falls within the
+   * caller's scope (see {@link de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}).
    *
    * <p>Refinery is strict-staffel, so the list never returns an order the per-order {@code
    * canSeeRefineryOrder} gate would deny.

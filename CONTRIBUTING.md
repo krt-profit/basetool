@@ -306,6 +306,13 @@ alias (`Catalog.kt`), not through `libs.…`. The typed `basetool { }` block of 
 it; after a change there run the checks above (`help --configuration-cache` twice,
 `build -m --configuration-cache`) and `./gradlew spotlessApply`, which also formats its Kotlin.
 
+**A module script names repository files with `layout.settingsDirectory.file|dir(…)`**, never
+`rootProject`; `scripts/check-gradle-input-paths.py` (`repo-lint.yml`) fails a script that does. A
+library module of an application is named `<app>-<name>` (`backend-exchange`): the image-reuse plan
+counts its `src/main` as an input of `<app>` only, the SBOM check counts it as shipped inside `<app>`
+(which must declare it as an `implementation` project dependency), and `<app>`'s JaCoCo report and floors
+include its classes and tests (REQ-OPS-047).
+
 **Each module declares its own quality settings** in `<module>/build-settings.properties`:
 `test.maxHeap`, the JaCoCo floors `coverage.instruction` / `coverage.branch` and the PIT
 patterns `mutation.targetClasses` / `mutation.targetTests`, each required as soon as the

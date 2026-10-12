@@ -26,6 +26,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
@@ -44,6 +46,9 @@ public class FuzzyNameMatcher {
 
   /** Default maximum number of suggestions returned per external name. */
   public static final int DEFAULT_LIMIT = 5;
+
+  /** Separates the word tokens of a normalized key. */
+  private static final Pattern SPACE = Pattern.compile(" ");
 
   /**
    * Returns the best {@code limit} candidates scoring at least {@code threshold}, highest rounded
@@ -199,13 +204,10 @@ public class FuzzyNameMatcher {
    */
   @NotNull
   private Set<String> tokenize(@NotNull String normalized) {
-    Set<String> tokens = new HashSet<>();
-    for (String token : normalized.split(" ")) {
-      if (!token.isEmpty()) {
-        tokens.add(token);
-      }
-    }
-    return tokens;
+    return SPACE
+        .splitAsStream(normalized)
+        .filter(token -> !token.isEmpty())
+        .collect(Collectors.toCollection(HashSet::new));
   }
 
   /**

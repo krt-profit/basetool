@@ -581,7 +581,7 @@ public class MissionParticipantService {
 
   /**
    * Removes a co-manager. The owner cannot be removed via this method — use {@link
-   * MissionService#setMissionOwner} to transfer ownership first.
+   * MissionService#updateMissionOwner} to transfer ownership first.
    */
   @Transactional
   public Mission removeManager(@NotNull UUID missionId, @NotNull UUID userId) {

@@ -290,7 +290,7 @@ public class TaskMetrics {
 
   /**
    * A job body that returns the number of items it processed and may throw a checked exception, for
-   * the item-counting {@link TaskMetrics#record(ScheduledJob, ThrowingIntSupplier)} overload.
+   * the item-counting {@link TaskMetrics#recordCounting(ScheduledJob, ThrowingIntSupplier)} method.
    */
   @FunctionalInterface
   public interface ThrowingIntSupplier {

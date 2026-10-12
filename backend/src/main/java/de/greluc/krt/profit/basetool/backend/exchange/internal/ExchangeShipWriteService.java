@@ -609,7 +609,7 @@ public class ExchangeShipWriteService {
    * @return {@code true} for a removal and for an update that changes both name and type
    */
   private static boolean isRemoval(@NotNull Planned planned) {
-    return planned instanceof Remove || planned instanceof Update update && update.removal();
+    return planned instanceof Remove || (planned instanceof Update update && update.removal());
   }
 
   /**

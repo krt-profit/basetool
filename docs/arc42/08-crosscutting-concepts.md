@@ -408,7 +408,8 @@ security or structural rule stays a hard rule
 **A quality gate never falls back to a default, and a guard never narrows in silence.** Each module
 declares its test heap, coverage floors and PIT targets in its own `build-settings.properties`, and
 configuration fails without them (REQ-OPS-037); the conventions that read them are plugins of the
-`build-logic` included build that a module applies explicitly (REQ-OPS-046). Guards that find their subject by a path or a
+`build-logic` included build that a module applies explicitly (REQ-OPS-046); a module script names
+repository files from the settings directory, never through `rootProject` (REQ-OPS-047). Guards that find their subject by a path or a
 listing fail when they stop seeing it — build-script input paths, recursive content scans, the DTO
 mirror pairing, and a counted context shape per application (REQ-OPS-038) — so moving files or
 packages cannot switch a gate off.

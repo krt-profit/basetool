@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public record RefineryGoodDto(
     @Nullable UUID id,
-    @Nullable @NotNull MaterialDto inputMaterial,
+    @SuppressWarnings("MultipleNullnessAnnotations") @Nullable @NotNull MaterialDto inputMaterial,
     @NotNull @Min(1) Integer inputQuantity,
     @Nullable MaterialDto outputMaterial,
     @NotNull @Min(1) Integer outputQuantity,

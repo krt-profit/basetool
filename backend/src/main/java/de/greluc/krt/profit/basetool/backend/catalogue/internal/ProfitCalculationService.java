@@ -29,6 +29,7 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -81,7 +82,8 @@ public class ProfitCalculationService {
             .orElseThrow(() -> new IllegalArgumentException("ShipType not found: " + shipId));
 
     int shipScu = ship.getScu() != null ? ship.getScu() : 0;
-    boolean isHullC = ship.getName() != null && ship.getName().toLowerCase().contains("hull c");
+    boolean isHullC =
+        ship.getName() != null && ship.getName().toLowerCase(Locale.ROOT).contains("hull c");
 
     log.debug("Ship: {}, SCU: {}, isHullC: {}", ship.getName(), shipScu, isHullC);
 

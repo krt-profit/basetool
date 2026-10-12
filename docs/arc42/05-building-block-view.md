@@ -373,7 +373,9 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
   conventions, Checkstyle, Spotless, JaCoCo, PIT, SpotBugs, CycloneDX, Licensee, Spring Boot and
   dependency management, Error Prone) that every module applies by id, the typed `basetool { }`
   extension and the reader of each module's `build-settings.properties` (REQ-OPS-046, ADR-0248). It is
-  the place a Gradle module extracted later (plan §5.8) gets its conventions from.
+  the place a Gradle module extracted later (plan §5.8) gets its conventions from. A library module of
+  an application is named `<app>-<name>`: the image plan, the SBOM check and the application's JaCoCo
+  floors read that name (REQ-OPS-047, ADR-0249).
 
 ### Inside `ingest`
 

@@ -183,7 +183,7 @@ public class KeycloakService {
             new KeycloakUserDto(
                 u.id(), u.username(), u.email(), u.enabled(), roles, discordUserId));
       }
-      return result;
+      return List.copyOf(result);
 
     } catch (Exception e) {
       logFetchFailure(e);
@@ -258,7 +258,7 @@ public class KeycloakService {
   /**
    * Builds the {@code userId -> realm role names} index by listing the members of each app-relevant
    * realm role once, plus the roles granted through the default-role composite via {@link
-   * #fetchDefaultRoleGrants(String)} (REQ-SEC-053).
+   * #fetchDefaultRoleGrants(String, Map)} (REQ-SEC-053).
    *
    * <p>Local role names are matched case-insensitively against {@link #fetchRealmRoleNames(String)}
    * and queried in Keycloak's casing; local-only roles simply find no members.
@@ -476,11 +476,9 @@ public class KeycloakService {
       }
       for (Map<String, Object> member : page) {
         if (member.get("id") instanceof String idText) {
-          try {
-            byUser
-                .computeIfAbsent(UUID.fromString(idText), _ -> new HashSet<>())
-                .addAll(storedRoleNames);
-          } catch (IllegalArgumentException _) {
+          UUID memberId = parseUuidOrNull(idText);
+          if (memberId != null) {
+            byUser.computeIfAbsent(memberId, _ -> new HashSet<>()).addAll(storedRoleNames);
           }
         }
       }
@@ -488,6 +486,21 @@ public class KeycloakService {
         break;
       }
       first += pageSize;
+    }
+  }
+
+  /**
+   * Parses a UUID, tolerating malformed text.
+   *
+   * @param text the candidate id
+   * @return the parsed id, or {@code null} when {@code text} is not a UUID
+   */
+  @Nullable
+  private static UUID parseUuidOrNull(@NotNull String text) {
+    try {
+      return UUID.fromString(text);
+    } catch (IllegalArgumentException _) {
+      return null;
     }
   }
 

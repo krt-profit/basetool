@@ -365,8 +365,8 @@ public class InventoryAggregationService {
 
   /**
    * Game-item sibling of {@link #getMyAggregatedInventory(UUID, List, List, Integer, List, List,
-   * boolean, boolean)}: the user's game-item stock grouped by item and stack. Items have no quality
-   * or mission filter (REQ-INV-031).
+   * boolean, boolean, boolean, boolean)}: the user's game-item stock grouped by item and stack.
+   * Items have no quality or mission filter (REQ-INV-031).
    *
    * @param userId owner id
    * @param gameItemIds optional game-item filter

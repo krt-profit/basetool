@@ -156,7 +156,7 @@ public class AsyncConfig {
 
   /**
    * Bounded executor for after-commit transactional mail, separate from {@link
-   * #notificationExecutor()} so a stalled SMTP relay cannot block notifications.
+   * #notificationExecutor(MeterRegistry)} so a stalled SMTP relay cannot block notifications.
    *
    * <p>Two core threads, at most four, a 200-slot queue, abort on overflow; propagates the deciding
    * request's MDC.

@@ -58,7 +58,8 @@ module scripts.
   `Catalog.kt`. A script-level `val` captured by a task action is a configuration-cache error that a
   root closure never had; the conventions copy such values into locals.
 - **Not covered:** `rootProject` accesses in the module scripts, JaCoCo aggregation and the
-  prefix rules of the image-reuse and SBOM scripts — they belong to the extraction itself.
+  prefix rules of the image-reuse and SBOM scripts — they belong to the extraction itself. *Done
+  2026-10-12 in [ADR-0249](0249-an-applications-library-modules-are-named-app-name-and-the-build-reads-the-name.md).*
 
 ## Alternatives considered
 

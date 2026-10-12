@@ -79,7 +79,7 @@ idea {
 }
 
 tasks.named<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
-  excludeFilter.set(rootProject.file("config/spotbugs/exclude.xml"))
+  excludeFilter.set(layout.settingsDirectory.file("config/spotbugs/exclude.xml"))
 }
 
 basetool {
@@ -159,52 +159,52 @@ tasks.named<Test>("test") {
 
   inputs
     .files(
-      rootProject.file(
+      layout.settingsDirectory.file(
         "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/ExchangeRelay.java",
       ),
-      rootProject.file(
+      layout.settingsDirectory.file(
         "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/observability/ObservationPrivacyFilter.java",
       ),
-      rootProject.file(
+      layout.settingsDirectory.file(
         "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/observability/ObservationPrivacyFilter.java",
       ),
-      rootProject.file(
+      layout.settingsDirectory.file(
         "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/KeycloakTrustSupport.java",
       ),
-      rootProject.file(
+      layout.settingsDirectory.file(
         "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/assembly/ManagementPortSecurityConfig.java",
       ),
-      rootProject.file(
+      layout.settingsDirectory.file(
         "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/security/ManagementPortSecurityConfig.java",
       ),
-      rootProject.file("ingest/src/main/resources/application.yml"),
-      rootProject.file("frontend/src/main/resources/application.yml"),
+      layout.settingsDirectory.file("ingest/src/main/resources/application.yml"),
+      layout.settingsDirectory.file("frontend/src/main/resources/application.yml"),
     )
     .withPropertyName("crossModuleParitySources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
-    .dir(rootProject.file("ingest/src/main/resources/exchange/v1/schemas"))
+    .dir(layout.settingsDirectory.file("ingest/src/main/resources/exchange/v1/schemas"))
     .withPropertyName("exchangeContractSchemas")
     .withPathSensitivity(PathSensitivity.RELATIVE)
   inputs
-    .dir(rootProject.file("docs/exchange/examples"))
+    .dir(layout.settingsDirectory.file("docs/exchange/examples"))
     .withPropertyName("exchangeContractFixtures")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
     .files(
-      rootProject.file("docker/edge/include/api-admission.conf"),
-      rootProject.file("docker/edge/include/api-allowlist.conf"),
-      rootProject.file(".github/workflows/edge-deny-probe.yml"),
-      rootProject.file("docker-compose.yml"),
+      layout.settingsDirectory.file("docker/edge/include/api-admission.conf"),
+      layout.settingsDirectory.file("docker/edge/include/api-allowlist.conf"),
+      layout.settingsDirectory.file(".github/workflows/edge-deny-probe.yml"),
+      layout.settingsDirectory.file("docker-compose.yml"),
     )
     .withPropertyName("apiVhostAdmission")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
     .file(
-      rootProject.file(
+      layout.settingsDirectory.file(
         "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/livesync/LiveSyncTopicClass.java",
       ),
     )
@@ -212,7 +212,7 @@ tasks.named<Test>("test") {
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   inputs
-    .file(rootProject.file("quadlet/env.d/backend.env.tmpl"))
+    .file(layout.settingsDirectory.file("quadlet/env.d/backend.env.tmpl"))
     .withPropertyName("backendQuadletEnvTemplate")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 

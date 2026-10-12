@@ -291,11 +291,10 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Stable top-down ordering of org-unit kinds for the owning-org-unit picker (OL → Bereich →
-   * Staffel → SK), so the picker fragment renders its {@code optgroup}s in hierarchy order.
+   * Orders picker options top-down by org-unit kind (OL → Bereich → Staffel → SK), then by name
+   * case-insensitively.
    *
-   * @param kind the option's org-unit kind; never {@code null}.
-   * @return the sort rank (0 = top of the hierarchy).
+   * @return the picker comparator
    */
   private static Comparator<OrgUnitMembershipOptionDto> pickerOrder() {
     return Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(o -> pickerKindOrder(o.kind()))

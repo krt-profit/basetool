@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.keycloak.spi.gate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import de.greluc.krt.profit.basetool.keycloak.spi.LogCapture;
 import de.greluc.krt.profit.basetool.keycloak.spi.gate.DiscordMembershipChecker.Result;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -30,6 +32,7 @@ import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.logging.Level;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -76,8 +79,9 @@ class DiscordMembershipCheckerTest {
   @Test
   void serverError5xx_failsClosed() throws IOException {
     HttpServer server = start(respond(500, "{\"message\":\"boom\"}"));
-    try {
+    try (LogCapture log = LogCapture.of(DiscordMembershipChecker.class)) {
       assertEquals(Result.DENIED_ERROR, check(server, Duration.ofSeconds(2), 0));
+      assertTrue(log.logged(Level.WARNING));
     } finally {
       server.stop(0);
     }
@@ -86,8 +90,9 @@ class DiscordMembershipCheckerTest {
   @Test
   void malformedBody_failsClosed() throws IOException {
     HttpServer server = start(respond(200, "this is not json"));
-    try {
+    try (LogCapture log = LogCapture.of(DiscordMembershipChecker.class)) {
       assertEquals(Result.DENIED_ERROR, check(server, Duration.ofSeconds(2), 0));
+      assertTrue(log.logged(Level.WARNING));
     } finally {
       server.stop(0);
     }
@@ -96,8 +101,9 @@ class DiscordMembershipCheckerTest {
   @Test
   void rateLimited429AfterRetryBudget_failsClosed() throws IOException {
     HttpServer server = start(respond(429, "{\"retry_after\":0}"));
-    try {
+    try (LogCapture log = LogCapture.of(DiscordMembershipChecker.class)) {
       assertEquals(Result.DENIED_ERROR, check(server, Duration.ofSeconds(2), 0));
+      assertTrue(log.logged(Level.WARNING));
     } finally {
       server.stop(0);
     }
@@ -115,8 +121,9 @@ class DiscordMembershipCheckerTest {
               }
               writeResponse(exchange, 200, "{\"roles\":[\"999\"]}");
             });
-    try {
+    try (LogCapture log = LogCapture.of(DiscordMembershipChecker.class)) {
       assertEquals(Result.DENIED_ERROR, check(server, Duration.ofMillis(300), 0));
+      assertTrue(log.logged(Level.WARNING));
     } finally {
       server.stop(0);
     }

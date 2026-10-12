@@ -25,10 +25,10 @@ dependencies {
 tasks.named<Test>("test") {
   inputs
     .files(
-      rootProject.file("docker-compose.yml"),
-      rootProject.file("quadlet/systemd/redis.container"),
-      rootProject.file("quadlet/systemd/db-backend.container"),
-      rootProject.file("backend/src/test/resources/application-test.yml"),
+      layout.settingsDirectory.file("docker-compose.yml"),
+      layout.settingsDirectory.file("quadlet/systemd/redis.container"),
+      layout.settingsDirectory.file("quadlet/systemd/db-backend.container"),
+      layout.settingsDirectory.file("backend/src/test/resources/application-test.yml"),
     )
     .withPropertyName("productionImageSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)

@@ -287,7 +287,7 @@ public class JobOrderMaterialDemandService {
           .thenComparing(
               r -> r.material() != null && r.material().name() != null ? r.material().name() : "",
               String.CASE_INSENSITIVE_ORDER)
-          .thenComparing(r -> -r.qualityTier().minQuality());
+          .thenComparingInt(r -> -r.qualityTier().minQuality());
 
   /**
    * The aggregation key inside one org-unit group: a material at one quality tier.

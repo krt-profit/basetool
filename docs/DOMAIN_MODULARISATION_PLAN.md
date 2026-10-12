@@ -424,12 +424,13 @@ After Phase 4, and only once the package boundary of each has been green for som
   ArchUnit rules guard today.
 
 Prerequisites: an included `build-logic` build with convention plugins (the root `subprojects {}`
-block and 22 cross-project `rootProject` accesses block Gradle's isolated projects and would silently
-give a new module default coverage floors; the block is gone since 2026-10-11, §7.7 P5-a), typed
-per-module build settings (done, REQ-OPS-037), prefix rules in the
-image-reuse and SBOM scripts, JaCoCo aggregation, and a context-shape test (scheduled tasks, event
-listeners, controllers) so a module outside the scan root cannot lose beans silently. One image per
-application stays; Flyway stays in `backend`.
+block and the `rootProject` accesses block Gradle's isolated projects and would silently give a new
+module default coverage floors; the block is gone since 2026-10-11, §7.7 P5-a, and the 32
+`rootProject` reads of the module scripts since 2026-10-12, P5-b), typed per-module build settings
+(done, REQ-OPS-037), prefix rules in the image-reuse and SBOM scripts (done, P5-b, ADR-0249), JaCoCo
+aggregation (done, P5-b), and a context-shape test (scheduled tasks, event listeners, controllers,
+filter chains) so a module outside the scan root cannot lose beans silently (G-24, done in Phase 0,
+REQ-OPS-038). One image per application stays; Flyway stays in `backend`.
 
 ### 5.9 Frontend
 
@@ -2485,7 +2486,7 @@ domain stays a package.
 | Step | Content |
 | --- | --- |
 | P5-a — **done 2026-10-11** | `build-logic` as an included build of precompiled convention plugins, the typed `basetool { }` settings, and the verification metadata for it; no module is extracted yet |
-| P5-b | The remaining prerequisites of §5.8: the 32 `rootProject` references of the module scripts, prefix rules in the image-reuse and SBOM scripts, JaCoCo aggregation, the context-shape test |
+| P5-b — **done 2026-10-12** | The remaining prerequisites of §5.8: the 32 `rootProject` references of the module scripts, prefix rules in the image-reuse and SBOM scripts, JaCoCo aggregation, the context-shape test (already in place since Phase 0) |
 | P5-c, P5-d | `backend-exchange`, then `backend-bank` |
 
 *P5-a as built (2026-10-11).* The included build `build-logic/` (`pluginManagement {
@@ -2548,6 +2549,56 @@ files (ktfmt, Google style), so no new Spotless task appeared. (8) The helper pa
 `…basetool.conventions`, not `…basetool.build`: a directory named `build` is excluded by
 `.dockerignore` (`**/build`), which failed the first image builds with unresolved references, and by
 Spotless's vendored globs (`**/build/**`), which had left those files unformatted.
+
+*P5-b as built (2026-10-12).* ADR-0249, REQ-OPS-047. A library module of an application is named
+`<app>-<name>`, and the build reads the name; no module was extracted, and no task, input or
+artifact of the shipped build changed.
+1. *The 32 `rootProject` reads.* They were 17 in `backend/build.gradle.kts`, 11 in
+   `frontend/build.gradle.kts` and 4 in `test-support/build.gradle.kts`; each is now
+   `layout.settingsDirectory.file|dir(…)`, as is the one relative `../docs/exchange` of `ingest`. The
+   frontend's DTO-mirror input no longer names `backend/src/main/java` but every `backend` and
+   `backend-*` directory, through `backendModuleDirectories()` in `build-logic`, and
+   `DtoMirrorConsistencyTest` looks for a record's twin in all of them. `check-gradle-input-paths.py`
+   reads the new shape (its parse of the 83 input paths is unchanged but for the two intended ones) and
+   fails a `rootProject` in any tracked `*.gradle.kts` except the root script and the settings files.
+2. *Prefix rules.* `image_reuse_plan.py`: a Dockerfile `COPY` source `<app>-<name>/src/main[/…]` is an own
+   input of `<app>`, its build script and settings stay shared. `check_sbom_coverage.py`: a module
+   `<app>-<name>` is shipped inside `<app>` with no entry, and `<app>` must declare it as
+   `implementation(project(…))`. Both scripts got self-test cases, and the SBOM script a `--selftest`
+   that `repo-lint.yml` runs.
+3. *JaCoCo aggregation.* `basetool.coverage-conventions` derives the application's `<app>-*` project
+   dependencies from `implementation` and adds their classes (without the generated mapper and
+   application classes), execution data and sources to `jacocoTestReport` and
+   `jacocoTestCoverageVerification` through three resolvable, non-transitive configurations selected by
+   the variants the JaCoCo and Java plugins already publish. An application with no such dependency is
+   measured as before. The consequence to remember: `:backend:jacocoTestReport` then depends on the
+   libraries' `test` tasks.
+4. *The context-shape test.* It exists since Phase 0 (G-24, REQ-OPS-038: `ContextShapeTest` in each
+   application over `test-support`'s `ContextShape`); nothing was added. It was run once on this branch:
+   scheduled methods / transactional event listeners / controllers / security filter chains are
+   backend 6 / 5 / 104 / 2, frontend 0 / 0 / 102 / 2, ingest 1 / 0 / 2 / 2. A library module whose
+   package leaves `de.greluc.krt.profit.basetool.backend` changes a count and fails there.
+5. *Proof of no behaviour change.* An init script (not committed) dumped, for every project, each task
+   with its type, dependencies and finalizers, the file inputs below the repository of every `Test`
+   task, `openApiGenerate`, `generateApiTypes`, `generateEdgeAdmission` and `spotbugsMain`, the JaCoCo
+   class, execution-data and source sets, and the arguments of those tasks, once on the parent commit and
+   once on the branch: the two dumps (326 tasks) are byte-identical. A throwaway `backend-probe` module
+   that the backend depended on (not committed) showed the aggregation: the probe's classes, execution
+   data and sources joined the backend's report, and the report depended on the probe's compile and `test`
+   tasks. `help` and `build -m` run with the configuration cache reuse their entry on the second run.
+
+**Corrections:** (1) The P5-b row listed the context-shape test as open; it was done in Phase 0, so this
+step verified it. (2) The `rootProject` uses of the root `build.gradle.kts` (the terms-version task and
+the OWASP suppression file) are the root project's own and stay; `rootDir` in `workingDir = rootDir` and
+`args(rootDir…)` stays too, since it is the build's directory and no access to another project.
+(3) Gradle's `jacoco-report-aggregation` plugin was rejected: it takes every project dependency of the
+application, `logging-support` included, whose classes have no tests and would enter the floors at
+zero. (4) Still bound to the extraction itself, and so left to P5-c: the Dockerfile lists each module's
+build script and `src/main` by name; the `sandbox-images.yml` path filter, the `docker-compose.build.yml`
+watch paths, `check_exchange_e2e_label.py`'s backend prefix, the `pitest.yml` module matrix and
+`CODEOWNERS`; the PIT target patterns of a library; and the test classes that read a backend source file
+by path (`NotificationTypeMessageCoverageTest`, the app-call lists under `backend/src/test/resources`),
+which break only if their file moves.
 
 ### 7.8 Frontend track
 

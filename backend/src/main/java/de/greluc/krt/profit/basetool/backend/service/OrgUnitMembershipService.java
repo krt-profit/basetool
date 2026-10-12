@@ -1102,6 +1102,10 @@ public class OrgUnitMembershipService {
             .with("missionManager", saved.isMissionManager()));
   }
 
+  private static String unitName(@Nullable String label) {
+    return label == null ? "—" : label;
+  }
+
   /**
    * Resolves an org unit's audit {@code subjectLabel} via {@link
    * OrgUnitLabels#shorthandOrName(OrgUnit)}.
@@ -1109,10 +1113,6 @@ public class OrgUnitMembershipService {
    * @param orgUnitId the org unit id; never {@code null}.
    * @return the org unit's shorthand/name label, or {@code null} when it cannot be resolved.
    */
-  private static String unitName(@Nullable String label) {
-    return label == null ? "—" : label;
-  }
-
   private @Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
     return orgUnitRepository.findById(orgUnitId).map(OrgUnitLabels::shorthandOrName).orElse(null);
   }

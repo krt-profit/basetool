@@ -254,7 +254,7 @@ public class JobOrderItemService {
                             ? a.material().name()
                             : "",
                     String.CASE_INSENSITIVE_ORDER)
-                .thenComparing(a -> -a.qualityTier().minQuality()))
+                .thenComparingInt(a -> -a.qualityTier().minQuality()))
         .toList();
   }
 

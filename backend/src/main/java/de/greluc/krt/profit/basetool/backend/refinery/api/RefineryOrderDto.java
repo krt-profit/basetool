@@ -44,7 +44,7 @@ import org.jetbrains.annotations.Nullable;
 public record RefineryOrderDto(
     @Nullable UUID id,
     @Nullable UserReferenceDto owner,
-    @Nullable @NotNull LocationDto location,
+    @SuppressWarnings("MultipleNullnessAnnotations") @Nullable @NotNull LocationDto location,
     @Nullable MissionReferenceDto mission,
     @Nullable Instant startedAt,
     @PositiveOrZero Long durationMinutes,

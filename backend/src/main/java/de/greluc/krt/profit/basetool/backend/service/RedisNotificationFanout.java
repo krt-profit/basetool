@@ -41,9 +41,10 @@ import tools.jackson.databind.node.ObjectNode;
  * Redis pub/sub {@link NotificationFanout} that delivers real-time notification pushes across
  * backend replicas (ADR-0094).
  *
- * <p>{@link #publish(Collection)} delivers to this instance's emitters first, then publishes on the
- * channel; {@link #onMessage(Message, byte[])} delivers peers' messages and skips its own. A Redis
- * outage leaves local delivery and the polling fallback intact (REQ-NOTIF-006).
+ * <p>{@link #publish(Collection, NotificationSignal)} delivers to this instance's emitters first,
+ * then publishes on the channel; {@link #onMessage(Message, byte[])} delivers peers' messages and
+ * skips its own. A Redis outage leaves local delivery and the polling fallback intact
+ * (REQ-NOTIF-006).
  */
 @Slf4j
 public class RedisNotificationFanout implements NotificationFanout, MessageListener {

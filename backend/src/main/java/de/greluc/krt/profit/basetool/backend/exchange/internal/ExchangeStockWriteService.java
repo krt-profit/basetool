@@ -59,6 +59,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -87,6 +88,7 @@ public class ExchangeStockWriteService {
   /** The share of a lot a batch may take within the window before it counts as a removal. */
   private static final BigDecimal REMOVAL_SHARE = new BigDecimal("0.1");
 
+  private static final Pattern LOT_KEY_SEPARATOR = Pattern.compile("\\|");
   private static final String UNCHANGED = "unchanged";
   private static final String UNMATCHED = "unmatched";
   private static final String AMBIGUOUS = "ambiguous";
@@ -268,28 +270,28 @@ public class ExchangeStockWriteService {
    * @return the lot, or empty when the key is malformed or names something that no longer exists
    */
   private @NotNull Optional<Lot> parseLot(@NotNull String lotKey, @NotNull String unit) {
-    String[] parts = lotKey.split("\\|");
-    if (parts.length != 4
-        || !parts[1].startsWith("l:")
-        || !parts[2].startsWith("q:")
-        || !parts[3].startsWith("s:")) {
+    List<String> parts = LOT_KEY_SEPARATOR.splitAsStream(lotKey).toList();
+    if (parts.size() != 4
+        || !parts.get(1).startsWith("l:")
+        || !parts.get(2).startsWith("q:")
+        || !parts.get(3).startsWith("s:")) {
       return Optional.empty();
     }
     try {
-      UUID catalogueId = UUID.fromString(parts[0].substring(2));
+      UUID catalogueId = UUID.fromString(parts.get(0).substring(2));
       Optional<Location> location =
-          locationRepository.findById(UUID.fromString(parts[1].substring(2)));
-      int quality = Integer.parseInt(parts[2].substring(2));
-      boolean stolen = "1".equals(parts[3].substring(2));
+          locationRepository.findById(UUID.fromString(parts.get(1).substring(2)));
+      int quality = Integer.parseInt(parts.get(2).substring(2));
+      boolean stolen = "1".equals(parts.get(3).substring(2));
       if (location.isEmpty()) {
         return Optional.empty();
       }
-      if (parts[0].startsWith("m:")) {
+      if (parts.get(0).startsWith("m:")) {
         return materialRepository
             .findById(catalogueId)
             .map(m -> new Lot(m, null, location.get(), quality, stolen, unit));
       }
-      if (parts[0].startsWith("i:")) {
+      if (parts.get(0).startsWith("i:")) {
         return gameItemRepository
             .findById(catalogueId)
             .map(i -> new Lot(null, i, location.get(), null, stolen, unit));
@@ -511,8 +513,8 @@ public class ExchangeStockWriteService {
    */
   private @NotNull Map<Change, BigDecimal> flipStolen(
       @NotNull UUID member, @NotNull List<Planned> plan) {
-    Map<Change, BigDecimal> flipped = new IdentityHashMap<>();
-    Map<Change, BigDecimal> room = new IdentityHashMap<>();
+    IdentityHashMap<Change, BigDecimal> flipped = new IdentityHashMap<>();
+    IdentityHashMap<Change, BigDecimal> room = new IdentityHashMap<>();
     for (Planned planned : plan) {
       if (planned instanceof Change change && change.target().compareTo(change.current()) > 0) {
         room.put(change, change.target().subtract(change.current()));
@@ -780,17 +782,6 @@ public class ExchangeStockWriteService {
    */
   private static @NotNull BigDecimal round(@NotNull BigDecimal amount, @NotNull String unit) {
     return amount.setScale(QuantityType.SCU.name().equals(unit) ? 3 : 0, RoundingMode.HALF_UP);
-  }
-
-  /**
-   * Rounds a double amount to its unit.
-   *
-   * @param amount the amount
-   * @param unit the unit
-   * @return the rounded amount
-   */
-  private static @NotNull BigDecimal round(double amount, @NotNull String unit) {
-    return round(BigDecimal.valueOf(amount), unit);
   }
 
   /**

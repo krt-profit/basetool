@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import de.greluc.krt.profit.basetool.frontend.contract.DtoMirrorScan;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -50,16 +51,17 @@ import org.junit.jupiter.api.io.TempDir;
  * backend twin, by parsing both source trees (REQ-OPS-038).
  *
  * <p>A twin is the backend record of the same simple name anywhere under {@code
- * backend/src/main/java}, nested records included, or the one {@link #RENAMED_TWINS} names. A
- * frontend record with no twin fails unless {@link #UNPAIRED_BY_DESIGN} lists it; a backend-only
- * component fails unless {@link #ALLOWED_BACKEND_ONLY_FIELDS} lists it; a frontend-only component
- * is only reported. The frontend sources are those of the top-level {@link DtoMirror} types; the
- * backend tree is walked recursively.
+ * backend/src/main/java} or the same path of a {@code backend-*} library module, nested records
+ * included, or the one {@link #RENAMED_TWINS} names. A frontend record with no twin fails unless
+ * {@link #UNPAIRED_BY_DESIGN} lists it; a backend-only component fails unless {@link
+ * #ALLOWED_BACKEND_ONLY_FIELDS} lists it; a frontend-only component is only reported. The frontend
+ * sources are those of the top-level {@link DtoMirror} types; the backend tree is walked
+ * recursively.
  */
 class DtoMirrorConsistencyTest {
 
   private static final Path FRONTEND_SOURCE_ROOT = resolveModuleRelative("src/main/java");
-  private static final Path BACKEND_SOURCE_ROOT = resolveModuleRelative("../backend/src/main/java");
+  private static final List<Path> BACKEND_SOURCE_ROOTS = backendSourceRoots(FRONTEND_SOURCE_ROOT);
 
   /** The number of mirrors paired today; fewer means the scan lost its sources. */
   private static final int PAIRED_FLOOR = 267;
@@ -140,14 +142,46 @@ class DtoMirrorConsistencyTest {
     return direct;
   }
 
+  /**
+   * Lists the Java source roots of the backend and of its library modules, {@code backend} and
+   * {@code backend-*}, beside the frontend module.
+   *
+   * @param frontendSourceRoot the frontend's {@code src/main/java}
+   * @return each module's {@code src/main/java} that exists, sorted by module name
+   */
+  private static List<Path> backendSourceRoots(Path frontendSourceRoot) {
+    Path repository =
+        frontendSourceRoot
+            .toAbsolutePath()
+            .normalize()
+            .getParent()
+            .getParent()
+            .getParent()
+            .getParent();
+    try (Stream<Path> children = Files.list(repository)) {
+      return children
+          .filter(
+              dir -> {
+                String name = dir.getFileName().toString();
+                return name.equals("backend") || name.startsWith("backend-");
+              })
+          .sorted()
+          .map(dir -> dir.resolve("src/main/java"))
+          .filter(Files::isDirectory)
+          .toList();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
   @Test
   void everyFrontendDtoMirrorMustNotMissBackendRecordComponents() throws IOException {
     assertTrue(
         Files.isDirectory(FRONTEND_SOURCE_ROOT),
         "Frontend source root not found at " + FRONTEND_SOURCE_ROOT.toAbsolutePath());
-    assertTrue(
-        Files.isDirectory(BACKEND_SOURCE_ROOT),
-        "Backend source root not found at " + BACKEND_SOURCE_ROOT.toAbsolutePath());
+    assertThat(BACKEND_SOURCE_ROOTS)
+        .as("backend source roots, the backend itself among them")
+        .anyMatch(root -> root.toString().replace('\\', '/').endsWith("backend/src/main/java"));
 
     List<Path> mirrors =
         DtoMirrorScan.topLevelTypes().stream()
@@ -155,7 +189,7 @@ class DtoMirrorConsistencyTest {
             .toList();
     assertThat(mirrors).as("@DtoMirror sources").allMatch(Files::isRegularFile);
 
-    Pairing pairing = pair(mirrors, BACKEND_SOURCE_ROOT, RENAMED_TWINS, UNPAIRED_BY_DESIGN);
+    Pairing pairing = pair(mirrors, BACKEND_SOURCE_ROOTS, RENAMED_TWINS, UNPAIRED_BY_DESIGN);
 
     assertThat(pairing.paired())
         .as("paired mirrors; fewer means the scan lost its sources or its layout")
@@ -241,6 +275,23 @@ class DtoMirrorConsistencyTest {
             "UNPAIRED_BY_DESIGN lists TwinnedDto, which has a backend twin");
   }
 
+  @Test
+  void aTwinInASecondBackendModuleIsFound(@TempDir Path root) throws IOException {
+    Path frontend = root.resolve("frontend");
+    Path backend = root.resolve("backend");
+    Path bank = root.resolve("backend-bank");
+    write(frontend.resolve("AccountDto.java"), "public record AccountDto(String a, int b) {}");
+    write(frontend.resolve("MissionDto.java"), "public record MissionDto(String a) {}");
+    write(backend.resolve("de/x/MissionDto.java"), "public record MissionDto(String a) {}");
+    write(bank.resolve("de/x/AccountDto.java"), "public record AccountDto(String a, int b) {}");
+
+    Pairing pairing = pair(javaSources(frontend), List.of(backend, bank), Map.of(), Map.of());
+
+    assertThat(pairing.unpaired()).isEmpty();
+    assertThat(pairing.pairs()).containsOnlyKeys("AccountDto", "MissionDto");
+    assertThat(pairing.pairs().get("AccountDto").backend()).containsExactly("a", "b");
+  }
+
   /**
    * One frontend record and its backend twin's components.
    *
@@ -287,14 +338,15 @@ class DtoMirrorConsistencyTest {
       Map<String, String> renamed,
       Map<String, String> unpairedByDesign)
       throws IOException {
-    return pair(javaSources(frontendRoot), backendRoot, renamed, unpairedByDesign);
+    return pair(javaSources(frontendRoot), List.of(backendRoot), renamed, unpairedByDesign);
   }
 
   /**
-   * Pairs the frontend records of the given sources with their backend twins below a root.
+   * Pairs the frontend records of the given sources with their backend twins below several roots.
    *
    * @param frontendSources the frontend sources, one top-level record each
-   * @param backendRoot the backend source root, walked recursively
+   * @param backendRoots the source roots of the backend and its library modules, each walked
+   *     recursively
    * @param renamed frontend name to backend name for twins under another name
    * @param unpairedByDesign frontend records that have no twin, with reasons
    * @return the pairs, the unexcused unpaired records and the stale list entries
@@ -302,12 +354,16 @@ class DtoMirrorConsistencyTest {
    */
   static Pairing pair(
       List<Path> frontendSources,
-      Path backendRoot,
+      List<Path> backendRoots,
       Map<String, String> renamed,
       Map<String, String> unpairedByDesign)
       throws IOException {
     Map<String, List<List<String>>> backendRecords = new TreeMap<>();
-    for (Path file : javaSources(backendRoot)) {
+    List<Path> backendSources = new ArrayList<>();
+    for (Path backendRoot : backendRoots) {
+      backendSources.addAll(javaSources(backendRoot));
+    }
+    for (Path file : backendSources) {
       String source = Files.readString(file, StandardCharsets.UTF_8);
       Matcher declaration = RECORD_DECLARATION.matcher(source);
       while (declaration.find()) {

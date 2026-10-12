@@ -95,7 +95,7 @@ public final class BankBalanceChart {
       BigDecimal dataMin = opening;
       BigDecimal dataMax = opening;
       for (BankBookingRow row : rows) {
-        double t = clamp(row.createdAt().toEpochMilli(), fromMs, toMs);
+        double t = clamp((double) row.createdAt().toEpochMilli(), fromMs, toMs);
         vertices.add(new double[] {t, running.doubleValue()});
         running = running.add(row.amount());
         vertices.add(new double[] {t, running.doubleValue()});

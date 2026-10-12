@@ -11,9 +11,14 @@ task then stays UP-TO-DATE or FROM-CACHE when the real file changes, and a test 
 may skip what it no longer finds. This check reads every tracked ``*.gradle.kts``, finds each
 ``inputs.file``, ``inputs.files`` and ``inputs.dir`` call, resolves the source paths it names (string
 literals, ``file(...)``, ``fileTree(...)``, ``layout.projectDirectory.file|dir(...)``,
-``rootProject.file|fileTree(...)``, and a ``val`` holding one of these) and fails on any that is
-missing. ``layout.buildDirectory`` outputs and interpolated strings are not source paths and are
+``layout.settingsDirectory.file|dir(...)``, and a ``val`` holding one of these) and fails on any that
+is missing. ``layout.buildDirectory`` outputs and interpolated strings are not source paths and are
 skipped. A selection floor fails the check when the parser stops finding today's references.
+
+A second rule keeps the module scripts independent of where a module sits: no tracked ``*.gradle.kts``
+other than the root script and the settings files may name ``rootProject``, which reaches into another
+project (it blocks Gradle's isolated projects); ``layout.settingsDirectory`` is the replacement
+(REQ-OPS-047).
 
 Usage::
 
@@ -38,7 +43,7 @@ MIN_REFERENCES = 56
 INPUT_CALL = re.compile(r"\binputs\s*\.\s*(?:file|files|dir)\s*\(")
 
 PATH_CALLS = (
-    (re.compile(r"rootProject\s*\.\s*(?:layout\s*\.\s*projectDirectory\s*\.\s*)?(?:file|files|fileTree|dir)\s*\(\s*"), "root"),
+    (re.compile(r"(?<![\w.])layout\s*\.\s*settingsDirectory\s*\.\s*(?:file|dir)\s*\(\s*"), "root"),
     (re.compile(r"(?<![\w.])layout\s*\.\s*projectDirectory\s*\.\s*(?:file|dir)\s*\(\s*"), "module"),
     (re.compile(r"(?<![\w.])(?:project\s*\.\s*)?(?:file|files|fileTree)\s*\(\s*"), "module"),
 )
@@ -46,6 +51,7 @@ PATH_CALLS = (
 STRING = re.compile(r'"((?:[^"\\]|\\.)*)"')
 IDENT = re.compile(r"[A-Za-z_]\w*")
 VAL_DECL = re.compile(r"^\s*val\s+([A-Za-z_]\w*)\s*(?::[^=\n]+)?=", re.M)
+ROOT_PROJECT = re.compile(r"(?<!\w)rootProject\b")
 
 
 @dataclass(frozen=True)
@@ -229,6 +235,25 @@ def missing(refs: list[Reference], root: Path) -> list[str]:
     return problems
 
 
+def root_project_uses(scripts: dict[str, str]) -> list[str]:
+    """Return a message for every ``rootProject`` use outside the root script and the settings files.
+
+    :param scripts: each script path, ``/``-separated and relative to the repository root, to its text.
+    :return: one message per offending line.
+    """
+    problems = []
+    for script, text in scripts.items():
+        if script == "build.gradle.kts" or script.endswith("settings.gradle.kts"):
+            continue
+        for number, line in enumerate(text.splitlines(), 1):
+            if ROOT_PROJECT.search(line):
+                problems.append(
+                    f"{script}:{number}: rootProject reaches into another project; use"
+                    " layout.settingsDirectory (REQ-OPS-047)"
+                )
+    return problems
+
+
 def tracked_scripts(root: Path) -> list[str]:
     """List the tracked Gradle Kotlin scripts.
 
@@ -249,9 +274,10 @@ def check(root: Path, verbose: bool = False) -> int:
     :return: 0 when every path exists and the floor holds, 1 otherwise.
     """
     refs: list[Reference] = []
-    for script in tracked_scripts(root):
-        refs.extend(references(script, (root / script).read_text(encoding="utf-8")))
-    problems = missing(refs, root)
+    texts = {script: (root / script).read_text(encoding="utf-8") for script in tracked_scripts(root)}
+    for script, text in texts.items():
+        refs.extend(references(script, text))
+    problems = missing(refs, root) + root_project_uses(texts)
     print(f"check-gradle-input-paths: {len(refs)} input path(s) in build scripts")
     if verbose:
         for ref in refs:
@@ -282,32 +308,51 @@ def selftest() -> int:
         'val mirrorDir = "backend/dto"\n'
         'val probe =\n  layout.projectDirectory.file(\n    "src/probe.js"\n  )\n'
         'val generated = layout.buildDirectory.file("gen/x.js")\n'
-        'val spec = rootProject.file("backend/openapi.json")\n'
+        'val spec = layout.settingsDirectory.file("backend/openapi.json")\n'
         'tasks.named<Test>("test") {\n'
-        '  inputs\n    .files(rootProject.fileTree(mirrorDir) { include("*.java") })\n'
+        '  inputs\n    .files(fileTree(layout.settingsDirectory.dir(mirrorDir)) { include("*.java") })\n'
         '    .withPropertyName("mirror")\n'
         '  inputs.file("package.json")\n'
         '  inputs.file(probe)\n'
         '  inputs.file(generated)\n'
         '  inputs.file(spec)\n'
-        '  inputs.dir(layout.projectDirectory.dir("../docs/exchange"))\n'
+        '  inputs.dir(layout.settingsDirectory.dir("docs/exchange"))\n'
+        '  inputs.dir(layout.projectDirectory.dir("../docs/legacy"))\n'
         '  inputs.files(fileTree("src/css") { include("**/*.css") }, file("oss.json"))\n'
         '  inputs.file("docs/${project.name}.json")\n'
         '}\n'
     )
     refs = references("frontend/build.gradle.kts", script)
     got = {(r.path, r.base) for r in refs}
-    expect("a val holding a string, used in rootProject.fileTree, resolves against the root",
+    expect("a val holding a string, used in a settingsDirectory fileTree, resolves against the root",
            ("backend/dto", "root") in got)
     expect("a bare string argument resolves against the module", ("package.json", "module") in got)
     expect("a multi-line val holding layout.projectDirectory.file resolves", ("src/probe.js", "module") in got)
-    expect("a val holding rootProject.file resolves against the root", ("backend/openapi.json", "root") in got)
-    expect("inputs.dir with a relative parent resolves", ("../docs/exchange", "module") in got)
+    expect("a val holding layout.settingsDirectory.file resolves against the root",
+           ("backend/openapi.json", "root") in got)
+    expect("layout.settingsDirectory.dir resolves against the root", ("docs/exchange", "root") in got)
+    expect("inputs.dir with a relative parent resolves", ("../docs/legacy", "module") in got)
     expect("fileTree and file in one call both resolve", {("src/css", "module"), ("oss.json", "module")} <= got)
     expect("an include pattern is not taken for a path", not any("*" in p for p, _ in got))
     expect("a buildDirectory output is skipped", not any(p.startswith("gen/") for p, _ in got))
     expect("an interpolated string is skipped", not any("$" in p for p, _ in got))
-    expect("exactly the seven source paths are found", len(got) == 7)
+    expect("exactly the eight source paths are found", len(got) == 8)
+
+    uses = root_project_uses(
+        {
+            "build.gradle.kts": "rootProject.file(\"x\")\n",
+            "settings.gradle.kts": "rootProject.name = \"x\"\n",
+            "build-logic/settings.gradle.kts": "rootProject.name = \"y\"\n",
+            "ingest/build.gradle.kts": "val a = 1\ninputs.file(rootProject.file(\"x\"))\n",
+            "build-logic/src/main/kotlin/c.gradle.kts": "val s = project.rootProject\n",
+            "frontend/build.gradle.kts": "val rootProjectDir = 1\nlayout.settingsDirectory\n",
+        }
+    )
+    expect("rootProject is reported in a module script and a convention script",
+           len(uses) == 2 and "ingest/build.gradle.kts:2" in uses[0] and "c.gradle.kts:1" in uses[1])
+    expect("rootProject is allowed in the root script and the settings files, and as part of a name",
+           not any(u.startswith(("build.gradle.kts", "settings.gradle.kts", "build-logic/settings")) for u in uses)
+           and not any("frontend/" in u for u in uses))
 
     import tempfile
 
@@ -316,6 +361,7 @@ def selftest() -> int:
         (root / "frontend" / "src" / "css").mkdir(parents=True)
         (root / "backend" / "dto").mkdir(parents=True)
         (root / "docs" / "exchange").mkdir(parents=True)
+        (root / "docs" / "legacy").mkdir(parents=True)
         for f in ("frontend/package.json", "frontend/src/probe.js", "backend/openapi.json", "frontend/oss.json"):
             (root / f).write_text("x", encoding="utf-8")
         expect("every planted path exists: no problem", missing(refs, root) == [])

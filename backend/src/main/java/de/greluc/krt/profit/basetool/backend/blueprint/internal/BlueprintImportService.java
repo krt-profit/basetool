@@ -62,10 +62,10 @@ import tools.jackson.databind.ObjectMapper;
  * Imports a user's blueprints from an uploaded export (REQ-INV-014) in two steps.
  *
  * <ol>
- *   <li>{@link #previewImport(String, MultipartFile)} resolves each entry by structural tag, exact
+ *   <li>{@link #previewImport(UUID, MultipartFile)} resolves each entry by structural tag, exact
  *       name, alias, the untagged name (REQ-INV-050), then fuzzy suggestion, without persisting
  *       anything.
- *   <li>{@link #applyImport(String, List)} creates the chosen owned-blueprint rows and learns an
+ *   <li>{@link #applyImport(UUID, List)} creates the chosen owned-blueprint rows and learns an
  *       alias for every manual pick.
  * </ol>
  *

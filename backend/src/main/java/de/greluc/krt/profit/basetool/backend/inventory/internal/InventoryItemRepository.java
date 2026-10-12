@@ -277,7 +277,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
   /**
    * Pages the material rows owned by {@code :user} with the same optional filters as {@link
-   * #findGlobalByFilters}; the item variant is {@link #findUserItemsByFilters}.
+   * #findGlobalByFilters}.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
@@ -60,6 +61,9 @@ public final class ContractTiers {
 
   /** The verbs a line may name. */
   private static final Set<String> VERBS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE");
+
+  /** Separates the three tokens of a line. */
+  private static final Pattern SPACE = Pattern.compile(" ");
 
   /** {@code VERB path} to its tier, for the listed operations. */
   private final Map<String, String> byOperation;
@@ -108,15 +112,15 @@ public final class ContractTiers {
       if (line.isEmpty()) {
         continue;
       }
-      String[] tokens = line.split(" ");
-      if (tokens.length != 3
-          || !LISTED.contains(tokens[0])
-          || !VERBS.contains(tokens[1])
-          || !tokens[2].startsWith("/")) {
+      List<String> tokens = SPACE.splitAsStream(line).toList();
+      if (tokens.size() != 3
+          || !LISTED.contains(tokens.get(0))
+          || !VERBS.contains(tokens.get(1))
+          || !tokens.get(2).startsWith("/")) {
         throw new IllegalArgumentException(
             RESOURCE + " line " + (index + 1) + " is not '<T0|T1> <VERB> <path>': " + line);
       }
-      if (tiers.put(tokens[1] + " " + tokens[2], tokens[0]) != null) {
+      if (tiers.put(tokens.get(1) + " " + tokens.get(2), tokens.get(0)) != null) {
         throw new IllegalArgumentException(
             RESOURCE + " line " + (index + 1) + " names an operation a second time: " + line);
       }
