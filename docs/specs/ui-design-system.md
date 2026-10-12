@@ -1396,7 +1396,7 @@ them in one place so nobody has to collect the addresses from Discord.
   the quick access. **Every signed-in account** may open it (class-level `@PreAuthorize("isAuthenticated()")`);
   since every account is at least a member, that is „every member". Not on the public surface: an
   anonymous caller is sent to the login like on every other page.
-- **What.** Thirty-eight links in six sections, in this order:
+- **What.** Forty links in six sections, in this order:
   - **Organisation** — das-kartell.org, krt-opsec.de
   - **Offizielles** / Official — robertsspaceindustries.com, its Spectrum community
     (`/spectrum/community/SC`), the roadmap, issue-council, status and public-telemetry
@@ -1406,18 +1406,24 @@ them in one place so nobody has to collect the addresses from Discord.
     sc-trading.kamille.ovh
   - **Schiffe & Ausrüstung** — erkul.games/calculator, spviewer.eu, fleetyards.net,
     starcitizen-community.de/holoviewer, ccugame.app, maps.adi.sc
-  - **Datenbanken & Crafting** — cstone.space, scmdb.net, sc-craft.tools, versekit.xharig.com
+  - **Datenbanken & Crafting** — cstone.space, scmdb.net, sc-craft.tools, versekit.xharig.com,
+    lootmaster.org
   - **Universum & Community** — verseguide.com, ueexi.com, star-citizen-characters.com,
     daymarrally.com, systemseven.gg, star-citizen.wiki, starcitizen.tools, sc-deutsch-launcher.de,
-    sc-links.org
+    sc-links.org, verseintel.org
+- **Sections fold.** Each section heading is a toggle button (`aria-expanded`, `aria-controls` the
+  section's card grid) with a chevron and the section's link count. Every section is open by
+  default; a member's choice is kept in the browser's `localStorage` (`sc_links_collapsed_categories`,
+  the keys of the closed sections), so a new section opens by default and an unavailable or
+  corrupt storage leaves all sections open. Nothing is sent to the server.
 - **How a link reads.** A `.card` per site: the site's own logo (48 px), its name, the host it leads
   to, and a one- or two-sentence description in the UI language. The whole card is the link; it opens
   in a new tab with `rel="noopener noreferrer"`, and says so to screen readers. A closing line states
   that the sites are run by third parties and their names and logos belong to them.
 - **Logos are local copies.** Each site's favicon or touch icon is stored under
-  `static/images/sc-links/` — PNGs normalised to 96 × 96 on a transparent square, three sites as
+  `static/images/sc-links/` — PNGs normalised to 96 × 96 on a transparent square, five sites as
   SVG; sites of one operator may share a logo file. The CSP's `img-src 'self' data:` forbids hotlinking, and a hotlinked logo would
-  also send every member's address to thirty-eight third parties on each visit. A shipped SVG carries no
+  also send every member's address to forty third parties on each visit. A shipped SVG carries no
   script, event handler, `foreignObject` or external reference.
 - **The catalogue is code.** `ScLink` (key, address, logo, section) and `ScLinkCategory` are enums;
   names and descriptions are i18n keys `scLinks.link.<key>.name` / `.description`. Changing the list

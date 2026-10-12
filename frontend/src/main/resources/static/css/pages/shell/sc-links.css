@@ -4,6 +4,47 @@
     .sc-links-section {
         margin-top: var(--space-6);
     }
+    .sc-links-head {
+        padding-bottom: 0;
+    }
+    .sc-links-toggle {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        width: 100%;
+        min-height: var(--touch-target);
+        padding: 0 0 0.5rem;
+        background: none;
+        border: 0;
+        color: inherit;
+        font: inherit;
+        letter-spacing: inherit;
+        text-align: left;
+        text-transform: inherit;
+        cursor: pointer;
+    }
+    .sc-links-toggle:hover {
+        color: var(--color-primary);
+    }
+    .sc-links-toggle:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+    .sc-links-chevron {
+        width: 16px;
+        height: 16px;
+        color: var(--color-gray-2-text);
+        transition: transform 0.2s;
+    }
+    .sc-links-toggle[aria-expanded='true'] .sc-links-chevron {
+        transform: rotate(90deg);
+    }
+    .sc-links-name {
+        flex: 0 1 auto;
+    }
+    .sc-links-grid[hidden] {
+        display: none;
+    }
     .sc-links-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
