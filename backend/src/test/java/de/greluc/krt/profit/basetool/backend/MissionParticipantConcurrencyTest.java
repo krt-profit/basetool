@@ -26,12 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -54,7 +54,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  * ObjectOptimisticLockingFailureException} and without changing {@link Mission#getVersion()}.
  *
  * <p>Guards the {@code @OptimisticLock(excluded = true)} on {@link
- * de.greluc.krt.profit.basetool.backend.model.Mission#getParticipants()} and the absence of a
+ * de.greluc.krt.profit.basetool.backend.mission.api.Mission#getParticipants()} and the absence of a
  * mission save in {@link MissionService#addParticipant}. Not {@code @Transactional}, so each worker
  * runs in its own session.
  */

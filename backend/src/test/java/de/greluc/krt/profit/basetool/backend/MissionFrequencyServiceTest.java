@@ -23,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequency;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFrequencyRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.model.*;

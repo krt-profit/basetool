@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferences;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;

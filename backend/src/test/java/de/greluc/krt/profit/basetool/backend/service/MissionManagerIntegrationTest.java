@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

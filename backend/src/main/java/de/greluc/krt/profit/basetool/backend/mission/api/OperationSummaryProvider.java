@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.api;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
 import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;

@@ -51,13 +51,13 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto.BookInDto;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController.ReassignResponsibleOrgUnitRequest;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddExternalParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwningOrgUnitRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionCreateRequest;

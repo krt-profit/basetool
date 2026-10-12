@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferences;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import jakarta.persistence.EntityManager;
 import java.util.HashMap;
 import java.util.LinkedHashSet;

@@ -30,9 +30,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
@@ -41,8 +43,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Arrays;

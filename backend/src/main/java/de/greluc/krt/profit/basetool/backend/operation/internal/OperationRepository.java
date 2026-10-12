@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationSummary;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -67,7 +67,7 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary(
+      SELECT new de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationSummary(
       o.id, o.name, o.description, CAST(o.status AS string), ou.id, ou.name, ou.shorthand, o.version,
       o.createdAt, o.updatedAt) FROM Operation o LEFT JOIN o.owningOrgUnit ou WHERE o.id IN :ids
       """)

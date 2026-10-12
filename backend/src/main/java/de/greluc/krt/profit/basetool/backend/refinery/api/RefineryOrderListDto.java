@@ -23,7 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;

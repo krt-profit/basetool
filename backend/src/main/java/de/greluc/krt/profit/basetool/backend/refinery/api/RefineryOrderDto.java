@@ -23,7 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.NotEmpty;

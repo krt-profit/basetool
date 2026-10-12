@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

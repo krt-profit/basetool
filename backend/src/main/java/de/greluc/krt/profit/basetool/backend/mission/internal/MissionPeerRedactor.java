@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnitDto;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;

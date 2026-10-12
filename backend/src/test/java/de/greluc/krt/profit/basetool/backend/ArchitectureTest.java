@@ -70,6 +70,9 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankViewUserDt
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibilityService;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
@@ -97,6 +100,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorPro
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
+import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.RejectedRegistrationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -124,6 +128,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
@@ -136,17 +141,26 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.livesync.internal.LiveSyncFanoutProperties;
-import de.greluc.krt.profit.basetool.backend.mapper.MissionViewerAccess;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeQueryParams;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionCrewDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequencyDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveKind;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationSummary;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionStepDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnitDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionViewerAccess;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationFanoutProperties;
@@ -156,6 +170,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgRoleManagementSecuri
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitLabels;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipMapper;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
@@ -177,7 +192,6 @@ import de.greluc.krt.profit.basetool.backend.privacy.api.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
@@ -408,6 +422,22 @@ class ArchitectureTest {
           LocationDto.class,
           ShipTypeDto.class,
           ManufacturerDto.class,
+          MissionDto.class,
+          MissionParticipantDto.class,
+          MissionUnitDto.class,
+          MissionCrewDto.class,
+          MissionFrequencyDto.class,
+          MissionOperationDto.class,
+          MissionStepDto.class,
+          MissionObjectiveDto.class,
+          JobTypeDto.class,
+          FrequencyTypeDto.class,
+          OrgUnitReferenceDto.class,
+          MissionObjectiveKind.class,
+          MissionOperationSummary.class,
+          PayoutPreference.class,
+          JobTypeArchetype.class,
+          OrgUnitKind.class,
           UexValues.class,
           UserDto.class,
           UserDtoRedaction.class,
@@ -774,7 +804,7 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("mapperLayerShouldNotReachIntoSecurityContext", MAPPER_CODE, 105);
+    assertClassFloor("mapperLayerShouldNotReachIntoSecurityContext", MAPPER_CODE, 103);
     mapperLayerShouldNotReachIntoSecurityContextRule().check(CLASSES);
   }
 
@@ -976,7 +1006,7 @@ class ArchitectureTest {
   void controllerLayerShouldNotDependOnRepositoryLayer() {
     assertClassFloor("controllerLayerShouldNotDependOnRepositoryLayer", CONTROLLER_CODE, 99);
     assertClassFloor(
-        "controllerLayerShouldNotDependOnRepositoryLayer (targets)", REPOSITORY_CODE, 111);
+        "controllerLayerShouldNotDependOnRepositoryLayer (targets)", REPOSITORY_CODE, 107);
     controllerLayerShouldNotDependOnRepositoryLayerRule().check(CLASSES);
   }
 
@@ -1268,7 +1298,7 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotDependOnServiceLayer() {
-    assertClassFloor("mapperLayerShouldNotDependOnServiceLayer", MAPPER_CODE, 105);
+    assertClassFloor("mapperLayerShouldNotDependOnServiceLayer", MAPPER_CODE, 103);
     mustNotDependOnServicesRule(MAPPER_CODE)
         .because(
             "the service layer depends on mappers, so a mapper -> service edge re-creates the "
@@ -1694,7 +1724,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 158);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 143);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

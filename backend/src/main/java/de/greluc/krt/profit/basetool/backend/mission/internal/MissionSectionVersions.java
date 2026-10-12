@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;

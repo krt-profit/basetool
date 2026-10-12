@@ -28,7 +28,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryMappe
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapperImpl;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodMapperImpl;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;

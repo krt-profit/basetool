@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
-import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import java.util.List;
 import java.util.UUID;

@@ -26,8 +26,8 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,11 +68,11 @@ class MissionControllerSecurityTest {
 
     when(missionSecurityService.canManageMission(any(UUID.class), ArgumentMatchers.any()))
         .thenReturn(true);
-    de.greluc.krt.profit.basetool.backend.model.MissionCrew crew =
-        new de.greluc.krt.profit.basetool.backend.model.MissionCrew();
+    de.greluc.krt.profit.basetool.backend.mission.api.MissionCrew crew =
+        new de.greluc.krt.profit.basetool.backend.mission.api.MissionCrew();
     crew.setId(crewId);
-    de.greluc.krt.profit.basetool.backend.model.MissionUnit unit =
-        new de.greluc.krt.profit.basetool.backend.model.MissionUnit();
+    de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit unit =
+        new de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit();
     unit.setId(unitId);
     unit.setCrew(new java.util.LinkedHashSet<>(java.util.List.of(crew)));
     Mission mission = new Mission();

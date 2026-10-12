@@ -31,10 +31,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionOwnership;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionOwnership;
 import de.greluc.krt.profit.basetool.backend.platform.api.GlobalExceptionHandler;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

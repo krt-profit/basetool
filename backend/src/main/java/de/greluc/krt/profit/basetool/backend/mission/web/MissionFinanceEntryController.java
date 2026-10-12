@@ -21,14 +21,14 @@ package de.greluc.krt.profit.basetool.backend.mission.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryUpdateDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;

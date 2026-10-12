@@ -40,6 +40,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.web.InventoryItemControll
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionController;
@@ -48,8 +50,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.model.MaterialClaim;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.web.OperationController;

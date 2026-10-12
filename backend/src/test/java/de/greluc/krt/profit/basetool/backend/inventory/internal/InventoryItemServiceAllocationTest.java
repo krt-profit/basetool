@@ -46,8 +46,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationExcepti
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;

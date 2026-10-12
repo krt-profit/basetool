@@ -157,8 +157,8 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldAutoClampMissionEarmark_whenDualTaggedPartialHandover() {
-    de.greluc.krt.profit.basetool.backend.model.Mission mission =
-        new de.greluc.krt.profit.basetool.backend.model.Mission();
+    de.greluc.krt.profit.basetool.backend.mission.api.Mission mission =
+        new de.greluc.krt.profit.basetool.backend.mission.api.Mission();
     mission.setId(UUID.randomUUID());
     InventoryAllocations.addMission(inventoryItem, mission.getId(), 10.0);
 
@@ -184,11 +184,11 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldApplyExplicitMissionPlan_whenAmbiguousMultiMission() {
-    de.greluc.krt.profit.basetool.backend.model.Mission missionA =
-        new de.greluc.krt.profit.basetool.backend.model.Mission();
+    de.greluc.krt.profit.basetool.backend.mission.api.Mission missionA =
+        new de.greluc.krt.profit.basetool.backend.mission.api.Mission();
     missionA.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.model.Mission missionB =
-        new de.greluc.krt.profit.basetool.backend.model.Mission();
+    de.greluc.krt.profit.basetool.backend.mission.api.Mission missionB =
+        new de.greluc.krt.profit.basetool.backend.mission.api.Mission();
     missionB.setId(UUID.randomUUID());
     InventoryAllocations.addMission(inventoryItem, missionA.getId(), 6.0);
     InventoryAllocations.addMission(inventoryItem, missionB.getId(), 4.0);

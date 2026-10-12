@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import java.util.UUID;
 
 /**

@@ -29,15 +29,15 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -338,7 +338,7 @@ class MissionAccessControlTest {
                 .content(ownFieldsUpdate))
         .andExpect(status().isOk());
 
-    de.greluc.krt.profit.basetool.backend.model.MissionParticipant participant =
+    de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant participant =
         missionRepository.findById(mission.getId()).orElseThrow().getParticipants().stream()
             .filter(mp1 -> mp1.getUser().getId().equals(memberUser.getId()))
             .findFirst()

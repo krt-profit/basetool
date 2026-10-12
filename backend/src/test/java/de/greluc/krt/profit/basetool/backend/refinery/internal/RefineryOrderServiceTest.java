@@ -90,10 +90,10 @@ class RefineryOrderServiceTest {
   @Mock private LocationRepository locationRepository;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.repository.MissionRepository missionRepository;
+  private de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository missionRepository;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository
+  private de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository
       missionParticipantRepository;
 
   @Mock
@@ -774,8 +774,8 @@ class RefineryOrderServiceTest {
 
     @Test
     void dropsTheOrdersMissionEarmark_onAPersonalRow_butKeepsItOnASharedOne() {
-      de.greluc.krt.profit.basetool.backend.model.Mission mission =
-          new de.greluc.krt.profit.basetool.backend.model.Mission();
+      de.greluc.krt.profit.basetool.backend.mission.api.Mission mission =
+          new de.greluc.krt.profit.basetool.backend.mission.api.Mission();
       mission.setId(UUID.randomUUID());
       order.setMissionId(mission.getId());
       stubLookupsForSingleItem();

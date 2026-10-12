@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObserver;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

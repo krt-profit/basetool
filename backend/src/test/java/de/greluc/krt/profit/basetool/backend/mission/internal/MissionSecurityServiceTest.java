@@ -28,11 +28,11 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,7 +56,7 @@ class MissionSecurityServiceTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository
+  private de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository
       missionFinanceEntryRepository;
 
   @Mock private MissionAccessPolicy missionAccessPolicy;

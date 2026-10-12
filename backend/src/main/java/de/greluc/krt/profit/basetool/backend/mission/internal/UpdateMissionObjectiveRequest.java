@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveKind;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

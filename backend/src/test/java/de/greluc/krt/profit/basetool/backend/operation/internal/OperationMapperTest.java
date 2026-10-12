@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationSummary;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import java.time.Instant;

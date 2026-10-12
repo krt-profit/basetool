@@ -21,10 +21,10 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionListDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionOperationSummary;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionListDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationSummary;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import java.lang.reflect.RecordComponent;

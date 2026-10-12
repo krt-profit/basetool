@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionDto;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;

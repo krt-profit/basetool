@@ -31,12 +31,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.FinanceType;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
-import de.greluc.krt.profit.basetool.backend.model.FinanceType;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.List;

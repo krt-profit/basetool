@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
-import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

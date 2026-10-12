@@ -26,9 +26,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Phase;
-import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

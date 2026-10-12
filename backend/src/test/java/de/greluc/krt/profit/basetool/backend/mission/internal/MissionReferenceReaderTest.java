@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
