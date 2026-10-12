@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The Bereichsleitung tier at the top of the org chart. Holds the single Bereichsleiter plus the
@@ -32,7 +33,7 @@ import java.util.List;
  * @param operators the Bereichsoperatoren, ordered for display; never {@code null}.
  */
 public record AreaLeadershipDto(
-    OrgChartNodeDto lead,
+    @Nullable OrgChartNodeDto lead,
     List<OrgChartNodeDto> commanders,
     List<OrgChartNodeDto> coordinators,
     List<OrgChartNodeDto> operators) {}

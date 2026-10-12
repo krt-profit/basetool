@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One filled person-node in the rendered org chart: the user who holds a single functional-rank
@@ -42,10 +43,10 @@ import java.util.UUID;
  *     changes.
  */
 public record OrgChartNodeDto(
-    UUID positionId,
+    @Nullable UUID positionId,
     OrgChartPositionType positionType,
-    UUID userId,
-    String userName,
-    String displayName,
+    @Nullable UUID userId,
+    @Nullable String userName,
+    @Nullable String displayName,
     int sortIndex,
-    Long version) {}
+    @Nullable Long version) {}

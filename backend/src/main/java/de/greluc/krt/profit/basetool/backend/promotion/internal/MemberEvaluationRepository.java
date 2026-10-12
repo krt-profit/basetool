@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.promotion.internal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -75,7 +76,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       e.category.topic.owningSquadron.id = :owningSquadronId)
       """)
   List<MemberEvaluation> findAllByUserIdScoped(
-      @Param("userId") UUID userId, @Param("owningSquadronId") UUID owningSquadronId);
+      @Param("userId") UUID userId, @Param("owningSquadronId") @Nullable UUID owningSquadronId);
 
   /**
    * Paginated squadron-scoped variant of {@link #findAllByUserIdScoped(UUID, UUID)}.
@@ -92,7 +93,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       """)
   Page<MemberEvaluation> findAllByUserIdScoped(
       @Param("userId") UUID userId,
-      @Param("owningSquadronId") UUID owningSquadronId,
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId,
       Pageable pageable);
 
   /**
@@ -110,7 +111,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       e.category.topic.owningSquadron.id = :owningSquadronId
       """)
   Page<MemberEvaluation> findAllScoped(
-      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId, Pageable pageable);
 
   /**
    * Looks up a single evaluation by its primary key components.
@@ -167,7 +168,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       AND (:owningSquadronId IS NULL OR t.owningSquadron.id = :owningSquadronId)
       """)
   List<MemberEvaluation> findAllByUserIdWithCategoryAndTopicScoped(
-      @Param("userId") UUID userId, @Param("owningSquadronId") UUID owningSquadronId);
+      @Param("userId") UUID userId, @Param("owningSquadronId") @Nullable UUID owningSquadronId);
 
   /**
    * Deletes every promotion grade of the given member during hard account deletion (REQ-DATA-008).

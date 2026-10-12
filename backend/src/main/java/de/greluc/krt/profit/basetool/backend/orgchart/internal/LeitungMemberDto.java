@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One roster row in the delegated Leitung view: a member of a managed org unit with their
@@ -36,8 +37,8 @@ import java.util.UUID;
  */
 public record LeitungMemberDto(
     UUID userId,
-    String userDisplayName,
+    @Nullable String userDisplayName,
     MembershipRole role,
-    UUID kommandoGroupId,
+    @Nullable UUID kommandoGroupId,
     long version,
     boolean self) {}

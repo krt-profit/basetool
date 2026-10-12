@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Result of evaluating one {@code RankRequirement} against a member's evaluations.
@@ -40,10 +41,10 @@ import java.util.UUID;
  */
 public record PromotionRequirementCheckResponse(
     UUID requirementId,
-    UUID topicId,
-    String topicName,
-    UUID categoryId,
-    String categoryName,
+    @Nullable UUID topicId,
+    @Nullable String topicName,
+    @Nullable UUID categoryId,
+    @Nullable String categoryName,
     PromotionLevel minimumLevel,
     int requiredCount,
     int achievedCount,

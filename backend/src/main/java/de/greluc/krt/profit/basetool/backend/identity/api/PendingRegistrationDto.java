@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One row of the admin registration-approval queue; carries no Discord id.
@@ -37,8 +38,8 @@ import java.util.UUID;
 public record PendingRegistrationDto(
     UUID id,
     String username,
-    String serverNickname,
+    @Nullable String serverNickname,
     Instant registeredAt,
-    Instant decidedAt,
+    @Nullable Instant decidedAt,
     boolean callsignCollision,
     Long version) {}

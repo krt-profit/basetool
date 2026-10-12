@@ -41,6 +41,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Requirements for a promotion from one rank to another. {@link #topic} and {@link #category} are
@@ -84,11 +85,13 @@ public class RankRequirement extends AbstractEntity<UUID> {
   @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "topic_id")
+  @Nullable
   private PromotionTopic topic;
 
   @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "category_id")
+  @Nullable
   private PromotionCategory category;
 
   @Enumerated(EnumType.STRING)

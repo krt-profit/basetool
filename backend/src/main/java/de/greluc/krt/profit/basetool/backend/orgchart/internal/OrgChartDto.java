@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The complete org chart as one nested read model (REQ-ORG-026), returned by {@code GET
@@ -34,7 +35,7 @@ import java.util.List;
  *     name; never {@code null}, possibly empty
  */
 public record OrgChartDto(
-    OlChartDto organisationsleitung,
+    @Nullable OlChartDto organisationsleitung,
     List<BereichChartDto> bereiche,
     AreaLeadershipDto areaLeadership,
     List<SquadronChartDto> squadrons,

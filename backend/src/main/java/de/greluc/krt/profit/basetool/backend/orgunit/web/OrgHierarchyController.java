@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -407,7 +408,7 @@ public class OrgHierarchyController {
    * @param version the bumped optimistic-lock version.
    */
   public record OrgUnitParentResponse(
-      UUID orgUnitId, OrgUnitKind kind, UUID parentOrgUnitId, Long version) {}
+      UUID orgUnitId, OrgUnitKind kind, @Nullable UUID parentOrgUnitId, Long version) {}
 
   /**
    * Response for the add-Bereichsleitung-member endpoint: the member's resulting role flags and the

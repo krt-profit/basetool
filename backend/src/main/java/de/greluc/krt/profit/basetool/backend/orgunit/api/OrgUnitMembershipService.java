@@ -468,13 +468,41 @@ public class OrgUnitMembershipService {
       @NotNull UUID specialCommandId,
       @NotNull UUID userId,
       @NotNull MembershipFlagsPatchRequest request) {
+    return patchFlags(
+        specialCommandId,
+        userId,
+        request.isLogistician(),
+        request.isMissionManager(),
+        request.version());
+  }
+
+  /**
+   * Updates the Logistician / Mission Manager flags of an SK membership from the plain values; a
+   * {@code null} flag leaves the current value and a {@code null} version never matches.
+   *
+   * @param specialCommandId the SK whose membership to patch; never {@code null}.
+   * @param userId the user whose membership to patch; never {@code null}.
+   * @param isLogistician the new Logistician flag, or {@code null} to keep it.
+   * @param isMissionManager the new Mission Manager flag, or {@code null} to keep it.
+   * @param version the inbound row version; a {@code null} version is a conflict.
+   * @return the persisted membership row with the bumped {@code @Version}.
+   * @throws NotFoundException if no SK matches the given id, or the user is not a member.
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembership patchFlags(
+      @NotNull UUID specialCommandId,
+      @NotNull UUID userId,
+      @Nullable Boolean isLogistician,
+      @Nullable Boolean isMissionManager,
+      @Nullable Long version) {
     OrgUnitMembership m = loadMembership(specialCommandId, userId);
-    assertVersionMatches(m, request.version());
-    if (request.isLogistician() != null) {
-      m.setLogistician(request.isLogistician());
+    assertVersionMatches(m, version);
+    if (isLogistician != null) {
+      m.setLogistician(isLogistician);
     }
-    if (request.isMissionManager() != null) {
-      m.setMissionManager(request.isMissionManager());
+    if (isMissionManager != null) {
+      m.setMissionManager(isMissionManager);
     }
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     recordCapabilityFlagsChanged(specialCommandId, userId, saved);

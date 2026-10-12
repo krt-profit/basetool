@@ -460,7 +460,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * @param raw the raw value to escape
    * @return the JSON-escaped value, ready to be wrapped in double quotes
    */
-  private static String jsonEscape(String raw) {
+  private static String jsonEscape(@Nullable String raw) {
     StringBuilder builder = new StringBuilder();
     JsonStringEncoder.getInstance().quoteAsString(raw, builder);
     return builder.toString();

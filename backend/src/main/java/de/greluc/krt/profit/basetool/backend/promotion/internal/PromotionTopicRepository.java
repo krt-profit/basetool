@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -54,7 +55,7 @@ public interface PromotionTopicRepository extends JpaRepository<PromotionTopic, 
       SELECT t FROM PromotionTopic t WHERE :owningSquadronId IS NULL OR t.owningSquadron.id =
       :owningSquadronId ORDER BY t.sortOrder ASC
       """)
-  List<PromotionTopic> findAllScoped(@Param("owningSquadronId") UUID owningSquadronId);
+  List<PromotionTopic> findAllScoped(@Param("owningSquadronId") @Nullable UUID owningSquadronId);
 
   /**
    * Squadron-scoped paged read. Same {@code null}-means-no-filter contract as {@link
@@ -66,5 +67,5 @@ public interface PromotionTopicRepository extends JpaRepository<PromotionTopic, 
       :owningSquadronId
       """)
   Page<PromotionTopic> findAllScoped(
-      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId, Pageable pageable);
 }

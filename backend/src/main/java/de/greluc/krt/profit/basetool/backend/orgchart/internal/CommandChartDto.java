@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One Kommando within a Staffel: the Kommando row itself, its optional Kommandoleiter and Stv.
@@ -47,12 +48,12 @@ import java.util.UUID;
  */
 public record CommandChartDto(
     UUID positionId,
-    String name,
+    @Nullable String name,
     Long version,
     int sortIndex,
-    UUID kommandoGroupId,
-    UUID leaderUserId,
-    String leaderUserName,
-    String leaderDisplayName,
-    OrgChartNodeDto deputy,
+    @Nullable UUID kommandoGroupId,
+    @Nullable UUID leaderUserId,
+    @Nullable String leaderUserName,
+    @Nullable String leaderDisplayName,
+    @Nullable OrgChartNodeDto deputy,
     List<OrgChartNodeDto> ensigns) {}

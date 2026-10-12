@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One Bereich tier of the org chart (REQ-ORG-026): its Bereichsleitung plus the Staffeln and
@@ -43,7 +44,7 @@ public record BereichChartDto(
     UUID orgUnitId,
     String name,
     String shorthand,
-    Department department,
+    @Nullable Department department,
     AreaLeadershipDto leadership,
     List<SquadronChartDto> squadrons,
     List<SpecialCommandChartDto> specialCommands) {}

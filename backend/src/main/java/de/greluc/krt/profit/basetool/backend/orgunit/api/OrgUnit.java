@@ -70,6 +70,7 @@ public abstract class OrgUnit extends AbstractEntity<UUID> {
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
+  @Setter(onParam_ = @__(@Nullable))
   private UUID id;
 
   /**

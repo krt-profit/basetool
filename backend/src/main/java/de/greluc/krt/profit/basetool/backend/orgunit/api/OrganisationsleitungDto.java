@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.orgunit.api;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Wire shape for {@link de.greluc.krt.profit.basetool.backend.orgunit.api.Organisationsleitung},
@@ -38,6 +39,6 @@ public record OrganisationsleitungDto(
     UUID id,
     @NotBlank @Size(max = 255) String name,
     @NotBlank @Size(max = 255) String shorthand,
-    @Size(max = 65_535) String description,
+    @Size(max = 65_535) @Nullable String description,
     Boolean active,
     Long version) {}

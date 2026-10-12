@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Flat hierarchy-node view of an {@link de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit}
@@ -39,6 +40,6 @@ public record OrgUnitNodeDto(
     String name,
     String shorthand,
     OrgUnitKind kind,
-    UUID parentOrgUnitId,
-    Department department,
+    @Nullable UUID parentOrgUnitId,
+    @Nullable Department department,
     Long version) {}

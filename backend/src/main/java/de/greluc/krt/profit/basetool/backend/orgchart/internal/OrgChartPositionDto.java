@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.orgchart.internal;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Flat wire shape of a single {@code org_chart_position}, returned by the create / update endpoints
@@ -46,11 +47,11 @@ import java.util.UUID;
 public record OrgChartPositionDto(
     UUID id,
     OrgChartPositionType positionType,
-    UUID orgUnitId,
-    UUID userId,
-    String userName,
-    String displayName,
-    String name,
-    UUID parentId,
+    @Nullable UUID orgUnitId,
+    @Nullable UUID userId,
+    @Nullable String userName,
+    @Nullable String displayName,
+    @Nullable String name,
+    @Nullable UUID parentId,
     int sortIndex,
     Long version) {}

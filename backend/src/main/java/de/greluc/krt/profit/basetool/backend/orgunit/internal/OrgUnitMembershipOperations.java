@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
 import de.greluc.krt.profit.basetool.backend.identity.api.StaffelAssignment;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipService;
@@ -95,9 +94,7 @@ public class OrgUnitMembershipOperations implements MembershipOperations {
       @Nullable Boolean isMissionManager,
       @Nullable Long version) {
     membershipService.patchFlags(
-        specialCommandId,
-        userId,
-        new MembershipFlagsPatchRequest(isLogistician, isMissionManager, version));
+        specialCommandId, userId, isLogistician, isMissionManager, version);
   }
 
   @Override

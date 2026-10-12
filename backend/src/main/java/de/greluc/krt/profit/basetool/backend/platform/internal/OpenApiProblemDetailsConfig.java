@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.SequencedMap;
 import java.util.Set;
 import java.util.TreeSet;
@@ -126,8 +127,7 @@ public class OpenApiProblemDetailsConfig {
                                 .keySet()
                                 .forEach(
                                     name ->
-                                        responses
-                                            .get("429")
+                                        Objects.requireNonNull(responses.get("429"))
                                             .addHeaderObject(
                                                 name, new Header().$ref(HEADER_REF_PREFIX + name)));
                           }

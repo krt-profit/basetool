@@ -38,7 +38,7 @@ import org.jetbrains.annotations.Nullable;
  * @param decisionNote the admin's reason, set on a refusal
  */
 public record DeletionRequestDto(
-    UUID id,
+    @Nullable UUID id,
     Long version,
     UUID userId,
     @Nullable String handle,

@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipChangeObserve
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -346,18 +347,19 @@ public class OrgChartService implements MembershipChangeObserver {
       @NotNull UUID squadronId,
       @NotNull UUID userId,
       @NotNull MembershipRole rank,
-      KommandoGroup group) {
+      @Nullable KommandoGroup group) {
     clearSquadronSeatForUser(squadronId, userId);
     switch (rank) {
       case STAFFELLEITER ->
           upsertSingletonSeat(squadronId, OrgChartPositionType.SQUADRON_LEAD, userId);
       case KOMMANDOLEITER -> {
-        OrgChartPosition command = commandLeadForGroup(squadronId, group);
+        OrgChartPosition command = commandLeadForGroup(squadronId, Objects.requireNonNull(group));
         command.setUser(userReference(userId));
         command.setDisplayName(null);
       }
       case STELLV_KOMMANDOLEITER ->
-          upsertDeputySeat(squadronId, commandLeadForGroup(squadronId, group), userId);
+          upsertDeputySeat(
+              squadronId, commandLeadForGroup(squadronId, Objects.requireNonNull(group)), userId);
       case ENSIGN ->
           createEnsignSeat(
               squadronId, group == null ? null : commandLeadForGroup(squadronId, group), userId);
@@ -529,7 +531,7 @@ public class OrgChartService implements MembershipChangeObserver {
    * @param userId the appointee; never {@code null}.
    */
   private void createEnsignSeat(
-      @NotNull UUID squadronId, OrgChartPosition parent, @NotNull UUID userId) {
+      @NotNull UUID squadronId, @Nullable OrgChartPosition parent, @NotNull UUID userId) {
     if (reuseFreeTextSeat(squadronId, OrgChartPositionType.ENSIGN, parent, userId)) {
       return;
     }
@@ -554,7 +556,7 @@ public class OrgChartService implements MembershipChangeObserver {
       @NotNull UUID orgUnitId,
       @NotNull OrgChartPositionType type,
       @NotNull UUID userId,
-      OrgChartPosition parent) {
+      @Nullable OrgChartPosition parent) {
     int sortIndex = (int) positionRepository.countByOrgUnitIdAndPositionType(orgUnitId, type);
     createSeat(orgUnitId, type, userId, parent, sortIndex);
   }
@@ -572,7 +574,7 @@ public class OrgChartService implements MembershipChangeObserver {
       @NotNull UUID orgUnitId,
       @NotNull OrgChartPositionType type,
       @NotNull UUID userId,
-      OrgChartPosition parent,
+      @Nullable OrgChartPosition parent,
       int sortIndex) {
     OrgChartPosition position = new OrgChartPosition();
     position.setPositionType(type);
@@ -598,7 +600,7 @@ public class OrgChartService implements MembershipChangeObserver {
   private boolean reuseFreeTextSeat(
       @NotNull UUID orgUnitId,
       @NotNull OrgChartPositionType type,
-      OrgChartPosition parent,
+      @Nullable OrgChartPosition parent,
       @NotNull UUID userId) {
     String appointee = effectiveName(userId);
     if (appointee == null || appointee.isBlank()) {
@@ -629,6 +631,7 @@ public class OrgChartService implements MembershipChangeObserver {
    * @param userId the user id; never {@code null}.
    * @return the effective name, or {@code null} when the user is missing.
    */
+  @Nullable
   private String effectiveName(@NotNull UUID userId) {
     return userRepository
         .findById(userId)
@@ -754,7 +757,7 @@ public class OrgChartService implements MembershipChangeObserver {
 
   @Nullable
   private OrgChartPosition resolveAndValidateParent(
-      OrgChartPositionType type, OrgUnit orgUnit, UUID parentId) {
+      OrgChartPositionType type, @Nullable OrgUnit orgUnit, UUID parentId) {
     if (type != OrgChartPositionType.DEPUTY_COMMAND_LEAD && type != OrgChartPositionType.ENSIGN) {
       if (parentId != null) {
         throw new BadRequestException(ERR_INVALID_PARENT);
@@ -775,19 +778,19 @@ public class OrgChartService implements MembershipChangeObserver {
     return parentId == null ? null : loadCommandLeadParent(parentId, orgUnit);
   }
 
-  private OrgChartPosition loadCommandLeadParent(UUID parentId, OrgUnit orgUnit) {
+  private OrgChartPosition loadCommandLeadParent(UUID parentId, @Nullable OrgUnit orgUnit) {
     OrgChartPosition parent =
         Entities.require(
             positionRepository.findById(parentId), () -> "Parent position not found: " + parentId);
     if (parent.getPositionType() != OrgChartPositionType.COMMAND_LEAD
         || parent.getOrgUnit() == null
-        || !parent.getOrgUnit().getId().equals(orgUnit.getId())) {
+        || !parent.getOrgUnit().getId().equals(Objects.requireNonNull(orgUnit).getId())) {
       throw new BadRequestException(ERR_INVALID_PARENT);
     }
     return parent;
   }
 
-  private void validateCardinality(OrgChartPositionType type, OrgUnit orgUnit) {
+  private void validateCardinality(OrgChartPositionType type, @Nullable OrgUnit orgUnit) {
     switch (type) {
       case AREA_LEAD -> {
         if (positionRepository.existsByOrgUnitIsNullAndPositionType(
@@ -797,35 +800,35 @@ public class OrgChartService implements MembershipChangeObserver {
       }
       case SQUADRON_LEAD -> {
         if (positionRepository.countByOrgUnitIdAndPositionType(
-                orgUnit.getId(), OrgChartPositionType.SQUADRON_LEAD)
+                Objects.requireNonNull(orgUnit).getId(), OrgChartPositionType.SQUADRON_LEAD)
             > 0) {
           throw new BadRequestException(ERR_DUPLICATE_LEAD);
         }
       }
       case COMMAND_LEAD -> {
         if (positionRepository.countByOrgUnitIdAndPositionType(
-                orgUnit.getId(), OrgChartPositionType.COMMAND_LEAD)
+                Objects.requireNonNull(orgUnit).getId(), OrgChartPositionType.COMMAND_LEAD)
             >= MAX_COMMAND_LEADS) {
           throw new BadRequestException(ERR_COMMAND_LIMIT);
         }
       }
       case ENSIGN -> {
         if (positionRepository.countByOrgUnitIdAndPositionType(
-                orgUnit.getId(), OrgChartPositionType.ENSIGN)
+                Objects.requireNonNull(orgUnit).getId(), OrgChartPositionType.ENSIGN)
             >= MAX_ENSIGNS) {
           throw new BadRequestException(ERR_ENSIGN_LIMIT);
         }
       }
       case SK_COMMANDER -> {
         if (positionRepository.countByOrgUnitIdAndPositionType(
-                orgUnit.getId(), OrgChartPositionType.SK_COMMANDER)
+                Objects.requireNonNull(orgUnit).getId(), OrgChartPositionType.SK_COMMANDER)
             >= MAX_SK_COMMANDERS) {
           throw new BadRequestException(ERR_COMMANDER_LIMIT);
         }
       }
       case BEREICHSLEITER -> {
         if (positionRepository.countByOrgUnitIdAndPositionType(
-                orgUnit.getId(), OrgChartPositionType.BEREICHSLEITER)
+                Objects.requireNonNull(orgUnit).getId(), OrgChartPositionType.BEREICHSLEITER)
             > 0) {
           throw new BadRequestException(ERR_DUPLICATE_LEAD);
         }
@@ -834,11 +837,12 @@ public class OrgChartService implements MembershipChangeObserver {
     }
   }
 
-  private void validateUserUnique(OrgChartScope scope, OrgUnit orgUnit, UUID userId) {
+  private void validateUserUnique(OrgChartScope scope, @Nullable OrgUnit orgUnit, UUID userId) {
     boolean alreadyAssigned =
         scope == OrgChartScope.AREA
             ? positionRepository.existsByOrgUnitIsNullAndUserId(userId)
-            : positionRepository.existsByOrgUnitIdAndUserId(orgUnit.getId(), userId);
+            : positionRepository.existsByOrgUnitIdAndUserId(
+                Objects.requireNonNull(orgUnit).getId(), userId);
     if (alreadyAssigned) {
       throw new BadRequestException(ERR_USER_ASSIGNED);
     }

@@ -28,6 +28,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -79,7 +80,8 @@ public class OrgChartReadService {
             : positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(
                 chartedUnitIds);
     Map<UUID, List<OrgChartPosition>> positionsByUnit =
-        unitPositions.stream().collect(Collectors.groupingBy(p -> p.getOrgUnit().getId()));
+        unitPositions.stream()
+            .collect(Collectors.groupingBy(p -> Objects.requireNonNull(p.getOrgUnit()).getId()));
 
     OlChartDto olTier = null;
     if (ol != null) {

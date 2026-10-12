@@ -31,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.StaffelAssignment;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipService;
@@ -143,14 +142,24 @@ class OrgUnitMembershipOperationsTest {
   }
 
   @Test
-  void patchFlags_rebuildsTheSameRequest() {
+  void patchFlags_passesTheValuesOnUnchanged() {
     UUID skId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    MembershipFlagsPatchRequest request = new MembershipFlagsPatchRequest(true, null, 3L);
 
     operations.patchFlags(skId, userId, true, null, 3L);
 
-    verify(membershipService).patchFlags(skId, userId, request);
+    verify(membershipService).patchFlags(skId, userId, true, null, 3L);
+    verifyNoMoreInteractions(queryService, membershipService);
+  }
+
+  @Test
+  void patchFlags_passesAMissingVersionOnForTheServiceToRefuse() {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+
+    operations.patchFlags(skId, userId, null, false, null);
+
+    verify(membershipService).patchFlags(skId, userId, null, false, null);
     verifyNoMoreInteractions(queryService, membershipService);
   }
 

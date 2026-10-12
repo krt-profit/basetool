@@ -2899,6 +2899,16 @@ gates need `RequestScopeResolver` (`scope`, rank 5), so a policy in the owning m
   to the letter, adds two SPIs for a one-line delegation and an inverted dependency; not recommended.
 The question for the owner: A, B or C.
 
+**Umbrella step 16 — NullAway checks the whole tree of eleven more modules — done 2026-10-12, partly**
+1. *Census with `-Xmaxerrs` raised*: `audit`, `livesync`, `notification` and `dashboard` had no finding; `admin` 1, `personalinventory` 1, `platform` 3, `privacy` 4, `orgunit` 11, `promotion` 27 and `orgchart` 40 were fixed;
+   `bank` (44) and `exchange` (69) were counted and left; adding `kernel` and `app` produced a cascade (the kernel's `ScuAmounts`, `StringNormalization` and `AppException` return nullable values every module uses).
+2. *Enabled* (`nullAwayPackages` in `backend/build.gradle.kts`): `admin`, `audit`, `dashboard`, `livesync`, `notification`, `orgchart`, `orgunit`, `personalinventory`, `platform`, `privacy`, `promotion` join the eleven already checked, 22 in all.
+3. *Fixes by annotation or restructuring, no suppression*: `@Nullable` on the optional fields of `OrgUnit`, `Organisationsleitung`, `OrgChartPosition`, `RankRequirement` and the optional components of 17 DTOs and records; the `owningSquadronId` parameter of
+   the promotion repositories; `HandleErasureCoverage.of` returns `@Nullable`; `AndroidClientProperties.releasesUrl` reads the override once; eleven dereferences of a value that is non-null by the surrounding rule are wrapped in `Objects.requireNonNull`
+   (the same `NullPointerException`). `OrgUnitMembershipService.patchFlags` got an overload on the plain values, which the `MembershipOperations` SPI calls, because the SPI's version may be `null` (an ADD or REMOVE carries none) and the request record
+   cannot say so without two conflicting nullness annotations; a `null` version still ends in the same 409.
+4. *Open*: `bank`, `exchange`, `kernel` and `app` stay on the `api`-only list; `bank` and `exchange` get their own conventions when P5-c and P5-d extract them.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2955,7 +2965,7 @@ before a decision.
         `TableOwnershipTest`); each move updates the owner of the tables it moves, nothing else.
   - [ ] **15.** P3-11, the per-command audit contract (REQ-AUDIT-001): waits for the moves above.
 - Quality gates:
-  - [ ] **16.** NullAway to the whole tree of every module as it becomes whole (today: `blueprint`,
+  - [x] **16.** partly done, `bank`, `exchange`, `kernel`, `app` open — NullAway to the whole tree of every module as it becomes whole (today: `blueprint`,
         `catalogue`, `hangar`, `identity`, `inventory`, `joborder`, `materialexchange`, `mission`,
         `operation`, `refinery`, `scope`; the other modules' `api` packages only).
   - [ ] **17.** Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,

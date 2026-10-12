@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
  * Combined search result entry exposing UEX cities and space stations to the frontend for the
  * personal-inventory location typeahead. The numeric {@code uexId} is the value persisted in {@code
@@ -30,4 +32,4 @@ public record UexLocationDto(
     PersonalInventoryLocationType type,
     String name,
     String starSystemName,
-    String parentName) {}
+    @Nullable String parentName) {}

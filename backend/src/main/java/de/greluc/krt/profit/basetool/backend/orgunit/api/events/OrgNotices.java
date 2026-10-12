@@ -112,7 +112,7 @@ public final class OrgNotices {
       @NotNull UUID userId,
       @NotNull String member,
       @NotNull OrgUnitRef unit,
-      @NotNull String unitName,
+      @Nullable String unitName,
       @NotNull String reasonCode,
       boolean seatVacant) {
     Map<String, String> params = new LinkedHashMap<>();

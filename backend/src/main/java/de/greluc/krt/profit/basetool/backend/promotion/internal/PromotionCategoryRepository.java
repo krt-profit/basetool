@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -72,7 +73,7 @@ public interface PromotionCategoryRepository extends JpaRepository<PromotionCate
       c.topic.owningSquadron.id = :owningSquadronId
       """)
   Page<PromotionCategory> findAllScoped(
-      @Param("owningSquadronId") UUID owningSquadronId, Pageable pageable);
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId, Pageable pageable);
 
   /**
    * Squadron-scoped paged read of the categories under one topic. A topic outside the caller's
@@ -91,7 +92,7 @@ public interface PromotionCategoryRepository extends JpaRepository<PromotionCate
       """)
   Page<PromotionCategory> findAllByTopicIdScoped(
       @Param("topicId") UUID topicId,
-      @Param("owningSquadronId") UUID owningSquadronId,
+      @Param("owningSquadronId") @Nullable UUID owningSquadronId,
       Pageable pageable);
 
   /**
@@ -108,5 +109,5 @@ public interface PromotionCategoryRepository extends JpaRepository<PromotionCate
       OR c.topic.owningSquadron.id = :owningSquadronId) ORDER BY c.sortOrder ASC
       """)
   List<PromotionCategory> findAllByTopicIdScopedOrdered(
-      @Param("topicId") UUID topicId, @Param("owningSquadronId") UUID owningSquadronId);
+      @Param("topicId") UUID topicId, @Param("owningSquadronId") @Nullable UUID owningSquadronId);
 }

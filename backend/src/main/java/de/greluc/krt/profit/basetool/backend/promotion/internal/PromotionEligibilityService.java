@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -280,7 +281,7 @@ public class PromotionEligibilityService {
             new PromotionRequirementCheckResponse(
                 req.getId(),
                 topicId,
-                req.getTopic().getName(),
+                Objects.requireNonNull(req.getTopic()).getName(),
                 null,
                 null,
                 minimum,
@@ -298,7 +299,7 @@ public class PromotionEligibilityService {
       @NotNull RankRequirement req,
       @NotNull PromotionLevel minimum,
       @NotNull Map<UUID, PromotionLevel> levelByCategory) {
-    PromotionCategory category = req.getCategory();
+    PromotionCategory category = Objects.requireNonNull(req.getCategory());
     PromotionLevel userLevel = levelByCategory.get(category.getId());
     boolean satisfied = userLevel != null && userLevel.isAtLeast(minimum);
     UUID topicId = category.getTopic() != null ? category.getTopic().getId() : null;

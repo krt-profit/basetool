@@ -39,6 +39,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One filled functional-rank position in the Profit-Bereich org chart, binding a holder to an
@@ -90,6 +91,7 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "org_unit_id")
   @ToString.Exclude
+  @Nullable
   private OrgUnit orgUnit;
 
   /**
@@ -101,6 +103,7 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id")
   @ToString.Exclude
+  @Nullable
   private User user;
 
   /**
@@ -109,6 +112,7 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
    * characters.
    */
   @Column(name = "display_name", length = 120)
+  @Nullable
   private String displayName;
 
   /**
@@ -118,6 +122,7 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
    * shows a generic fallback label. Capped at 120 characters by the column definition.
    */
   @Column(name = "name", length = 120)
+  @Nullable
   private String name;
 
   /**
@@ -128,6 +133,7 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "parent_id")
   @ToString.Exclude
+  @Nullable
   private OrgChartPosition parent;
 
   /**
@@ -147,5 +153,6 @@ public class OrgChartPosition extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "kommando_group_id")
   @ToString.Exclude
+  @Nullable
   private KommandoGroup kommandoGroup;
 }
