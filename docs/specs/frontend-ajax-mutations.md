@@ -2657,6 +2657,10 @@ head's first, synchronous script. The list only shrinks.
   a node test, a classic script or an inline bootstrap reads it (today `krtFetch`, `krtCsrf`,
   `krtLiveSync`, `krtModal`, `krtSearchableSelect`, `krtHtml`, `krtComboboxRemoteSources`,
   `krtEvents`, `krtI18nText`, `krtMaterialRelease`, `krtMaterialRequest`).
+- **A URL read from the DOM reaches a form `action` only through `safeSameOriginUrl`**, which accepts a
+  same-origin absolute path and nothing else: one `/` first, no `//` or `/\` after it, no whitespace (a tab
+  inside `/<tab>/host` is dropped by the URL parser and would make it `//host`), and a parsed origin equal to
+  the page's (`scripts/safe-url.test.mjs`, `:frontend:testSafeUrl`).
 - **A script under its plain URL is revalidated.** `/js/**` answers `Cache-Control: no-cache`; only a
   content-hashed name answers `max-age=31536000, public, immutable`, so a module the scan missed is
   never held stale for a year.
