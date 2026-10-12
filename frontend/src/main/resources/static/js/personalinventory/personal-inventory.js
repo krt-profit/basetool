@@ -122,9 +122,6 @@ function wireAdminMemberPersistence() {
 }
 
 function wireWriteSubmits() {
-    if (!krtFetch) {
-        return;
-    }
     document.addEventListener('submit', (e) => {
         if (e.target === form) {
             e.preventDefault();
@@ -194,14 +191,12 @@ function submitItemForm() {
     const isUpdate = /\/update$/.test(action);
     const uexId = hiddenUexId ? hiddenUexId.value : '';
     if (!uexId) {
-        if (showFrontendErrorToast) {
-            showFrontendErrorToast(
-                krtI18nText(
-                    i18n.locationRequired || i18n.errorCreate,
-                    'krtPersonalInventoryI18n.locationRequired',
-                ),
-            );
-        }
+        showFrontendErrorToast(
+            krtI18nText(
+                i18n.locationRequired || i18n.errorCreate,
+                'krtPersonalInventoryI18n.locationRequired',
+            ),
+        );
         return;
     }
     /** @type {Record<string, unknown>} */
@@ -273,7 +268,7 @@ function submitDeleteForm() {
 }
 
 function wireFilterSwap() {
-    if (!krtFetch || !document.getElementById('pi-results')) {
+    if (!document.getElementById('pi-results')) {
         return;
     }
     krtFetch.bindSwap({ container: '#pi-results', history: true });
@@ -542,11 +537,9 @@ if (document.readyState === 'loading') {
     init();
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'pi-open-create', openCreate);
-    krtEvents.on('click', 'pi-open-edit', openEdit);
-    krtEvents.on('click', 'pi-open-delete', openDelete);
-    krtEvents.on('click', 'pi-close-modal', closeModal);
-    krtEvents.on('click', 'pi-close-delete', closeDelete);
-    krtEvents.on('input', 'pi-sanitize-quantity', sanitizeQuantity);
-}
+krtEvents.on('click', 'pi-open-create', openCreate);
+krtEvents.on('click', 'pi-open-edit', openEdit);
+krtEvents.on('click', 'pi-open-delete', openDelete);
+krtEvents.on('click', 'pi-close-modal', closeModal);
+krtEvents.on('click', 'pi-close-delete', closeDelete);
+krtEvents.on('input', 'pi-sanitize-quantity', sanitizeQuantity);

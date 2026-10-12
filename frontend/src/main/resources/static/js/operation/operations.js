@@ -12,7 +12,7 @@ function initOperations() {
     const loadingIndicator = document.getElementById('operations-loading-indicator');
     const resetBtn = document.getElementById('operations-filter-reset');
 
-    if (!filterForm || !resultsContainer || !krtFetch) return;
+    if (!filterForm || !resultsContainer) return;
     const form = filterForm;
 
     /** @type {number | null} */
@@ -130,7 +130,7 @@ function initOperations() {
             });
             selectPeriod('UPCOMING');
             persistFilters();
-            if (krtFilterChips) krtFilterChips.refresh(form);
+            krtFilterChips.refresh(form);
             loadResults();
         });
     }

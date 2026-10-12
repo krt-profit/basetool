@@ -96,10 +96,6 @@ function reapplyNameFilter() {
 }
 
 function fetchView(state) {
-    if (!krtFetch || typeof krtFetch.swap !== 'function') {
-        window.location.reload();
-        return;
-    }
     krtFetch
         .swap({
             url: `/bank?layout=${state.layout}&group=${state.group}`,
@@ -197,10 +193,6 @@ function initBankLayoutPrefs() {
     }
 
     function fetchView(layout) {
-        if (!krtFetch || typeof krtFetch.swap !== 'function') {
-            window.location.reload();
-            return;
-        }
         krtFetch
             .swap({
                 url: `/org-unit-bank?layout=${layout}`,

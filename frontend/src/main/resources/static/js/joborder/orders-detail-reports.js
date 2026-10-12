@@ -256,7 +256,7 @@ export async function previewHandoverReport(btn) {
         recipientHandle,
         items,
     };
-    if (!krtFetch) return;
+
     const result = await krtFetch.write({
         method: 'POST',
         url: `/api/v1/orders/${encodeURIComponent(String(orderId))}/handovers/report/preview`,

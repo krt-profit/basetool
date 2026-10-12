@@ -113,7 +113,7 @@ function updateCollectionProgress() {
 }
 
 function broadcastCollectionChanged() {
-    if (window.orderId && krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+    if (window.orderId && typeof krtLiveSync.sendChanged === 'function') {
         krtLiveSync.sendChanged(`order:${window.orderId}`, ['materials', 'aggregated']);
     }
 }
@@ -127,7 +127,7 @@ function broadcastCollectionChanged() {
  */
 async function collectionTransfer(inventoryId, target, successMessage) {
     const row = collectionRow(inventoryId);
-    if (!krtFetch || !row) return;
+    if (!row) return;
     const amount = parseFloat(row.getAttribute('data-amount') ?? '');
     const version = parseInt(row.getAttribute('data-version') ?? '', 10);
     row.querySelectorAll('select').forEach((s) => {
@@ -201,7 +201,7 @@ document.addEventListener('change', (e) => {
 async function onDeliveredToggle(cb) {
     const inventoryId = cb.getAttribute('data-inventory-id');
     const row = collectionRow(inventoryId);
-    if (!krtFetch || !row) return;
+    if (!row) return;
     const previous = !cb.checked;
     const result = await krtFetch.write({
         method: 'PATCH',
@@ -230,14 +230,7 @@ const MATERIAL_COLLECTION_SECTIONS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (
-        window.orderId &&
-        krtLiveSync &&
-        typeof krtLiveSync.createReceiver === 'function' &&
-        krtFetch &&
-        typeof krtFetch.swap === 'function' &&
-        document.getElementById('material-collection-results')
-    ) {
+    if (window.orderId && document.getElementById('material-collection-results')) {
         krtLiveSync.createReceiver({
             topic: `order:${window.orderId}`,
             sections: MATERIAL_COLLECTION_SECTIONS,

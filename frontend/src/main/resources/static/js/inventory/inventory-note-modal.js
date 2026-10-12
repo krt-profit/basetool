@@ -70,10 +70,8 @@ export function updateNoteCounter() {
 
 export function showInventoryToast(type, msg) {
     if (type === 'error') {
-        if (typeof showFrontendErrorToast === 'function') {
-            showFrontendErrorToast(msg);
-        }
-    } else if (typeof showFrontendSuccessToast === 'function') {
+        showFrontendErrorToast(msg);
+    } else {
         showFrontendSuccessToast(msg);
     }
 }
@@ -89,10 +87,7 @@ export function saveNote() {
 
 export function removeNote() {
     if (!activeNoteButton) return;
-    if (typeof showKrtConfirm !== 'function') {
-        submitNoteUpdate('');
-        return;
-    }
+
     showKrtConfirm(noteI18n.confirmTitle, noteI18n.confirmMessage).then((confirmed) => {
         if (confirmed) submitNoteUpdate('');
     });
@@ -108,12 +103,9 @@ function submitNoteUpdate(noteValue) {
     const btn = activeNoteButton;
     if (!btn) return;
     const id = /** @type {string} */ (btn.getAttribute('data-id'));
-    if (krtFetch && typeof krtFetch.serialize === 'function') {
-        return krtFetch.serialize(`inv-note:${id}`, () => {
-            return runNoteUpdate(btn, id, noteValue);
-        });
-    }
-    return runNoteUpdate(btn, id, noteValue);
+    return krtFetch.serialize(`inv-note:${id}`, () => {
+        return runNoteUpdate(btn, id, noteValue);
+    });
 }
 
 /**
@@ -125,7 +117,6 @@ function submitNoteUpdate(noteValue) {
  * @returns {Promise<unknown>} the write
  */
 function runNoteUpdate(btn, id, noteValue) {
-    if (!krtFetch) return Promise.resolve();
     const version = btn.getAttribute('data-version');
     const trimmed = (noteValue || '').trim();
     const isEmpty = trimmed.length === 0;

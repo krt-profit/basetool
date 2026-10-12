@@ -26,16 +26,8 @@ const INVENTORY_INDEX_SECTIONS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (krtFetch) {
-        krtFetch.bindSwap({ container: '#inventory-results', history: true });
-    }
-    if (
-        krtLiveSync &&
-        typeof krtLiveSync.createReceiver === 'function' &&
-        krtFetch &&
-        typeof krtFetch.swap === 'function' &&
-        document.getElementById('inventory-results')
-    ) {
+    krtFetch.bindSwap({ container: '#inventory-results', history: true });
+    if (document.getElementById('inventory-results')) {
         krtLiveSync.createReceiver({
             topic: 'inventory',
             sections: INVENTORY_INDEX_SECTIONS,

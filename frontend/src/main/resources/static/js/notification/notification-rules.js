@@ -231,9 +231,7 @@ function initNotificationRules() {
          */
         function enhanceSelectorRow(row, selector) {
             const enhance = function () {
-                if (krtEnhanceComboboxes) {
-                    krtEnhanceComboboxes(row);
-                }
+                krtEnhanceComboboxes(row);
             };
             const userId = selector && selector.kind === 'SPECIFIC_USER' ? selector.userId : null;
             if (!userId) {
@@ -351,9 +349,7 @@ function initNotificationRules() {
                     }
                 })
                 .catch(() => {
-                    if (typeof showFrontendErrorToast === 'function') {
-                        showFrontendErrorToast(i18n.error);
-                    }
+                    showFrontendErrorToast(i18n.error);
                 });
         }
 
@@ -370,9 +366,7 @@ function initNotificationRules() {
         /** @param {SubmitEvent} event */
         function onSubmit(event) {
             event.preventDefault();
-            if (!krtFetch) {
-                return;
-            }
+
             const id = el.form.getAttribute('data-rule-id');
             const submitter = el.form.querySelector('button[type="submit"]');
             krtFetch.write({
@@ -394,9 +388,6 @@ function initNotificationRules() {
          * @param {Element} submitter
          */
         function deleteRule(id, submitter) {
-            if (!krtFetch) {
-                return;
-            }
             confirmThen(() => {
                 krtFetch.write({
                     method: 'DELETE',
@@ -416,20 +407,16 @@ function initNotificationRules() {
 
         /** @param {() => void} action */
         function confirmThen(action) {
-            if (typeof showKrtConfirm === 'function') {
-                showKrtConfirm(
-                    i18n.confirmDeleteTitle,
-                    i18n.confirmDeleteBody,
-                    i18n.confirmOk,
-                    i18n.confirmCancel,
-                ).then((ok) => {
-                    if (ok) {
-                        action();
-                    }
-                });
-            } else {
-                action();
-            }
+            showKrtConfirm(
+                i18n.confirmDeleteTitle,
+                i18n.confirmDeleteBody,
+                i18n.confirmOk,
+                i18n.confirmCancel,
+            ).then((ok) => {
+                if (ok) {
+                    action();
+                }
+            });
         }
 
         el.form.addEventListener('submit', onSubmit);

@@ -26,16 +26,8 @@ const INVENTORY_MATERIAL_SECTIONS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (krtFetch) {
-        krtFetch.bindSwap({ container: '#inventory-material-results', history: true });
-    }
-    if (
-        krtLiveSync &&
-        typeof krtLiveSync.createReceiver === 'function' &&
-        krtFetch &&
-        typeof krtFetch.swap === 'function' &&
-        document.getElementById('inventory-material-results')
-    ) {
+    krtFetch.bindSwap({ container: '#inventory-material-results', history: true });
+    if (document.getElementById('inventory-material-results')) {
         krtLiveSync.createReceiver({
             topic: 'inventory',
             sections: INVENTORY_MATERIAL_SECTIONS,

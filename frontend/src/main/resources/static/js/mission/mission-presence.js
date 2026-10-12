@@ -57,7 +57,7 @@ function MissionPresence(missionId, currentUserId) {
 }
 
 MissionPresence.prototype.start = function () {
-    if (!krtLiveSync || typeof krtLiveSync.subscribe !== 'function') {
+    if (typeof krtLiveSync.subscribe !== 'function') {
         return;
     }
     document.addEventListener('focusin', this._onFocusIn);
@@ -104,7 +104,7 @@ MissionPresence.prototype.stop = function () {
 };
 
 MissionPresence.prototype._sendPresence = function (type, sectionKey) {
-    if (krtLiveSync && typeof krtLiveSync.sendPresence === 'function') {
+    if (typeof krtLiveSync.sendPresence === 'function') {
         krtLiveSync.sendPresence(this.topic, type, sectionKey);
     }
 };
@@ -113,7 +113,6 @@ MissionPresence.prototype.sendChanged = function (sections) {
     if (
         Array.isArray(sections) &&
         sections.length > 0 &&
-        krtLiveSync &&
         typeof krtLiveSync.sendChanged === 'function'
     ) {
         krtLiveSync.sendChanged(this.topic, sections);

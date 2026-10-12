@@ -16,7 +16,7 @@ function initMissions() {
     const loadingIndicator = document.getElementById('missions-loading-indicator');
     const resetBtn = document.getElementById('missions-filter-reset');
 
-    if (!resultsContainer || !krtFetch) return;
+    if (!resultsContainer) return;
 
     /** @type {number | null} */
     let debounceTimer = null;
@@ -41,16 +41,14 @@ function initMissions() {
         });
     }
 
-    if (krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
-        krtLiveSync.createReceiver({
-            topic: 'missions',
-            sections: MISSIONS_SECTIONS,
-            coalesceMs: 1500,
-            refresh() {
-                loadResults(false);
-            },
-        });
-    }
+    krtLiveSync.createReceiver({
+        topic: 'missions',
+        sections: MISSIONS_SECTIONS,
+        coalesceMs: 1500,
+        refresh() {
+            loadResults(false);
+        },
+    });
 
     if (!form) return;
 
@@ -144,7 +142,7 @@ function initMissions() {
             });
             selectPeriod('UPCOMING');
             persistFilters();
-            if (krtFilterChips) krtFilterChips.refresh(form);
+            krtFilterChips.refresh(form);
             loadResults();
         });
     }

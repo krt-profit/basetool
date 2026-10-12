@@ -370,23 +370,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (eStartTimeUi) {
                         eStartTimeUi.value = startUtc;
-                        if (typeof krtSyncDatetimeSplitGroup === 'function') {
-                            krtSyncDatetimeSplitGroup(
-                                /** @type {ParentNode} */ (
-                                    eStartTimeUi.closest('.datetime-split-group')
-                                ),
-                            );
-                        }
+                        krtSyncDatetimeSplitGroup(
+                            /** @type {ParentNode} */ (
+                                eStartTimeUi.closest('.datetime-split-group')
+                            ),
+                        );
                     }
                     if (eEndTimeUi) {
                         eEndTimeUi.value = endUtc;
-                        if (typeof krtSyncDatetimeSplitGroup === 'function') {
-                            krtSyncDatetimeSplitGroup(
-                                /** @type {ParentNode} */ (
-                                    eEndTimeUi.closest('.datetime-split-group')
-                                ),
-                            );
-                        }
+                        krtSyncDatetimeSplitGroup(
+                            /** @type {ParentNode} */ (eEndTimeUi.closest('.datetime-split-group')),
+                        );
                     }
 
                     missionHooks.modalOpen(eModal);
@@ -654,7 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (result.ok) {
                 missionHooks.modalClose(customFreqModal);
-                if (isEdit && Array.isArray(result.body) && krtFetch) {
+                if (isEdit && Array.isArray(result.body)) {
                     const updated = result.body.find((e) => {
                         return e && e.id === fid;
                     });

@@ -122,10 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('submit', (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
-            if (!krtFetch) {
-                form.submit();
-                return;
-            }
+
             submitOverride(form);
         });
     });
@@ -138,10 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('submit', (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
-            if (!krtFetch) {
-                form.submit();
-                return;
-            }
+
             submitVisibility(form);
         });
     });

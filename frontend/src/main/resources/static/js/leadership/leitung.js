@@ -42,10 +42,6 @@ function root() {
  * @returns {Promise<boolean> | undefined} the swap, or nothing when it fell back to a reload
  */
 function reswap() {
-    if (!krtFetch || !krtFetch.swap) {
-        window.location.reload();
-        return undefined;
-    }
     const params = new URLSearchParams();
     if (state.unit) {
         params.set('unit', state.unit);
@@ -70,10 +66,6 @@ function reswap() {
  *     success: string }} opts the request
  */
 function write(opts) {
-    if (!krtFetch || !krtFetch.write) {
-        window.location.reload();
-        return;
-    }
     krtFetch.write({
         url: opts.url,
         method: opts.method,
@@ -98,10 +90,6 @@ function write(opts) {
  * @param {() => void} run the confirmed action
  */
 function confirmThen(title, message, run) {
-    if (typeof showKrtConfirm !== 'function') {
-        run();
-        return;
-    }
     showKrtConfirm(title, message, i18n.confirm, i18n.cancel).then((ok) => {
         if (ok) {
             run();
@@ -646,9 +634,6 @@ function submitModal() {
             success: i18n.saved,
         });
     } else if (context.action === 'add-sk') {
-        if (!krtFetch) {
-            return;
-        }
         const params = new URLSearchParams();
         params.set('userId', userId);
         krtFetch.submitForm({

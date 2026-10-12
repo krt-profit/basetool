@@ -31,9 +31,6 @@ const ORG_STRUCTURE_SECTIONS = {
 const ORG_STRUCTURE_CHART_SECTION = 'chart';
 
 function initAdminOrgStructure() {
-    if (!krtFetch) {
-        return;
-    }
     const i18n = readMessages();
 
     const orgStructureSeam = krtFetch.sectionWrite({
@@ -46,7 +43,7 @@ function initAdminOrgStructure() {
             return '/admin/org-structure';
         },
         broadcast(keys) {
-            if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+            if (typeof krtLiveSync.sendChanged === 'function') {
                 krtLiveSync.sendChanged(
                     'org-structure',
                     keys.concat([ORG_STRUCTURE_CHART_SECTION]),
@@ -63,27 +60,25 @@ function initAdminOrgStructure() {
         return orgStructureSeam.refresh(['units']);
     }
 
-    if (krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
-        krtLiveSync.createReceiver({
-            topic: 'org-structure',
-            sections: ORG_STRUCTURE_SECTIONS,
-            coalesceMs: 1500,
-            refresh(keys) {
-                orgStructureSeam.refresh(keys, { broadcast: false });
-            },
-            busyTest(sectionKey) {
-                if (sectionKey !== 'forms') {
-                    return false;
-                }
-                return Array.prototype.some.call(
-                    document.querySelectorAll('#ol-form input, #bereich-form input'),
-                    (el) => {
-                        return el.value.trim() !== '';
-                    },
-                );
-            },
-        });
-    }
+    krtLiveSync.createReceiver({
+        topic: 'org-structure',
+        sections: ORG_STRUCTURE_SECTIONS,
+        coalesceMs: 1500,
+        refresh(keys) {
+            orgStructureSeam.refresh(keys, { broadcast: false });
+        },
+        busyTest(sectionKey) {
+            if (sectionKey !== 'forms') {
+                return false;
+            }
+            return Array.prototype.some.call(
+                document.querySelectorAll('#ol-form input, #bereich-form input'),
+                (el) => {
+                    return el.value.trim() !== '';
+                },
+            );
+        },
+    });
 
     function readMessages() {
         const holder = document.getElementById('os-i18n');
@@ -102,10 +97,6 @@ function initAdminOrgStructure() {
 
     function emptyToNull(value) {
         return value === '' || value == null ? null : value;
-    }
-
-    if (!krtEvents || typeof krtEvents.on !== 'function') {
-        return;
     }
 
     krtEvents.on('submit', 'os-create-ol', (form, event) => {

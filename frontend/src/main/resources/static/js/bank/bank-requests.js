@@ -124,10 +124,6 @@ function initBankRequests() {
      * @param {string} segment the segment to show
      */
     function load(segment) {
-        if (!krtFetch || typeof krtFetch.swap !== 'function') {
-            window.location.assign(`/bank/requests?status=${encodeURIComponent(segment)}`);
-            return;
-        }
         krtFetch.swap({
             url: `/bank/requests?status=${encodeURIComponent(segment)}`,
             container: `#${RESULTS_ID}`,

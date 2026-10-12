@@ -1,5 +1,8 @@
 // @ts-check
 
+/** Whitespace, which a URL parser drops (tab, line feed) or encodes: `/<tab>/host` would resolve as `//host`. */
+const WHITESPACE = /\s/;
+
 /**
  * Returns the URL when it is a same-origin absolute path.
  *
@@ -22,15 +25,23 @@
  * @returns {unknown} the URL, or the fallback
  */
 export function safeSameOriginUrl(url, fallback) {
-    if (typeof url !== 'string' || url.length < 2) {
-        return fallback === undefined ? null : fallback;
-    }
-    if (url.charAt(0) !== '/') {
-        return fallback === undefined ? null : fallback;
+    const rejected = fallback === undefined ? null : fallback;
+    if (typeof url !== 'string' || url.length < 2 || url.charAt(0) !== '/') {
+        return rejected;
     }
     const second = url.charAt(1);
     if (second === '/' || second === '\\') {
-        return fallback === undefined ? null : fallback;
+        return rejected;
+    }
+    if (WHITESPACE.test(url)) {
+        return rejected;
+    }
+    try {
+        if (new URL(url, window.location.origin).origin !== window.location.origin) {
+            return rejected;
+        }
+    } catch {
+        return rejected;
     }
     return url;
 }

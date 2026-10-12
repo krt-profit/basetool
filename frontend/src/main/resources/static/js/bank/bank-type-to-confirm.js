@@ -60,10 +60,7 @@ export function initTypeToConfirm() {
             return;
         }
         event.preventDefault();
-        if (!krtFetch) {
-            form.submit();
-            return;
-        }
+
         const confirmInput = /** @type {HTMLInputElement | null} */ (
             form.querySelector('input[name="confirm"]')
         );
@@ -86,7 +83,7 @@ export function initTypeToConfirm() {
                         body && body.accountsReset != null ? body.accountsReset : 0;
                     const zeroed =
                         body && body.holderStashesZeroed != null ? body.holderStashesZeroed : 0;
-                    if (typeof showFrontendSuccessToast === 'function') {
+                    {
                         const message =
                             accountsReset === 0
                                 ? form.getAttribute('data-wipe-noop') || ''

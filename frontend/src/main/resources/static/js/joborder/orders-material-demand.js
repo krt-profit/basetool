@@ -418,7 +418,7 @@ function applyDemandView() {
 
     applyDemandSort();
     restoreBucketStates(document);
-    if (krtFilterPanel) krtFilterPanel.refresh('demandFilterPanel');
+    krtFilterPanel.refresh('demandFilterPanel');
 }
 
 /**
@@ -549,17 +549,15 @@ function restoreBucketStates(root) {
     });
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'demand-toggle-orders', toggleBucketOrders);
-    krtEvents.on('click', 'demand-toggle-multi', toggleDemandMulti);
-    krtEvents.on('change', 'demand-toggle-material-all', toggleDemandMaterialAll);
-    krtEvents.on('change', 'demand-update-material-state', syncDemandMaterialSelection);
-    krtEvents.on('change', 'demand-update-quality', syncDemandQualitySelection);
-    krtEvents.on('change', 'demand-toggle-hide-covered', toggleDemandHideCovered);
-    krtEvents.on('click', 'demand-reset-filters', resetDemandFilters);
-    krtEvents.on('input', 'demand-material-search', filterDemandMaterialOptions);
-    krtEvents.on('click', 'demand-sort', cycleDemandSort);
-}
+krtEvents.on('click', 'demand-toggle-orders', toggleBucketOrders);
+krtEvents.on('click', 'demand-toggle-multi', toggleDemandMulti);
+krtEvents.on('change', 'demand-toggle-material-all', toggleDemandMaterialAll);
+krtEvents.on('change', 'demand-update-material-state', syncDemandMaterialSelection);
+krtEvents.on('change', 'demand-update-quality', syncDemandQualitySelection);
+krtEvents.on('change', 'demand-toggle-hide-covered', toggleDemandHideCovered);
+krtEvents.on('click', 'demand-reset-filters', resetDemandFilters);
+krtEvents.on('input', 'demand-material-search', filterDemandMaterialOptions);
+krtEvents.on('click', 'demand-sort', cycleDemandSort);
 
 document.addEventListener('click', (e) => {
     const target = /** @type {Element|null} */ (e.target);
@@ -573,19 +571,11 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     readDemandState();
     restoreDemandControls();
-    if (krtFilterPanel) {
-        krtFilterPanel.registerCounter('demandFilterPanel', countActiveDemandFilters);
-        krtFilterPanel.refresh('demandFilterPanel');
-    }
+    krtFilterPanel.registerCounter('demandFilterPanel', countActiveDemandFilters);
+    krtFilterPanel.refresh('demandFilterPanel');
     applyDemandView();
 
-    if (
-        krtLiveSync &&
-        typeof krtLiveSync.createReceiver === 'function' &&
-        krtFetch &&
-        typeof krtFetch.swap === 'function' &&
-        document.getElementById('orders-material-demand-results')
-    ) {
+    if (document.getElementById('orders-material-demand-results')) {
         krtLiveSync.createReceiver({
             topic: 'orders',
             sections: DEMAND_SECTIONS,

@@ -170,7 +170,7 @@ function clear(filter) {
     } else {
         control.value = '';
         const group = control.closest('.datetime-split-group');
-        if (group && typeof krtSyncDatetimeSplitGroup === 'function') {
+        if (group) {
             krtSyncDatetimeSplitGroup(group);
         }
     }

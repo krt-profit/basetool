@@ -64,9 +64,6 @@ function initCommonHandlers() {
         repositionHintFrom(event.target);
     });
 
-    if (!krtEvents || typeof krtEvents.on !== 'function') {
-        return;
-    }
     const on = krtEvents.on;
 
     /**

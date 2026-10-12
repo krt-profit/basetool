@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     missionHooks.modalClose(editForm.closest('.krt-modal-overlay'));
                     const dto = res.body;
-                    if (dto && dto.version !== undefined && dto.version !== null && krtFetch) {
+                    if (dto && dto.version !== undefined && dto.version !== null) {
                         document.querySelectorAll(`[data-participant-id="${pId}"]`).forEach((c) => {
                             krtFetch.syncVersion(c, dto.version);
                         });
@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (res.ok) {
                 const dto = res.body;
-                if (dto && dto.version !== undefined && dto.version !== null && krtFetch) {
+                if (dto && dto.version !== undefined && dto.version !== null) {
                     document.querySelectorAll(`[data-participant-id="${pId}"]`).forEach((c) => {
                         krtFetch.syncVersion(c, dto.version);
                     });

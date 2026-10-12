@@ -45,7 +45,7 @@ const modalContent = modal ? modal.querySelector('.krt-modal') : null;
 let lastTrigger = null;
 
 function refreshChart(keepScroll) {
-    if (!chart || !krtFetch) {
+    if (!chart) {
         window.location.reload();
         return;
     }
@@ -78,12 +78,12 @@ function refreshChart(keepScroll) {
 }
 
 function broadcastOrgStructureChanged() {
-    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+    if (typeof krtLiveSync.sendChanged === 'function') {
         krtLiveSync.sendChanged('org-structure', ['chart', ORG_CHART_UNITS_SECTION]);
     }
 }
 
-if (chart && krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+if (chart) {
     krtLiveSync.createReceiver({
         topic: 'org-structure',
         sections: ORG_CHART_SECTIONS,
@@ -219,10 +219,6 @@ function openModal(mode, ctx) {
 }
 
 function send(method, url, body) {
-    if (!krtFetch) {
-        showFrontendErrorToast(OC_I18N.genericError);
-        return;
-    }
     krtFetch.write({
         method,
         url,
@@ -316,132 +312,127 @@ function submitModal() {
     send('POST', '/org-chart/positions/ajax', body);
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'oc-toggle-edit', (btn) => {
-        if (!chart) {
-            return;
-        }
-        const editing = chart.classList.toggle('editing');
-        btn.setAttribute('aria-pressed', editing ? 'true' : 'false');
-        btn.textContent = editing ? OC_I18N.editDone : OC_I18N.edit;
-        if (editHint) {
-            editHint.classList.toggle('oc-edit-hint--on', editing);
-        }
-    });
+krtEvents.on('click', 'oc-toggle-edit', (btn) => {
+    if (!chart) {
+        return;
+    }
+    const editing = chart.classList.toggle('editing');
+    btn.setAttribute('aria-pressed', editing ? 'true' : 'false');
+    btn.textContent = editing ? OC_I18N.editDone : OC_I18N.edit;
+    if (editHint) {
+        editHint.classList.toggle('oc-edit-hint--on', editing);
+    }
+});
 
-    krtEvents.on('click', 'oc-add', (btn) => {
-        lastTrigger = btn;
-        openModal('create', {
-            positionType: btn.getAttribute('data-position-type'),
-            orgUnitId: btn.getAttribute('data-org-unit-id'),
-            parentId: btn.getAttribute('data-parent-id'),
-            rankLabel: btn.getAttribute('data-rank-label'),
-            needsName: btn.getAttribute('data-needs-name') === 'true',
-            userOptional: btn.getAttribute('data-user-optional') === 'true',
-        });
+krtEvents.on('click', 'oc-add', (btn) => {
+    lastTrigger = btn;
+    openModal('create', {
+        positionType: btn.getAttribute('data-position-type'),
+        orgUnitId: btn.getAttribute('data-org-unit-id'),
+        parentId: btn.getAttribute('data-parent-id'),
+        rankLabel: btn.getAttribute('data-rank-label'),
+        needsName: btn.getAttribute('data-needs-name') === 'true',
+        userOptional: btn.getAttribute('data-user-optional') === 'true',
     });
+});
 
-    krtEvents.on('click', 'oc-add-staff', (btn) => {
-        lastTrigger = btn;
-        openModal('create', { staffChoice: true });
+krtEvents.on('click', 'oc-add-staff', (btn) => {
+    lastTrigger = btn;
+    openModal('create', { staffChoice: true });
+});
+
+krtEvents.on('click', 'oc-ga-add', (btn) => {
+    lastTrigger = btn;
+    openModal('grandAdmiral', {
+        orgUnitId: btn.getAttribute('data-org-unit-id'),
+        rankLabel: btn.getAttribute('data-rank-label'),
+        displayName: btn.getAttribute('data-display-name'),
     });
+});
 
-    krtEvents.on('click', 'oc-ga-add', (btn) => {
-        lastTrigger = btn;
-        openModal('grandAdmiral', {
-            orgUnitId: btn.getAttribute('data-org-unit-id'),
-            rankLabel: btn.getAttribute('data-rank-label'),
-            displayName: btn.getAttribute('data-display-name'),
-        });
-    });
-
-    krtEvents.on('click', 'oc-ga-remove', (btn) => {
-        showKrtConfirm?.(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm).then((ok) => {
-            if (ok) {
-                const olId = encodeURIComponent(String(btn.getAttribute('data-org-unit-id')));
-                send(
-                    'DELETE',
-                    `/organisation/leitung/organisationsleitung/${olId}/grand-admiral/ajax`,
-                    null,
-                );
-            }
-        });
-    });
-
-    krtEvents.on('click', 'oc-reassign', (btn) => {
-        lastTrigger = btn;
-        openModal('reassign', {
-            positionId: btn.getAttribute('data-position-id'),
-            version: btn.getAttribute('data-version'),
-            userId: btn.getAttribute('data-user-id'),
-            displayName: btn.getAttribute('data-display-name'),
-            rankLabel: btn.getAttribute('data-rank-label'),
-        });
-    });
-
-    krtEvents.on('click', 'oc-rename', (btn) => {
-        lastTrigger = btn;
-        openModal('rename', {
-            positionId: btn.getAttribute('data-position-id'),
-            version: btn.getAttribute('data-version'),
-            name: btn.getAttribute('data-name'),
-        });
-    });
-
-    krtEvents.on('click', 'oc-remove', (btn) => {
-        const isCommand = btn.getAttribute('data-position-type') === 'COMMAND_LEAD';
-        const message = isCommand ? OC_I18N.removeConfirmCommand : OC_I18N.removeConfirm;
-        const title = OC_I18N.removeConfirmTitle;
-        showKrtConfirm?.(title, message).then((ok) => {
-            if (ok) {
-                const id = encodeURIComponent(String(btn.getAttribute('data-position-id')));
-                send('DELETE', `/org-chart/positions/${id}/ajax`, null);
-            }
-        });
-    });
-
-    krtEvents.on('click', 'oc-vacate', (btn) => {
-        const title = OC_I18N.vacateConfirmTitle;
-        const message = OC_I18N.vacateConfirm;
-        showKrtConfirm?.(title, message).then((ok) => {
-            if (ok) {
-                const id = encodeURIComponent(String(btn.getAttribute('data-position-id')));
-                const version = encodeURIComponent(String(btn.getAttribute('data-version')));
-                send('DELETE', `/org-chart/positions/${id}/leader/ajax?version=${version}`, null);
-            }
-        });
-    });
-
-    krtEvents.on('click', 'oc-collapse', (btn) => {
-        const bodyId = btn.getAttribute('aria-controls');
-        const body = bodyId ? document.getElementById(bodyId) : null;
-        if (!body) {
-            return;
-        }
-        const expand = btn.getAttribute('aria-expanded') === 'false';
-        btn.setAttribute('aria-expanded', expand ? 'true' : 'false');
-        body.hidden = !expand;
-        const wrap = btn.closest('.oc-leader-wrap');
-        const leader = wrap ? wrap.querySelector('[role="treeitem"]') : null;
-        if (leader) {
-            leader.setAttribute('aria-expanded', expand ? 'true' : 'false');
-            if (!expand) {
-                const tree = btn.closest('.oc-tree');
-                if (tree) {
-                    Array.prototype.forEach.call(
-                        tree.querySelectorAll('[role="treeitem"]'),
-                        (n) => {
-                            n.setAttribute('tabindex', n === leader ? '0' : '-1');
-                        },
-                    );
-                }
-            }
+krtEvents.on('click', 'oc-ga-remove', (btn) => {
+    showKrtConfirm?.(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm).then((ok) => {
+        if (ok) {
+            const olId = encodeURIComponent(String(btn.getAttribute('data-org-unit-id')));
+            send(
+                'DELETE',
+                `/organisation/leitung/organisationsleitung/${olId}/grand-admiral/ajax`,
+                null,
+            );
         }
     });
+});
 
-    krtEvents.on('click', 'oc-modal-cancel', closeModal);
-    krtEvents.on('click', 'oc-modal-submit', submitModal);
-}
+krtEvents.on('click', 'oc-reassign', (btn) => {
+    lastTrigger = btn;
+    openModal('reassign', {
+        positionId: btn.getAttribute('data-position-id'),
+        version: btn.getAttribute('data-version'),
+        userId: btn.getAttribute('data-user-id'),
+        displayName: btn.getAttribute('data-display-name'),
+        rankLabel: btn.getAttribute('data-rank-label'),
+    });
+});
+
+krtEvents.on('click', 'oc-rename', (btn) => {
+    lastTrigger = btn;
+    openModal('rename', {
+        positionId: btn.getAttribute('data-position-id'),
+        version: btn.getAttribute('data-version'),
+        name: btn.getAttribute('data-name'),
+    });
+});
+
+krtEvents.on('click', 'oc-remove', (btn) => {
+    const isCommand = btn.getAttribute('data-position-type') === 'COMMAND_LEAD';
+    const message = isCommand ? OC_I18N.removeConfirmCommand : OC_I18N.removeConfirm;
+    const title = OC_I18N.removeConfirmTitle;
+    showKrtConfirm?.(title, message).then((ok) => {
+        if (ok) {
+            const id = encodeURIComponent(String(btn.getAttribute('data-position-id')));
+            send('DELETE', `/org-chart/positions/${id}/ajax`, null);
+        }
+    });
+});
+
+krtEvents.on('click', 'oc-vacate', (btn) => {
+    const title = OC_I18N.vacateConfirmTitle;
+    const message = OC_I18N.vacateConfirm;
+    showKrtConfirm?.(title, message).then((ok) => {
+        if (ok) {
+            const id = encodeURIComponent(String(btn.getAttribute('data-position-id')));
+            const version = encodeURIComponent(String(btn.getAttribute('data-version')));
+            send('DELETE', `/org-chart/positions/${id}/leader/ajax?version=${version}`, null);
+        }
+    });
+});
+
+krtEvents.on('click', 'oc-collapse', (btn) => {
+    const bodyId = btn.getAttribute('aria-controls');
+    const body = bodyId ? document.getElementById(bodyId) : null;
+    if (!body) {
+        return;
+    }
+    const expand = btn.getAttribute('aria-expanded') === 'false';
+    btn.setAttribute('aria-expanded', expand ? 'true' : 'false');
+    body.hidden = !expand;
+    const wrap = btn.closest('.oc-leader-wrap');
+    const leader = wrap ? wrap.querySelector('[role="treeitem"]') : null;
+    if (leader) {
+        leader.setAttribute('aria-expanded', expand ? 'true' : 'false');
+        if (!expand) {
+            const tree = btn.closest('.oc-tree');
+            if (tree) {
+                Array.prototype.forEach.call(tree.querySelectorAll('[role="treeitem"]'), (n) => {
+                    n.setAttribute('tabindex', n === leader ? '0' : '-1');
+                });
+            }
+        }
+    }
+});
+
+krtEvents.on('click', 'oc-modal-cancel', closeModal);
+krtEvents.on('click', 'oc-modal-submit', submitModal);
 
 if (modal) {
     modal.addEventListener('click', (event) => {

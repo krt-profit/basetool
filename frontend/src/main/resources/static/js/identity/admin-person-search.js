@@ -34,13 +34,7 @@ document.addEventListener('submit', (event) => {
     const term = input ? input.value.trim() : '';
     const action = form.getAttribute('action') || '/admin/person-search';
     const url = action + (term ? `?q=${encodeURIComponent(term)}` : '');
-    if (krtFetch) {
-        krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
-    } else {
-        window.location.assign(url);
-    }
+    krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
 });
 
-if (krtFetch) {
-    krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
-}
+krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });

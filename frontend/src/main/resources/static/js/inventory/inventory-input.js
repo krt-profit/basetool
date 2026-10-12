@@ -113,11 +113,7 @@ const INVENTORY_INPUT_ORDER_SECTIONS = {
 };
 
 function startOrderNeedsLiveSync() {
-    if (
-        !krtLiveSync ||
-        typeof krtLiveSync.createReceiver !== 'function' ||
-        !document.getElementById('jobOrderAllocGroup')
-    ) {
+    if (!document.getElementById('jobOrderAllocGroup')) {
         return;
     }
     krtLiveSync.createReceiver({
@@ -868,7 +864,7 @@ function updateAllocOver() {
     if (!overEl) return;
     const amountEl = /** @type {HTMLInputElement | null} */ (document.getElementById('amount'));
     const raw = amountEl ? amountEl.value : '';
-    const amount = krtScuInput && amountEl ? krtScuInput.parse(raw) : parseFloat(raw);
+    const amount = amountEl ? krtScuInput.parse(raw) : parseFloat(raw);
     const total = isNaN(amount) ? 0 : amount;
     const over =
         allocDimensionSum('jobOrder') > total + 1e-6 || allocDimensionSum('mission') > total + 1e-6;
@@ -893,7 +889,6 @@ function syncPersonalAllocations() {
 }
 
 function initInventoryInput() {
-    if (!krtFetch) return;
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('inventory-input-form')
     );
@@ -902,7 +897,7 @@ function initInventoryInput() {
         event.preventDefault();
         const blank = markBlankAllocationAmounts();
         if (blank.length) {
-            if (showFrontendErrorToast) showFrontendErrorToast(INV_ADD_MSG.allocAmountMissing);
+            showFrontendErrorToast(INV_ADD_MSG.allocAmountMissing);
             blank[0].focus();
             return;
         }
@@ -913,10 +908,7 @@ function initInventoryInput() {
             errorMessage: INV_ADD_MSG.failed,
             onError(status, problem) {
                 let msg = INV_ADD_MSG.failed;
-                const ownerRequired =
-                    krtFetch && krtFetch.ownerOrgUnitRequiredMessage
-                        ? krtFetch.ownerOrgUnitRequiredMessage(problem)
-                        : null;
+                const ownerRequired = krtFetch.ownerOrgUnitRequiredMessage(problem);
                 if (ownerRequired) msg = ownerRequired;
                 else if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT')
                     msg = INV_ADD_MSG.personalAssignment;
@@ -924,7 +916,7 @@ function initInventoryInput() {
                     msg = INV_ADD_MSG.allocAmountMissing;
                 else if (problem && problem.code === 'VALIDATION') msg = INV_ADD_MSG.validation;
                 else if (problem && problem.detail) msg = problem.detail;
-                if (showFrontendErrorToast) showFrontendErrorToast(msg);
+                showFrontendErrorToast(msg);
                 return true;
             },
             onSuccess(body) {

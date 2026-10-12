@@ -31,7 +31,7 @@ function initAdminTerms() {
         );
     }
 
-    if (!results || !krtFetch) {
+    if (!results) {
         form.addEventListener('change', (event) => {
             if (isFilterRadio(event.target)) {
                 form.submit();

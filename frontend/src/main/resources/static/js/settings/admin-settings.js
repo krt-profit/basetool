@@ -39,9 +39,6 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
     /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll(selector)).forEach(
         (checkbox) => {
             checkbox.addEventListener('change', () => {
-                if (!krtFetch) {
-                    return;
-                }
                 const id = checkbox.getAttribute(idAttribute) || '';
                 const checked = checkbox.checked;
                 const labelSpan = checkbox.parentElement
@@ -69,7 +66,7 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
                         if (status === 409) {
                             return false;
                         }
-                        if (showFrontendErrorToast) showFrontendErrorToast(labels.error);
+                        showFrontendErrorToast(labels.error);
                         return true;
                     },
                     onNetworkError() {
@@ -133,10 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     settingsForm.addEventListener('submit', (event) => {
         event.preventDefault();
-        if (!krtFetch) {
-            settingsForm.submit();
-            return;
-        }
+
         const el = /** @type {Record<string, HTMLInputElement>} */ (
             /** @type {unknown} */ (settingsForm.elements)
         );

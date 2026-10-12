@@ -63,7 +63,7 @@ function initRefineryOrdersIndex() {
      *     in sync; a peer refresh keeps the scroll position instead
      */
     function load(fromUser) {
-        if (!results || !krtFetch) return;
+        if (!results) return;
         const query = queryString();
         krtFetch.swap({
             url: `/refinery-orders${query ? `?${query}` : ''}`,
@@ -74,7 +74,7 @@ function initRefineryOrdersIndex() {
         });
     }
 
-    if (results && krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+    if (results) {
         krtLiveSync.createReceiver({
             topic: 'refinery',
             sections: REFINERY_SECTIONS,
@@ -322,7 +322,7 @@ function initRefineryOrdersIndex() {
         }
         if (view && (differs || typeof saved.view !== 'string')) persist();
         if (differs) {
-            if (krtFilterChips) krtFilterChips.refresh(form || undefined);
+            krtFilterChips.refresh(form || undefined);
             load(true);
         }
     }

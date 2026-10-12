@@ -23,9 +23,6 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 function initAdminDeletionRequests() {
-    if (!krtFetch) {
-        return;
-    }
     /** @type {KrtI18nDict} */
     const i18n = window.krtDeletionRequestsI18n || {};
 

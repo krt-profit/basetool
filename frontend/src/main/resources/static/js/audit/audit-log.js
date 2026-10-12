@@ -8,7 +8,7 @@ const form = /** @type {HTMLFormElement | null} */ (document.getElementById('aud
 const resultsContainer = document.getElementById('audit-results');
 const resetLink = document.getElementById('audit-filter-reset');
 
-if (form && resultsContainer && krtFetch) {
+if (form && resultsContainer) {
     /** @type {number | null} */
     let debounceTimer = null;
 
@@ -59,14 +59,14 @@ if (form && resultsContainer && krtFetch) {
             form.querySelectorAll('select').forEach((el) => {
                 el.selectedIndex = 0;
             });
-            if (krtFilterChips) krtFilterChips.refresh(form);
+            krtFilterChips.refresh(form);
             loadResults(resetLink.getAttribute('href'));
         });
     }
 }
 
 const reloadAuditResults = function () {
-    if (!resultsContainer || !krtFetch) {
+    if (!resultsContainer) {
         return;
     }
     let url = '/admin/audit-log';
@@ -116,7 +116,7 @@ const persistEventType = function () {
     } catch (_e) {}
 };
 
-if (eventSelect && activeDomain && form && resultsContainer && krtFetch) {
+if (eventSelect && activeDomain && form && resultsContainer) {
     eventSelect.addEventListener('change', persistEventType);
     if (resetLink) {
         resetLink.addEventListener('click', persistEventType);
@@ -141,9 +141,7 @@ if (eventSelect && activeDomain && form && resultsContainer && krtFetch) {
 const csrfHeaders = function () {
     const base = { Accept: 'application/json' };
     try {
-        if (krtCsrf && typeof krtCsrf.headers === 'function') {
-            return krtCsrf.headers(base);
-        }
+        return krtCsrf.headers(base);
     } catch {}
     return base;
 };
@@ -253,10 +251,7 @@ document.addEventListener('submit', (event) => {
         showError(frm, 'before', required);
         return;
     }
-    if (!krtFetch || typeof krtFetch.write !== 'function') {
-        showError(frm, '_global', deleteError);
-        return;
-    }
+
     const endpoint = frm.getAttribute('data-endpoint');
     const url = `${endpoint}?before=${encodeURIComponent(before.value)}`;
     const successTemplate = frm.getAttribute('data-success-template') || '';

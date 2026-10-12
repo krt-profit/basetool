@@ -68,9 +68,6 @@ const ORDER_SECTIONS = {
 };
 
 function initOrdersDetail() {
-    if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
-        return;
-    }
     const orderSeam = krtFetch.sectionWrite({
         dict() {
             return {
@@ -86,7 +83,7 @@ function initOrdersDetail() {
             return window.orderId ? `/orders/${window.orderId}` : null;
         },
         broadcast(keys) {
-            if (window.orderId && krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+            if (window.orderId && typeof krtLiveSync.sendChanged === 'function') {
                 krtLiveSync.sendChanged(`order:${window.orderId}`, keys);
             }
         },
@@ -94,7 +91,7 @@ function initOrdersDetail() {
     joborderHooks.refreshOrderSection = orderSeam.refresh;
     joborderHooks.notifyOrderChanged = orderSeam.notify;
 
-    if (window.orderId && krtLiveSync && krtLiveSync.createReceiver) {
+    if (window.orderId) {
         krtLiveSync.createReceiver({
             topic: `order:${window.orderId}`,
             sections: ORDER_SECTIONS,
@@ -117,7 +114,7 @@ function initOrdersDetail() {
 initOrdersDetail();
 
 export function _publishOrdersQueue() {
-    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+    if (typeof krtLiveSync.sendChanged === 'function') {
         krtLiveSync.sendChanged('orders', ['queue', 'demand']);
     }
 }
@@ -188,12 +185,7 @@ export function _serializeHandoverForm() {
             row.querySelector('input[name$=".amount"]')
         );
         const inventoryItemId = sel ? sel.value : '';
-        const amount =
-            amtInput && krtScuInput
-                ? krtScuInput.parse(amtInput.value)
-                : amtInput
-                  ? parseFloat(amtInput.value)
-                  : NaN;
+        const amount = amtInput ? krtScuInput.parse(amtInput.value) : NaN;
         if (!inventoryItemId || !(amount > 0)) return;
         const tierSel = /** @type {HTMLSelectElement | null} */ (
             row.querySelector('select[data-role="handover-tier"]')
@@ -545,7 +537,7 @@ function _refreshHandoverMissionPicker(row) {
     const missions = inv && Array.isArray(inv.missionAllocations) ? inv.missionAllocations : [];
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
     const isPiece = !!(inv && inv.material && inv.material.quantityType === 'PIECE');
-    const handed = amtInput && krtScuInput ? krtScuInput.parse(amtInput.value) : Number.NaN;
+    const handed = amtInput ? krtScuInput.parse(amtInput.value) : Number.NaN;
     const ambiguous = missions.length >= 2 && isFinite(handed) && handed > missionRest + 0.0005;
 
     let holder = /** @type {HTMLElement | null} */ (
@@ -628,7 +620,7 @@ function _updateHandoverMissionRest(row) {
     const inv = cachedInventoryItems.find((i) => i.id === sel.value);
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
     const isPiece = !!(inv && inv.material && inv.material.quantityType === 'PIECE');
-    const handed = krtScuInput ? krtScuInput.parse(amtInput.value) : parseFloat(amtInput.value);
+    const handed = krtScuInput.parse(amtInput.value);
     let assigned = 0;
     holder.querySelectorAll('[data-mission-input]').forEach((el) => {
         const v = parseFloat(/** @type {HTMLInputElement} */ (el).value);

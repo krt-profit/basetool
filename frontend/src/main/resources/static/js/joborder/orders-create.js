@@ -143,8 +143,7 @@ function refreshMaterialUnit(row) {
  * @returns {number} the amount, or NaN when it is not a number
  */
 function parseAmount(raw) {
-    if (krtScuInput) return krtScuInput.parse(raw);
-    return parseFloat(String(raw).replace(',', '.'));
+    return krtScuInput.parse(raw);
 }
 
 /**
@@ -379,26 +378,20 @@ async function importFromScmdb() {
         importField.value = '';
         syncMaterialRemoveButtons();
         updateMaterialSummary();
-        if (krtModal) {
-            krtModal.close('orders-scmdb-modal');
-        }
+        krtModal.close('orders-scmdb-modal');
         let successMsg = MSG_SCMDB_SUCCESS;
         if (unknownMaterials.length > 0) {
             successMsg += ` (${MSG_SCMDB_SOME_UNKNOWN}: ${unknownMaterials.join(', ')})`;
         }
 
-        if (showFrontendSuccessToast) {
-            showFrontendSuccessToast(successMsg);
-        }
+        showFrontendSuccessToast(successMsg);
     } else {
         let errorMsg = MSG_SCMDB_NO_MATCH;
         if (unknownMaterials.length > 0) {
             errorMsg = `${MSG_SCMDB_NOT_FOUND}: ${unknownMaterials.join(', ')}`;
         }
 
-        if (showFrontendErrorToast) {
-            showFrontendErrorToast(errorMsg);
-        }
+        showFrontendErrorToast(errorMsg);
     }
 }
 
@@ -436,9 +429,7 @@ function addMaterialRow() {
     );
 
     container.appendChild(row);
-    if (krtEnhanceComboboxes) {
-        krtEnhanceComboboxes(row);
-    }
+    krtEnhanceComboboxes(row);
     materialIndex++;
     syncMaterialRemoveButtons();
     refreshMaterialUnit(row);
@@ -545,7 +536,7 @@ function addItemLine(prefill) {
         itemSelect.appendChild(seeded);
         itemSelect.value = prefill.gameItemId;
     }
-    if (itemSelect && krtSearchableSelect) {
+    if (itemSelect) {
         krtSearchableSelect(itemSelect, {
             placeholder: ITEM_I18N.searchPlaceholder,
             noResultsText: ITEM_I18N.searchNoResults,
@@ -763,18 +754,12 @@ document.querySelectorAll('textarea[data-counter]').forEach((area) => {
 updateMaterialSummary();
 updateItemSummary();
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'orders-import-scmdb', importFromScmdb);
-    krtEvents.on('click', 'orders-add-material', addMaterialRow);
-    krtEvents.on('click', 'orders-remove-material', removeMaterialRow);
-    krtEvents.on('click', 'orders-add-item', () => addItemLine());
-}
+krtEvents.on('click', 'orders-import-scmdb', importFromScmdb);
+krtEvents.on('click', 'orders-add-material', addMaterialRow);
+krtEvents.on('click', 'orders-remove-material', removeMaterialRow);
+krtEvents.on('click', 'orders-add-item', () => addItemLine());
 
 function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
-    if (!krtFetch) {
-        form.submit();
-        return;
-    }
     krtFetch.submitForm({
         form,
         submitter,

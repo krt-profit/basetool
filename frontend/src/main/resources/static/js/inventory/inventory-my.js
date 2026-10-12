@@ -258,9 +258,7 @@ async function toggleSelectAllInView() {
         updateBulkCheckoutState();
     } catch (e) {
         console.error('Failed to select all inventory entries', e);
-        if (typeof showFrontendErrorToast === 'function') {
-            showFrontendErrorToast(bulkI18n.selectAllFailed);
-        }
+        showFrontendErrorToast(bulkI18n.selectAllFailed);
     } finally {
         bulkSelectAllInFlight = false;
         if (btn) btn.disabled = false;
@@ -291,9 +289,7 @@ async function executeBulkCheckout() {
         return;
     }
     closeBulkCheckoutModal();
-    if (!krtFetch) {
-        return;
-    }
+
     const affectedOrderIds = [];
     ids.forEach((itemId) => {
         myLager.collectLeafOrderIds(itemId).forEach((orderId) => {
@@ -308,9 +304,7 @@ async function executeBulkCheckout() {
         errorMessage: bulkI18n.errorFailed,
         conflict: inventoryConflictI18n,
         onSuccess() {
-            if (typeof showFrontendSuccessToast === 'function') {
-                showFrontendSuccessToast(bulkI18n.success.replace('{0}', String(ids.length)));
-            }
+            showFrontendSuccessToast(bulkI18n.success.replace('{0}', String(ids.length)));
             filterMyInventory();
             broadcastInventoryChanged();
             myLager.broadcastOrdersChanged(affectedOrderIds);
@@ -336,9 +330,7 @@ function bulkRebookMode() {
 }
 
 function showBulkRebookError(message) {
-    if (typeof showFrontendErrorToast === 'function') {
-        showFrontendErrorToast(message);
-    }
+    showFrontendErrorToast(message);
 }
 
 /**
@@ -448,14 +440,12 @@ function reportBulkRebookOutcome(body) {
                   .replace('{0}', String(rebooked))
                   .replace('{1}', String(skipped))
             : bulkRebookI18n.success.replace('{0}', String(rebooked));
-    if (typeof showFrontendSuccessToast === 'function') {
-        showFrontendSuccessToast(message);
-    }
+    showFrontendSuccessToast(message);
 }
 
 function submitBulkRebook(event) {
     if (event) event.preventDefault();
-    if (bulkRebookInFlight || !krtFetch) return;
+    if (bulkRebookInFlight) return;
     const ids = getCheckedItemIds();
     if (ids.length === 0) {
         closeBulkRebookModal();
@@ -767,8 +757,8 @@ function countActiveMyInventoryFilters() {
 function filterMyInventory() {
     clearBulkSelection();
     persistMyInventoryFilters();
-    if (krtFilterPanel) krtFilterPanel.refresh('myFilterPanel');
-    if (krtFilterChips) krtFilterChips.refresh();
+    krtFilterPanel.refresh('myFilterPanel');
+    krtFilterChips.refresh();
     const itemsView = myLager.lagerIsItemsView();
     const activeMaterials = myLager.collectChecked('matCheck');
     const activeGameItems = myLager.collectChecked('gameItemCheck');
@@ -883,17 +873,13 @@ const INVENTORY_MY_SECTIONS = {
 };
 
 function broadcastInventoryChanged() {
-    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+    if (typeof krtLiveSync.sendChanged === 'function') {
         krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_MY_SECTIONS));
     }
 }
 inventoryHooks.notifyChanged = broadcastInventoryChanged;
 
-if (
-    krtLiveSync &&
-    typeof krtLiveSync.createReceiver === 'function' &&
-    document.getElementById('myInventoryTableContainer')
-) {
+if (document.getElementById('myInventoryTableContainer')) {
     krtLiveSync.createReceiver({
         topic: 'inventory',
         sections: INVENTORY_MY_SECTIONS,
@@ -908,11 +894,7 @@ const INVENTORY_MY_ORDER_SECTIONS = {
     demand: { container: '#myInventoryTableContainer' },
 };
 
-if (
-    krtLiveSync &&
-    typeof krtLiveSync.createReceiver === 'function' &&
-    document.getElementById('myInventoryTableContainer')
-) {
+if (document.getElementById('myInventoryTableContainer')) {
     krtLiveSync.createReceiver({
         topic: 'orders',
         sections: INVENTORY_MY_ORDER_SECTIONS,
@@ -968,11 +950,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ) {
         myLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
-    if (krtFilterPanel) {
-        krtFilterPanel.registerCounter('myFilterPanel', countActiveMyInventoryFilters);
-        krtFilterPanel.refresh('myFilterPanel');
-    }
-    if (krtFilterChips) krtFilterChips.refresh();
+    krtFilterPanel.registerCounter('myFilterPanel', countActiveMyInventoryFilters);
+    krtFilterPanel.refresh('myFilterPanel');
+    krtFilterChips.refresh();
     if (filtersRestored) filterMyInventory();
 });
 
@@ -1053,9 +1033,7 @@ function toggleUmbuchenMode() {
         targetUser.required = true;
         targetLocation.required = true;
     }
-    if (krtHerkunft) {
-        krtHerkunft.recompute('umbuchen');
-    }
+    krtHerkunft.recompute('umbuchen');
 }
 
 function openUmbuchenModal(
@@ -1151,21 +1129,19 @@ function openUmbuchenModal(
     if (locationMode) locationMode.checked = true;
     toggleUmbuchenMode();
     setMyDisplay('umbuchenModal', 'flex');
-    if (krtHerkunft) {
-        krtHerkunft.populate('umbuchen', id);
-    }
+    krtHerkunft.populate('umbuchen', id);
 }
 
 function submitUmbuchen(event) {
     if (event && event.defaultPrevented) return;
     if (event) event.preventDefault();
-    if (umbuchenInFlight || !krtFetch || !umbuchenItemId) return;
+    if (umbuchenInFlight || !umbuchenItemId) return;
     const modeInput = /** @type {HTMLInputElement | null} */ (
         document.querySelector('input[name="umbuchenMode"]:checked')
     );
     const mode = modeInput ? modeInput.value : 'LOCATION';
     const amountValue = myFieldValue('umbuchenAmount');
-    const amount = krtScuInput ? krtScuInput.parse(amountValue) : parseFloat(amountValue);
+    const amount = krtScuInput.parse(amountValue);
     const version = parseInt(myFieldValue('umbuchenVersion'), 10);
     const submitBtn = /** @type {HTMLButtonElement | null} */ (
         document.getElementById('umbuchenSubmitBtn')
@@ -1199,20 +1175,14 @@ function submitUmbuchen(event) {
             (targetUserId === null || targetUserId === umbuchenSource.userId) &&
             (targetLocationId === null || targetLocationId === umbuchenSource.locationId)
         ) {
-            if (typeof showFrontendErrorToast === 'function') {
-                showFrontendErrorToast(umbuchenI18n.unchanged);
-            }
+            showFrontendErrorToast(umbuchenI18n.unchanged);
             return;
         }
-        if (krtHerkunft && !krtHerkunft.isValid('umbuchen')) {
-            if (typeof showFrontendErrorToast === 'function') {
-                showFrontendErrorToast(assocI18n.overallocated);
-            }
+        if (!krtHerkunft.isValid('umbuchen')) {
+            showFrontendErrorToast(assocI18n.overallocated);
             return;
         }
-        const reductions = krtHerkunft
-            ? krtHerkunft.collect('umbuchen')
-            : { jobOrderReductions: null, missionReductions: null };
+        const reductions = krtHerkunft.collect('umbuchen');
         url = `/inventory/${umbuchenItemId}/transfer`;
         payload = {
             amount,
@@ -1370,9 +1340,7 @@ function reportBulkOrgUnitOutcome(body) {
                   .replace('{0}', String(changed))
                   .replace('{1}', String(skipped))
             : orgUnitChangeI18n.successBulk.replace('{0}', String(changed));
-    if (typeof showFrontendSuccessToast === 'function') {
-        showFrontendSuccessToast(message);
-    }
+    showFrontendSuccessToast(message);
 }
 
 /**
@@ -1383,7 +1351,7 @@ function reportBulkOrgUnitOutcome(body) {
  */
 function submitOrgUnitChange(event) {
     if (event) event.preventDefault();
-    if (orgUnitChangeInFlight || !krtFetch) return;
+    if (orgUnitChangeInFlight) return;
     const orgUnitId = myFieldValue('orgUnitChangeTarget') || null;
     const merge = /** @type {HTMLInputElement | null} */ (
         document.getElementById('orgUnitChangeMergeStock')
@@ -1432,7 +1400,7 @@ let bulkStolenInFlight = false;
  * @param {Element} el the bulk-bar button carrying the requested marker in data-stolen
  */
 function submitBulkStolenMark(el) {
-    if (bulkStolenInFlight || !krtFetch) return;
+    if (bulkStolenInFlight) return;
     const ids = getCheckedItemIds();
     if (ids.length === 0) {
         showBulkRebookError(stolenMarkI18n.errorEmpty);
@@ -1478,76 +1446,72 @@ function reportBulkStolenOutcome(body) {
     const message = stolenMarkI18n.successBulk
         .replace('{0}', String(changed))
         .replace('{1}', String(skipped));
-    if (typeof showFrontendSuccessToast === 'function') {
-        showFrontendSuccessToast(message);
-    }
+    showFrontendSuccessToast(message);
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'inv-my-toggle-multi', (el) => {
-        myLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
-    });
-    krtEvents.on('change', 'inv-my-toggle-all', (el) => {
-        myLager.toggleSelectAll(
-            el.getAttribute('data-all-id'),
-            el.getAttribute('data-check-class'),
-            el.getAttribute('data-header-id'),
-        );
-        filterMyInventory();
-    });
-    krtEvents.on('change', 'inv-my-update-state', (el) => {
-        myLager.updateSelectState(
-            el.getAttribute('data-all-id'),
-            el.getAttribute('data-check-class'),
-            el.getAttribute('data-header-id'),
-        );
-        filterMyInventory();
-    });
-    krtEvents.on('change', 'inv-my-filter', filterMyInventory);
-    krtEvents.on('click', 'inv-my-reset-filter', resetMyInventoryFilter);
-    krtEvents.on('click', 'inv-my-clear-selection', clearBulkSelection);
-    krtEvents.on('click', 'inv-my-open-bulk', openBulkCheckoutModal);
-    krtEvents.on('change', 'inv-my-toggle-group-cb', (el) => {
-        toggleGroupCheckboxes(el);
-    });
-    krtEvents.on('change', 'inv-my-update-bulk-state', (el) => {
-        onEntryCheckboxToggle(el);
-    });
-    krtEvents.on('click', 'inv-my-select-all', toggleSelectAllInView);
-    krtEvents.on('click', 'inv-my-umbuchen', (el) => {
-        openUmbuchenModal(
-            el.getAttribute('data-id'),
-            el.getAttribute('data-amount'),
-            el.getAttribute('data-version'),
-            el.getAttribute('data-material-id'),
-            el.getAttribute('data-user-id'),
-            el.getAttribute('data-location-id'),
-            el.getAttribute('data-location-name'),
-            el.getAttribute('data-quantity-type'),
-            el.getAttribute('data-personal') === 'true',
-            el.getAttribute('data-has-assoc') === 'true',
-            el.getAttribute('data-owning-org-unit-id'),
-        );
-    });
-    krtEvents.on('click', 'inv-my-open-note', (el) => {
-        openNoteModal(el);
-    });
-    krtEvents.on('change', 'inv-my-toggle-umbuchen-mode', toggleUmbuchenMode);
-    krtEvents.on('click', 'inv-my-close-note', closeNoteModal);
-    krtEvents.on('input', 'inv-my-update-note-counter', updateNoteCounter);
-    krtEvents.on('click', 'inv-my-save-note', saveNote);
-    krtEvents.on('click', 'inv-my-remove-note', removeNote);
-    krtEvents.on('click', 'inv-my-close-bulk', closeBulkCheckoutModal);
-    krtEvents.on('click', 'inv-my-execute-bulk', executeBulkCheckout);
-    krtEvents.on('click', 'inv-my-open-bulk-rebook', openBulkRebookModal);
-    krtEvents.on('click', 'inv-my-close-bulk-rebook', closeBulkRebookModal);
-    krtEvents.on('change', 'inv-my-toggle-bulk-rebook-mode', toggleBulkRebookMode);
-    krtEvents.on('change', 'inv-my-bulk-rebook-user-changed', refreshBulkRebookOrgUnitPicker);
-    krtEvents.on('click', 'inv-my-org-unit', openOrgUnitChangeModal);
-    krtEvents.on('click', 'inv-my-open-bulk-org-unit', openBulkOrgUnitChangeModal);
-    krtEvents.on('click', 'inv-my-close-org-unit', closeOrgUnitChangeModal);
-    krtEvents.on('click', 'inv-my-bulk-stolen', submitBulkStolenMark);
-}
+krtEvents.on('click', 'inv-my-toggle-multi', (el) => {
+    myLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
+});
+krtEvents.on('change', 'inv-my-toggle-all', (el) => {
+    myLager.toggleSelectAll(
+        el.getAttribute('data-all-id'),
+        el.getAttribute('data-check-class'),
+        el.getAttribute('data-header-id'),
+    );
+    filterMyInventory();
+});
+krtEvents.on('change', 'inv-my-update-state', (el) => {
+    myLager.updateSelectState(
+        el.getAttribute('data-all-id'),
+        el.getAttribute('data-check-class'),
+        el.getAttribute('data-header-id'),
+    );
+    filterMyInventory();
+});
+krtEvents.on('change', 'inv-my-filter', filterMyInventory);
+krtEvents.on('click', 'inv-my-reset-filter', resetMyInventoryFilter);
+krtEvents.on('click', 'inv-my-clear-selection', clearBulkSelection);
+krtEvents.on('click', 'inv-my-open-bulk', openBulkCheckoutModal);
+krtEvents.on('change', 'inv-my-toggle-group-cb', (el) => {
+    toggleGroupCheckboxes(el);
+});
+krtEvents.on('change', 'inv-my-update-bulk-state', (el) => {
+    onEntryCheckboxToggle(el);
+});
+krtEvents.on('click', 'inv-my-select-all', toggleSelectAllInView);
+krtEvents.on('click', 'inv-my-umbuchen', (el) => {
+    openUmbuchenModal(
+        el.getAttribute('data-id'),
+        el.getAttribute('data-amount'),
+        el.getAttribute('data-version'),
+        el.getAttribute('data-material-id'),
+        el.getAttribute('data-user-id'),
+        el.getAttribute('data-location-id'),
+        el.getAttribute('data-location-name'),
+        el.getAttribute('data-quantity-type'),
+        el.getAttribute('data-personal') === 'true',
+        el.getAttribute('data-has-assoc') === 'true',
+        el.getAttribute('data-owning-org-unit-id'),
+    );
+});
+krtEvents.on('click', 'inv-my-open-note', (el) => {
+    openNoteModal(el);
+});
+krtEvents.on('change', 'inv-my-toggle-umbuchen-mode', toggleUmbuchenMode);
+krtEvents.on('click', 'inv-my-close-note', closeNoteModal);
+krtEvents.on('input', 'inv-my-update-note-counter', updateNoteCounter);
+krtEvents.on('click', 'inv-my-save-note', saveNote);
+krtEvents.on('click', 'inv-my-remove-note', removeNote);
+krtEvents.on('click', 'inv-my-close-bulk', closeBulkCheckoutModal);
+krtEvents.on('click', 'inv-my-execute-bulk', executeBulkCheckout);
+krtEvents.on('click', 'inv-my-open-bulk-rebook', openBulkRebookModal);
+krtEvents.on('click', 'inv-my-close-bulk-rebook', closeBulkRebookModal);
+krtEvents.on('change', 'inv-my-toggle-bulk-rebook-mode', toggleBulkRebookMode);
+krtEvents.on('change', 'inv-my-bulk-rebook-user-changed', refreshBulkRebookOrgUnitPicker);
+krtEvents.on('click', 'inv-my-org-unit', openOrgUnitChangeModal);
+krtEvents.on('click', 'inv-my-open-bulk-org-unit', openBulkOrgUnitChangeModal);
+krtEvents.on('click', 'inv-my-close-org-unit', closeOrgUnitChangeModal);
+krtEvents.on('click', 'inv-my-bulk-stolen', submitBulkStolenMark);
 
 const umbuchenFormEl = document.getElementById('umbuchenForm');
 if (umbuchenFormEl) {

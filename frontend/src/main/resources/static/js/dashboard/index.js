@@ -39,11 +39,9 @@ function toggleInfo(toggle) {
     if (label) toggle.textContent = label;
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'index-toggle-info', (toggle) => {
-        toggleInfo(toggle);
-    });
-}
+krtEvents.on('click', 'index-toggle-info', (toggle) => {
+    toggleInfo(toggle);
+});
 
 /**
  * Renders the newest notifications into the home card; the unread ones carry a dot and are
@@ -66,10 +64,7 @@ function renderNotifications(items) {
     shown.forEach((item) => {
         const li = document.createElement('li');
         li.className = `home-notif${item.read ? '' : ' is-unread'}`;
-        const safe =
-            item.href && typeof safeSameOriginUrl === 'function'
-                ? safeSameOriginUrl(item.href)
-                : null;
+        const safe = item.href ? safeSameOriginUrl(item.href) : null;
         const main = document.createElement(safe ? 'a' : 'div');
         main.className = 'home-notif__main';
         if (safe && main instanceof HTMLAnchorElement) main.href = safe;
@@ -111,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadNotifications();
 
     const announcementForm = document.getElementById('announcement-read-form');
-    if (announcementForm && krtFetch) {
+    if (announcementForm) {
         announcementForm.addEventListener('submit', (event) => {
             event.preventDefault();
             const idInput = /** @type {HTMLInputElement | null} */ (

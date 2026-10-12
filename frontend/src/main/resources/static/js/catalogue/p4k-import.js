@@ -77,12 +77,11 @@ function gateTookOver() {
 }
 
 function toastError() {
-    if (showFrontendErrorToast)
-        showFrontendErrorToast(krtI18nText(i18n().error, 'krtP4kImportI18n.error'));
+    showFrontendErrorToast(krtI18nText(i18n().error, 'krtP4kImportI18n.error'));
 }
 
 function toastOk(msg) {
-    if (showFrontendSuccessToast) showFrontendSuccessToast(msg);
+    showFrontendSuccessToast(msg);
 }
 
 function init() {
@@ -155,11 +154,10 @@ function jobFromWrite(result, reported) {
 function upload() {
     const file = selectedFile();
     if (!file) {
-        if (showFrontendErrorToast)
-            showFrontendErrorToast(krtI18nText(i18n().pickFirst, 'krtP4kImportI18n.pickFirst'));
+        showFrontendErrorToast(krtI18nText(i18n().pickFirst, 'krtP4kImportI18n.pickFirst'));
         return;
     }
-    if (!krtFetch) return;
+
     const fd = new FormData();
     fd.append('file', file);
     let reported = false;
@@ -458,7 +456,7 @@ function confirmApply() {
     const url = `${jobsUrl()}/${encodeURIComponent(applyTargetId)}/apply?seedNew=${
         seed ? 'true' : 'false'
     }`;
-    if (!krtFetch) return;
+
     let reported = false;
     krtFetch
         .write({

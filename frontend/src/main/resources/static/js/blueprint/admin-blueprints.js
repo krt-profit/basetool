@@ -103,11 +103,7 @@ function search(form) {
     const input = form.querySelector('input[name="search"]');
     const term = input ? input.value.trim() : '';
     const url = form.getAttribute('action') + (term ? `?search=${encodeURIComponent(term)}` : '');
-    if (krtFetch) {
-        krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
-    } else {
-        window.location.assign(url);
-    }
+    krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
 }
 
 /** @type {number | null} */
@@ -124,7 +120,7 @@ document.addEventListener('submit', (e) => {
 });
 
 const filterForm = document.getElementById('admin-bp-filter');
-if (filterForm && krtFetch) {
+if (filterForm) {
     filterForm.addEventListener('input', () => {
         clearTimeout(searchTimer ?? undefined);
         searchTimer = setTimeout(() => {
@@ -134,9 +130,7 @@ if (filterForm && krtFetch) {
 }
 
 computeAll(document);
-if (krtFetch) {
-    krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
-}
+krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
 document.addEventListener('krt:swapped', (e) => {
     const c = e.detail && e.detail.container;
     if (c && c.id === RESULTS_ID) {

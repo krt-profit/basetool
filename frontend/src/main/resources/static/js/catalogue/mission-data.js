@@ -141,7 +141,7 @@ function missionSectionForAction(action) {
  */
 function reswapMissionSection(action) {
     const section = missionSectionForAction(action);
-    if (section && krtFetch) {
+    if (section) {
         krtFetch.swap({
             url: `/admin/mission-data?${missionFilterParams()}`,
             container: `#${section}`,
@@ -390,10 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            if (!krtFetch) {
-                form.submit();
-                return;
-            }
+
             missionWrite(form, MISSION_MSG.saved, () => {
                 if (modal) {
                     krtModal.close(modal);
@@ -408,10 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (deleteForm) {
         deleteForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            if (!krtFetch) {
-                deleteForm.submit();
-                return;
-            }
+
             missionWrite(deleteForm, MISSION_MSG.deleted, () => {
                 if (deleteModal) {
                     krtModal.close(deleteModal);
@@ -428,10 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         e.preventDefault();
-        if (!krtFetch) {
-            actForm.submit();
-            return;
-        }
+
         missionWrite(actForm, MISSION_MSG.saved, null);
     });
 });
@@ -470,36 +461,30 @@ function setupDragAndDrop(containerId, reorderUrl) {
         const newOrderIds = rows.map((row) => row.dataset.id);
 
         const reswapFreqTypes = function () {
-            if (krtFetch) {
-                krtFetch.swap({
-                    url: `/admin/mission-data?${missionFilterParams()}`,
-                    container: '#freqtypes-results',
-                    fragmentValue: 'freqtypes-results',
-                    history: false,
-                });
-            }
+            krtFetch.swap({
+                url: `/admin/mission-data?${missionFilterParams()}`,
+                container: '#freqtypes-results',
+                fragmentValue: 'freqtypes-results',
+                history: false,
+            });
         };
-        if (krtFetch) {
-            krtFetch
-                .write({
-                    method: 'POST',
-                    url: reorderUrl,
-                    payload: newOrderIds,
-                    toast: false,
-                    errorMessage: MISSION_MSG.error,
-                    conflict: MISSION_CONFLICT,
-                    onError(status) {
-                        if (status === 409) {
-                            return false;
-                        }
-                        if (showFrontendErrorToast) {
-                            showFrontendErrorToast(MISSION_MSG.error);
-                        }
-                        return true;
-                    },
-                })
-                .then(reswapFreqTypes);
-        }
+        krtFetch
+            .write({
+                method: 'POST',
+                url: reorderUrl,
+                payload: newOrderIds,
+                toast: false,
+                errorMessage: MISSION_MSG.error,
+                conflict: MISSION_CONFLICT,
+                onError(status) {
+                    if (status === 409) {
+                        return false;
+                    }
+                    showFrontendErrorToast(MISSION_MSG.error);
+                    return true;
+                },
+            })
+            .then(reswapFreqTypes);
 
         draggedRow = null;
     });
@@ -529,11 +514,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDragAndDrop('freqtypes-results', '/admin/mission-data/frequency-types/reorder');
 });
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'mission-data-select-kind', (el) => {
-        selectMissionKind(el.getAttribute('data-md-kind'), false);
-    });
-}
+krtEvents.on('click', 'mission-data-select-kind', (el) => {
+    selectMissionKind(el.getAttribute('data-md-kind'), false);
+});
 
 const MISSION_FILTER_PREF_KEY = 'admin_mission_data_filters';
 
@@ -577,7 +560,7 @@ function persistMissionFilters() {
     } catch (_e) {}
 }
 
-if (krtFetch) {
+{
     /**
      * Re-renders a result section whenever its inactive-toggle changes.
      *

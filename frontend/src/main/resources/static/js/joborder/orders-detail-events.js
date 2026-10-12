@@ -60,81 +60,77 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('change', 'od-update-status', (el) => {
-        updateStatus(/** @type {HTMLSelectElement} */ (el));
-    });
-    krtEvents.on('change', 'od-toggle-bp-counting', (el) => {
-        _toggleBlueprintCounting(/** @type {HTMLInputElement} */ (el));
-    });
-    krtEvents.on('click', 'od-toggle-inventory', (el, ev) => {
-        const target = /** @type {Element | null} */ (ev && ev.target);
-        if (
-            target &&
-            typeof target.closest === 'function' &&
-            target.closest('[data-claim-control], [data-trigger="od-unlink-inventory"]')
-        ) {
-            return;
-        }
-        toggleInventory(el);
-    });
-    krtEvents.on('click', 'od-unlink-inventory', (el) => {
-        unlinkInventoryItem(el);
-    });
-    krtEvents.on('click', 'claim-add', (el) => {
-        openClaimCreate(el);
-    });
-    krtEvents.on('click', 'claim-edit', (el) => {
-        openClaimEdit(el);
-    });
-    krtEvents.on('click', 'claim-submit', () => {
-        submitClaim();
-    });
-    krtEvents.on('click', 'claim-withdraw', () => {
-        withdrawClaimAction();
-    });
-    krtEvents.on('click', 'od-open-handover', openHandoverModal);
-    krtEvents.on('click', 'od-open-production', openProductionModal);
-    krtEvents.on('click', 'od-book-production', bookProduction);
-    krtEvents.on('change', 'od-production-bookin-changed', () => {
-        _prodReconcile();
-    });
-    krtEvents.on('change', 'od-production-owner-changed', () => {
-        _prodSyncPersonalForOwner();
-        _prodRefreshOrgUnitPicker();
-    });
-    krtEvents.on('change', 'od-production-personal-toggle', () => {
-        _prodSyncPersonalAllocate();
-    });
-    krtEvents.on('click', 'od-toggle-demand', _odToggleDemandRow);
-    krtEvents.on('click', 'od-download-report', (el) => {
-        downloadHandoverReport(el);
-    });
-    krtEvents.on('click', 'od-download-item-report', (el) => {
-        downloadItemHandoverReport(el);
-    });
-    krtEvents.on('click', 'od-cancel-status', cancelStatusChange);
-    krtEvents.on('click', 'od-confirm-status', confirmStatusChange);
-    krtEvents.on('click', 'od-confirm-remove-material', () => {
-        if (typeof joborderHooks.confirmRemoveMaterial === 'function')
-            joborderHooks.confirmRemoveMaterial();
-    });
-    krtEvents.on('click', 'od-add-handover-item', addHandoverItemRow);
-    krtEvents.on('click', 'od-preview-handover', (el) => {
-        previewHandoverReport(el);
-    });
-    krtEvents.on('click', 'od-remove-handover-row', (el) => {
-        const row = el.parentElement && el.parentElement.parentElement;
-        if (row) row.remove();
-        updateHandoverIndexes();
-    });
-    krtEvents.on('submit', 'od-disable-submit', (el) => {
-        const btn = /** @type {HTMLButtonElement | null} */ (
-            el.querySelector('button[type=submit]')
-        );
-        if (btn) btn.disabled = true;
-    });
-}
+krtEvents.on('change', 'od-update-status', (el) => {
+    updateStatus(/** @type {HTMLSelectElement} */ (el));
+});
+krtEvents.on('change', 'od-toggle-bp-counting', (el) => {
+    _toggleBlueprintCounting(/** @type {HTMLInputElement} */ (el));
+});
+krtEvents.on('click', 'od-toggle-inventory', (el, ev) => {
+    const target = /** @type {Element | null} */ (ev && ev.target);
+    if (
+        target &&
+        typeof target.closest === 'function' &&
+        target.closest('[data-claim-control], [data-trigger="od-unlink-inventory"]')
+    ) {
+        return;
+    }
+    toggleInventory(el);
+});
+krtEvents.on('click', 'od-unlink-inventory', (el) => {
+    unlinkInventoryItem(el);
+});
+krtEvents.on('click', 'claim-add', (el) => {
+    openClaimCreate(el);
+});
+krtEvents.on('click', 'claim-edit', (el) => {
+    openClaimEdit(el);
+});
+krtEvents.on('click', 'claim-submit', () => {
+    submitClaim();
+});
+krtEvents.on('click', 'claim-withdraw', () => {
+    withdrawClaimAction();
+});
+krtEvents.on('click', 'od-open-handover', openHandoverModal);
+krtEvents.on('click', 'od-open-production', openProductionModal);
+krtEvents.on('click', 'od-book-production', bookProduction);
+krtEvents.on('change', 'od-production-bookin-changed', () => {
+    _prodReconcile();
+});
+krtEvents.on('change', 'od-production-owner-changed', () => {
+    _prodSyncPersonalForOwner();
+    _prodRefreshOrgUnitPicker();
+});
+krtEvents.on('change', 'od-production-personal-toggle', () => {
+    _prodSyncPersonalAllocate();
+});
+krtEvents.on('click', 'od-toggle-demand', _odToggleDemandRow);
+krtEvents.on('click', 'od-download-report', (el) => {
+    downloadHandoverReport(el);
+});
+krtEvents.on('click', 'od-download-item-report', (el) => {
+    downloadItemHandoverReport(el);
+});
+krtEvents.on('click', 'od-cancel-status', cancelStatusChange);
+krtEvents.on('click', 'od-confirm-status', confirmStatusChange);
+krtEvents.on('click', 'od-confirm-remove-material', () => {
+    if (typeof joborderHooks.confirmRemoveMaterial === 'function')
+        joborderHooks.confirmRemoveMaterial();
+});
+krtEvents.on('click', 'od-add-handover-item', addHandoverItemRow);
+krtEvents.on('click', 'od-preview-handover', (el) => {
+    previewHandoverReport(el);
+});
+krtEvents.on('click', 'od-remove-handover-row', (el) => {
+    const row = el.parentElement && el.parentElement.parentElement;
+    if (row) row.remove();
+    updateHandoverIndexes();
+});
+krtEvents.on('submit', 'od-disable-submit', (el) => {
+    const btn = /** @type {HTMLButtonElement | null} */ (el.querySelector('button[type=submit]'));
+    if (btn) btn.disabled = true;
+});
 
 function oaOrderId() {
     const sec = document.getElementById('assignees-section');
@@ -161,7 +157,7 @@ const OA_CONFLICT = {
  */
 async function oaSend(method, url, opts) {
     opts ||= {};
-    if (!krtFetch) return false;
+
     const errorMsg = opts.errorMsg || I18N_NOTE_ERROR;
     const common = {
         method,
@@ -303,26 +299,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ta) ta.addEventListener('input', oaUpdateCounter);
 });
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'oa-add-me', (el) => {
-        oaAdd(el.getAttribute('data-user-id'));
-    });
-    krtEvents.on('click', 'oa-add-user', () => {
-        const sel = /** @type {HTMLSelectElement | null} */ (
-            document.getElementById('assignee-add-select')
-        );
-        if (sel && sel.value) oaAdd(sel.value);
-    });
-    krtEvents.on('click', 'oa-remove-assignee', (el) => {
-        oaRemove(el);
-    });
-    krtEvents.on('click', 'oa-edit-note', (el) => {
-        oaOpenNote(el);
-    });
-    krtEvents.on('click', 'oa-save-note', () => {
-        oaSaveNote();
-    });
-    krtEvents.on('click', 'oa-delete-note', (el) => {
-        oaDeleteNote(el);
-    });
-}
+krtEvents.on('click', 'oa-add-me', (el) => {
+    oaAdd(el.getAttribute('data-user-id'));
+});
+krtEvents.on('click', 'oa-add-user', () => {
+    const sel = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('assignee-add-select')
+    );
+    if (sel && sel.value) oaAdd(sel.value);
+});
+krtEvents.on('click', 'oa-remove-assignee', (el) => {
+    oaRemove(el);
+});
+krtEvents.on('click', 'oa-edit-note', (el) => {
+    oaOpenNote(el);
+});
+krtEvents.on('click', 'oa-save-note', () => {
+    oaSaveNote();
+});
+krtEvents.on('click', 'oa-delete-note', (el) => {
+    oaDeleteNote(el);
+});

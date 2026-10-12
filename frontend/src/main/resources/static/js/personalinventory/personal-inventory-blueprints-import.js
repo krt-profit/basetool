@@ -69,7 +69,7 @@ function loadHandoff() {
     if (window.history && window.history.replaceState) {
         window.history.replaceState(null, '', cleaned);
     }
-    if (!krtFetch) return;
+
     const url = `${
         endpoints().importStaged || '/personal-inventory/blueprints/import/staged'
     }?handoff=${encodeURIComponent(id)}`;
@@ -93,14 +93,12 @@ function loadHandoff() {
 }
 
 function handoffNotFound() {
-    if (showFrontendErrorToast) {
-        showFrontendErrorToast(
-            krtI18nText(
-                i18n().handoffNotFound || i18n().error,
-                'krtBlueprintsImportI18n.handoffNotFound',
-            ),
-        );
-    }
+    showFrontendErrorToast(
+        krtI18nText(
+            i18n().handoffNotFound || i18n().error,
+            'krtBlueprintsImportI18n.handoffNotFound',
+        ),
+    );
 }
 
 function pickFile() {
@@ -115,7 +113,6 @@ function onFileChosen() {
 }
 
 function uploadPreview(file) {
-    if (!krtFetch) return;
     const fd = new FormData();
     fd.append('file', file);
     krtFetch
@@ -400,10 +397,7 @@ function apply() {
         return;
     }
     if (applyBtn) applyBtn.disabled = true;
-    if (!krtFetch) {
-        applyError();
-        return;
-    }
+
     krtFetch
         .write({
             method: 'POST',
@@ -429,9 +423,7 @@ function apply() {
                     i18n().skippedLabel,
                     'krtBlueprintsImportI18n.skippedLabel',
                 )}: ${res.skipped || 0}`;
-                if (showFrontendSuccessToast) {
-                    showFrontendSuccessToast(msg);
-                }
+                showFrontendSuccessToast(msg);
                 closeModal();
                 krtFetch.swap({
                     url: window.location.pathname + window.location.search,
@@ -448,14 +440,8 @@ function apply() {
         });
 }
 
-function applyError() {
-    if (applyBtn) applyBtn.disabled = false;
-    toastError();
-}
-
 function toastError() {
-    if (showFrontendErrorToast)
-        showFrontendErrorToast(krtI18nText(i18n().error, 'krtBlueprintsImportI18n.error'));
+    showFrontendErrorToast(krtI18nText(i18n().error, 'krtBlueprintsImportI18n.error'));
 }
 
 function openModal() {
@@ -472,14 +458,12 @@ if (document.readyState === 'loading') {
     init();
 }
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('click', 'bp-import-pick', pickFile);
-    krtEvents.on('click', 'bp-import-close', closeModal);
-    krtEvents.on('click', 'bp-import-apply', apply);
-    krtEvents.on('click', 'bp-import-selectall', () => {
-        selectAll(true);
-    });
-    krtEvents.on('click', 'bp-import-selectnone', () => {
-        selectAll(false);
-    });
-}
+krtEvents.on('click', 'bp-import-pick', pickFile);
+krtEvents.on('click', 'bp-import-close', closeModal);
+krtEvents.on('click', 'bp-import-apply', apply);
+krtEvents.on('click', 'bp-import-selectall', () => {
+    selectAll(true);
+});
+krtEvents.on('click', 'bp-import-selectnone', () => {
+    selectAll(false);
+});

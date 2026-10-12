@@ -945,7 +945,7 @@ export function bookProduction() {
                     'item-handover-lines',
                 ]);
             }
-            if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+            if (typeof krtLiveSync.sendChanged === 'function') {
                 krtLiveSync.sendChanged('inventory', ['stock']);
             }
         },

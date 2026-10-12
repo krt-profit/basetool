@@ -304,14 +304,12 @@ document.addEventListener('DOMContentLoaded', () => {
     updateProfitCalculation();
 });
 
-if (krtEvents && typeof krtEvents.on === 'function') {
-    krtEvents.on('change', 'profit-update', onInputChanged);
-    krtEvents.on('change', 'profit-toggle-all', (el) => {
-        const all = /** @type {HTMLInputElement} */ (el);
-        systemChecks().forEach((c) => {
-            c.checked = all.checked;
-        });
-        onInputChanged();
+krtEvents.on('change', 'profit-update', onInputChanged);
+krtEvents.on('change', 'profit-toggle-all', (el) => {
+    const all = /** @type {HTMLInputElement} */ (el);
+    systemChecks().forEach((c) => {
+        c.checked = all.checked;
     });
-    krtEvents.on('change', 'profit-update-state', onInputChanged);
-}
+    onInputChanged();
+});
+krtEvents.on('change', 'profit-update-state', onInputChanged);

@@ -82,10 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (updateForm) {
         updateForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            if (!krtFetch) {
-                updateForm.submit();
-                return;
-            }
+
             const versionInput = /** @type {HTMLInputElement | null} */ (
                 updateForm.querySelector('input[name="version"]')
             );
@@ -117,10 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (deleteForm) {
         deleteForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            if (!krtFetch) {
-                deleteForm.submit();
-                return;
-            }
+
             krtFetch.write({
                 method: 'POST',
                 url: deleteForm.getAttribute('action') || '',

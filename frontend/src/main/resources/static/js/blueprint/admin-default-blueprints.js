@@ -83,14 +83,14 @@ function str(value) {
 
 /** @param {string | undefined} message */
 function successToast(message) {
-    if (message && typeof showFrontendSuccessToast === 'function') {
+    if (message) {
         showFrontendSuccessToast(message);
     }
 }
 
 /** @param {string | undefined} message */
 function errorToast(message) {
-    if (message && typeof showFrontendErrorToast === 'function') {
+    if (message) {
         showFrontendErrorToast(message);
     }
 }
@@ -307,9 +307,6 @@ function applyAddResult(result) {
 if (addForm) {
     const form = addForm;
     form.addEventListener('submit', (event) => {
-        if (!krtFetch) {
-            return;
-        }
         event.preventDefault();
         if (staged.size === 0) {
             return;
@@ -360,10 +357,7 @@ if (deleteConfirm) {
         if (!form) {
             return;
         }
-        if (!krtFetch) {
-            form.requestSubmit();
-            return;
-        }
+
         krtFetch.write({
             method: 'POST',
             url: form.getAttribute('action') || '',

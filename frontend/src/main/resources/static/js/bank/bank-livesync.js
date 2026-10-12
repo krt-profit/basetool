@@ -92,9 +92,6 @@ function bankAccountId() {
  */
 function makeBankReceiverRefresh(sectionMap) {
     return function (keys) {
-        if (!krtFetch || typeof krtFetch.swap !== 'function') {
-            return;
-        }
         const url = window.location.pathname + window.location.search;
         const errorMessage = bankRefreshError();
         /** @type {Record<string, boolean>} */
@@ -120,14 +117,6 @@ function makeBankReceiverRefresh(sectionMap) {
  * and the single-account room (REQ-FE-015).
  */
 export function initLiveSyncReceivers() {
-    if (
-        !krtLiveSync ||
-        typeof krtLiveSync.createReceiver !== 'function' ||
-        !krtFetch ||
-        typeof krtFetch.swap !== 'function'
-    ) {
-        return;
-    }
     function pill() {
         return { label: bankLiveSyncUpdates };
     }
@@ -213,7 +202,7 @@ function resolveBankLiveSyncAccount(form, ref) {
  * @param {HTMLFormElement} form the form whose write just succeeded
  */
 export function publishBankLiveSync(form) {
-    if (!krtLiveSync || typeof krtLiveSync.sendChanged !== 'function') {
+    if (typeof krtLiveSync.sendChanged !== 'function') {
         return;
     }
     const spec = form.getAttribute('data-livesync');

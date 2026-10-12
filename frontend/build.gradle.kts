@@ -760,6 +760,20 @@ val testTrustedTypesJs =
     outputs.upToDateWhen { false }
   }
 
+val testSafeUrl =
+  tasks.register<NodeTask>("testSafeUrl") {
+    group = "verification"
+    description =
+      "Regression tests for safeSameOriginUrl, the validator between a DOM-read URL and a form action."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/safe-url.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/safe-url.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/safe-url.js"))
+    outputs.upToDateWhen { false }
+  }
+
 val testEslintBans =
   tasks.register<NodeTask>("testEslintBans") {
     group = "verification"
@@ -779,6 +793,7 @@ tasks.named("check").configure {
   dependsOn(
     testKrtFetchReadJs,
     testTrustedTypesJs,
+    testSafeUrl,
     testEslintBans,
     testTypecheckRatchet,
     testPromotionCsvEscape,

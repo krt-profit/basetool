@@ -36,7 +36,7 @@ function refresh(roster) {
     const url = roster.getAttribute('data-refresh-url');
     const container = roster.getAttribute('data-refresh-container');
     const fragment = roster.getAttribute('data-refresh-fragment');
-    if (!url || !container || !fragment || !krtFetch) {
+    if (!url || !container || !fragment) {
         return undefined;
     }
     return krtFetch.swap({
@@ -70,10 +70,6 @@ function currentRow(skId, userId) {
  * @param {() => void} run the confirmed action
  */
 function confirmThen(title, message, run) {
-    if (typeof showKrtConfirm !== 'function') {
-        run();
-        return;
-    }
     showKrtConfirm(title, message, MEMBER_MSG.confirm, MEMBER_MSG.cancel).then((ok) => {
         if (ok) {
             run();
@@ -111,7 +107,7 @@ function toggleFlag(button) {
     const parts = rowOf(button);
     const flag = button.getAttribute('data-sk-flag');
     const url = parts ? parts.row.getAttribute('data-flags-url') : null;
-    if (!parts || !flag || !url || !krtFetch) {
+    if (!parts || !flag || !url) {
         return;
     }
     button.setAttribute('aria-busy', 'true');
@@ -155,7 +151,7 @@ function toggleFlag(button) {
 function toggleLead(item) {
     const parts = rowOf(item);
     const url = parts ? parts.row.getAttribute('data-lead-url') : null;
-    if (!parts || !url || !krtFetch) {
+    if (!parts || !url) {
         return;
     }
     const lead = parts.row.getAttribute('data-lead') === 'true';
@@ -203,7 +199,7 @@ function toggleLead(item) {
 function removeMember(item) {
     const parts = rowOf(item);
     const url = parts ? parts.row.getAttribute('data-remove-url') : null;
-    if (!parts || !url || !krtFetch) {
+    if (!parts || !url) {
         return;
     }
     confirmThen(parts.row.getAttribute('data-user-name'), MEMBER_MSG.confirmRemove, () => {
@@ -254,7 +250,7 @@ const scId = membersBox ? membersBox.getAttribute('data-sc-id') : '';
 
 /** Re-renders the member page's roster fragment. */
 function reswapMembers() {
-    if (!krtFetch || !scId) {
+    if (!scId) {
         return undefined;
     }
     return krtFetch.swap({
@@ -304,10 +300,7 @@ if (modal && openBtn) {
     if (addForm) {
         addForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            if (!krtFetch) {
-                addForm.submit();
-                return;
-            }
+
             krtFetch.submitForm({
                 form: addForm,
                 successMessage: MEMBER_MSG.saved,

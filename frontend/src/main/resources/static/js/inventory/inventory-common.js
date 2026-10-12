@@ -391,9 +391,7 @@ function createLager(cfg) {
             .then((html) => {
                 krtFetch.setTrustedHtml(content, html);
                 headerRow.setAttribute('data-stack-loaded', 'true');
-                if (typeof krtEnhanceComboboxes === 'function') {
-                    krtEnhanceComboboxes(content);
-                }
+                krtEnhanceComboboxes(content);
                 if (cfg.onStackEntriesLoaded) cfg.onStackEntriesLoaded(content);
             })
             .catch((e) => {
@@ -584,7 +582,7 @@ function createLager(cfg) {
      * @param {Array<string | null | undefined> | null | undefined} orderIds the affected orders
      */
     function broadcastOrdersChanged(orderIds) {
-        if (!krtLiveSync || typeof krtLiveSync.sendChanged !== 'function') return;
+        if (typeof krtLiveSync.sendChanged !== 'function') return;
         let touchedAnyOrder = false;
         (orderIds || []).forEach((orderId) => {
             if (orderId) {
@@ -605,7 +603,7 @@ function createLager(cfg) {
      * Tells the Materialbörse to re-pull its board after a stock-reducing write.
      */
     function broadcastBoardChanged() {
-        if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        if (typeof krtLiveSync.sendChanged === 'function') {
             krtLiveSync.sendChanged('materialboard', ['board']);
         }
     }
@@ -642,7 +640,7 @@ function createLager(cfg) {
         const source = input(sourceId);
         const other = input(otherId);
         const maxEl = input(maxId);
-        if (!source || !other || !maxEl || !krtScuInput) return;
+        if (!source || !other || !maxEl) return;
         const value = krtScuInput.parse(source.value);
         const max = parseFloat(maxEl.value) || 0;
         if (!isNaN(value)) {
@@ -811,9 +809,7 @@ function createLager(cfg) {
             return;
         }
         bookOutItemId = id;
-        if (safeSameOriginUrl) {
-            bookOutForm.action = safeSameOriginUrl(`/inventory/${id}/book-out`, bookOutForm.action);
-        }
+        bookOutForm.action = safeSameOriginUrl(`/inventory/${id}/book-out`, bookOutForm.action);
         const isScu = quantityType !== 'PIECE';
         amountInput.setAttribute('step', isScu ? '0.001' : '1');
         targetAmountInput.setAttribute('step', isScu ? '0.001' : '1');
@@ -845,19 +841,15 @@ function createLager(cfg) {
         loadSellTerminals(materialId, terminalSelect, sellRadio, sellNotPossibleReason);
 
         krtModal.open(modal);
-        if (krtHerkunft && id) {
+        if (id) {
             krtHerkunft.populate('bookout', id);
         }
     }
 
     /** Closes the book-out modal and resets its unsaved-changes and Herkunft state. */
     function closeBookOutModal() {
-        if (typeof resetUnsavedChanges === 'function') {
-            resetUnsavedChanges();
-        }
-        if (krtHerkunft) {
-            krtHerkunft.reset('bookout');
-        }
+        resetUnsavedChanges();
+        krtHerkunft.reset('bookout');
         const modal = document.getElementById('bookOutModal');
         if (modal) krtModal.close(modal);
     }
@@ -871,7 +863,7 @@ function createLager(cfg) {
     function submitBookOut(event) {
         if (event.defaultPrevented) return;
         event.preventDefault();
-        if (bookOutInFlight || !krtFetch || !bookOutItemId) return;
+        if (bookOutInFlight || !bookOutItemId) return;
         const itemId = bookOutItemId;
         const typeInput = /** @type {HTMLInputElement | null} */ (
             document.querySelector('input[name="type"]:checked')
@@ -884,16 +876,12 @@ function createLager(cfg) {
         );
         const versionEl = input('version');
         if (!amountEl || !versionEl) return;
-        const amount = krtScuInput ? krtScuInput.parse(amountEl.value) : parseFloat(amountEl.value);
-        if (krtHerkunft && !krtHerkunft.isValid('bookout')) {
-            if (typeof showFrontendErrorToast === 'function') {
-                showFrontendErrorToast(assocI18n.overallocated);
-            }
+        const amount = krtScuInput.parse(amountEl.value);
+        if (!krtHerkunft.isValid('bookout')) {
+            showFrontendErrorToast(assocI18n.overallocated);
             return;
         }
-        const reductions = krtHerkunft
-            ? krtHerkunft.collect('bookout')
-            : { jobOrderReductions: null, missionReductions: null };
+        const reductions = krtHerkunft.collect('bookout');
         const payload = {
             amount,
             type,
@@ -1005,10 +993,10 @@ function createLager(cfg) {
      */
     function submitStolenMark(event) {
         event.preventDefault();
-        if (stolenMarkInFlight || !krtFetch || !stolenMarkTarget.id) return;
+        if (stolenMarkInFlight || !stolenMarkTarget.id) return;
         const amountInput = input('stolenMarkAmount');
         const raw = amountInput ? amountInput.value : '';
-        const amount = krtScuInput ? krtScuInput.parse(raw) : parseFloat(raw);
+        const amount = krtScuInput.parse(raw);
         const invalid =
             amount == null ||
             Number.isNaN(amount) ||
@@ -1016,9 +1004,7 @@ function createLager(cfg) {
             amount > stolenMarkTarget.max + 0.0005 ||
             (stolenMarkTarget.piece && !Number.isInteger(amount));
         if (invalid) {
-            if (typeof showFrontendErrorToast === 'function') {
-                showFrontendErrorToast(stolenMarkI18n.errorAmount);
-            }
+            showFrontendErrorToast(stolenMarkI18n.errorAmount);
             return;
         }
         const whole = amount >= stolenMarkTarget.max - 0.0005;
@@ -1055,10 +1041,8 @@ function createLager(cfg) {
 
     /** Closes the Umbuchen modal and resets its unsaved-changes and Herkunft state. */
     function closeUmbuchenModal() {
-        if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
-        if (krtHerkunft) {
-            krtHerkunft.reset('umbuchen');
-        }
+        resetUnsavedChanges();
+        krtHerkunft.reset('umbuchen');
         const modal = document.getElementById('umbuchenModal');
         if (modal) krtModal.close(modal);
     }
@@ -1289,7 +1273,7 @@ function createLager(cfg) {
             },
         );
         assocUpdateRestChip(split.querySelector('[data-assoc-rest]'), rest, isPiece);
-        if (dto.version != null && krtFetch && typeof krtFetch.syncVersion === 'function') {
+        if (dto.version != null) {
             const leaf = split.closest('.tree-row--leaf');
             if (leaf) krtFetch.syncVersion(leaf, dto.version);
         }
@@ -1323,7 +1307,6 @@ function createLager(cfg) {
      * @returns {Promise<void>} settles when the write finished
      */
     async function assocSend(entryId, method, body, split, pop) {
-        if (!krtFetch) return;
         await krtFetch.write({
             method,
             url: `/inventory/${encodeURIComponent(entryId ?? '')}/allocation`,
@@ -1344,9 +1327,7 @@ function createLager(cfg) {
             },
             onError(status) {
                 if (status === 422) {
-                    if (typeof showFrontendErrorToast === 'function') {
-                        showFrontendErrorToast(assocI18n.overallocated);
-                    }
+                    showFrontendErrorToast(assocI18n.overallocated);
                     return true;
                 }
                 return false;
@@ -1376,9 +1357,7 @@ function createLager(cfg) {
             );
             amount = parseFloat(amountInput ? amountInput.value : '');
             if (isNaN(amount) || amount <= 0 || (isPiece && amount % 1 !== 0)) {
-                if (typeof showFrontendErrorToast === 'function') {
-                    showFrontendErrorToast(assocI18n.amountRequired);
-                }
+                showFrontendErrorToast(assocI18n.amountRequired);
                 return;
             }
             amount = Math.round(amount * 1000) / 1000;
@@ -1397,10 +1376,7 @@ function createLager(cfg) {
             const body = { field, targetId, amount, version };
             return assocSend(entryId, method, body, split, pop);
         };
-        if (krtFetch && typeof krtFetch.serialize === 'function') {
-            return krtFetch.serialize(`inv-assoc:${entryId}`, run).finally(release);
-        }
-        return Promise.resolve().then(run).finally(release);
+        return krtFetch.serialize(`inv-assoc:${entryId}`, run).finally(release);
     }
 
     /**
@@ -1535,44 +1511,42 @@ function createLager(cfg) {
         document.addEventListener('DOMContentLoaded', restoreExpandedTree);
         document.addEventListener('click', closeMultiSelectsOnOutsideClick);
         document.addEventListener('change', clearFamilyFromChip);
-        if (krtEvents && typeof krtEvents.on === 'function') {
-            krtEvents.on('click', trigger('toggle-group'), toggleGroup);
-            krtEvents.on('click', trigger('toggle-stack'), toggleStack);
-            krtEvents.on('click', trigger('stack-page'), goToStackEntriesPage);
-            bindAssoc();
-            krtEvents.on('click', trigger('bookout'), (el) => {
-                openBookOutModal(
-                    el.getAttribute('data-id'),
-                    el.getAttribute('data-amount'),
-                    el.getAttribute('data-version'),
-                    el.getAttribute('data-material-id'),
-                    el.getAttribute('data-quantity-type'),
-                );
-            });
-            krtEvents.on('click', trigger('close-bookout'), closeBookOutModal);
-            krtEvents.on('click', trigger('stolen'), openStolenMarkModal);
-            krtEvents.on('click', trigger('close-stolen'), closeStolenMarkModal);
-            krtEvents.on('click', trigger('stolen-all'), fillStolenMarkAll);
-            krtEvents.on('input', trigger('amount-from-target'), updateAmountFromTarget);
-            krtEvents.on('input', trigger('target-from-amount'), updateTargetFromAmount);
-            krtEvents.on('change', trigger('toggle-bookout-type'), toggleBookOutTypeFields);
-            krtEvents.on('click', trigger('close-umbuchen'), closeUmbuchenModal);
-            krtEvents.on(
-                'input',
-                trigger('umbuchen-amount-from-target'),
-                updateUmbuchenAmountFromTarget,
+        krtEvents.on('click', trigger('toggle-group'), toggleGroup);
+        krtEvents.on('click', trigger('toggle-stack'), toggleStack);
+        krtEvents.on('click', trigger('stack-page'), goToStackEntriesPage);
+        bindAssoc();
+        krtEvents.on('click', trigger('bookout'), (el) => {
+            openBookOutModal(
+                el.getAttribute('data-id'),
+                el.getAttribute('data-amount'),
+                el.getAttribute('data-version'),
+                el.getAttribute('data-material-id'),
+                el.getAttribute('data-quantity-type'),
             );
-            krtEvents.on(
-                'input',
-                trigger('umbuchen-target-from-amount'),
-                updateUmbuchenTargetFromAmount,
-            );
-            krtEvents.on(
-                'change',
-                trigger('umbuchen-target-user-changed'),
-                refreshUmbuchenTransferOrgUnitPicker,
-            );
-        }
+        });
+        krtEvents.on('click', trigger('close-bookout'), closeBookOutModal);
+        krtEvents.on('click', trigger('stolen'), openStolenMarkModal);
+        krtEvents.on('click', trigger('close-stolen'), closeStolenMarkModal);
+        krtEvents.on('click', trigger('stolen-all'), fillStolenMarkAll);
+        krtEvents.on('input', trigger('amount-from-target'), updateAmountFromTarget);
+        krtEvents.on('input', trigger('target-from-amount'), updateTargetFromAmount);
+        krtEvents.on('change', trigger('toggle-bookout-type'), toggleBookOutTypeFields);
+        krtEvents.on('click', trigger('close-umbuchen'), closeUmbuchenModal);
+        krtEvents.on(
+            'input',
+            trigger('umbuchen-amount-from-target'),
+            updateUmbuchenAmountFromTarget,
+        );
+        krtEvents.on(
+            'input',
+            trigger('umbuchen-target-from-amount'),
+            updateUmbuchenTargetFromAmount,
+        );
+        krtEvents.on(
+            'change',
+            trigger('umbuchen-target-user-changed'),
+            refreshUmbuchenTransferOrgUnitPicker,
+        );
         const bookOutForm = document.getElementById('bookOutForm');
         if (bookOutForm) {
             bookOutForm.addEventListener('submit', (e) => {

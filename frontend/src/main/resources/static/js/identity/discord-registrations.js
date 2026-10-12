@@ -26,9 +26,6 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (!krtFetch) {
-        return;
-    }
     const body = document.getElementById('registrationsBody');
     const rejectedBody = document.getElementById('rejectedBody');
     const modal = document.getElementById('reject-modal');
@@ -273,9 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toast: false,
             errorMessage: DISCORD_MSG.approveError,
             onSuccess() {
-                if (showFrontendSuccessToast) {
-                    showFrontendSuccessToast(DISCORD_MSG.approved);
-                }
+                showFrontendSuccessToast(DISCORD_MSG.approved);
                 removeRow(row);
             },
         });
@@ -395,9 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.rejectError,
                 onSuccess(data) {
-                    if (showFrontendSuccessToast) {
-                        showFrontendSuccessToast(DISCORD_MSG.rejected);
-                    }
+                    showFrontendSuccessToast(DISCORD_MSG.rejected);
                     closeReject();
                     removeRow(row);
                     insertRejectedRow(data);
@@ -419,9 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const picker = linkPicker();
             const targetUserId = picker && picker.value ? picker.value : '';
             if (!targetUserId) {
-                if (showFrontendErrorToast) {
-                    showFrontendErrorToast(DISCORD_MSG.linkNoTarget);
-                }
+                showFrontendErrorToast(DISCORD_MSG.linkNoTarget);
                 return;
             }
             const row = linkTarget;
@@ -437,9 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.linkError,
                 onSuccess() {
-                    if (showFrontendSuccessToast) {
-                        showFrontendSuccessToast(DISCORD_MSG.linked);
-                    }
+                    showFrontendSuccessToast(DISCORD_MSG.linked);
                     closeLink();
                     removeRow(row);
                 },
@@ -461,9 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const picker = mergePicker();
             const sourceUserId = picker && picker.value ? picker.value : '';
             if (!sourceUserId) {
-                if (showFrontendErrorToast) {
-                    showFrontendErrorToast(DISCORD_MSG.mergeNoSource);
-                }
+                showFrontendErrorToast(DISCORD_MSG.mergeNoSource);
                 return;
             }
             const row = mergeTarget;
@@ -479,9 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.mergeError,
                 onSuccess(data) {
-                    if (showFrontendSuccessToast) {
-                        showFrontendSuccessToast(DISCORD_MSG.merged);
-                    }
+                    showFrontendSuccessToast(DISCORD_MSG.merged);
                     if (data && data.version != null) {
                         row.setAttribute('data-version', String(data.version));
                     }
@@ -515,9 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: false,
                 errorMessage: DISCORD_MSG.reopenError,
                 onSuccess(data) {
-                    if (showFrontendSuccessToast) {
-                        showFrontendSuccessToast(DISCORD_MSG.reopened);
-                    }
+                    showFrontendSuccessToast(DISCORD_MSG.reopened);
                     closeReopen();
                     removeRejectedRow(row);
                     insertPendingRow(data);

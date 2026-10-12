@@ -51,11 +51,7 @@ function applyGrantFlagResult(button, row, flag, newValue, payload) {
     if (version == null) {
         return;
     }
-    if (krtFetch && typeof krtFetch.syncVersion === 'function') {
-        krtFetch.syncVersion(row, version);
-    } else {
-        row.setAttribute('data-version', String(version));
-    }
+    krtFetch.syncVersion(row, version);
 }
 
 /**
@@ -106,21 +102,17 @@ export function initGrantMatrix() {
             errorMessage: genericError(),
             onSuccess(payload) {
                 applyGrantFlagResult(flagButton, row, flag, newValue, payload);
-                if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+                if (typeof krtLiveSync.sendChanged === 'function') {
                     krtLiveSync.sendChanged('bank', ['grants']);
                 }
             },
             onError(status, payload) {
                 const message = payload && payload.message ? payload.message : genericError();
-                if (typeof showFrontendErrorToast === 'function') {
-                    showFrontendErrorToast(message);
-                }
+                showFrontendErrorToast(message);
                 return true;
             },
             onNetworkError() {
-                if (typeof showFrontendErrorToast === 'function') {
-                    showFrontendErrorToast(genericError());
-                }
+                showFrontendErrorToast(genericError());
                 return true;
             },
         });

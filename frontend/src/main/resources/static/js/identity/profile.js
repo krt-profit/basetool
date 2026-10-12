@@ -23,9 +23,6 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 function initProfile() {
-    if (!krtFetch) {
-        return;
-    }
     /** @type {Record<string, string>} */
     const i18n = window.krtProfileI18n || {};
 
@@ -200,7 +197,7 @@ function initProfile() {
             return isDirty(entry.form);
         });
         bar.hidden = dirty.length === 0;
-        if (!dirty.length && !saving && typeof resetUnsavedChanges === 'function') {
+        if (!dirty.length && !saving) {
             resetUnsavedChanges();
         }
         if (summary) {
@@ -297,7 +294,7 @@ function initProfile() {
                 saveButton.disabled = false;
             }
         }
-        if (allSaved && typeof resetUnsavedChanges === 'function') {
+        if (allSaved) {
             resetUnsavedChanges();
         }
         refreshBar();
@@ -339,9 +336,7 @@ function initProfile() {
             });
         });
         updateCounter();
-        if (typeof resetUnsavedChanges === 'function') {
-            resetUnsavedChanges();
-        }
+        resetUnsavedChanges();
         refreshBar();
     }
 
@@ -421,9 +416,6 @@ function initProfile() {
      * @returns {Promise<boolean> | undefined} the swap, or undefined when no swap helper exists
      */
     function refreshDeletionCard() {
-        if (!krtFetch.swap) {
-            return undefined;
-        }
         return krtFetch.swap({
             url: DELETION_URL,
             container: '#profile-deletion-host',

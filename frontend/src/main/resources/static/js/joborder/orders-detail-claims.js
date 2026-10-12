@@ -35,7 +35,6 @@ import {
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * @typedef {object} OdClaimModalOptions
@@ -309,7 +308,7 @@ function _doStatusUpdate(orderId, status, selectElement) {
 export function _toggleBlueprintCounting(checkbox) {
     const orderId = checkbox.getAttribute('data-order-id');
     const desired = checkbox.checked;
-    if (!orderId || !krtFetch) {
+    if (!orderId) {
         return;
     }
     checkbox.disabled = true;

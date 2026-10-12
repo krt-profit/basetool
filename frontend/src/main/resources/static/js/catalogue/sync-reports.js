@@ -26,9 +26,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (krtFetch) {
-        krtFetch.bindSwap({ container: '#sync-results', history: true });
-    }
+    krtFetch.bindSwap({ container: '#sync-results', history: true });
 
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('purge-form'));
     const daysInput = /** @type {HTMLInputElement | null} */ (
@@ -47,7 +45,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    const purgeForm = form;
     const purgeDays = daysInput;
     const template = messageEl ? messageEl.getAttribute('data-template') || '' : '';
 
@@ -76,10 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
             purgeDays.reportValidity();
             return;
         }
-        if (!krtFetch) {
-            purgeForm.submit();
-            return;
-        }
+
         closeModal();
         const sourceValue = sourceInput ? sourceInput.value : '';
         const url = `/admin/sync-reports/delete-old?days=${encodeURIComponent(
@@ -92,16 +86,12 @@ document.addEventListener('DOMContentLoaded', () => {
             errorMessage: SYNC_MSG.deleteError,
             onSuccess(body) {
                 const count = body && body.deleted != null ? body.deleted : 0;
-                if (showFrontendSuccessToast) {
-                    showFrontendSuccessToast(SYNC_MSG.successTemplate.replace('{0}', count));
-                }
-                if (krtFetch) {
-                    krtFetch.swap({
-                        url: window.location.pathname + window.location.search,
-                        container: '#sync-results',
-                        history: false,
-                    });
-                }
+                showFrontendSuccessToast(SYNC_MSG.successTemplate.replace('{0}', count));
+                krtFetch.swap({
+                    url: window.location.pathname + window.location.search,
+                    container: '#sync-results',
+                    history: false,
+                });
             },
         });
     }
