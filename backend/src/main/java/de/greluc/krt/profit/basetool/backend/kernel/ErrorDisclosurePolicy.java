@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exception;
+package de.greluc.krt.profit.basetool.backend.kernel;
 
 /**
  * How {@code GlobalExceptionHandler}'s generic dispatch treats an {@link AppException}'s message

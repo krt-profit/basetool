@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.kernel.AppException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.validation.ConstraintViolationException;

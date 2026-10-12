@@ -19,7 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import de.greluc.krt.profit.basetool.backend.kernel.AppException;
+import de.greluc.krt.profit.basetool.backend.kernel.AppExceptionKind;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.ErrorDisclosurePolicy;
+import de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;

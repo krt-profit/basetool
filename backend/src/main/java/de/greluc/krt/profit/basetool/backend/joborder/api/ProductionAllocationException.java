@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
-import de.greluc.krt.profit.basetool.backend.exception.DomainProblem;
+import de.greluc.krt.profit.basetool.backend.kernel.DomainProblem;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;

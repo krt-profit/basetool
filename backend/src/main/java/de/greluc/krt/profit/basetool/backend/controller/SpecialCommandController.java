@@ -119,8 +119,8 @@ public class SpecialCommandController {
    *
    * @param id Spezialkommando id.
    * @return the matching DTO.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException if no SK matches and
-   *     the caller is an admin.
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException if no SK matches and the
+   *     caller is an admin.
    */
   @GetMapping("/{id}")
   @PreAuthorize("@specialCommandSecurityService.canManageMembers(#id, authentication)")

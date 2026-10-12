@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.validation;
+package de.greluc.krt.profit.basetool.backend.kernel;
 
 /**
  * Shared validation constants for write DTOs, referenced from {@code @Size(max = …)} and

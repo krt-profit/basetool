@@ -31,7 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionObjectiveRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTimelineService;
 import de.greluc.krt.profit.basetool.backend.model.Mission;

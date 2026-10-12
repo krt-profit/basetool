@@ -26,10 +26,10 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionCommands;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
@@ -225,7 +225,7 @@ public class MissionService implements MissionCommands {
    *
    * @param id mission primary key
    * @return the mission
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    */
   public Mission getMissionById(@NotNull UUID id) {
     Mission mission = Entities.require(missionRepository.findById(id), "Mission not found");
@@ -296,8 +296,8 @@ public class MissionService implements MissionCommands {
    *
    * @param request create payload (already validated by Bean Validation at the controller boundary)
    * @return the persisted mission entity
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when {@code
-   *     operationId} does not resolve
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when {@code operationId}
+   *     does not resolve
    */
   @Transactional
   public Mission createMission(CreateMissionRequest request) {
@@ -380,7 +380,7 @@ public class MissionService implements MissionCommands {
    *
    * @param operationId the operation to link
    * @return {@code operationId}
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no operation
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no operation
    *     matches
    */
   private @NotNull UUID requireOperation(@NotNull UUID operationId) {
@@ -396,8 +396,8 @@ public class MissionService implements MissionCommands {
    * <p>A transition to {@code ACTIVE} without an actual start time also stamps {@code
    * actualStartTime} and bumps {@code scheduleVersion}.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when any referenced
-   *     id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when any referenced id
+   *     is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
    *     {@code expectedCoreVersion} is stale
    */
@@ -532,7 +532,7 @@ public class MissionService implements MissionCommands {
    * Deletes a mission with its participants, finance entries, units, crews and frequencies; linked
    * inventory items and refinery orders are unlinked, not deleted.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
    *     unknown
    */
   @Transactional
@@ -593,8 +593,8 @@ public class MissionService implements MissionCommands {
    * participant keeps the submitted {@code orgUnitIds}. A non-null {@code payoutPreference}
    * overrides the profile default (REQ-MISSION-002).
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when any referenced
-   *     id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when any referenced id
+   *     is unknown
    */
   @Transactional
   public Mission addParticipant(
@@ -613,7 +613,7 @@ public class MissionService implements MissionCommands {
    * Returns a participant of the given mission; a participant of another mission counts as not
    * found.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the participant
    *     does not exist on this mission
    */
   public MissionParticipant getParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
@@ -646,8 +646,8 @@ public class MissionService implements MissionCommands {
    *
    * @param authentication the caller; a caller who may not manage the mission can neither set the
    *     planned job type nor rename the row onto a member or another guest
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
-   *     or any referenced id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the participant or
+   *     any referenced id is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale
    */
   @Transactional
@@ -781,7 +781,7 @@ public class MissionService implements MissionCommands {
    * @param meta the optional free-text time/place hint
    * @param expectedStepsVersion the steps-section version the caller last saw
    * @return the managed mission
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
    *     unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
    *     expectedStepsVersion} is stale
@@ -816,8 +816,8 @@ public class MissionService implements MissionCommands {
    * Removes an Ablauf step and re-packs the remaining steps' {@code orderIndex} to 0..n-1 so the
    * timeline stays contiguous. Bumps {@code stepsVersion}.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the step is not
-   *     a child of the mission
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the step is not a
+   *     child of the mission
    */
   @Transactional
   public Mission deleteStep(
@@ -844,8 +844,8 @@ public class MissionService implements MissionCommands {
   /**
    * Sets a step's {@code done} flag and bumps {@code stepsVersion}.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the step is not
-   *     a child of the mission
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the step is not a
+   *     child of the mission
    */
   @Transactional
   public Mission toggleStepDone(
@@ -865,7 +865,7 @@ public class MissionService implements MissionCommands {
    * @param kind the classification (primary / secondary / non-goal)
    * @param expectedObjectivesVersion the goals-section version the caller last saw
    * @return the managed mission
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
    *     unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
    *     expectedObjectivesVersion} is stale
@@ -901,8 +901,8 @@ public class MissionService implements MissionCommands {
    * Removes a goal and re-packs the remaining goals' {@code orderIndex} to 0..n-1 so the list stays
    * contiguous. Bumps {@code objectivesVersion}.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the goal is not
-   *     a child of the mission
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the goal is not a
+   *     child of the mission
    */
   @Transactional
   public Mission deleteObjective(
@@ -1198,7 +1198,7 @@ public class MissionService implements MissionCommands {
    * @param targetOrgUnitId the target org-unit id, or {@code null} for an ownerless mission.
    * @param expectedOwningOrgUnitVersion expected value of {@code Mission.owningOrgUnitVersion}.
    * @return the managed mission with the new owning org unit applied.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
    *     unknown.
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
    *     expectedOwningOrgUnitVersion} is stale.
@@ -1253,8 +1253,8 @@ public class MissionService implements MissionCommands {
    * @param guestName free-text party-lead handle, or {@code null}
    * @param expectedPartyLeadVersion expected value of {@code Mission.partyLeadVersion}
    * @return the managed mission with the party lead applied
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission or
-   *     the referenced user is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission or the
+   *     referenced user is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
    *     expectedPartyLeadVersion} is stale
    */

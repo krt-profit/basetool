@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException;
+import de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;

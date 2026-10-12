@@ -31,14 +31,14 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
@@ -1722,7 +1722,7 @@ class JobOrderServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(material));
 
       assertThrows(
-          de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+          de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
           () -> jobOrderService.updateItemJobOrder(orderId, oneLine(null)));
       verify(jobOrderItemService, never()).buildItemLine(any());
     }
@@ -1736,7 +1736,7 @@ class JobOrderServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
 
       assertThrows(
-          de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+          de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
           () -> jobOrderService.updateItemJobOrder(orderId, oneLine(null)));
       verify(jobOrderItemService, never()).buildItemLine(any());
     }
@@ -1840,7 +1840,7 @@ class JobOrderServiceTest {
           .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
 
       assertThrows(
-          de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+          de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
           () -> jobOrderService.updateItemJobOrder(orderId, oneLine(1L)));
       verify(jobOrderRepository, never()).save(any(JobOrder.class));
     }
@@ -1870,7 +1870,7 @@ class JobOrderServiceTest {
               1L);
 
       assertThrows(
-          de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+          de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
           () -> jobOrderService.updateItemJobOrder(orderId, dto));
       verify(jobOrderRepository, never()).save(any(JobOrder.class));
     }
@@ -1899,7 +1899,7 @@ class JobOrderServiceTest {
               1L);
 
       assertThrows(
-          de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+          de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
           () -> jobOrderService.updateItemJobOrder(orderId, dto));
       verify(jobOrderRepository, never()).save(any(JobOrder.class));
     }

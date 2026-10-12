@@ -39,9 +39,9 @@ public interface AccountErasure {
    * @param userId the user to delete
    * @param presence whether the Keycloak presence probe applies
    * @throws java.util.NoSuchElementException when the user id is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the user is
-   *     still present in Keycloak, by the stored flag or, under {@link KeycloakPresence#ENFORCED},
-   *     a live check
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the user is still
+   *     present in Keycloak, by the stored flag or, under {@link KeycloakPresence#ENFORCED}, a live
+   *     check
    * @throws IllegalStateException when no other admin exists to receive the reassigned references
    * @throws org.springframework.web.client.RestClientException when Keycloak cannot be reached for
    *     the live check

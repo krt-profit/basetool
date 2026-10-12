@@ -21,6 +21,9 @@ package de.greluc.krt.profit.basetool.backend.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.kernel.AppException;
+import de.greluc.krt.profit.basetool.backend.kernel.CoreProblemCode;
+import de.greluc.krt.profit.basetool.backend.kernel.DomainProblem;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;

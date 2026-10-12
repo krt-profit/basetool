@@ -30,7 +30,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

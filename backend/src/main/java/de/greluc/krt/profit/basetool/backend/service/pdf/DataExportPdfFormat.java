@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service.pdf;
 
-import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
+import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
 import de.greluc.krt.profit.basetool.backend.service.DataExportService.DataExport;
 import de.greluc.krt.profit.basetool.backend.service.DataExportService.ExportSection;

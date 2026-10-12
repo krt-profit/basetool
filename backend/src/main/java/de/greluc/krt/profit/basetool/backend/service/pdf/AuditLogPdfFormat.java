@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service.pdf;
 
-import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
+import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;

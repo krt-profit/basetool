@@ -17,20 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exception;
+package de.greluc.krt.profit.basetool.backend.kernel;
 
 /**
- * Thrown when an entity cannot be deleted because other entities still reference it; mapped to
- * {@code 409 Conflict} with code {@code ENTITY_IN_USE} via {@link AppExceptionKind#ENTITY_IN_USE}.
+ * Bean Validation group for constraints that apply only on update, letting one write DTO serve both
+ * create and update.
+ *
+ * <p>The optimistic-lock version is declared {@code @NotNull(groups = OnUpdate.class)}: create
+ * endpoints validate with {@code @Valid}, update endpoints with {@code @Validated({Default.class,
+ * OnUpdate.class})}, so only an update requires the version.
  */
-public final class EntityInUseException extends AppException {
-
-  /**
-   * Creates an {@code EntityInUseException} with a description of the blocking reference.
-   *
-   * @param message human-readable explanation of which referencing entities still exist
-   */
-  public EntityInUseException(String message) {
-    super(AppExceptionKind.ENTITY_IN_USE, message);
-  }
-}
+public interface OnUpdate {}

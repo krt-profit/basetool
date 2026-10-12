@@ -274,8 +274,8 @@ public class OwnerScopeService implements SquadronVisibility {
    * @param owningOrgUnitId the picker output from the form, or {@code null} when the picker was not
    *     used.
    * @return the Squadron whose stock / aggregate list this row should join; never {@code null}.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the picker
-   *     output is invalid for the target user.
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the picker output
+   *     is invalid for the target user.
    */
   public Squadron resolveSquadronForPickerOutput(
       @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
@@ -291,8 +291,8 @@ public class OwnerScopeService implements SquadronVisibility {
    * @param owningOrgUnitId the picker-supplied org unit id; {@code null} triggers the auto-stamp
    *     path when the user has exactly one membership.
    * @return the resolved {@link OrgUnit}; never {@code null}.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException on an invalid
-   *     picker output.
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException on an invalid picker
+   *     output.
    */
   public OrgUnit resolveOrgUnitForPickerOutput(
       @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
@@ -309,7 +309,7 @@ public class OwnerScopeService implements SquadronVisibility {
    *     used.
    * @return the resolved {@link OrgUnit}, or {@code null} for the ownerless-personal-aggregate
    *     case.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException for every rejection
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException for every rejection
    *     other than the ownerless case.
    */
   @Nullable
@@ -339,8 +339,8 @@ public class OwnerScopeService implements SquadronVisibility {
    * @return the resolved managed {@link OrgUnit}, or {@code null} for an ownerless target.
    * @throws org.springframework.security.access.AccessDeniedException when the caller may not
    *     assign to the requested target.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when a non-null
-   *     target id does not resolve to a known org unit.
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when a non-null target
+   *     id does not resolve to a known org unit.
    */
   @Nullable
   public OrgUnit resolveReassignTargetOrgUnit(@Nullable UUID targetOrgUnitId) {

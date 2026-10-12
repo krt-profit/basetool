@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
@@ -62,8 +62,7 @@ public class TerminalService {
    *
    * @param id terminal primary key
    * @return the terminal
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no terminal
-   *     matches
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no terminal matches
    */
   @Cacheable(cacheNames = CacheConfig.TERMINALS_CACHE)
   public TerminalDto getTerminal(UUID id) {

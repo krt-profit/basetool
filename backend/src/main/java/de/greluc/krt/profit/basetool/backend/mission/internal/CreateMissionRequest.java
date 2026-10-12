@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.DtoConstraints;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
-import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

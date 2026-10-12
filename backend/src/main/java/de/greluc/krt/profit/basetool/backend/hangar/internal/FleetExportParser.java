@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.service.ShipTypeMatcher;
 import java.io.IOException;
 import java.util.List;

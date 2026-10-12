@@ -580,7 +580,7 @@ public class UserController {
    *
    * @param id the member
    * @return the stored handle, {@code null} when none is stored
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the member is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the member is
    *     unknown
    */
   @NotNull

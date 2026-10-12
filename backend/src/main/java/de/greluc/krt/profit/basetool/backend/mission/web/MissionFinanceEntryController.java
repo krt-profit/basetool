@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.web;
 
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntryService;

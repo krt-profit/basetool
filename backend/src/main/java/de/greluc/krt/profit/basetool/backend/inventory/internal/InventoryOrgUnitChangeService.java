@@ -22,10 +22,10 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -71,8 +71,7 @@ public class InventoryOrgUnitChangeService {
    * @param dto the version, the target unit or {@code null}, and the merge opt-in
    * @param callerId the authenticated caller
    * @return the row after the change, or the merge survivor it was folded into
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the row is
-   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the row is unknown
    * @throws AccessDeniedException when the row belongs to another member
    * @throws BadRequestException when the row is not personal or the target is not one of the
    *     caller's direct memberships
@@ -117,7 +116,7 @@ public class InventoryOrgUnitChangeService {
    * @param request the selection, the target unit or {@code null}, and the merge opt-in
    * @param callerId the authenticated caller
    * @return how many rows changed and how many were skipped
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when an id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when an id is unknown
    * @throws AccessDeniedException when a listed row belongs to another member
    * @throws BadRequestException when a listed row is not personal or the target is not one of the
    *     caller's direct memberships

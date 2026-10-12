@@ -22,10 +22,10 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exchange.api.events.ExchangeNotices;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
@@ -122,7 +122,7 @@ public class ExchangeRegistryService {
    *
    * @param id the registry id
    * @return the client
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when absent
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when absent
    */
   @NotNull
   @Transactional(readOnly = true)

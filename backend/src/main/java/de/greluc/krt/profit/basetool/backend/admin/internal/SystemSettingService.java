@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.admin.internal;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import java.util.List;
 import java.util.Optional;

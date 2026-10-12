@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exception;
+package de.greluc.krt.profit.basetool.backend.kernel;
 
 /**
  * Indicates that a requested domain entity does not exist; mapped to {@code 404 Not Found}.

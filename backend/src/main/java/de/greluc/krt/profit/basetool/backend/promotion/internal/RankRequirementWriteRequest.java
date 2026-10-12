@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
-import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
-import de.greluc.krt.profit.basetool.backend.validation.OnUpdate;
+import de.greluc.krt.profit.basetool.backend.kernel.DtoConstraints;
+import de.greluc.krt.profit.basetool.backend.kernel.OnUpdate;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

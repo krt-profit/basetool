@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -68,7 +68,7 @@ public class ShipTypeService {
    *
    * @param id ship type primary key
    * @return the ship type read model
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no ship type
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no ship type
    *     matches
    */
   @Cacheable(cacheNames = CacheConfig.SHIP_TYPES_CACHE)

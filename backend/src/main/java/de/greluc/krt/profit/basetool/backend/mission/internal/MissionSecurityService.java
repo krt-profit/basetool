@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -66,7 +66,7 @@ public class MissionSecurityService {
    * participant's own linked user. An external participant is accessible to elevated callers only.
    *
    * <p>A missing participant raises {@link
-   * de.greluc.krt.profit.basetool.backend.exception.NotFoundException}.
+   * de.greluc.krt.profit.basetool.backend.kernel.NotFoundException}.
    */
   public boolean canAccessParticipant(
       UUID missionId, UUID participantId, Authentication authentication) {
@@ -140,8 +140,8 @@ public class MissionSecurityService {
    * @param entryId finance entry id
    * @param authentication current Spring Security authentication
    * @return true if the caller may edit the entry
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the entry does
-   *     not exist
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the entry does not
+   *     exist
    */
   public boolean canEditFinanceEntry(UUID entryId, Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {

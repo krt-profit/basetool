@@ -23,7 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerMapper;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -69,7 +69,7 @@ public class ManufacturerService {
    *
    * @param id manufacturer primary key
    * @return the manufacturer read model
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no manufacturer
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no manufacturer
    *     matches
    */
   @Cacheable(cacheNames = CacheConfig.MANUFACTURERS_CACHE)

@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
@@ -205,8 +205,7 @@ public class UserRegistrationService {
    *     bypasses the check
    * @param adminId the approving admin's id (for the audit row)
    * @return the now-active user
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
@@ -231,8 +230,7 @@ public class UserRegistrationService {
    *     bypasses the check
    * @param adminId the deciding admin's id (for the audit row)
    * @return the now-rejected user
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional

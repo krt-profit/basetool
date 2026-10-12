@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.validation;
+package de.greluc.krt.profit.basetool.backend.kernel;
 
 import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
 import static java.lang.annotation.ElementType.CONSTRUCTOR;
@@ -29,28 +29,32 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
+import jakarta.validation.ReportAsSingleViolation;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Asserts that a {@link java.math.BigDecimal} has no fractional part, by value rather than scale:
- * {@code 500.00} passes, {@code 500.50} fails. {@code null} is valid.
- *
- * <p>Enforces whole-aUEC mission-finance amounts (REQ-MISSION-001).
+ * Asserts that a quality or a quality floor lies in {@link Quality#MIN} to {@link Quality#MAX}
+ * (REQ-DATA-023). {@code null} is valid; combine with {@code @NotNull} where a value is required.
  */
 @Documented
-@Constraint(validatedBy = WholeNumberValidator.class)
+@Min(Quality.MIN)
+@Max(Quality.MAX)
+@ReportAsSingleViolation
+@Constraint(validatedBy = {})
 @Target({METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE})
 @Retention(RUNTIME)
-public @interface WholeNumber {
+public @interface QualityValue {
 
   /**
-   * The violation message template surfaced when the amount has a fractional part.
+   * The violation message template surfaced when the value lies outside the range.
    *
    * @return the message template (resolved against {@code ValidationMessages})
    */
-  String message() default "{error.validation.amount_must_be_whole}";
+  String message() default "{error.validation.quality_out_of_range}";
 
   /**
    * The validation groups this constraint participates in.

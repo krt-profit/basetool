@@ -32,6 +32,11 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.EntityInUseException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -648,7 +653,7 @@ class GlobalExceptionHandlerTest {
   @Test
   void handleEntityInUse_messageIsPassedThroughWhenPresent() {
     EntityInUseException ex =
-        new de.greluc.krt.profit.basetool.backend.exception.EntityInUseException(
+        new de.greluc.krt.profit.basetool.backend.kernel.EntityInUseException(
             "Mission is referenced by 3 inventory items");
     ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
@@ -659,7 +664,7 @@ class GlobalExceptionHandlerTest {
   @Test
   void handleEntityInUse_fallsBackToLocalizedDetailWhenMessageBlank() {
     EntityInUseException ex =
-        new de.greluc.krt.profit.basetool.backend.exception.EntityInUseException("");
+        new de.greluc.krt.profit.basetool.backend.kernel.EntityInUseException("");
     ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
     assertCommon(resp, HttpStatus.CONFLICT, ex.code());
@@ -670,7 +675,7 @@ class GlobalExceptionHandlerTest {
   @Test
   void handleBusinessConflict_messageIsPassedThroughWhenPresent() {
     BusinessConflictException ex =
-        new de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException(
+        new de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException(
             "Mission already completed");
     ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
@@ -681,7 +686,7 @@ class GlobalExceptionHandlerTest {
   @Test
   void handleBusinessConflict_fallsBackToLocalizedDetailWhenMessageBlank() {
     BusinessConflictException ex =
-        new de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException(null);
+        new de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException(null);
     ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
     assertCommon(resp, HttpStatus.CONFLICT, ex.code());
@@ -863,8 +868,8 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void handleExternalService_returns502_andDoesNotLeakUpstreamMessage() {
-    de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException ex =
-        new de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException(
+    de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException ex =
+        new de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException(
             "Keycloak returned 503: <html><body>realm offline</body></html>");
 
     ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
@@ -949,8 +954,8 @@ class GlobalExceptionHandlerTest {
    */
   @Test
   void aRefusalNamesTheSourceLineThatProducedIt() {
-    de.greluc.krt.profit.basetool.backend.exception.BadRequestException ex =
-        new de.greluc.krt.profit.basetool.backend.exception.BadRequestException(
+    de.greluc.krt.profit.basetool.backend.kernel.BadRequestException ex =
+        new de.greluc.krt.profit.basetool.backend.kernel.BadRequestException(
             "A user may belong to at most two Staffeln (REQ-ORG-017)");
 
     ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
@@ -1021,8 +1026,8 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void handleReportGeneration_returns500_andDoesNotLeakLibraryError() {
-    de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException ex =
-        new de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException(
+    de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException ex =
+        new de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException(
             "openpdf: invalid font /usr/share/fonts/missing.ttf", new RuntimeException());
 
     ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);

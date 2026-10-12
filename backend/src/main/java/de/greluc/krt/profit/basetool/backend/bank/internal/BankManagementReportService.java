@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
-import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
+import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
 import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;

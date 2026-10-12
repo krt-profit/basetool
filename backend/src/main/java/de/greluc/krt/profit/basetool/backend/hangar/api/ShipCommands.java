@@ -37,10 +37,10 @@ public interface ShipCommands {
    * @param member the owning member
    * @param ship the ship payload; its org unit is ignored
    * @return the persisted ship
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the member does
-   *     not exist
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the ship type
-   *     or location id is missing or invalid
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the member does not
+   *     exist
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the ship type or
+   *     location id is missing or invalid
    */
   @NotNull
   Ship addShipForClient(@NotNull UUID member, @NotNull ShipRequestDto ship);
@@ -53,8 +53,8 @@ public interface ShipCommands {
    * @param shipId the ship
    * @param ship the update payload
    * @return the persisted ship
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the ship does
-   *     not exist
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the ship does not
+   *     exist
    * @throws org.springframework.security.access.AccessDeniedException when the member does not own
    *     the ship
    */
@@ -68,8 +68,8 @@ public interface ShipCommands {
    * @param member the owning member
    * @param shipId the ship
    * @return how many mission units the ship was detached from
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the ship does
-   *     not exist
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the ship does not
+   *     exist
    * @throws org.springframework.security.access.AccessDeniedException when the member does not own
    *     the ship
    */

@@ -594,21 +594,21 @@ class P4kImportServiceTest {
   @Test
   void emptyFile_throwsBadRequest() {
     org.junit.jupiter.api.Assertions.assertThrows(
-        de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
         () -> service.previewImport(new byte[0]));
   }
 
   @Test
   void malformedJson_throwsBadRequest() {
     org.junit.jupiter.api.Assertions.assertThrows(
-        de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
         () -> service.previewImport("{ not json ".getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test
   void nonObjectJson_throwsBadRequest() {
     org.junit.jupiter.api.Assertions.assertThrows(
-        de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
         () -> service.previewImport(upload("[1,2,3]")));
   }
 

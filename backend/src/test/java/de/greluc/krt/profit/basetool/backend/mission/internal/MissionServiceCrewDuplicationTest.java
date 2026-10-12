@@ -72,7 +72,7 @@ class MissionServiceCrewDuplicationTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     assertThrows(
-        de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException.class,
+        de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException.class,
         () ->
             missionStructureService.addCrewToShip(
                 missionId, unitId, participantId, Collections.emptySet()));
@@ -108,7 +108,7 @@ class MissionServiceCrewDuplicationTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     assertThrows(
-        de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException.class,
+        de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException.class,
         () ->
             missionStructureService.addCrewToShip(
                 missionId, unitId2, participantId, Collections.emptySet()));

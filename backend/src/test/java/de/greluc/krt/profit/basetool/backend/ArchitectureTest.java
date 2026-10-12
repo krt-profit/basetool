@@ -172,7 +172,6 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
-import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -199,6 +198,7 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.hibernate.annotations.OptimisticLock;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.Mapper;
 import org.mapstruct.MapperConfig;
@@ -317,9 +317,9 @@ class ArchitectureTest {
   static final DescribedPredicate<JavaClass> MODEL_CODE =
       layer("model code", PERSISTENT_TYPES, User.class);
 
-  /** The validation leaf: constraints, validators and the legacy validation package. */
+  /** The validation leaf: constraints and validators, wherever they lie. */
   static final DescribedPredicate<JavaClass> VALIDATION_CODE =
-      layer("validation code", VALIDATION_TYPES, DtoConstraints.class);
+      layer("validation code", VALIDATION_TYPES, null);
 
   /**
    * The dependency-leaf helpers: the kernel's and platform's primitives and the small per-module
@@ -1290,7 +1290,7 @@ class ArchitectureTest {
 
   @Test
   void validationLayerMustStayADependencyLeaf() {
-    assertClassFloor("validationLayerMustStayADependencyLeaf", VALIDATION_CODE, 7);
+    assertClassFloor("validationLayerMustStayADependencyLeaf", VALIDATION_CODE, 5);
     validationLayerMustStayADependencyLeafRule(VALIDATION_CODE).check(CLASSES);
   }
 
@@ -2042,8 +2042,8 @@ class ArchitectureTest {
    * @return the layer predicate
    */
   static DescribedPredicate<JavaClass> layer(
-      String name, DescribedPredicate<JavaClass> role, Class<?> legacyAnchor) {
-    String anchorPackage = legacyAnchor.getPackageName();
+      String name, DescribedPredicate<JavaClass> role, @Nullable Class<?> legacyAnchor) {
+    String anchorPackage = legacyAnchor == null ? null : legacyAnchor.getPackageName();
     return DescribedPredicate.describe(
         "are "
             + name
@@ -2051,12 +2051,12 @@ class ArchitectureTest {
             + role.getDescription()
             + ", the classes nested in them, or the"
             + " package tree of "
-            + legacyAnchor.getSimpleName()
+            + (legacyAnchor == null ? "no legacy package" : legacyAnchor.getSimpleName())
             + ")",
         c ->
             role.test(c)
                 || role.test(outermost(c))
-                || isInPackageTree(c.getPackageName(), anchorPackage));
+                || (anchorPackage != null && isInPackageTree(c.getPackageName(), anchorPackage)));
   }
 
   /**

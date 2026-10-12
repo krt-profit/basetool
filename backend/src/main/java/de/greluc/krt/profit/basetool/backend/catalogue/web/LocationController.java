@@ -189,7 +189,7 @@ public class LocationController {
 
   /**
    * Deletes a location. Rejected with {@link
-   * de.greluc.krt.profit.basetool.backend.exception.EntityInUseException} when any ship or refinery
+   * de.greluc.krt.profit.basetool.backend.kernel.EntityInUseException} when any ship or refinery
    * order still references it.
    *
    * @param id location id

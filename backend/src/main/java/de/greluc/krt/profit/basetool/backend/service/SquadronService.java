@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.JobTypeService;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
@@ -86,7 +86,7 @@ public class SquadronService {
    *
    * @param id squadron primary key
    * @return the squadron
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    */
   public Squadron getSquadronById(@NotNull UUID id) {
     return Entities.require(squadronRepository.findById(id), "Squadron not found");
@@ -172,7 +172,7 @@ public class SquadronService {
    * @param enabled new value of {@code is_promotion_enabled}; {@code false} hides the promotion
    *     menu for the squadron's non-admin members.
    * @return the persisted squadron
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no matching row.
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no matching row.
    */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
@@ -191,7 +191,7 @@ public class SquadronService {
    * @param eligible new value of {@code is_profit_eligible}; {@code true} makes the squadron
    *     selectable as a Job-Order processor, {@code false} removes it from the responsible picker.
    * @return the persisted squadron
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no matching row.
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no matching row.
    */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)

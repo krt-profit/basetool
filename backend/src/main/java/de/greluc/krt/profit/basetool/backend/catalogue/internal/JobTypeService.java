@@ -25,8 +25,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObs
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
@@ -106,8 +106,8 @@ public class JobTypeService {
    * @param jobType transient entity
    * @return the persisted job type
    * @throws DuplicateEntityException when the name collides with an existing row
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the parent id
-   *     does not resolve
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the parent id does
+   *     not resolve
    */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)

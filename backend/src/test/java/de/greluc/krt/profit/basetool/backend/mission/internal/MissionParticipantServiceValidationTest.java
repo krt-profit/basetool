@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
-import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
@@ -341,7 +341,7 @@ class MissionParticipantServiceValidationTest {
         .thenReturn(java.util.List.of(new de.greluc.krt.profit.basetool.backend.model.User()));
 
     assertThrows(
-        de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
         () ->
             missionParticipantService.updateParticipantAttributes(
                 missionId,
@@ -382,7 +382,7 @@ class MissionParticipantServiceValidationTest {
         .thenReturn(java.util.List.of());
 
     assertThrows(
-        de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException.class,
+        de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException.class,
         () ->
             missionParticipantService.updateParticipantAttributes(
                 missionId,

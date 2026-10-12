@@ -29,11 +29,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.exception.AppException;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
@@ -42,6 +37,11 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.kernel.AppException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
@@ -417,7 +417,7 @@ public class InventoryItemService {
    * mission.
    *
    * @throws NotFoundException when any referenced id is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the job-order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the job-order
    *     requirement, catalog-kind or quality rules are violated, or a game-item row names a mission
    */
   @Transactional
@@ -1128,7 +1128,7 @@ public class InventoryItemService {
    * @param isAdmin whether the caller is an admin (bypasses the owner check)
    * @return the reduced source or new target row, or {@code null} when the row is depleted
    * @throws NotFoundException when the item is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the amount
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the amount
    *     exceeds stock, a SELL lacks terminal or amount, or a TRANSFER has no target (REQ-INV-025)
    */
   @Nullable

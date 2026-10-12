@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.greluc.krt.profit.basetool.backend.admin.internal.SystemSetting;
 import de.greluc.krt.profit.basetool.backend.admin.internal.SystemSettingRepository;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;

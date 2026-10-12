@@ -22,9 +22,9 @@ package de.greluc.krt.profit.basetool.backend.identity.api;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -164,8 +164,7 @@ public class UserService {
    * (officers 1–12, members 13–20); {@code joinDate} may be cleared with {@code null}, the other
    * fields change only when supplied.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    * @throws IllegalArgumentException when the rank is outside the role-permitted range
    */
@@ -213,8 +212,7 @@ public class UserService {
   /**
    * Updates only the self-editable profile fields (description and display name).
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
@@ -243,8 +241,7 @@ public class UserService {
    * @param preference the new default payout preference; never {@code null}
    * @param version the version the caller last read; {@code null} skips the check
    * @return the persisted user
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
@@ -267,8 +264,7 @@ public class UserService {
    * @param rsiHandle the new handle, already format-validated, or {@code null} / blank to clear it
    * @param version the version the caller last read; {@code null} skips the check
    * @return the persisted user
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
    * @throws BadRequestException when the handle does not have the shape of an RSI handle
    * @throws DuplicateEntityException when another account already answers to the handle
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
@@ -305,8 +301,7 @@ public class UserService {
    * @param shareBlueprintsGlobally the new opt-in value
    * @param version the version the caller last read; {@code null} skips the check
    * @return the persisted user
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
@@ -335,7 +330,7 @@ public class UserService {
    * @param id user id
    * @param announcementId announcement they read
    * @return the persisted user
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user id is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user id is
    *     unknown
    */
   @Transactional
@@ -440,7 +435,7 @@ public class UserService {
    *
    * @param id user primary key
    * @return the user
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    */
   public User findById(@NotNull UUID id) {
     return Entities.require(userRepository.findById(id), "User not found");

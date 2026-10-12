@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryImportService;
 import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;

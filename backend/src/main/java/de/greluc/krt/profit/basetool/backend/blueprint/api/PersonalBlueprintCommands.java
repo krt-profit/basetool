@@ -39,7 +39,7 @@ public interface PersonalBlueprintCommands {
    * @param ownerUserId the owning member
    * @param request the product and the optional acquisition date and note
    * @return the added blueprint
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the product key
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the product key
    *     names no active product
    */
   @NotNull
@@ -55,7 +55,7 @@ public interface PersonalBlueprintCommands {
    * @param source where the blueprint came from
    * @param sourceClientId the connected application, or {@code null}
    * @return the added blueprint
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the product key
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the product key
    *     names no active product
    */
   @NotNull
@@ -70,7 +70,7 @@ public interface PersonalBlueprintCommands {
    *
    * @param ownerUserId the owning member
    * @param id the blueprint
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the entry is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the entry is
    *     missing or owned by someone else
    */
   void delete(@NotNull UUID ownerUserId, @NotNull UUID id);

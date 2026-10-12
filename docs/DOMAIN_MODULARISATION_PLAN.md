@@ -2662,8 +2662,7 @@ owner decided on 2026-10-12 to leave that as it is.
    identity-owned `identity.api.SquadronVisibility` with the two calls `UserService` made
    (`canSeeSquadron`, `currentUserListScopeSquadronIds`), which `OwnerScopeService` implements with the
    same method bodies (bean name unchanged; the `scope -> identity` edge is a lower-rank one). **The shape of
-   this SPI is the two verbatim calls; the plan did not name it and the owner has not been asked about it
-   separately, so it is open to review in this pull request.** It also removes the cycle the converter's move
+   this SPI is the two verbatim calls; the plan did not name it. Confirmed by the owner on 2026-10-12.** It also removes the cycle the converter's move
    would have closed (`scope -> identity: converter -> UserReconciliationService` against `identity -> scope`).
 4. *The converter*: `CustomJwtGrantedAuthoritiesConverter` moved to `scope.api`, not `scope.internal`:
    `exchange.internal.DatabaseActingMemberAuthorities` calls `assembleFor(User)`, and a class another
@@ -2677,6 +2676,21 @@ owner decided on 2026-10-12 to leave that as it is.
    MembershipDeltaRequest` stays (public parameter). One domain-map class rule (the converter) left. No floor
    changed. The tests of the moved classes stay in their packages and compile against the new ones.
    Four logger names follow the packages (`UserService`, `UserReconciliationService`, `UserRegistrationService`, the converter); nothing in `monitoring/` or the observability spec matches them.
+
+**Umbrella step 5a — the kernel's exception and validation types move into the `kernel` package — done 2026-10-12**
+1. *Probe*: the 15 types of `exception` (`AppException` and its eight generic kinds, `DomainProblem`, `ProblemCode`, `CoreProblemCode`,
+   `ErrorDisclosurePolicy`, `Entities`) and the five of `validation` (`DtoConstraints`, `OnUpdate`, `QualityValue`, `WholeNumber`,
+   `WholeNumberValidator`) that the domain map assigns to `kernel`, moved together with the 65 platform types of step 5b, close no
+   cycle at top level.
+2. *Move*: all 20 into `kernel` (§5.1 gives the kernel no sub-package), same class names; `git mv` and the import script rewrote 340
+   files (imports, qualified names in code, Javadoc and strings). Nothing else changed: the sealed `AppException` still permits
+   its subclasses from one package, error codes and `openapi.json` are untouched.
+3. *Gates*: `ArchitectureTest` anchored the validation layer on `DtoConstraints`, whose package is `kernel` now, so the layer would
+   have selected the whole kernel; the layer takes no legacy package any more (the `validation` package is empty), and its
+   selection floor falls 7 → **5**, measured from the failing assertion. No other floor, baseline line or declaration changed.
+4. *Text scan* of all tracked files for `backend.exception.<kernel type>` and `backend.validation.<type>`: none left in code or
+   resources; the source-path link of `whole-number-amounts.md` is corrected; the two remaining `backend.exception.…` strings name
+   `ProblemSupport` and `GlobalExceptionHandler`, which are platform types (step 5b).
 
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
@@ -2692,7 +2706,7 @@ before a decision.
 - [x] **0.** P4-7 slice c (this pull request's first commit).
 - [ ] **1.** Housekeeping: `backend/build-settings.properties` aims the mutation tests at
       `backend.service.*`, which shrinks with every move (P4-5 "Open").
-- Rank 0–1 modules leave the layer packages (nothing below depends on them being late):
+- Rank 0–1 modules leave the layer packages (nothing below depends on them being late; **5a, the `kernel` half of step 5, is done**):
   - [ ] **2.** `audit` (12): `AuditEvent`, `AuditEventRepository`, `AuditService` and its report,
         retention and handle-anonymisation participant, mapper, controller, task. The P4 slice-b entry
         records that the participant waits for the repository.

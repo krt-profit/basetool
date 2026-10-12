@@ -40,8 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
  * direct-booking cap (REQ-BANK-047).
  *
  * <p>Each guard throws a {@link BankConflictException} (or {@link
- * de.greluc.krt.profit.basetool.backend.exception.BadRequestException}) with a stable code and
- * never mutates state. Holder balances may go negative and are not guarded (ADR-0039).
+ * de.greluc.krt.profit.basetool.backend.kernel.BadRequestException}) with a stable code and never
+ * mutates state. Holder balances may go negative and are not guarded (ADR-0039).
  */
 @Service
 @RequiredArgsConstructor

@@ -27,11 +27,11 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
@@ -125,8 +125,8 @@ public class MissionParticipantService {
    * participant keeps the submitted {@code orgUnitIds}. A non-null {@code payoutPreference}
    * overrides the profile default (REQ-MISSION-002).
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when any referenced
-   *     id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when any referenced id
+   *     is unknown
    */
   @Transactional
   public Mission addParticipant(
@@ -218,7 +218,7 @@ public class MissionParticipantService {
    * Returns a participant of the given mission; a participant of another mission counts as not
    * found.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the participant
    *     does not exist on this mission
    */
   public MissionParticipant getParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
@@ -289,8 +289,8 @@ public class MissionParticipantService {
    *
    * @param authentication the caller; a caller who may not manage the mission can neither set the
    *     planned job type nor rename the row onto a member or another guest
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
-   *     or any referenced id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the participant or
+   *     any referenced id is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale
    */
   @Transactional
@@ -517,8 +517,8 @@ public class MissionParticipantService {
    *     clear
    * @param expectedPartyLeadVersion expected value of {@code Mission.partyLeadVersion}
    * @return the managed mission with the party lead applied
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission or
-   *     the referenced user is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission or the
+   *     referenced user is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
    *     expectedPartyLeadVersion} is stale
    */

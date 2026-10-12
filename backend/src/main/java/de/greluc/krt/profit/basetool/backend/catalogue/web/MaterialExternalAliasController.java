@@ -23,8 +23,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAlias
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialExternalAliasDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialExternalAliasMapper;
+import de.greluc.krt.profit.basetool.backend.kernel.OnUpdate;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.validation.OnUpdate;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

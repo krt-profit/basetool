@@ -24,8 +24,8 @@ import static de.greluc.krt.profit.basetool.backend.mission.internal.MissionSect
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions.MissionSection;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -81,7 +81,7 @@ public class MissionTimelineService {
    * @param meta the optional free-text time/place hint
    * @param expectedStepsVersion the steps-section version the caller last saw
    * @return the managed mission
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
    *     unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
    *     expectedStepsVersion} is stale
@@ -177,8 +177,8 @@ public class MissionTimelineService {
    * Removes an Ablauf step and re-packs the remaining steps' {@code orderIndex} to 0..n-1 so the
    * timeline stays contiguous. Bumps {@code stepsVersion}.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the step is not
-   *     a child of the mission
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the step is not a
+   *     child of the mission
    */
   @Transactional
   public Mission deleteStep(
@@ -246,8 +246,8 @@ public class MissionTimelineService {
   /**
    * Sets a step's {@code done} flag and bumps {@code stepsVersion}.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the step is not
-   *     a child of the mission
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the step is not a
+   *     child of the mission
    */
   @Transactional
   public Mission toggleStepDone(
@@ -275,8 +275,8 @@ public class MissionTimelineService {
   /**
    * Finds a managed step by id within the mission, or throws.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the step is not
-   *     a child of the mission
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the step is not a
+   *     child of the mission
    */
   private static MissionStep findStep(@NotNull Mission mission, @NotNull UUID stepId) {
     return Entities.require(
@@ -313,7 +313,7 @@ public class MissionTimelineService {
    * @param kind the classification (primary / secondary / non-goal)
    * @param expectedObjectivesVersion the goals-section version the caller last saw
    * @return the managed mission
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the mission is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the mission is
    *     unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
    *     expectedObjectivesVersion} is stale
@@ -415,8 +415,8 @@ public class MissionTimelineService {
    * Removes a goal and re-packs the remaining goals' {@code orderIndex} to 0..n-1 so the list stays
    * contiguous. Bumps {@code objectivesVersion}.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the goal is not
-   *     a child of the mission
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the goal is not a
+   *     child of the mission
    */
   @Transactional
   public Mission deleteObjective(
@@ -492,8 +492,8 @@ public class MissionTimelineService {
   /**
    * Finds a managed goal by id within the mission, or throws.
    *
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the goal is not
-   *     a child of the mission
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the goal is not a
+   *     child of the mission
    */
   private static MissionObjective findObjective(
       @NotNull Mission mission, @NotNull UUID objectiveId) {

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -98,7 +99,7 @@ class EntitiesRequireRatchetTest {
     assertThat(
             HAND_WRITTEN.matcher(
                 "repo.findById(id).orElseThrow(() -> new"
-                    + " de.greluc.krt.profit.basetool.backend.exception.NotFoundException(m))"))
+                    + " de.greluc.krt.profit.basetool.backend.kernel.NotFoundException(m))"))
         .matches(Matcher::find);
     assertThat(HAND_WRITTEN.matcher("Entities.require(repo.findById(id), \"x\")"))
         .matches(m -> !m.find());

@@ -70,7 +70,7 @@ amount.
 `MissionFinanceEntryE2eTest` (e2e create→view: add a finance entry, reopen the detail page, assert
 200 + the rendered `data-amount`). **Code:** `backend/.../model/dto/MissionFinanceEntry{Create,Update}Dto`
 (`@WholeNumber`, `@DecimalMin`, `@DecimalMax`), `frontend/.../mission/model/MissionFinanceEntryForm`
-(`@WholeNumber`), `backend/.../validation/WholeNumber` + `frontend/.../kernel/web/WholeNumber`,
+(`@WholeNumber`), `backend/.../kernel/WholeNumber` + `frontend/.../kernel/web/WholeNumber`,
 `frontend/.../kernel/web/MoneyFormat`, `templates/mission/mission-detail.html`, `templates/operation/operation-detail.html`.
 **Issues:** PR #465.
 

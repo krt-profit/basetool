@@ -42,12 +42,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -762,9 +762,9 @@ class RefineryOrderServiceTest {
       RefineryOrderStoreDto dto =
           new RefineryOrderStoreDto(List.of(personalItem(true, JOB_ORDER_ID)));
 
-      de.greluc.krt.profit.basetool.backend.exception.BadRequestException ex =
+      de.greluc.krt.profit.basetool.backend.kernel.BadRequestException ex =
           assertThrows(
-              de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+              de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
               () -> refineryOrderService.storeRefineryOrder(OWNER_ID, ORDER_ID, dto, false));
 
       assertEquals("Personal items cannot be assigned to a mission or job order", ex.getMessage());

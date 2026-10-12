@@ -22,11 +22,11 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -78,7 +78,7 @@ public class JobOrderAssigneeService {
    * @param jobOrderId job order id
    * @param userId user to add
    * @return the order with its refreshed assignee list
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when either id is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when either id is
    *     unknown
    */
   @Transactional

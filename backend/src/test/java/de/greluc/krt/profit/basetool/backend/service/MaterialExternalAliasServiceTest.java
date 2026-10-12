@@ -31,8 +31,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAlias
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.List;
 import java.util.Optional;

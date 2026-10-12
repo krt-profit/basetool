@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.exception;
+package de.greluc.krt.profit.basetool.backend.kernel;
 
 /**
  * Thrown when an insert or update would violate a uniqueness constraint the service layer checks

@@ -23,7 +23,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
@@ -92,7 +92,7 @@ public class RoleService {
    * @param roleName role display name, matched case-sensitively
    * @param permissions new permission set
    * @return the persisted role
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no role matches
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no role matches
    */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.ROLES_CACHE, allEntries = true)
@@ -198,7 +198,7 @@ public class RoleService {
    * @param roleName role display name
    * @param description new description
    * @return the persisted role
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no role matches
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no role matches
    */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.ROLES_CACHE, allEntries = true)

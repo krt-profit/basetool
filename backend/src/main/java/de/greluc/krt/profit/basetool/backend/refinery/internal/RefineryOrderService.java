@@ -33,11 +33,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
@@ -303,7 +303,7 @@ public class RefineryOrderService implements CraftabilityYieldSource {
    *
    * @param id refinery order primary key
    * @return the order
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    */
   public RefineryOrder getRefineryOrder(@NotNull UUID id) {
     return Entities.require(refineryOrderRepository.findById(id), "error.refinery_order.not_found");
@@ -319,9 +319,9 @@ public class RefineryOrderService implements CraftabilityYieldSource {
    * @param owningOrgUnitId the org unit to stamp, which must be one of the owner's memberships;
    *     when {@code null}, the owner's single membership or none
    * @return the persisted order
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when any referenced
-   *     id is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the location
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when any referenced id
+   *     is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the location
    *     hosts no refinery or the org unit is not a membership of the owner
    * @throws MissionParticipantRequiredException when the owner does not take part in the given
    *     mission (REQ-SEC-042)
@@ -397,8 +397,8 @@ public class RefineryOrderService implements CraftabilityYieldSource {
    * @param missionId the requested mission
    * @param owner the order's owner; {@code null} can never be linked
    * @return the id of the existing mission
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no mission has
-   *     that id
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no mission has that
+   *     id
    * @throws MissionParticipantRequiredException when the owner is not a participant of the mission
    */
   private UUID resolveMissionForOwner(@NotNull UUID missionId, @Nullable User owner) {
@@ -623,9 +623,9 @@ public class RefineryOrderService implements CraftabilityYieldSource {
    *
    * @throws AccessDeniedException when the caller is neither owner nor logistician, or when a
    *     non-logistician names another user as an item's receiving stock owner
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the order or any
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order or any
    *     referenced id is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the order is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the order is
    *     already stored, has no output goods, an item combines {@code personal} with a job order, or
    *     an item names a job order that does not require its material
    */

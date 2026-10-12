@@ -46,8 +46,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialMatrixIt
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialService;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;

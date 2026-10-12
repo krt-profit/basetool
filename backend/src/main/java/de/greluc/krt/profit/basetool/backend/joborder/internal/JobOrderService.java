@@ -26,9 +26,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
@@ -38,6 +35,9 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedE
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderUpdatedByRequesterEvent;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -116,7 +116,7 @@ public class JobOrderService {
    *
    * @param createDto create payload
    * @return the persisted order
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when a referenced
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when a referenced
    *     material or user id is unknown
    */
   @Transactional
@@ -166,8 +166,8 @@ public class JobOrderService {
    *
    * @param createDto item-order create payload
    * @return the persisted order with derived materials and aggregation
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when a referenced
-   *     game item or blueprint id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when a referenced game
+   *     item or blueprint id is unknown
    * @throws BadRequestException when a blueprint does not produce its line's item, or org-unit
    *     stamping cannot be resolved
    */
@@ -289,8 +289,8 @@ public class JobOrderService {
    * @param id job order primary key
    * @param dto the new status and expected version
    * @return the persisted order
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException for illegal
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException for illegal
    *     transitions
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
    *     stale
@@ -357,7 +357,7 @@ public class JobOrderService {
    * @param id job order primary key
    * @param newPriority target slot (1-based)
    * @return the persisted order
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    */
   @Transactional
   public JobOrderDto updateJobOrderPriority(UUID id, Integer newPriority) {
@@ -373,9 +373,9 @@ public class JobOrderService {
    * @param countWithVariants the requested counting mode
    * @param version the expected optimistic-lock version
    * @return the order DTO, with the bumped version if the mode changed
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no order matches
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the order is
-   *     not an item order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no order matches
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the order is not
+   *     an item order
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
    *     stale
    */
@@ -414,7 +414,7 @@ public class JobOrderService {
    * @param id job order primary key
    * @param updateDto update payload with the expected version
    * @return the persisted order
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
    *     stale
    */
@@ -862,7 +862,7 @@ public class JobOrderService {
    * unlinked first via {@link #unlinkInventoryItem}).
    *
    * @param id job order primary key
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
    */
   @Transactional
   public void deleteJobOrder(UUID id) {
@@ -895,7 +895,7 @@ public class JobOrderService {
    * @param jobOrderId job order primary key
    * @param userId user to add
    * @return the persisted order with the refreshed assignee list
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when either id is
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when either id is
    *     unknown
    */
   @Transactional

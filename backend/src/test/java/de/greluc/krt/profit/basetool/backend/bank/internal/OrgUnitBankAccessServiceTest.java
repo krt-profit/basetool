@@ -32,7 +32,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -592,7 +592,7 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(true);
 
     assertThrows(
-        de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
         () -> service.addRoleVisibility(accountId, MembershipRole.BEREICHSKOORDINATOR.name()));
     verify(viewGrantRepository, never()).save(any());
   }
@@ -789,7 +789,7 @@ class OrgUnitBankAccessServiceTest {
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
 
     assertThrows(
-        de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
         () -> service.createBookingRequest(request));
     verifyNoInteractions(bankBookingRequestService);
   }

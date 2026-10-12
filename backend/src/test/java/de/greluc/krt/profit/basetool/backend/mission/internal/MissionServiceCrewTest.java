@@ -317,7 +317,7 @@ class MissionServiceCrewTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
     assertThrows(
-        de.greluc.krt.profit.basetool.backend.exception.NotFoundException.class,
+        de.greluc.krt.profit.basetool.backend.kernel.NotFoundException.class,
         () ->
             missionStructureService.addCrewToShip(
                 missionId, unitId, UUID.randomUUID(), Collections.emptySet()));

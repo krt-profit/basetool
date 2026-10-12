@@ -23,15 +23,15 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
-import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -80,8 +80,7 @@ public class InventoryStolenMarkService {
    * @param isLogistician whether the caller is a logistician or above and so may mark another
    *     member's row
    * @return the row carrying the requested marker, or the merge survivor it was folded into
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the row is
-   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the row is unknown
    * @throws AccessDeniedException when the caller neither owns the row nor is a logistician
    * @throws BusinessConflictException when marking is switched off, or a split would leave the row
    *     below the amount it offers on the Materialbörse
@@ -129,7 +128,7 @@ public class InventoryStolenMarkService {
    * @param callerId the authenticated caller
    * @return how many rows changed and how many were skipped
    * @throws BusinessConflictException when marking is switched off
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when an id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when an id is unknown
    * @throws AccessDeniedException when a listed row belongs to another member
    */
   @Transactional

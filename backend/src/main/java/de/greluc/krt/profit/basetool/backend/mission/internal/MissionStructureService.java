@@ -27,9 +27,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -202,8 +202,7 @@ public class MissionStructureService {
    *
    * @param responsibleUserId the user id, or {@code null} for no explicit responsible
    * @return the resolved user or {@code null}
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the id is
-   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the id is unknown
    */
   @Contract("null -> null")
   @Nullable
@@ -557,7 +556,7 @@ public class MissionStructureService {
    *
    * @param jobTypeIds the crew job-type ids; {@code null} or empty yields an empty set
    * @return the resolved, archetype-checked job types
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when an id is unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when an id is unknown
    * @throws IllegalArgumentException when a resolved job type is not of archetype {@code CREW}
    */
   @NotNull

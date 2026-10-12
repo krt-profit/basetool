@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
-import de.greluc.krt.profit.basetool.backend.exception.ProblemCode;
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemCode;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
