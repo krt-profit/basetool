@@ -68,6 +68,7 @@ A floor only has to clear its advisory: stay on the lines above rather than taki
 |---|---|---|---|
 | backend `spring-boot-starter-data-jpa` | `org.springframework:spring-aspects`, `org.aspectj:aspectjweaver` | Licence, not size (ADR-0197): the AspectJ jar is `EPL-2.0 AND BSD-3-Clause AND Apache-1.1` with no GPL secondary licence and may not ship in a GPL-3.0-only image. Nothing uses AspectJ; the proxy-based advisors (`@Transactional`, `@PreAuthorize`, `@Cacheable`, `@Async`, `@Scheduled`) work without it. `:backend:licensee` refuses EPL-2.0 if a new path brings it back. | Never, while the images are GPL-3.0-only. |
 | backend, frontend, ingest `spring-boot-starter-opentelemetry` | `io.micrometer:micrometer-registry-otlp` | It would switch on Boot's OTLP metrics push to a localhost default endpoint in every environment. Metrics are Prometheus pull only (REQ-OBS-005). | Metrics export moves to OTLP. |
+| `.github/tools/markdownlint` | `braces` 3.0.3 (markdownlint-cli2 → micromatch / globby / fast-glob) | GHSA-vfj7-8cjw-p6xm (stack exhaustion on deeply nested brace patterns) has no patched release: the advisory range is `<= 3.0.3` and 3.0.3 is the newest version, so nothing can be bumped or overridden. The tool is CI-only and runs one fixed glob (`docs/exchange/**/*.md` in `exchange-docs.yml`), so no attacker-controlled pattern reaches it; the worst case is a failed lint run. `npm audit` keeps reporting it. | A `braces` release above 3.0.3 appears: add it to the `overrides` in `package.json`. |
 
 ## Proposals refused on the 2026-09-28 sweep
 
