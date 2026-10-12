@@ -21,8 +21,6 @@
 /* global QT_MSG, QT_CONFLICT */
 
 (function () {
-    'use strict';
-
     const PAGE_URL = '/admin/quality-tiers';
 
     const modal = document.getElementById('qt-modal');

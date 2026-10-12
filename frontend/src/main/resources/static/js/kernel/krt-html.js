@@ -24,8 +24,6 @@
  * `krtHtml`, and `krtHtml.set` is the one way page scripts write markup into an element.
  */
 (function (root) {
-    'use strict';
-
     const POLICY_NAME = 'krt-html';
 
     /** @type {Record<string, string>} */

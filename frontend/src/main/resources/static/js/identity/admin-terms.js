@@ -7,8 +7,6 @@
  */
 
 (function () {
-    'use strict';
-
     const filterForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('admin-terms-filter-form')
     );

@@ -1,8 +1,6 @@
 // @ts-check
 
 (function () {
-    'use strict';
-
     window.addEventListener('pageshow', (event) => {
         if (event.persisted) {
             window.location.reload();

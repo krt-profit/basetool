@@ -14,8 +14,6 @@
 // @ts-check
 
 (function () {
-    'use strict';
-
     /**
      * The seed values `open` takes from its caller; absent fields are blank.
      *

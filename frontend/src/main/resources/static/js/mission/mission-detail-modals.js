@@ -192,46 +192,42 @@
     hydrate(stepList, stepTemplate, stepsJson);
 })();
 
-(function () {
-    window.krtModalOpen = function (overlay) {
-        window.krtModal.open(overlay);
-    };
-    window.krtModalClose = function (overlay) {
-        window.krtModal.close(overlay);
-    };
-    window.krtSegSet = function (targetId, value) {
-        const seg = document.querySelector(`.seg[data-seg-target="${targetId}"]`);
-        const input = /** @type {HTMLInputElement | null} */ (document.getElementById(targetId));
-        if (!seg || !input) return;
-        input.value = value;
-        seg.querySelectorAll('button[data-type-value]').forEach((b) => {
-            const on = b.getAttribute('data-type-value') === value;
-            b.classList.toggle('on-pos', on && value === 'INCOME');
-            b.classList.toggle('on-neg', on && value === 'EXPENSE');
-            if (!on) {
-                b.classList.remove('on-pos', 'on-neg');
-            }
-            b.setAttribute('aria-pressed', String(on));
-        });
-    };
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.seg[data-seg-target]').forEach((seg) => {
-            const targetId = /** @type {string} */ (seg.getAttribute('data-seg-target'));
-            const input = /** @type {HTMLInputElement | null} */ (
-                document.getElementById(targetId)
-            );
-            seg.querySelectorAll('button[data-type-value]').forEach((b) => {
-                b.addEventListener('click', () => {
-                    window.krtSegSet(
-                        targetId,
-                        /** @type {string} */ (b.getAttribute('data-type-value')),
-                    );
-                });
-            });
-            window.krtSegSet(targetId, input && input.value ? input.value : 'INCOME');
-        });
+window.krtModalOpen = function (overlay) {
+    window.krtModal.open(overlay);
+};
+window.krtModalClose = function (overlay) {
+    window.krtModal.close(overlay);
+};
+window.krtSegSet = function (targetId, value) {
+    const seg = document.querySelector(`.seg[data-seg-target="${targetId}"]`);
+    const input = /** @type {HTMLInputElement | null} */ (document.getElementById(targetId));
+    if (!seg || !input) return;
+    input.value = value;
+    seg.querySelectorAll('button[data-type-value]').forEach((b) => {
+        const on = b.getAttribute('data-type-value') === value;
+        b.classList.toggle('on-pos', on && value === 'INCOME');
+        b.classList.toggle('on-neg', on && value === 'EXPENSE');
+        if (!on) {
+            b.classList.remove('on-pos', 'on-neg');
+        }
+        b.setAttribute('aria-pressed', String(on));
     });
-})();
+};
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.seg[data-seg-target]').forEach((seg) => {
+        const targetId = /** @type {string} */ (seg.getAttribute('data-seg-target'));
+        const input = /** @type {HTMLInputElement | null} */ (document.getElementById(targetId));
+        seg.querySelectorAll('button[data-type-value]').forEach((b) => {
+            b.addEventListener('click', () => {
+                window.krtSegSet(
+                    targetId,
+                    /** @type {string} */ (b.getAttribute('data-type-value')),
+                );
+            });
+        });
+        window.krtSegSet(targetId, input && input.value ? input.value : 'INCOME');
+    });
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     const pModal = document.getElementById('participant-modal');

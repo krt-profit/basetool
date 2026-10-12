@@ -18,32 +18,28 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-(function () {
-    'use strict';
-
-    function toOption(row) {
-        return {
-            value: row.id,
-            label: row.effectiveName || row.displayName || row.username || row.id,
-        };
-    }
-
-    function fetchUsers(path, query) {
-        return window.krtFetch
-            .getJson(`${path}?query=${encodeURIComponent(query || '')}`)
-            .then((list) => {
-                return (list || []).map(toOption);
-            })
-            .catch(() => {
-                return [];
-            });
-    }
-
-    window.krtComboboxRemoteSources ||= {};
-    window.krtComboboxRemoteSources['remote-users'] = function (query) {
-        return fetchUsers('/users/search', query);
+function toOption(row) {
+    return {
+        value: row.id,
+        label: row.effectiveName || row.displayName || row.username || row.id,
     };
-    window.krtComboboxRemoteSources['remote-bank-users'] = function (query) {
-        return fetchUsers('/users/search-bank', query);
-    };
-})();
+}
+
+function fetchUsers(path, query) {
+    return window.krtFetch
+        .getJson(`${path}?query=${encodeURIComponent(query || '')}`)
+        .then((list) => {
+            return (list || []).map(toOption);
+        })
+        .catch(() => {
+            return [];
+        });
+}
+
+window.krtComboboxRemoteSources ||= {};
+window.krtComboboxRemoteSources['remote-users'] = function (query) {
+    return fetchUsers('/users/search', query);
+};
+window.krtComboboxRemoteSources['remote-bank-users'] = function (query) {
+    return fetchUsers('/users/search-bank', query);
+};

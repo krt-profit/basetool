@@ -1,8 +1,6 @@
 // @ts-check
 
 (function () {
-    'use strict';
-
     const filterForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('operations-filter-form')
     );

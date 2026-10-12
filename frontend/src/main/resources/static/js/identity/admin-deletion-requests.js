@@ -20,7 +20,6 @@
 // @ts-check
 
 (function () {
-    'use strict';
     if (!window.krtFetch) {
         return;
     }

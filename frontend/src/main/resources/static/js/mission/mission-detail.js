@@ -216,252 +216,250 @@ window.krtLiveSync.createReceiver({
     },
 });
 
-(function () {
-    function mid() {
-        return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
+function mid() {
+    return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
+}
+function stepsVersion() {
+    const holder = document.querySelector('[data-steps-version]');
+    const v = holder ? Number(holder.getAttribute('data-steps-version')) : null;
+    return v === null || Number.isNaN(v) ? null : v;
+}
+function refreshSteps() {
+    if (window.krtRefreshMissionSection) {
+        return window.krtRefreshMissionSection(['steps', 'overview']);
     }
-    function stepsVersion() {
-        const holder = document.querySelector('[data-steps-version]');
-        const v = holder ? Number(holder.getAttribute('data-steps-version')) : null;
-        return v === null || Number.isNaN(v) ? null : v;
-    }
-    function refreshSteps() {
-        if (window.krtRefreshMissionSection) {
-            return window.krtRefreshMissionSection(['steps', 'overview']);
-        }
-        return Promise.resolve();
-    }
-    function writeStep(opts) {
-        return window.krtMissionWrite(
-            Object.assign({ sectionKey: 'steps', onSuccess: refreshSteps }, opts),
-        );
-    }
-    function listOrder() {
-        return Array.prototype.map.call(
-            document.querySelectorAll('#mission-step-list .ae-row'),
-            (r) => {
-                return r.getAttribute('data-step-id');
-            },
-        );
-    }
+    return Promise.resolve();
+}
+function writeStep(opts) {
+    return window.krtMissionWrite(
+        Object.assign({ sectionKey: 'steps', onSuccess: refreshSteps }, opts),
+    );
+}
+function listOrder() {
+    return Array.prototype.map.call(
+        document.querySelectorAll('#mission-step-list .ae-row'),
+        (r) => {
+            return r.getAttribute('data-step-id');
+        },
+    );
+}
 
-    function toggleStep(box) {
-        const sid = box.getAttribute('data-step-id');
-        if (!sid || stepsVersion() === null) {
-            return;
-        }
-        const done = box.getAttribute('data-done') !== 'true';
-        writeStep({
-            method: 'PATCH',
-            url: `/missions/${mid()}/steps/${sid}/done/ajax`,
-            payload() {
-                return { done, stepsVersion: stepsVersion() };
-            },
-        });
+function toggleStep(box) {
+    const sid = box.getAttribute('data-step-id');
+    if (!sid || stepsVersion() === null) {
+        return;
     }
-    function addStep(_btn) {
-        if (stepsVersion() === null) {
-            return;
-        }
-        const title = window.krtI18nText(
-            window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.default_title,
-            'MISSION_STEP_I18N.default_title',
-        );
-        writeStep({
-            method: 'POST',
-            url: `/missions/${mid()}/steps/ajax`,
-            payload() {
-                return { title, meta: null, stepsVersion: stepsVersion() };
-            },
-        });
+    const done = box.getAttribute('data-done') !== 'true';
+    writeStep({
+        method: 'PATCH',
+        url: `/missions/${mid()}/steps/${sid}/done/ajax`,
+        payload() {
+            return { done, stepsVersion: stepsVersion() };
+        },
+    });
+}
+function addStep(_btn) {
+    if (stepsVersion() === null) {
+        return;
     }
-    function editStep(row) {
-        const sid = row.getAttribute('data-step-id');
-        const titleInput = row.querySelector('.ae-title');
-        if (!sid || stepsVersion() === null || !titleInput) {
-            return;
-        }
-        const title = titleInput.value.trim();
-        const metaInput = row.querySelector('.ae-meta');
-        const meta = metaInput ? metaInput.value : null;
-        if (!title) {
-            return;
-        }
-        writeStep({
-            method: 'PUT',
-            url: `/missions/${mid()}/steps/${sid}/ajax`,
-            payload() {
-                return { title, meta, stepsVersion: stepsVersion() };
-            },
-        });
+    const title = window.krtI18nText(
+        window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.default_title,
+        'MISSION_STEP_I18N.default_title',
+    );
+    writeStep({
+        method: 'POST',
+        url: `/missions/${mid()}/steps/ajax`,
+        payload() {
+            return { title, meta: null, stepsVersion: stepsVersion() };
+        },
+    });
+}
+function editStep(row) {
+    const sid = row.getAttribute('data-step-id');
+    const titleInput = row.querySelector('.ae-title');
+    if (!sid || stepsVersion() === null || !titleInput) {
+        return;
     }
-    async function deleteStep(btn) {
-        const row = btn.closest('.ae-row');
-        if (!row) {
-            return;
-        }
-        const sid = row.getAttribute('data-step-id');
-        if (!sid || stepsVersion() === null) {
-            return;
-        }
-        const msg = window.krtI18nText(
-            window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.delete_confirm,
-            'MISSION_STEP_I18N.delete_confirm',
-        );
-        const ok = await window.showKrtConfirm?.(
-            msg,
-            msg,
-            window.krtI18nText(
-                window.MISSION_SUBRES_I18N &&
-                    window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
-                'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
-            ),
-            window.krtI18nText(
-                window.MISSION_SUBRES_I18N &&
-                    window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
-                'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
-            ),
-        );
-        if (!ok) {
-            return;
-        }
-        writeStep({
-            method: 'DELETE',
-            url() {
-                return `/missions/${mid()}/steps/${sid}/ajax?stepsVersion=${stepsVersion()}`;
-            },
-        });
+    const title = titleInput.value.trim();
+    const metaInput = row.querySelector('.ae-meta');
+    const meta = metaInput ? metaInput.value : null;
+    if (!title) {
+        return;
     }
-    function reorder(order) {
-        if (stepsVersion() === null) {
-            return;
-        }
-        writeStep({
-            method: 'PUT',
-            url: `/missions/${mid()}/steps/reorder/ajax`,
-            payload() {
-                return { stepIds: order, stepsVersion: stepsVersion() };
-            },
-        });
+    writeStep({
+        method: 'PUT',
+        url: `/missions/${mid()}/steps/${sid}/ajax`,
+        payload() {
+            return { title, meta, stepsVersion: stepsVersion() };
+        },
+    });
+}
+async function deleteStep(btn) {
+    const row = btn.closest('.ae-row');
+    if (!row) {
+        return;
     }
-    function moveStep(btn, dir) {
-        const row = btn.closest('.ae-row');
-        if (!row) {
-            return;
-        }
+    const sid = row.getAttribute('data-step-id');
+    if (!sid || stepsVersion() === null) {
+        return;
+    }
+    const msg = window.krtI18nText(
+        window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.delete_confirm,
+        'MISSION_STEP_I18N.delete_confirm',
+    );
+    const ok = await window.showKrtConfirm?.(
+        msg,
+        msg,
+        window.krtI18nText(
+            window.MISSION_SUBRES_I18N &&
+                window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
+            'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
+        ),
+        window.krtI18nText(
+            window.MISSION_SUBRES_I18N &&
+                window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
+            'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
+        ),
+    );
+    if (!ok) {
+        return;
+    }
+    writeStep({
+        method: 'DELETE',
+        url() {
+            return `/missions/${mid()}/steps/${sid}/ajax?stepsVersion=${stepsVersion()}`;
+        },
+    });
+}
+function reorder(order) {
+    if (stepsVersion() === null) {
+        return;
+    }
+    writeStep({
+        method: 'PUT',
+        url: `/missions/${mid()}/steps/reorder/ajax`,
+        payload() {
+            return { stepIds: order, stepsVersion: stepsVersion() };
+        },
+    });
+}
+function moveStep(btn, dir) {
+    const row = btn.closest('.ae-row');
+    if (!row) {
+        return;
+    }
+    const order = listOrder();
+    const i = order.indexOf(row.getAttribute('data-step-id'));
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= order.length) {
+        return;
+    }
+    const tmp = order[i];
+    order[i] = order[j];
+    order[j] = tmp;
+    reorder(order);
+}
+
+document.addEventListener('click', (e) => {
+    const t = /** @type {Element} */ (e.target).closest('[data-trigger]');
+    if (!t) {
+        return;
+    }
+    const trig = t.getAttribute('data-trigger');
+    if (trig === 'mission-toggle-step') {
+        e.preventDefault();
+        toggleStep(t);
+    } else if (trig === 'mission-step-add') {
+        e.preventDefault();
+        addStep(t);
+    } else if (trig === 'mission-step-delete') {
+        e.preventDefault();
+        deleteStep(t);
+    } else if (trig === 'mission-step-up') {
+        e.preventDefault();
+        moveStep(t, -1);
+    } else if (trig === 'mission-step-down') {
+        e.preventDefault();
+        moveStep(t, 1);
+    }
+});
+document.addEventListener('keydown', (e) => {
+    const t = /** @type {Element} */ (e.target).closest('[data-trigger="mission-toggle-step"]');
+    if (!t) {
+        return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleStep(t);
+    }
+});
+document.addEventListener('change', (e) => {
+    const inp = /** @type {Element} */ (e.target).closest(
+        '#mission-step-list .ae-title, #mission-step-list .ae-meta',
+    );
+    if (!inp) {
+        return;
+    }
+    const row = inp.closest('.ae-row');
+    if (row) {
+        editStep(row);
+    }
+});
+
+/** @type {Element | null} */
+let dragRow = null;
+document.addEventListener('dragstart', (e) => {
+    const row = /** @type {Element} */ (e.target).closest('#mission-step-list .ae-row');
+    if (!row) {
+        return;
+    }
+    dragRow = row;
+    if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+    }
+});
+document.addEventListener('dragover', (e) => {
+    const list = /** @type {Element} */ (e.target).closest('#mission-step-list');
+    if (!list || !dragRow) {
+        return;
+    }
+    e.preventDefault();
+    const row = /** @type {Element} */ (e.target).closest('.ae-row');
+    list.querySelectorAll('.ae-row').forEach((r) => {
+        r.classList.remove('drag-over');
+    });
+    if (row && row !== dragRow) {
+        row.classList.add('drag-over');
+    }
+});
+document.addEventListener('drop', (e) => {
+    const list = /** @type {Element} */ (e.target).closest('#mission-step-list');
+    if (!list || !dragRow) {
+        return;
+    }
+    e.preventDefault();
+    const target = /** @type {Element} */ (e.target).closest('.ae-row');
+    list.querySelectorAll('.ae-row').forEach((r) => {
+        r.classList.remove('drag-over');
+    });
+    if (target && target !== dragRow) {
         const order = listOrder();
-        const i = order.indexOf(row.getAttribute('data-step-id'));
-        const j = i + dir;
-        if (i < 0 || j < 0 || j >= order.length) {
-            return;
-        }
-        const tmp = order[i];
-        order[i] = order[j];
-        order[j] = tmp;
+        const from = order.indexOf(dragRow.getAttribute('data-step-id'));
+        order.splice(
+            order.indexOf(target.getAttribute('data-step-id')),
+            0,
+            order.splice(from, 1)[0],
+        );
         reorder(order);
     }
-
-    document.addEventListener('click', (e) => {
-        const t = /** @type {Element} */ (e.target).closest('[data-trigger]');
-        if (!t) {
-            return;
-        }
-        const trig = t.getAttribute('data-trigger');
-        if (trig === 'mission-toggle-step') {
-            e.preventDefault();
-            toggleStep(t);
-        } else if (trig === 'mission-step-add') {
-            e.preventDefault();
-            addStep(t);
-        } else if (trig === 'mission-step-delete') {
-            e.preventDefault();
-            deleteStep(t);
-        } else if (trig === 'mission-step-up') {
-            e.preventDefault();
-            moveStep(t, -1);
-        } else if (trig === 'mission-step-down') {
-            e.preventDefault();
-            moveStep(t, 1);
-        }
+    dragRow = null;
+});
+document.addEventListener('dragend', () => {
+    document.querySelectorAll('#mission-step-list .ae-row.drag-over').forEach((r) => {
+        r.classList.remove('drag-over');
     });
-    document.addEventListener('keydown', (e) => {
-        const t = /** @type {Element} */ (e.target).closest('[data-trigger="mission-toggle-step"]');
-        if (!t) {
-            return;
-        }
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            toggleStep(t);
-        }
-    });
-    document.addEventListener('change', (e) => {
-        const inp = /** @type {Element} */ (e.target).closest(
-            '#mission-step-list .ae-title, #mission-step-list .ae-meta',
-        );
-        if (!inp) {
-            return;
-        }
-        const row = inp.closest('.ae-row');
-        if (row) {
-            editStep(row);
-        }
-    });
-
-    /** @type {Element | null} */
-    let dragRow = null;
-    document.addEventListener('dragstart', (e) => {
-        const row = /** @type {Element} */ (e.target).closest('#mission-step-list .ae-row');
-        if (!row) {
-            return;
-        }
-        dragRow = row;
-        if (e.dataTransfer) {
-            e.dataTransfer.effectAllowed = 'move';
-        }
-    });
-    document.addEventListener('dragover', (e) => {
-        const list = /** @type {Element} */ (e.target).closest('#mission-step-list');
-        if (!list || !dragRow) {
-            return;
-        }
-        e.preventDefault();
-        const row = /** @type {Element} */ (e.target).closest('.ae-row');
-        list.querySelectorAll('.ae-row').forEach((r) => {
-            r.classList.remove('drag-over');
-        });
-        if (row && row !== dragRow) {
-            row.classList.add('drag-over');
-        }
-    });
-    document.addEventListener('drop', (e) => {
-        const list = /** @type {Element} */ (e.target).closest('#mission-step-list');
-        if (!list || !dragRow) {
-            return;
-        }
-        e.preventDefault();
-        const target = /** @type {Element} */ (e.target).closest('.ae-row');
-        list.querySelectorAll('.ae-row').forEach((r) => {
-            r.classList.remove('drag-over');
-        });
-        if (target && target !== dragRow) {
-            const order = listOrder();
-            const from = order.indexOf(dragRow.getAttribute('data-step-id'));
-            order.splice(
-                order.indexOf(target.getAttribute('data-step-id')),
-                0,
-                order.splice(from, 1)[0],
-            );
-            reorder(order);
-        }
-        dragRow = null;
-    });
-    document.addEventListener('dragend', () => {
-        document.querySelectorAll('#mission-step-list .ae-row.drag-over').forEach((r) => {
-            r.classList.remove('drag-over');
-        });
-        dragRow = null;
-    });
-})();
+    dragRow = null;
+});
 
 (function () {
     function mid() {

@@ -13,8 +13,6 @@
 // @ts-check
 
 (function () {
-    'use strict';
-
     const i18n = window.materialboerseInventoryI18n || {};
     const release = window.krtMaterialRelease;
     if (!window.krtEvents || !release || !window.krtFetch) {

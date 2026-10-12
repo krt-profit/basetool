@@ -20,8 +20,6 @@
 // @ts-check
 
 (function () {
-    'use strict';
-
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const gi18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
     if (!window.krtFetch || !document.getElementById('mb-board')) {

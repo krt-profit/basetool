@@ -21,189 +21,181 @@
 
 /* global SC_MSG, SC_CONFLICT */
 
-(function () {
-    const modal = /** @type {HTMLElement} */ (document.getElementById('specialcommand-modal'));
-    const form = /** @type {HTMLFormElement} */ (document.getElementById('sc-form'));
-    const title = /** @type {HTMLElement} */ (document.getElementById('sc-modal-title'));
-    const versionInput = /** @type {HTMLInputElement} */ (
-        document.getElementById('edit-sc-version')
+const modal = /** @type {HTMLElement} */ (document.getElementById('specialcommand-modal'));
+const form = /** @type {HTMLFormElement} */ (document.getElementById('sc-form'));
+const title = /** @type {HTMLElement} */ (document.getElementById('sc-modal-title'));
+const versionInput = /** @type {HTMLInputElement} */ (document.getElementById('edit-sc-version'));
+const nameInput = /** @type {HTMLInputElement} */ (document.getElementById('sc-name'));
+const shorthandInput = /** @type {HTMLInputElement} */ (document.getElementById('sc-shorthand'));
+const descInput = /** @type {HTMLInputElement} */ (document.getElementById('sc-desc'));
+
+function openCreate() {
+    title.textContent = SC_MSG.createTitle;
+    form.action = '/admin/special-commands';
+    versionInput.value = '0';
+    nameInput.value = '';
+    shorthandInput.value = '';
+    descInput.value = '';
+    window.krtModal.open(modal);
+}
+
+function openEdit(btn) {
+    title.textContent = SC_MSG.editTitle;
+    form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
+    versionInput.value = btn.getAttribute('data-version') || '0';
+    nameInput.value = btn.getAttribute('data-name') || '';
+    shorthandInput.value = btn.getAttribute('data-shorthand') || '';
+    descInput.value = btn.getAttribute('data-desc') || '';
+    window.krtModal.open(modal);
+}
+
+function closeModal() {
+    window.krtModal.close(modal);
+}
+
+const deleteModal = document.getElementById('sc-delete-modal');
+const deleteForm = /** @type {HTMLFormElement | null} */ (
+    document.getElementById('sc-delete-form')
+);
+const deleteNameEl = document.getElementById('sc-delete-name');
+
+function openDelete(btn) {
+    if (!deleteModal || !deleteForm) return;
+    deleteForm.action = window.safeSameOriginUrl(
+        btn.getAttribute('data-action'),
+        deleteForm.action,
     );
-    const nameInput = /** @type {HTMLInputElement} */ (document.getElementById('sc-name'));
-    const shorthandInput = /** @type {HTMLInputElement} */ (
-        document.getElementById('sc-shorthand')
-    );
-    const descInput = /** @type {HTMLInputElement} */ (document.getElementById('sc-desc'));
+    if (deleteNameEl) deleteNameEl.textContent = btn.getAttribute('data-name') || '';
+    window.krtModal.open(deleteModal);
+}
 
-    function openCreate() {
-        title.textContent = SC_MSG.createTitle;
-        form.action = '/admin/special-commands';
-        versionInput.value = '0';
-        nameInput.value = '';
-        shorthandInput.value = '';
-        descInput.value = '';
-        window.krtModal.open(modal);
+function closeDelete() {
+    if (deleteModal) window.krtModal.close(deleteModal);
+}
+
+/** @type {HTMLElement} */ (document.getElementById('add-sc-btn')).addEventListener(
+    'click',
+    openCreate,
+);
+document.addEventListener('click', (e) => {
+    const target = /** @type {Element} */ (e.target);
+    const editBtn = target.closest('.edit-sc-btn');
+    if (editBtn) {
+        openEdit(editBtn);
+        return;
     }
-
-    function openEdit(btn) {
-        title.textContent = SC_MSG.editTitle;
-        form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
-        versionInput.value = btn.getAttribute('data-version') || '0';
-        nameInput.value = btn.getAttribute('data-name') || '';
-        shorthandInput.value = btn.getAttribute('data-shorthand') || '';
-        descInput.value = btn.getAttribute('data-desc') || '';
-        window.krtModal.open(modal);
-    }
-
-    function closeModal() {
-        window.krtModal.close(modal);
-    }
-
-    const deleteModal = document.getElementById('sc-delete-modal');
-    const deleteForm = /** @type {HTMLFormElement | null} */ (
-        document.getElementById('sc-delete-form')
-    );
-    const deleteNameEl = document.getElementById('sc-delete-name');
-
-    function openDelete(btn) {
-        if (!deleteModal || !deleteForm) return;
-        deleteForm.action = window.safeSameOriginUrl(
-            btn.getAttribute('data-action'),
-            deleteForm.action,
-        );
-        if (deleteNameEl) deleteNameEl.textContent = btn.getAttribute('data-name') || '';
-        window.krtModal.open(deleteModal);
-    }
-
-    function closeDelete() {
-        if (deleteModal) window.krtModal.close(deleteModal);
-    }
-
-    /** @type {HTMLElement} */ (document.getElementById('add-sc-btn')).addEventListener(
-        'click',
-        openCreate,
-    );
-    document.addEventListener('click', (e) => {
-        const target = /** @type {Element} */ (e.target);
-        const editBtn = target.closest('.edit-sc-btn');
-        if (editBtn) {
-            openEdit(editBtn);
-            return;
-        }
-        const deleteBtn = target.closest('.delete-btn');
-        if (deleteBtn) openDelete(deleteBtn);
+    const deleteBtn = target.closest('.delete-btn');
+    if (deleteBtn) openDelete(deleteBtn);
+});
+/** @type {Element} */ (
+    document.querySelector('#specialcommand-modal .close-sc-modal')
+).addEventListener('click', closeModal);
+document
+    .querySelectorAll('#sc-delete-modal .close-sc-delete-modal')
+    .forEach((btn) => btn.addEventListener('click', closeDelete));
+modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+});
+if (deleteModal) {
+    deleteModal.addEventListener('click', (e) => {
+        if (e.target === deleteModal) closeDelete();
     });
-    /** @type {Element} */ (
-        document.querySelector('#specialcommand-modal .close-sc-modal')
-    ).addEventListener('click', closeModal);
-    document
-        .querySelectorAll('#sc-delete-modal .close-sc-delete-modal')
-        .forEach((btn) => btn.addEventListener('click', closeDelete));
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-    });
-    if (deleteModal) {
-        deleteModal.addEventListener('click', (e) => {
-            if (e.target === deleteModal) closeDelete();
-        });
-    }
+}
 
-    const SC_FILTER_PREF_KEY = 'admin_special_commands_filter';
-    const includeInactive = /** @type {HTMLInputElement | null} */ (
-        document.getElementById('includeInactive')
-    );
-    if (includeInactive && window.krtFetch) {
-        const persistScFilter = function () {
-            try {
-                localStorage.setItem(
-                    SC_FILTER_PREF_KEY,
-                    JSON.stringify({ includeInactive: includeInactive.checked }),
-                );
-            } catch (_e) {}
-        };
-        includeInactive.addEventListener('change', () => {
-            persistScFilter();
-            const url = `/admin/special-commands${
-                includeInactive.checked ? '?includeInactive=true' : ''
-            }`;
-            window.krtFetch.swap({ url, container: '#sc-results', history: true });
-        });
-
-        if (/[?&]includeInactive=/.test(window.location.search)) {
-            persistScFilter();
-        } else {
-            let saved;
-            try {
-                saved = JSON.parse(
-                    /** @type {string} */ (localStorage.getItem(SC_FILTER_PREF_KEY)),
-                );
-            } catch (_e) {
-                saved = null;
-            }
-            if (saved && typeof saved === 'object') {
-                const want = saved.includeInactive === true;
-                if (want !== includeInactive.checked) {
-                    includeInactive.checked = want;
-                    includeInactive.dispatchEvent(new Event('change'));
-                }
-            }
-        }
-    }
-
-    function reswapScResults() {
-        if (!window.krtFetch) return;
+const SC_FILTER_PREF_KEY = 'admin_special_commands_filter';
+const includeInactive = /** @type {HTMLInputElement | null} */ (
+    document.getElementById('includeInactive')
+);
+if (includeInactive && window.krtFetch) {
+    const persistScFilter = function () {
+        try {
+            localStorage.setItem(
+                SC_FILTER_PREF_KEY,
+                JSON.stringify({ includeInactive: includeInactive.checked }),
+            );
+        } catch (_e) {}
+    };
+    includeInactive.addEventListener('change', () => {
+        persistScFilter();
         const url = `/admin/special-commands${
-            includeInactive && includeInactive.checked ? '?includeInactive=true' : ''
+            includeInactive.checked ? '?includeInactive=true' : ''
         }`;
-        window.krtFetch.swap({ url, container: '#sc-results', history: false });
-    }
+        window.krtFetch.swap({ url, container: '#sc-results', history: true });
+    });
 
-    function scWrite(theForm, successMessage, onSuccess) {
-        window.krtFetch.submitForm({
-            form: theForm,
-            successMessage,
-            errorMessage: SC_MSG.error,
-            conflict: SC_CONFLICT,
-            onSuccess() {
-                if (typeof onSuccess === 'function') {
-                    onSuccess();
-                }
-                reswapScResults();
-            },
-        });
-    }
-
-    if (form) {
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (!window.krtFetch) {
-                form.submit();
-                return;
-            }
-            scWrite(form, SC_MSG.saved, closeModal);
-        });
-    }
-    if (deleteForm) {
-        deleteForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (!window.krtFetch) {
-                deleteForm.submit();
-                return;
-            }
-            scWrite(deleteForm, SC_MSG.deleted, closeDelete);
-        });
-    }
-    document.addEventListener('submit', (e) => {
-        const actForm = /** @type {HTMLFormElement | null} */ (
-            /** @type {Element} */ (e.target).closest('form[action*="/activate"]')
-        );
-        if (!actForm) {
-            return;
+    if (/[?&]includeInactive=/.test(window.location.search)) {
+        persistScFilter();
+    } else {
+        let saved;
+        try {
+            saved = JSON.parse(/** @type {string} */ (localStorage.getItem(SC_FILTER_PREF_KEY)));
+        } catch (_e) {
+            saved = null;
         }
+        if (saved && typeof saved === 'object') {
+            const want = saved.includeInactive === true;
+            if (want !== includeInactive.checked) {
+                includeInactive.checked = want;
+                includeInactive.dispatchEvent(new Event('change'));
+            }
+        }
+    }
+}
+
+function reswapScResults() {
+    if (!window.krtFetch) return;
+    const url = `/admin/special-commands${
+        includeInactive && includeInactive.checked ? '?includeInactive=true' : ''
+    }`;
+    window.krtFetch.swap({ url, container: '#sc-results', history: false });
+}
+
+function scWrite(theForm, successMessage, onSuccess) {
+    window.krtFetch.submitForm({
+        form: theForm,
+        successMessage,
+        errorMessage: SC_MSG.error,
+        conflict: SC_CONFLICT,
+        onSuccess() {
+            if (typeof onSuccess === 'function') {
+                onSuccess();
+            }
+            reswapScResults();
+        },
+    });
+}
+
+if (form) {
+    form.addEventListener('submit', (e) => {
         e.preventDefault();
         if (!window.krtFetch) {
-            actForm.submit();
+            form.submit();
             return;
         }
-        scWrite(actForm, SC_MSG.saved, null);
+        scWrite(form, SC_MSG.saved, closeModal);
     });
-})();
+}
+if (deleteForm) {
+    deleteForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!window.krtFetch) {
+            deleteForm.submit();
+            return;
+        }
+        scWrite(deleteForm, SC_MSG.deleted, closeDelete);
+    });
+}
+document.addEventListener('submit', (e) => {
+    const actForm = /** @type {HTMLFormElement | null} */ (
+        /** @type {Element} */ (e.target).closest('form[action*="/activate"]')
+    );
+    if (!actForm) {
+        return;
+    }
+    e.preventDefault();
+    if (!window.krtFetch) {
+        actForm.submit();
+        return;
+    }
+    scWrite(actForm, SC_MSG.saved, null);
+});

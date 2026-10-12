@@ -1,8 +1,6 @@
 // @ts-check
 
 (function (root) {
-    'use strict';
-
     const SELECTOR = 'input[data-scu-decimal]';
     const MAX_DECIMALS = 3;
 

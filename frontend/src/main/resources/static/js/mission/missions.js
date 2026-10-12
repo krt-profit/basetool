@@ -5,8 +5,6 @@ const MISSIONS_SECTIONS = {
 };
 
 (function () {
-    'use strict';
-
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('missions-filter-form')
     );

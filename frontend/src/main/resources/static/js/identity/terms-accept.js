@@ -7,8 +7,6 @@
  */
 
 (function () {
-    'use strict';
-
     const submitButton = document.getElementById('terms-accept-submit');
     const errorMessage = document.getElementById('terms-accept-error');
 

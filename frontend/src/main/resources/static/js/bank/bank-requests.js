@@ -19,8 +19,6 @@
  */
 
 (function () {
-    'use strict';
-
     /** The segments of the status control, in display order. */
     const SEGMENTS = ['PENDING', 'CONFIRMED', 'REJECTED', 'ALL'];
 

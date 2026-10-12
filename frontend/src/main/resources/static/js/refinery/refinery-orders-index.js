@@ -23,8 +23,6 @@ const REFINERY_SECTIONS = {
 };
 
 (function () {
-    'use strict';
-
     const FILTER_PREF_KEY = 'refinery_orders_filter';
     const VIEWS = ['RUNNING', 'READY', 'COMPLETED', 'ALL'];
     const DEFAULT_VIEW = 'RUNNING';

@@ -19,8 +19,6 @@
  */
 
 (function () {
-    'use strict';
-
     const table = /** @type {HTMLTableElement | null} */ (document.getElementById('priceTable'));
     const input = /** @type {HTMLInputElement | null} */ (
         document.getElementById('terminalFilter')

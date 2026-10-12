@@ -19,8 +19,6 @@
  */
 
 (function () {
-    'use strict';
-
     /**
      * One terminal column of the grid.
      *

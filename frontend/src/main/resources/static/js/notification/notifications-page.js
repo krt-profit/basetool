@@ -19,8 +19,6 @@
  */
 
 (function () {
-    'use strict';
-
     const inboxEl = document.getElementById('notification-inbox');
     const toolbarEl = document.getElementById('notifications-toolbar');
     if (!inboxEl || !toolbarEl) return;
