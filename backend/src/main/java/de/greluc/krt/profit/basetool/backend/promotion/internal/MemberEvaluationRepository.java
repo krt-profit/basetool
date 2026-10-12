@@ -52,7 +52,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
   List<MemberEvaluation> findAllByUserId(UUID userId);
 
   /**
-   * Paginated variant of {@link #findAllByUserId(String)} for the personal view.
+   * Paginated variant of {@link #findAllByUserId(UUID)} for the personal view.
    *
    * @param userId the {@code app_user.id} of the member
    * @param pageable Spring Data pagination/sort instructions
@@ -61,7 +61,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
   Page<MemberEvaluation> findAllByUserId(UUID userId, Pageable pageable);
 
   /**
-   * Squadron-scoped variant of {@link #findAllByUserId(String)} for the "my evaluations" list, so a
+   * Squadron-scoped variant of {@link #findAllByUserId(UUID)} for the "my evaluations" list, so a
    * member who belongs to more than one squadron only sees the active squadron's grades. {@code
    * null} scope spans every squadron.
    *
@@ -78,7 +78,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       @Param("userId") UUID userId, @Param("owningSquadronId") UUID owningSquadronId);
 
   /**
-   * Paginated squadron-scoped variant of {@link #findAllByUserIdScoped(String, UUID)}.
+   * Paginated squadron-scoped variant of {@link #findAllByUserIdScoped(UUID, UUID)}.
    *
    * @param userId the {@code app_user.id} of the member
    * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
@@ -149,7 +149,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
   List<MemberEvaluation> findAllByUserIdWithCategoryAndTopic(UUID userId);
 
   /**
-   * Squadron-scoped variant of {@link #findAllByUserIdWithCategoryAndTopic(String)} used by the
+   * Squadron-scoped variant of {@link #findAllByUserIdWithCategoryAndTopic(UUID)} used by the
    * eligibility evaluator. Restricting the member's grades to the active squadron keeps a global
    * ("any N categories") rank requirement from counting grades the member earned in a different
    * squadron's catalog. {@code null} scope spans every squadron (admin "all squadrons" mode).

@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.notification.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -32,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationPre
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationPreferenceGroups;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
@@ -51,7 +51,9 @@ class NotificationPreferenceProxyControllerTest {
   @SuppressWarnings("unchecked")
   void card_groupsThePreferencesByArea() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(eq("/api/v1/notifications/preferences"), any(ParameterizedTypeReference.class)))
+    when(client.get(
+            eq("/api/v1/notifications/preferences"),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any()))
         .thenReturn(
             List.of(
                 new NotificationPreferenceDto("JOB_ORDER_CREATED", true, false),
@@ -70,7 +72,9 @@ class NotificationPreferenceProxyControllerTest {
   @Test
   void card_flagsTheCardUnavailableWhenTheBackendCannotBeRead() {
     BackendApiClient client = mock(BackendApiClient.class);
-    when(client.get(eq("/api/v1/notifications/preferences"), any(ParameterizedTypeReference.class)))
+    when(client.get(
+            eq("/api/v1/notifications/preferences"),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any()))
         .thenThrow(new IllegalStateException("down"));
     Model model = new ConcurrentModel();
 

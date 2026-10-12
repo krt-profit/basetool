@@ -50,7 +50,7 @@ public interface RankRequirementRepository extends JpaRepository<RankRequirement
   /**
    * Squadron-scoped paged read for the admin list endpoint. When {@code owningSquadronId} is {@code
    * null} the result spans every squadron (admin "all squadrons" mode); a non-null id restricts the
-   * result to a single squadron's requirements via the requirement's own {@code owningSquadron}.
+   * result to a single squadron's requirements via the requirement's own squadron.
    *
    * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
    * @param pageable Spring Data paging and sorting parameters

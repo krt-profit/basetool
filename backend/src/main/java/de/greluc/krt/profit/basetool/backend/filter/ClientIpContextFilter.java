@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.StringJoiner;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -71,6 +72,9 @@ public class ClientIpContextFilter extends OncePerRequestFilter {
 
   /** Separator used when folding repeated header lines into one chain, per RFC 9110 section 5.3. */
   private static final String HOP_SEPARATOR = ",";
+
+  /** Splits a folded chain back into its hops. */
+  private static final Pattern HOP_SPLITTER = Pattern.compile(HOP_SEPARATOR);
 
   /** Trusted-proxy matchers compiled once at construction, never re-parsed per request. */
   private final List<IpAddressMatcher> trustedProxyMatchers;
@@ -149,9 +153,9 @@ public class ClientIpContextFilter extends OncePerRequestFilter {
     if (xffHeader == null || xffHeader.isBlank() || !isTrusted(remoteAddr, trustedProxies)) {
       return remoteAddr;
     }
-    String[] hops = xffHeader.split(",");
-    for (int i = hops.length - 1; i >= 0; i--) {
-      String candidate = hops[i].trim();
+    List<String> hops = HOP_SPLITTER.splitAsStream(xffHeader).toList();
+    for (int i = hops.size() - 1; i >= 0; i--) {
+      String candidate = hops.get(i).trim();
       if (!candidate.isEmpty() && !isTrusted(candidate, trustedProxies)) {
         return candidate;
       }
@@ -173,14 +177,26 @@ public class ClientIpContextFilter extends OncePerRequestFilter {
       return false;
     }
     for (IpAddressMatcher matcher : trustedProxies) {
-      try {
-        if (matcher.matches(ip)) {
-          return true;
-        }
-      } catch (IllegalArgumentException _) {
+      if (matchesQuietly(matcher, ip)) {
+        return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Matches an address, treating one the matcher cannot parse as a non-match.
+   *
+   * @param matcher the trusted-proxy matcher
+   * @param ip the candidate address
+   * @return {@code true} iff the matcher accepts {@code ip}
+   */
+  private static boolean matchesQuietly(@NotNull IpAddressMatcher matcher, @NotNull String ip) {
+    try {
+      return matcher.matches(ip);
+    } catch (IllegalArgumentException _) {
+      return false;
+    }
   }
 
   /**

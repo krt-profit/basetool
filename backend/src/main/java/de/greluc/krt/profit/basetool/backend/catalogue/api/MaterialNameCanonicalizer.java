@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -48,6 +46,9 @@ public final class MaterialNameCanonicalizer {
 
   /** Matches any run of non-alphanumeric characters, used to fold names to a canonical core. */
   private static final Pattern NON_ALNUM = Pattern.compile("[^a-z0-9]+");
+
+  /** Matches a run of whitespace, used to split a name into words. */
+  private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
   private MaterialNameCanonicalizer() {}
 
@@ -101,14 +102,10 @@ public final class MaterialNameCanonicalizer {
   @NotNull
   private static Iterable<String> foldedWords(@NotNull String name) {
     String stripped = PARENTHETICAL.matcher(name.toLowerCase(Locale.ROOT)).replaceAll(" ");
-    List<String> words = new ArrayList<>();
-    for (String word : stripped.split("\\s+")) {
-      String folded = NON_ALNUM.matcher(word).replaceAll("");
-      if (folded.isEmpty() || CANONICAL_QUALIFIER_WORDS.contains(folded)) {
-        continue;
-      }
-      words.add(folded);
-    }
-    return words;
+    return WHITESPACE
+        .splitAsStream(stripped)
+        .map(word -> NON_ALNUM.matcher(word).replaceAll(""))
+        .filter(folded -> !folded.isEmpty() && !CANONICAL_QUALIFIER_WORDS.contains(folded))
+        .toList();
   }
 }

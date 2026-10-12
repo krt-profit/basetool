@@ -41,6 +41,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentMatchers;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.GrantedAuthority;
@@ -97,7 +98,7 @@ class LogisticianCheckLogPrivacyTest {
       BackendApiClient api = mock(BackendApiClient.class);
       UserDto me = mock(UserDto.class);
       when(me.isLogistician()).thenReturn(Boolean.TRUE);
-      when(api.get(any(String.class), any(Class.class))).thenReturn(me);
+      when(api.get(any(String.class), ArgumentMatchers.<Class<Object>>any())).thenReturn(me);
       RoleHierarchy hierarchy = mock(RoleHierarchy.class);
       when(hierarchy.getReachableGrantedAuthorities(any()))
           .thenAnswer(inv -> List.<GrantedAuthority>of(new SimpleGrantedAuthority("ROLE_X")));

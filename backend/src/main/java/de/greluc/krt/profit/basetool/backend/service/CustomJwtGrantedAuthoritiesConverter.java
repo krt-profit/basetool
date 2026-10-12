@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -341,7 +342,7 @@ public class CustomJwtGrantedAuthoritiesConverter
                   Stream<GrantedAuthority> roleAuth =
                       Stream.of(
                           new SimpleGrantedAuthority(
-                              "ROLE_" + role.getName().toUpperCase().replace(" ", "_")));
+                              "ROLE_" + role.getName().toUpperCase(Locale.ROOT).replace(" ", "_")));
                   Stream<GrantedAuthority> permAuth =
                       role.getPermissions().stream().map(SimpleGrantedAuthority::new);
                   return Stream.concat(roleAuth, permAuth);

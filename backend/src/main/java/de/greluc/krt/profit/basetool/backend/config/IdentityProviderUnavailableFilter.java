@@ -136,7 +136,7 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
         return true;
       }
       Throwable next = cause.getCause();
-      if (next == cause) {
+      if (cause.equals(next)) {
         break;
       }
       cause = next;

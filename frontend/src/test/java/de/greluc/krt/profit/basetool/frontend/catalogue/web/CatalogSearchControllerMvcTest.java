@@ -43,6 +43,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.ParameterizedTypeReference;
@@ -112,7 +113,10 @@ class CatalogSearchControllerMvcTest {
         new PageResponse<>(List.of(material(id, "Quantainium")), 0, 25, 1L, 1, List.of());
     doReturn(page)
         .when(backendApiClient)
-        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
+        .get(
+            anyString(),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
+            any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/material-search").param("q", "quant").param("raw", "true"))
@@ -131,7 +135,7 @@ class CatalogSearchControllerMvcTest {
         .when(backendApiClient)
         .get(
             contains("jobOrderOnly={jobOrder}&rawOnly={raw}"),
-            any(ParameterizedTypeReference.class),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
             any(Object[].class));
 
     mockMvc
@@ -144,7 +148,10 @@ class CatalogSearchControllerMvcTest {
   void materialSearch_backendFailure_returnsEmptyList() throws Exception {
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
+        .get(
+            anyString(),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
+            any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/material-search").param("q", "x"))
@@ -160,7 +167,10 @@ class CatalogSearchControllerMvcTest {
             List.of(new LocationReferenceDto(id, "Port Olisar")), 0, 25, 1L, 1, List.of());
     doReturn(page)
         .when(backendApiClient)
-        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
+        .get(
+            anyString(),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
+            any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/location-search").param("q", "port"))
@@ -174,7 +184,10 @@ class CatalogSearchControllerMvcTest {
   void locationSearch_backendFailure_returnsEmptyList() throws Exception {
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
+        .get(
+            anyString(),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
+            any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/location-search").param("q", "x"))
@@ -193,7 +206,10 @@ class CatalogSearchControllerMvcTest {
     PageResponse<LocationReferenceDto> page = new PageResponse<>(List.of(), 0, 1, 0L, 0, List.of());
     doReturn(page)
         .when(backendApiClient)
-        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
+        .get(
+            anyString(),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
+            any(Object[].class));
 
     mockMvc.perform(get("/catalog/location-search").param("q", "x")).andExpect(status().isOk());
 
@@ -201,7 +217,7 @@ class CatalogSearchControllerMvcTest {
     verify(backendApiClient)
         .get(
             uri.capture(),
-            any(ParameterizedTypeReference.class),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
             eq("x"),
             eq(PickerSearch.LOCATION_PAGE_SIZE));
     assertThat(uri.getValue()).as("location relay page size").contains("size={size}");
@@ -219,7 +235,10 @@ class CatalogSearchControllerMvcTest {
     PageResponse<MaterialDto> page = new PageResponse<>(List.of(), 0, 1, 0L, 0, List.of());
     doReturn(page)
         .when(backendApiClient)
-        .get(anyString(), any(ParameterizedTypeReference.class), any(Object[].class));
+        .get(
+            anyString(),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
+            any(Object[].class));
 
     mockMvc.perform(get("/catalog/material-search").param("q", "x")).andExpect(status().isOk());
 
@@ -227,7 +246,7 @@ class CatalogSearchControllerMvcTest {
     verify(backendApiClient)
         .get(
             uri.capture(),
-            any(ParameterizedTypeReference.class),
+            ArgumentMatchers.<ParameterizedTypeReference<Object>>any(),
             eq("x"),
             eq(false),
             eq(false),

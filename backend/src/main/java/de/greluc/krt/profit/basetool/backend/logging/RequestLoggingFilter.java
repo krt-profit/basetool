@@ -34,7 +34,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Emits one access-log line per request (method, path, status, duration) at INFO, or at WARN above
- * {@link LoggingProperties#getSlowRequestThresholdMs()}.
+ * {@link LoggingProperties#slowRequestThresholdMs()}.
  *
  * <p>The notification SSE stream ({@value #STREAM_PATH}) never escalates to WARN, since its
  * duration is the stream's lifetime (REQ-OBS-009). Correlation and user ids come from the MDC.

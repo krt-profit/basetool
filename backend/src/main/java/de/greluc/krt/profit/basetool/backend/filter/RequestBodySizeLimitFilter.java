@@ -41,6 +41,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -73,8 +74,8 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
   private final List<PathPattern> cappedPaths;
 
   /**
-   * Compiles {@link RequestBodyLimitProperties#getPaths()} into {@link PathPattern}s, failing
-   * startup on a malformed entry.
+   * Compiles {@link RequestBodyLimitProperties#paths()} into {@link PathPattern}s, failing startup
+   * on a malformed entry.
    *
    * @param properties the validated cap configuration (enabled flag, byte cap, capped paths)
    * @param problemProperties RFC 7807 problem-type base URI for the 413 body
@@ -164,7 +165,7 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
     }
     String contentType = request.getContentType();
     return contentType != null
-        && contentType.toLowerCase().startsWith(MediaType.MULTIPART_FORM_DATA_VALUE);
+        && contentType.toLowerCase(Locale.ROOT).startsWith(MediaType.MULTIPART_FORM_DATA_VALUE);
   }
 
   /**
@@ -281,6 +282,11 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
         @Override
         public int read() {
           return delegate.read();
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) {
+          return delegate.read(buffer, offset, length);
         }
 
         @Override

@@ -24,8 +24,7 @@ package de.greluc.krt.profit.basetool.backend.validation;
  * create and update.
  *
  * <p>The optimistic-lock version is declared {@code @NotNull(groups = OnUpdate.class)}: create
- * endpoints validate with {@code @Valid}, update endpoints with
- * {@code @Validated(&#123;Default.class, OnUpdate.class&#125;)}, so only an update requires the
- * version.
+ * endpoints validate with {@code @Valid}, update endpoints with {@code @Validated({Default.class,
+ * OnUpdate.class})}, so only an update requires the version.
  */
 public interface OnUpdate {}

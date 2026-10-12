@@ -265,7 +265,7 @@ public class InventoryItemService {
 
   /**
    * Aggregates squadron-wide stock by material and quality only; see {@link
-   * #getAllAggregatedInventory(List, List, Integer, List, List)}.
+   * #getAllAggregatedInventory(List, List, Integer, List, List, boolean, boolean)}.
    *
    * @param materialIds optional material filter
    * @param minQuality optional min-quality filter

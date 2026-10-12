@@ -96,7 +96,6 @@ public class JobOrderHandoverService {
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final StockCommands stockCommands;
   private final JobOrderHandoverMapper jobOrderHandoverMapper;
-  private final JobOrderMaterialRepository jobOrderMaterialRepository;
   private final JobOrderService jobOrderService;
   private final UserService userService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;

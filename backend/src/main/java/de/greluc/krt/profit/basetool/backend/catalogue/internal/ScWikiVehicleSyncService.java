@@ -112,7 +112,6 @@ public class ScWikiVehicleSyncService {
           match = shipTypeRepository.findByNameIgnoreCase(dto.name());
         }
         ShipType st = match.orElse(null);
-        boolean isNew = st == null;
         if (st == null) {
           st = new ShipType();
           st.setName(dto.name());

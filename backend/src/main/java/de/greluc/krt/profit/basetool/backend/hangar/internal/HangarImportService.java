@@ -59,7 +59,8 @@ import tools.jackson.databind.ObjectMapper;
  * auto-detected from the payload shape. Each entry is resolved against the cached {@code ShipType}
  * rows by progressively looser name matching (exact, normalised, then unique token-subset in both
  * directions) and, for the slug-carrying formats, a final slug match; ambiguous entries stay
- * unresolved. Only {@link #DEFAULT_INSURANCE} or {@code "LTI"} is set as insurance.
+ * unresolved. Only {@link FleetExportParser#DEFAULT_INSURANCE} or {@code "LTI"} is set as
+ * insurance.
  *
  * <p>The hangar ends up with at least as many ships per type as the upload lists; existing ships
  * are never deleted. Unmatched names are reported in {@code skippedShips}.

@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.internal;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -26,13 +29,18 @@ import org.jetbrains.annotations.NotNull;
  * #LEVEL_B} (intermediate) &lt; {@link #LEVEL_C} (expert); a higher grade satisfies every lower
  * minimum in {@link RankRequirement} evaluation.
  */
+@RequiredArgsConstructor
 public enum PromotionLevel {
   /** Entry level – basic competence. Lowest grade in the ordering. */
-  LEVEL_A,
+  LEVEL_A(0),
   /** Intermediate level – broadened competence. */
-  LEVEL_B,
+  LEVEL_B(1),
   /** Expert level – full mastery. Highest grade in the ordering. */
-  LEVEL_C;
+  LEVEL_C(2);
+
+  /** Position in the grade ordering; a higher value is a higher grade. */
+  @Getter(AccessLevel.PACKAGE)
+  private final int rank;
 
   /**
    * Returns whether this level is at least {@code minimum} in the {@link PromotionLevel#LEVEL_A}
@@ -42,6 +50,6 @@ public enum PromotionLevel {
    * @return {@code true} iff this level is at least {@code minimum}
    */
   public boolean isAtLeast(@NotNull PromotionLevel minimum) {
-    return this.ordinal() >= minimum.ordinal();
+    return rank >= minimum.rank;
   }
 }
