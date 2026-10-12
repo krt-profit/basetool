@@ -29,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintVariantAliasOverrides;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintVariantFamilyResolver;
@@ -69,6 +70,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
   @Mock private UserRepository userRepository;
+  @Mock private MemberBlueprintSharings memberBlueprintSharings;
 
   private JobOrderItemBlueprintOwnersService service;
 
@@ -80,6 +82,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
             orgUnitMembershipRepository,
             personalBlueprintRepository,
             userRepository,
+            memberBlueprintSharings,
             new BlueprintVariantFamilyResolver(
                 new BlueprintNameNormalizer(), new BlueprintVariantAliasOverrides()));
   }
@@ -362,7 +365,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE));
-    when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(CARLA));
+    when(memberBlueprintSharings.userIdsSharingGlobally()).thenReturn(Set.of(CARLA));
     ArgumentCaptor<Collection<UUID>> ownerUserIds = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds.capture()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR"), owned(CARLA, "Aurora MR")));
@@ -389,7 +392,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE));
-    when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of());
+    when(memberBlueprintSharings.userIdsSharingGlobally()).thenReturn(Set.of());
     ArgumentCaptor<Collection<UUID>> ownerUserIds = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds.capture()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR")));

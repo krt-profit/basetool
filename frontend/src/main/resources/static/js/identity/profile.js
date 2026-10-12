@@ -35,6 +35,8 @@ function initProfile() {
      * @property {(form: HTMLFormElement, version: number) => Record<string, unknown>} payload
      *     builds the JSON body for the section's endpoint
      * @property {(form: HTMLFormElement, body: any) => void} [onSaved] applies the response
+     * @property {boolean} [ownVersion] true when the section's row carries its own optimistic-lock
+     *     version instead of the user row's
      */
 
     /**
@@ -86,6 +88,7 @@ function initProfile() {
         },
         {
             formId: 'profile-payout-form',
+            ownVersion: true,
             payload(form, version) {
                 const checked = control(form, 'input[name="defaultPayoutPreference"]:checked');
                 return { defaultPayoutPreference: checked ? checked.value : null, version };
@@ -93,6 +96,7 @@ function initProfile() {
         },
         {
             formId: 'profile-blueprint-sharing-form',
+            ownVersion: true,
             payload(form, version) {
                 const checkbox = /** @type {HTMLInputElement | null} */ (
                     form.querySelector('input[name="shareBlueprintsGlobally"]')
@@ -210,16 +214,32 @@ function initProfile() {
     }
 
     /**
-     * Writes the user row's fresh version into every section form; the forms share one version.
+     * Writes a fresh version into the section forms it belongs to: the user row's version into
+     * every section that shares it, a section's own version into that section's form alone.
      *
      * @param {unknown} version the version from the save response
+     * @param {ProfileSection} saved the section that was saved
+     * @param {HTMLFormElement} savedForm the form of the saved section
      */
-    function syncAllVersions(version) {
+    function syncVersions(version, saved, savedForm) {
         if (version == null) {
             return;
         }
-        document.querySelectorAll('#profile-settings input[name="version"]').forEach((input) => {
-            /** @type {HTMLInputElement} */ (input).value = String(version);
+        if (saved.ownVersion) {
+            const own = control(savedForm, 'input[name="version"]');
+            if (own) {
+                own.value = String(version);
+            }
+            return;
+        }
+        presentSections().forEach((entry) => {
+            if (entry.section.ownVersion) {
+                return;
+            }
+            const input = control(entry.form, 'input[name="version"]');
+            if (input) {
+                input.value = String(version);
+            }
         });
     }
 
@@ -281,7 +301,7 @@ function initProfile() {
                     break;
                 }
                 if (result.body) {
-                    syncAllVersions(result.body.version);
+                    syncVersions(result.body.version, entry.section, entry.form);
                     if (entry.section.onSaved) {
                         entry.section.onSaved(entry.form, result.body);
                     }

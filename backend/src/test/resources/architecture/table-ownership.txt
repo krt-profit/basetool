@@ -65,7 +65,9 @@ material_exchange_request materialexchange
 material_exchange_request_interest materialexchange
 material_external_alias catalogue
 material_price catalogue
+member_blueprint_sharing blueprint
 member_evaluation promotion
+member_payout_setting mission
 mission mission
 mission_crew mission
 mission_crew_job_types mission

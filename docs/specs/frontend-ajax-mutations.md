@@ -545,8 +545,8 @@ changes from `boolean` to `String` so it binds the `krtFetch.swap` helper's `fra
 toggles were removed: per-Staffel flags (REQ-SEC-005) are now edited on the member-edit page, whose
 two Staffel slots (REQ-ORG-017, up to two) each carry their own flags and save through the in-place
 `{field: message}` membership-delta twin (REQ-FE-007).
-The profile payout-preference form joins the description form on `krtFetch.write` (both echo the one
-shared user-row version), and the home-page mark-announcement-read posts in place and removes its
+The profile payout-preference form joins the description form on `krtFetch.write` (the description echoes the
+user-row version, the payout form its own setting version), and the home-page mark-announcement-read posts in place and removes its
 control. Since 2026-10-03 the profile is one settings page (REQ-UI-027): its four sections keep
 their forms and endpoints, and one save bar — shown only while a section differs from what was
 loaded — writes the changed sections one after another, each with the version the previous write

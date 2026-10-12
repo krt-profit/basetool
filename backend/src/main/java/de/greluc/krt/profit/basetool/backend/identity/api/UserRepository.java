@@ -138,15 +138,6 @@ public interface UserRepository
   Set<UUID> findUserIdsByRoleCode(@Param("roleCode") String roleCode);
 
   /**
-   * Returns the ids of every user who shares their blueprints globally ({@link
-   * User#isShareBlueprintsGlobally()}), for the blueprint-availability aggregations (REQ-INV-018).
-   *
-   * @return the user ids of global blueprint sharers; never {@code null}, possibly empty
-   */
-  @Query("SELECT u.id FROM User u WHERE u.shareBlueprintsGlobally = true")
-  Set<UUID> findIdsBySharingBlueprintsGlobally();
-
-  /**
    * Returns the ids of users who hold the global role {@code roleCode} and are members of the given
    * org unit, for the notification rule engine's {@code ORG_RELATIVE_ROLE} resolution.
    *

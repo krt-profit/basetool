@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintFamilies;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -64,6 +65,7 @@ public class JobOrderItemBlueprintOwnersService {
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
   private final UserRepository userRepository;
+  private final MemberBlueprintSharings memberBlueprintSharings;
   private final BlueprintFamilies familyResolver;
 
   /**
@@ -108,7 +110,7 @@ public class JobOrderItemBlueprintOwnersService {
               Set.of(responsible.getId())));
     }
     Set<UUID> ownerUserIds = new LinkedHashSet<>(memberSubs);
-    ownerUserIds.addAll(userRepository.findIdsBySharingBlueprintsGlobally());
+    ownerUserIds.addAll(memberBlueprintSharings.userIdsSharingGlobally());
 
     Map<UUID, Set<String>> ownedNamesByOwnerId = new LinkedHashMap<>();
     Map<String, Set<UUID>> ownersByFamily = new HashMap<>();

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
@@ -66,6 +67,7 @@ class PersonalBlueprintOverviewServiceTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
   @Mock private UserRepository userRepository;
+  @Mock private MemberBlueprintSharings memberBlueprintSharings;
   @Mock private BlueprintVariantFamilyCatalog familyCatalog;
 
   private PersonalBlueprintOverviewService service;
@@ -78,6 +80,7 @@ class PersonalBlueprintOverviewServiceTest {
             orgUnitMembershipRepository,
             personalBlueprintRepository,
             userRepository,
+            memberBlueprintSharings,
             new BlueprintVariantFamilyResolver(
                 new BlueprintNameNormalizer(), new BlueprintVariantAliasOverrides()),
             familyCatalog);
@@ -355,7 +358,7 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(new ScopePredicate(false, ORG_A, Set.of()));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
-    when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(USER_2));
+    when(memberBlueprintSharings.userIdsSharingGlobally()).thenReturn(Set.of(USER_2));
     ArgumentCaptor<Collection<UUID>> ownerUserIds = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds.capture()))
         .thenReturn(List.of(op("Aurora MR", USER_1), op("Aurora MR", USER_2)));
@@ -375,7 +378,7 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(new ScopePredicate(false, null, Set.of(ORG_A)));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
-    when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(USER_2));
+    when(memberBlueprintSharings.userIdsSharingGlobally()).thenReturn(Set.of(USER_2));
     ArgumentCaptor<Collection<UUID>> ownerUserIds = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findAllByProductKeyInAndOwnerUserIdIn(
             any(), ownerUserIds.capture()))

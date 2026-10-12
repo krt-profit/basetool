@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
@@ -33,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
+import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
@@ -73,6 +75,8 @@ class UserControllerTest {
 
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private UserSyncService userSyncService;
+  @Mock private MemberPayoutSettings memberPayoutSettings;
+  @Mock private MemberBlueprintSharings memberBlueprintSharings;
   @Mock private TaskMetrics taskMetrics;
   @Mock private Jwt jwt;
 
@@ -327,11 +331,8 @@ class UserControllerTest {
   @Test
   void getMyPayoutPreference_resolvesIdFromJwt_andReturnsPreferenceAndVersion() {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    User me = new User();
-    me.setId(CALLER_ID);
-    me.setDefaultPayoutPreference(PayoutPreference.DONATE);
-    me.setVersion(4L);
-    when(userService.findById(CALLER_ID)).thenReturn(me);
+    when(memberPayoutSettings.snapshotOf(CALLER_ID))
+        .thenReturn(new MemberPayoutSettings.Snapshot(PayoutPreference.DONATE, 4L));
 
     UserController.MyPayoutPreferenceResponse result = controller.getMyPayoutPreference(jwt);
 
@@ -342,15 +343,14 @@ class UserControllerTest {
   @Test
   void getMyPayoutPreference_returnsNullPreference_whenUserNeverChose() {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    User me = new User();
-    me.setId(CALLER_ID);
-    me.setVersion(1L);
-    when(userService.findById(CALLER_ID)).thenReturn(me);
+    when(memberPayoutSettings.snapshotOf(CALLER_ID))
+        .thenReturn(new MemberPayoutSettings.Snapshot(null, 0L));
 
     UserController.MyPayoutPreferenceResponse result = controller.getMyPayoutPreference(jwt);
 
     assertNull(
         result.defaultPayoutPreference(), "no explicit choice surfaces as a null preference");
+    assertEquals(0L, result.version());
   }
 
   @Test
@@ -358,29 +358,22 @@ class UserControllerTest {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
     UserController.MyPayoutPreferenceRequest req =
         new UserController.MyPayoutPreferenceRequest(PayoutPreference.DONATE, 2L);
-    User updated = new User();
-    updated.setId(CALLER_ID);
-    updated.setDefaultPayoutPreference(PayoutPreference.DONATE);
-    updated.setVersion(3L);
-    when(userService.updateUserDefaultPayoutPreference(CALLER_ID, PayoutPreference.DONATE, 2L))
-        .thenReturn(updated);
+    when(memberPayoutSettings.update(CALLER_ID, PayoutPreference.DONATE, 2L))
+        .thenReturn(new MemberPayoutSettings.Snapshot(PayoutPreference.DONATE, 3L));
 
     UserController.MyPayoutPreferenceResponse result =
         controller.updateMyPayoutPreference(jwt, req);
 
     assertEquals(PayoutPreference.DONATE, result.defaultPayoutPreference());
     assertEquals(3L, result.version());
-    verify(userService).updateUserDefaultPayoutPreference(CALLER_ID, PayoutPreference.DONATE, 2L);
+    verify(memberPayoutSettings).update(CALLER_ID, PayoutPreference.DONATE, 2L);
   }
 
   @Test
   void getMyBlueprintSharing_resolvesIdFromJwt_andReturnsFlagAndVersion() {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    User me = new User();
-    me.setId(CALLER_ID);
-    me.setShareBlueprintsGlobally(true);
-    me.setVersion(4L);
-    when(userService.findById(CALLER_ID)).thenReturn(me);
+    when(memberBlueprintSharings.snapshotOf(CALLER_ID))
+        .thenReturn(new MemberBlueprintSharings.Snapshot(true, 4L));
 
     UserController.MyBlueprintSharingResponse result = controller.getMyBlueprintSharing(jwt);
 
@@ -393,18 +386,15 @@ class UserControllerTest {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
     UserController.MyBlueprintSharingRequest req =
         new UserController.MyBlueprintSharingRequest(true, 2L);
-    User updated = new User();
-    updated.setId(CALLER_ID);
-    updated.setShareBlueprintsGlobally(true);
-    updated.setVersion(3L);
-    when(userService.updateUserShareBlueprintsGlobally(CALLER_ID, true, 2L)).thenReturn(updated);
+    when(memberBlueprintSharings.update(CALLER_ID, true, 2L))
+        .thenReturn(new MemberBlueprintSharings.Snapshot(true, 3L));
 
     UserController.MyBlueprintSharingResponse result =
         controller.updateMyBlueprintSharing(jwt, req);
 
     assertTrue(result.shareBlueprintsGlobally());
     assertEquals(3L, result.version());
-    verify(userService).updateUserShareBlueprintsGlobally(CALLER_ID, true, 2L);
+    verify(memberBlueprintSharings).update(CALLER_ID, true, 2L);
   }
 
   @Test

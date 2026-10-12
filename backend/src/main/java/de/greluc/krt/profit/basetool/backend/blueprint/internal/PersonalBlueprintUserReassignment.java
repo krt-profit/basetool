@@ -45,6 +45,6 @@ public class PersonalBlueprintUserReassignment extends OwnedRowsReassignment {
         mover,
         POSITION,
         List.of(OwnedRows.deduped("personal_blueprint", "owner_user_id", "product_key")),
-        List.of());
+        List.of("member_blueprint_sharing.user_id"));
   }
 }

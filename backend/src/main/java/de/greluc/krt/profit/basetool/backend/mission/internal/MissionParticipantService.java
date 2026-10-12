@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
@@ -82,6 +83,8 @@ public class MissionParticipantService {
 
   /** Repository used to resolve a linked user and the guest-name promotion match. */
   private final UserRepository userRepository;
+
+  private final MemberPayoutSettings memberPayoutSettings;
 
   /** Repository used to resolve the desired/planned mission job type references. */
   private final JobTypeRepository jobTypeRepository;
@@ -182,9 +185,7 @@ public class MissionParticipantService {
       User user = Entities.require(userRepository.findPlainById(effectiveUserId), "User not found");
       participant.setUser(user);
       participant.setOrgUnits(resolveMembershipOrgUnits(user.getId()));
-      if (user.getDefaultPayoutPreference() != null) {
-        participant.setPayoutPreference(user.getDefaultPayoutPreference());
-      }
+      memberPayoutSettings.defaultFor(user.getId()).ifPresent(participant::setPayoutPreference);
     } else {
       participant.setGuestName(effectiveGuestName);
       participant.setOrgUnits(resolveSubmittedOrgUnits(orgUnitIds));

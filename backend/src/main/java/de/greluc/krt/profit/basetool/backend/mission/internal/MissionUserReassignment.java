@@ -51,6 +51,6 @@ public class MissionUserReassignment extends OwnedRowsReassignment {
             OwnedRows.of("mission_unit", "responsible_user_id"),
             OwnedRows.deduped("mission_managers", "user_id", "mission_id"),
             OwnedRows.deduped("mission_participant", "user_id", "mission_id")),
-        List.of());
+        List.of("member_payout_setting.user_id"));
   }
 }

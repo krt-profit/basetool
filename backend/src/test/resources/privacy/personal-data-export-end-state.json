@@ -18,8 +18,6 @@
       "discord_user_id" : null,
       "discord_guild_nickname" : null,
       "rsi_handle" : null,
-      "default_payout_preference" : null,
-      "share_blueprints_globally" : false,
       "approval_status" : "ACTIVE",
       "approved_at" : null,
       "created_at" : "<instant>",
@@ -507,6 +505,24 @@
     "rows" : [ {
       "occurred_at" : "<instant>",
       "event_type" : "ACCOUNT_CREATED"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "payoutPreference",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "default_payout_preference" : "DONATE",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "blueprintSharing",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "share_globally" : true,
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
     } ],
     "truncated" : false
   } ]
