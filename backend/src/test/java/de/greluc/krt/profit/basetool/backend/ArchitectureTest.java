@@ -70,12 +70,15 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankViewUserDt
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibilityService;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
@@ -92,6 +95,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeConnectio
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.identity.api.RejectedRegistrationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
@@ -400,6 +404,10 @@ class ArchitectureTest {
           StringNormalization.class,
           SubjectAuthentication.class,
           TermsConsentCheck.class,
+          ShipDto.class,
+          LocationDto.class,
+          ShipTypeDto.class,
+          ManufacturerDto.class,
           UexValues.class,
           UserDto.class,
           UserDtoRedaction.class,
@@ -689,7 +697,7 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 484);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 483);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 
@@ -1337,7 +1345,7 @@ class ArchitectureTest {
     assertClassFloor(
         "mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional",
         SERVICE_CODE.or(EXCHANGE_NON_WEB).or(BANK_NON_WEB),
-        487);
+        486);
     mutatingServiceMethodsInReadOnlyClassesRule().check(CLASSES);
   }
 
@@ -1686,7 +1694,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 160);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 158);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.hangar.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
@@ -40,6 +40,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /** Ship JPA entity. */
 @TenantScoped("owningOrgUnit")
@@ -56,7 +57,7 @@ public class Ship extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  private String name;
+  @Nullable private String name;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "ship_type_id", nullable = false)
@@ -72,6 +73,7 @@ public class Ship extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "location_id")
   @ToString.Exclude
+  @Nullable
   private Location location;
 
   private boolean fitted;
@@ -89,5 +91,6 @@ public class Ship extends AbstractEntity<UUID> {
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id", nullable = true)
+  @Nullable
   private OrgUnit owningOrgUnit;
 }

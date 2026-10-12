@@ -17,13 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.hangar.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /** Data transfer record carrying Ship payload. */
 public record ShipDto(
@@ -31,8 +32,8 @@ public record ShipDto(
     String name,
     ShipTypeDto shipType,
     String insurance,
-    LocationDto location,
+    @Nullable LocationDto location,
     boolean fitted,
-    UserDto owner,
-    SquadronReferenceDto owningSquadron,
+    @Nullable UserDto owner,
+    @Nullable SquadronReferenceDto owningSquadron,
     Long version) {}

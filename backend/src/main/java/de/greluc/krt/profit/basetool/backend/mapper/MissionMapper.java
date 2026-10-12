@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.Mission;

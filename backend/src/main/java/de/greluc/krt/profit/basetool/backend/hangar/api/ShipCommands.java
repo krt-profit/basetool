@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.api;
 
-import de.greluc.krt.profit.basetool.backend.model.Ship;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 

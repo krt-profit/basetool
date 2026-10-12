@@ -2830,6 +2830,17 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
    `^(Inventory|StockViewerAccess)` assigns no class any more and left. The module baseline stays empty. `compileJava --rerun` shows 0 warnings.
 5. *Text scan*: no code, resource or doc named the old packages.
 
+**Umbrella step 11a — the hangar module's six types move into `hangar.api` — done 2026-10-12**
+1. *Probe*: the six types close no cycle at top level; hangar, mission and job order are independent of each other in the probe.
+2. *Move* (62 files; `ShipMapperTest` and `ShipRepositoryPersonalHangarTest` follow): `Ship`, `ShipDto`, `ShipRequestDto`, `ShipMapper`, `ShipRepository` and `ShipTypeMatcher` to `hangar.api`
+   (the mission module, the exchange and the job order use all of them). Entity and table names, bean names, paths and `openapi.json` are unchanged.
+3. *NullAway* (`hangar` is checked as a whole tree): `Ship.name`, `location` and `owningOrgUnit`, the optional `location`, `owner` and `owningSquadron` of `ShipDto` and the scope, search
+   and fitted parameters of `ShipRepository` carry `@Nullable`; no suppression.
+4. *Gates* from the failing assertions: service layer 484 -> **483**, join-column selection 160 -> **158**, read-only mutation rule 487 -> **486**; `ShipDto`, `ShipTypeDto`, `LocationDto` and
+   `ManufacturerDto` joined the leaf helpers (pure records the mission peer redaction builds); the domain-map name rule for the hangar classes assigns no class any more and left.
+   The module baseline stays empty. `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: source path in `hangar-notifications.md`. `MissionUnit.ship` is still an entity association (the eighth conversion of §5.6); it did not block the move, because `mission` ranks above `hangar`.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code

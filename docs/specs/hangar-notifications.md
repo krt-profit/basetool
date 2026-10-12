@@ -63,6 +63,6 @@ nothing.
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `mission/api/events/MissionNotices`,
 `admin/api/events/HangarNotices`, `mission/internal/MissionNotificationPublisher`,
 `mission/internal/MissionStructureService`, `mission/internal/MissionUnitShipRelease`, `service/HangarService`, `blueprint/internal/PersonalBlueprintService`,
-`repository/ShipRepository#countFittedByOwnerScoped`,
+`hangar/api/ShipRepository#countFittedByOwnerScoped`,
 `blueprint/api/PersonalBlueprintRepository#countRemovableByOwner`,
 `V280__seed_hangar_and_blueprint_notification_rules.sql` · **Issues:** #2414

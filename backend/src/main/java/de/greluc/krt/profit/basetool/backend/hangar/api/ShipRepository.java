@@ -17,17 +17,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.repository;
+package de.greluc.krt.profit.basetool.backend.hangar.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
-import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopeSpecifications;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -46,7 +46,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   String EXCHANGE_SHIPS =
       """
       SELECT new
-      de.greluc.krt.profit.basetool.backend.repository.ShipRepository$ExchangeShipRow(
+      de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository$ExchangeShipRow(
       s.id, s.version, s.name, t.id, t.name, s.insurance, l.name, c.idCity, st.idSpaceStation,
       s.fitted) FROM Ship s JOIN s.shipType t LEFT JOIN s.location l LEFT JOIN l.city c
       LEFT JOIN l.spaceStation st WHERE s.owner.id = :member
@@ -121,7 +121,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
   int resetAllFittedScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
@@ -139,7 +139,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           + " GROUP BY s.owner.id")
   List<OwnerShipCount> countFittedByOwnerScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /** Row of {@link #countFittedByOwnerScoped}: an owner and how many of their ships it counts. */
@@ -320,8 +320,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           """)
   Page<Ship> findByOwnerIdFiltered(
       @Param("ownerId") UUID ownerId,
-      @Param("search") String search,
-      @Param("fitted") Boolean fitted,
+      @Param("search") @Nullable String search,
+      @Param("fitted") @Nullable Boolean fitted,
       Pageable pageable);
 
   /**
@@ -354,7 +354,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   @Query("SELECT s FROM Ship s WHERE " + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
   Page<Ship> findAllScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
@@ -396,7 +396,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
               + " LIKE LOWER(CONCAT('%', cast(:query as string), '%')) ESCAPE '\\' )")
   Page<Object[]> countShipsByType(
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("query") String query,
       Pageable pageable);
@@ -420,7 +420,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   List<Ship> findByShipTypeInScoped(
       @Param("shipTypes") List<ShipType> shipTypes,
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**

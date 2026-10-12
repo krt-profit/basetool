@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest.SpecialCommandChange;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkOrgUnitChangeRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookRequest;
@@ -57,7 +58,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwnin
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionCreateRequest;
