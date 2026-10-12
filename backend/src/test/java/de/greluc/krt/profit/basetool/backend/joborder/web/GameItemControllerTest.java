@@ -27,12 +27,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.SecurityConfig;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.service.InventoryItemCatalogService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -70,7 +70,7 @@ class GameItemControllerTest {
   private static final ObjenesisStd OBJENESIS = new ObjenesisStd();
   private static final PreAuthorizeAuthorizationManager MANAGER = manager();
 
-  @Mock private InventoryItemCatalogService inventoryItemCatalogService;
+  @Mock private StockItemCatalogue stockItemCatalogue;
   @Mock private JobOrderItemService jobOrderItemService;
   @InjectMocks private GameItemController controller;
 
@@ -109,7 +109,7 @@ class GameItemControllerTest {
   void fullCatalogueReadsTheBookableQuery() {
     InventoryGameItemReferenceDto ref =
         new InventoryGameItemReferenceDto(UUID.randomUUID(), "Quantum Drive", "RSI", "GENERIC");
-    when(inventoryItemCatalogService.findBookableItems(eq("drive"), any(Pageable.class)))
+    when(stockItemCatalogue.findBookableItems(eq("drive"), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(ref), PageRequest.of(0, 20), 1));
 
     PageResponse<InventoryGameItemReferenceDto> result =
@@ -118,10 +118,10 @@ class GameItemControllerTest {
     assertThat(result.content()).containsExactly(ref);
     assertThat(result.totalElements()).isEqualTo(1L);
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-    verify(inventoryItemCatalogService).findBookableItems(eq("drive"), pageable.capture());
+    verify(stockItemCatalogue).findBookableItems(eq("drive"), pageable.capture());
     assertThat(pageable.getValue().getSort().getOrderFor("name")).isNotNull();
     assertThat(pageable.getValue().getSort().getOrderFor("id")).isNotNull();
-    verify(inventoryItemCatalogService, never()).findOrderableItems(any(), any());
+    verify(stockItemCatalogue, never()).findOrderableItems(any(), any());
   }
 
   @Test
@@ -129,14 +129,14 @@ class GameItemControllerTest {
   void orderableReadsTheOrderableQuery() {
     InventoryGameItemReferenceDto ref =
         new InventoryGameItemReferenceDto(UUID.randomUUID(), "Cirrus Scope", "Behring", "WEAPON");
-    when(inventoryItemCatalogService.findOrderableItems(eq("cirrus"), any(Pageable.class)))
+    when(stockItemCatalogue.findOrderableItems(eq("cirrus"), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(ref), PageRequest.of(0, 20), 1));
 
     PageResponse<InventoryGameItemReferenceDto> result =
         controller.getGameItems("cirrus", true, 0, 20, "name,asc");
 
     assertThat(result.content()).containsExactly(ref);
-    verify(inventoryItemCatalogService, never()).findBookableItems(any(), any());
+    verify(stockItemCatalogue, never()).findBookableItems(any(), any());
   }
 
   @Test

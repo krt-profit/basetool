@@ -27,9 +27,9 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeQuant
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockLotDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeTombstoneDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository.ExchangeStockLotRow;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;

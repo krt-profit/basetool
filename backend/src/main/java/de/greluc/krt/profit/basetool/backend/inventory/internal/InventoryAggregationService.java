@@ -21,23 +21,15 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
-import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
-import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -46,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -562,7 +555,7 @@ public class InventoryAggregationService {
         .values()
         .stream()
         .map(this::buildMaterialGroup)
-        .sorted(Comparator.comparing(g -> g.material().name()))
+        .sorted(Comparator.comparing(g -> Objects.requireNonNull(g.material()).name()))
         .toList();
   }
 
@@ -629,7 +622,7 @@ public class InventoryAggregationService {
         .values()
         .stream()
         .map(this::buildItemGroup)
-        .sorted(Comparator.comparing(g -> g.gameItem().name()))
+        .sorted(Comparator.comparing(g -> Objects.requireNonNull(g.gameItem()).name()))
         .toList();
   }
 

@@ -19,18 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.LinkedStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.service.OrderLinkedStockRows;
 import java.util.Collection;
 import java.util.List;
@@ -58,13 +57,13 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   private final InventoryItemMapper inventoryItemMapper;
 
   @Override
-  public @NotNull List<InventoryItemRepository.ExchangeStockLotRow> exchangeLots(
+  public @NotNull List<ExchangeStockLotRow> exchangeLots(
       @NotNull UUID member, @NotNull UUID after, int limit) {
     return inventoryRepository.findExchangeLots(member, after, limit);
   }
 
   @Override
-  public @NotNull List<InventoryItemRepository.ExchangeStockLotRow> exchangeLotsByKeys(
+  public @NotNull List<ExchangeStockLotRow> exchangeLotsByKeys(
       @NotNull UUID member, @NotNull Collection<String> keys) {
     return inventoryRepository.findExchangeLotsByKeys(member, keys);
   }

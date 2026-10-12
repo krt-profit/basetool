@@ -28,6 +28,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderGameItemNeedDto;
@@ -48,9 +50,7 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;

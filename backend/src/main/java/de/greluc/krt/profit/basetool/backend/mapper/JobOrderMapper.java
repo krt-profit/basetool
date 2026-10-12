@@ -39,7 +39,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 @Mapper(
     config = CentralMapperConfig.class,
     uses = {
-      InventoryItemMapper.class,
       UserMapper.class,
       MaterialMapper.class,
       JobOrderHandoverMapper.class,

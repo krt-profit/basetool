@@ -31,19 +31,13 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryEarmarkLookup;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
-import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
@@ -114,7 +108,7 @@ class InventoryCheckoutServiceAuditTest {
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
     when(inventoryItemMapper.toDto(item))
         .thenReturn(
-            new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
+            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto(
                 itemId,
                 null,
                 null,

@@ -69,17 +69,10 @@ class ScopeSpecifications scope compile-time JPQL scope fragments per aggregate 
 class AuthHelperService platform the single SecurityContextHolder reader (ArchUnit rule)
 class ActiveOrgUnitProvider platform SPI for the orgUnitId MDC field, implemented by scope (plan 5.3)
 class CustomJwtGrantedAuthoritiesConverter scope JWT -> authorities, incl. contextual org-unit authorities
-class MissionAllocationDto inventory mission slice of an inventory entry (REQ-INV-027), mapped by InventoryItemMapper
 class MaterialCollectionEntryDto inventory produced by InventoryAggregationService
-class UpdateDeliveredRequest inventory delivered toggle of an inventory entry's job-order slice (REQ-INV-027)
-class InventoryCatalog inventory inventory read-family discriminator
-class AllocationReductions inventory deduct-from plans for inventory writes (REQ-INV-027)
-class CheckoutType inventory book-out type
-class BulkRebookMode inventory bulk rebooking mode (REQ-INV-036)
-class JobOrderEarmark inventory what the Lager shows of an earmarked job order, in the layer for the Lager mapper's lookup seam
-class MissionEarmark inventory what the Lager shows of an earmarked mission, in the layer for the Lager mapper's lookup seam
-class JobOrderMaterialStockRow inventory earmarked material stock row the Lager repository projects
-class JobOrderGameItemStockRow inventory earmarked game-item stock row the Lager repository projects
+class JobOrderEarmark inventory what the Lager shows of an earmarked job order, in the layer because the job-order repository returns it
+class MissionEarmark inventory what the Lager shows of an earmarked mission, in the layer because the mission repository returns it
+class JobOrderMaterialStockRow inventory earmarked material stock row the Lager reads for the layer's stock projection
 class OrderLinkedStockRows inventory the Lager rows the job order's stock projection reads, a seam in the layer implemented by the Lager
 class QualityBucketAllocator joborder distributes order-linked stock across quality buckets (REQ-ORDERS-037)
 class LinkedStockAttributionDto joborder per-row quality-bucket attribution (REQ-ORDERS-037)
@@ -165,7 +158,6 @@ class BlueprintProductRow catalogue recipe repository projection
 class BlueprintReferenceDto catalogue recipe reference DTO
 class BlueprintIngredientKind catalogue recipe graph enum
 class UexCategory catalogue UEX category reference row
-class JobOrderAllocationDto inventory job-order slice of an inventory entry (REQ-INV-027), mapped by InventoryItemMapper
 class CraftabilityYieldSource blueprint pending-yield SPI of the craftability, implemented by the refinery (plan 5.3)
 class BlueprintEnvelopeReader blueprint upload-preview envelope SPI, implemented by the exchange (plan 5.3)
 class BlueprintAccessPolicy blueprint the blueprint module's access policy (plan 5.4)
@@ -202,7 +194,7 @@ package personalinventory personalinventory the personal-inventory module's pack
 
 name ^(MaterialClaim|ClaimBucket|ClaimDto|CreateClaim|MaterialDemand) joborder
 name ^(JobOrder|CreateJobOrder|UpdateJobOrder|HandoverReport) joborder
-name ^(Inventory|BulkCheckout|BulkRebook|BulkStolenMark|BulkOrgUnitChange|AggregatedInventory|GroupedInventory|AllocationReduction|StockViewerAccess|OwnedStockSlice) inventory
+name ^(Inventory|StockViewerAccess) inventory
 name ^(PersonalBlueprint|DefaultBlueprint|BlueprintImport|BlueprintExport|BlueprintCraftability|Craftability|BlueprintOverview|BlueprintProduct|BlueprintUploadPreview|BlueprintOwner|BlueprintModifierMath|BlueprintVariant|BlueprintSource|BlueprintExternalAlias) blueprint
 name ^(Blueprint) catalogue
 name ^(Mission|AddCrew|AddExternalParticipant|AddParticipantById|AddUnit|JoinMission|UpdateCrew|UpdateParticipant|UpdatePayoutPreference|UpdateUnit|AddCustomFrequency|AddFrequency|UpdateCustomFrequency|CreateMission|PatchMission|ReorderMission|SetPartyLead|ToggleMissionStep|UpdateMission|AddMission|ParticipantTargetResolver) mission

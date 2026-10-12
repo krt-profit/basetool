@@ -27,15 +27,13 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEarmarkTargets;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryEarmarkLookup;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeStockOfferLookup;
-import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
@@ -51,7 +49,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.*;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -1732,7 +1729,7 @@ class InventoryItemServiceTest {
             null,
             null,
             java.util.List.of(
-                new de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto(
+                new de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto(
                     missionId, 5.0)));
 
     Mission mission = new Mission();
@@ -1911,8 +1908,8 @@ class InventoryItemServiceTest {
     slice.setDelivered(false);
     item.getJobOrderAllocations().add(slice);
 
-    de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+    de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest request =
+        new de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest(
             true, orderId, 1L);
 
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
@@ -1928,17 +1925,17 @@ class InventoryItemServiceTest {
   }
 
   /**
-   * A minimal {@link de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto} for stubbing
-   * {@code inventoryItemMapper.toDto(...)} on the force-increment write paths (delivered toggle,
-   * allocation writes), which wrap the mapped DTO with the post-commit version via {@code
+   * A minimal {@link de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto} for
+   * stubbing {@code inventoryItemMapper.toDto(...)} on the force-increment write paths (delivered
+   * toggle, allocation writes), which wrap the mapped DTO with the post-commit version via {@code
    * withVersion}.
    *
    * @param id the entry id to carry.
    * @return a minimal DTO (version {@code 1L}).
    */
-  private static de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto
+  private static de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto
       minimalInventoryDto(UUID id) {
-    return new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
+    return new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto(
         id, null, null, null, null, null, null, null, false, List.of(), 0.0, List.of(), 0.0, null,
         null, 1L, null, null);
   }
@@ -1974,8 +1971,8 @@ class InventoryItemServiceTest {
     slice.setDelivered(false);
     item.getJobOrderAllocations().add(slice);
 
-    de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+    de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest request =
+        new de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest(
             true, orderId, 1L);
 
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
@@ -1983,7 +1980,7 @@ class InventoryItemServiceTest {
     when(inventoryItemMapper.toDto(any(InventoryItem.class)))
         .thenReturn(minimalInventoryDto(itemId));
 
-    de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto result =
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto result =
         inventoryItemService.updateDelivered(itemId, request, ownerId, false);
 
     verify(inventoryItemRepository).saveAndFlush(item);
@@ -2004,8 +2001,8 @@ class InventoryItemServiceTest {
     item.setVersion(2L);
     item.setUser(owner);
 
-    de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+    de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest request =
+        new de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest(
             true, UUID.randomUUID(), 1L);
 
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
@@ -2030,8 +2027,8 @@ class InventoryItemServiceTest {
     item.setVersion(1L);
     item.setUser(owner);
 
-    de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+    de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest request =
+        new de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest(
             true, UUID.randomUUID(), 1L);
 
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));

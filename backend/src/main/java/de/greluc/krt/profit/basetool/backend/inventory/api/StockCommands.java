@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

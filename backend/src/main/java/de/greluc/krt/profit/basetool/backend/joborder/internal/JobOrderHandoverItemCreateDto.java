@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;

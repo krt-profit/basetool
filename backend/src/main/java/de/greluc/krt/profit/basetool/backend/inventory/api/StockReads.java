@@ -20,9 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderGameItemStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -47,8 +44,7 @@ public interface StockReads {
    * @return the lots
    */
   @NotNull
-  List<InventoryItemRepository.ExchangeStockLotRow> exchangeLots(
-      @NotNull UUID member, @NotNull UUID after, int limit);
+  List<ExchangeStockLotRow> exchangeLots(@NotNull UUID member, @NotNull UUID after, int limit);
 
   /**
    * Returns the member's lots with the given keys, as they are now.
@@ -58,7 +54,7 @@ public interface StockReads {
    * @return the lots that still hold rows
    */
   @NotNull
-  List<InventoryItemRepository.ExchangeStockLotRow> exchangeLotsByKeys(
+  List<ExchangeStockLotRow> exchangeLotsByKeys(
       @NotNull UUID member, @NotNull Collection<String> keys);
 
   /**

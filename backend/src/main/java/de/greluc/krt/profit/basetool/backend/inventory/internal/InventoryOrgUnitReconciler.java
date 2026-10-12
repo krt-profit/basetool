@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.FirstMembershipObserver;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

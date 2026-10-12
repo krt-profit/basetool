@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationInput;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.validation.ValidQuantityAmountValidator;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorFactory;
