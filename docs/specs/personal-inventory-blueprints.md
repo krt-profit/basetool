@@ -152,13 +152,13 @@ hard account deletion ([REQ-DATA-008 in `data-persistence.md`](data-persistence.
 - [ ] Given an admin removes a product from the default set, then users keep the rows they already
   hold and those rows become removable.
 
-**Code links:** [`DefaultBlueprintProvisioningService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintProvisioningService.java),
+**Code links:** [`DefaultBlueprintProvisioningService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintProvisioningService.java),
 [`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
 [`UserReconciliationService#syncUser`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserReconciliationService.java),
-[`DefaultBlueprintKeyService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintKeyService.java)
+[`DefaultBlueprintKeyService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintKeyService.java)
 (cached default-key set behind the `removable` flag and the delete guard),
-[`DefaultBlueprintProvisioningTask`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/task/DefaultBlueprintProvisioningTask.java),
-[`PersonalBlueprintService#requireRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java).
+[`DefaultBlueprintProvisioningTask`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintProvisioningTask.java),
+[`PersonalBlueprintService#requireRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintService.java).
 
 ### REQ-INV-017 — Admin curation of the default-blueprint set
 
@@ -210,10 +210,10 @@ second admin sees another's change on the next refresh after their own write.
 `AdminDefaultBlueprintsPageControllerMvcTest` (the XHR twins, the `rows` fragment, the redirect
 fallback), `DefaultBlueprintsE2eTest` (in-place remove, no-reload marker).
 
-**Code links:** [`DefaultBlueprintService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintService.java),
-[`AdminDefaultBlueprintController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/AdminDefaultBlueprintController.java),
-[`DefaultBlueprintBootstrap`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintBootstrap.java),
-[`DefaultBlueprintCatalog`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintCatalog.java),
+**Code links:** [`DefaultBlueprintService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintService.java),
+[`AdminDefaultBlueprintController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/web/AdminDefaultBlueprintController.java),
+[`DefaultBlueprintBootstrap`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintBootstrap.java),
+[`DefaultBlueprintCatalog`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintCatalog.java),
 [`V157__create_default_blueprint.sql`](../../backend/src/main/resources/db/migration/V157__create_default_blueprint.sql),
 [`AdminDefaultBlueprintsPageController`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminDefaultBlueprintsPageController.java),
 [`blueprint/admin/default-blueprints.html`](../../frontend/src/main/resources/templates/blueprint/admin/default-blueprints.html),
@@ -272,7 +272,7 @@ and a global sharer is counted once.
 
 **Code links:** [`UserService#updateUserShareBlueprintsGlobally`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserService.java),
 [`UserController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/UserController.java) (`/me/blueprint-sharing`),
-[`PersonalBlueprintOverviewService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintOverviewService.java),
+[`PersonalBlueprintOverviewService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintOverviewService.java),
 [`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/joborder/internal/JobOrderItemBlueprintOwnersService.java),
 [`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql).
 
@@ -401,13 +401,13 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 - [ ] Everything is owner-scoped by JWT `sub`; no other user's blueprints, stock, or refinery
   orders are visible.
 
-**Code links:** [`BlueprintCraftabilityService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintCraftabilityService.java),
-[`BlueprintModifierMath`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintModifierMath.java),
-[`PersonalBlueprintController#craftability`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/PersonalBlueprintController.java),
+**Code links:** [`BlueprintCraftabilityService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/BlueprintCraftabilityService.java),
+[`BlueprintModifierMath`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/BlueprintModifierMath.java),
+[`PersonalBlueprintController#craftability`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/web/PersonalBlueprintController.java),
 [`InventoryCraftableStock#ownedStockSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/inventory/internal/InventoryCraftableStock.java)
 (the blueprint's `CraftableStockSource`),
 [`RefineryOrderService#pendingYieldSlices`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/refinery/internal/RefineryOrderService.java),
-[`BlueprintCraftabilityDto`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto/BlueprintCraftabilityDto.java),
+[`BlueprintCraftabilityDto`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/BlueprintCraftabilityDto.java),
 [`PersonalInventoryBlueprintsPageController#craftability`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints-recipe.js`](../../frontend/src/main/resources/static/js/personalinventory/personal-inventory-blueprints-recipe.js).
 
@@ -457,7 +457,7 @@ eslint/prettier and the server-side apply contract — blank/unresolvable picks 
 `BlueprintImportServiceTest`) · **Code:**
 [`personal-inventory-blueprints-import.js`](../../frontend/src/main/resources/static/js/personalinventory/personal-inventory-blueprints-import.js)
 (`renderRow`, `apply`),
-[`BlueprintImportService#applyImport`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/BlueprintImportService.java)
+[`BlueprintImportService#applyImport`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/BlueprintImportService.java)
 · **Issues:** [#824](https://github.com/krt-profit/basetool/issues/824)
 
 ### REQ-INV-022 — Admin twin shares the member page's design-system surface
@@ -545,8 +545,8 @@ caller's **entire removable owned-blueprint set** in one action, so a user who w
 - [ ] On success the list re-renders in place (no full-page reload); the no-JS path redirects with a
   success toast.
 
-**Code links:** [`PersonalBlueprintController#deleteAll`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/PersonalBlueprintController.java),
-[`PersonalBlueprintService#deleteAllOwn`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java),
+**Code links:** [`PersonalBlueprintController#deleteAll`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/web/PersonalBlueprintController.java),
+[`PersonalBlueprintService#deleteAllOwn`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintService.java),
 [`PersonalBlueprintRepository#deleteRemovableByOwnerUserId`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
 [`PersonalInventoryBlueprintsPageController#deleteAll`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personalinventory/personal-inventory-blueprints.js)
@@ -584,8 +584,8 @@ removable owned blueprints of **every** user at once — a maintenance/reset too
 - [ ] After the purge, a member's owned-list fragment re-renders in place (no full-page reload); the
   no-JS path redirects with a success toast.
 
-**Code links:** [`AdminPersonalBlueprintController#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/AdminPersonalBlueprintController.java),
-[`PersonalBlueprintService#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java),
+**Code links:** [`AdminPersonalBlueprintController#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/web/AdminPersonalBlueprintController.java),
+[`PersonalBlueprintService#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintService.java),
 [`PersonalBlueprintRepository#deleteAllRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
 [`AdminPersonalBlueprintsPageController#deleteAllUsers`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminPersonalBlueprintsPageController.java),
 [`admin-personal-blueprints-purge.js`](../../frontend/src/main/resources/static/js/personalinventory/admin-personal-blueprints-purge.js).

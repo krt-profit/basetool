@@ -1,0 +1,108 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.blueprint.internal;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * Integration tests for the default-blueprint grant queries against the Postgres test container
+ * (REQ-INV-016): the schema validates against {@link DefaultBlueprint}, and the native bulk grants
+ * create one row per (user, default), are idempotent and skip soft-deleted users.
+ */
+@SpringBootTest
+class DefaultBlueprintProvisioningIntegrationTest {
+
+  @Autowired private UserRepository userRepository;
+  @Autowired private DefaultBlueprintRepository defaultBlueprintRepository;
+  @Autowired private PersonalBlueprintRepository personalBlueprintRepository;
+  @Autowired private DefaultBlueprintProvisioningService provisioningService;
+  @Autowired private TransactionTemplate transactionTemplate;
+
+  private UUID createUser(boolean inKeycloak) {
+    UUID id = UUID.randomUUID();
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          User u = new User();
+          u.setId(id);
+          u.setUsername("user-" + id);
+          u.setInKeycloak(inKeycloak);
+          userRepository.save(u);
+        });
+    return id;
+  }
+
+  private String createDefault() {
+    String key = "test-default-" + UUID.randomUUID();
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          DefaultBlueprint d = new DefaultBlueprint();
+          d.setProductKey(key);
+          d.setProductName("Test Default " + key);
+          d.setCreatedBy("system");
+          defaultBlueprintRepository.save(d);
+        });
+    return key;
+  }
+
+  @Test
+  void grantDefaultsToUser_materialisesEveryDefault_andIsIdempotent() {
+    UUID user = createUser(true);
+    String keyA = createDefault();
+    String keyB = createDefault();
+
+    int firstRun = provisioningService.grantDefaultsToUser(user);
+    assertThat(firstRun).isGreaterThanOrEqualTo(2);
+    assertThat(personalBlueprintRepository.existsByOwnerUserIdAndProductKey(user, keyA)).isTrue();
+    assertThat(personalBlueprintRepository.existsByOwnerUserIdAndProductKey(user, keyB)).isTrue();
+
+    int beforeKeys =
+        personalBlueprintRepository
+            .findAllByOwnerUserIdAndProductKeyIn(user, java.util.List.of(keyA, keyB))
+            .size();
+    provisioningService.grantDefaultsToUser(user);
+    int afterKeys =
+        personalBlueprintRepository
+            .findAllByOwnerUserIdAndProductKeyIn(user, java.util.List.of(keyA, keyB))
+            .size();
+    assertThat(afterKeys).isEqualTo(beforeKeys).isEqualTo(2);
+  }
+
+  @Test
+  void grantDefaultsToAllUsers_grantsToActiveUsersAndSkipsSoftDeletedOnes() {
+    UUID active = createUser(true);
+    UUID inactive = createUser(false);
+    String key = createDefault();
+
+    provisioningService.grantDefaultsToAllUsers();
+
+    assertThat(personalBlueprintRepository.existsByOwnerUserIdAndProductKey(active, key)).isTrue();
+    assertThat(personalBlueprintRepository.existsByOwnerUserIdAndProductKey(inactive, key))
+        .isFalse();
+  }
+}

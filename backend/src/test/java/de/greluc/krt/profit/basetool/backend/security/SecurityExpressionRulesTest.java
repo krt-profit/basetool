@@ -25,6 +25,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankSecurityService;
+import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
@@ -38,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionAnalyzer.BeanCall;
 import de.greluc.krt.profit.basetool.backend.security.SecurityExpressionSources.Declared;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService;
