@@ -223,6 +223,17 @@ does: `mapper.StockViewerAccess` (the caller's `canEdit`, read by `JobOrderMappe
 records the job-order and mission repositories return, `model.projection.JobOrderEarmark` and
 `MissionEarmark`, so the layer packages and the module stay acyclic.
 
+The blueprint moved in part since P4-2: the five controllers sit in `blueprint.web`, and
+`blueprint.internal` holds the personal and default blueprint services, the command service behind
+`PersonalBlueprintCommands`, the import, the craftability, the product resolution and the variant
+families, `BlueprintAccessPolicy`, the default-blueprint grant observer and provisioning task, the two
+mappers, the default-blueprint and alias entities and repositories, the DTOs only the blueprint
+controllers use, and its four GDPR participants. No layer class names any of them, so the move closed
+no package cycle. `PersonalBlueprint`, `PersonalBlueprintRepository`, `BlueprintSource`, the import
+preview, suggestion and status DTOs, the create request and response and `BlueprintOwnerProduct` stay in
+the layer packages, because the exchange (feed, write, undo and demand services, the draft and resolve
+services) and the job order's blueprint-owner service read them directly (plan §7.6, P4-2).
+
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
 
@@ -328,6 +339,12 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
   `IngestEndpointSurfaceTest`, which pins the gateway's routed surface to the exchange route table
   and fails on any mapping under `/v1`; and `ContextShape`, the bean count each application's
   `ContextShapeTest` ratchets (REQ-OPS-038).
+- **`build-logic`** — an included build, not a module of the product and never shipped: the
+  `basetool.*` precompiled convention plugins (toolchain, annotation wiring, test and compile
+  conventions, Checkstyle, Spotless, JaCoCo, PIT, SpotBugs, CycloneDX, Licensee, Spring Boot and
+  dependency management, Error Prone) that every module applies by id, the typed `basetool { }`
+  extension and the reader of each module's `build-settings.properties` (REQ-OPS-046, ADR-0248). It is
+  the place a Gradle module extracted later (plan §5.8) gets its conventions from.
 
 ### Inside `ingest`
 

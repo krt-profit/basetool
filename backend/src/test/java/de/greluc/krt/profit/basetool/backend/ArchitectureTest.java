@@ -68,6 +68,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibi
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankViewUserDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibilityService;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
+import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
@@ -168,14 +169,15 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintOverviewService;
 import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Constraint;
@@ -801,6 +803,27 @@ class ArchitectureTest {
         .because(
             "to-one associations are LAZY by project rule (BE-PERF-11); fetch what a read needs"
                 + " with an @EntityGraph or JOIN FETCH instead of making every load eager");
+  }
+
+  @Test
+  void toManyAssociationsAreNeverFetchedEagerly() {
+    assertFieldFloor("toManyAssociationsAreNeverFetchedEagerly", TO_MANY_ASSOCIATIONS, 34);
+    toManyAssociationsAreNeverFetchedEagerlyRule().check(CLASSES);
+  }
+
+  /** Fields mapping a {@code @OneToMany} or {@code @ManyToMany} association. */
+  static final DescribedPredicate<JavaField> TO_MANY_ASSOCIATIONS =
+      DescribedPredicate.describe(
+          "are @OneToMany or @ManyToMany associations",
+          f -> f.isAnnotatedWith(OneToMany.class) || f.isAnnotatedWith(ManyToMany.class));
+
+  static ArchRule toManyAssociationsAreNeverFetchedEagerlyRule() {
+    return fields()
+        .that(TO_MANY_ASSOCIATIONS)
+        .should(notBeFetchedEagerly())
+        .because(
+            "collections are LAZY by project rule (D-20); fetch what a read needs with an"
+                + " @EntityGraph or JOIN FETCH instead of loading every owner's collection");
   }
 
   @Test
@@ -1640,7 +1663,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 312);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 293);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 
@@ -2337,6 +2360,28 @@ class ArchitectureTest {
           events.add(
               SimpleConditionEvent.violated(
                   field, field.getFullName() + " is fetched " + fetch + ", not LAZY"));
+        }
+      }
+    };
+  }
+
+  /**
+   * The condition behind {@link #toManyAssociationsAreNeverFetchedEagerly()}: the field's {@code
+   * OneToMany} or {@code ManyToMany} annotation does not state {@code fetch = FetchType.EAGER}.
+   *
+   * @return the condition
+   */
+  static ArchCondition<JavaField> notBeFetchedEagerly() {
+    return new ArchCondition<>("not declare fetch = FetchType.EAGER") {
+      @Override
+      public void check(JavaField field, ConditionEvents events) {
+        FetchType fetch =
+            field.isAnnotatedWith(OneToMany.class)
+                ? field.getAnnotationOfType(OneToMany.class).fetch()
+                : field.getAnnotationOfType(ManyToMany.class).fetch();
+        if (fetch == FetchType.EAGER) {
+          events.add(
+              SimpleConditionEvent.violated(field, field.getFullName() + " is fetched EAGER"));
         }
       }
     };

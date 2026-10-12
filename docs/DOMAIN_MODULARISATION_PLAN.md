@@ -72,7 +72,7 @@ refuses code that reaches past that API. It is the report of a whole-repository 
 | D-17 | **Member settings move with their owner** (was O-08, decided 2026-10-01) | The payout-preference and blueprint-sharing columns move from the user table into tables of the owning modules, each with its own version, by a Flyway migration with data transfer in that domain's wave. |
 | D-18 | **Every API family classified; a kernel page policy** (was O-09, decided 2026-10-01) | Every family is classified explicitly as `no-store` or revalidatable, with a test that catches an unclassified one (REQ-SEC-031); a kernel page policy replaces the 100,000 ceiling with a lower default, set by measurement, and explicit, tested opt-outs. |
 | D-19 | **SpEL evaluation failures stay a fail-closed 400, counted and alerted** (was O-10, decided 2026-10-01) | A metric counts them and a Prometheus rule alerts on them; the problem-code contract is unchanged. |
-| D-20 | **`MissionParticipant.orgUnits` becomes lazy** (was O-11, decided 2026-10-01) | Loaded through an entity graph where it is needed, the load paths pinned by N+1 tests. |
+| D-20 | **`MissionParticipant.orgUnits` becomes lazy** (was O-11, decided 2026-10-01) | Loaded through an entity graph where it is needed, the load paths pinned by N+1 tests. **Done 2026-10-11 (§7.6).** |
 | D-21 | **CI reuses the configuration cache** (was O-12, decided 2026-10-01) | The owner adds the encryption key as a repository secret; pull requests read the cache, `main` writes it; the workflow change follows the secret. |
 | D-22 | **The raw evidence is kept** (was O-13, decided 2026-10-01) | Reports, finding data and scripts, sanitised, in [`docs/archive/domain-modularisation-audit-2026-09/`](archive/domain-modularisation-audit-2026-09/README.md). |
 | D-23 | **No soak before Phase 5** (decided 2026-10-04) | `exchange` and `bank` become Gradle modules right after Phases 2–4, without waiting for their package boundary to stay green for some releases; the Phase 0 guards and the frozen module baseline hold the boundary meanwhile (§7.7). |
@@ -425,7 +425,8 @@ After Phase 4, and only once the package boundary of each has been green for som
 
 Prerequisites: an included `build-logic` build with convention plugins (the root `subprojects {}`
 block and 22 cross-project `rootProject` accesses block Gradle's isolated projects and would silently
-give a new module default coverage floors), typed per-module build settings, prefix rules in the
+give a new module default coverage floors; the block is gone since 2026-10-11, §7.7 P5-a), typed
+per-module build settings (done, REQ-OPS-037), prefix rules in the
 image-reuse and SBOM scripts, JaCoCo aggregation, and a context-shape test (scheduled tasks, event
 listeners, controllers) so a module outside the scan root cannot lose beans silently. One image per
 application stays; Flyway stays in `backend`.
@@ -1364,7 +1365,9 @@ as each pair is decoupled.
     package `service` (`InventoryCraftableStock`), because the inventory has not moved. So `service`
     depends on `blueprint.api`. Any blueprint implementation class in `blueprint.internal` needs
     `service` (the scope hub, the audit recorder), which closes a `service <-> blueprint` package
-    cycle, as it did for the inventory. **Tracked as P4-2 (§7.6).**
+    cycle, as it did for the inventory. **Tracked as P4-2 (§7.6).** *Update 2026-10-12:* part 1 of
+    P4-2 moved 55 types (§7.6); with `InventoryCraftableStock` in `inventory.internal` the move closes
+    no cycle.
 
 - `operation` ⇄ `mission` — **P3-8a done 2026-10-11.** `Mission.operation` becomes `Mission.operationId`
   (the same `operation_id` column and foreign key, still outside the row version and every section
@@ -1582,7 +1585,7 @@ module now publishes nothing, as `promotion` does, and nine package declarations
 `personalinventory::api`. (6) The inventory, blueprint and notification participants sit in
 `service` for now, assigned by their names: the Lager and the blueprint moves wait for P4-1 and
 P4-2 (§7.5), and the notification services still live in the layer packages; each participant
-moves with its module. (7) The plan's remark that the inventory
+moves with its module (the inventory's with P4-1, the blueprint's with P4-2). (7) The plan's remark that the inventory
 observer's `beforeUserPurge` waits for §7.6 is settled here: it left `StockChangeObserver`, which keeps
 `lower`, `beforeDelete` and `beforeWipe`.
 **P4 slice b — done 2026-10-11 (the handle-anonymisation participants).** `HandleAnonymisationService`
@@ -1647,8 +1650,9 @@ central list: it runs the sections the modules declare, and `DataExportSections`
    implementations, one per owning module: identity (5 sections), orgunit (2), orgchart (1),
    promotion (1), inventory (1), hangar (1), exchange (6), personalinventory (1), blueprint (1),
    notification (3), mission (5), refinery (1), joborder (2), materialexchange (4), bank (9: seven
-   bank sections and the two bank audit trails), audit (2). The inventory's and the blueprint's sit
-   in `service`, assigned by their names, until their modules move (P4-1, P4-2).
+   bank sections and the two bank audit trails), audit (2). The inventory's and the blueprint's sat
+   in `service`, assigned by their names, until their modules moved (P4-1, P4-2; both now in
+   `<module>.internal`).
 3. *Registry*: `privacy.internal.PersonalDataExportRegistry` collects the beans, orders them by
    position and refuses a duplicate key or position at startup. The two maps of the old class,
    `FREE_TEXT_COLUMNS` and `UNSCRUBBED_PERSON_COLUMNS`, became declarations on the section that
@@ -1757,8 +1761,8 @@ audit row's key order is part of the observable result, so the three are separat
 70 and 80. (3) Three modules, `audit`, `operation` and `identity`, own staying columns only; they
 need a participant for the coverage test to find their columns. (4) The participants are declarative
 and share one engine instead of each running SQL; a module that later needs its own reassignment
-overrides `reassign`. (5) The inventory and blueprint participants sit in `service`, assigned by their
-names, until their modules move (P4-1, P4-2); the others sit in `<module>.internal`, since they use no
+overrides `reassign`. (5) The inventory and blueprint participants sat in `service`, assigned by their
+names, until their modules moved (P4-1, P4-2); the others sit in `<module>.internal`, since they use no
 layer repository and close no package cycle. (6) The ledger check reads `BankHolderRepository`
 (`existsByUserId` on both accounts) instead of counting rows with a native query; the message and the
 409 are unchanged. (7) The two coverage tests that read the old static lists now run in a transaction,
@@ -1937,10 +1941,73 @@ interim, and goes with the projection service when the job order's services move
 baseline as 36 → 35 in 7 pairs; the file held 32 in 6 (the P4-2 entry says so too) and still does.
 (5) `JobOrderMapper` listed `InventoryItemMapper` in `uses` without needing it. (6) `ExchangeStockLotRow`
 had to leave the repository with the move: a published type must not be nested in an internal repository.
-**P4-2 — move the blueprint into `blueprint.web` / `blueprint.internal`** (carried from
-P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
-The five published interfaces already cover every foreign caller, so the move touches no
-other module; the §8.1 idioms go with it.
+**P4-2 — move the blueprint into `blueprint.web` / `blueprint.internal` — part 1 done 2026-10-12**
+(carried from P3-7b, §7.5). 55 of the 65 types the domain map assigns to `blueprint` move; the ten that
+other modules read directly stay in the layer packages (**part 2**, below).
+1. *Probe* (not a guess): a class-dependency graph over the compiled `main` classes (`jdeps
+   -verbose:class`, nested and generated classes folded onto their source type, one node per first
+   package segment), the 65 blueprint types reassigned to `blueprint`. The strongly connected set was
+   **empty** with all 65 moved, and is empty on the compiled result of the 55. `InventoryCraftableStock`
+   in `inventory.internal` was the only edge P3-7b feared, and no layer class names a blueprint
+   implementation: the exchange, the job order and the Materialbörse reach the blueprint through the
+   five published interfaces, the participants are found by their SPIs, and the two query-side users
+   below read data types. So no SPI was needed and none was added; the work is the move itself.
+2. *Move*: the five controllers (`AdminDefaultBlueprintController`, `AdminPersonalBlueprintController`,
+   `BlueprintProductController`, `PersonalBlueprintController`, `PersonalBlueprintOverviewController`)
+   into `blueprint.web`; into `blueprint.internal`: the services (`PersonalBlueprintService`,
+   `PersonalBlueprintCommandService`, `PersonalBlueprintOverviewService`, `DefaultBlueprintService`,
+   `DefaultBlueprintKeyService`, `DefaultBlueprintBootstrap`, `DefaultBlueprintCatalog`,
+   `DefaultBlueprintProvisioningService`, `BlueprintImportService`, `BlueprintExportParser`,
+   `BlueprintUploadPreviewService`, `BlueprintProductService`, `BlueprintCraftabilityService`,
+   `BlueprintModifierMath`, `BlueprintPackTags`, the three variant-family classes),
+   `BlueprintAccessPolicy`, `DefaultBlueprintGrantOnCreation`, `DefaultBlueprintProvisioningTask`, the
+   four GDPR participants (`PersonalBlueprintUserErasure`, `PersonalBlueprintUserReassignment`,
+   `PersonalBlueprintExportSections`, `PersonalBlueprintMentionSource`), `PersonalBlueprintMapper`,
+   `DefaultBlueprintMapper`, the entities `DefaultBlueprint` and `BlueprintExternalAlias` with
+   `BlueprintExternalAliasSource`, their two repositories, and the 18 DTOs only the blueprint
+   controllers and services use. 26 tests moved with their classes (package-private access follows
+   the class). The name rule for the two admin controllers left the domain map (it assigns no class
+   now, the package rule takes them); nothing else in it changed.
+3. *Stays, and the import that blocks it* (ten types; moving any of them gives the exchange or the job
+   order a reference into `blueprint.internal`, which `ModularityTest` forbids):
+   - `PersonalBlueprintRepository`: seven finders (`findAllByOwnerUserIdOrderByIdAsc`,
+     `…AndIdGreaterThan…`, `findAllByOwnerUserIdAndProductKeyIn`, `countByOwnerUserId`,
+     `existsByOwnerUserIdAndProductKey`, `findByOwnerUserIdAndProductKey`,
+     `findOwnerProductByOwnerUserIdIn`) are called by
+     `ExchangeBlueprintFeedService`, `ExchangeBlueprintWriteService`, `ExchangeUndoService`,
+     `ExchangeDemandService` and the job order's `JobOrderItemBlueprintOwnersService`.
+   - The entity `PersonalBlueprint` and `BlueprintSource`: the exchange's feed, write and undo
+     services hold and build them.
+   - `BlueprintOwnerProduct` (the finder's projection, read by `ExchangeDemandService` and
+     `JobOrderItemBlueprintOwnersService`).
+   - `PersonalBlueprintCreateRequest` and `PersonalBlueprintResponse` (the argument and the result of
+     `PersonalBlueprintCommands`), `BlueprintImportPreviewDto` with `BlueprintImportEntryDto`,
+     `BlueprintImportSuggestionDto` and `BlueprintImportStatus` (the exchange's draft and resolve
+     services and its envelope reader).
+   **Part 2** publishes a read API for the seven finders (`blueprint.api`, records instead of the
+   entity) and moves the data types above that the exchange needs by name into `blueprint.api`, then moves the rest.
+4. *NullAway*: the whole `blueprint` tree was already checked; the moved types produced 18 findings,
+   all optional values: the craftability DTOs' limiting-material names and effective qualities, the
+   product DTO's manufacturer and example key and the three nullable columns of `DefaultBlueprint`
+   carry `@Nullable`, as do the optional parameters of `PersonalBlueprintService#newOwned` and
+   `PersonalBlueprintMapper#toResponse`; two map lookups that cannot miss are wrapped in
+   `Objects.requireNonNull`. The §8.1 idioms have no site (no two-bound clamp, no concatenated
+   `@Query`, no `isPresent()`/`get()` pair that `Optional.filter` fits).
+5. *Gates*: baseline **32 → 32** (the file holds 32 lines in 6 module pairs; no blueprint edge was in
+   it and none was added). `ModularityTest` stays green, so no foreign module reaches a
+   `blueprint.internal` type. The model layer's join-column selection floor drops 340 → 325 (the entity,
+   the DTOs and the repositories left the layer packages). `ArchitectureTest`, the tenancy guard and
+   the stock-write test needed no other change. 576 tests of the touched areas ran green (the moved
+   tests, the module and architecture gates, the GDPR coverage and order tests, `OpenApiGeneratorTest`
+   with the frozen contract, the exchange tests that name blueprint types).
+**Corrections:** (1) The plan expected the five published interfaces to cover every foreign caller;
+the exchange and the job order also read `PersonalBlueprintRepository`, the entity and eight data
+types directly, so ten types stay until a read API replaces those reads (part 2). (2) P3-7b predicted
+that a blueprint class in `blueprint.internal` would close `service ⇄ blueprint`; with
+`InventoryCraftableStock` in `inventory.internal` (P4-1) it does not. (3) The GDPR slices a, c, d and e
+recorded "the blueprint participants sit in `service` until P4-2": since this step they sit in
+`blueprint.internal`; only the notification's still sit in `service`. (4) The earlier slices quote the
+baseline as 35 lines; the file holds 32 (6 pairs), as `module-boundaries.md` says.
 **P4-3 — the refinery's entities move into `refinery.internal` / `refinery.api` — done
 2026-10-11** (carried from P3-8b, §7.5).
 1. *Characterise*: `LocationDeleteInUseIntegrationTest` (real Postgres) pins the in-use check of a
@@ -2069,12 +2136,111 @@ stayed behind: the seven types and the scope fragment all moved. (6) `main` carr
 the asset move F5 (2 of 5): its path rewrite turned `hangar::api` into `hangar/hangar::api` in the
 `allowedDependencies` of nine backend modules, so `ModularityTest` failed with "no module found";
 the nine declarations read `hangar::api` again, in a commit of their own.
+**D-20 — `MissionParticipant.orgUnits` becomes lazy — done 2026-10-11** (O-11, §13).
+1. *Characterise*: `MissionParticipantOrgUnitsReadNoNPlusOneTest` drives the `MissionController`
+   bean with no test transaction, as in production with `open-in-view` off, on a mission of 3 and of
+   25 guest participants that carry one or two org units each. It pins the mission detail, the
+   unassigned roster, the peer-redacted detail, a participant update and the single-participant
+   payout endpoint: the same statement count for both sizes, and every participant DTO listing exactly
+   its stamped org units, Staffel first. Green on `53179e6e5` with the collection still `EAGER`:
+   **9, 4, 8, 10 and 7 statements**, flat in size.
+2. *Readers*: one. `MissionMapper.toDto(MissionParticipant)` is the only dereference of `getOrgUnits()`
+   in the code (`existsByOrgUnitId` is a JPQL join and needs no loaded collection); the GDPR export
+   sections, the viewer-access and policy classes and `MissionPeerRedactor` (which copies the DTO list)
+   never touch it. Every caller of the mapper is `MissionController`, which is `@Transactional` for
+   the class, so no read path maps outside a transaction.
+3. *Change*: the association is `fetch = LAZY`, still with `@BatchSize(50)`, and `@ToString.Exclude`
+   (the generated `toString` would otherwise initialise it). `MissionRepository.findById` adds
+   `participants.orgUnits` to its entity graph, so the collection arrives with the participants in
+   the one statement, and `MissionParticipantRepository.findById` graphs it for the check-in,
+   check-out and payout endpoints that load one participant. After: **8, 3, 7, 9 and 7 statements**,
+   still flat in size, and the DTOs are unchanged. No migration; `openapi.json`, audit rows and the
+   403/404 results are untouched.
+4. *Gate*: `ArchitectureTest.toManyAssociationsAreNeverFetchedEagerly` (floor 34) fails on any
+   `@OneToMany` / `@ManyToMany` declared `EAGER`, with a planted violation in
+   `ArchitectureRuleFailureTest`. `toOneAssociationsAreDeclaredLazy` and its floor of 146 are
+   unchanged. REQ-DATA-003 records the rule.
+**Corrections:** (1) The decision speaks of a collection that is "cross-domain"; it is an `OrgUnit`
+collection of a mission row, read by the mission module only, so the change needed no SPI. (2) The
+single-participant endpoints (`check-in`, `check-out`, `payout-preference`) do not load the mission
+through `MissionRepository.findById`: they find the participant by id and reach the roster through the
+lazy `Mission.participants`. The participant's own `findById` carries the graph so its org units
+stay part of that one join, as the eager mapping made them. (3) The mission-level graph made four paths one
+statement cheaper than the eager mapping had been, because the batch select that followed the
+participants' join is part of the join now.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
 Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-logic` convention
 plugins, typed per-module settings, then `backend-exchange` and `backend-bank` (§5.8). Every other
 domain stays a package.
+
+| Step | Content |
+| --- | --- |
+| P5-a — **done 2026-10-11** | `build-logic` as an included build of precompiled convention plugins, the typed `basetool { }` settings, and the verification metadata for it; no module is extracted yet |
+| P5-b | The remaining prerequisites of §5.8: the 32 `rootProject` references of the module scripts, prefix rules in the image-reuse and SBOM scripts, JaCoCo aggregation, the context-shape test |
+| P5-c, P5-d | `backend-exchange`, then `backend-bank` |
+
+*P5-a as built (2026-10-11).* The included build `build-logic/` (`pluginManagement {
+includeBuild("build-logic") }`; ADR-0248, REQ-OPS-046) carries everything the root
+`subprojects { plugins.withId(…) }` blocks and the repeated per-module blocks carried, as sixteen
+precompiled script plugins, one per concern, applied by id from the module scripts:
+`basetool.java-conventions` (toolchain 25, Lombok and JetBrains annotations, the Mockito agent, the
+SEC-17 jar guard, `Test` and `JavaCompile` conventions, the `basetool { }` extension),
+`checkstyle-`, `spotless-`, `coverage-` (JaCoCo) and `spotbugs-conventions` with their aggregate
+`quality-conventions`, `mutation-` (PIT), `sbom-` and `licensee-conventions` with the aggregate
+`supply-chain-conventions`, `dependency-management-`, `spring-library-` and `spring-app-conventions`,
+`errorprone-` (Error Prone with NullAway), `javadoc-` and, for the root project only,
+`repository-format-conventions` (the Spotless formats of the non-Java files). A module script now
+lists its plugins and its dependencies and keeps only its own tasks; the root script falls from 620
+to 72 lines (group and version, the terms-version task, OWASP). The licence tables became the class
+`OssLicensePolicy`, which the frontend's `generateOssLicenses` reads in place of
+`rootProject.extra`. The catalog is imported by `build-logic/settings.gradle.kts`; plugin versions
+stay the catalog's `[plugins]` entries, put on the included build's classpath through their markers,
+and the security floors for their transitive jars moved from four `buildscript` blocks into
+`build-logic/build.gradle.kts`.
+1. *Proof of no behaviour change.* An init script (not committed) dumped, for each of the seven
+   projects, every task (type, enabled, group, description, dependencies, finalizers, ordering,
+   input property names, outputs), every configuration (flags, extends, declared dependencies,
+   attributes, constraints), the resolved `compileClasspath`, `runtimeClasspath`, annotation
+   processor, test, Error Prone, SpotBugs and Mockito-agent classpaths, the `JavaCompile` options
+   including Error Prone's and NullAway's package list, the `Test` JVM arguments and system
+   properties, and the Checkstyle, SpotBugs, JaCoCo, PIT and Spring Boot settings, once on the
+   parent commit and once on the branch. The two dumps differ in the `basetool` extension of each
+   module and in the two `ossLicense*` extras the root no longer carries. `build -m` (175 tasks),
+   `tasks --all` and `:backend:compileJava --dry-run` are identical; `help` and `build -m` run with the
+   configuration cache reuse their entry on the second run; the regenerated CycloneDX BOMs list the
+   components of the committed ones.
+2. *Verification.* The one `gradle/verification-metadata.xml` covers the included build (Gradle ignores
+   the metadata of an included build): 423 lines were added, all for the Kotlin DSL plugin, the Kotlin
+   compiler and their own transitive jars and parent POMs; nothing was removed. A cold Gradle user home
+   resolved `help`, `spotlessCheck`, every `compileJava` and `compileTestJava`, `compileE2eJava`,
+   `:backend:checkstyleMain`, `:backend:spotbugsMain`, `licensee` and a test under the strict file.
+3. *Around the build.* `check_sbom_coverage.py` reads the SBOM convention and each module's
+   application of it instead of the root block; both image Dockerfiles copy `build-logic/`, which the
+   image-reuse plan derives as a shared input (its self-test now names it); `build-logic/**` is a path
+   filter of the dependency-check and sandbox-image workflows; `CODEOWNERS` lists it.
+**Corrections:** (1) §5.8 and §8.4 spoke of typed per-module settings as a step still to take;
+they already existed (`build-settings.properties`, REQ-OPS-037), so this step moved their reader into
+the included build and added the `basetool { }` extension for the two values still passed inline
+(`javaRelease` of `keycloak-spi`, the NullAway packages of the backend). (2) Precompiled scripts
+cannot use the type-safe `libs.…` accessors; they read the catalog by alias (`Catalog.kt`). (3) A
+precompiled script's top-level `val` belongs to the script object, so a task action or provider
+lambda that captured one (the Licensee export's `rename`, the SBOM check) failed the configuration
+cache where the former closure's locals had not; seven sites copy the value into a local. (4) The
+root no longer declares Spotless, pitest, Licensee, SpotBugs or CycloneDX with `apply false`: a second
+copy on the root classpath would load every plugin twice, so the third-party plugins are applied only by
+their convention and the root applies Spotless through `repository-format-conventions`. (5) A few
+transitive jars of the plugins resolve to other versions now, because the plugins no longer share one
+classpath per module (`slf4j-api` is 2.0.18 in the included build where the backend and ingest had
+1.7.36; `httpclient5` is 5.6.4 on the root, `commons-codec` 1.11 on the frontend); all of it is
+build-time only, and the four security floors hold in the included build. (6) The plan
+counted 22 cross-project `rootProject` accesses; there are 32 in three module scripts, and they are
+P5-b. (7) A `.kt` file of `build-logic` is formatted by the same Spotless format as the `*.gradle.kts`
+files (ktfmt, Google style), so no new Spotless task appeared. (8) The helper package is
+`…basetool.conventions`, not `…basetool.build`: a directory named `build` is excluded by
+`.dockerignore` (`**/build`), which failed the first image builds with unresolved references, and by
+Spotless's vendored globs (`**/build/**`), which had left those files unformatted.
 
 ### 7.8 Frontend track
 
@@ -2368,8 +2534,9 @@ JSpecify stays out for now (ADR-0192).
 
 ### 8.4 Gradle and CI
 
-Typed per-module build settings now; an included `build-logic` with convention plugins before the
-first Gradle extraction (it also prepares Gradle's isolated projects); `java-test-fixtures` for
+Typed per-module build settings now (done: `build-settings.properties` and the `basetool { }`
+extension); an included `build-logic` with convention plugins before the
+first Gradle extraction (done 2026-10-11, §7.7 P5-a; it also prepares Gradle's isolated projects); `java-test-fixtures` for
 module-owned test fixtures; the configuration cache on for local builds (done 2026-10-04, #2387); a decision whether CI reuses
 configuration-cache entries (it never does today, because `setup-gradle` gets no encryption key).
 
@@ -2524,7 +2691,7 @@ Full tables, per finding with status, evidence and verdict:
 | O-08 | Storage of member settings that move out of identity (payout preference, blueprint sharing) | **Decided 2026-10-01 as recommended — D-17** |
 | O-09 | `no-store` for the unlisted families and a lower page-size ceiling | **Decided 2026-10-01 as recommended — D-18** |
 | O-10 | SpEL evaluation failures | **Decided 2026-10-01 — D-19:** fail-closed 400, counted and alerted |
-| O-11 | `MissionParticipant.orgUnits` is the one eager cross-domain collection | **Decided 2026-10-01 as recommended — D-20** |
+| O-11 | `MissionParticipant.orgUnits` is the one eager cross-domain collection | **Decided 2026-10-01 as recommended — D-20;** done 2026-10-11 (§7.6) |
 | O-12 | CI configuration-cache reuse | **Decided 2026-10-01 as recommended — D-21** |
 | O-13 | Keep the raw evidence of this audit | **Decided 2026-10-01 — D-22:** kept in `docs/archive/` |
 | O-14 | Home of the 14 exchange-administration operations | **Decided 2026-10-01 — D-12:** `/api/v1/connected-apps/admin/**` |

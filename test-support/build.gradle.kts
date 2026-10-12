@@ -1,17 +1,12 @@
 plugins {
   `java-library`
-  checkstyle
-  id("com.diffplug.spotless")
-  alias(libs.plugins.spring.dependency.management)
+  id("basetool.java-conventions")
+  id("basetool.checkstyle-conventions")
+  id("basetool.spotless-conventions")
+  id("basetool.spring-library-conventions")
 }
 
 description = "test-support"
-
-dependencyManagement {
-  imports {
-    mavenBom("org.springframework.boot:spring-boot-dependencies:${libs.versions.springBoot.get()}")
-  }
-}
 
 dependencies {
   api("org.springframework:spring-web")

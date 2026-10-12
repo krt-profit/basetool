@@ -1,23 +1,9 @@
-buildscript {
-  dependencies {
-    constraints {
-      classpath(libs.commons.lang3)
-      classpath(libs.jackson3.databind)
-    }
-  }
-}
-
 plugins {
-  java
-  checkstyle
-  id("jacoco")
-  alias(libs.plugins.spring.boot)
-  alias(libs.plugins.spring.dependency.management)
-  alias(libs.plugins.cyclonedx.bom)
-  alias(libs.plugins.licensee)
-  alias(libs.plugins.spotbugs.base)
-  alias(libs.plugins.pitest)
-  id("com.diffplug.spotless")
+  id("basetool.spring-app-conventions")
+  id("basetool.quality-conventions")
+  id("basetool.mutation-conventions")
+  id("basetool.supply-chain-conventions")
+  id("basetool.javadoc-conventions")
 }
 
 description = "ingest"
@@ -58,11 +44,6 @@ dependencies {
   testImplementation(libs.archunit.core)
   testImplementation(project(":test-support"))
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
-
-tasks.javadoc {
-  options { (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet") }
-  destinationDir = project.file("docs/javadoc")
 }
 
 val exchangeBaseline = layout.buildDirectory.dir("exchange-baseline")

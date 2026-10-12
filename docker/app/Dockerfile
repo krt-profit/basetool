@@ -9,6 +9,7 @@ COPY --chmod=755 gradlew .
 COPY gradle/ gradle/
 COPY build.gradle.kts .
 COPY settings.gradle.kts .
+COPY build-logic/ build-logic/
 COPY gradle.properties .
 COPY backend/build.gradle.kts backend/build-settings.properties backend/
 COPY frontend/build.gradle.kts frontend/build-settings.properties frontend/

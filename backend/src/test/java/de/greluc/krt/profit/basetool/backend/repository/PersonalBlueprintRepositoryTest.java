@@ -22,7 +22,8 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.backend.model.DefaultBlueprint;
+import de.greluc.krt.profit.basetool.backend.blueprint.internal.DefaultBlueprint;
+import de.greluc.krt.profit.basetool.backend.blueprint.internal.DefaultBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
