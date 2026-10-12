@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.privacy.web;
+package de.greluc.krt.profit.basetool.backend.identity.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApproveRegistrationRequest;
@@ -30,9 +30,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRegistrationServic
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
-import de.greluc.krt.profit.basetool.backend.privacy.api.MergeAccountRequest;
-import de.greluc.krt.profit.basetool.backend.privacy.api.UserAccountMergeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -40,7 +37,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +55,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Admin queue for Discord registration approvals: lists pending or rejected registrations and
- * approves, rejects, reopens, links or merges them (REQ-SEC-017).
+ * approves, rejects, reopens or links them (REQ-SEC-017); the merge action lives in the privacy
+ * module's {@code DiscordRegistrationMergeController}.
  *
  * <p>Every decision is optimistic-locked (stale {@code version} gives 409) and audited in {@code
  * user_approval_event}. Approval grants no Basetool roles by itself.
@@ -71,9 +68,6 @@ public class DiscordRegistrationAdminController {
 
   private final UserService userService;
   private final UserRegistrationService userRegistrationService;
-
-  /** The account merge behind the queue's duplicate-callsign remedy (REQ-SEC-045). */
-  private final UserAccountMergeService userAccountMergeService;
 
   /**
    * Lists registrations by approval status, oldest first (REQ-SEC-034). Only {@code PENDING} and
@@ -105,7 +99,7 @@ public class DiscordRegistrationAdminController {
                   "Only PENDING and REJECTED registrations can be listed here");
         };
     Set<String> colliding = userRegistrationService.findCollidingCallsigns(users);
-    return users.stream().map(user -> toDto(user, colliding)).toList();
+    return users.stream().map(user -> PendingRegistrationDto.from(user, colliding)).toList();
   }
 
   /**
@@ -203,66 +197,15 @@ public class DiscordRegistrationAdminController {
   }
 
   /**
-   * Merges an older account into this registration (REQ-SEC-046, ADR-0142).
-   *
-   * <p>Everything the source account owns moves onto the registration; records of who did something
-   * stay where they are. Does not approve the registration, and leaves the emptied source row in
-   * place.
-   *
-   * @param id the surviving registration the member logs into
-   * @param adminUserId the acting admin, recorded as the audit actor
-   * @param body the source account to empty, and the registration's optimistic-lock version
-   * @return the surviving account
-   */
-  @NotNull
-  @PostMapping("/{id}/merge")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  @Operation(summary = "Move an older account's own data onto this registration.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Merged; the surviving account is returned."),
-    @ApiResponse(responseCode = "403", description = "Caller is not an administrator."),
-    @ApiResponse(responseCode = "404", description = "Either account is unknown."),
-    @ApiResponse(
-        responseCode = "409",
-        description =
-            "The two ids are the same, both accounts hold a bank ledger, or the version is stale.")
-  })
-  public PendingRegistrationDto merge(
-      @PathVariable UUID id,
-      @CurrentUserId UUID adminUserId,
-      @NotNull @Valid @RequestBody MergeAccountRequest body) {
-    return toDto(userAccountMergeService.merge(body.sourceUserId(), id, adminUserId));
-  }
-
-  /**
    * Maps one registration, resolving its callsign collision for that row alone; list reads use
-   * {@link #toDto(User, Set)} instead.
+   * {@link PendingRegistrationDto#from} instead.
    *
    * @param user the registration to map
    * @return the DTO, with {@code callsignCollision} resolved for this row
    */
   @NotNull
   private PendingRegistrationDto toDto(User user) {
-    return toDto(user, userRegistrationService.findCollidingCallsigns(List.of(user)));
-  }
-
-  /**
-   * Maps one registration against a pre-resolved set of colliding callsigns.
-   *
-   * @param user the registration to map
-   * @param collidingCallsigns lower-cased usernames held by more than one account
-   * @return the DTO
-   */
-  @NotNull
-  private PendingRegistrationDto toDto(@NotNull User user, Set<String> collidingCallsigns) {
-    return new PendingRegistrationDto(
-        user.getId(),
-        user.getEffectiveName(),
-        user.getDiscordGuildNickname(),
-        user.getCreatedAt(),
-        user.getApprovedAt(),
-        user.getUsername() != null
-            && collidingCallsigns.contains(user.getUsername().toLowerCase(Locale.ROOT)),
-        user.getVersion());
+    return PendingRegistrationDto.from(
+        user, userRegistrationService.findCollidingCallsigns(List.of(user)));
   }
 }
