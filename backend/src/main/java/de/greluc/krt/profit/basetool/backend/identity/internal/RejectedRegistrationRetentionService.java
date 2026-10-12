@@ -17,13 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.privacy.internal;
+package de.greluc.krt.profit.basetool.backend.identity.internal;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakPresence;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -39,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Purges registrations rejected longer ago than the configured retention window (REQ-SEC-057).
  *
  * <p>Within the window a rejection can still be reopened (REQ-SEC-034). Deletion goes through
- * {@link UserDeletionService}, which owns the foreign-key order.
+ * {@link AccountErasure}, which owns the foreign-key order.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RejectedRegistrationRetentionService {
 
   private final UserRepository userRepository;
-  private final UserDeletionService userDeletionService;
+  private final AccountErasure accountErasure;
   private final KeycloakService keycloakService;
 
   /**
@@ -113,7 +114,7 @@ public class RejectedRegistrationRetentionService {
 
   /**
    * Transactional database half of a purge: re-reads the row, re-checks that it is still a
-   * rejection past the cutoff, and deletes it via {@link UserDeletionService}.
+   * rejection past the cutoff, and deletes it via {@link AccountErasure}.
    *
    * <p>The re-check skips a registration reopened meanwhile. {@code inKeycloak} is cleared first
    * because the caller deletes the Keycloak user itself after this commits.
@@ -136,8 +137,7 @@ public class RejectedRegistrationRetentionService {
     }
     user.setInKeycloak(false);
     userRepository.saveAndFlush(user);
-    userDeletionService.deleteUser(
-        userId, UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+    accountErasure.deleteAccount(userId, KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
     return true;
   }
 }

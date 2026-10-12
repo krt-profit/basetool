@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.privacy.internal;
+package de.greluc.krt.profit.basetool.backend.identity.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,11 +26,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakPresence;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -61,7 +62,7 @@ class RejectedRegistrationRetentionServiceTest {
   private static final Instant CUTOFF = Instant.now().minus(90, ChronoUnit.DAYS);
 
   @Mock private UserRepository userRepository;
-  @Mock private UserDeletionService userDeletionService;
+  @Mock private AccountErasure accountErasure;
   @Mock private KeycloakService keycloakService;
   @Mock private ObjectProvider<RejectedRegistrationRetentionService> selfProvider;
 
@@ -90,9 +91,8 @@ class RejectedRegistrationRetentionServiceTest {
 
     assertThat(service.purgeRejectedOlderThan(CUTOFF)).isEqualTo(1);
 
-    verify(userDeletionService)
-        .deleteUser(
-            id, UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+    verify(accountErasure)
+        .deleteAccount(id, KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
     verify(keycloakService).deleteUser(id);
   }
 
@@ -119,8 +119,8 @@ class RejectedRegistrationRetentionServiceTest {
 
     service.purgeRejectedOlderThan(CUTOFF);
 
-    InOrder inOrder = Mockito.inOrder(userDeletionService, keycloakService);
-    inOrder.verify(userDeletionService).deleteUser(any(), any());
+    InOrder inOrder = Mockito.inOrder(accountErasure, keycloakService);
+    inOrder.verify(accountErasure).deleteAccount(any(), any());
     inOrder.verify(keycloakService).deleteUser(id);
   }
 
@@ -134,7 +134,7 @@ class RejectedRegistrationRetentionServiceTest {
 
     assertThat(service.purgeRejectedOlderThan(CUTOFF)).isZero();
 
-    verifyNoInteractions(userDeletionService);
+    verifyNoInteractions(accountErasure);
     verify(keycloakService, never()).deleteUser(any());
   }
 
@@ -147,7 +147,7 @@ class RejectedRegistrationRetentionServiceTest {
 
     assertThat(service.purgeRejectedOlderThan(CUTOFF)).isZero();
 
-    verifyNoInteractions(userDeletionService);
+    verifyNoInteractions(accountErasure);
   }
 
   @Test
@@ -160,11 +160,10 @@ class RejectedRegistrationRetentionServiceTest {
     when(userRepository.findPlainById(ok))
         .thenReturn(Optional.of(rejected(ok, CUTOFF.minus(1, ChronoUnit.DAYS))));
     Mockito.doThrow(new IllegalStateException("no admin to reassign to"))
-        .when(userDeletionService)
-        .deleteUser(
+        .when(accountErasure)
+        .deleteAccount(
             Mockito.eq(failing),
-            Mockito.eq(
-                UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER));
+            Mockito.eq(KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER));
 
     assertThat(service.purgeRejectedOlderThan(CUTOFF)).isEqualTo(1);
 
@@ -191,6 +190,6 @@ class RejectedRegistrationRetentionServiceTest {
 
     assertThat(service.purgeRejectedOlderThan(CUTOFF)).isZero();
 
-    verifyNoInteractions(userDeletionService, keycloakService);
+    verifyNoInteractions(accountErasure, keycloakService);
   }
 }

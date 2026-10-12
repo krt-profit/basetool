@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.privacy.internal;
+package de.greluc.krt.profit.basetool.backend.identity.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.RejectedRegistrationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;

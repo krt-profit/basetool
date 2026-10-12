@@ -61,8 +61,6 @@ class MergeAccountRequest privacy GDPR orchestration, transitional module (plan 
 class UserController privacy REST and retention classes of identity awaiting their host module, transitional (plan 7.6)
 class MeController privacy REST and retention classes of identity awaiting their host module, transitional (plan 7.6)
 class DiscordRegistrationAdminController privacy REST and retention classes of identity awaiting their host module, transitional (plan 7.6)
-class RejectedRegistrationRetentionService privacy REST and retention classes of identity awaiting their host module, transitional (plan 7.6)
-class RejectedRegistrationRetentionTask privacy REST and retention classes of identity awaiting their host module, transitional (plan 7.6)
 class PayoutPreference identity member preference on User (plan 7.3)
 class AuthHelperService platform the single SecurityContextHolder reader (ArchUnit rule)
 class MaterialCollectionEntryDto inventory produced by InventoryAggregationService
