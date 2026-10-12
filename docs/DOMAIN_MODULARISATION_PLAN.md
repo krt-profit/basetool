@@ -2916,6 +2916,76 @@ The question for the owner: A, B or C.
 3. *CLAUDE.md*: the root file describes the backend as a modular monolith with `api` / `internal` / `web`; `backend/CLAUDE.md` gained three landmines found in this pull request (fragment implementation beside its
    interface, no field injection of another module's type, tests that read backend sources by path).
 
+**Umbrella steps 13, 1, 18 and 19 — designs and reasons, not built; they wait for the owner**
+*Step 13 — D-17, the member settings leave `app_user` (design, nothing written).*
+1. *What moves.* `app_user.default_payout_preference` (VARCHAR 50, nullable, V142) and `app_user.share_blueprints_globally` (BOOLEAN NOT NULL DEFAULT FALSE, V163). Readers and writers: `User`, `UserService`
+   (`updateUserDefaultPayoutPreference`, `updateUserShareBlueprintsGlobally`, which also records `BLUEPRINT_SHARING_CHANGED`), `UserRepository.findIdsBySharingBlueprintsGlobally` (read by `PersonalBlueprintOverviewService` and
+   `JobOrderItemBlueprintOwnersService`), `MissionParticipantService` (pre-fills the sign-up), `UserController` (the four endpoints, now in `privacy.web`), `IdentityExportSections` and `IdentityMentionSource`.
+2. *Target.* Two tables with their own `@Version`: `member_payout_setting` (owner `mission`) and `member_blueprint_sharing` (owner `blueprint`), one row per member, `user_id` the primary key and a foreign key to `app_user` `ON DELETE CASCADE`.
+   A member with no row has the default (no preference; sharing off), so the sharing table holds only rows that were ever written.
+3. *Migration, phase 1 (additive, `V283`; the number is claimed by re-grepping `origin/main` and the open pull requests at push time; today `origin/main` ends at V282 and no other pull request is open):*
+
+```sql
+CREATE TABLE member_payout_setting (
+    user_id UUID PRIMARY KEY REFERENCES app_user (id) ON DELETE CASCADE,
+    default_payout_preference VARCHAR(50) NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+CREATE TABLE member_blueprint_sharing (
+    user_id UUID PRIMARY KEY REFERENCES app_user (id) ON DELETE CASCADE,
+    share_globally BOOLEAN NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+INSERT INTO member_payout_setting (user_id, default_payout_preference)
+SELECT id, default_payout_preference FROM app_user WHERE default_payout_preference IS NOT NULL;
+INSERT INTO member_blueprint_sharing (user_id, share_globally)
+SELECT id, TRUE FROM app_user WHERE share_blueprints_globally;
+```
+
+   The old columns stay (the repository's two-phase drop rule); the entities stop mapping them. Phase 2, a later release, is
+   `ALTER TABLE app_user DROP COLUMN default_payout_preference, DROP COLUMN share_blueprints_globally`. The types of `created_at` and `updated_at` follow what `AbstractEntity` maps; the final text is checked against
+   `ddl-auto: validate` before anything is pushed.
+4. *Data check, run read-only on the host before and after the release:*
+
+```sql
+SELECT (SELECT count(*) FROM app_user WHERE default_payout_preference IS NOT NULL) AS payout_users,
+       (SELECT count(*) FROM member_payout_setting) AS payout_rows,
+       (SELECT count(*) FROM app_user WHERE share_blueprints_globally) AS sharing_users,
+       (SELECT count(*) FROM member_blueprint_sharing WHERE share_globally) AS sharing_rows;
+```
+
+   `payout_users = payout_rows` and `sharing_users = sharing_rows` immediately after the migration.
+5. *Rollback.* Deploying the previous release is enough while phase 2 has not run: it reads the old columns, which still hold the values of the migration day. Changes made in the new tables after the upgrade are not in them;
+   to carry them back first:
+
+```sql
+UPDATE app_user u SET default_payout_preference = s.default_payout_preference
+FROM member_payout_setting s WHERE s.user_id = u.id;
+UPDATE app_user u SET share_blueprints_globally =
+    COALESCE((SELECT b.share_globally FROM member_blueprint_sharing b WHERE b.user_id = u.id), FALSE);
+```
+
+   The new tables can stay or be dropped afterwards; nothing in the old release reads them.
+6. *Consequences the owner should see.* (a) The `version` of the four endpoints (`/users/me/payout-preference` and `/users/me/blueprint-sharing` with their moved paths) becomes the setting's own counter, 0 for a member with no row.
+   The web profile page seeds both forms from the user-row version of `/users/me`, so it changes with this step (`ProfileController`, `profile.js`, the two forms). The Android app (`MemberPreferencesRepository`, T1 app contract)
+   reads `version` in the same GET it later PUTs, but whether it ever combines it with the user version cannot be proved from the call list, so an app release may be needed. (b) Fine-grained locking is the point: saving the payout
+   card no longer makes the profile and RSI-handle cards stale. (c) The account merge keeps the old outcome: the settings stay with the emptied source account (`staysWithTheAct`), because the old columns did.
+   (d) The GDPR registries gain the two tables: erasure by the cascade, an Art. 15 export section in each owning module, the two columns removed from the identity export, the mention-source exemption for the payout column,
+   `table-ownership.txt` and the coverage floors. (e) The audit event `BLUEPRINT_SHARING_CHANGED` moves with the sharing write into the blueprint module; its type, domain and payload do not change.
+
+*Step 1 — the mutation target.* `backend/build-settings.properties` aims PIT at `backend.service.*` and `backend.service.*Test`. No main class lies in `service` any more, so the target matches nothing. Options:
+A) the module internals, `de.greluc.krt.profit.basetool.backend.*.internal.*Service` with the tests of the same names (most of the old target's content); B) `*.internal.*` and `*.api.*Service` together (many more classes, a much longer run);
+C) retire the target until a module extraction gives it a natural place. Not decided here.
+
+*Steps 18 and 19 — `backend-exchange` and `backend-bank`.* §5.8 starts them "only once the package boundary of each has been green for some releases". Both packages became real modules, with the Modulith and rank gates, on this branch within days,
+and NullAway does not cover them yet (69 and 44 findings). Extracting them now would also move their tests, their JaCoCo and PIT settings and the OpenAPI generator's classpath in the same change. Not started.
+
+*Step 15 — P3-11.* The plan names the per-command audit contract and nowhere defines it; nothing was invented.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2928,7 +2998,7 @@ ends the step with a question to the owner. Ticked as the steps land; `Q` marks 
 before a decision.
 
 - [x] **0.** P4-7 slice c (this pull request's first commit).
-- [ ] **1.** Housekeeping: `backend/build-settings.properties` aims the mutation tests at
+- [ ] **1.** `Q` options in the entry above — Housekeeping: `backend/build-settings.properties` aims the mutation tests at
       `backend.service.*`, which shrinks with every move (P4-5 "Open").
 - Rank 0–1 modules leave the layer packages (nothing below depends on them being late; **5a, the `kernel` half of step 5, is done**):
   - [x] **2.** done — `audit` (12): `AuditEvent`, `AuditEventRepository`, `AuditService` and its report,
@@ -2964,7 +3034,7 @@ before a decision.
   - [ ] **12.** `Q` design written, waiting for the owner's choice of A, B or C (entry above) — Access policies left in the scope hub (§5.4): `OwnerScopeService` and
         `AccessGateService` keep the org-unit and user gates; `Q` the plan names no policy for them.
 - Persistence:
-  - [ ] **13.** `Q` D-17, member settings move with their owner: the payout-preference and
+  - [ ] **13.** `Q` design and SQL written (entry above), waiting for the owner — D-17, member settings move with their owner: the payout-preference and
         blueprint-sharing columns into tables of the owning modules, each with its own version, by a
         Flyway migration with data transfer. The api-cut notes say the columns stay in the cut, so this
         step comes after the path moves; its SQL and rollback go to the owner before they are pushed.
@@ -2978,7 +3048,7 @@ before a decision.
   - [x] **17.** partly done, REQ-DATA-010 and REQ-AUDIT-001 wait — Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
         REQ-XCH-009/011; arc42 §5.2/§5.3 per module; CLAUDE.md files.
 - Gradle extraction, last (they move whole source trees):
-  - [ ] **18.** P5-c `backend-exchange`, then **19.** P5-d `backend-bank` (§5.8; P5-a and P5-b are done).
+  - [ ] **18.** `Q` P5-c `backend-exchange`, then **19.** P5-d `backend-bank` (§5.8; P5-a and P5-b are done): not started, §5.8 asks for the package boundary to be green for some releases first (entry above).
 - Not in this branch:
   - [x] The ES-module step of F5 (§7.8) was built on its own branch, `claude/mod-f5-es-modules`, and merged into this branch on 2026-10-12 (ADR-0250, REQ-FE-035).
   - `Q` The REST API cut (§7.9, waves on `claude/api-cut` and `claude/api-cut-w1` … `w6`, the
