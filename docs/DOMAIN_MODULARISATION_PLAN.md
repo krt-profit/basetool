@@ -2781,6 +2781,10 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
    `Objects.requireNonNull` (the same `NullPointerException` as before). No suppression. `UserDtoRedaction.toPeerShapedAssignees` went to `JobOrderController`, its only caller.
 6. *Text scan* of all tracked files: source paths in `bank.md`, `discord-integration.md`, `org-notifications.md` and `security-and-access.md` rewritten; nothing in code, resources
    or `monitoring/` names the old packages. `compileJava --rerun` shows 0 warnings.
+7. *Correction (found by `MissionUnitFrequencyTest` on the pull request's CI)*: the move put `UserRepositoryPlainLookupFragmentImpl` in `identity.internal` and its
+   interface in `identity.api`. Spring Data finds a fragment implementation beside its interface, so it did not find it and derived `findPlainById` from the method name as a
+   query, which auto-flushes; nine tests that persist a ship without insurance went red. The implementation lies in `identity.api` now, and `RepositoryFragmentPlacementTest`
+   pins that every `*Fragment` interface has its `*FragmentImpl` in the same package. The move script keeps fragment implementations beside their interface from here on.
 
 **Umbrella step 8 — the transitional privacy module leaves the layer packages — done 2026-10-12**
 1. *Probe*: the 28 classes the domain map assigns to `privacy` (the 23 of the census plus the five identity classes step 7 left behind) close no cycle at top level.

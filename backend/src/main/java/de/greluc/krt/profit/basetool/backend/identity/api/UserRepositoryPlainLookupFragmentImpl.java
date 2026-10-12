@@ -17,11 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.identity.internal;
+package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepositoryPlainLookupFragment;
 import jakarta.persistence.EntityManager;
 import java.util.Optional;
 import java.util.UUID;
