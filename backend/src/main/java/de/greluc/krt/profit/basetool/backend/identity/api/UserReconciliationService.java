@@ -114,7 +114,6 @@ public class UserReconciliationService {
     String username = jwt.getClaimAsString("preferred_username");
 
     final String discordUserId = jwt.getClaimAsString("discord_user_id");
-    final boolean viaDiscord = discordUserId != null && !discordUserId.isBlank();
 
     Optional<User> existingUser = userRepository.findById(finalUserId);
     if (existingUser.isEmpty() && username != null) {
@@ -185,7 +184,9 @@ public class UserReconciliationService {
           localRoles.size());
     }
 
-    if (viaDiscord && discordUserId != null && applyDiscordLink(user, discordUserId)) {
+    if (discordUserId != null
+        && !discordUserId.isBlank()
+        && applyDiscordLink(user, discordUserId)) {
       changed = true;
     }
 
