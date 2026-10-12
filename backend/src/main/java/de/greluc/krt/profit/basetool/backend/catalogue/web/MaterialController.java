@@ -30,8 +30,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialSellingT
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil.PageCeiling;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil.PageCeiling;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

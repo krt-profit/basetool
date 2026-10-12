@@ -21,10 +21,10 @@ package de.greluc.krt.profit.basetool.backend.promotion.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.OnUpdate;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirementResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirementService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirementWriteRequest;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

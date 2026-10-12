@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
+import de.greluc.krt.profit.basetool.backend.platform.api.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.MeterRegistry;

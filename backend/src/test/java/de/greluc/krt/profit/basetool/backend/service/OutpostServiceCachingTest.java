@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.Outpost;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.OutpostRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.OutpostService;
-import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

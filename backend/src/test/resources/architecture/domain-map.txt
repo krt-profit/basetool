@@ -187,10 +187,3 @@ name ^(OrgRoleManagement|AddOlMember|SquadronRole|AssignSquadronRank) orgunit le
 name ^(OrgUnit|Squadron|SpecialCommand|Bereich|Organisationsleitung|KommandoGroup|CreateKommandoGroup|UpdateKommandoGroup|OrgHierarchy|Membership) orgunit
 name ^(User|Role|Registration|PendingRegistration|ApproveRegistration|RejectRegistration|ReopenRegistration|LinkRegistration|MyRegistration|Discord|Keycloak|Terms|DeletionRequest|CreateDeletionRequest|DecideDeletionRequest|DataExport|AdminDataExport|AccountDeletion|AccountConsolidation|ConsolidateAccount|MergeAccount|Handle|PersonSearch|AdminPersonSearch|AdminTerms|AdminDeletion|RejectedRegistration|ApprovalDecision|ApprovalStatus|AdminController$) identity
 name ^(LiveSync|LocalLiveSync|RedisLiveSync) livesync
-
-layer config platform infrastructure layer package
-layer filter platform infrastructure layer package
-layer logging platform infrastructure layer package
-layer metrics platform infrastructure layer package
-layer annotation platform infrastructure layer package
-layer web platform infrastructure layer package

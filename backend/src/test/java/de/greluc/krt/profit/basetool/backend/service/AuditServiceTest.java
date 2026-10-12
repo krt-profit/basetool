@@ -35,11 +35,11 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayPropertie
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.mapper.AuditEventMapper;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
+import de.greluc.krt.profit.basetool.backend.platform.api.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
-import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.MeterRegistry;

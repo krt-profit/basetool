@@ -703,7 +703,7 @@ client a bank mutation came through is recorded on the trail (REQ-BANK-012, REQ-
   relevant rule whitelists (`BankSecurityService` as accepted gate).
 - [x] `openapi.json` regenerated in every phase PR that touches the API.
 
-**Enforced by:** `OpenApiGeneratorTest`, `docs/specs/api-conventions.md` · **Code:** `controller/Bank*Controller`, `web/PaginationUtil` · **Issues:** #556
+**Enforced by:** `OpenApiGeneratorTest`, `docs/specs/api-conventions.md` · **Code:** `controller/Bank*Controller`, `platform/api/PaginationUtil` · **Issues:** #556
 
 ### REQ-BANK-019 — Season independence
 
@@ -2379,7 +2379,7 @@ membership-based notification seam; the Bankleitung instead picks the request up
 `bank/internal/BankBookingOutcomeDto`, `bank/web/BankAccountController#setCartelApprovalTiers`,
 `db/migration/V203` + `V222` (approver rename), frontend `templates/bank/bank-manage.html` +
 `bank/org-unit-bank-account-detail.html` + `static/js/bank/bank.js` (202 `pendingRequest` notice) +
-`exception/GlobalExceptionHandler` (bank-409 message map) ·
+`platform/api/GlobalExceptionHandler` (bank-409 message map) ·
 **ADR:** [ADR-0066](../adr/0066-krt-account-amount-tiered-approval-ladder.md) (supersedes the
 single-approver assumption of [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md)),
 amended by [ADR-0109](../adr/0109-krt-middle-band-bankleitung-and-over-ceiling-auto-request.md)
@@ -2719,7 +2719,7 @@ expandable) • **Code:** `bank/internal/BankTransaction`, `bank/internal/BankBo
 `bank/internal/ConfirmBankBookingRequest`, `bank/internal/BankBookingRow`,
 `model/dto/Bank{Booking,BookingRequest}Dto`, `bank/internal/BankPostingWriter`, `bank/internal/BankLedgerService`,
 `bank/internal/BankBookingRequestService`, `bank/internal/OrgUnitBankAccessService`,
-`service/Bank{Statement,Management}ReportService`, `service/pdf/KrtPdfSupport`, `db/migration/V231`
+`service/Bank{Statement,Management}ReportService`, `platform/api/KrtPdfSupport`, `db/migration/V231`
 
 ### REQ-BANK-055 — Empfänger on a withdrawal request
 

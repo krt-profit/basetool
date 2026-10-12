@@ -2692,6 +2692,29 @@ owner decided on 2026-10-12 to leave that as it is.
    resources; the source-path link of `whole-number-amounts.md` is corrected; the two remaining `backend.exception.…` strings name
    `ProblemSupport` and `GlobalExceptionHandler`, which are platform types (step 5b).
 
+**Umbrella step 5b — the platform's 65 types leave the layer packages for `platform.api` / `platform.internal` — done 2026-10-12**
+Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their layer packages, mechanically.
+1. *Probe*: the 65 types the domain map assigns to `platform` (`config` 33, `web` 6, `exception` 6, `filter` 5, `logging` 4,
+   `metrics` 4, `service` 3, `annotation` 2, `controller` 1, `health` 1), together with the kernel's 20, close no cycle at top level.
+2. *Placement* (§5.2): a class another module or a layer class uses goes to `api`, and so does everything an `api` type
+   depends on, because the layers inside a module must stay acyclic: **35 in `api`, 30 in `internal`**. The two existing
+   `internal` records `ApiClientMetricsProperties` and `RequestBodyLimitProperties` moved to `api`, because `ClientAttribution`
+   and `RequestBodySizeLimitFilter` take them. `BasetoolErrorController` lies in `platform.api` (no `platform.web`).
+   Members the new foreign users reach became `public` (`RedisJsonFanout`, `SseSendFailureCause`,
+   `BackpressureRejectedExecutionHandler`); 374 files were rewritten by `git mv` and the import script.
+3. *Tests*: 47 tests moved with their subjects (they reach package-private members); the test fixture `PathControlInventory` is
+   public now so `RateLimitRuleCoverageTest` and `FilterExemptionSetsTest` can stay in `config` beside their other fixtures.
+4. *NullAway* checks the moved `platform.api` classes (`platform.internal` stays unchecked until step 16): eight sites, fixed by
+   `@Nullable` (`ThrowingItemWork`, the argument-resolver parameters, `maskQuotedValues`, `emitJobMetrics`) and by `Objects.requireNonNull` where
+   a default message makes the result non-null; no suppression and no behaviour change.
+5. *Gates*: the service layer's selection floor 507 → **504**; the controller layer anchored on `BasetoolErrorController`, so it
+   takes `UserController` now; the six `layer … platform` rules of the domain map assign no class any more and left;
+   `ModularityTest` caught the package-private `BackpressureRejectedExecutionHandler` (now public) and the layers rule the
+   two properties records. Baseline unchanged. `compileJava --rerun` shows 0 warnings.
+6. *Text scan* of all tracked files: the path-reading tests `PlatformMirrorParityTest` and `ObservationPrivacyFilterMirrorParityTest`, the
+   SpotBugs exclude for `BasetoolErrorController`, and the source paths in nine docs were rewritten; no logger name of a moved
+   class appears in `monitoring/`, the logging configuration or the observability spec; the historical audit appendices were left.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2713,7 +2736,7 @@ before a decision.
   - [ ] **3.** `livesync` (9: controller, DTO, seven services).
   - [ ] **4.** `notification` (47: entities and enums, rules, mail, recipient services, the GDPR
         participants that sit in `service`).
-  - [ ] **5.** `Q` `kernel` (20 types in the layer packages `exception` and `validation`) and `platform`
+  - [x] **5.** done (5a `kernel`, 5b `platform`; owner decision 2026-10-12) — `kernel` (20 types in the layer packages `exception` and `validation`) and `platform`
         (65 in `config`, `filter`, `logging`, `metrics`, `web`, `exception`, `annotation`, `health`):
         the domain map assigns whole layer packages to them and no plan step says they must move.
 - Foundation modules (§5.2 publishes their entities in `api`):

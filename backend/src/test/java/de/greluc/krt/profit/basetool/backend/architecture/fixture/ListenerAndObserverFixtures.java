@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.architecture.fixture;
 
-import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.ObserverSpi;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import java.util.UUID;

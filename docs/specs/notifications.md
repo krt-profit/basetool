@@ -155,7 +155,7 @@ source aggregate (no second `@Version` bump).
 
 **Enforced by:** `NotificationCreationServiceTest`, `NotificationRuleEngineIntegrationTest`,
 `JobOrderServiceTest` · **Code:** `notification/api/events/NotificationEvent`, `service/NotificationEventListener`,
-`config/AsyncConfig`, `service/NotificationCreationService`
+`platform/api/AsyncConfig`, `service/NotificationCreationService`
 
 ### REQ-NOTIF-003 — Extensibility without schema changes
 
@@ -363,7 +363,7 @@ which is the question a half that has quietly stopped raises (REQ-OBS-011).
 (`deleteReadOlderThan`, `deleteUnreadOlderThan`), `BackendPropertiesValidationTest` (the bounds) ·
 **Code:** `task/NotificationRetentionTask`, `notification/internal/NotificationRetentionProperties`,
 `service/NotificationService#purgeReadOlderThan` / `#purgeUnreadOlderThan`,
-`metrics/ScheduledJob#NOTIFICATION_RETENTION`, `metrics/MetricNames#NOTIFICATION_RETENTION_DELETED`
+`platform/api/ScheduledJob#NOTIFICATION_RETENTION`, `platform/api/MetricNames#NOTIFICATION_RETENTION_DELETED`
 
 ### REQ-NOTIF-021 — The `notification` event says what arrived
 
@@ -549,7 +549,7 @@ events + clean timeout completion), `DisconnectedClientHandlingTest`,
 `controller/NotificationController#stream`, frontend
 `notification/web/NotificationPageController#stream`, `kernel/backend/BackendSideChannels#notificationStream`,
 `kernel/backend/WebClientConfig#sseWebClient`,
-`exception/GlobalExceptionHandler#handleDisconnectedClient`, `static/js/notification/notifications.js`
+`platform/api/GlobalExceptionHandler#handleDisconnectedClient`, `static/js/notification/notifications.js`
 
 ### REQ-NOTIF-011 — UC2/UC3: notify on the bank booking-request lifecycle
 
@@ -634,7 +634,7 @@ logged** (REQ-OBS).
   sending. With no host it stays a no-op; `APP_MAIL_ENABLED=false` hard-disables it.
 
 **Enforced by:** `SmtpMailServiceTest` · **Code:** `service/MailService`, `service/MailMessage`,
-`service/SmtpMailService`, `config/MailProperties`, `config/AsyncConfig#MAIL_EXECUTOR`,
+`service/SmtpMailService`, `config/MailProperties`, `platform/api/AsyncConfig#MAIL_EXECUTOR`,
 `application.yml` (`spring.mail.*` / `app.mail.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
 ### REQ-NOTIF-016 — UC4: notify the Materialbörse offer owner on an interest registration
@@ -1105,7 +1105,7 @@ that outlasts the limit (a stalled database) rejects the task; that is a lost no
 
 **Enforced by:** `NotificationBurstIntegrationTest`, `BackpressureRejectedExecutionHandlerTest`,
 `NotificationCreationServiceTest`, `notification_delivery_alerts_test.yml` · **Code:**
-`config/AsyncConfig#notificationExecutor`, `config/BackpressureRejectedExecutionHandler`,
+`platform/api/AsyncConfig#notificationExecutor`, `platform/api/BackpressureRejectedExecutionHandler`,
 `service/NotificationCreationService#recordCreated`
 
 ## Out of scope (v1)

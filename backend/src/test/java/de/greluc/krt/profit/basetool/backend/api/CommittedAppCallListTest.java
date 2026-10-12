@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.config.RetiredOperations;
-import de.greluc.krt.profit.basetool.backend.config.RetiredOperationsConfig;
+import de.greluc.krt.profit.basetool.backend.platform.api.RetiredOperations;
+import de.greluc.krt.profit.basetool.backend.platform.internal.RetiredOperationsConfig;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;

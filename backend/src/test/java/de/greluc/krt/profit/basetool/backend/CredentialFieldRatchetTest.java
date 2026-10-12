@@ -38,7 +38,7 @@ class CredentialFieldRatchetTest {
       Set.of(
           "de.greluc.krt.profit.basetool.backend.identity.internal.DiscordSpiPrecheckProperties",
           "de.greluc.krt.profit.basetool.backend.identity.api.KeycloakSyncProperties",
-          "de.greluc.krt.profit.basetool.backend.config.MonitoringScrapeProperties");
+          "de.greluc.krt.profit.basetool.backend.platform.internal.MonitoringScrapeProperties");
 
   @Test
   void everyCredentialBearingTypeIsReviewedAndRedacts() {

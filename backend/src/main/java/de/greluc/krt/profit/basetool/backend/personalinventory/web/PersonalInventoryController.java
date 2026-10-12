@@ -24,8 +24,8 @@ import de.greluc.krt.profit.basetool.backend.personalinventory.internal.Personal
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemResponse;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemService;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

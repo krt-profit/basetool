@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.guardfixture.tenancy;
 
-import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
+import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import java.util.UUID;

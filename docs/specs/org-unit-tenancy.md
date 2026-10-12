@@ -851,7 +851,7 @@ pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidd
 ### REQ-ORG-028 — A scoped aggregate carries `@TenantScoped`, and the scope rules select by it
 
 Every entity whose rows belong to an owning or responsible org unit carries the marker
-`backend.annotation.TenantScoped`, naming the field that holds that unit. Today that is `Mission`,
+`backend.platform.api.TenantScoped`, naming the field that holds that unit. Today that is `Mission`,
 `Operation`, `Ship`, `InventoryItem` and `RefineryOrder` (`owningOrgUnit`), `JobOrder`
 (`responsibleOrgUnit`), and `PromotionTopic` and `RankRequirement` (`owningSquadron`).
 

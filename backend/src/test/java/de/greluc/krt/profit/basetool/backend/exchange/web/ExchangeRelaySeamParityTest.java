@@ -22,13 +22,13 @@ package de.greluc.krt.profit.basetool.backend.exchange.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.platform.api.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.testsupport.exchange.ExchangeSeam;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;

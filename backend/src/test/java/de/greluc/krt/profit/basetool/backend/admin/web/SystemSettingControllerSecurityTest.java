@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.admin.internal.SystemSettingDto;
 import de.greluc.krt.profit.basetool.backend.admin.internal.SystemSettingService;
-import de.greluc.krt.profit.basetool.backend.filter.ApiCacheControlFilter;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ApiCacheControlFilter;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

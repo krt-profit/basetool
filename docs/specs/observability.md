@@ -1191,7 +1191,7 @@ in the backend and frontend, `observability` in the ingest; the single source of
 tag keys and the non-enum label values). The backend
 `metrics` package is a dependency leaf (Micrometer only) so `service` / `task` / `filter` /
 `exception` reuse it without a package cycle (ADR-0047). Scheduled-job health flows through the
-shared `metrics.TaskMetrics` wrapper; queue depth is sampled by the `task.BusinessMetricsCollector`
+shared `platform.api.TaskMetrics` wrapper; queue depth is sampled by the `task.BusinessMetricsCollector`
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
 transaction per pass) rather than per-scrape.
 

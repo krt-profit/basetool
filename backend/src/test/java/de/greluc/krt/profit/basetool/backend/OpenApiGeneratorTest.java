@@ -29,7 +29,7 @@ import de.greluc.krt.profit.basetool.backend.api.CommittedOpenApi;
 import de.greluc.krt.profit.basetool.backend.api.ExchangeFence;
 import de.greluc.krt.profit.basetool.backend.api.ExposedTypes;
 import de.greluc.krt.profit.basetool.backend.api.OpenApiDocumentAssertions;
-import de.greluc.krt.profit.basetool.backend.config.ContractTiers;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ContractTiers;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;

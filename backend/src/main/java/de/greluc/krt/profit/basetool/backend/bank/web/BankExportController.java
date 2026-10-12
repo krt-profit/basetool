@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.bank.web;
 
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankManagementReportService;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
-import de.greluc.krt.profit.basetool.backend.web.UserZone;
+import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;

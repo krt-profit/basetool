@@ -38,7 +38,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReconciliationService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncFollowUp;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Collections;

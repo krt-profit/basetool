@@ -25,7 +25,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import de.greluc.krt.profit.basetool.backend.config.ApiDomains;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ApiDomains;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

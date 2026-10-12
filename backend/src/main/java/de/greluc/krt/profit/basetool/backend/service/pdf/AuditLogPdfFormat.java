@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service.pdf;
 
 import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
+import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;

@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

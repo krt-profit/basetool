@@ -24,9 +24,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationTimedProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;

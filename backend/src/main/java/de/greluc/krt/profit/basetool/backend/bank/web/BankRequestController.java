@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.ConfirmBankBookingReq
 import de.greluc.krt.profit.basetool.backend.bank.internal.RejectBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.Set;

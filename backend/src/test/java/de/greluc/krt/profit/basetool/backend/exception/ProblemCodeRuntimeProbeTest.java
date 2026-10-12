@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import de.greluc.krt.profit.basetool.backend.kernel.CoreProblemCode;
-import de.greluc.krt.profit.basetool.backend.logging.CorrelationIdFilter;
+import de.greluc.krt.profit.basetool.backend.platform.api.CorrelationIdFilter;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

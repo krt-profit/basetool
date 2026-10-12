@@ -183,7 +183,7 @@ class NotificationServiceTest {
   @Test
   void listSortWhitelistYieldsStableCreatedAtDescWithIdTiebreaker() {
     org.springframework.data.domain.Sort sort =
-        de.greluc.krt.profit.basetool.backend.web.PaginationUtil.createPageRequest(
+        de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil.createPageRequest(
                 0,
                 50,
                 "createdAt,desc",

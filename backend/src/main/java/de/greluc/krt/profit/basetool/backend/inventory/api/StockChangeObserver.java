@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
-import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
+import de.greluc.krt.profit.basetool.backend.platform.api.ObserverSpi;
 import java.util.Collection;
 import java.util.Set;
 import java.util.UUID;

@@ -53,7 +53,8 @@ class ApiCborNegotiationTest {
   @Autowired private WebApplicationContext context;
 
   @Autowired
-  private de.greluc.krt.profit.basetool.backend.filter.ApiCacheControlFilter apiCacheControlFilter;
+  private de.greluc.krt.profit.basetool.backend.platform.internal.ApiCacheControlFilter
+      apiCacheControlFilter;
 
   private MockMvc mockMvc;
 

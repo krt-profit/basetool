@@ -29,7 +29,7 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedacto
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
-import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.Set;

@@ -4812,7 +4812,7 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 `BusinessMetricsCollectorTest` · **Code:** `model/User#keycloakAbsentSince`,
 `repository/UserRepository#markMissingUsers` / `#countOrphanedMemberAccounts` /
 `#findOldestOrphanedMemberAbsenceStamp`, `identity/api/UserReconciliationService#syncUser`,
-`task/BusinessMetricsCollector`, `metrics/MetricNames#USERS_PENDING_DELETION`,
+`task/BusinessMetricsCollector`, `platform/api/MetricNames#USERS_PENDING_DELETION`,
 `db/migration/V241`, `monitoring/prometheus/alerts/business.yml`,
 `monitoring/grafana/dashboards/07-basetool-operations.json` · **Decision:**
 [ADR-0182](../adr/0182-an-unfinished-account-deletion-is-measured-from-a-recorded-absence.md) ·

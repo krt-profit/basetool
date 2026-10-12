@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationTimedProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;

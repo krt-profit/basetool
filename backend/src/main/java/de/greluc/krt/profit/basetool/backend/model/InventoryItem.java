@@ -19,13 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
-import de.greluc.krt.profit.basetool.backend.annotation.TenantScoped;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
+import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

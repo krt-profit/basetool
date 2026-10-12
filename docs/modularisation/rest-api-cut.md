@@ -279,7 +279,7 @@ an id-keyed gate that changes meaning under the path-scoped variant → G-02, G-
   in 10 classes and `org-units` 36 in 6.
 - **Backend:** `NoStoreApiScopes` already lists `/api/v1/bank/**`, so the moved reads stay
   `no-store` and the `/api/v1/org-units/bank/**` entry goes
-  (`backend/src/main/…/filter/NoStoreApiScopes.java:42-43`). No URL rule covers
+  (`backend/src/main/…/platform/internal/NoStoreApiScopes.java:42-43`). No URL rule covers
   `/org-units/bank/**` today, so none is lost; its 29 mappings carry only
   `isAuthenticated()` in their annotations and are decided imperatively by the one seam class
   `OrgUnitBankAccessService`. The seam rules `bankClassesMustNotConsultOrgUnitScope` and
@@ -957,7 +957,7 @@ by design (`OperationPayoutStatusUpdateDto`, the find-or-create retry). No test 
 or REQ-API-003; `NormalizedStringDeserializer` bounds free text globally. → G-06.
 
 **The error contract is not in the contract.**
-`backend/src/main/…/config/OpenApiProblemDetailsConfig.java:55-108` attaches six problem responses
+`backend/src/main/…/platform/internal/OpenApiProblemDetailsConfig.java:55-108` attaches six problem responses
 to every operation and defines `ProblemDetail` without `code`, `correlationId` or `fieldErrors`, the
 fields REQ-API-004 calls the contract; 429 is documented on one operation although both rate
 limiters answer it on all of `/api/**`. Codes are string literals — about 50 in the exception
@@ -975,7 +975,7 @@ REQ-API-005 amended to the `PaginationUtil` reality.
 
 **The OpenAPI document is monolithic and partly wrong.** No `GroupedOpenApi`; 96 tags, 55 of them
 generated from class names; `@Operation` on 400 of 574 mappings and `@ApiResponses` on 231, although
-REQ-API-007 asks for both everywhere. `backend/src/main/…/config/OpenApiCachingConfig.java:58-75`
+REQ-API-007 asks for both everywhere. `backend/src/main/…/platform/internal/OpenApiCachingConfig.java:58-75`
 promises `304` and an `ETag` on all 244 `GET`s, while 114 of them belong to no-store families that
 never send one. Three schema names collide (`Op`, `Provenance`, `Skipped`): the committed `Op` is
 the stock shape, so the blueprint and ship change sets are documented wrongly.

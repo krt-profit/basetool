@@ -23,7 +23,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.internal.DefaultBlueprint
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.DefaultBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.DefaultBlueprintService;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
+import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

@@ -79,7 +79,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
-import de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController;
+import de.greluc.krt.profit.basetool.backend.controller.UserController;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
@@ -150,19 +150,20 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.platform.api.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProperties;
+import de.greluc.krt.profit.basetool.backend.platform.api.BasetoolErrorController;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
+import de.greluc.krt.profit.basetool.backend.platform.api.RequestBodyLimitProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.ResilientRedisMessageListenerContainer;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
-import de.greluc.krt.profit.basetool.backend.platform.internal.ApiClientMetricsProperties;
-import de.greluc.krt.profit.basetool.backend.platform.internal.RequestBodyLimitProperties;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleErasureCoverage;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
@@ -299,7 +300,7 @@ class ArchitectureTest {
 
   /** The controller layer: web controllers, their nested classes and the legacy package. */
   static final DescribedPredicate<JavaClass> CONTROLLER_CODE =
-      layer("controller code", WEB_CONTROLLERS, BasetoolErrorController.class);
+      layer("controller code", WEB_CONTROLLERS, UserController.class);
 
   /** The service layer: services, their nested classes and the legacy package. */
   static final DescribedPredicate<JavaClass> SERVICE_CODE =
@@ -682,7 +683,7 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 507);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 504);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 

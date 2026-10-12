@@ -20,13 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.JobTypeService;
-import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.List;
 import java.util.UUID;

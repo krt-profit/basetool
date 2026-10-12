@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
-import de.greluc.krt.profit.basetool.backend.annotation.ObserverSpi;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;

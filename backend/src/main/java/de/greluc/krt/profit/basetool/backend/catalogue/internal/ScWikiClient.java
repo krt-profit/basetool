@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiMetaDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiRow;
-import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ResponseSizeLimitInterceptor;
 import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
 import io.micrometer.core.instrument.MeterRegistry;

@@ -24,9 +24,9 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
 import de.greluc.krt.profit.basetool.backend.config.PathControlInventory.Endpoint;
-import de.greluc.krt.profit.basetool.backend.filter.ApiCacheControlFilter;
-import de.greluc.krt.profit.basetool.backend.filter.NoStoreApiScopes;
-import de.greluc.krt.profit.basetool.backend.filter.NoStoreApiScopes.Caching;
+import de.greluc.krt.profit.basetool.backend.platform.internal.ApiCacheControlFilter;
+import de.greluc.krt.profit.basetool.backend.platform.internal.NoStoreApiScopes;
+import de.greluc.krt.profit.basetool.backend.platform.internal.NoStoreApiScopes.Caching;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;

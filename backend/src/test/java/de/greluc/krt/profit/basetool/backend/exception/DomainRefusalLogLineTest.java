@@ -30,6 +30,7 @@ import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ProductionAllocationException;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.platform.api.GlobalExceptionHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;

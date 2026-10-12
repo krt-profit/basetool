@@ -648,7 +648,7 @@ and swallowed there, so the scheduler thread survives a bad run.
 
 **Enforced by:** `AuditRetentionServiceTest`, `AuditRetentionTaskTest`,
 `BackendPropertiesValidationTest` (the floors) · **Code:**
-`service/AuditRetentionService`, `audit/api/RetentionParticipant`, `task/AuditRetentionTask`, `audit/internal/AuditRetentionProperties`, `metrics/ScheduledJob#AUDIT_RETENTION`,
+`service/AuditRetentionService`, `audit/api/RetentionParticipant`, `task/AuditRetentionTask`, `audit/internal/AuditRetentionProperties`, `platform/api/ScheduledJob#AUDIT_RETENTION`,
 `repository/AuditEventRepository#existsByDomainAndOccurredAtBefore`,
 `bank/internal/BankAuditService#holdsRowsBefore`,
 `bank/internal/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/audit/admin/audit-log.html` ·
@@ -698,5 +698,5 @@ current principal and no request is bound.
   the compliant twins (`runAs`, `MANDATORY` on method or class) not. Selection floors: 8
   after-commit or asynchronous methods, 14 listener methods, 0 observer SPIs.
 
-**Enforced by:** `ListenerAndObserverRulesTest` · **Code:** `annotation/ObserverSpi`,
+**Enforced by:** `ListenerAndObserverRulesTest` · **Code:** `platform/api/ObserverSpi`,
 `service/AuditService`, `bank/internal/BankAuditService`
