@@ -24,7 +24,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -41,7 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class UserJoinDateServiceTest {
 
   @Mock private UserRepository userRepository;
-  @Mock private MembershipOperations<OrgUnitMembership> membershipOperations;
+  @Mock private MembershipOperations membershipOperations;
 
   @InjectMocks private UserService userService;
 

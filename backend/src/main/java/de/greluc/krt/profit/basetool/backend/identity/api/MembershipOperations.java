@@ -32,13 +32,8 @@ import org.jetbrains.annotations.Nullable;
  * <p>Every method forwards one call verbatim: the implementation adds no transaction, no check and
  * no side effect, so the transaction, the audit rows and the exceptions are those of the org-unit
  * services behind it. The returned rows are the managed instances of the caller's transaction.
- *
- * <p>The row type is a parameter, because the membership entity still belongs to the org-unit
- * module; the identity module names it only where it holds the concrete type.
- *
- * @param <M> the membership row type
  */
-public interface MembershipOperations<M> {
+public interface MembershipOperations {
 
   /**
    * The user's Staffel ids, name-sorted, primary first.
@@ -48,15 +43,6 @@ public interface MembershipOperations<M> {
    */
   @NotNull
   List<UUID> findStaffelMembershipOrgUnitIds(@NotNull UUID userId);
-
-  /**
-   * Every membership row of the user, Staffel first, then Spezialkommandos by name.
-   *
-   * @param userId the user whose memberships to list
-   * @return the membership rows; possibly empty
-   */
-  @NotNull
-  List<M> findAllMembershipsForUser(@NotNull UUID userId);
 
   /**
    * Makes the user's Staffel memberships equal to the desired set, within the caller's transaction.
@@ -71,18 +57,25 @@ public interface MembershipOperations<M> {
   void reconcileStaffelMemberships(@NotNull User user, @NotNull List<StaffelAssignment> desired);
 
   /**
-   * Adds the user to a Spezialkommando.
+   * Adds the user to a Spezialkommando and sets the initial capability flags on the new row, in one
+   * save and without a second audit row.
    *
    * @param specialCommandId the Spezialkommando
    * @param userId the user to add
-   * @return the persisted membership row, managed in the caller's transaction
+   * @param isLogistician {@code true} to start as Logistician; {@code null} or {@code false} leaves
+   *     the flag unset
+   * @param isMissionManager {@code true} to start as Mission Manager; {@code null} or {@code false}
+   *     leaves the flag unset
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the
    *     Spezialkommando or the user is unknown
    * @throws de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException when the user
    *     is already a member
    */
-  @NotNull
-  M addMember(@NotNull UUID specialCommandId, @NotNull UUID userId);
+  void addMember(
+      @NotNull UUID specialCommandId,
+      @NotNull UUID userId,
+      @Nullable Boolean isLogistician,
+      @Nullable Boolean isMissionManager);
 
   /**
    * Removes the user from a Spezialkommando.
@@ -102,17 +95,25 @@ public interface MembershipOperations<M> {
    * @param isLogistician the new Logistician flag, or {@code null} to leave it unchanged
    * @param isMissionManager the new Mission Manager flag, or {@code null} to leave it unchanged
    * @param version the row version the caller expects
-   * @return the persisted membership row with the bumped version
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the
    *     Spezialkommando is unknown or the user is not a member
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
    *     stale
    */
-  @NotNull
-  M patchFlags(
+  void patchFlags(
       @NotNull UUID specialCommandId,
       @NotNull UUID userId,
       @Nullable Boolean isLogistician,
       @Nullable Boolean isMissionManager,
       @Nullable Long version);
+
+  /**
+   * Flushes the pending membership writes of the caller's transaction to the database, so a
+   * constraint or optimistic-lock failure surfaces from the calling operation and not from the next
+   * query. Runs the user's membership read, whose automatic flush is the one that has always ended
+   * the membership delta; the rows it reads are not returned.
+   *
+   * @param userId the user whose memberships were changed
+   */
+  void flushMembershipChanges(@NotNull UUID userId);
 }

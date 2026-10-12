@@ -35,11 +35,12 @@ import org.springframework.stereotype.Service;
 /**
  * The org-unit module's implementation of the identity-owned {@link MembershipOperations}: each
  * method forwards to {@link OrgUnitMembershipService} or {@link OrgUnitMembershipQueryService}
- * unchanged. It declares no transaction of its own, so the callee's propagation applies.
+ * unchanged, except that {@code addMember} also sets the initial capability flags on the row it
+ * gets back. It declares no transaction of its own, so the callee's propagation applies.
  */
 @Service
 @RequiredArgsConstructor
-public class OrgUnitMembershipOperations implements MembershipOperations<OrgUnitMembership> {
+public class OrgUnitMembershipOperations implements MembershipOperations {
 
   private final OrgUnitMembershipService membershipService;
   private final OrgUnitMembershipQueryService membershipQueryService;
@@ -47,11 +48,6 @@ public class OrgUnitMembershipOperations implements MembershipOperations<OrgUnit
   @Override
   public @NotNull List<UUID> findStaffelMembershipOrgUnitIds(@NotNull UUID userId) {
     return membershipQueryService.findStaffelMembershipOrgUnitIds(userId);
-  }
-
-  @Override
-  public @NotNull List<OrgUnitMembership> findAllMembershipsForUser(@NotNull UUID userId) {
-    return membershipQueryService.findAllMembershipsForUser(userId);
   }
 
   @Override
@@ -68,9 +64,20 @@ public class OrgUnitMembershipOperations implements MembershipOperations<OrgUnit
   }
 
   @Override
-  public @NotNull OrgUnitMembership addMember(
-      @NotNull UUID specialCommandId, @NotNull UUID userId) {
-    return membershipService.addMember(specialCommandId, userId);
+  public void addMember(
+      @NotNull UUID specialCommandId,
+      @NotNull UUID userId,
+      @Nullable Boolean isLogistician,
+      @Nullable Boolean isMissionManager) {
+    OrgUnitMembership fresh = membershipService.addMember(specialCommandId, userId);
+    if (Boolean.TRUE.equals(isLogistician) || Boolean.TRUE.equals(isMissionManager)) {
+      if (Boolean.TRUE.equals(isLogistician)) {
+        fresh.setLogistician(true);
+      }
+      if (Boolean.TRUE.equals(isMissionManager)) {
+        fresh.setMissionManager(true);
+      }
+    }
   }
 
   @Override
@@ -79,15 +86,20 @@ public class OrgUnitMembershipOperations implements MembershipOperations<OrgUnit
   }
 
   @Override
-  public @NotNull OrgUnitMembership patchFlags(
+  public void patchFlags(
       @NotNull UUID specialCommandId,
       @NotNull UUID userId,
       @Nullable Boolean isLogistician,
       @Nullable Boolean isMissionManager,
       @Nullable Long version) {
-    return membershipService.patchFlags(
+    membershipService.patchFlags(
         specialCommandId,
         userId,
         new MembershipFlagsPatchRequest(isLogistician, isMissionManager, version));
+  }
+
+  @Override
+  public void flushMembershipChanges(@NotNull UUID userId) {
+    membershipQueryService.findAllMembershipsForUser(userId);
   }
 }

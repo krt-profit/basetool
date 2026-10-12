@@ -25,7 +25,6 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -55,7 +54,7 @@ class UserServiceSortTest {
   @Mock private SquadronRepository squadronRepository;
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
-  @Mock private MembershipOperations<OrgUnitMembership> membershipOperations;
+  @Mock private MembershipOperations membershipOperations;
 
   @InjectMocks private UserService userService;
 

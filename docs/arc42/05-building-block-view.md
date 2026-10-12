@@ -272,7 +272,8 @@ lies in `platform.api`, which `KeycloakTrustSupport` needs. `UserService`, `User
 `UserReconciliationService`, the `User` entity and `UserRepository` stay in the layer packages until two
 calls are inverted through identity-owned SPIs. Slice b is done: `UserService` reaches the org-unit
 membership services only through `identity.api.MembershipOperations`, which
-`service.OrgUnitMembershipOperations` implements as a pure pass-through. The account-erasure call
+`service.OrgUnitMembershipOperations` implements as a pass-through (it also sets the initial flags of a
+new Spezialkommando member). The seam names no org-unit type and has no type parameter. The account-erasure call
 towards the GDPR orchestrator follows in slice c.
 
 The platform modules reach the domains only through SPIs they own and the domains implement
