@@ -283,9 +283,7 @@ The org-unit module (rank 4) owns the Staffeln, Spezialkommandos, Bereiche, the 
 the entities, repositories, DTOs and services other modules call lie in `orgunit.api`, the departure notifier, the membership operations
 and the recipient directory in `orgunit.internal`, the eight controllers in `orgunit.web`. Two placements follow the dependency direction
 rather than the names: `UserMapper` lies in `orgunit.api` (it reads memberships, and `orgunit` may depend on `identity`, not the reverse),
-and `OrgUnitKind` and `SquadronReferenceDto` lie in the kernel, which lets `notification` and `identity` name them. `UserController`, `MeController`,
-`DiscordRegistrationAdminController` and the rejected-registration retention lie in the transitional `privacy` module (`privacy.web`, `privacy.internal`)
-until their host module exists, which is why the module baseline is empty. `privacy.api` holds the GDPR services, the deletion-request entity and the data-export and person-search
+and `OrgUnitKind` and `SquadronReferenceDto` lie in the kernel, which lets `notification` and `identity` name them. `UserController` and `MeController` lie in the composition root (`app.web`), which may depend on every module they read; the registration queue (`DiscordRegistrationAdminController`) lies in `identity.web` and the rejected-registration retention in `identity.internal`, which deletes accounts through the `AccountErasure` SPI; only the merge endpoint (`DiscordRegistrationMergeController`) lies in `privacy.web`. The module baseline is empty. `privacy.api` holds the GDPR services, the deletion-request entity and the data-export and person-search
 types; the module is dissolved into `identity` with the GDPR SPIs, not before.
 
 The platform modules reach the domains only through SPIs they own and the domains implement

@@ -64,7 +64,10 @@ class ApiDomainsMatchTheDomainMapTest {
               + " serves the picker from the personal inventory",
           "MeController",
           "identity: the REST cut serves the caller's own context under identity; the code"
-              + " hosts the read across seven modules in the composition root");
+              + " hosts the read across seven modules in the composition root",
+          "UserController",
+          "identity: the REST cut serves the member endpoints under identity; the code hosts"
+              + " them across eight modules in the composition root");
 
   /** The controllers today; a smaller selection would check less. */
   private static final int CONTROLLER_FLOOR = 98;

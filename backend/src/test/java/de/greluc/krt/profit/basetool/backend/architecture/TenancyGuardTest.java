@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.app.web.UserController;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.GateReport;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.HandlerKey;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
@@ -62,7 +63,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityS
 import de.greluc.krt.profit.basetool.backend.orgunit.web.SpecialCommandController;
 import de.greluc.krt.profit.basetool.backend.orgunit.web.SpecialCommandMembershipController;
 import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
-import de.greluc.krt.profit.basetool.backend.privacy.web.UserController;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.RankRequirement;
 import de.greluc.krt.profit.basetool.backend.promotion.web.MemberEvaluationController;

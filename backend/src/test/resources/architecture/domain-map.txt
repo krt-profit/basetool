@@ -58,8 +58,8 @@ class CreateDeletionRequestRequest privacy GDPR orchestration, transitional modu
 class DecideDeletionRequestRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class ConsolidateAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class MergeAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
-class UserController privacy REST and retention classes of identity awaiting their host module, transitional (plan 7.6)
 class MeController app composition root: the caller's context and layout read (plan 7.6)
+class UserController app composition root: the member endpoints read and write across eight modules (plan 7.6)
 class PayoutPreference identity member preference on User (plan 7.3)
 class AuthHelperService platform the single SecurityContextHolder reader (ArchUnit rule)
 class MaterialCollectionEntryDto inventory produced by InventoryAggregationService

@@ -257,7 +257,7 @@ the modules its row allows; a dependency upward is inverted through an SPI or an
 | 10 | `refinery`, `joborder`, `materialexchange` | Raffinerie, Aufträge, Materialbörse. |
 | 11 | `operation`, `bank` | Operationen and payouts; the Kartellbank (org-unit-blind by design, ADR-0020). |
 | 12 | `exchange` | The external client exchange — an adapter over the other modules' APIs. |
-| 14 | `app` | The composition root: `BackendApplication`, `SecurityConfig`, `DataInitializer`, and `BusinessMetricsCollector` until each module publishes its own gauges. |
+| 14 | `app` | The composition root: `BackendApplication`, `SecurityConfig`, `DataInitializer`, the cross-module `MeController` and `UserController` (`app.web`, plan §7.6), and `BusinessMetricsCollector` until each module publishes its own gauges. |
 
 Rank 13 (`privacy`) exists only during the migration: the 31 GDPR classes are re-homed there first
 and then dissolved into identity-owned SPIs (§7.6).
@@ -2772,8 +2772,8 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
 3. *Left behind on purpose*: `UserController`, `MeController`, `DiscordRegistrationAdminController`, `RejectedRegistrationRetentionService` and its task stay in
    `controller` / `service`. They call the GDPR services (`UserDeletionService`, `AccountConsolidationService`, `UserAccountMergeService`), which are rank 13, and
    `MeController` reaches the inventory properties and `OwnerScopeService`; their host module is the REST-surface and GDPR step. The domain map assigns the five to the
-   transitional `privacy` module (class rules), so their 14 upward edges leave the baseline **by reclassification, not by being resolved** (the other 12 of the 26 were resolved by the moves).
-4. *Gates*: the module baseline went **26 → 0** and `ModuleBaselineTest` no longer asserts a non-empty selection (the planted-fixture tests still prove the rule fires);
+   transitional `privacy` module (class rules), so their 14 upward edges left the baseline **by reclassification, not by being resolved** (the other 12 of the 26 were resolved by the moves). *Corrected 2026-10-12: the five classes were then resolved for real; see the entry "the 14 baseline edges are resolved, not reclassified".*
+4. *Gates*: the module baseline went **26 → 0** and `ModuleBaselineTest` no longer asserted a non-empty selection (restored in the correction entry as a floor on the module graph; the planted-fixture tests still prove the rule fires);
    the two domain-map name rules for `orgunit` and the one for `identity` assign no class any more and left. `UserDto`, `UserReferenceDto` and
    `SquadronReferenceDto` joined the leaf helpers (the rule let leaf helpers depend on the legacy `model` package, which they left). Floors from the failing
    assertions: service layer 489 → **486**, join-column selection 208 → **180**, `mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional` 492 → **489**, controller targets 113 → **111**.
@@ -2923,7 +2923,7 @@ The question for the owner: A, B or C.
 *Step 13 — D-17, the member settings leave `app_user` (design, nothing written).*
 1. *What moves.* `app_user.default_payout_preference` (VARCHAR 50, nullable, V142) and `app_user.share_blueprints_globally` (BOOLEAN NOT NULL DEFAULT FALSE, V163). Readers and writers: `User`, `UserService`
    (`updateUserDefaultPayoutPreference`, `updateUserShareBlueprintsGlobally`, which also records `BLUEPRINT_SHARING_CHANGED`), `UserRepository.findIdsBySharingBlueprintsGlobally` (read by `PersonalBlueprintOverviewService` and
-   `JobOrderItemBlueprintOwnersService`), `MissionParticipantService` (pre-fills the sign-up), `UserController` (the four endpoints, now in `privacy.web`), `IdentityExportSections` and `IdentityMentionSource`.
+   `JobOrderItemBlueprintOwnersService`), `MissionParticipantService` (pre-fills the sign-up), `UserController` (the four endpoints, now in `app.web`), `IdentityExportSections` and `IdentityMentionSource`.
 2. *Target.* Two tables with their own `@Version`: `member_payout_setting` (owner `mission`) and `member_blueprint_sharing` (owner `blueprint`), one row per member, `user_id` the primary key and a foreign key to `app_user` `ON DELETE CASCADE`.
    A member with no row has the default (no preference; sharing off), so the sharing table holds only rows that were ever written.
 3. *Migration, phase 1 (additive, `V283`; the number is claimed by re-grepping `origin/main` and the open pull requests at push time; today `origin/main` ends at V282 and no other pull request is open):*
@@ -3026,6 +3026,14 @@ C) retire the target until a module extraction gives it a natural place. Not dec
    of their own, which is a different and much larger cut. The same holds for `backend-bank`. The P5-a and P5-b preparation (the included `build-logic`, the `<app>-<name>` rules of the image-reuse and SBOM scripts, the JaCoCo aggregation) stays; the spike is
    discarded (its stash was `064ec3b0be5a549fef5a21948e66ca7d98a9e87e`, "p5c-exchange-spike"). ADR-0249 and ADR-0231 carry an amendment; nothing in the repository says the extraction is scheduled any more.
 
+**Umbrella correction — the 14 baseline edges are resolved, not reclassified — done 2026-10-12 (owner instruction)**
+The owner did not accept the empty module baseline of steps 6 and 7: five classes had left it only because the domain map assigned them to the transitional `privacy` module. Resolved in four commits, one per group, each green on its targeted tests:
+1. *Retention* (`RejectedRegistrationRetentionService` and its task): back to `identity.internal`. The service deletes through the existing `identity.api.AccountErasure` SPI with `KeycloakPresence.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER`, the contract the registration flow already uses; no new SPI.
+2. *Registration queue*: `DiscordRegistrationAdminController` (list, approve, reject, reopen, link) to `identity.web`; the merge endpoint only needs the GDPR merge service, so it is its own class `DiscordRegistrationMergeController` in `privacy.web`, same path, method name and annotations. The row mapping is `PendingRegistrationDto.from`, shared by both. The merge endpoint gets a unit test.
+3. *Caller context* (`MeController`) and *member endpoints* (`UserController`, 28 mappings): both move whole to the composition root, `app.web`. Their highest dependency is rank 8 (`MeController`: the inventory properties) or 13 (`UserController`: the deletion and consolidation services), and the composition root is the module that may depend on all of them; splitting `UserController` by path domain (orgunit, mission, blueprint, dashboard, bank, privacy hosts) was not done because the hosts, the OpenAPI tags and the class-level `@Transactional` / `@PreAuthorize` per method are choices the existing calls do not dictate. Paths, method names, annotations and `openapi.json` are unchanged. **Derived, not individually reviewed.**
+4. *Gates*: the five class rules for `privacy` left the domain map (`MeController` and `UserController` now have class rules for `app`); the module baseline stays empty, and now it is empty because nothing violates the ranks. The removed non-empty assertion of `ModuleBaselineTest` is replaced by `theRuleSeesTheRealModuleGraphSoAnEmptyBaselineIsNotVacuous`: a floor of **174** module pairs with a class dependency, every one permitted by the map. `ApiDomains` has entries for the new controller; the three controllers keep the tag `identity` through reviewed `CONTROLLER_TO_API` entries (`MeController`, `UserController`), so the tags in `openapi.json` do not change. The recorded context shape counts 105 controllers (was 104). `scratch_d17c.py`, a scratch script committed by mistake in the step 13 commit, is deleted.
+5. *Question left for the owner*: whether `UserController` should be split by path domain into the modules that own the data (the 28 mappings are sorted by domain in the commit message of the correction); until then it lives in the composition root.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -3058,7 +3066,8 @@ before a decision.
         `UserMapper`/`UserDto`/`UserReferenceDto`, `UserController`, `MeController`, the mail services,
         `UserSyncService`/`UserSyncTask`, the rejected-registration retention.
         `UserController`, `MeController`, `DiscordRegistrationAdminController`, `RejectedRegistrationRetentionService` and its task moved into the transitional
-        `privacy` module in step 8, until their host module exists; `UserMapper` went to `orgunit.api` (see the entry above).
+        `privacy` module in step 8 and were resolved for real afterwards (retention to `identity.internal`, the registration queue to `identity.web` with the merge endpoint in `privacy.web`,
+        `MeController` and `UserController` to `app.web`; see the correction entry); `UserMapper` went to `orgunit.api` (see the entry above).
   - [x] **8.** done — `privacy` (23, 28 with the identity leftovers): the GDPR orchestration classes (§5.1 rank 13) into `privacy`, then
         dissolved into identity as §5.1 and §7.6 say.
 - Business core leftovers (the entities other modules still hold):

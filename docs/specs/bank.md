@@ -2149,7 +2149,7 @@ reaches `/memberships`) · **Code:**
 (`resolveCounterparty`), `bank/internal/BankBookingRequestService`,
 `orgunit/api/OrgUnitMembershipQueryService#listDirectMembershipOptions`, `bank/internal/BankBookingRow`,
 `bank/internal/BankPostingRepository`, `bank/internal/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
-`bank/internal/OrgUnitBankAccessService#redact`, `privacy/web/UserController`, `app/api/SecurityConfig`,
+`bank/internal/OrgUnitBankAccessService#redact`, `app/web/UserController`, `app/api/SecurityConfig`,
 `db/migration/V197`, `db/migration/V205` (#994 constraint relax),
 `orgunit/api/OrgUnitMembershipQueryService#listAllActiveOrgUnitOptionsAllKinds` (#994),
 frontend `bank/web/BankPageController`, `bank/web/BankRequestQueuePageController`,
