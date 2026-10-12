@@ -25,11 +25,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepositor
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequestRepository;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequestStatus;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -39,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.privacy.api.DeletionRequestReposito
 import de.greluc.krt.profit.basetool.backend.privacy.api.DeletionRequestStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;

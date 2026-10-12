@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
  * Domain event published right after a new job order is persisted. Carries the scalars the
  * notification pipeline needs (the responsible / requesting org units, the display id and handle
  * for rendering, the order type, and the creating actor to exclude) so the after-commit listener
- * never touches the managed {@link de.greluc.krt.profit.basetool.backend.model.JobOrder}.
+ * never touches the managed {@link de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder}.
  *
  * @param jobOrderId the created job order's id (also the notification's loose entity id)
  * @param displayId the human-facing sequential display id

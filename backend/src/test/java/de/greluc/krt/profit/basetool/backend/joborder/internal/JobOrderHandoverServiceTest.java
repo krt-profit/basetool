@@ -34,14 +34,13 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverMapper;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipService;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -78,7 +77,7 @@ class JobOrderHandoverServiceTest {
   private JobOrder order;
   private InventoryItem inventoryItem;
   private de.greluc.krt.profit.basetool.backend.catalogue.api.Material material;
-  private de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial;
+  private de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial jobOrderMaterial;
 
   @BeforeEach
   void setUp() {
@@ -96,7 +95,7 @@ class JobOrderHandoverServiceTest {
     material = new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material.setId(materialId);
 
-    jobOrderMaterial = new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    jobOrderMaterial = new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial();
     jobOrderMaterial.setId(UUID.randomUUID());
     jobOrderMaterial.setMaterial(material);
     jobOrderMaterial.setAmount(10.0);
@@ -114,7 +113,7 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldRejectItemOrder_soProductionRemainsTheSoleMaterialConsumer() {
-    order.setType(de.greluc.krt.profit.basetool.backend.model.JobOrderType.ITEM);
+    order.setType(de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType.ITEM);
     JobOrderHandoverItemCreateDto itemDto =
         new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null, null);
     JobOrderHandoverCreateDto createDto =
@@ -263,8 +262,8 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    de.greluc.krt.profit.basetool.backend.model.JobOrderHandover[] persistedHandover =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrderHandover[1];
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover[] persistedHandover =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover[1];
     when(jobOrderHandoverRepository.save(any()))
         .thenAnswer(
             i -> {
@@ -336,8 +335,8 @@ class JobOrderHandoverServiceTest {
         new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material2.setId(materialId2);
 
-    de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial jobOrderMaterial2 =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial();
     jobOrderMaterial2.setQualityTier(
         de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.none());
     jobOrderMaterial2.setId(UUID.randomUUID());
@@ -396,8 +395,8 @@ class JobOrderHandoverServiceTest {
         new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material2.setId(materialId2);
 
-    de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial jobOrderMaterial2 =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial();
     jobOrderMaterial2.setQualityTier(
         de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.none());
     jobOrderMaterial2.setId(UUID.randomUUID());
@@ -638,8 +637,8 @@ class JobOrderHandoverServiceTest {
         new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     material2.setId(materialId2);
 
-    de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial jobOrderMaterial2 =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial();
     jobOrderMaterial2.setQualityTier(
         de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.none());
     jobOrderMaterial2.setId(UUID.randomUUID());

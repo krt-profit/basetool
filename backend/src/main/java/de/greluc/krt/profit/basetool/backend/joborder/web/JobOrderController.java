@@ -22,6 +22,15 @@ package de.greluc.krt.profit.basetool.backend.joborder.web;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
@@ -46,15 +55,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderBlu
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAssigneeDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
@@ -1084,8 +1084,8 @@ public class JobOrderController {
    * Request body for the assignee-note PUT endpoint.
    *
    * @param note the new note text (at most {@value
-   *     de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee#NOTE_MAX_LENGTH} characters;
-   *     blank/{@code null} clears the note)
+   *     de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee#NOTE_MAX_LENGTH}
+   *     characters; blank/{@code null} clears the note)
    * @param version the assignee edge version the client last saw, or {@code null} to skip the
    *     optimistic-lock check
    */

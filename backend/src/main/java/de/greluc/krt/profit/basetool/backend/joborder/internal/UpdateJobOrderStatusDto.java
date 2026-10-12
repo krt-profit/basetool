@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import jakarta.validation.constraints.NotNull;
 
 /**

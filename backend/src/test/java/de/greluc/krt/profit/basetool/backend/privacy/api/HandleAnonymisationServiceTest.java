@@ -38,11 +38,11 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRep
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransactionRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandleAnonymisation;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

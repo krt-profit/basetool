@@ -41,23 +41,23 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMapper;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -107,7 +107,7 @@ class JobOrderServiceTest {
   @Mock private JobOrderItemService jobOrderItemService;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper
+  private de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverMapper
       jobOrderItemHandoverMapper;
 
   @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
@@ -872,7 +872,9 @@ class JobOrderServiceTest {
 
   @Test
   void updateJobOrderAsRequester_frozenOnceDelivered_throws400() {
-    jobOrder.getHandovers().add(new de.greluc.krt.profit.basetool.backend.model.JobOrderHandover());
+    jobOrder
+        .getHandovers()
+        .add(new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover());
     CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto updateDto =
         new CreateJobOrderDto(null, null, null, "note", List.of(updateMat), null);
@@ -945,7 +947,7 @@ class JobOrderServiceTest {
     itemOrder.setVersion(1L);
     itemOrder
         .getItemHandovers()
-        .add(new de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover());
+        .add(new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover());
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(itemOrder));
 
     de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto dto =
@@ -976,7 +978,7 @@ class JobOrderServiceTest {
     itemOrder.setRequestingOrgUnit(requestingUnit);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(itemOrder));
     when(jobOrderItemService.buildItemLine(any()))
-        .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
+        .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem());
     UUID keptMaterial = UUID.randomUUID();
     UUID removedMaterial = UUID.randomUUID();
     when(jobOrderItemService.requiredMaterialIds(itemOrder))
@@ -993,7 +995,7 @@ class JobOrderServiceTest {
             "requester item note",
             null,
             List.of(
-                new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                     null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
             1L);
 
@@ -1041,7 +1043,7 @@ class JobOrderServiceTest {
     itemOrder.setRequestingOrgUnit(requestingUnit);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(itemOrder));
     when(jobOrderItemService.buildItemLine(any()))
-        .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
+        .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem());
     UUID keptGameItem = UUID.randomUUID();
     UUID removedGameItem = UUID.randomUUID();
     when(jobOrderItemService.requiredGameItemIds(itemOrder))
@@ -1058,7 +1060,7 @@ class JobOrderServiceTest {
             "requester item note",
             null,
             List.of(
-                new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                     null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
             1L);
 
@@ -1403,8 +1405,8 @@ class JobOrderServiceTest {
     UUID requiredMatId = UUID.randomUUID();
     UUID orphanMatId = UUID.randomUUID();
 
-    de.greluc.krt.profit.basetool.backend.model.JobOrder order =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrder();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder order =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder();
     order.setId(orderId);
 
     de.greluc.krt.profit.basetool.backend.catalogue.api.Material requiredMat =
@@ -1464,8 +1466,8 @@ class JobOrderServiceTest {
     UUID requestedGameItemId = UUID.randomUUID();
     UUID orphanGameItemId = UUID.randomUUID();
 
-    de.greluc.krt.profit.basetool.backend.model.JobOrder order =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrder();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder order =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder();
     order.setId(orderId);
     order.setType(JobOrderType.ITEM);
 
@@ -1700,7 +1702,7 @@ class JobOrderServiceTest {
           "edited",
           null,
           List.of(
-              new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+              new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                   null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
           version);
     }
@@ -1709,7 +1711,7 @@ class JobOrderServiceTest {
       JobOrder order = new JobOrder();
       order.setId(orderId);
       order.setType(JobOrderType.ITEM);
-      order.setStatus(de.greluc.krt.profit.basetool.backend.model.JobOrderStatus.OPEN);
+      order.setStatus(de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus.OPEN);
       order.setVersion(1L);
       return order;
     }
@@ -1732,7 +1734,7 @@ class JobOrderServiceTest {
       JobOrder order = itemOrder();
       order
           .getItemHandovers()
-          .add(new de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover());
+          .add(new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover());
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
 
       assertThrows(
@@ -1761,7 +1763,7 @@ class JobOrderServiceTest {
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any())).thenReturn(List.of());
       when(jobOrderItemService.buildItemLine(any()))
-          .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
+          .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem());
 
       de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto dto =
           new de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto(
@@ -1770,9 +1772,9 @@ class JobOrderServiceTest {
               "edited",
               null,
               List.of(
-                  new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                  new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                       null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null),
-                  new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                  new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                       null, UUID.randomUUID(), UUID.randomUUID(), 2, List.of(), 2, 1)),
               1L);
 
@@ -1780,7 +1782,7 @@ class JobOrderServiceTest {
 
       verify(jobOrderItemService, times(2)).buildItemLine(any());
       assertEquals(2, order.getItems().size(), "the two new lines replace the old set");
-      java.util.List<de.greluc.krt.profit.basetool.backend.model.JobOrderItem> items =
+      java.util.List<de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem> items =
           new java.util.ArrayList<>(order.getItems());
       assertTrue(
           items.stream().anyMatch(i -> i.getParentItem() != null),
@@ -1792,8 +1794,8 @@ class JobOrderServiceTest {
     @Test
     void matchedLine_isReDerivedInPlace_soBookedProductionSurvives() {
       JobOrder order = itemOrder();
-      de.greluc.krt.profit.basetool.backend.model.JobOrderItem existing =
-          new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+      de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem existing =
+          new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem();
       java.util.UUID lineId = UUID.randomUUID();
       existing.setId(lineId);
       existing.setAmount(10);
@@ -1813,7 +1815,7 @@ class JobOrderServiceTest {
               "edited",
               null,
               List.of(
-                  new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                  new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                       lineId, UUID.randomUUID(), UUID.randomUUID(), 12, List.of(), 1, null)),
               1L);
 
@@ -1829,15 +1831,15 @@ class JobOrderServiceTest {
     @Test
     void droppingALineWithBookedProduction_throwsBadRequest() {
       JobOrder order = itemOrder();
-      de.greluc.krt.profit.basetool.backend.model.JobOrderItem produced =
-          new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+      de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem produced =
+          new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem();
       produced.setId(UUID.randomUUID());
       produced.setAmount(4);
       produced.setManufacturedAmount(4);
       order.addItem(produced);
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
       when(jobOrderItemService.buildItemLine(any()))
-          .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
+          .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem());
 
       assertThrows(
           de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
@@ -1848,8 +1850,8 @@ class JobOrderServiceTest {
     @Test
     void twoPayloadLinesClaimingTheSameExistingLine_throwsBadRequest() {
       JobOrder order = itemOrder();
-      de.greluc.krt.profit.basetool.backend.model.JobOrderItem existing =
-          new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+      de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem existing =
+          new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem();
       java.util.UUID lineId = UUID.randomUUID();
       existing.setId(lineId);
       existing.setAmount(5);
@@ -1863,9 +1865,9 @@ class JobOrderServiceTest {
               "edited",
               null,
               List.of(
-                  new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                  new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                       lineId, UUID.randomUUID(), UUID.randomUUID(), 5, List.of(), 1, null),
-                  new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                  new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                       lineId, UUID.randomUUID(), UUID.randomUUID(), 7, List.of(), 2, null)),
               1L);
 
@@ -1878,8 +1880,8 @@ class JobOrderServiceTest {
     @Test
     void loweringAmountBelowManufactured_throwsBadRequest() {
       JobOrder order = itemOrder();
-      de.greluc.krt.profit.basetool.backend.model.JobOrderItem existing =
-          new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+      de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem existing =
+          new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem();
       java.util.UUID lineId = UUID.randomUUID();
       existing.setId(lineId);
       existing.setAmount(10);
@@ -1894,7 +1896,7 @@ class JobOrderServiceTest {
               "edited",
               null,
               List.of(
-                  new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                  new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
                       lineId, UUID.randomUUID(), UUID.randomUUID(), 3, List.of(), 1, null)),
               1L);
 
@@ -1936,7 +1938,7 @@ class JobOrderServiceTest {
       when(jobOrderItemService.aggregateMaterials(any()))
           .thenReturn(
               List.of(
-                  new de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto(
+                  new de.greluc.krt.profit.basetool.backend.joborder.api.AggregatedMaterialDto(
                       materialDto,
                       "GOOD",
                       QualityTierFixtures.goodDto(),
@@ -1945,7 +1947,7 @@ class JobOrderServiceTest {
                       List.of(),
                       null)));
       when(jobOrderItemService.buildItemLine(any()))
-          .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
+          .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem());
       when(orderLinkedStockRows.materialStockOfOrders(List.of(orderId)))
           .thenReturn(
               List.of(

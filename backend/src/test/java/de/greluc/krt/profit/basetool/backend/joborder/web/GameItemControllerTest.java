@@ -30,10 +30,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintReferenceDto
 import de.greluc.krt.profit.basetool.backend.config.SecurityConfig;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
+import de.greluc.krt.profit.basetool.backend.joborder.api.ItemDerivationDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.dto.ItemDerivationDto;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;

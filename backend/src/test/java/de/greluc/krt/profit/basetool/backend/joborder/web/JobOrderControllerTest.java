@@ -30,6 +30,11 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
@@ -51,11 +56,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderBlu
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -302,8 +302,8 @@ class JobOrderControllerTest {
   void getJobOrderById_requesterOnlyViewer_redactsProgressAssigneesAndAggregates() {
     UUID id = UUID.randomUUID();
     UUID matLineId = UUID.randomUUID();
-    de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto matLine =
-        new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto(
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto matLine =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto(
             matLineId,
             null,
             650,
@@ -344,7 +344,7 @@ class JobOrderControllerTest {
     assertThat(result.handovers()).isEmpty();
     assertThat(result.itemHandovers()).isEmpty();
     assertThat(result.materials()).hasSize(1);
-    de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto redacted =
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto redacted =
         result.materials().get(0);
     assertThat(redacted.id()).isEqualTo(matLineId);
     assertThat(redacted.minQuality()).isEqualTo(650);

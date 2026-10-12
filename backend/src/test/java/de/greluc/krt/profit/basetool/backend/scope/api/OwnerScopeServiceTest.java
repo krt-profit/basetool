@@ -40,13 +40,16 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
@@ -63,9 +66,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
@@ -2183,10 +2183,10 @@ class OwnerScopeServiceTest {
   }
 
   /** Builds a {@link JobOrder} responsible to the given org unit (Squadron or SpecialCommand). */
-  private static de.greluc.krt.profit.basetool.backend.model.JobOrder jobOrderResponsibleTo(
+  private static de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder jobOrderResponsibleTo(
       UUID id, de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit responsible) {
-    de.greluc.krt.profit.basetool.backend.model.JobOrder o =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrder();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder o =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder();
     o.setId(id);
     o.setResponsibleOrgUnit(responsible);
     return o;

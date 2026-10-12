@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemBoo
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPersonalRebookDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto.BookInDto;
@@ -57,7 +58,6 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionReque
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwningOrgUnitRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.orgchart.internal.OrgChartPositionCreateRequest;

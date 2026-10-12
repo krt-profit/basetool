@@ -2855,6 +2855,20 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
    the domain-map name rule for the mission classes assigns no class any more and left. The module baseline stays empty. `compileJava --rerun` shows 0 warnings.
 5. *Text scan*: nothing in code, resources or docs named the old packages. `MissionUnit.ship` is still an entity association (hangar ranks below mission); the eighth §5.6 conversion did not block the move.
 
+**Umbrella step 11c — the job-order module's 45 types move into `joborder.api` / `joborder.internal` — done 2026-10-12**
+1. *Probe*: the 45 types close no cycle at top level once the hangar's and the mission's types have moved.
+2. *Move* (150 files; six tests follow, among them `MaterialAmountRoundingTest`, which reads the package-private rounding of three entities): the order, material, item, assignee and handover
+   entities and enums, their repositories, mappers and DTOs, the material-claim entity, `ClaimBucketSource`, the item service, the material-requirement resolver, the stock projection service and
+   `QualityBucketAllocator` to `joborder.api` (39), the claim-create request, the two handover repositories, the claim repository and the stock-entry and stock-group DTOs to `joborder.internal` (6).
+   Entity and table names, bean names, paths and `openapi.json` are unchanged.
+3. *NullAway* (`joborder` is checked as a whole tree): `@Nullable` on `JobOrder.priority`, `JobOrderHandoverItem.quality` and `locationName`, and on the optional components of `LinkedStockAttributionDto`,
+   `AggregatedMaterialDto`, `JobOrderMaterialDto`, `JobOrderItemDto`, `ClaimDto`, `JobOrderItemStockEntryDto`, `JobOrderItemStockGroupDto` and the catalogue's `GameItemReferenceDto.kind`, and on the squadron
+   parameters of `JobOrderRepository`; three dereferences of a map lookup and one unboxing are wrapped in `Objects.requireNonNull`, which throws the same `NullPointerException`.
+   `JobOrderMapper` gets its `UserMapper` and `StockViewerAccess` through `@Autowired` setters, because `ModularityTest` rejects field injection of a type of another module. No suppression.
+4. *Gates* from the failing assertions: service layer 483 -> **481**, join-column selection 143 -> **120**, read-only mutation rule 486 -> **484**; the stock DTOs joined the leaf helpers; the two
+   domain-map name rules for the job-order classes assign no class any more and left. The module baseline stays empty. `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: source paths in `security-and-access.md` and `whole-number-amounts.md`.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2897,7 +2911,7 @@ before a decision.
         and `StockViewerAccess`.
   - [x] **10.** done — P4-2 part 2, blueprint: a read API for the seven `PersonalBlueprintRepository` finders,
         the data types the exchange names into `blueprint.api`, then the ten remaining types.
-  - [ ] **11.** hangar and mission done, joborder open — `hangar` (6), `joborder` (45), `mission` (36): what the foreign modules no longer
+  - [x] **11.** done — `hangar` (6), `joborder` (45), `mission` (36): what the foreign modules no longer
         hold after steps 6, 7 and 9; of the eight association-to-id conversions of §5.6 seven are done,
         `MissionUnit.ship` is still an entity association.
   - [ ] **12.** Access policies left in the scope hub (§5.4): `OwnerScopeService` and

@@ -50,15 +50,15 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -205,8 +205,8 @@ class RefineryOrderServiceTest {
   @Test
   void shouldRefuseEarmarkingForAJobOrderThatDoesNotRequireTheMaterial() {
     stubLookupsForSingleItem();
-    de.greluc.krt.profit.basetool.backend.model.JobOrder jobOrder =
-        new de.greluc.krt.profit.basetool.backend.model.JobOrder();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder jobOrder =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder();
     jobOrder.setId(JOB_ORDER_ID);
     when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(jobOrder));
     when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));

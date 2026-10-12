@@ -123,6 +123,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckou
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockEntryDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
@@ -438,6 +440,8 @@ class ArchitectureTest {
           PayoutPreference.class,
           JobTypeArchetype.class,
           OrgUnitKind.class,
+          JobOrderItemStockEntryDto.class,
+          JobOrderItemStockGroupDto.class,
           UexValues.class,
           UserDto.class,
           UserDtoRedaction.class,
@@ -727,7 +731,7 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 483);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 481);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 
@@ -1375,7 +1379,7 @@ class ArchitectureTest {
     assertClassFloor(
         "mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional",
         SERVICE_CODE.or(EXCHANGE_NON_WEB).or(BANK_NON_WEB),
-        486);
+        484);
     mutatingServiceMethodsInReadOnlyClassesRule().check(CLASSES);
   }
 
@@ -1724,7 +1728,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 143);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 120);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

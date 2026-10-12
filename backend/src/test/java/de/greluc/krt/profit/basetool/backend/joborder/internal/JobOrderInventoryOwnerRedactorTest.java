@@ -30,8 +30,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

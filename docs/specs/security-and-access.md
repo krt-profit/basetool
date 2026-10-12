@@ -5181,8 +5181,8 @@ that must stay, the counts and both marker rows), `HandleAnonymisationServiceTes
 `bank/internal/BankAuditEventRepository#anonymiseActorHandle`,
 `bank/internal/BankTransactionRepository#anonymiseCounterpartyHandle`,
 `bank/internal/BankBookingRequestRepository#anonymiseHandles`,
-`repository/JobOrderHandoverRepository#anonymiseRecipientHandle`,
-`repository/JobOrderItemHandoverRepository#anonymiseRecipientHandle`,
+`joborder/internal/JobOrderHandoverRepository#anonymiseRecipientHandle`,
+`joborder/internal/JobOrderItemHandoverRepository#anonymiseRecipientHandle`,
 `frontend/kernel/web/HandleDisplay` · **Decision:**
 [ADR-0183](../adr/0183-a-granted-erasure-anonymises-the-handle-snapshots-in-place.md)
 
