@@ -424,10 +424,13 @@ function createReceiver(cfg) {
     return { apply };
 }
 
-window.krtLiveSync = {
+/** @type {KrtLiveSyncApi} */
+export const krtLiveSync = {
     createReceiver,
     subscribe: syncSocket.subscribe,
     sendChanged: syncSocket.sendChanged,
     sendPresence: syncSocket.sendPresence,
     subscribedTopics: syncSocket.subscribedTopics,
 };
+
+window.krtLiveSync = krtLiveSync;

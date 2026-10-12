@@ -24,6 +24,7 @@
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
@@ -372,35 +373,35 @@ function updateProfitPreview() {
     }
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
-    window.krtEvents.on('focusout', 'rfc-update-profit', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('input', 'rfc-update-profit', updateProfitPreview);
+    krtEvents.on('focusout', 'rfc-update-profit', (el) => {
         const field = /** @type {HTMLInputElement} */ (el);
         if (field.value.trim() === '') {
             field.value = '0';
             updateProfitPreview();
         }
     });
-    window.krtEvents.on('click', 'rfc-set-started-now', setStartedAtNow);
-    window.krtEvents.on('change', 'rfc-update-method', updateMethodRatings);
-    window.krtEvents.on('click', 'rfc-add-material', addMaterialRow);
-    window.krtEvents.on('click', 'rfc-remove-material', (el) => {
+    krtEvents.on('click', 'rfc-set-started-now', setStartedAtNow);
+    krtEvents.on('change', 'rfc-update-method', updateMethodRatings);
+    krtEvents.on('click', 'rfc-add-material', addMaterialRow);
+    krtEvents.on('click', 'rfc-remove-material', (el) => {
         removeMaterialRow(el);
     });
-    window.krtEvents.on('change', 'rfc-update-output', (el) => {
+    krtEvents.on('change', 'rfc-update-output', (el) => {
         updateOutputMaterial(/** @type {KrtRefineryControl} */ (el));
     });
-    window.krtEvents.on('change', 'rfc-location-change', (el) => {
+    krtEvents.on('change', 'rfc-location-change', (el) => {
         window.krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
     });
-    window.krtEvents.on('input', 'rfc-calc-scu', (el) => {
+    krtEvents.on('input', 'rfc-calc-scu', (el) => {
         calcScu(el.getAttribute('data-index'));
     });
-    window.krtEvents.on('click', 'rfc-import-pick', () => {
+    krtEvents.on('click', 'rfc-import-pick', () => {
         const fileInput = document.getElementById('refineryImportFile');
         if (fileInput) fileInput.click();
     });
-    window.krtEvents.on('change', 'rfc-import-file', (el) => {
+    krtEvents.on('change', 'rfc-import-file', (el) => {
         const fileField = /** @type {HTMLInputElement} */ (el);
         if (fileField.files && fileField.files.length > 0) {
             const importForm = /** @type {HTMLFormElement | null} */ (
@@ -409,7 +410,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             if (importForm) importForm.requestSubmit();
         }
     });
-    window.krtEvents.on('click', 'rfc-apply-suggestion', (el) => {
+    krtEvents.on('click', 'rfc-apply-suggestion', (el) => {
         const materialId = el.getAttribute('data-material-id');
         const materialName = el.getAttribute('data-material-name') || '';
         const entry = el.closest('.material-entry');

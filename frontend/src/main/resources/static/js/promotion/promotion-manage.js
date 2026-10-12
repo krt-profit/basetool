@@ -27,6 +27,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 function pmPutEvaluation(url, payload) {
     if (!krtFetch) {
@@ -625,25 +626,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const search = document.getElementById('pm-member-search');
     if (search) search.addEventListener('input', pmApplyFilters);
 
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('change', 'pm-save-evaluation', (el) => {
+    if (krtEvents && typeof krtEvents.on === 'function') {
+        krtEvents.on('change', 'pm-save-evaluation', (el) => {
             pmEnqueueSave(el);
             pmRefreshLastEvaluatedFor(el.getAttribute('data-user-id'));
         });
-        window.krtEvents.on('click', 'pm-toggle-topic', pmToggleTopic);
-        window.krtEvents.on('click', 'pm-expand-all', pmExpandAllTopics);
-        window.krtEvents.on('click', 'pm-collapse-all', pmCollapseAllTopics);
-        window.krtEvents.on('click', 'pm-export-csv', pmExportCsv);
-        window.krtEvents.on('click', 'pm-cycle-sort', pmCycleSort);
-        window.krtEvents.on('change', 'pm-filter-change', () => {
+        krtEvents.on('click', 'pm-toggle-topic', pmToggleTopic);
+        krtEvents.on('click', 'pm-expand-all', pmExpandAllTopics);
+        krtEvents.on('click', 'pm-collapse-all', pmCollapseAllTopics);
+        krtEvents.on('click', 'pm-export-csv', pmExportCsv);
+        krtEvents.on('click', 'pm-cycle-sort', pmCycleSort);
+        krtEvents.on('change', 'pm-filter-change', () => {
             pmSaveFilters();
             pmApplyFilters();
             pmRefreshBulkPanel();
         });
-        window.krtEvents.on('change', 'pm-row-check', pmOnRowCheck);
-        window.krtEvents.on('change', 'pm-select-all', pmOnSelectAll);
-        window.krtEvents.on('click', 'pm-bulk-apply', pmBulkApply);
-        window.krtEvents.on('click', 'pm-bulk-clear', pmClearSelection);
+        krtEvents.on('change', 'pm-row-check', pmOnRowCheck);
+        krtEvents.on('change', 'pm-select-all', pmOnSelectAll);
+        krtEvents.on('click', 'pm-bulk-apply', pmBulkApply);
+        krtEvents.on('click', 'pm-bulk-clear', pmClearSelection);
     }
 
     document.addEventListener('krt:swapped', (e) => {

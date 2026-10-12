@@ -24,6 +24,7 @@
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 /**
  * Fills a date-time input (plain or split into date and time parts) with the current local time;
@@ -635,26 +636,26 @@ function openEditFinanceModal(id, note, type, amount, version) {
 }
 
 function registerMissionDetailEventHandlers() {
-    if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
+    if (!krtEvents || typeof krtEvents.on !== 'function') {
         console.error(
             '[mission-detail] window.krtEvents missing — page click handlers not registered. ' +
                 'event-delegation.js must load before mission-detail body scripts.',
         );
         return;
     }
-    window.krtEvents.on('click', 'mission-set-now', (el) => {
+    krtEvents.on('click', 'mission-set-now', (el) => {
         setNowToInput(/** @type {string} */ (el.getAttribute('data-input-id')));
     });
-    window.krtEvents.on('click', 'mission-change-owner', changeMissionOwner);
-    window.krtEvents.on('click', 'mission-change-owning-org-unit', changeMissionOwningOrgUnit);
-    window.krtEvents.on('click', 'mission-remove-manager', (el) => {
+    krtEvents.on('click', 'mission-change-owner', changeMissionOwner);
+    krtEvents.on('click', 'mission-change-owning-org-unit', changeMissionOwningOrgUnit);
+    krtEvents.on('click', 'mission-remove-manager', (el) => {
         removeMissionManager(el.getAttribute('data-manager-id'));
     });
-    window.krtEvents.on('click', 'mission-add-manager', addMissionManager);
-    window.krtEvents.on('change', 'mission-update-payout', (el) => {
+    krtEvents.on('click', 'mission-add-manager', addMissionManager);
+    krtEvents.on('change', 'mission-update-payout', (el) => {
         updatePayoutPreference(/** @type {HTMLSelectElement} */ (el));
     });
-    window.krtEvents.on('click', 'mission-open-edit-finance', (el) => {
+    krtEvents.on('click', 'mission-open-edit-finance', (el) => {
         openEditFinanceModal(
             el.getAttribute('data-id'),
             el.getAttribute('data-note'),

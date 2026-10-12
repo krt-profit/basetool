@@ -1,5 +1,7 @@
 // @ts-check
 
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+
 const HEARTBEAT_MS = 60000;
 const SECTION_SELECTOR = '[data-panel-key]';
 
@@ -53,14 +55,14 @@ function MissionPresence(missionId, currentUserId) {
 }
 
 MissionPresence.prototype.start = function () {
-    if (!window.krtLiveSync || typeof window.krtLiveSync.subscribe !== 'function') {
+    if (!krtLiveSync || typeof krtLiveSync.subscribe !== 'function') {
         return;
     }
     document.addEventListener('focusin', this._onFocusIn);
     document.addEventListener('focusout', this._onFocusOut);
     document.addEventListener('visibilitychange', this._onVisibility);
     const self = this;
-    this.subscription = window.krtLiveSync.subscribe(this.topic, {
+    this.subscription = krtLiveSync.subscribe(this.topic, {
         onSubscribed() {
             if (self.activeSection) {
                 self._sendPresence('focus', self.activeSection);
@@ -100,8 +102,8 @@ MissionPresence.prototype.stop = function () {
 };
 
 MissionPresence.prototype._sendPresence = function (type, sectionKey) {
-    if (window.krtLiveSync && typeof window.krtLiveSync.sendPresence === 'function') {
-        window.krtLiveSync.sendPresence(this.topic, type, sectionKey);
+    if (krtLiveSync && typeof krtLiveSync.sendPresence === 'function') {
+        krtLiveSync.sendPresence(this.topic, type, sectionKey);
     }
 };
 
@@ -109,10 +111,10 @@ MissionPresence.prototype.sendChanged = function (sections) {
     if (
         Array.isArray(sections) &&
         sections.length > 0 &&
-        window.krtLiveSync &&
-        typeof window.krtLiveSync.sendChanged === 'function'
+        krtLiveSync &&
+        typeof krtLiveSync.sendChanged === 'function'
     ) {
-        window.krtLiveSync.sendChanged(this.topic, sections);
+        krtLiveSync.sendChanged(this.topic, sections);
     }
 };
 

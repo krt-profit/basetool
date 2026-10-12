@@ -19,6 +19,7 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 /** @typedef {ApiDto<'ProfitCalculationDto'>} ProfitRow */
 
@@ -302,14 +303,14 @@ document.addEventListener('DOMContentLoaded', () => {
     updateProfitCalculation();
 });
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('change', 'profit-update', onInputChanged);
-    window.krtEvents.on('change', 'profit-toggle-all', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('change', 'profit-update', onInputChanged);
+    krtEvents.on('change', 'profit-toggle-all', (el) => {
         const all = /** @type {HTMLInputElement} */ (el);
         systemChecks().forEach((c) => {
             c.checked = all.checked;
         });
         onInputChanged();
     });
-    window.krtEvents.on('change', 'profit-update-state', onInputChanged);
+    krtEvents.on('change', 'profit-update-state', onInputChanged);
 }

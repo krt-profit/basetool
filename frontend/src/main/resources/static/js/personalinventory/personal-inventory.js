@@ -4,6 +4,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 const SEARCH_LIMIT = 2000;
 
@@ -539,11 +540,11 @@ if (document.readyState === 'loading') {
     init();
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'pi-open-create', openCreate);
-    window.krtEvents.on('click', 'pi-open-edit', openEdit);
-    window.krtEvents.on('click', 'pi-open-delete', openDelete);
-    window.krtEvents.on('click', 'pi-close-modal', closeModal);
-    window.krtEvents.on('click', 'pi-close-delete', closeDelete);
-    window.krtEvents.on('input', 'pi-sanitize-quantity', sanitizeQuantity);
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'pi-open-create', openCreate);
+    krtEvents.on('click', 'pi-open-edit', openEdit);
+    krtEvents.on('click', 'pi-open-delete', openDelete);
+    krtEvents.on('click', 'pi-close-modal', closeModal);
+    krtEvents.on('click', 'pi-close-delete', closeDelete);
+    krtEvents.on('input', 'pi-sanitize-quantity', sanitizeQuantity);
 }

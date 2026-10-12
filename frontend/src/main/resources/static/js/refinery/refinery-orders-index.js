@@ -19,6 +19,7 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const REFINERY_SECTIONS = {
     queue: { container: '#refinery-orders-results', fragmentValue: 'results' },
@@ -72,8 +73,8 @@ const REFINERY_SECTIONS = {
         });
     }
 
-    if (results && window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
-        window.krtLiveSync.createReceiver({
+    if (results && krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+        krtLiveSync.createReceiver({
             topic: 'refinery',
             sections: REFINERY_SECTIONS,
             coalesceMs: 1500,

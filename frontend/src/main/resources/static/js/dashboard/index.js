@@ -20,6 +20,7 @@
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 /** How many of the newest notifications the home card lists. */
 const NOTIFICATION_LIMIT = 3;
@@ -38,8 +39,8 @@ function toggleInfo(toggle) {
     if (label) toggle.textContent = label;
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'index-toggle-info', (toggle) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'index-toggle-info', (toggle) => {
         toggleInfo(toggle);
     });
 }

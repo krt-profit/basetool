@@ -23,6 +23,7 @@
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const MISSION_SECTIONS = {
     crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
@@ -51,11 +52,7 @@ const MISSION_SECTIONS = {
  */
 function crossPublishToParentOperation(keys) {
     const operationId = window.missionOperationId;
-    if (
-        !operationId ||
-        !window.krtLiveSync ||
-        typeof window.krtLiveSync.sendChanged !== 'function'
-    ) {
+    if (!operationId || !krtLiveSync || typeof krtLiveSync.sendChanged !== 'function') {
         return;
     }
     const changed = Array.isArray(keys) ? keys : [keys];
@@ -67,7 +64,7 @@ function crossPublishToParentOperation(keys) {
         operationSections.push('finance');
     }
     if (operationSections.length) {
-        window.krtLiveSync.sendChanged(`operation:${operationId}`, operationSections);
+        krtLiveSync.sendChanged(`operation:${operationId}`, operationSections);
     }
 }
 
@@ -199,7 +196,7 @@ document.addEventListener('krt:swapped', (ev) => {
     }
 });
 
-window.krtLiveSync.createReceiver({
+krtLiveSync.createReceiver({
     sections: MISSION_SECTIONS,
     events: { changed: 'krt:mission-changed', resync: 'krt:mission-resync' },
     refresh(keys) {

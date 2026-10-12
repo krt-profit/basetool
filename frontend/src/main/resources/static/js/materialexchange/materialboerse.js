@@ -21,6 +21,7 @@
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 (function () {
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
@@ -604,14 +605,14 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
     }
 
     function notifyPeersBoard() {
-        if (window.krtLiveSync) {
-            window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
+        if (krtLiveSync) {
+            krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
         }
     }
 
     function notifyPeersRequests() {
-        if (window.krtLiveSync) {
-            window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
+        if (krtLiveSync) {
+            krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['requests']);
         }
     }
 
@@ -782,8 +783,8 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
             }
         }, 400);
     }
-    if (window.krtLiveSync) {
-        window.krtLiveSync.subscribe(MATERIALBOARD_TOPIC, { onChanged: onPeerChanged });
+    if (krtLiveSync) {
+        krtLiveSync.subscribe(MATERIALBOARD_TOPIC, { onChanged: onPeerChanged });
     }
 
     document.addEventListener('krt:swapped', () => {

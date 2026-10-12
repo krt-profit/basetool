@@ -31,6 +31,8 @@ import {
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const myLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-my',
@@ -876,18 +878,18 @@ const INVENTORY_MY_SECTIONS = {
 };
 
 function broadcastInventoryChanged() {
-    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-        window.krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_MY_SECTIONS));
+    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_MY_SECTIONS));
     }
 }
 window.krtNotifyInventoryChanged = broadcastInventoryChanged;
 
 if (
-    window.krtLiveSync &&
-    typeof window.krtLiveSync.createReceiver === 'function' &&
+    krtLiveSync &&
+    typeof krtLiveSync.createReceiver === 'function' &&
     document.getElementById('myInventoryTableContainer')
 ) {
-    window.krtLiveSync.createReceiver({
+    krtLiveSync.createReceiver({
         topic: 'inventory',
         sections: INVENTORY_MY_SECTIONS,
         coalesceMs: 1500,
@@ -902,11 +904,11 @@ const INVENTORY_MY_ORDER_SECTIONS = {
 };
 
 if (
-    window.krtLiveSync &&
-    typeof window.krtLiveSync.createReceiver === 'function' &&
+    krtLiveSync &&
+    typeof krtLiveSync.createReceiver === 'function' &&
     document.getElementById('myInventoryTableContainer')
 ) {
-    window.krtLiveSync.createReceiver({
+    krtLiveSync.createReceiver({
         topic: 'orders',
         sections: INVENTORY_MY_ORDER_SECTIONS,
         coalesceMs: 1500,
@@ -1476,11 +1478,11 @@ function reportBulkStolenOutcome(body) {
     }
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'inv-my-toggle-multi', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'inv-my-toggle-multi', (el) => {
         myLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
     });
-    window.krtEvents.on('change', 'inv-my-toggle-all', (el) => {
+    krtEvents.on('change', 'inv-my-toggle-all', (el) => {
         myLager.toggleSelectAll(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
@@ -1488,7 +1490,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         );
         filterMyInventory();
     });
-    window.krtEvents.on('change', 'inv-my-update-state', (el) => {
+    krtEvents.on('change', 'inv-my-update-state', (el) => {
         myLager.updateSelectState(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
@@ -1496,18 +1498,18 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         );
         filterMyInventory();
     });
-    window.krtEvents.on('change', 'inv-my-filter', filterMyInventory);
-    window.krtEvents.on('click', 'inv-my-reset-filter', resetMyInventoryFilter);
-    window.krtEvents.on('click', 'inv-my-clear-selection', clearBulkSelection);
-    window.krtEvents.on('click', 'inv-my-open-bulk', openBulkCheckoutModal);
-    window.krtEvents.on('change', 'inv-my-toggle-group-cb', (el) => {
+    krtEvents.on('change', 'inv-my-filter', filterMyInventory);
+    krtEvents.on('click', 'inv-my-reset-filter', resetMyInventoryFilter);
+    krtEvents.on('click', 'inv-my-clear-selection', clearBulkSelection);
+    krtEvents.on('click', 'inv-my-open-bulk', openBulkCheckoutModal);
+    krtEvents.on('change', 'inv-my-toggle-group-cb', (el) => {
         toggleGroupCheckboxes(el);
     });
-    window.krtEvents.on('change', 'inv-my-update-bulk-state', (el) => {
+    krtEvents.on('change', 'inv-my-update-bulk-state', (el) => {
         onEntryCheckboxToggle(el);
     });
-    window.krtEvents.on('click', 'inv-my-select-all', toggleSelectAllInView);
-    window.krtEvents.on('click', 'inv-my-umbuchen', (el) => {
+    krtEvents.on('click', 'inv-my-select-all', toggleSelectAllInView);
+    krtEvents.on('click', 'inv-my-umbuchen', (el) => {
         openUmbuchenModal(
             el.getAttribute('data-id'),
             el.getAttribute('data-amount'),
@@ -1522,28 +1524,24 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             el.getAttribute('data-owning-org-unit-id'),
         );
     });
-    window.krtEvents.on('click', 'inv-my-open-note', (el) => {
+    krtEvents.on('click', 'inv-my-open-note', (el) => {
         openNoteModal(el);
     });
-    window.krtEvents.on('change', 'inv-my-toggle-umbuchen-mode', toggleUmbuchenMode);
-    window.krtEvents.on('click', 'inv-my-close-note', closeNoteModal);
-    window.krtEvents.on('input', 'inv-my-update-note-counter', updateNoteCounter);
-    window.krtEvents.on('click', 'inv-my-save-note', saveNote);
-    window.krtEvents.on('click', 'inv-my-remove-note', removeNote);
-    window.krtEvents.on('click', 'inv-my-close-bulk', closeBulkCheckoutModal);
-    window.krtEvents.on('click', 'inv-my-execute-bulk', executeBulkCheckout);
-    window.krtEvents.on('click', 'inv-my-open-bulk-rebook', openBulkRebookModal);
-    window.krtEvents.on('click', 'inv-my-close-bulk-rebook', closeBulkRebookModal);
-    window.krtEvents.on('change', 'inv-my-toggle-bulk-rebook-mode', toggleBulkRebookMode);
-    window.krtEvents.on(
-        'change',
-        'inv-my-bulk-rebook-user-changed',
-        refreshBulkRebookOrgUnitPicker,
-    );
-    window.krtEvents.on('click', 'inv-my-org-unit', openOrgUnitChangeModal);
-    window.krtEvents.on('click', 'inv-my-open-bulk-org-unit', openBulkOrgUnitChangeModal);
-    window.krtEvents.on('click', 'inv-my-close-org-unit', closeOrgUnitChangeModal);
-    window.krtEvents.on('click', 'inv-my-bulk-stolen', submitBulkStolenMark);
+    krtEvents.on('change', 'inv-my-toggle-umbuchen-mode', toggleUmbuchenMode);
+    krtEvents.on('click', 'inv-my-close-note', closeNoteModal);
+    krtEvents.on('input', 'inv-my-update-note-counter', updateNoteCounter);
+    krtEvents.on('click', 'inv-my-save-note', saveNote);
+    krtEvents.on('click', 'inv-my-remove-note', removeNote);
+    krtEvents.on('click', 'inv-my-close-bulk', closeBulkCheckoutModal);
+    krtEvents.on('click', 'inv-my-execute-bulk', executeBulkCheckout);
+    krtEvents.on('click', 'inv-my-open-bulk-rebook', openBulkRebookModal);
+    krtEvents.on('click', 'inv-my-close-bulk-rebook', closeBulkRebookModal);
+    krtEvents.on('change', 'inv-my-toggle-bulk-rebook-mode', toggleBulkRebookMode);
+    krtEvents.on('change', 'inv-my-bulk-rebook-user-changed', refreshBulkRebookOrgUnitPicker);
+    krtEvents.on('click', 'inv-my-org-unit', openOrgUnitChangeModal);
+    krtEvents.on('click', 'inv-my-open-bulk-org-unit', openBulkOrgUnitChangeModal);
+    krtEvents.on('click', 'inv-my-close-org-unit', closeOrgUnitChangeModal);
+    krtEvents.on('click', 'inv-my-bulk-stolen', submitBulkStolenMark);
 }
 
 const umbuchenFormEl = document.getElementById('umbuchenForm');

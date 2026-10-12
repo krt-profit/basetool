@@ -26,6 +26,8 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
@@ -65,18 +67,18 @@ function withOverview(keys) {
         broadcast(keys) {
             if (
                 window.operationId &&
-                window.krtLiveSync &&
-                typeof window.krtLiveSync.sendChanged === 'function'
+                krtLiveSync &&
+                typeof krtLiveSync.sendChanged === 'function'
             ) {
-                window.krtLiveSync.sendChanged(`operation:${window.operationId}`, keys);
+                krtLiveSync.sendChanged(`operation:${window.operationId}`, keys);
             }
         },
     });
     window.opRefreshSection = operationSeam.refresh;
     window.opNotifyChanged = operationSeam.notify;
 
-    if (window.operationId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
-        window.krtLiveSync.createReceiver({
+    if (window.operationId && krtLiveSync && krtLiveSync.createReceiver) {
+        krtLiveSync.createReceiver({
             topic: `operation:${window.operationId}`,
             sections: OPERATION_SECTIONS,
             refresh(keys) {
@@ -247,8 +249,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'operation-open-delete', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'operation-open-delete', (el) => {
         openDeleteModal(el.getAttribute('data-id'));
     });
 }

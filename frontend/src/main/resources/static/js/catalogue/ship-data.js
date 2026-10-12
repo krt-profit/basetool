@@ -26,6 +26,7 @@ import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const shipTypesData = /** @type {HTMLDataListElement | null} */ (
@@ -106,8 +107,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'ship-close-modal', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'ship-close-modal', (el) => {
         closeModal(el.getAttribute('data-modal-id'));
     });
 }
@@ -167,7 +168,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             });
     });
 
-    window.krtEvents.on('click', 'shipdata-reset', (target) => {
+    krtEvents.on('click', 'shipdata-reset', (target) => {
         const el = /** @type {HTMLButtonElement} */ (target);
         el.disabled = true;
         krtFetch

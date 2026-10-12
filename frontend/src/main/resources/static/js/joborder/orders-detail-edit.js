@@ -39,6 +39,7 @@ import {
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const handoverForm = /** @type {HTMLFormElement | null} */ (
@@ -117,11 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
                     _swapOrderSection(orderId, 'order-kpi-results', 'kpi');
-                    if (
-                        window.krtLiveSync &&
-                        typeof window.krtLiveSync.sendChanged === 'function'
-                    ) {
-                        window.krtLiveSync.sendChanged('inventory', ['stock']);
+                    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+                        krtLiveSync.sendChanged('inventory', ['stock']);
                     }
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
                         _publishOrdersQueue();

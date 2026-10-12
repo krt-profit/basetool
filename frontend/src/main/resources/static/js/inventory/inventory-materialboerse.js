@@ -14,11 +14,13 @@
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 (function () {
     const i18n = window.materialboerseInventoryI18n || {};
     const release = window.krtMaterialRelease;
-    if (!window.krtEvents || !release || !krtFetch) {
+    if (!krtEvents || !release || !krtFetch) {
         return;
     }
 
@@ -38,7 +40,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
         chip.classList.toggle('chip--muted', !released);
     }
 
-    window.krtEvents.on('change', 'inv-boerse-toggle', (element) => {
+    krtEvents.on('change', 'inv-boerse-toggle', (element) => {
         const el = /** @type {HTMLInputElement} */ (element);
         const itemId = el.getAttribute('data-id');
         if (el.checked) {
@@ -84,8 +86,8 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
                 serialize: 'materialboerse',
                 onSuccess() {
                     setStatus(itemId, false);
-                    if (window.krtLiveSync) {
-                        window.krtLiveSync.sendChanged('materialboard', ['board']);
+                    if (krtLiveSync) {
+                        krtLiveSync.sendChanged('materialboard', ['board']);
                     }
                 },
                 onError() {

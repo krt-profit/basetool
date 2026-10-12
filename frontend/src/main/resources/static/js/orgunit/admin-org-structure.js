@@ -19,6 +19,8 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const ORG_STRUCTURE_SECTIONS = {
     units: { container: '#org-structure-units', fragmentValue: 'units' },
@@ -43,8 +45,8 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
             return '/admin/org-structure';
         },
         broadcast(keys) {
-            if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-                window.krtLiveSync.sendChanged(
+            if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged(
                     'org-structure',
                     keys.concat([ORG_STRUCTURE_CHART_SECTION]),
                 );
@@ -60,8 +62,8 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         return orgStructureSeam.refresh(['units']);
     }
 
-    if (window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
-        window.krtLiveSync.createReceiver({
+    if (krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+        krtLiveSync.createReceiver({
             topic: 'org-structure',
             sections: ORG_STRUCTURE_SECTIONS,
             coalesceMs: 1500,
@@ -101,11 +103,11 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         return value === '' || value == null ? null : value;
     }
 
-    if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
+    if (!krtEvents || typeof krtEvents.on !== 'function') {
         return;
     }
 
-    window.krtEvents.on('submit', 'os-create-ol', (form, event) => {
+    krtEvents.on('submit', 'os-create-ol', (form, event) => {
         event.preventDefault();
         krtFetch.write({
             method: 'POST',
@@ -122,7 +124,7 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         });
     });
 
-    window.krtEvents.on('submit', 'os-create-bereich', (form, event) => {
+    krtEvents.on('submit', 'os-create-bereich', (form, event) => {
         event.preventDefault();
         krtFetch.write({
             method: 'POST',
@@ -141,7 +143,7 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         });
     });
 
-    window.krtEvents.on('change', 'os-parent-select', (select) => {
+    krtEvents.on('change', 'os-parent-select', (select) => {
         const row = select.closest('[data-org-unit-id]');
         if (!row) {
             return;

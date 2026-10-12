@@ -22,6 +22,8 @@
 /* global KRT_ORDERS_AGE_YELLOW, KRT_ORDERS_AGE_RED, KRT_ORDERS_LIVESYNC_UPDATES, KRT_ORDERS_SECTION_REFRESH_ERROR */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const ORDERS_SECTIONS = {
     queue: { container: '#orders-results', fragmentValue: 'results' },
@@ -46,15 +48,15 @@ const ORDERS_SECTIONS = {
             return window.location.pathname + window.location.search;
         },
         broadcast(keys) {
-            if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-                window.krtLiveSync.sendChanged('orders', keys);
+            if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged('orders', keys);
             }
         },
     });
     window.krtRefreshOrdersQueue = ordersQueueSeam.refresh;
 
-    if (window.krtLiveSync && window.krtLiveSync.createReceiver) {
-        window.krtLiveSync.createReceiver({
+    if (krtLiveSync && krtLiveSync.createReceiver) {
+        krtLiveSync.createReceiver({
             topic: 'orders',
             sections: ORDERS_SECTIONS,
             coalesceMs: 1500,
@@ -429,11 +431,11 @@ if (window.krtFilterPanel && typeof window.krtFilterPanel.registerCounter === 'f
     window.krtFilterPanel.registerCounter('orders-filter-panel', countActiveOrdersFilters);
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'ord-toggle-materials', toggleOrderMaterials);
-    window.krtEvents.on('click', 'ord-toggle-squadron-multi', toggleSquadronMulti);
-    window.krtEvents.on('change', 'ord-toggle-squadron-all', toggleSquadronAll);
-    window.krtEvents.on('change', 'ord-update-squadron-state', updateSquadronState);
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'ord-toggle-materials', toggleOrderMaterials);
+    krtEvents.on('click', 'ord-toggle-squadron-multi', toggleSquadronMulti);
+    krtEvents.on('change', 'ord-toggle-squadron-all', toggleSquadronAll);
+    krtEvents.on('change', 'ord-update-squadron-state', updateSquadronState);
 }
 
 document.addEventListener('click', (e) => {

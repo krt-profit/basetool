@@ -32,6 +32,8 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const adminLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-admin',
@@ -304,18 +306,18 @@ const INVENTORY_ALL_SECTIONS = {
 };
 
 function broadcastInventoryAllChanged() {
-    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-        window.krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_ALL_SECTIONS));
+    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_ALL_SECTIONS));
     }
 }
 window.krtNotifyInventoryChanged = broadcastInventoryAllChanged;
 
 if (
-    window.krtLiveSync &&
-    typeof window.krtLiveSync.createReceiver === 'function' &&
+    krtLiveSync &&
+    typeof krtLiveSync.createReceiver === 'function' &&
     document.getElementById('tableContainer')
 ) {
-    window.krtLiveSync.createReceiver({
+    krtLiveSync.createReceiver({
         topic: 'inventory',
         sections: INVENTORY_ALL_SECTIONS,
         coalesceMs: 1500,
@@ -330,11 +332,11 @@ const INVENTORY_ALL_ORDER_SECTIONS = {
 };
 
 if (
-    window.krtLiveSync &&
-    typeof window.krtLiveSync.createReceiver === 'function' &&
+    krtLiveSync &&
+    typeof krtLiveSync.createReceiver === 'function' &&
     document.getElementById('tableContainer')
 ) {
-    window.krtLiveSync.createReceiver({
+    krtLiveSync.createReceiver({
         topic: 'orders',
         sections: INVENTORY_ALL_ORDER_SECTIONS,
         coalesceMs: 1500,
@@ -726,11 +728,11 @@ function submitUmbuchen(event) {
     });
 })();
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'inv-admin-toggle-multi', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'inv-admin-toggle-multi', (el) => {
         adminLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
     });
-    window.krtEvents.on('change', 'inv-admin-toggle-all', (el) => {
+    krtEvents.on('change', 'inv-admin-toggle-all', (el) => {
         adminLager.toggleSelectAll(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
@@ -738,7 +740,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         );
         filterInventory();
     });
-    window.krtEvents.on('change', 'inv-admin-update-state', (el) => {
+    krtEvents.on('change', 'inv-admin-update-state', (el) => {
         adminLager.updateSelectState(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
@@ -746,9 +748,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         );
         filterInventory();
     });
-    window.krtEvents.on('change', 'inv-admin-filter', filterInventory);
-    window.krtEvents.on('click', 'inv-admin-reset-filter', resetInventoryFilter);
-    window.krtEvents.on('click', 'inv-admin-umbuchen', (el) => {
+    krtEvents.on('change', 'inv-admin-filter', filterInventory);
+    krtEvents.on('click', 'inv-admin-reset-filter', resetInventoryFilter);
+    krtEvents.on('click', 'inv-admin-umbuchen', (el) => {
         openUmbuchenModal(
             el.getAttribute('data-id'),
             el.getAttribute('data-amount'),
@@ -762,13 +764,13 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             el.getAttribute('data-owning-org-unit-id'),
         );
     });
-    window.krtEvents.on('click', 'inv-admin-open-note', (el) => {
+    krtEvents.on('click', 'inv-admin-open-note', (el) => {
         openNoteModal(el);
     });
-    window.krtEvents.on('click', 'inv-admin-close-note', closeNoteModal);
-    window.krtEvents.on('input', 'inv-admin-update-note-counter', updateNoteCounter);
-    window.krtEvents.on('click', 'inv-admin-save-note', saveNote);
-    window.krtEvents.on('click', 'inv-admin-remove-note', removeNote);
+    krtEvents.on('click', 'inv-admin-close-note', closeNoteModal);
+    krtEvents.on('input', 'inv-admin-update-note-counter', updateNoteCounter);
+    krtEvents.on('click', 'inv-admin-save-note', saveNote);
+    krtEvents.on('click', 'inv-admin-remove-note', removeNote);
 }
 
 const adminUmbuchenFormEl = document.getElementById('umbuchenForm');

@@ -25,7 +25,10 @@ function on(eventType, actionName, handler) {
     });
 }
 
-window.krtEvents = { on };
+/** @type {KrtEventsApi} */
+export const krtEvents = { on };
+
+window.krtEvents = krtEvents;
 
 for (let i = 0; i < pendingQueue.length; i++) {
     on(pendingQueue[i][0], pendingQueue[i][1], pendingQueue[i][2]);

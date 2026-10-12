@@ -26,6 +26,8 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
@@ -67,21 +69,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function afterHangarWrite() {
         reswapHangar();
-        if (
-            hangarTopic &&
-            window.krtLiveSync &&
-            typeof window.krtLiveSync.sendChanged === 'function'
-        ) {
-            window.krtLiveSync.sendChanged(hangarTopic, Object.keys(HANGAR_SECTIONS));
+        if (hangarTopic && krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+            krtLiveSync.sendChanged(hangarTopic, Object.keys(HANGAR_SECTIONS));
         }
     }
 
-    if (
-        hangarTopic &&
-        window.krtLiveSync &&
-        typeof window.krtLiveSync.createReceiver === 'function'
-    ) {
-        window.krtLiveSync.createReceiver({
+    if (hangarTopic && krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+        krtLiveSync.createReceiver({
             topic: hangarTopic,
             sections: HANGAR_SECTIONS,
             coalesceMs: 1500,
@@ -282,9 +276,9 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal();
     }
 
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'hangar-add-ship', openAddModal);
-        window.krtEvents.on('click', 'hangar-edit-ship', openEditModal);
+    if (krtEvents && typeof krtEvents.on === 'function') {
+        krtEvents.on('click', 'hangar-add-ship', openAddModal);
+        krtEvents.on('click', 'hangar-edit-ship', openEditModal);
     }
 
     modalDeleteBtn.addEventListener('click', () => {
@@ -546,8 +540,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-            window.krtEvents.on('click', 'hangar-open-home', (btn) => {
+        if (krtEvents && typeof krtEvents.on === 'function') {
+            krtEvents.on('click', 'hangar-open-home', (btn) => {
                 if (btn && /** @type {HTMLButtonElement} */ (btn).disabled) return;
                 refreshHomeBody();
                 krtModal.open(homeModal);

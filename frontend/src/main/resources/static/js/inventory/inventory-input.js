@@ -24,6 +24,7 @@
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const matSelect = /** @type {HTMLSelectElement | null} */ (
@@ -113,13 +114,13 @@ const INVENTORY_INPUT_ORDER_SECTIONS = {
 
 function startOrderNeedsLiveSync() {
     if (
-        !window.krtLiveSync ||
-        typeof window.krtLiveSync.createReceiver !== 'function' ||
+        !krtLiveSync ||
+        typeof krtLiveSync.createReceiver !== 'function' ||
         !document.getElementById('jobOrderAllocGroup')
     ) {
         return;
     }
-    window.krtLiveSync.createReceiver({
+    krtLiveSync.createReceiver({
         topic: 'orders',
         sections: INVENTORY_INPUT_ORDER_SECTIONS,
         coalesceMs: 1500,

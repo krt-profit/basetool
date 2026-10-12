@@ -25,6 +25,7 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 function buildScuHint() {
     const hint = document.createElement('span');
@@ -760,11 +761,11 @@ document.querySelectorAll('textarea[data-counter]').forEach((area) => {
 updateMaterialSummary();
 updateItemSummary();
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'orders-import-scmdb', importFromScmdb);
-    window.krtEvents.on('click', 'orders-add-material', addMaterialRow);
-    window.krtEvents.on('click', 'orders-remove-material', removeMaterialRow);
-    window.krtEvents.on('click', 'orders-add-item', () => addItemLine());
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'orders-import-scmdb', importFromScmdb);
+    krtEvents.on('click', 'orders-add-material', addMaterialRow);
+    krtEvents.on('click', 'orders-remove-material', removeMaterialRow);
+    krtEvents.on('click', 'orders-add-item', () => addItemLine());
 }
 
 function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {

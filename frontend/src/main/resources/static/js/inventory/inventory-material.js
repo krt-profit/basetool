@@ -19,6 +19,7 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const INVENTORY_MATERIAL_SECTIONS = {
     stock: { container: '#inventory-material-results', fragmentValue: 'results' },
@@ -29,13 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
         krtFetch.bindSwap({ container: '#inventory-material-results', history: true });
     }
     if (
-        window.krtLiveSync &&
-        typeof window.krtLiveSync.createReceiver === 'function' &&
+        krtLiveSync &&
+        typeof krtLiveSync.createReceiver === 'function' &&
         krtFetch &&
         typeof krtFetch.swap === 'function' &&
         document.getElementById('inventory-material-results')
     ) {
-        window.krtLiveSync.createReceiver({
+        krtLiveSync.createReceiver({
             topic: 'inventory',
             sections: INVENTORY_MATERIAL_SECTIONS,
             coalesceMs: 1500,

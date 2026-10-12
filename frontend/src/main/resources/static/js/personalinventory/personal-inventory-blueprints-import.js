@@ -3,6 +3,7 @@
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
@@ -469,14 +470,14 @@ if (document.readyState === 'loading') {
     init();
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'bp-import-pick', pickFile);
-    window.krtEvents.on('click', 'bp-import-close', closeModal);
-    window.krtEvents.on('click', 'bp-import-apply', apply);
-    window.krtEvents.on('click', 'bp-import-selectall', () => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'bp-import-pick', pickFile);
+    krtEvents.on('click', 'bp-import-close', closeModal);
+    krtEvents.on('click', 'bp-import-apply', apply);
+    krtEvents.on('click', 'bp-import-selectall', () => {
         selectAll(true);
     });
-    window.krtEvents.on('click', 'bp-import-selectnone', () => {
+    krtEvents.on('click', 'bp-import-selectnone', () => {
         selectAll(false);
     });
 }

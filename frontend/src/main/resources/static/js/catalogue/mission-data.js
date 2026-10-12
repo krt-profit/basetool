@@ -25,6 +25,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
 
@@ -528,8 +529,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDragAndDrop('freqtypes-results', '/admin/mission-data/frequency-types/reorder');
 });
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'mission-data-select-kind', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'mission-data-select-kind', (el) => {
         selectMissionKind(el.getAttribute('data-md-kind'), false);
     });
 }

@@ -1,6 +1,7 @@
 // @ts-check
 
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 (function () {
     window.addEventListener('pageshow', (event) => {
@@ -62,10 +63,10 @@ import { krtModal } from '/js/kernel/krt-modal.js';
         repositionHintFrom(event.target);
     });
 
-    if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
+    if (!krtEvents || typeof krtEvents.on !== 'function') {
         return;
     }
-    const on = window.krtEvents.on;
+    const on = krtEvents.on;
 
     /**
      * Whitelist for same-origin path URLs: a leading `/` not followed by `/` or a backslash, and no

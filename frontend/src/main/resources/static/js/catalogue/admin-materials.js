@@ -25,6 +25,7 @@ import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 /** @type {string[]} */
 const materialNames = [];
@@ -314,8 +315,8 @@ function updateMaterial(selectElement) {
         });
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('change', 'admin-materials-update', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('change', 'admin-materials-update', (el) => {
         updateMaterial(/** @type {HTMLInputElement | HTMLSelectElement} */ (el));
     });
 }
@@ -461,10 +462,10 @@ function refreshMaterialsTable() {
         });
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'materials-open-create-modal', openCreateMaterialModal);
-    window.krtEvents.on('click', 'materials-close-create-modal', closeCreateMaterialModal);
-    window.krtEvents.on('click', 'materials-submit-create', (btn) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'materials-open-create-modal', openCreateMaterialModal);
+    krtEvents.on('click', 'materials-close-create-modal', closeCreateMaterialModal);
+    krtEvents.on('click', 'materials-submit-create', (btn) => {
         submitCreateMaterial(btn);
     });
 }

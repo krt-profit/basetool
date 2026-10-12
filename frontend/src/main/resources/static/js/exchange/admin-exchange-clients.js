@@ -22,6 +22,7 @@
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const EXCHANGE_CLIENTS_SECTIONS = {
     registry: { container: '#xc-registry-host', fragmentValue: 'registry' },
@@ -36,15 +37,15 @@ const EXCHANGE_CLIENTS_SECTIONS = {
 
     /** Tells the other admins' open pages that the switch or the client table changed. */
     function broadcastRegistry() {
-        if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-            window.krtLiveSync.sendChanged('exchange-clients', ['registry']);
+        if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+            krtLiveSync.sendChanged('exchange-clients', ['registry']);
         }
     }
 
     /** Tells the other admins' open pages that a bulk undo started and suspended its client. */
     function broadcastUndoStart() {
-        if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-            window.krtLiveSync.sendChanged('exchange-clients', ['registry', 'undoRuns']);
+        if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+            krtLiveSync.sendChanged('exchange-clients', ['registry', 'undoRuns']);
         }
     }
 
@@ -828,8 +829,8 @@ const EXCHANGE_CLIENTS_SECTIONS = {
 
         schedulePoll();
 
-        if (window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
-            window.krtLiveSync.createReceiver({
+        if (krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+            krtLiveSync.createReceiver({
                 topic: 'exchange-clients',
                 sections: EXCHANGE_CLIENTS_SECTIONS,
                 coalesceMs: 1500,

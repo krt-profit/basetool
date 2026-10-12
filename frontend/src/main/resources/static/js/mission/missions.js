@@ -1,6 +1,7 @@
 // @ts-check
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const MISSIONS_SECTIONS = {
     list: { container: '#missions-results', fragmentValue: 'results' },
@@ -39,8 +40,8 @@ const MISSIONS_SECTIONS = {
         });
     }
 
-    if (window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
-        window.krtLiveSync.createReceiver({
+    if (krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+        krtLiveSync.createReceiver({
             topic: 'missions',
             sections: MISSIONS_SECTIONS,
             coalesceMs: 1500,

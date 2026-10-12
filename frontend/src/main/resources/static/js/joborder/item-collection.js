@@ -23,6 +23,7 @@
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 /**
  * Finds the collection row of an inventory entry.
@@ -112,12 +113,8 @@ function updateCollectionProgress() {
 }
 
 function broadcastCollectionChanged() {
-    if (
-        window.orderId &&
-        window.krtLiveSync &&
-        typeof window.krtLiveSync.sendChanged === 'function'
-    ) {
-        window.krtLiveSync.sendChanged(`order:${window.orderId}`, ['items']);
+    if (window.orderId && krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        krtLiveSync.sendChanged(`order:${window.orderId}`, ['items']);
     }
 }
 
@@ -235,13 +232,13 @@ const ITEM_COLLECTION_SECTIONS = {
 document.addEventListener('DOMContentLoaded', () => {
     if (
         window.orderId &&
-        window.krtLiveSync &&
-        typeof window.krtLiveSync.createReceiver === 'function' &&
+        krtLiveSync &&
+        typeof krtLiveSync.createReceiver === 'function' &&
         krtFetch &&
         typeof krtFetch.swap === 'function' &&
         document.getElementById('item-collection-results')
     ) {
-        window.krtLiveSync.createReceiver({
+        krtLiveSync.createReceiver({
             topic: `order:${window.orderId}`,
             sections: ITEM_COLLECTION_SECTIONS,
             coalesceMs: 1500,

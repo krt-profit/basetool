@@ -28,6 +28,7 @@ import {
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
 function toastSuccess(msg) {
     if (showFrontendSuccessToast) showFrontendSuccessToast(msg);
@@ -474,43 +475,43 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'pa-open-create-topic', openCreateTopicModal);
-        window.krtEvents.on('click', 'pa-edit-topic', openEditTopicModal);
-        window.krtEvents.on('click', 'pa-delete-topic', deleteTopic);
-        window.krtEvents.on('click', 'pa-open-create-category', openCreateCategoryModal);
-        window.krtEvents.on('click', 'pa-edit-category', openEditCategoryModal);
-        window.krtEvents.on('click', 'pa-delete-category', deleteCategory);
+    if (krtEvents && typeof krtEvents.on === 'function') {
+        krtEvents.on('click', 'pa-open-create-topic', openCreateTopicModal);
+        krtEvents.on('click', 'pa-edit-topic', openEditTopicModal);
+        krtEvents.on('click', 'pa-delete-topic', deleteTopic);
+        krtEvents.on('click', 'pa-open-create-category', openCreateCategoryModal);
+        krtEvents.on('click', 'pa-edit-category', openEditCategoryModal);
+        krtEvents.on('click', 'pa-delete-category', deleteCategory);
 
-        window.krtEvents.on('click', 'pa-create-topic', createTopic);
-        window.krtEvents.on('click', 'pa-update-topic', updateTopic);
-        window.krtEvents.on('click', 'pa-create-category', createCategory);
-        window.krtEvents.on('click', 'pa-update-category', updateCategory);
+        krtEvents.on('click', 'pa-create-topic', createTopic);
+        krtEvents.on('click', 'pa-update-topic', updateTopic);
+        krtEvents.on('click', 'pa-create-category', createCategory);
+        krtEvents.on('click', 'pa-update-category', updateCategory);
 
-        window.krtEvents.on('click', 'pa-close-modal', (btn) => {
+        krtEvents.on('click', 'pa-close-modal', (btn) => {
             const id = btn.getAttribute('data-pa-modal');
             if (id) closeModal(id);
         });
 
-        window.krtEvents.on('click', 'pa-move-topic-up', (btn) => {
+        krtEvents.on('click', 'pa-move-topic-up', (btn) => {
             moveTopic(btn, 'up');
         });
-        window.krtEvents.on('click', 'pa-move-topic-down', (btn) => {
+        krtEvents.on('click', 'pa-move-topic-down', (btn) => {
             moveTopic(btn, 'down');
         });
-        window.krtEvents.on('click', 'pa-move-cat-up', (btn) => {
+        krtEvents.on('click', 'pa-move-cat-up', (btn) => {
             moveCategory(btn, 'up');
         });
-        window.krtEvents.on('click', 'pa-move-cat-down', (btn) => {
+        krtEvents.on('click', 'pa-move-cat-down', (btn) => {
             moveCategory(btn, 'down');
         });
 
-        window.krtEvents.on('input', 'pa-level-dirty', paMarkDirty);
-        window.krtEvents.on('click', 'pa-save-level-content', paSaveLevelContentFromButton);
-        window.krtEvents.on('click', 'pa-save-all', paSaveAll);
-        window.krtEvents.on('click', 'pa-discard-all', paDiscardAll);
+        krtEvents.on('input', 'pa-level-dirty', paMarkDirty);
+        krtEvents.on('click', 'pa-save-level-content', paSaveLevelContentFromButton);
+        krtEvents.on('click', 'pa-save-all', paSaveAll);
+        krtEvents.on('click', 'pa-discard-all', paDiscardAll);
 
-        window.krtEvents.on('click', 'pa-select-topic', (row) => {
+        krtEvents.on('click', 'pa-select-topic', (row) => {
             paSelectTopic(row.getAttribute('data-pa-select-topic'), false);
         });
     }

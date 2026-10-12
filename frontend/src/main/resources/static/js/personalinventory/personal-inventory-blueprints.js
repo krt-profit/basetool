@@ -4,6 +4,8 @@ import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 /** @type {HTMLInputElement | null} */
 let searchInput = null;
@@ -354,17 +356,17 @@ function blueprintTopic() {
 function afterListWrite() {
     reswapList();
     const topic = blueprintTopic();
-    if (topic && window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-        window.krtLiveSync.sendChanged(topic, Object.keys(BLUEPRINT_SECTIONS));
+    if (topic && krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        krtLiveSync.sendChanged(topic, Object.keys(BLUEPRINT_SECTIONS));
     }
 }
 
 function wireLiveSync() {
     const topic = blueprintTopic();
-    if (!topic || !window.krtLiveSync || typeof window.krtLiveSync.createReceiver !== 'function') {
+    if (!topic || !krtLiveSync || typeof krtLiveSync.createReceiver !== 'function') {
         return;
     }
-    window.krtLiveSync.createReceiver({
+    krtLiveSync.createReceiver({
         topic,
         sections: BLUEPRINT_SECTIONS,
         coalesceMs: 1500,
@@ -726,11 +728,11 @@ if (document.readyState === 'loading') {
     init();
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'bp-open-edit', openEdit);
-    window.krtEvents.on('click', 'bp-close-edit', closeEdit);
-    window.krtEvents.on('click', 'bp-open-delete', openDelete);
-    window.krtEvents.on('click', 'bp-close-delete', closeDelete);
-    window.krtEvents.on('click', 'bp-open-delete-all', openDeleteAll);
-    window.krtEvents.on('click', 'bp-close-delete-all', closeDeleteAll);
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'bp-open-edit', openEdit);
+    krtEvents.on('click', 'bp-close-edit', closeEdit);
+    krtEvents.on('click', 'bp-open-delete', openDelete);
+    krtEvents.on('click', 'bp-close-delete', closeDelete);
+    krtEvents.on('click', 'bp-open-delete-all', openDeleteAll);
+    krtEvents.on('click', 'bp-close-delete-all', closeDeleteAll);
 }

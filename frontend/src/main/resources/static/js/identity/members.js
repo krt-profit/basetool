@@ -28,6 +28,8 @@ import {
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const MEMBERS_SECTIONS = {
     roster: { container: '#members-results', fragmentValue: 'results' },
@@ -239,25 +241,25 @@ document.addEventListener('click', (event) => {
     }
 });
 
-window.krtEvents.on('click', 'members-delete-user', (el) => {
+krtEvents.on('click', 'members-delete-user', (el) => {
     deleteUser(el.getAttribute('data-user-id'));
 });
-window.krtEvents.on('click', 'members-sync', () => {
+krtEvents.on('click', 'members-sync', () => {
     syncMembersNow();
 });
-window.krtEvents.on('click', 'members-consolidate', (el) => {
+krtEvents.on('click', 'members-consolidate', (el) => {
     openConsolidate(el);
 });
 
 (function () {
-    if (!window.krtLiveSync || typeof window.krtLiveSync.createReceiver !== 'function') {
+    if (!krtLiveSync || typeof krtLiveSync.createReceiver !== 'function') {
         return;
     }
     if (!document.getElementById('members-results')) {
         return;
     }
 
-    window.krtLiveSync.createReceiver({
+    krtLiveSync.createReceiver({
         topic: 'members',
         sections: MEMBERS_SECTIONS,
         coalesceMs: 1500,

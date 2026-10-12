@@ -24,6 +24,8 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 /**
  * A form control of a material or store row, whose `id`, `name` and `value` the renumbering
@@ -70,18 +72,14 @@ function refineryStoreModalOpen() {
         },
         broadcast(keys) {
             const topic = refineryTopic();
-            if (
-                topic &&
-                window.krtLiveSync &&
-                typeof window.krtLiveSync.sendChanged === 'function'
-            ) {
-                window.krtLiveSync.sendChanged(topic, keys);
+            if (topic && krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged(topic, keys);
             }
         },
     });
 
-    if (refineryTopic() && window.krtLiveSync && window.krtLiveSync.createReceiver) {
-        window.krtLiveSync.createReceiver({
+    if (refineryTopic() && krtLiveSync && krtLiveSync.createReceiver) {
+        krtLiveSync.createReceiver({
             topic: refineryTopic(),
             sections: REFINERY_ORDER_SECTIONS,
             refresh(keys) {
@@ -749,37 +747,37 @@ function markRefineryFormDirty(event) {
 document.addEventListener('input', markRefineryFormDirty);
 document.addEventListener('change', markRefineryFormDirty);
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('input', 'rod-update-profit', updateProfitPreview);
-    window.krtEvents.on('focusout', 'rod-update-profit', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('input', 'rod-update-profit', updateProfitPreview);
+    krtEvents.on('focusout', 'rod-update-profit', (el) => {
         const field = /** @type {HTMLInputElement} */ (el);
         if (field.value.trim() === '') {
             field.value = '0';
             updateProfitPreview();
         }
     });
-    window.krtEvents.on('click', 'rod-set-started-now', setStartedAtNow);
-    window.krtEvents.on('change', 'rod-update-method', updateMethodRatings);
-    window.krtEvents.on('click', 'rod-add-material', addMaterialRow);
-    window.krtEvents.on('click', 'rod-remove-material', (el) => {
+    krtEvents.on('click', 'rod-set-started-now', setStartedAtNow);
+    krtEvents.on('change', 'rod-update-method', updateMethodRatings);
+    krtEvents.on('click', 'rod-add-material', addMaterialRow);
+    krtEvents.on('click', 'rod-remove-material', (el) => {
         removeMaterialRow(el);
     });
-    window.krtEvents.on('change', 'rod-update-output', (el) => {
+    krtEvents.on('change', 'rod-update-output', (el) => {
         updateOutputMaterial(el);
     });
-    window.krtEvents.on('change', 'rod-location-change', (el) => {
+    krtEvents.on('change', 'rod-location-change', (el) => {
         window.krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
     });
-    window.krtEvents.on('input', 'rod-calc-scu', (el) => {
+    krtEvents.on('input', 'rod-calc-scu', (el) => {
         calcScu(el.getAttribute('data-index'));
     });
-    window.krtEvents.on('click', 'rod-open-store', openStoreModal);
-    window.krtEvents.on('click', 'rod-discard', discardRefineryEdits);
-    window.krtEvents.on('click', 'rod-close-store', closeStoreModal);
-    window.krtEvents.on('click', 'rod-duplicate-store', (el) => {
+    krtEvents.on('click', 'rod-open-store', openStoreModal);
+    krtEvents.on('click', 'rod-discard', discardRefineryEdits);
+    krtEvents.on('click', 'rod-close-store', closeStoreModal);
+    krtEvents.on('click', 'rod-duplicate-store', (el) => {
         duplicateStoreItem(el);
     });
-    window.krtEvents.on('submit', 'rod-disable-submit', (el) => {
+    krtEvents.on('submit', 'rod-disable-submit', (el) => {
         const btn = /** @type {HTMLButtonElement | null} */ (
             el.querySelector('button[type=submit]')
         );
@@ -872,9 +870,9 @@ function refineryStoreJobOrderIds(form) {
 }
 
 function crossPublishStoredStock(jobOrderIds) {
-    if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
+    if (!krtLiveSync || typeof krtLiveSync.sendChanged !== 'function') return;
     jobOrderIds.forEach((jobOrderId) => {
-        window.krtLiveSync.sendChanged(`order:${jobOrderId}`, ['materials', 'aggregated']);
+        krtLiveSync.sendChanged(`order:${jobOrderId}`, ['materials', 'aggregated']);
     });
 }
 

@@ -25,6 +25,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 /** @type {any[]} */
 export let cachedInventoryItems = [];
@@ -83,20 +84,16 @@ const ORDER_SECTIONS = {
             return window.orderId ? `/orders/${window.orderId}` : null;
         },
         broadcast(keys) {
-            if (
-                window.orderId &&
-                window.krtLiveSync &&
-                typeof window.krtLiveSync.sendChanged === 'function'
-            ) {
-                window.krtLiveSync.sendChanged(`order:${window.orderId}`, keys);
+            if (window.orderId && krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+                krtLiveSync.sendChanged(`order:${window.orderId}`, keys);
             }
         },
     });
     window.krtRefreshOrderSection = orderSeam.refresh;
     window.krtNotifyOrderChanged = orderSeam.notify;
 
-    if (window.orderId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
-        window.krtLiveSync.createReceiver({
+    if (window.orderId && krtLiveSync && krtLiveSync.createReceiver) {
+        krtLiveSync.createReceiver({
             topic: `order:${window.orderId}`,
             sections: ORDER_SECTIONS,
             refresh(keys) {
@@ -116,8 +113,8 @@ const ORDER_SECTIONS = {
 })();
 
 export function _publishOrdersQueue() {
-    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-        window.krtLiveSync.sendChanged('orders', ['queue', 'demand']);
+    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        krtLiveSync.sendChanged('orders', ['queue', 'demand']);
     }
 }
 

@@ -26,6 +26,8 @@ import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const ASSOC_EPS = 0.0005;
 
@@ -579,12 +581,12 @@ function createLager(cfg) {
      * @param {Array<string | null | undefined> | null | undefined} orderIds the affected orders
      */
     function broadcastOrdersChanged(orderIds) {
-        if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
+        if (!krtLiveSync || typeof krtLiveSync.sendChanged !== 'function') return;
         let touchedAnyOrder = false;
         (orderIds || []).forEach((orderId) => {
             if (orderId) {
                 touchedAnyOrder = true;
-                window.krtLiveSync.sendChanged(`order:${orderId}`, [
+                krtLiveSync.sendChanged(`order:${orderId}`, [
                     'materials',
                     'aggregated',
                     'item-stock',
@@ -592,7 +594,7 @@ function createLager(cfg) {
             }
         });
         if (touchedAnyOrder) {
-            window.krtLiveSync.sendChanged('orders', ['demand']);
+            krtLiveSync.sendChanged('orders', ['demand']);
         }
     }
 
@@ -600,8 +602,8 @@ function createLager(cfg) {
      * Tells the Materialbörse to re-pull its board after a stock-reducing write.
      */
     function broadcastBoardChanged() {
-        if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-            window.krtLiveSync.sendChanged('materialboard', ['board']);
+        if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+            krtLiveSync.sendChanged('materialboard', ['board']);
         }
     }
 
@@ -1424,7 +1426,7 @@ function createLager(cfg) {
 
     /** Installs the delegated allocation-chip handlers and the popover's window listeners. */
     function bindAssoc() {
-        window.krtEvents.on('click', trigger('assoc-add-open'), (el) => {
+        krtEvents.on('click', trigger('assoc-add-open'), (el) => {
             const ctx = assocContext(el);
             if (!ctx) return;
             const pop = ctx.pop;
@@ -1447,7 +1449,7 @@ function createLager(cfg) {
                 pop.hidden = true;
             }
         });
-        window.krtEvents.on('change', trigger('assoc-pick'), (el) => {
+        krtEvents.on('change', trigger('assoc-pick'), (el) => {
             const value = /** @type {HTMLInputElement} */ (el).value;
             if (!value) return;
             const pop = el.closest('[data-assoc-pop]');
@@ -1464,7 +1466,7 @@ function createLager(cfg) {
                 amountInput.focus();
             }
         });
-        window.krtEvents.on('click', trigger('assoc-edit'), (el) => {
+        krtEvents.on('click', trigger('assoc-edit'), (el) => {
             const ctx = assocContext(el);
             if (!ctx) return;
             const pop = ctx.pop;
@@ -1480,13 +1482,13 @@ function createLager(cfg) {
             assocPositionPop(pop);
             if (amountInput) amountInput.focus();
         });
-        window.krtEvents.on('click', trigger('assoc-save'), (el) => {
+        krtEvents.on('click', trigger('assoc-save'), (el) => {
             const pop = el.closest('[data-assoc-pop]');
             const split = el.closest('.assoc-split');
             if (!pop || !split) return;
             assocSubmit(split, pop, assocSaveMethod(pop));
         });
-        window.krtEvents.on('click', trigger('assoc-remove'), (el) => {
+        krtEvents.on('click', trigger('assoc-remove'), (el) => {
             const pop = el.closest('[data-assoc-pop]');
             const split = el.closest('.assoc-split');
             if (!pop || !split) return;
@@ -1530,12 +1532,12 @@ function createLager(cfg) {
         document.addEventListener('DOMContentLoaded', restoreExpandedTree);
         document.addEventListener('click', closeMultiSelectsOnOutsideClick);
         document.addEventListener('change', clearFamilyFromChip);
-        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-            window.krtEvents.on('click', trigger('toggle-group'), toggleGroup);
-            window.krtEvents.on('click', trigger('toggle-stack'), toggleStack);
-            window.krtEvents.on('click', trigger('stack-page'), goToStackEntriesPage);
+        if (krtEvents && typeof krtEvents.on === 'function') {
+            krtEvents.on('click', trigger('toggle-group'), toggleGroup);
+            krtEvents.on('click', trigger('toggle-stack'), toggleStack);
+            krtEvents.on('click', trigger('stack-page'), goToStackEntriesPage);
             bindAssoc();
-            window.krtEvents.on('click', trigger('bookout'), (el) => {
+            krtEvents.on('click', trigger('bookout'), (el) => {
                 openBookOutModal(
                     el.getAttribute('data-id'),
                     el.getAttribute('data-amount'),
@@ -1544,25 +1546,25 @@ function createLager(cfg) {
                     el.getAttribute('data-quantity-type'),
                 );
             });
-            window.krtEvents.on('click', trigger('close-bookout'), closeBookOutModal);
-            window.krtEvents.on('click', trigger('stolen'), openStolenMarkModal);
-            window.krtEvents.on('click', trigger('close-stolen'), closeStolenMarkModal);
-            window.krtEvents.on('click', trigger('stolen-all'), fillStolenMarkAll);
-            window.krtEvents.on('input', trigger('amount-from-target'), updateAmountFromTarget);
-            window.krtEvents.on('input', trigger('target-from-amount'), updateTargetFromAmount);
-            window.krtEvents.on('change', trigger('toggle-bookout-type'), toggleBookOutTypeFields);
-            window.krtEvents.on('click', trigger('close-umbuchen'), closeUmbuchenModal);
-            window.krtEvents.on(
+            krtEvents.on('click', trigger('close-bookout'), closeBookOutModal);
+            krtEvents.on('click', trigger('stolen'), openStolenMarkModal);
+            krtEvents.on('click', trigger('close-stolen'), closeStolenMarkModal);
+            krtEvents.on('click', trigger('stolen-all'), fillStolenMarkAll);
+            krtEvents.on('input', trigger('amount-from-target'), updateAmountFromTarget);
+            krtEvents.on('input', trigger('target-from-amount'), updateTargetFromAmount);
+            krtEvents.on('change', trigger('toggle-bookout-type'), toggleBookOutTypeFields);
+            krtEvents.on('click', trigger('close-umbuchen'), closeUmbuchenModal);
+            krtEvents.on(
                 'input',
                 trigger('umbuchen-amount-from-target'),
                 updateUmbuchenAmountFromTarget,
             );
-            window.krtEvents.on(
+            krtEvents.on(
                 'input',
                 trigger('umbuchen-target-from-amount'),
                 updateUmbuchenTargetFromAmount,
             );
-            window.krtEvents.on(
+            krtEvents.on(
                 'change',
                 trigger('umbuchen-target-user-changed'),
                 refreshUmbuchenTransferOrgUnitPicker,

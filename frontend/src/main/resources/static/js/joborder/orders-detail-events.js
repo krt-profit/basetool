@@ -57,15 +57,16 @@ import {
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('change', 'od-update-status', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('change', 'od-update-status', (el) => {
         updateStatus(/** @type {HTMLSelectElement} */ (el));
     });
-    window.krtEvents.on('change', 'od-toggle-bp-counting', (el) => {
+    krtEvents.on('change', 'od-toggle-bp-counting', (el) => {
         _toggleBlueprintCounting(/** @type {HTMLInputElement} */ (el));
     });
-    window.krtEvents.on('click', 'od-toggle-inventory', (el, ev) => {
+    krtEvents.on('click', 'od-toggle-inventory', (el, ev) => {
         const target = /** @type {Element | null} */ (ev && ev.target);
         if (
             target &&
@@ -76,56 +77,56 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         }
         toggleInventory(el);
     });
-    window.krtEvents.on('click', 'od-unlink-inventory', (el) => {
+    krtEvents.on('click', 'od-unlink-inventory', (el) => {
         unlinkInventoryItem(el);
     });
-    window.krtEvents.on('click', 'claim-add', (el) => {
+    krtEvents.on('click', 'claim-add', (el) => {
         openClaimCreate(el);
     });
-    window.krtEvents.on('click', 'claim-edit', (el) => {
+    krtEvents.on('click', 'claim-edit', (el) => {
         openClaimEdit(el);
     });
-    window.krtEvents.on('click', 'claim-submit', () => {
+    krtEvents.on('click', 'claim-submit', () => {
         submitClaim();
     });
-    window.krtEvents.on('click', 'claim-withdraw', () => {
+    krtEvents.on('click', 'claim-withdraw', () => {
         withdrawClaimAction();
     });
-    window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
-    window.krtEvents.on('click', 'od-open-production', openProductionModal);
-    window.krtEvents.on('click', 'od-book-production', bookProduction);
-    window.krtEvents.on('change', 'od-production-bookin-changed', () => {
+    krtEvents.on('click', 'od-open-handover', openHandoverModal);
+    krtEvents.on('click', 'od-open-production', openProductionModal);
+    krtEvents.on('click', 'od-book-production', bookProduction);
+    krtEvents.on('change', 'od-production-bookin-changed', () => {
         _prodReconcile();
     });
-    window.krtEvents.on('change', 'od-production-owner-changed', () => {
+    krtEvents.on('change', 'od-production-owner-changed', () => {
         _prodSyncPersonalForOwner();
         _prodRefreshOrgUnitPicker();
     });
-    window.krtEvents.on('change', 'od-production-personal-toggle', () => {
+    krtEvents.on('change', 'od-production-personal-toggle', () => {
         _prodSyncPersonalAllocate();
     });
-    window.krtEvents.on('click', 'od-toggle-demand', _odToggleDemandRow);
-    window.krtEvents.on('click', 'od-download-report', (el) => {
+    krtEvents.on('click', 'od-toggle-demand', _odToggleDemandRow);
+    krtEvents.on('click', 'od-download-report', (el) => {
         downloadHandoverReport(el);
     });
-    window.krtEvents.on('click', 'od-download-item-report', (el) => {
+    krtEvents.on('click', 'od-download-item-report', (el) => {
         downloadItemHandoverReport(el);
     });
-    window.krtEvents.on('click', 'od-cancel-status', cancelStatusChange);
-    window.krtEvents.on('click', 'od-confirm-status', confirmStatusChange);
-    window.krtEvents.on('click', 'od-confirm-remove-material', () => {
+    krtEvents.on('click', 'od-cancel-status', cancelStatusChange);
+    krtEvents.on('click', 'od-confirm-status', confirmStatusChange);
+    krtEvents.on('click', 'od-confirm-remove-material', () => {
         if (typeof window.confirmRemoveMaterial === 'function') window.confirmRemoveMaterial();
     });
-    window.krtEvents.on('click', 'od-add-handover-item', addHandoverItemRow);
-    window.krtEvents.on('click', 'od-preview-handover', (el) => {
+    krtEvents.on('click', 'od-add-handover-item', addHandoverItemRow);
+    krtEvents.on('click', 'od-preview-handover', (el) => {
         previewHandoverReport(el);
     });
-    window.krtEvents.on('click', 'od-remove-handover-row', (el) => {
+    krtEvents.on('click', 'od-remove-handover-row', (el) => {
         const row = el.parentElement && el.parentElement.parentElement;
         if (row) row.remove();
         updateHandoverIndexes();
     });
-    window.krtEvents.on('submit', 'od-disable-submit', (el) => {
+    krtEvents.on('submit', 'od-disable-submit', (el) => {
         const btn = /** @type {HTMLButtonElement | null} */ (
             el.querySelector('button[type=submit]')
         );
@@ -300,26 +301,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ta) ta.addEventListener('input', oaUpdateCounter);
 });
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'oa-add-me', (el) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'oa-add-me', (el) => {
         oaAdd(el.getAttribute('data-user-id'));
     });
-    window.krtEvents.on('click', 'oa-add-user', () => {
+    krtEvents.on('click', 'oa-add-user', () => {
         const sel = /** @type {HTMLSelectElement | null} */ (
             document.getElementById('assignee-add-select')
         );
         if (sel && sel.value) oaAdd(sel.value);
     });
-    window.krtEvents.on('click', 'oa-remove-assignee', (el) => {
+    krtEvents.on('click', 'oa-remove-assignee', (el) => {
         oaRemove(el);
     });
-    window.krtEvents.on('click', 'oa-edit-note', (el) => {
+    krtEvents.on('click', 'oa-edit-note', (el) => {
         oaOpenNote(el);
     });
-    window.krtEvents.on('click', 'oa-save-note', () => {
+    krtEvents.on('click', 'oa-save-note', () => {
         oaSaveNote();
     });
-    window.krtEvents.on('click', 'oa-delete-note', (el) => {
+    krtEvents.on('click', 'oa-delete-note', (el) => {
         oaDeleteNote(el);
     });
 }

@@ -28,6 +28,8 @@ import {
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 
 const ORG_CHART_SECTIONS = {
     chart: { container: '#oc-chart', fragmentValue: 'chartBody' },
@@ -76,13 +78,13 @@ function refreshChart(keepScroll) {
 }
 
 function broadcastOrgStructureChanged() {
-    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-        window.krtLiveSync.sendChanged('org-structure', ['chart', ORG_CHART_UNITS_SECTION]);
+    if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {
+        krtLiveSync.sendChanged('org-structure', ['chart', ORG_CHART_UNITS_SECTION]);
     }
 }
 
-if (chart && window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
-    window.krtLiveSync.createReceiver({
+if (chart && krtLiveSync && typeof krtLiveSync.createReceiver === 'function') {
+    krtLiveSync.createReceiver({
         topic: 'org-structure',
         sections: ORG_CHART_SECTIONS,
         coalesceMs: 1500,
@@ -314,8 +316,8 @@ function submitModal() {
     send('POST', '/org-chart/positions/ajax', body);
 }
 
-if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('click', 'oc-toggle-edit', (btn) => {
+if (krtEvents && typeof krtEvents.on === 'function') {
+    krtEvents.on('click', 'oc-toggle-edit', (btn) => {
         if (!chart) {
             return;
         }
@@ -327,7 +329,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         }
     });
 
-    window.krtEvents.on('click', 'oc-add', (btn) => {
+    krtEvents.on('click', 'oc-add', (btn) => {
         lastTrigger = btn;
         openModal('create', {
             positionType: btn.getAttribute('data-position-type'),
@@ -339,12 +341,12 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         });
     });
 
-    window.krtEvents.on('click', 'oc-add-staff', (btn) => {
+    krtEvents.on('click', 'oc-add-staff', (btn) => {
         lastTrigger = btn;
         openModal('create', { staffChoice: true });
     });
 
-    window.krtEvents.on('click', 'oc-ga-add', (btn) => {
+    krtEvents.on('click', 'oc-ga-add', (btn) => {
         lastTrigger = btn;
         openModal('grandAdmiral', {
             orgUnitId: btn.getAttribute('data-org-unit-id'),
@@ -353,7 +355,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         });
     });
 
-    window.krtEvents.on('click', 'oc-ga-remove', (btn) => {
+    krtEvents.on('click', 'oc-ga-remove', (btn) => {
         showKrtConfirm?.(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm).then((ok) => {
             if (ok) {
                 const olId = encodeURIComponent(String(btn.getAttribute('data-org-unit-id')));
@@ -366,7 +368,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         });
     });
 
-    window.krtEvents.on('click', 'oc-reassign', (btn) => {
+    krtEvents.on('click', 'oc-reassign', (btn) => {
         lastTrigger = btn;
         openModal('reassign', {
             positionId: btn.getAttribute('data-position-id'),
@@ -377,7 +379,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         });
     });
 
-    window.krtEvents.on('click', 'oc-rename', (btn) => {
+    krtEvents.on('click', 'oc-rename', (btn) => {
         lastTrigger = btn;
         openModal('rename', {
             positionId: btn.getAttribute('data-position-id'),
@@ -386,7 +388,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         });
     });
 
-    window.krtEvents.on('click', 'oc-remove', (btn) => {
+    krtEvents.on('click', 'oc-remove', (btn) => {
         const isCommand = btn.getAttribute('data-position-type') === 'COMMAND_LEAD';
         const message = isCommand ? OC_I18N.removeConfirmCommand : OC_I18N.removeConfirm;
         const title = OC_I18N.removeConfirmTitle;
@@ -398,7 +400,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         });
     });
 
-    window.krtEvents.on('click', 'oc-vacate', (btn) => {
+    krtEvents.on('click', 'oc-vacate', (btn) => {
         const title = OC_I18N.vacateConfirmTitle;
         const message = OC_I18N.vacateConfirm;
         showKrtConfirm?.(title, message).then((ok) => {
@@ -410,7 +412,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         });
     });
 
-    window.krtEvents.on('click', 'oc-collapse', (btn) => {
+    krtEvents.on('click', 'oc-collapse', (btn) => {
         const bodyId = btn.getAttribute('aria-controls');
         const body = bodyId ? document.getElementById(bodyId) : null;
         if (!body) {
@@ -437,8 +439,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         }
     });
 
-    window.krtEvents.on('click', 'oc-modal-cancel', closeModal);
-    window.krtEvents.on('click', 'oc-modal-submit', submitModal);
+    krtEvents.on('click', 'oc-modal-cancel', closeModal);
+    krtEvents.on('click', 'oc-modal-submit', submitModal);
 }
 
 if (modal) {
