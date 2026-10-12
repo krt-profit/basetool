@@ -81,11 +81,9 @@ class LocationControllerTest {
 
   @Test
   void getAll_wrapsServicePageIntoPageResponseAndMapsContent() {
-    Location entity = new Location();
     LocationDto dto = new LocationDto(UUID.randomUUID(), "Lorville", null, false, false, 1L);
     when(service.getAllLocations(any(Pageable.class), eq(false)))
-        .thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.toDto(entity)).thenReturn(dto);
+        .thenReturn(new PageImpl<>(List.of(dto)));
 
     PageResponse<LocationDto> resp = controller.getAllLocations(0, 50, null, false);
 
@@ -108,12 +106,10 @@ class LocationControllerTest {
   }
 
   @Test
-  void getById_delegatesAndMaps() {
+  void getById_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    Location entity = new Location();
     LocationDto dto = new LocationDto(id, "x", null, false, false, 1L);
-    when(service.getLocation(id)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getLocation(id)).thenReturn(dto);
 
     LocationDto result = controller.getLocation(id);
 
@@ -122,13 +118,9 @@ class LocationControllerTest {
 
   @Test
   void getRefineryLocations_mapsEachEntityToDto() {
-    Location loc1 = new Location();
-    Location loc2 = new Location();
     LocationDto dto1 = new LocationDto(UUID.randomUUID(), "ARC-L1", null, false, false, 1L);
     LocationDto dto2 = new LocationDto(UUID.randomUUID(), "CRU-L4", null, false, false, 1L);
-    when(service.getRefineryLocations()).thenReturn(List.of(loc1, loc2));
-    when(mapper.toDto(loc1)).thenReturn(dto1);
-    when(mapper.toDto(loc2)).thenReturn(dto2);
+    when(service.getRefineryLocations()).thenReturn(List.of(dto1, dto2));
 
     List<LocationDto> result = controller.getRefineryLocations();
 
@@ -137,13 +129,9 @@ class LocationControllerTest {
 
   @Test
   void getHomeLocations_mapsEachEntityToDto() {
-    Location loc1 = new Location();
-    Location loc2 = new Location();
     LocationDto dto1 = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 1L);
     LocationDto dto2 = new LocationDto(UUID.randomUUID(), "Lorville", null, false, true, 1L);
-    when(service.getHomeLocations()).thenReturn(List.of(loc1, loc2));
-    when(mapper.toDto(loc1)).thenReturn(dto1);
-    when(mapper.toDto(loc2)).thenReturn(dto2);
+    when(service.getHomeLocations()).thenReturn(List.of(dto1, dto2));
 
     List<LocationDto> result = controller.getHomeLocations();
 

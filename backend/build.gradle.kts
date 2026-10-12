@@ -110,6 +110,7 @@ basetool {
   nullAwayPackages.addAll(
     listOf(
         "blueprint",
+        "catalogue",
         "hangar",
         "inventory",
         "joborder",

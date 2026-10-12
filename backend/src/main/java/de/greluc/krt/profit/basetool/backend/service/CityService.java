@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityDto;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mapper.CityMapper;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
 import java.util.UUID;
@@ -46,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CityService {
 
   private final CityRepository cityRepository;
+  private final CityMapper cityMapper;
 
   /**
    * Returns the paged city catalogue. The page is cached per {@link Pageable} (default key
@@ -55,19 +58,29 @@ public class CityService {
    * @return one page of cities, sorted by the pageable's sort
    */
   @Cacheable(cacheNames = CacheConfig.CITIES_CACHE)
-  public Page<City> getAllCities(Pageable pageable) {
-    return cityRepository.findAll(pageable);
+  public Page<CityDto> getAllCities(Pageable pageable) {
+    return cityRepository.findAll(pageable).map(cityMapper::toDto);
   }
 
   /**
    * Returns a single city by primary key.
    *
    * @param id city primary key
-   * @return the managed city entity
+   * @return the city read model
    * @throws NotFoundException when no city matches the id
    */
   @Cacheable(cacheNames = CacheConfig.CITIES_CACHE)
-  public City getCity(UUID id) {
+  public CityDto getCity(UUID id) {
+    return cityMapper.toDto(requireCity(id));
+  }
+
+  /**
+   * Loads the managed City entity a mutator edits; it never comes from the cache.
+   *
+   * @param id City primary key
+   * @return the managed entity
+   */
+  private City requireCity(UUID id) {
     return Entities.require(cityRepository.findById(id), "City not found");
   }
 
@@ -82,7 +95,7 @@ public class CityService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.CITIES_CACHE, allEntries = true)
   public City setLoadingDockOverride(UUID id, boolean value) {
-    City city = getCity(id);
+    City city = requireCity(id);
     city.setHasLoadingDock(value);
     city.setHasLoadingDockOverridden(true);
     return cityRepository.save(city);
@@ -98,7 +111,7 @@ public class CityService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.CITIES_CACHE, allEntries = true)
   public City clearLoadingDockOverride(UUID id) {
-    City city = getCity(id);
+    City city = requireCity(id);
     city.setHasLoadingDockOverridden(false);
     return cityRepository.save(city);
   }

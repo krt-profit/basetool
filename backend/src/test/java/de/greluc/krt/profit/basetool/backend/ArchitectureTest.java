@@ -70,7 +70,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibility
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
 import de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController;
@@ -332,7 +331,6 @@ class ArchitectureTest {
           AuditRetentionProperties.class,
           AuthenticatedSubject.class,
           AuthoritiesCacheProperties.class,
-          CachedEntityGraphs.class,
           ChangeSource.class,
           ChangeSourceProperties.class,
           ClientAttribution.class,
@@ -950,7 +948,7 @@ class ArchitectureTest {
   void controllerLayerShouldNotDependOnRepositoryLayer() {
     assertClassFloor("controllerLayerShouldNotDependOnRepositoryLayer", CONTROLLER_CODE, 99);
     assertClassFloor(
-        "controllerLayerShouldNotDependOnRepositoryLayer (targets)", REPOSITORY_CODE, 115);
+        "controllerLayerShouldNotDependOnRepositoryLayer (targets)", REPOSITORY_CODE, 114);
     controllerLayerShouldNotDependOnRepositoryLayerRule().check(CLASSES);
   }
 
@@ -1104,7 +1102,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 61);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 60);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);
@@ -1663,7 +1661,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 293);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 273);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

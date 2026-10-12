@@ -48,14 +48,10 @@ class MaterialCategoryControllerTest {
 
   @Test
   void getAll_returnsServiceListMappedToDtos() {
-    MaterialCategory minerals = new MaterialCategory();
-    MaterialCategory gases = new MaterialCategory();
     MaterialCategoryDto mineralsDto = new MaterialCategoryDto(UUID.randomUUID(), "Mineral", 1L);
     MaterialCategoryDto gasesDto = new MaterialCategoryDto(UUID.randomUUID(), "Gas", 1L);
 
-    when(service.findAll()).thenReturn(List.of(minerals, gases));
-    when(mapper.toDto(minerals)).thenReturn(mineralsDto);
-    when(mapper.toDto(gases)).thenReturn(gasesDto);
+    when(service.findAll()).thenReturn(List.of(mineralsDto, gasesDto));
 
     List<MaterialCategoryDto> result = controller.getAll();
 
@@ -65,13 +61,11 @@ class MaterialCategoryControllerTest {
   }
 
   @Test
-  void getById_delegatesAndMaps() {
+  void getById_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    MaterialCategory entity = new MaterialCategory();
     MaterialCategoryDto dto = new MaterialCategoryDto(id, "Mineral", 1L);
 
-    when(service.findById(id)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.findById(id)).thenReturn(dto);
 
     MaterialCategoryDto result = controller.getById(id);
 

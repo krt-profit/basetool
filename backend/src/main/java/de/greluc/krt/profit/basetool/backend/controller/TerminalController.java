@@ -19,11 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.TerminalMapper;
-import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.service.TerminalService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil.PageCeiling;
@@ -32,7 +31,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,8 +74,7 @@ public class TerminalController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "starSystemName"), "name", PageCeiling.LOAD_ALL);
-    Page<Terminal> p = terminalService.getAllTerminals(pageable);
-    return PageResponse.of(p.map(terminalMapper::toDto));
+    return PageResponse.of(terminalService.getAllTerminals(pageable));
   }
 
   /**
@@ -88,7 +85,7 @@ public class TerminalController {
    */
   @GetMapping("/{id}")
   public TerminalDto getTerminal(@PathVariable @NotNull UUID id) {
-    return terminalMapper.toDto(terminalService.getTerminal(id));
+    return terminalService.getTerminal(id);
   }
 
   /**

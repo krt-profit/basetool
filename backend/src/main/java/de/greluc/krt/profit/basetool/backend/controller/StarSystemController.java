@@ -19,11 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.StarSystemMapper;
-import de.greluc.krt.profit.basetool.backend.model.StarSystem;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.service.StarSystemService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
@@ -31,7 +30,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,8 +72,7 @@ public class StarSystemController {
       @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
-    Page<StarSystem> p = starSystemService.getAllStarSystems(pageable);
-    return PageResponse.of(p.map(starSystemMapper::toDto));
+    return PageResponse.of(starSystemService.getAllStarSystems(pageable));
   }
 
   /**
@@ -86,7 +83,7 @@ public class StarSystemController {
    */
   @GetMapping("/{id}")
   public StarSystemDto getStarSystem(@PathVariable @NotNull UUID id) {
-    return starSystemMapper.toDto(starSystemService.getStarSystem(id));
+    return starSystemService.getStarSystem(id);
   }
 
   /**

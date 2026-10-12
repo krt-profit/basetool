@@ -205,6 +205,17 @@ whether a location is in use through its own `catalogue.api.LocationUsage`, whic
 and the refinery (orders) implement, so it names neither repository. `RefineryAccessPolicy` owns
 the JPQL scope fragment of the order queries.
 
+The catalogue moved in part since P4-5 (plan §7.6). Its thirteen cached services map the entity
+to its wire record inside their own read-only transaction and cache that record, so no cache holds
+an entity of the catalogue. The six records no model class embeds (`CityDto`, `OutpostDto`,
+`PoiDto`, `TerminalDto`, `StarSystemDto`, `RefiningMethodDto`) and the two name helpers other
+modules call (`BlueprintNameNormalizer`, `MaterialNameCanonicalizer`) sit in `catalogue.api`; the
+sync infrastructure (`SyncCoordinator`, `SyncChunkWriter`, `SyncReportService`), the UEX, SC Wiki
+and P4K feed records (`catalogue.internal.uex`, `.scwiki`, `.p4k`), the sync report entity and its
+repository, the key projections and the integration properties sit in `catalogue.internal`.
+Entities, repositories, mappers, controllers and the other DTOs stay in the layer packages until
+the kernel types `AbstractEntity` and `PageResponse` have left `model` (§11).
+
 The inventory (the Lager) moved since P4-1: `InventoryItemController` sits in `inventory.web`, and
 `inventory.internal` holds the Lager services (item, aggregation, checkout, org-unit change, stolen
 mark), `InventoryAccessPolicy` (also the `BookInPolicy`), `InventoryStockCommands` (the `StockCommands`

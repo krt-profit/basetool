@@ -19,16 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCreateDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialSellingTerminalDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialSellingTerminalDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.MaterialService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
@@ -93,15 +92,15 @@ public class MaterialController {
       @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "type", "id"), "name");
-    Page<Material> p;
+    Page<MaterialDto> p;
     if (Boolean.TRUE.equals(hasTerminals)) {
-      p = materialService.getAllMaterialsWithPrices(pageable);
+      p = materialService.getAllMaterialsWithPrices(pageable).map(materialMapper::toDto);
     } else if (Boolean.TRUE.equals(includeHidden)) {
       p = materialService.getAllMaterials(pageable);
     } else {
       p = materialService.getVisibleMaterials(pageable);
     }
-    return PageResponse.of(p.map(materialMapper::toDto));
+    return PageResponse.of(p);
   }
 
   /**
@@ -232,7 +231,7 @@ public class MaterialController {
    */
   @GetMapping("/{id}")
   public MaterialDto getMaterial(@PathVariable @NotNull UUID id) {
-    return materialMapper.toDto(materialService.getMaterial(id));
+    return materialService.getMaterial(id);
   }
 
   /**

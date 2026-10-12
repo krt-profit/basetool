@@ -25,7 +25,7 @@ import java.util.UUID;
 /**
  * Frontend-side projection of the {@code SpaceStation} payload returned by the backend's
  * UEX-overrides endpoint. Mirrors {@code
- * de.greluc.krt.profit.basetool.backend.model.dto.SpaceStationDto} exactly.
+ * de.greluc.krt.profit.basetool.backend.catalogue.internal.SpaceStationDto} exactly.
  *
  * @param id space station primary key
  * @param name canonical station name as supplied by UEX

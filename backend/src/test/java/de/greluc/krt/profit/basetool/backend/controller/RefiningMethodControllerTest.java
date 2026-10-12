@@ -23,10 +23,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.service.RefiningMethodService;
 import java.util.List;
 import java.util.UUID;
@@ -49,12 +49,10 @@ class RefiningMethodControllerTest {
 
   @Test
   void getAll_wrapsServicePageIntoPageResponse() {
-    RefiningMethod entity = new RefiningMethod();
     RefiningMethodDto dto =
         new RefiningMethodDto(UUID.randomUUID(), "Cormack", null, "CORMACK", 95, 70, 30);
     when(service.getAllRefiningMethods(any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.toDto(entity)).thenReturn(dto);
+        .thenReturn(new PageImpl<>(List.of(dto)));
 
     PageResponse<RefiningMethodDto> resp = controller.getAllRefiningMethods(null, null, null);
 
@@ -63,12 +61,10 @@ class RefiningMethodControllerTest {
   }
 
   @Test
-  void getById_delegatesAndMaps() {
+  void getById_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    RefiningMethod entity = new RefiningMethod();
     RefiningMethodDto dto = new RefiningMethodDto(id, "x", null, "X", 50, 50, 50);
-    when(service.getRefiningMethod(id)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getRefiningMethod(id)).thenReturn(dto);
 
     RefiningMethodDto result = controller.getRefiningMethod(id);
 

@@ -23,10 +23,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.mapper.StarSystemMapper;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.service.StarSystemService;
 import java.util.List;
 import java.util.UUID;
@@ -49,12 +49,9 @@ class StarSystemControllerTest {
 
   @Test
   void getAll_wrapsServicePageIntoPageResponse() {
-    StarSystem entity = new StarSystem();
     StarSystemDto dto =
         new StarSystemDto(UUID.randomUUID(), 1, "Stanton", null, true, null, null, null, 1L);
-    when(service.getAllStarSystems(any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getAllStarSystems(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(dto)));
 
     PageResponse<StarSystemDto> resp = controller.getAllStarSystems(null, null, null);
 
@@ -63,12 +60,10 @@ class StarSystemControllerTest {
   }
 
   @Test
-  void getById_delegatesAndMaps() {
+  void getById_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    StarSystem entity = new StarSystem();
     StarSystemDto dto = new StarSystemDto(id, 1, "Stanton", null, true, null, null, null, 1L);
-    when(service.getStarSystem(id)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getStarSystem(id)).thenReturn(dto);
 
     StarSystemDto result = controller.getStarSystem(id);
 

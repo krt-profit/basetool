@@ -30,13 +30,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiManufacturerDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
-import de.greluc.krt.profit.basetool.backend.model.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
-import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.HashMap;
 import java.util.List;

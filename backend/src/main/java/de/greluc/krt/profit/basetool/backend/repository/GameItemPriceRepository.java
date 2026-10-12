@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.PairKeyRef;
 import de.greluc.krt.profit.basetool.backend.model.GameItemPrice;
 import java.util.Collection;
 import java.util.List;

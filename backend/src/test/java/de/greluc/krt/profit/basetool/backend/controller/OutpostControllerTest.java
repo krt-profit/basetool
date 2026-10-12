@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.mapper.OutpostMapper;
 import de.greluc.krt.profit.basetool.backend.model.Outpost;
-import de.greluc.krt.profit.basetool.backend.model.dto.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.OutpostService;
 import java.util.List;
@@ -49,11 +49,9 @@ class OutpostControllerTest {
 
   @Test
   void getAllOutposts_wrapsServicePageIntoPageResponse() {
-    Outpost entity = new Outpost();
     OutpostDto dto =
         new OutpostDto(UUID.randomUUID(), "HDMS-Anderson", "Stanton", "Hurston", true, false);
-    when(service.getAllOutposts(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getAllOutposts(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(dto)));
 
     PageResponse<OutpostDto> resp = controller.getAllOutposts(null, null, null);
 
@@ -62,12 +60,10 @@ class OutpostControllerTest {
   }
 
   @Test
-  void getOutpost_delegatesAndMaps() {
+  void getOutpost_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    Outpost entity = new Outpost();
     OutpostDto dto = new OutpostDto(id, "HDMS-Anderson", "Stanton", "Hurston", true, false);
-    when(service.getOutpost(id)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getOutpost(id)).thenReturn(dto);
 
     OutpostDto result = controller.getOutpost(id);
 

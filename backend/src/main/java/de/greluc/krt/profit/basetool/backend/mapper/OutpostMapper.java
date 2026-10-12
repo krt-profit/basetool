@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.model.Outpost;
-import de.greluc.krt.profit.basetool.backend.model.dto.OutpostDto;
 import org.mapstruct.Mapper;
 
 /**

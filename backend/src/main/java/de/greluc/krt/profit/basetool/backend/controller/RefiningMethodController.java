@@ -19,11 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
-import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.service.RefiningMethodService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
@@ -31,7 +30,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,8 +72,7 @@ public class RefiningMethodController {
       @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
-    Page<RefiningMethod> p = refiningMethodService.getAllRefiningMethods(pageable);
-    return PageResponse.of(p.map(refiningMethodMapper::toDto));
+    return PageResponse.of(refiningMethodService.getAllRefiningMethods(pageable));
   }
 
   /**
@@ -86,7 +83,7 @@ public class RefiningMethodController {
    */
   @GetMapping("/{id}")
   public RefiningMethodDto getRefiningMethod(@PathVariable @NotNull UUID id) {
-    return refiningMethodMapper.toDto(refiningMethodService.getRefiningMethod(id));
+    return refiningMethodService.getRefiningMethod(id);
   }
 
   /**

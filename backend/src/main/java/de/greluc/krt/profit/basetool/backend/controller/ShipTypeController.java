@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
-import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.service.ShipTypeService;
@@ -30,7 +29,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,8 +70,7 @@ public class ShipTypeController {
       @RequestParam(required = false, defaultValue = "false") boolean includeHidden) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
-    Page<ShipType> p = shipTypeService.getAllShipTypes(pageable, includeHidden);
-    return PageResponse.of(p.map(shipTypeMapper::toDto));
+    return PageResponse.of(shipTypeService.getAllShipTypes(pageable, includeHidden));
   }
 
   /**
@@ -84,7 +81,7 @@ public class ShipTypeController {
    */
   @GetMapping("/{id}")
   public ShipTypeDto getShipType(@PathVariable @NotNull UUID id) {
-    return shipTypeMapper.toDto(shipTypeService.getShipType(id));
+    return shipTypeService.getShipType(id);
   }
 
   /**

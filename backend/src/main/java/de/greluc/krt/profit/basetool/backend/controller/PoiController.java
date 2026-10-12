@@ -19,11 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.PoiDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.PoiMapper;
-import de.greluc.krt.profit.basetool.backend.model.Poi;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.PoiDto;
 import de.greluc.krt.profit.basetool.backend.service.PoiService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil.PageCeiling;
@@ -31,7 +30,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,8 +72,7 @@ public class PoiController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "starSystemName"), "name", PageCeiling.LOAD_ALL);
-    Page<Poi> p = poiService.getAllPois(pageable);
-    return PageResponse.of(p.map(poiMapper::toDto));
+    return PageResponse.of(poiService.getAllPois(pageable));
   }
 
   /**
@@ -86,7 +83,7 @@ public class PoiController {
    */
   @GetMapping("/{id}")
   public PoiDto getPoi(@PathVariable @NotNull UUID id) {
-    return poiMapper.toDto(poiService.getPoi(id));
+    return poiService.getPoi(id);
   }
 
   /**

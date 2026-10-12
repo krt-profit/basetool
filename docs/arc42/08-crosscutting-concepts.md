@@ -94,7 +94,7 @@ a drift between entity and column fails at start-up rather than at runtime. Seed
 common shapes of one: statement-count tests over the hot reads, Hibernate refusing a paged query it
 would have to page in memory, and a catalogue sweep that rejects any foreign key without a leading
 index. Every to-one association is `LAZY` (an ArchUnit rule refuses an eager one); a read fetches
-what it maps deliberately, and a cached entity is completed before the cache stores it
+what it maps deliberately, and a cache holds the mapped record, never the entity
 (`REQ-DATA-003`, BE-PERF-11).
 
 Authority: [`data-persistence.md`](../specs/data-persistence.md) (`REQ-DATA-*`),
@@ -117,8 +117,9 @@ table only through a listed crossing, and every column a trigger function names 
 because PostgreSQL would otherwise only notice a renamed column on the next insert
 (`REQ-DATA-020`). Every column that references a member has a disposition in the erasure, the
 Art. 15 export and the account merge (`REQ-DATA-021`). A master-data cache shares one instance
-between every reader, so no mutator may edit an instance a cache handed out; caches move to read
-models, and the entity-returning ones are a list that may only shrink (`REQ-DATA-022`).
+between every reader, so no mutator may edit an instance a cache handed out; the catalogue's
+caches hold read models (the wire records), and the identity and org-unit caches that still return
+an entity are a list that may only shrink (`REQ-DATA-022`).
 
 ## 8.4 Concurrency — the landmine field
 

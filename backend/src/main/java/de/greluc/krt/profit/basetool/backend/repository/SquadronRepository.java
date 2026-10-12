@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.LookupTableRepository;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import java.util.List;
 import java.util.Optional;

@@ -20,13 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationUsage;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
@@ -57,6 +57,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class LocationService {
 
   private final LocationRepository locationRepository;
+  private final LocationMapper locationMapper;
   private final List<LocationUsage> locationUsages;
 
   /**
@@ -64,14 +65,14 @@ public class LocationService {
    *
    * @param pageable page request
    * @param includeHidden true to include hidden entries (admin view)
-   * @return cached page of locations
+   * @return cached page of location read models
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE)
-  public Page<Location> getAllLocations(@NotNull Pageable pageable, boolean includeHidden) {
-    return CachedEntityGraphs.locations(
-        includeHidden
+  public Page<LocationDto> getAllLocations(@NotNull Pageable pageable, boolean includeHidden) {
+    return (includeHidden
             ? locationRepository.findAll(pageable)
-            : locationRepository.findByHiddenFalse(pageable));
+            : locationRepository.findByHiddenFalse(pageable))
+        .map(locationMapper::toDto);
   }
 
   /**
@@ -101,24 +102,35 @@ public class LocationService {
    * Returns the location.
    *
    * @param id location primary key
-   * @return the location
+   * @return the location read model
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE)
-  public Location getLocation(@NotNull UUID id) {
-    return CachedEntityGraphs.location(
-        Entities.require(locationRepository.findById(id), "Location not found"));
+  public LocationDto getLocation(@NotNull UUID id) {
+    return locationMapper.toDto(requireLocation(id));
+  }
+
+  /**
+   * Loads the managed location entity a mutator edits; it never comes from the cache.
+   *
+   * @param id location primary key
+   * @return the managed entity
+   */
+  private Location requireLocation(UUID id) {
+    return Entities.require(locationRepository.findById(id), "Location not found");
   }
 
   /**
    * Lists only the locations that host a refinery (used by the refinery-order create form). Single
    * fixed-key cache entry shared by every caller.
    *
-   * @return cached list
+   * @return cached list of location read models
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE, key = "'refineries'")
-  public List<Location> getRefineryLocations() {
-    return CachedEntityGraphs.locations(locationRepository.findLocationsWithRefinery());
+  public List<LocationDto> getRefineryLocations() {
+    return locationRepository.findLocationsWithRefinery().stream()
+        .map(locationMapper::toDto)
+        .toList();
   }
 
   /**
@@ -126,12 +138,13 @@ public class LocationService {
    * hangar bulk "set home location" picker. Single fixed-key cache entry shared by every caller;
    * evicted whenever a location is created/updated/deleted.
    *
-   * @return curated home locations, name descending
+   * @return curated home location read models, name descending
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE, key = "'homeLocations'")
-  public List<Location> getHomeLocations() {
-    return CachedEntityGraphs.locations(
-        locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc());
+  public List<LocationDto> getHomeLocations() {
+    return locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc().stream()
+        .map(locationMapper::toDto)
+        .toList();
   }
 
   /**
@@ -167,7 +180,7 @@ public class LocationService {
       throw new DuplicateEntityException(
           "A Location with the name '" + locationDto.name() + "' already exists.");
     }
-    Location location = getLocation(id);
+    Location location = requireLocation(id);
 
     OptimisticLock.check(location.getVersion(), locationDto.version(), Location.class, id);
 
@@ -197,7 +210,7 @@ public class LocationService {
             "Cannot delete location: It is currently used by one or more " + usage.users() + ".");
       }
     }
-    Location location = getLocation(id);
+    Location location = requireLocation(id);
     locationRepository.delete(location);
   }
 }

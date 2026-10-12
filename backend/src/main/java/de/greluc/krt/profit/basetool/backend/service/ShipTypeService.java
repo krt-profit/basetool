@@ -19,10 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.mapper.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
+import de.greluc.krt.profit.basetool.backend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -45,34 +46,44 @@ import org.springframework.transaction.annotation.Transactional;
 public class ShipTypeService {
 
   private final ShipTypeRepository shipTypeRepository;
+  private final ShipTypeMapper shipTypeMapper;
 
   /**
    * Returns cached page result.
    *
    * @param pageable page request
    * @param includeHidden true to include ship types marked hidden
-   * @return cached page result
+   * @return cached page of ship type read models
    */
   @Cacheable(cacheNames = CacheConfig.SHIP_TYPES_CACHE)
-  public Page<ShipType> getAllShipTypes(@NotNull Pageable pageable, boolean includeHidden) {
-    return CachedEntityGraphs.shipTypes(
-        includeHidden
+  public Page<ShipTypeDto> getAllShipTypes(@NotNull Pageable pageable, boolean includeHidden) {
+    return (includeHidden
             ? shipTypeRepository.findAll(pageable)
-            : shipTypeRepository.findByHiddenFalse(pageable));
+            : shipTypeRepository.findByHiddenFalse(pageable))
+        .map(shipTypeMapper::toDto);
   }
 
   /**
    * Returns the ship type with the given id (cached).
    *
    * @param id ship type primary key
-   * @return the ship type
+   * @return the ship type read model
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no ship type
    *     matches
    */
   @Cacheable(cacheNames = CacheConfig.SHIP_TYPES_CACHE)
-  public ShipType getShipType(@NotNull UUID id) {
-    return CachedEntityGraphs.shipType(
-        Entities.require(shipTypeRepository.findById(id), "ShipType not found"));
+  public ShipTypeDto getShipType(@NotNull UUID id) {
+    return shipTypeMapper.toDto(requireShipType(id));
+  }
+
+  /**
+   * Loads the managed ship type entity a mutator edits; it never comes from the cache.
+   *
+   * @param id ship type primary key
+   * @return the managed entity
+   */
+  private ShipType requireShipType(UUID id) {
+    return Entities.require(shipTypeRepository.findById(id), "ShipType not found");
   }
 
   /**
@@ -86,7 +97,7 @@ public class ShipTypeService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.SHIP_TYPES_CACHE, allEntries = true)
   public ShipType updateShipTypeVisibility(@NotNull UUID id, boolean hidden) {
-    ShipType shipType = getShipType(id);
+    ShipType shipType = requireShipType(id);
     shipType.setHidden(hidden);
     return shipTypeRepository.save(shipType);
   }

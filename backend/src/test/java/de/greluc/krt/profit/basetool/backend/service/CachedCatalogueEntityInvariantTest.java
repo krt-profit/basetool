@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedCityCommands;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedCityQueries;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedModuleCache;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
@@ -45,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.model.StarSystem;
 import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
@@ -57,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.RecordComponent;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -101,8 +102,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ClassUtils;
 
 /**
- * Holds the cached-entity invariant of REQ-DATA-022 for every service with a {@code @Cacheable}
- * method: no mutator edits an instance a cache has handed out.
+ * Holds the cached-instance invariant of REQ-DATA-022 for every service with a {@code @Cacheable}
+ * method: no mutator edits an instance a cache has handed out, whether the cache holds a read model
+ * or an entity.
  *
  * <p>Each case reads through the cache proxy, runs one mutator through its proxy, and compares
  * every field of every instance the read returned. The test runs without a surrounding transaction,
@@ -454,7 +456,7 @@ class CachedCatalogueEntityInvariantTest {
                           true,
                           true,
                           false,
-                          versionOf(jobTypeService.getJobTypes(null), id))));
+                          jobVersionOf(jobTypeService.getJobTypes(null), id))));
         });
     cases.put(
         "JobTypeService#deleteJobType",
@@ -497,7 +499,7 @@ class CachedCatalogueEntityInvariantTest {
                           "changed",
                           true,
                           true,
-                          locationService.getLocation(id).getVersion())));
+                          locationService.getLocation(id).version())));
         });
     cases.put(
         "LocationService#deleteLocation",
@@ -752,7 +754,7 @@ class CachedCatalogueEntityInvariantTest {
   }
 
   private static void collect(Object candidate, List<Object> found) {
-    if (candidate instanceof AbstractEntity<?>) {
+    if (candidate instanceof AbstractEntity<?> || candidate instanceof Record) {
       found.add(candidate);
     }
   }
@@ -799,8 +801,28 @@ class CachedCatalogueEntityInvariantTest {
     return value;
   }
 
-  private static Object idOf(Object entity) {
-    return ((AbstractEntity<?>) entity).getId();
+  private static Object idOf(Object watched) {
+    if (watched instanceof AbstractEntity<?> entity) {
+      return entity.getId();
+    }
+    for (RecordComponent component : watched.getClass().getRecordComponents()) {
+      if ("id".equals(component.getName())) {
+        try {
+          return component.getAccessor().invoke(watched);
+        } catch (ReflectiveOperationException e) {
+          throw new IllegalStateException(component.toString(), e);
+        }
+      }
+    }
+    return "";
+  }
+
+  private static Long jobVersionOf(Collection<JobTypeDto> jobTypes, UUID id) {
+    return jobTypes.stream()
+        .filter(jobType -> id.equals(jobType.id()))
+        .findFirst()
+        .map(JobTypeDto::version)
+        .orElseThrow();
   }
 
   private static Long versionOf(Collection<? extends AbstractEntity<UUID>> entities, UUID id) {

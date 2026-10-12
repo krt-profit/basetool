@@ -64,12 +64,10 @@ class ManufacturerControllerTest {
 
   @Test
   void getAllManufacturers_wrapsServicePageIntoPageResponse() {
-    Manufacturer m = new Manufacturer();
     ManufacturerDto dto =
         new ManufacturerDto(UUID.randomUUID(), "Drake", "DRAK", null, null, null, false);
     when(service.getAllManufacturers(any(Pageable.class), eq(false)))
-        .thenReturn(new PageImpl<>(List.of(m)));
-    when(mapper.toDto(m)).thenReturn(dto);
+        .thenReturn(new PageImpl<>(List.of(dto)));
 
     PageResponse<ManufacturerDto> resp = controller.getAllManufacturers(0, 50, null, false);
 
@@ -78,12 +76,10 @@ class ManufacturerControllerTest {
   }
 
   @Test
-  void getManufacturer_delegatesAndMaps() {
+  void getManufacturer_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    Manufacturer m = new Manufacturer();
     ManufacturerDto dto = new ManufacturerDto(id, "Anvil", "ANVL", null, null, null, false);
-    when(service.getManufacturer(id)).thenReturn(m);
-    when(mapper.toDto(m)).thenReturn(dto);
+    when(service.getManufacturer(id)).thenReturn(dto);
 
     ManufacturerDto result = controller.getManufacturer(id);
 

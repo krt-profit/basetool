@@ -345,10 +345,21 @@ since the go-live of 2026-09-28, so these risks hold now.
   the image pins name different Keycloak lines, and `ServiceRegistrationsTest` fails when one of the
   six service registrations no longer resolves, implements its SPI, instantiates or keeps its
   provider id. Neither runs the SPI inside Keycloak; that stays the sandbox smoke test's job.
-- **Thirty-two master-data caches hold the catalogue entities themselves** (opened 2026-10-03).
-  Every reader shares the cached instance, and the mutators are safe only because they load
-  through self-invocation; a test runs every mutator against a cached read and a rule lets the
-  list only shrink until the caches hold read models (`REQ-DATA-022`, plan Phase 4).
+- **The catalogue's entities, repositories, mappers and controllers cannot leave the layer
+  packages yet** (opened 2026-10-12). Every catalogue entity extends `AbstractEntity` and every
+  controller returns `PageResponse`, both kernel types that still lie in the `model` package, and
+  `model` already reaches the catalogue through the entities that point at it. Moving a catalogue
+  entity or controller into `catalogue.internal` would close a `catalogue ↔ model` package cycle,
+  which `ArchitectureTest` refuses; the two types move to the `kernel` package first (102 and 91
+  files import them), and then 159 of the 182 catalogue classes still in the layer packages can
+  follow; the other 23 (the UEX and SC Wiki clients and syncs) also wait for `AuthHelperService`,
+  `CacheConfig` and `ResponseSizeLimitInterceptor`, platform types that lie in layer packages too
+  (plan §7.6, P4-5).
+- **Three master-data caches still hold entities** (opened 2026-10-03 with thirty-two; the
+  catalogue's twenty-nine closed 2026-10-12). `RoleService` and `SquadronService` share the cached
+  instance, and their mutators are safe only because they load through self-invocation; a test runs
+  every mutator against a cached read and a rule lets the list only shrink until identity and the
+  org units cache read models (`REQ-DATA-022`, plan Phase 4).
 - **Eight member-referencing columns were not in the Art. 15 export** (opened and closed
   2026-10-03): approval limits, account booking grants, booking requests as counterparty,
   market-request interest, party lead, unit responsibility, grand admiral appointment and realm

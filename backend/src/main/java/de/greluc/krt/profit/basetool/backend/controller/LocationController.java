@@ -36,7 +36,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,8 +80,7 @@ public class LocationController {
       @RequestParam(required = false, defaultValue = "false") boolean includeHidden) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
-    Page<Location> p = locationService.getAllLocations(pageable, includeHidden);
-    return PageResponse.of(p.map(locationMapper::toDto));
+    return PageResponse.of(locationService.getAllLocations(pageable, includeHidden));
   }
 
   /**
@@ -126,7 +124,7 @@ public class LocationController {
    */
   @GetMapping("/{id}")
   public LocationDto getLocation(@PathVariable @NotNull UUID id) {
-    return locationMapper.toDto(locationService.getLocation(id));
+    return locationService.getLocation(id);
   }
 
   /**
@@ -137,7 +135,7 @@ public class LocationController {
   @GetMapping("/refineries")
   @PreAuthorize("isAuthenticated()")
   public List<LocationDto> getRefineryLocations() {
-    return locationService.getRefineryLocations().stream().map(locationMapper::toDto).toList();
+    return locationService.getRefineryLocations();
   }
 
   /**
@@ -158,7 +156,7 @@ public class LocationController {
   @GetMapping("/home-locations")
   @PreAuthorize("isAuthenticated()")
   public List<LocationDto> getHomeLocations() {
-    return locationService.getHomeLocations().stream().map(locationMapper::toDto).toList();
+    return locationService.getHomeLocations();
   }
 
   /**

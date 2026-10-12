@@ -71,8 +71,8 @@ public interface P4kImportJobRepository extends JpaRepository<P4kImportJob, UUID
 
   /**
    * Bulk-deletes jobs created before {@code cutoff}. Their {@link
-   * de.greluc.krt.profit.basetool.backend.model.P4kImportJobPayload} rows are removed by the {@code
-   * ON DELETE CASCADE} foreign key at the database layer.
+   * de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayload} rows are removed
+   * by the {@code ON DELETE CASCADE} foreign key at the database layer.
    *
    * @param cutoff jobs created strictly before this instant are deleted
    * @return the number of job rows deleted

@@ -61,7 +61,7 @@ public class MaterialCategoryController {
    */
   @GetMapping
   public List<MaterialCategoryDto> getAll() {
-    return service.findAll().stream().map(mapper::toDto).toList();
+    return service.findAll();
   }
 
   /**
@@ -72,7 +72,7 @@ public class MaterialCategoryController {
    */
   @GetMapping("/{id}")
   public MaterialCategoryDto getById(@PathVariable UUID id) {
-    return mapper.toDto(service.findById(id));
+    return service.findById(id);
   }
 
   /**

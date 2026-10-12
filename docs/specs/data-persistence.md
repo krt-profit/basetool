@@ -124,13 +124,13 @@ materials), a `JOIN FETCH` into the current persistence context
 (`MissionRepository.fetchAssignedUnitGraph` for the mission detail's units), or the batch loader
 inside the caller's transaction. With `open-in-view` off, no mapping may happen after the
 transaction that loaded the entity — every controller that maps these aggregates runs in its own
-`@Transactional`. **An entity that enters a Caffeine cache is completed first**:
-`catalogue.internal.CachedEntityGraphs` initialises the lazy to-ones of `Material` (the whole
-`refinedMaterial` chain with categories), `Location`, `ShipType` and `JobType` inside the cached
-method's own read-only transaction, because a cached entity outlives its session and is handed to
-every later reader on any thread. `LazyToOneReadPathsTest` drives the hot reads through the real
-HTTP stack without a test transaction, twice (cold and from the caches), and asserts that none
-costs more statements for twelve rows than for three.
+`@Transactional`. **A Caffeine cache holds a record, never an entity**: a cached catalogue service maps the entity
+to its wire record inside its own read-only transaction (the mapper walks `Material`'s whole
+`refinedMaterial` chain with categories, `Location`, `ShipType` and `JobType` while the session is
+open), so no lazy association outlives its session and nothing needs initialising first.
+`LazyToOneReadPathsTest` drives the hot reads through the real HTTP stack without a test
+transaction, twice (cold and from the caches), and asserts that none costs more statements for
+twelve rows than for three.
 
 **No collection is `EAGER`** (D-20, 2026-10-11). `MissionParticipant.orgUnits` was the one
 `@ManyToMany(fetch = EAGER)` — every participant load dragged its affiliated org units along, in a
@@ -733,7 +733,7 @@ checks; `ScopeSpecifications`' fragments are exercised by the existing scope-reg
 `OwnerScopeServiceTest` and the per-aggregate service lifecycle tests) — no new tests were needed
 because the wire behaviour is unchanged.
 
-**Code:** `backend/src/main/java/.../backend/repository/LookupTableRepository.java`,
+**Code:** `backend/src/main/java/.../backend/catalogue/internal/LookupTableRepository.java`,
 `backend/src/main/java/.../backend/repository/ScopeSpecifications.java`
 
 ### REQ-DATA-011 — Background sync sweeps evict the master-data caches they rewrite (CACHE-SYNC-EVICT-001)
@@ -1208,9 +1208,13 @@ proxy; a query/command split would route the same call through the proxy, edit t
 instance, and — since `@CacheEvict` does not run when the write throws — leave the edit in the
 cache after a failed write.
 
-The **target state** is that a cache holds read models, never an `@Entity` (plan §5.6, Phase 4).
-Until then the 32 catalogue methods that still return an entity are listed with their reason, and
-the list may only shrink.
+A cache holds read models, never an `@Entity` (plan §5.6, Phase 4). The thirteen catalogue
+services switched on 2026-10-12: a cached method maps the entity to its existing wire record
+(`CityDto`, `LocationDto`, `MaterialDto`, …) in its own read-only transaction and caches that
+immutable record; cache names, keys, TTLs and evict triggers are unchanged and so is the JSON, and
+a mutator loads the entity through a private `require…` method, never through its cached getter.
+The three methods that still return an entity (`RoleService`, `SquadronService`) are listed with
+their reason, and the list may only shrink.
 
 **Acceptance**
 
@@ -1223,9 +1227,13 @@ the list may only shrink.
 - [x] Proven able to fail: a planted query/command split, as beans of the invariant test, is
   caught editing the cached instance; the same split and a planted entity cache are reported by
   the structural rules. Selection floor: 33 `@Cacheable` methods.
+- [x] Each catalogue cached read is pinned through its controller against real Postgres: cold it
+  shows the seeded row field by field, warm it loads no entity and prepares no statement beyond
+  the controller transaction's change-source stamp, and answers the same JSON; the mutators evict
+  it (`CatalogueCachedReadsTest`).
 
-**Enforced by:** `CachedCatalogueEntityInvariantTest`, `CacheableEntityRulesTest` · **Code:**
-`CacheConfig`, the catalogue `…Service` classes
+**Enforced by:** `CachedCatalogueEntityInvariantTest`, `CacheableEntityRulesTest`,
+`CatalogueCachedReadsTest` · **Code:** `CacheConfig`, the catalogue `…Service` classes
 
 ### REQ-DATA-023 — every quality lies in 0–1000
 

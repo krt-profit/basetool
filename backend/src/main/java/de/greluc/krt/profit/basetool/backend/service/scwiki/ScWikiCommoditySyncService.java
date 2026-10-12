@@ -19,20 +19,20 @@
 
 package de.greluc.krt.profit.basetool.backend.service.scwiki;
 
-import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiCommodityDto;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialNameCanonicalizer;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiCommodityDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
-import de.greluc.krt.profit.basetool.backend.model.SyncEventType;
-import de.greluc.krt.profit.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
-import de.greluc.krt.profit.basetool.backend.service.MaterialNameCanonicalizer;
-import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;

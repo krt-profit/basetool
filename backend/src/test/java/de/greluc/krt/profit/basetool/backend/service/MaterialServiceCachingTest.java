@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,7 +86,7 @@ class MaterialServiceCachingTest {
 
   @Test
   void getMaterial_populatesTheByIdCacheOnly_notTheListCache() {
-    Material first = materialService.getMaterial(alpha.getId());
+    MaterialDto first = materialService.getMaterial(alpha.getId());
 
     Cache.ValueWrapper entry = byIdCache().get(alpha.getId());
     assertNotNull(entry, "getMaterial(id) must populate MATERIAL_BY_ID_CACHE under the id key");
@@ -95,7 +96,7 @@ class MaterialServiceCachingTest {
         "getMaterial(id) must NOT populate the list catalogue cache — the whole point of CACHE-02 "
             + "is that by-id lookups and list-page sweeps no longer share a budget");
 
-    Material second = materialService.getMaterial(alpha.getId());
+    MaterialDto second = materialService.getMaterial(alpha.getId());
     assertSame(first, second, "second read must come from the cache, not the repository");
   }
 

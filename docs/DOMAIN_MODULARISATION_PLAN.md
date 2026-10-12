@@ -394,9 +394,9 @@ map now assigns to the kernel as part of the exception contract (138 → 136 edg
   `MaterialExchangeOffer.inventoryItem`, `MissionUnit.ship`, `Mission.operation`,
   `Mission.refineryOrders`, `Operation.missions`, `RefineryOrder.mission`. Associations into
   identity, org units and the catalogue stay; they carry the scope JPQL and the fetch graphs.
-- **Caching holds read models, not entities.** Cached catalogue mutators are safe today only because
-  they call their own `@Cacheable` getter through self-invocation; a query/command split would make
-  them edit the cached instance (§7.2, G-19).
+- **Caching holds read models, not entities.** Cached catalogue mutators were safe only because
+  they called their own `@Cacheable` getter through self-invocation; a query/command split would make
+  them edit the cached instance (§7.2, G-19). Done for the catalogue 2026-10-12 (P4-5, §7.6).
 
 ### 5.7 Enforcement
 
@@ -579,7 +579,7 @@ what they were written for. The guarantee therefore rests on four rules.
 | G-16 | Session allow-list closure test (exact list of session-bound types) and a test that no entry is broader than a model or session package | Flash values silently dropped after a move; a widened deserializer gadget surface |
 | G-17 | `WebClient` confinement: only the backend kernel builds or injects clients (named exceptions: the SSE relay and the live-sync probe); every typed client is created from the `webClient` bean (MockWebServer test asserting `Authorization`, `X-Correlation-Id`, `X-Active-Org-Unit-Id`, `Accept-Language` and breaker behaviour); no `URI` or `UriBuilderFactory` parameters and no absolute URL in an `@HttpExchange` annotation; no `@CookieValue`; no `@Cacheable` on clients; and a filter on the `webClient` bean that refuses any request not addressed to the backend's own host — the OAuth2 filter attaches the member's token without a host check, which today already applies to any absolute URI passed to that bean | Lost bearer relay, lost tenancy header, lost resilience, token exfiltration to another host, cross-user cache leaks |
 | G-18 | Exchange freeze: backend wire-contract test against the published schemas and fixtures; parity tests for every shared identifier; ingest filter-order test via `FilterChainProxy`; golden answers per route; the `e2e` label required for pull requests touching the exchange path | A backend refactor changing external behaviour, found today only in production as a 502 |
-| G-19 | Cached-entity invariant test for every `@Cacheable` catalogue service; target state: caches hold read models and an ArchUnit rule forbids `@Cacheable` returning an entity | A query/command split letting a mutator edit the cached instance |
+| G-19 | Cached-entity invariant test for every `@Cacheable` catalogue service; target state: caches hold read models and an ArchUnit rule forbids `@Cacheable` returning an entity (the catalogue's caches switched 2026-10-12, P4-5; the list holds the identity and org-unit caches) | A query/command split letting a mutator edit the cached instance |
 | G-20 | Build wiring keyed on names made explicit: per-module coverage floors, test heap and mutation targets as typed settings whose absence fails the build; PIT gated on its completion line; repository check that every `inputs.file(s)` path exists; the two non-recursive frontend tests walk recursively; `DtoMirrorConsistencyTest` fails on an unpaired mirror | Coverage floors dropping from 0.82 to 0.50, mutation testing going dark, contract tests skipping moved DTOs |
 | G-21 | Deploy refuses a `:stable` set whose images do not share one `org.opencontainers.image.revision` label (compared on cosign-verified digests); promotion verifies all five and then re-tags all five | A mixed release in which every call of a re-cut domain answers 404 |
 | G-22 | `toString` ratchet: record components and generated-`toString` fields named like secrets must belong to a reviewed list of redacting types | Credentials in log lines after a Lombok → record conversion |
@@ -2168,6 +2168,86 @@ lazy `Mission.participants`. The participant's own `findById` carries the graph 
 stay part of that one join, as the eager mapping made them. (3) The mission-level graph made four paths one
 statement cheaper than the eager mapping had been, because the batch select that followed the
 participants' join is part of the join now.
+
+**P4-5 — the catalogue's caches hold read models, and its sync infrastructure moves into `catalogue.internal` / `catalogue.api` — part 1 done 2026-10-12**
+(carried from §7.6: "`catalogue`, whose caches switch to read models").
+1. *Characterise*: `CatalogueCachedReadsTest` (real Postgres, through the controllers) pins the 29
+   cached reads of the thirteen services (city, outpost, point of interest, terminal, star system,
+   refining method, manufacturer, ship type, location, material category, material, job type,
+   frequency type). Cold, each shows its seeded row field by field, nested manufacturer, category
+   and refined material included; warm, it loads no entity, prepares nothing beyond the change-source
+   stamp of the controller's read-write transaction and answers the same JSON; thirteen mutators
+   then evict their cache and the next read is cold again and shows the change. Green on `11f346769`
+   with the caches still holding entities, and still green after the switch.
+2. *Switch*: a cached method maps the entity to its existing wire record with the mapper it always
+   used, inside its own read-only transaction, and caches that record: `Page<CityDto>`,
+   `LocationDto`, `MaterialDto` and so on. Cache names, keys, TTLs and every evict trigger are
+   unchanged, the JSON is byte-identical. A mutator loads the entity through a private `require…`
+   method, no longer through its own cached getter, and still returns the entity; the controllers
+   return the cached record on the read paths and keep the mapper for mutators and uncached reads.
+   `CachedEntityGraphs` is deleted, because the mapper walks the lazy graph while the transaction
+   is open. `CacheableEntityRulesTest.ENTITY_CACHES` shrinks from 32 to 3 (`RoleService`,
+   `SquadronService`), and `CachedCatalogueEntityInvariantTest` now watches records as well as
+   entities.
+3. *Probe* (not a guess): a class-dependency graph over the compiled `main` classes (`jdeps`), nested
+   and generated classes folded onto their source type, one node per first package segment, run
+   to a fixpoint for the largest set of the 268 catalogue classes in layer packages that closes
+   no cycle. With the kernel types where they lie it is 89; the architecture test, which also reads
+   annotation members, took three of those back (below). What blocks the other 182: the catalogue's
+   entities extend `model.AbstractEntity` and its controllers return `model.dto.PageResponse`, both
+   assigned to the kernel by the domain map and both still in `model`; `model` reaches the
+   catalogue (`Ship`, `InventoryItem`, `MissionUnit` and eleven more entities, 22 DTOs and two
+   projections of other domains), so any catalogue entity or controller in `catalogue.*` closes `catalogue ↔ model`.
+   `QuantityTypeRounding` (`catalogue.api`) already reaches `model`, which is why the seven
+   read-model records that `model.dto` embeds (`LocationDto`, `MaterialDto`, `MaterialCategoryDto`,
+   `ManufacturerDto`, `ShipTypeDto`, `JobTypeDto`, `FrequencyTypeDto`) stay in `model.dto` (the
+   lesson of P3-8a).
+4. *Move* (86 types and 7 tests): to `catalogue.api` the six read-model records no `model` class
+   embeds (`CityDto`, `OutpostDto`, `PoiDto`, `TerminalDto`, `StarSystemDto`, `RefiningMethodDto`)
+   and the two name helpers the exchange and the refinery call (`BlueprintNameNormalizer`,
+   `MaterialNameCanonicalizer`); to `catalogue.internal` the sync infrastructure
+   (`SyncCoordinator`, `SyncChunkWriter`, `SyncReportService`, `UexMatrixLookups`,
+   `BlueprintOutputNameOverrides`, `ScWikiOrphanSweep`), the sync report (entity, repository, DTOs),
+   `P4kImportJobPayload` with its repository, `SyncEventType`, `SyncSourceSystem`, the key
+   projections (`PairKeyRef`, `UexKeyRef`, `LookupTableRepository`), the integration properties
+   (`UexProperties`, `ScWikiProperties`), `EvictAllMaterialCaches`, the web records of the material,
+   alias, quality-tier, profit and space-station endpoints, the two blueprint repository rows, and to
+   `catalogue.internal.uex`, `.scwiki` and `.p4k` the 48 feed records of the three imports. The
+   `dto` package no longer holds a catalogue class, so its domain-map rule is gone.
+5. *NullAway*: the whole `catalogue` tree is checked now, not only `catalogue.api`. The compile named
+   three sites: `SyncCoordinator.activeLabel` is `@Nullable`, and
+   `BlueprintOutputNameOverrides.correct` null-checks the lookup instead of dereferencing it.
+6. *Gates*: the architecture test's floors fall 340 → 324 (the model selection), 115 → 114 (the
+   repository selection) and 61 → 60 (the leaf helpers, since `CachedEntityGraphs` is gone). The
+   moved tests followed their subjects; `RecordingTransactionManager` became public for them.
+Baseline **32 → 32**: the file holds 32 lines in 6 module pairs, none of them with the catalogue as
+source, so nothing could shrink; `ModuleBaselineTest` passes without a rewrite and the moved
+classes added no edge.
+**What remains of P4-5** (part 2): 182 catalogue classes still lie in the layer packages. 159 of
+them follow once `AbstractEntity` and `PageResponse` have moved to the `kernel` package (102 and
+91 files import them, tests included): the remaining entities, enums and DTOs of `model` (68),
+repositories (29), mappers (19), controllers (21) and the services in `service` (39), into
+`catalogue.internal` and `catalogue.web`, with the `api` surface the foreign modules use. The other 23 (the UEX and SC Wiki clients, syncs and schedulers,
+`MaterialExternalAliasService`, `P4kImportJobRunner`, `MasterDataCacheEvictionService`) also wait for
+`AuthHelperService`, `CacheConfig` and `ResponseSizeLimitInterceptor`, platform types that lie in
+layer packages.
+**Corrections:** (1) The assignment named the consumers of the cached methods as job order,
+inventory, exchange, mission, blueprint, refinery and hangar; none of them calls one. Every cached
+method has exactly one caller, its own controller (the two other service references are Javadoc), and
+the other modules reach the catalogue through repositories and entities, which nothing caches. The
+switch therefore changed the catalogue's services, controllers and tests only. (2) The read models
+are the existing wire records, not new types: they are immutable already, they carry exactly what the
+controllers answer, and a second record per entity would only copy them. (3) `jdeps` does not see
+class literals in annotation members; the architecture test named `SyncReportMapper`
+(`@Mapper(config = CentralMapperConfig.class)`, whose class lies in `mapper`),
+`ValidQuantityAmountValidator` and `MaterialPieceTypeLookup` (`@Constraint(validatedBy = …)` on an
+annotation that stays in `validation`), which went back to their old packages. (4) The warm path
+costs one statement through a controller, not none: the backend's transaction manager stamps the
+change source in every transaction that is not read-only (ADR-0224), and the controllers are
+read-write. The test therefore pins "no entity load and at most the stamp" and a cold read that
+costs more; a read-only service call prepares nothing. (5) `RefiningMethodDto` lies in
+`catalogue.api` because `refinery.api` embeds it. (6) `UexMatrixLookups` is public now: the UEX
+services that stay in `service` build it.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 

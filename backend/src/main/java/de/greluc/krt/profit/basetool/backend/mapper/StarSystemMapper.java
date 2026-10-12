@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
-import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

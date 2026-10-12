@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintFamilies;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintNameNormalizer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

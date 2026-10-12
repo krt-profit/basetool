@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityDto;
 import de.greluc.krt.profit.basetool.backend.model.City;
-import de.greluc.krt.profit.basetool.backend.model.dto.CityDto;
 import org.mapstruct.Mapper;
 
 /**

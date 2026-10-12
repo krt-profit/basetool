@@ -19,15 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.service.scwiki;
 
-import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiManufacturerDto;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiOrphanSweep;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiManufacturerDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
-import de.greluc.krt.profit.basetool.backend.model.SyncEventType;
-import de.greluc.krt.profit.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
-import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;

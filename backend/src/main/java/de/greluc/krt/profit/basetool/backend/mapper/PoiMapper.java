@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.PoiDto;
 import de.greluc.krt.profit.basetool.backend.model.Poi;
-import de.greluc.krt.profit.basetool.backend.model.dto.PoiDto;
 import org.mapstruct.Mapper;
 
 /**

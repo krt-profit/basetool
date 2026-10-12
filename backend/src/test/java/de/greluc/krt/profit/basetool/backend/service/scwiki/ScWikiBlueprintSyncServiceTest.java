@@ -26,21 +26,25 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
-import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintDismantleDto;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintDto;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintIngredientDto;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintModifierDto;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintModifierRangeDto;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintQualityRangeDto;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintRequirementChildDto;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintRequirementGroupDto;
-import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintSummaryPropertyDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintOutputNameOverrides;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintDismantleDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintIngredientDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintModifierDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintModifierRangeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintModifierSegmentDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintQualityRangeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintRequirementChildDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintRequirementGroupDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintSummaryPropertyDto;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAliasSource;
-import de.greluc.krt.profit.basetool.backend.model.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind;
@@ -50,9 +54,7 @@ import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintSummaryProper
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
-import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.HashMap;
 import java.util.List;
@@ -204,10 +206,8 @@ class ScWikiBlueprintSyncServiceTest {
             new ScWikiBlueprintModifierRangeDto(0.9, 1.1),
             "linear",
             List.of(
-                new de.greluc.krt.profit.basetool.backend.dto.scwiki
-                    .ScWikiBlueprintModifierSegmentDto(0.0, 500.0, 0.9, 1.0),
-                new de.greluc.krt.profit.basetool.backend.dto.scwiki
-                    .ScWikiBlueprintModifierSegmentDto(500.0, 1000.0, 1.0, 1.1)));
+                new ScWikiBlueprintModifierSegmentDto(0.0, 500.0, 0.9, 1.0),
+                new ScWikiBlueprintModifierSegmentDto(500.0, 1000.0, 1.0, 1.1)));
     ScWikiBlueprintRequirementChildDto frameChild =
         new ScWikiBlueprintRequirementChildDto(
             null, "resource", resourceUuid, "Agricium", null, 0.36, 1);

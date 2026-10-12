@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.FrequencyTypeMapper;
-import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.FrequencyTypeService;
@@ -32,7 +31,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,8 +75,7 @@ public class FrequencyTypeController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "active", "sortIndex"), "sortIndex");
-    Page<FrequencyType> p = frequencyTypeService.getAllFrequencyTypes(active, pageable);
-    return PageResponse.of(p.map(frequencyTypeMapper::toDto));
+    return PageResponse.of(frequencyTypeService.getAllFrequencyTypes(active, pageable));
   }
 
   /**
@@ -89,7 +86,7 @@ public class FrequencyTypeController {
    */
   @GetMapping("/{id}")
   public FrequencyTypeDto getFrequencyType(@PathVariable @NotNull UUID id) {
-    return frequencyTypeMapper.toDto(frequencyTypeService.getFrequencyType(id));
+    return frequencyTypeService.getFrequencyType(id);
   }
 
   /**

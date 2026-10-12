@@ -164,7 +164,6 @@ class BlueprintAccessPolicy blueprint the blueprint module's access policy (plan
 class BlueprintPackTags blueprint log-name clean-up used only by BlueprintImportService
 class BasetoolErrorController platform container error dispatch as RFC 7807
 
-package dto catalogue external feed DTO packages of the UEX, SC Wiki and P4K imports
 package integration catalogue outbound catalogue clients
 package audit audit the audit module's package tree (plan 5.2)
 package bank bank the bank module's package tree (plan 5.2)

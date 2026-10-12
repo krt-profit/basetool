@@ -21,8 +21,10 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import java.util.UUID;
@@ -45,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefiningMethodService {
 
   private final RefiningMethodRepository refiningMethodRepository;
+  private final RefiningMethodMapper refiningMethodMapper;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -54,8 +57,8 @@ public class RefiningMethodService {
    * @return cached page of refining methods
    */
   @Cacheable(cacheNames = CacheConfig.REFINING_METHODS_CACHE)
-  public Page<RefiningMethod> getAllRefiningMethods(@NotNull Pageable pageable) {
-    return refiningMethodRepository.findAll(pageable);
+  public Page<RefiningMethodDto> getAllRefiningMethods(@NotNull Pageable pageable) {
+    return refiningMethodRepository.findAll(pageable).map(refiningMethodMapper::toDto);
   }
 
   /**
@@ -66,7 +69,17 @@ public class RefiningMethodService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   @Cacheable(cacheNames = CacheConfig.REFINING_METHODS_CACHE)
-  public RefiningMethod getRefiningMethod(@NotNull UUID id) {
+  public RefiningMethodDto getRefiningMethod(@NotNull UUID id) {
+    return refiningMethodMapper.toDto(requireRefiningMethod(id));
+  }
+
+  /**
+   * Loads the managed refining method entity a mutator edits; it never comes from the cache.
+   *
+   * @param id refining method primary key
+   * @return the managed entity
+   */
+  private RefiningMethod requireRefiningMethod(UUID id) {
     return Entities.require(refiningMethodRepository.findById(id), "RefiningMethod not found");
   }
 
@@ -101,7 +114,7 @@ public class RefiningMethodService {
   @CacheEvict(cacheNames = CacheConfig.REFINING_METHODS_CACHE, allEntries = true)
   public RefiningMethod updateRefiningMethod(
       @NotNull UUID id, @NotNull RefiningMethod refiningMethodDetails) {
-    RefiningMethod refiningMethod = getRefiningMethod(id);
+    RefiningMethod refiningMethod = requireRefiningMethod(id);
 
     String previousName = refiningMethod.getName();
     refiningMethod.setName(refiningMethodDetails.getName());
@@ -126,7 +139,7 @@ public class RefiningMethodService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.REFINING_METHODS_CACHE, allEntries = true)
   public void deleteRefiningMethod(@NotNull UUID id) {
-    RefiningMethod refiningMethod = getRefiningMethod(id);
+    RefiningMethod refiningMethod = requireRefiningMethod(id);
     String name = refiningMethod.getName();
     refiningMethodRepository.delete(refiningMethod);
     auditRecorder.record(AuditEventType.REFINERY_METHOD_DELETED, id, name, null, "name=" + name);

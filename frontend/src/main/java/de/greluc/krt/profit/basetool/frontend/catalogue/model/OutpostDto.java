@@ -24,7 +24,7 @@ import java.util.UUID;
 
 /**
  * Frontend-side projection of the {@code Outpost} payload returned by the backend's UEX-overrides
- * endpoint. Mirrors {@code de.greluc.krt.profit.basetool.backend.model.dto.OutpostDto} exactly.
+ * endpoint. Mirrors {@code de.greluc.krt.profit.basetool.backend.catalogue.api.OutpostDto} exactly.
  *
  * @param id outpost primary key
  * @param name canonical outpost name as supplied by UEX

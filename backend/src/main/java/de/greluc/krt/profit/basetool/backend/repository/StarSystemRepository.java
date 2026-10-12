@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.LookupTableRepository;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
 import java.util.Optional;
 import java.util.UUID;

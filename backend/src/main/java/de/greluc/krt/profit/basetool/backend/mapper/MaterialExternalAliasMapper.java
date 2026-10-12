@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialExternalAliasDto;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAlias;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExternalAliasDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

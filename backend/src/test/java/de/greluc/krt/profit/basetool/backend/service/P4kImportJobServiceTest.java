@@ -31,14 +31,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayload;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayloadRepository;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobKind;
-import de.greluc.krt.profit.basetool.backend.model.P4kImportJobPayload;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobStatus;
-import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobPayloadRepository;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

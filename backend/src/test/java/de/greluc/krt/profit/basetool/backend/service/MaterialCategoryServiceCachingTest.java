@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,13 +88,13 @@ class MaterialCategoryServiceCachingTest {
 
   @Test
   void findById_populatesCacheKeyedByIdAndReturnsCachedInstanceOnSecondCall() {
-    MaterialCategory first = materialCategoryService.findById(ore.getId());
+    MaterialCategoryDto first = materialCategoryService.findById(ore.getId());
 
     Cache.ValueWrapper entry = cache().get(ore.getId());
     assertNotNull(entry, "findById(id) must populate the cache under the id key");
     assertSame(first, entry.get(), "cache entry must reference the same instance as the read");
 
-    MaterialCategory second = materialCategoryService.findById(ore.getId());
+    MaterialCategoryDto second = materialCategoryService.findById(ore.getId());
     assertSame(first, second, "second read must come from the cache, not the repository");
   }
 

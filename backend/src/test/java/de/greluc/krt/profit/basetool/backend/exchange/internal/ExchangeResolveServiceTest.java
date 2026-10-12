@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintExterna
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintProductService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
@@ -50,7 +51,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintNameNormalizer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;

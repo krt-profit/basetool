@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
@@ -29,16 +30,16 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
  * SyncChunkWriter} (whose callbacks then actually run against the mocked repositories) and still
  * assert the transaction shape — one per chunk, a rolled-back chunk retried row by row.
  */
-class RecordingTransactionManager extends AbstractPlatformTransactionManager {
+public class RecordingTransactionManager extends AbstractPlatformTransactionManager {
 
   /** Transactions begun. */
-  int begun;
+  public int begun;
 
   /** Transactions committed. */
-  int committed;
+  public int committed;
 
   /** Transactions rolled back. */
-  int rolledBack;
+  public int rolledBack;
 
   @Override
   protected Object doGetTransaction() {
