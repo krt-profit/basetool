@@ -2579,7 +2579,8 @@ edge in every case: `Role` and `UserReferenceDto` are named by `User` and the mo
    the callees join whatever transaction `UserService` holds. The delegate declares no transaction at
    all, so each callee's propagation applies exactly as before (`OrgUnitMembershipOperationsTest` fails on any
    `@Transactional` on the class or a method).
-2. *SPI*: `identity.api.MembershipOperations<M>` with the six calls, implemented by
+2. *SPI*: `identity.api.MembershipOperations` with the six calls (first built as
+   `MembershipOperations<M>`; the type parameter is gone, see the follow-up below), implemented by
    `service.OrgUnitMembershipOperations` (bean `orgUnitMembershipOperations`, assigned to `orgunit`
    by the name rule, `orgunit -> identity` is a lower-rank edge) delegating verbatim to
    `OrgUnitMembershipService` and `OrgUnitMembershipQueryService`. The rows come back as the
@@ -2592,8 +2593,9 @@ edge in every case: `Role` and `UserReferenceDto` are named by `User` and the mo
    org-unit type: the Staffel changes travel as the identity-owned record `StaffelAssignment`, the
    patch as its three components (the delegate rebuilds `MembershipDeltaRequest.StaffelChange` and
    `MembershipFlagsPatchRequest` with equal values), and the membership row is the type parameter
-   `M`, bound to `OrgUnitMembership` by `UserService` and by the implementation. `M` goes away when
-   the entity leaves `model` or a read model replaces it.
+   `M`, bound to `OrgUnitMembership` by `UserService` and by the implementation. *Status:* `M` was a
+   design choice of this slice that nobody had decided, not an accepted one; the owner decided on
+   2026-10-12 to remove it by changing the return contract (follow-up below).
 4. *Differential test* `UserServiceMembershipSeamDifferentialTest` (real schema, one rolled-back
    transaction): eight test methods run scenarios once through `UserService.applyMembershipDelta` and once as the
    direct calls it made before the seam, on two fresh users over the same units: a Staffel set that
@@ -2615,7 +2617,31 @@ semantics"); they are plain `@Transactional`, and the seam keeps that. (2) The d
 baseline lines; three left, because the third (`MembershipFlagsPatchRequest`) went with the flat
 patch arguments, and `MembershipDeltaRequest` stays in `UserService`'s signature. (3) A `null`
 element in `staffeln` (the request validates the elements but not their presence) now fails with a
-`NullPointerException` in `UserService` instead of in the reconcile; both are the same type.
+`NullPointerException` in `UserService` instead of in the reconcile; both are the same type. The
+owner decided on 2026-10-12 to leave that as it is.
+
+**P4-7, slice b-fix — the type parameter `M` is removed — done 2026-10-12**
+1. *Callers, read from the code*: `applyMembershipDelta` has one production caller,
+   `UserController.patchMemberships`, and it ignores the returned list; it builds its response from
+   `findAllMembershipDtosForUser` in the same class-level transaction. Only two tests read the
+   return value. So the method returns `void`, and no field of the entity needs to cross the seam.
+2. *The flags and the flush, the two things the return value carried*: `addMember(specialCommandId,
+   userId, isLogistician, isMissionManager)` takes the initial flags, and the implementation sets them
+   on the managed row the org-unit service returned, with the same three statements `UserService` used:
+   same row, same dirty checking, same single `MEMBERSHIP_GRANTED` audit row. `patchFlags` returns
+   nothing (nobody read the row). The trailing `findAllMembershipsForUser` of `applyMembershipDelta` was
+   a JPQL query whose automatic flush ended the delta, so a constraint or optimistic-lock failure
+   surfaced from `UserService`; the SPI keeps that point as `flushMembershipChanges(userId)`, which
+   runs the same query and returns nothing. Owner decision 2026-10-12: keep the flush point.
+3. *Tests*: the differential test now also reads the user's rows over the transaction's JDBC
+   connection straight after the call, before any explicit flush, and requires them equal to the
+   direct path's; with the flush call turned into a no-op four of the eight methods go red.
+   `UserServiceMembershipDeltaTest` pins that the flush is the last call after every mutation and is
+   skipped when a mutation fails; `OrgUnitMembershipOperationsTest` pins the flag logic on the very
+   row the service returned, for every flag combination.
+4. *Gates*: baseline **29 → 28**, measured by `ModuleBaselineTest`: `UserService -> OrgUnitMembership`
+   left (the return type is gone). `UserService -> MembershipDeltaRequest` stays, because the request is
+   still the parameter of the public method. No floor, domain-map rule or declaration changed.
 
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 

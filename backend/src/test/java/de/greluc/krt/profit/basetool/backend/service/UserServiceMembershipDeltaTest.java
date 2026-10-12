@@ -19,10 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,7 +31,6 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
 import de.greluc.krt.profit.basetool.backend.identity.api.StaffelAssignment;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange;
@@ -52,6 +52,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -84,7 +85,7 @@ class UserServiceMembershipDeltaTest {
   @Mock private SquadronRepository squadronRepository;
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
-  @Mock private MembershipOperations<OrgUnitMembership> membershipOperations;
+  @Mock private MembershipOperations membershipOperations;
 
   @InjectMocks private UserService userService;
 
@@ -97,24 +98,22 @@ class UserServiceMembershipDeltaTest {
         NoSuchElementException.class,
         () -> userService.applyMembershipDelta(userId, new MembershipDeltaRequest(null, null)));
     verify(membershipOperations, never()).reconcileStaffelMemberships(any(), any());
-    verify(membershipOperations, never()).addMember(any(), any());
+    verify(membershipOperations, never()).addMember(any(), any(), any(), any());
     verify(membershipOperations, never()).removeMember(any(), any());
     verify(membershipOperations, never()).patchFlags(any(), any(), any(), any(), any());
   }
 
   @Test
-  void emptyDelta_returnsCurrentStateWithoutMutating() {
+  void emptyDelta_flushesWithoutMutating() {
     UUID userId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(membershipOperations.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
-    List<OrgUnitMembership> result =
-        userService.applyMembershipDelta(userId, new MembershipDeltaRequest(null, null));
+    userService.applyMembershipDelta(userId, new MembershipDeltaRequest(null, null));
 
-    assertEquals(0, result.size());
+    verify(membershipOperations).flushMembershipChanges(userId);
     verify(membershipOperations, never()).reconcileStaffelMemberships(any(), any());
-    verify(membershipOperations, never()).addMember(any(), any());
+    verify(membershipOperations, never()).addMember(any(), any(), any(), any());
     verify(membershipOperations, never()).removeMember(any(), any());
     verify(membershipOperations, never()).patchFlags(any(), any(), any(), any(), any());
   }
@@ -126,7 +125,6 @@ class UserServiceMembershipDeltaTest {
     UUID squadronB = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(membershipOperations.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     List<StaffelChange> staffeln =
         List.of(
@@ -147,7 +145,6 @@ class UserServiceMembershipDeltaTest {
     UUID userId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(membershipOperations.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     userService.applyMembershipDelta(userId, new MembershipDeltaRequest(List.of(), null));
 
@@ -155,43 +152,33 @@ class UserServiceMembershipDeltaTest {
   }
 
   @Test
-  void skAdd_callsAddMember_andAdoptsInitialFlagsInline() {
+  void skAdd_callsAddMember_withTheInitialFlags() {
     UUID userId = UUID.randomUUID();
     UUID skId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    OrgUnitMembership freshRow = new OrgUnitMembership();
-    when(membershipOperations.addMember(skId, userId)).thenReturn(freshRow);
-    when(membershipOperations.findAllMembershipsForUser(userId)).thenReturn(List.of(freshRow));
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(
             null, List.of(new SpecialCommandChange(skId, Action.ADD, true, true, null)));
     userService.applyMembershipDelta(userId, delta);
 
-    verify(membershipOperations).addMember(skId, userId);
-    assertEquals(true, freshRow.isLogistician());
-    assertEquals(true, freshRow.isMissionManager());
+    verify(membershipOperations).addMember(skId, userId, true, true);
   }
 
   @Test
-  void skAdd_withoutFlags_doesNotMutateRow() {
+  void skAdd_withoutFlags_passesNoFlags() {
     UUID userId = UUID.randomUUID();
     UUID skId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    OrgUnitMembership freshRow = new OrgUnitMembership();
-    when(membershipOperations.addMember(skId, userId)).thenReturn(freshRow);
-    when(membershipOperations.findAllMembershipsForUser(userId)).thenReturn(List.of(freshRow));
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(
             null, List.of(new SpecialCommandChange(skId, Action.ADD, null, null, null)));
     userService.applyMembershipDelta(userId, delta);
 
-    verify(membershipOperations).addMember(skId, userId);
-    assertEquals(false, freshRow.isLogistician());
-    assertEquals(false, freshRow.isMissionManager());
+    verify(membershipOperations).addMember(skId, userId, null, null);
   }
 
   @Test
@@ -200,7 +187,6 @@ class UserServiceMembershipDeltaTest {
     UUID skId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(membershipOperations.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(
@@ -208,7 +194,7 @@ class UserServiceMembershipDeltaTest {
     userService.applyMembershipDelta(userId, delta);
 
     verify(membershipOperations).removeMember(skId, userId);
-    verify(membershipOperations, never()).addMember(any(), any());
+    verify(membershipOperations, never()).addMember(any(), any(), any(), any());
     verify(membershipOperations, never()).patchFlags(any(), any(), any(), any(), any());
   }
 
@@ -218,7 +204,6 @@ class UserServiceMembershipDeltaTest {
     UUID skId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(membershipOperations.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(
@@ -226,6 +211,50 @@ class UserServiceMembershipDeltaTest {
     userService.applyMembershipDelta(userId, delta);
 
     verify(membershipOperations).patchFlags(eq(skId), eq(userId), eq(true), eq(false), eq(4L));
+  }
+
+  @Test
+  void theFlushIsTheLastCallOfTheDelta_afterEveryMutation() {
+    UUID userId = UUID.randomUUID();
+    UUID skA = UUID.randomUUID();
+    UUID skB = UUID.randomUUID();
+    User user = newUser(userId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    MembershipDeltaRequest delta =
+        new MembershipDeltaRequest(
+            List.of(),
+            List.of(
+                new SpecialCommandChange(skA, Action.ADD, true, null, null),
+                new SpecialCommandChange(skB, Action.PATCH, null, true, 2L),
+                new SpecialCommandChange(skA, Action.REMOVE, null, null, null)));
+    userService.applyMembershipDelta(userId, delta);
+
+    InOrder order = inOrder(membershipOperations);
+    order.verify(membershipOperations).reconcileStaffelMemberships(eq(user), eq(List.of()));
+    order.verify(membershipOperations).addMember(skA, userId, true, null);
+    order.verify(membershipOperations).patchFlags(skB, userId, null, true, 2L);
+    order.verify(membershipOperations).removeMember(skA, userId);
+    order.verify(membershipOperations).flushMembershipChanges(userId);
+    order.verifyNoMoreInteractions();
+  }
+
+  @Test
+  void aFailingMutationSkipsTheFlush() {
+    UUID userId = UUID.randomUUID();
+    UUID skId = UUID.randomUUID();
+    User user = newUser(userId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    IllegalStateException refusal = new IllegalStateException("refused");
+    doThrow(refusal).when(membershipOperations).removeMember(skId, userId);
+
+    MembershipDeltaRequest delta =
+        new MembershipDeltaRequest(
+            null, List.of(new SpecialCommandChange(skId, Action.REMOVE, null, null, null)));
+
+    assertThrows(
+        IllegalStateException.class, () -> userService.applyMembershipDelta(userId, delta));
+    verify(membershipOperations, never()).flushMembershipChanges(any());
   }
 
   private User newUser(UUID id) {

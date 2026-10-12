@@ -50,14 +50,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Differential test of the identity-owned {@link MembershipOperations} seam: the membership-delta
  * paths of {@link UserService#applyMembershipDelta} go through the seam, and the same steps,
  * written as the direct calls {@code UserService} made before the seam existed, run on a second
- * user. Both must leave the same membership rows (kind, role, flags, row version), write the same
- * audit rows and fail with the same exception type and message.
+ * user. Both must leave the same membership rows (kind, role, flags, row version), as the database
+ * holds them straight after the call as well as after an explicit flush,, write the same audit rows
+ * and fail with the same exception type and message.
  *
  * <p>Runs against the real schema inside one rolled-back transaction, so the after-commit
  * notification fan-out is not exercised; the seam adds no transaction and no side effect of its
@@ -72,7 +74,7 @@ class UserServiceMembershipSeamDifferentialTest {
           "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
   @Autowired private UserService userService;
-  @Autowired private MembershipOperations<OrgUnitMembership> membershipOperations;
+  @Autowired private MembershipOperations membershipOperations;
   @Autowired private OrgUnitMembershipService membershipService;
   @Autowired private OrgUnitMembershipQueryService membershipQueryService;
   @Autowired private UserRepository userRepository;
@@ -82,6 +84,7 @@ class UserServiceMembershipSeamDifferentialTest {
   @Autowired private OrgUnitMembershipRepository membershipRepository;
   @Autowired private AuditEventRepository auditEventRepository;
   @Autowired private EntityManager entityManager;
+  @Autowired private JdbcTemplate jdbc;
 
   /** The org units one scenario runs against. */
   private record Units(UUID sqA, UUID sqB, UUID sqC, UUID sk1, UUID sk2) {}
@@ -90,7 +93,8 @@ class UserServiceMembershipSeamDifferentialTest {
   private interface Step extends BiFunction<Units, Long, MembershipDeltaRequest> {}
 
   /** What one step did: the user's rows afterwards, or the exception it ended with. */
-  private record Observed(List<String> rows, List<UUID> staffelIds, String failure) {}
+  private record Observed(
+      List<String> storedRows, List<String> rows, List<UUID> staffelIds, String failure) {}
 
   @Test
   @DisplayName("a Staffel set that grows and shrinks")
@@ -264,6 +268,7 @@ class UserServiceMembershipSeamDifferentialTest {
                 legacyApply(userId, delta);
               }
             });
+    List<String> storedRows = storedRows(userId);
     entityManager.flush();
     entityManager.clear();
     List<String> rows =
@@ -275,7 +280,33 @@ class UserServiceMembershipSeamDifferentialTest {
         viaSeam
             ? membershipOperations.findStaffelMembershipOrgUnitIds(userId)
             : membershipQueryService.findStaffelMembershipOrgUnitIds(userId);
-    return new Observed(rows, staffelIds, failure);
+    return new Observed(storedRows, rows, staffelIds, failure);
+  }
+
+  /**
+   * The user's rows as the database holds them right now, read over the transaction's own JDBC
+   * connection before any explicit flush: a row appears here only if the operation itself flushed,
+   * so this pins where the flush happens.
+   */
+  private List<String> storedRows(UUID userId) {
+    return jdbc
+        .query(
+            "SELECT org_unit_id, role, is_logistician, is_mission_manager, version"
+                + " FROM org_unit_membership WHERE user_id = ?",
+            (rs, n) ->
+                rs.getString(1)
+                    + "|"
+                    + rs.getString(2)
+                    + "|"
+                    + rs.getBoolean(3)
+                    + "|"
+                    + rs.getBoolean(4)
+                    + "|v"
+                    + rs.getLong(5),
+            userId)
+        .stream()
+        .sorted()
+        .toList();
   }
 
   /** The direct calls {@code UserService} made before the seam existed. */
