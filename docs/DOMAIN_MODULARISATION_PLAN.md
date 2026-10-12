@@ -1363,7 +1363,9 @@ as each pair is decoupled.
     package `service` (`InventoryCraftableStock`), because the inventory has not moved. So `service`
     depends on `blueprint.api`. Any blueprint implementation class in `blueprint.internal` needs
     `service` (the scope hub, the audit recorder), which closes a `service <-> blueprint` package
-    cycle, as it did for the inventory. **Tracked as P4-2 (§7.6).**
+    cycle, as it did for the inventory. **Tracked as P4-2 (§7.6).** *Update 2026-10-12:* part 1 of
+    P4-2 moved 55 types (§7.6); with `InventoryCraftableStock` in `inventory.internal` the move closes
+    no cycle.
 
 - `operation` ⇄ `mission` — **P3-8a done 2026-10-11.** `Mission.operation` becomes `Mission.operationId`
   (the same `operation_id` column and foreign key, still outside the row version and every section
@@ -1581,7 +1583,7 @@ module now publishes nothing, as `promotion` does, and nine package declarations
 `personalinventory::api`. (6) The inventory, blueprint and notification participants sit in
 `service` for now, assigned by their names: the Lager and the blueprint moves wait for P4-1 and
 P4-2 (§7.5), and the notification services still live in the layer packages; each participant
-moves with its module. (7) The plan's remark that the inventory
+moves with its module (the inventory's with P4-1, the blueprint's with P4-2). (7) The plan's remark that the inventory
 observer's `beforeUserPurge` waits for §7.6 is settled here: it left `StockChangeObserver`, which keeps
 `lower`, `beforeDelete` and `beforeWipe`.
 **P4 slice b — done 2026-10-11 (the handle-anonymisation participants).** `HandleAnonymisationService`
@@ -1646,8 +1648,9 @@ central list: it runs the sections the modules declare, and `DataExportSections`
    implementations, one per owning module: identity (5 sections), orgunit (2), orgchart (1),
    promotion (1), inventory (1), hangar (1), exchange (6), personalinventory (1), blueprint (1),
    notification (3), mission (5), refinery (1), joborder (2), materialexchange (4), bank (9: seven
-   bank sections and the two bank audit trails), audit (2). The inventory's and the blueprint's sit
-   in `service`, assigned by their names, until their modules move (P4-1, P4-2).
+   bank sections and the two bank audit trails), audit (2). The inventory's and the blueprint's sat
+   in `service`, assigned by their names, until their modules moved (P4-1, P4-2; both now in
+   `<module>.internal`).
 3. *Registry*: `privacy.internal.PersonalDataExportRegistry` collects the beans, orders them by
    position and refuses a duplicate key or position at startup. The two maps of the old class,
    `FREE_TEXT_COLUMNS` and `UNSCRUBBED_PERSON_COLUMNS`, became declarations on the section that
@@ -1756,8 +1759,8 @@ audit row's key order is part of the observable result, so the three are separat
 70 and 80. (3) Three modules, `audit`, `operation` and `identity`, own staying columns only; they
 need a participant for the coverage test to find their columns. (4) The participants are declarative
 and share one engine instead of each running SQL; a module that later needs its own reassignment
-overrides `reassign`. (5) The inventory and blueprint participants sit in `service`, assigned by their
-names, until their modules move (P4-1, P4-2); the others sit in `<module>.internal`, since they use no
+overrides `reassign`. (5) The inventory and blueprint participants sat in `service`, assigned by their
+names, until their modules moved (P4-1, P4-2); the others sit in `<module>.internal`, since they use no
 layer repository and close no package cycle. (6) The ledger check reads `BankHolderRepository`
 (`existsByUserId` on both accounts) instead of counting rows with a native query; the message and the
 409 are unchanged. (7) The two coverage tests that read the old static lists now run in a transaction,
@@ -1839,10 +1842,73 @@ only its Javadoc named it; only the service did. (3) The package-info of nine mo
 `ModularityTest` failed on `main` and is restored to `hangar::api` here. (4) The GDPR slices a, c, d
 and e recorded "the inventory participants sit in `service` until P4-1": since this step they sit in
 `inventory.internal`; the blueprint's and the notification's still sit in `service`.
-**P4-2 — move the blueprint into `blueprint.web` / `blueprint.internal`** (carried from
-P3-7b, §7.5), right after P4-1, once `InventoryCraftableStock` lives in `inventory.internal`.
-The five published interfaces already cover every foreign caller, so the move touches no
-other module; the §8.1 idioms go with it.
+**P4-2 — move the blueprint into `blueprint.web` / `blueprint.internal` — part 1 done 2026-10-12**
+(carried from P3-7b, §7.5). 55 of the 65 types the domain map assigns to `blueprint` move; the ten that
+other modules read directly stay in the layer packages (**part 2**, below).
+1. *Probe* (not a guess): a class-dependency graph over the compiled `main` classes (`jdeps
+   -verbose:class`, nested and generated classes folded onto their source type, one node per first
+   package segment), the 65 blueprint types reassigned to `blueprint`. The strongly connected set was
+   **empty** with all 65 moved, and is empty on the compiled result of the 55. `InventoryCraftableStock`
+   in `inventory.internal` was the only edge P3-7b feared, and no layer class names a blueprint
+   implementation: the exchange, the job order and the Materialbörse reach the blueprint through the
+   five published interfaces, the participants are found by their SPIs, and the two query-side users
+   below read data types. So no SPI was needed and none was added; the work is the move itself.
+2. *Move*: the five controllers (`AdminDefaultBlueprintController`, `AdminPersonalBlueprintController`,
+   `BlueprintProductController`, `PersonalBlueprintController`, `PersonalBlueprintOverviewController`)
+   into `blueprint.web`; into `blueprint.internal`: the services (`PersonalBlueprintService`,
+   `PersonalBlueprintCommandService`, `PersonalBlueprintOverviewService`, `DefaultBlueprintService`,
+   `DefaultBlueprintKeyService`, `DefaultBlueprintBootstrap`, `DefaultBlueprintCatalog`,
+   `DefaultBlueprintProvisioningService`, `BlueprintImportService`, `BlueprintExportParser`,
+   `BlueprintUploadPreviewService`, `BlueprintProductService`, `BlueprintCraftabilityService`,
+   `BlueprintModifierMath`, `BlueprintPackTags`, the three variant-family classes),
+   `BlueprintAccessPolicy`, `DefaultBlueprintGrantOnCreation`, `DefaultBlueprintProvisioningTask`, the
+   four GDPR participants (`PersonalBlueprintUserErasure`, `PersonalBlueprintUserReassignment`,
+   `PersonalBlueprintExportSections`, `PersonalBlueprintMentionSource`), `PersonalBlueprintMapper`,
+   `DefaultBlueprintMapper`, the entities `DefaultBlueprint` and `BlueprintExternalAlias` with
+   `BlueprintExternalAliasSource`, their two repositories, and the 18 DTOs only the blueprint
+   controllers and services use. 26 tests moved with their classes (package-private access follows
+   the class). The name rule for the two admin controllers left the domain map (it assigns no class
+   now, the package rule takes them); nothing else in it changed.
+3. *Stays, and the import that blocks it* (ten types; moving any of them gives the exchange or the job
+   order a reference into `blueprint.internal`, which `ModularityTest` forbids):
+   - `PersonalBlueprintRepository`: seven finders (`findAllByOwnerUserIdOrderByIdAsc`,
+     `…AndIdGreaterThan…`, `findAllByOwnerUserIdAndProductKeyIn`, `countByOwnerUserId`,
+     `existsByOwnerUserIdAndProductKey`, `findByOwnerUserIdAndProductKey`,
+     `findOwnerProductByOwnerUserIdIn`) are called by
+     `ExchangeBlueprintFeedService`, `ExchangeBlueprintWriteService`, `ExchangeUndoService`,
+     `ExchangeDemandService` and the job order's `JobOrderItemBlueprintOwnersService`.
+   - The entity `PersonalBlueprint` and `BlueprintSource`: the exchange's feed, write and undo
+     services hold and build them.
+   - `BlueprintOwnerProduct` (the finder's projection, read by `ExchangeDemandService` and
+     `JobOrderItemBlueprintOwnersService`).
+   - `PersonalBlueprintCreateRequest` and `PersonalBlueprintResponse` (the argument and the result of
+     `PersonalBlueprintCommands`), `BlueprintImportPreviewDto` with `BlueprintImportEntryDto`,
+     `BlueprintImportSuggestionDto` and `BlueprintImportStatus` (the exchange's draft and resolve
+     services and its envelope reader).
+   **Part 2** publishes a read API for the seven finders (`blueprint.api`, records instead of the
+   entity) and moves the data types above that the exchange needs by name into `blueprint.api`, then moves the rest.
+4. *NullAway*: the whole `blueprint` tree was already checked; the moved types produced 18 findings,
+   all optional values: the craftability DTOs' limiting-material names and effective qualities, the
+   product DTO's manufacturer and example key and the three nullable columns of `DefaultBlueprint`
+   carry `@Nullable`, as do the optional parameters of `PersonalBlueprintService#newOwned` and
+   `PersonalBlueprintMapper#toResponse`; two map lookups that cannot miss are wrapped in
+   `Objects.requireNonNull`. The §8.1 idioms have no site (no two-bound clamp, no concatenated
+   `@Query`, no `isPresent()`/`get()` pair that `Optional.filter` fits).
+5. *Gates*: baseline **32 → 32** (the file holds 32 lines in 6 module pairs; no blueprint edge was in
+   it and none was added). `ModularityTest` stays green, so no foreign module reaches a
+   `blueprint.internal` type. The model layer's join-column selection floor drops 340 → 325 (the entity,
+   the DTOs and the repositories left the layer packages). `ArchitectureTest`, the tenancy guard and
+   the stock-write test needed no other change. 576 tests of the touched areas ran green (the moved
+   tests, the module and architecture gates, the GDPR coverage and order tests, `OpenApiGeneratorTest`
+   with the frozen contract, the exchange tests that name blueprint types).
+**Corrections:** (1) The plan expected the five published interfaces to cover every foreign caller;
+the exchange and the job order also read `PersonalBlueprintRepository`, the entity and eight data
+types directly, so ten types stay until a read API replaces those reads (part 2). (2) P3-7b predicted
+that a blueprint class in `blueprint.internal` would close `service ⇄ blueprint`; with
+`InventoryCraftableStock` in `inventory.internal` (P4-1) it does not. (3) The GDPR slices a, c, d and e
+recorded "the blueprint participants sit in `service` until P4-2": since this step they sit in
+`blueprint.internal`; only the notification's still sit in `service`. (4) The earlier slices quote the
+baseline as 35 lines; the file holds 32 (6 pairs), as `module-boundaries.md` says.
 **P4-3 — the refinery's entities move into `refinery.internal` / `refinery.api` — done
 2026-10-11** (carried from P3-8b, §7.5).
 1. *Characterise*: `LocationDeleteInUseIntegrationTest` (real Postgres) pins the in-use check of a

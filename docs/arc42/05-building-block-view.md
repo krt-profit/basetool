@@ -218,6 +218,17 @@ entities hold `InventoryItem` (plan §7.6, P4-1). The mapper's two seams sit bes
 `mapper.InventoryEarmarkLookup` (the per-transaction memo of the earmark targets), and the earmark records
 and the earmarked-stock rows are in `model.projection`, so no layer class names `inventory.api`.
 
+The blueprint moved in part since P4-2: the five controllers sit in `blueprint.web`, and
+`blueprint.internal` holds the personal and default blueprint services, the command service behind
+`PersonalBlueprintCommands`, the import, the craftability, the product resolution and the variant
+families, `BlueprintAccessPolicy`, the default-blueprint grant observer and provisioning task, the two
+mappers, the default-blueprint and alias entities and repositories, the DTOs only the blueprint
+controllers use, and its four GDPR participants. No layer class names any of them, so the move closed
+no package cycle. `PersonalBlueprint`, `PersonalBlueprintRepository`, `BlueprintSource`, the import
+preview, suggestion and status DTOs, the create request and response and `BlueprintOwnerProduct` stay in
+the layer packages, because the exchange (feed, write, undo and demand services, the draft and resolve
+services) and the job order's blueprint-owner service read them directly (plan §7.6, P4-2).
+
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:
 
