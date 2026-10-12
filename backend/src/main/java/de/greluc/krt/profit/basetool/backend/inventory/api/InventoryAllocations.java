@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
@@ -149,7 +150,7 @@ public final class InventoryAllocations {
       return;
     }
     double reduced = (slice.getAmount() != null ? slice.getAmount() : 0.0) - amount;
-    if (InventoryItem.roundToScuScale(reduced) <= 0.0) {
+    if (ScuAmounts.roundToScuScale(reduced) <= 0.0) {
       item.getJobOrderAllocations().remove(slice);
     } else {
       slice.setAmount(reduced);
@@ -170,7 +171,7 @@ public final class InventoryAllocations {
       return;
     }
     double reduced = (slice.getAmount() != null ? slice.getAmount() : 0.0) - amount;
-    if (InventoryItem.roundToScuScale(reduced) <= 0.0) {
+    if (ScuAmounts.roundToScuScale(reduced) <= 0.0) {
       item.getMissionAllocations().remove(slice);
     } else {
       slice.setAmount(reduced);

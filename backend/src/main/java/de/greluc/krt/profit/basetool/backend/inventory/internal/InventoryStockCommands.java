@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockConsumption;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -153,7 +154,7 @@ public class InventoryStockCommands implements StockCommands {
     item.setGameItem(lot.gameItem());
     item.setLocation(lot.location());
     item.setQuality(lot.material() == null ? null : lot.quality() == null ? 0 : lot.quality());
-    item.setAmount(InventoryItem.roundToScuScale(amount));
+    item.setAmount(ScuAmounts.roundToScuScale(amount));
     item.setPersonal(true);
     item.setStolen(lot.stolen());
     InventoryItem saved = inventoryRepository.save(item);
@@ -272,7 +273,7 @@ public class InventoryStockCommands implements StockCommands {
       }
       double take = Math.min(remainingToConsume, sliceAmount);
       double rowAmount = row.getAmount() != null ? row.getAmount() : 0.0;
-      double rowRemaining = InventoryItem.roundToScuScale(rowAmount - take);
+      double rowRemaining = ScuAmounts.roundToScuScale(rowAmount - take);
       boolean depleted = rowRemaining <= QUANTITY_EPSILON;
       String gameItemName = row.getGameItem() != null ? row.getGameItem().getName() : "—";
       consumed.add(
@@ -383,7 +384,7 @@ public class InventoryStockCommands implements StockCommands {
     item.setMaterial(material);
     item.setLocation(location);
     item.setQuality(quality);
-    item.setAmount(InventoryItem.roundToScuScale(amount));
+    item.setAmount(ScuAmounts.roundToScuScale(amount));
     item.setNote(note);
     item.setPersonal(personal);
     if (jobOrderId != null) {

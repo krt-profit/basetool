@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -522,7 +523,7 @@ public class MaterialExchangeService {
     if (requested == null || requested <= 0.0) {
       throw new BadRequestException("The offered amount must be a positive quantity.");
     }
-    double offered = InventoryItem.roundToScuScale(requested);
+    double offered = ScuAmounts.roundToScuScale(requested);
     double available = item.getAmount() == null ? 0.0 : item.getAmount();
     if (offered <= 0.0) {
       throw new BadRequestException("The offered amount must be a positive quantity.");

@@ -28,9 +28,9 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialRequestFulfillmentSignalledEvent;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -410,7 +410,7 @@ public class MaterialRequestService {
     if (requested == null || requested <= 0.0) {
       throw new BadRequestException("The desired amount must be a positive quantity.");
     }
-    double amount = InventoryItem.roundToScuScale(requested);
+    double amount = ScuAmounts.roundToScuScale(requested);
     if (amount <= 0.0) {
       throw new BadRequestException("The desired amount must be a positive quantity.");
     }

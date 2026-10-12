@@ -111,6 +111,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
@@ -372,6 +373,7 @@ class ArchitectureTest {
           RequestMemo.class,
           ResilientRedisMessageListenerContainer.class,
           Roles.class,
+          ScuAmounts.class,
           StaffelMembershipResolver.class,
           StalePriceSweep.class,
           StockViewerAccess.class,

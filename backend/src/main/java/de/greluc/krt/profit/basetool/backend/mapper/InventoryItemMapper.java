@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
@@ -188,6 +189,6 @@ public abstract class InventoryItemMapper {
    */
   private Double rest(Double amount, double allocated) {
     double total = amount == null ? 0.0 : amount;
-    return InventoryItem.roundToScuScale(total - allocated);
+    return ScuAmounts.roundToScuScale(total - allocated);
   }
 }

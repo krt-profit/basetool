@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTrans
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryEarmarkLookup;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
@@ -235,7 +236,7 @@ public class InventoryCheckoutService {
       throw new BadRequestException("Transfer requires a target user or location");
     }
 
-    double remainingAmount = InventoryItem.roundToScuScale(item.getAmount() - dto.amount());
+    double remainingAmount = ScuAmounts.roundToScuScale(item.getAmount() - dto.amount());
 
     final UUID sourceId = item.getId();
     final String sourceLabel = InventoryAuditLabels.label(item);
@@ -374,7 +375,7 @@ public class InventoryCheckoutService {
     newItem.setGameItem(item.getGameItem());
     newItem.setLocation(targetLocation);
     newItem.setQuality(item.getQuality());
-    newItem.setAmount(InventoryItem.roundToScuScale(dto.amount()));
+    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount()));
     newItem.setPersonal(item.getPersonal());
     newItem.setStolen(item.getStolen());
     Map<UUID, Double> orderReductions =
@@ -421,7 +422,7 @@ public class InventoryCheckoutService {
                 sourceId,
                 sourceUser,
                 targetUser,
-                InventoryItem.roundToScuScale(dto.amount()),
+                ScuAmounts.roundToScuScale(dto.amount()),
                 sourceLocation,
                 targetLocation)));
     final InventoryItem mergedTarget =
@@ -650,7 +651,7 @@ public class InventoryCheckoutService {
             : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
                 item.getUser(), dto.targetOwningOrgUnitId());
 
-    final double remainingAmount = InventoryItem.roundToScuScale(item.getAmount() - dto.amount());
+    final double remainingAmount = ScuAmounts.roundToScuScale(item.getAmount() - dto.amount());
     final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
 
     final UUID sourceId = item.getId();
@@ -665,7 +666,7 @@ public class InventoryCheckoutService {
     newItem.setGameItem(item.getGameItem());
     newItem.setLocation(item.getLocation());
     newItem.setQuality(item.getQuality());
-    newItem.setAmount(InventoryItem.roundToScuScale(dto.amount()));
+    newItem.setAmount(ScuAmounts.roundToScuScale(dto.amount()));
     newItem.setPersonal(targetPersonal);
     newItem.setStolen(item.getStolen());
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
@@ -763,7 +764,7 @@ public class InventoryCheckoutService {
       collectNote(notes, victim.getNote());
     }
 
-    row.setAmount(InventoryItem.roundToScuScale(total));
+    row.setAmount(ScuAmounts.roundToScuScale(total));
     row.setNote(mergeNotes(notes));
     for (InventoryItem victim : victims) {
       InventoryAllocations.unionInto(row, victim);
@@ -1081,7 +1082,7 @@ public class InventoryCheckoutService {
               item.getId(),
               item.getUser(),
               rowTargetUser,
-              InventoryItem.roundToScuScale(item.getAmount() != null ? item.getAmount() : 0.0),
+              ScuAmounts.roundToScuScale(item.getAmount() != null ? item.getAmount() : 0.0),
               item.getLocation(),
               rowTargetLocation));
       rebookWholeRow(
@@ -1290,7 +1291,7 @@ public class InventoryCheckoutService {
     newItem.setGameItem(source.getGameItem());
     newItem.setLocation(targetLocation);
     newItem.setQuality(source.getQuality());
-    newItem.setAmount(InventoryItem.roundToScuScale(amount));
+    newItem.setAmount(ScuAmounts.roundToScuScale(amount));
     newItem.setPersonal(targetPersonal);
     newItem.setStolen(source.getStolen());
     newItem.setNote(source.getNote());

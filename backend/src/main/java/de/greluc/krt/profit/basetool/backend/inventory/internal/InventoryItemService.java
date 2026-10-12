@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryEarmarkLookup;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
@@ -489,7 +490,7 @@ public class InventoryItemService {
     item.setGameItem(gameItem);
     item.setLocation(location);
     item.setQuality(dto.quality());
-    item.setAmount(InventoryItem.roundToScuScale(dto.amount()));
+    item.setAmount(ScuAmounts.roundToScuScale(dto.amount()));
     item.setPersonal(isPersonal);
     item.setStolen(isStolen);
     List<InventoryAllocationInput> jobAllocations =
@@ -514,7 +515,7 @@ public class InventoryItemService {
         assertMaterialRequiredByJobOrder(Objects.requireNonNull(material), allocation.targetId());
       }
       InventoryAllocations.addJobOrder(
-          item, allocation.targetId(), InventoryItem.roundToScuScale(allocation.amount()), false);
+          item, allocation.targetId(), ScuAmounts.roundToScuScale(allocation.amount()), false);
     }
     Set<UUID> seenMissions = new HashSet<>();
     for (InventoryAllocationInput allocation : missionAllocations) {
@@ -525,7 +526,7 @@ public class InventoryItemService {
       Entities.require(
           Optional.ofNullable(earmarkTargets.mission(allocation.targetId())), "Mission not found");
       InventoryAllocations.addMission(
-          item, allocation.targetId(), InventoryItem.roundToScuScale(allocation.amount()));
+          item, allocation.targetId(), ScuAmounts.roundToScuScale(allocation.amount()));
     }
     if (!InventoryAllocations.fits(item)) {
       throw new OverAllocationException();
@@ -874,7 +875,7 @@ public class InventoryItemService {
               ? "An item allocation amount must be a whole number"
               : "A PIECE allocation amount must be a whole number");
     }
-    return InventoryItem.roundToScuScale(raw);
+    return ScuAmounts.roundToScuScale(raw);
   }
 
   /**
@@ -887,7 +888,7 @@ public class InventoryItemService {
    *     #OVER_ALLOCATION_EPSILON}
    */
   private void assertFits(double proposedSum, double capacity) {
-    if (InventoryItem.roundToScuScale(proposedSum) - capacity > OVER_ALLOCATION_EPSILON) {
+    if (ScuAmounts.roundToScuScale(proposedSum) - capacity > OVER_ALLOCATION_EPSILON) {
       throw new OverAllocationException();
     }
   }
