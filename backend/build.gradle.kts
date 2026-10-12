@@ -105,7 +105,7 @@ basetool {
         "refinery",
         "scope",
       )
-      .map { "de.greluc.krt.profit.basetool.backend.$it.api" }
+      .map { "de.greluc.krt.profit.basetool.backend.$it.api" },
   )
   nullAwayPackages.addAll(
     listOf(
@@ -119,7 +119,7 @@ basetool {
         "operation",
         "refinery",
       )
-      .map { "de.greluc.krt.profit.basetool.backend.$it" }
+      .map { "de.greluc.krt.profit.basetool.backend.$it" },
   )
 }
 
@@ -153,28 +153,28 @@ tasks.named<Test>("test") {
         "-Dcontract.baseline.relay=" + relayBaseline.get().asFile.absolutePath,
         "-Dcontract.baseline.required=" + baselineRequired.get(),
       )
-    }
+    },
   )
 
   inputs
     .files(
       rootProject.file(
-        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/ExchangeRelay.java"
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/ExchangeRelay.java",
       ),
       rootProject.file(
-        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/observability/ObservationPrivacyFilter.java"
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/observability/ObservationPrivacyFilter.java",
       ),
       rootProject.file(
-        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/observability/ObservationPrivacyFilter.java"
+        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/observability/ObservationPrivacyFilter.java",
       ),
       rootProject.file(
-        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/KeycloakTrustSupport.java"
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/relay/KeycloakTrustSupport.java",
       ),
       rootProject.file(
-        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/assembly/ManagementPortSecurityConfig.java"
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/assembly/ManagementPortSecurityConfig.java",
       ),
       rootProject.file(
-        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/security/ManagementPortSecurityConfig.java"
+        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/security/ManagementPortSecurityConfig.java",
       ),
       rootProject.file("ingest/src/main/resources/application.yml"),
       rootProject.file("frontend/src/main/resources/application.yml"),
@@ -204,8 +204,8 @@ tasks.named<Test>("test") {
   inputs
     .file(
       rootProject.file(
-        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/livesync/LiveSyncTopicClass.java"
-      )
+        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/kernel/livesync/LiveSyncTopicClass.java",
+      ),
     )
     .withPropertyName("liveSyncTopicRegistrySource")
     .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -218,7 +218,7 @@ tasks.named<Test>("test") {
   val authzMatrixUpdate = providers.systemProperty("authz.matrix.update").orElse("false")
   inputs.property("authzMatrixUpdate", authzMatrixUpdate)
   jvmArgumentProviders.add(
-    CommandLineArgumentProvider { listOf("-Dauthz.matrix.update=" + authzMatrixUpdate.get()) }
+    CommandLineArgumentProvider { listOf("-Dauthz.matrix.update=" + authzMatrixUpdate.get()) },
   )
 }
 

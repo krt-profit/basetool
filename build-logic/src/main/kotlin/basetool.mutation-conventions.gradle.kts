@@ -29,6 +29,6 @@ pitest {
         args += "-javaagent:${it.absolutePath}"
       }
       args
-    }
+    },
   )
 }

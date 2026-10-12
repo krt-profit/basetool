@@ -36,7 +36,7 @@ spotless {
        */
 
       """
-        .trimIndent() + "\n"
+        .trimIndent() + "\n",
     )
   }
 }

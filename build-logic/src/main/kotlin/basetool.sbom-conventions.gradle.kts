@@ -85,7 +85,7 @@ tasks.register("verifyCyclonedxBom") {
             extra.forEach { append("    - $it\n") }
           }
           append("A stale BOM was written; regenerate it with a fresh `cyclonedxBom` run.")
-        }
+        },
       )
     }
   }
