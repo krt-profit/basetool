@@ -18,7 +18,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-(function () {
+function initNotificationsPage() {
     const inboxEl = document.getElementById('notification-inbox');
     const toolbarEl = document.getElementById('notifications-toolbar');
     if (!inboxEl || !toolbarEl) return;
@@ -101,4 +101,6 @@
     const stored = readStoredView();
     if (stored && stored !== currentView()) selectView(stored);
     applyView();
-})();
+}
+
+initNotificationsPage();

@@ -8,7 +8,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-(function () {
+function initTermsAccept() {
     const submitButton = document.getElementById('terms-accept-submit');
     const errorMessage = document.getElementById('terms-accept-error');
 
@@ -36,4 +36,6 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
             errorMessage.hidden = false;
         }
     });
-})();
+}
+
+initTermsAccept();

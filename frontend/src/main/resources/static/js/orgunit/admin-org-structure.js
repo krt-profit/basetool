@@ -30,7 +30,7 @@ const ORG_STRUCTURE_SECTIONS = {
 
 const ORG_STRUCTURE_CHART_SECTION = 'chart';
 
-(function () {
+function initAdminOrgStructure() {
     if (!krtFetch) {
         return;
     }
@@ -167,4 +167,6 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
             onSuccess: refreshOrgStructureAfterParentChange,
         });
     });
-})();
+}
+
+initAdminOrgStructure();

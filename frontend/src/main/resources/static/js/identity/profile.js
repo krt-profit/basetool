@@ -22,7 +22,7 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-(function () {
+function initProfile() {
     if (!krtFetch) {
         return;
     }
@@ -473,4 +473,6 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
             });
         });
     }
-})();
+}
+
+initProfile();

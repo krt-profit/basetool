@@ -24,7 +24,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-(function () {
+function initAdminQualityTiers() {
     const PAGE_URL = '/admin/quality-tiers';
 
     const modal = document.getElementById('qt-modal');
@@ -284,4 +284,6 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
             openDelete(deleteBtn);
         }
     });
-})();
+}
+
+initAdminQualityTiers();

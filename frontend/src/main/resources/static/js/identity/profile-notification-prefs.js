@@ -20,7 +20,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-(function () {
+function initProfileNotificationPrefs() {
     if (!krtFetch) {
         return;
     }
@@ -79,4 +79,6 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
             },
         });
     });
-})();
+}
+
+initProfileNotificationPrefs();

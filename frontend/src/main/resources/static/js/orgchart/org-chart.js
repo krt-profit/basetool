@@ -600,7 +600,7 @@ document.addEventListener('krt:swapped', (e) => {
     }
 });
 
-(function initStickyScrollbar() {
+function initOrgChart() {
     if (!chart) {
         return;
     }
@@ -662,4 +662,6 @@ document.addEventListener('krt:swapped', (e) => {
         });
     }
     measure();
-})();
+}
+
+initOrgChart();

@@ -113,7 +113,7 @@ if (krtEvents && typeof krtEvents.on === 'function') {
     });
 }
 
-(function () {
+function initShipData() {
     if (!krtFetch) {
         return;
     }
@@ -189,4 +189,6 @@ if (krtEvents && typeof krtEvents.on === 'function') {
                 el.disabled = false;
             });
     });
-})();
+}
+
+initShipData();

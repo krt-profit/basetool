@@ -251,7 +251,7 @@ krtEvents.on('click', 'members-consolidate', (el) => {
     openConsolidate(el);
 });
 
-(function () {
+function initMembers() {
     if (!krtLiveSync || typeof krtLiveSync.createReceiver !== 'function') {
         return;
     }
@@ -269,4 +269,6 @@ krtEvents.on('click', 'members-consolidate', (el) => {
             }
         },
     });
-})();
+}
+
+initMembers();

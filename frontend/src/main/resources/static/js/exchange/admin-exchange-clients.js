@@ -30,7 +30,7 @@ const EXCHANGE_CLIENTS_SECTIONS = {
     undoRuns: { container: '#xc-undo-runs-host', fragmentValue: 'undoRuns' },
 };
 
-(function () {
+function initAdminExchangeClients() {
     const BASE = '/admin/exchange-clients';
     const RUN_POLL_MS = 3000;
 
@@ -847,4 +847,6 @@ const EXCHANGE_CLIENTS_SECTIONS = {
             });
         }
     }
-})();
+}
+
+initAdminExchangeClients();
