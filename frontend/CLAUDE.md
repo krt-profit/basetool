@@ -90,9 +90,10 @@ decides, before specificity:
 
 ### Script load order (binding — it has regressed three times)
 
-Every external `<script>` is `defer` — head and page modules alike — except `krt-client-error.js`,
-which stays the head's first, synchronous script (`REQ-FE-023`). Deferred scripts run in document
-order after parsing, so a page module may use every head global at load.
+Every external `<script>` is a module (`type="module"`, no `defer` — a module is deferred) except
+`krt-client-error.js`, which stays the head's first, synchronous classic script (`REQ-FE-023`,
+`REQ-FE-035`). Module scripts run in document order after parsing, with the other deferred ones, so a
+page module may use every head global at load.
 
 **An inline script is a data bootstrap and nothing else** (ADR-0069). It is a
 `th:inline="javascript"` block of `const` / `let` / `var NAME = literal` and `window.NAME = literal`
@@ -186,7 +187,7 @@ hands over its parts and **never calls the head, sidebar, header or toast fragme
 </head>
 <body>
 <th:block th:fragment="pageContent"><main>…</main></th:block>
-<th:block th:fragment="pageTail"><script th:src="@{/js/bank/x.js}" defer th:attr="nonce=${cspNonce}"></script></th:block>
+<th:block th:fragment="pageTail"><script type="module" th:src="@{/js/bank/x.js}" th:attr="nonce=${cspNonce}"></script></th:block>
 </body>
 </html>
 ```
@@ -240,8 +241,8 @@ whitelist and a page's JS seam map disagree.
 
 The scripts under `static/js` are statically type-checked by `:frontend:typecheckJs`
 (`tsc --noEmit`, strict, wired into `check`). **TypeScript is a checker here, not a language:**
-the sources stay JavaScript, stay classic non-module `<script>` tags sharing one global scope
-(ADR-0069), and nothing is compiled, bundled or renamed. Do **not** convert files to `.ts` — the
+the sources stay JavaScript, stay ES modules served as they are (ADR-0250), and nothing is
+compiled, bundled or renamed. Do **not** convert files to `.ts` — the
 full migration is an unscheduled, costed option in
 [`docs/TYPESCRIPT_MIGRATION_PLAN.md`](../docs/TYPESCRIPT_MIGRATION_PLAN.md), not a default.
 
@@ -292,8 +293,8 @@ debt rather than anything TS 7 introduced.
   first commit, and a new domain is added to `"domains"`, to `"migrated"` and to `MIGRATED_FLOOR`
   (raise `CHECKED_FILES_FLOOR` too) in `scripts/typecheck-ratchet.mjs`; the list and the floors never
   shrink.
-  A script that is too large to check is split first at top-level statement boundaries into parts
-  loaded by consecutive `defer` tags in the original order, the first part keeping the file name.
+  A script that is too large to check is split first into modules by responsibility (see *ES modules*
+  below), the first keeping the file name.
 - **Declare shared contracts in the same change.** A new `window.krt*` API, a new custom DOM event
   or a new Thymeleaf bootstrap constant goes into `frontend/types/globals.d.ts` or
   `frontend/types/thymeleaf-bootstrap.d.ts` as part of the change that introduces it. A bootstrap
@@ -306,6 +307,27 @@ debt rather than anything TS 7 introduced.
 - **In a checked file, JSDoc must be real JSDoc.** The Javadoc spellings used elsewhere in this
   repo — `{@code …}`, `{@link …}`, `@param name {shape}` — are parsed as type syntax and are hard
   errors. Convert them when you opt a file in.
+
+## ES modules (REQ-FE-035, ADR-0250)
+
+Every script under `static/js` is an ES module except the ones `frontend/module-ratchet.json` lists as
+classic (today only `kernel/krt-client-error.js`; the list only shrinks). The rules:
+
+- **Link it as `<script type="module" th:src="@{/js/<domain>/<file>.js}" th:attr="nonce=${cspNonce}">`**
+  — no `defer`. `ModuleScriptsTest` fails on a module linked as a classic script and the other way round.
+- **Import by the absolute asset path, statically**: `import { x } from '/js/bank/bank-messages.js';`.
+  Only your own domain's `/js/<domain>/` and `/js/kernel/` — never another domain, never a relative
+  path, never `import()` (`:frontend:lintJs`, `ModuleScriptsTest`, which also rejects a cycle). A
+  script another domain's page needs is a page-level `<script>` tag, as before.
+- **The head renders the page's import map** (`moduleImportMap` bean): the content-hashed URL of every
+  module the page's scripts import, found by scanning the page template and its fragments. You do not
+  write it; a module reachable only through a construct the scan cannot follow (a dynamic fragment
+  name) would be fetched unhashed, so keep a page's script tags in its own file's `pageTail`.
+- **A module has no hidden shared scope.** It reads server values from a Thymeleaf data bootstrap or
+  a `data-*` attribute, uses the shared API as `window.krt*` (declared in `types/globals.d.ts`), and
+  hands another module only what it `export`s. A module that registers document listeners does it
+  in an exported `init…` function the entry module calls, so the order of listeners per event type is
+  visible in one place (`bank/bank.js` is the example).
 
 ## Package layout (REQ-FE-032, plan §5.9)
 

@@ -312,7 +312,7 @@ anywhere else.
 | `kernel.backend` | The backend seam — `BackendApiClient` with its catalogue cache and URI-template verbs for every verb, `BackendErrorMapper` (the one mapping of a failed call, a sealed `Outcome`), `BackendSideChannels` (the SSE relay and the live-sync probe), `CatalogueCacheEviction`, `WebClientConfig` with Resilience4j, the outbound relays (org unit, client IP, locale, logging), Reactor context propagation, `ParallelPageLoader`, the ingest handoff |
 | `kernel.security` | `SecurityConfig`, the access gates (role sync, terms gate), `Roles`, CSP, Trusted Types and security headers, the login and logout handlers, the monitoring and management port security |
 | `kernel.session` | `RedisSessionConfig`, `SessionTypeAllowList`, the fault-tolerant serializer and same-request repair, session metrics and cookie settings |
-| `kernel.layout` | `UsesLayoutModel`, `LayoutContextLoader` and the layout advices |
+| `kernel.layout` | `UsesLayoutModel`, `LayoutContextLoader`, the layout advices and `ModuleImportMap`, which renders each page's import map of content-hashed module URLs (REQ-FE-035) |
 | `kernel.web` | `GlobalExceptionHandler`, `BackendErrorResponses`, `RelayParams`, binding and string normalisation, the request contexts (correlation id, client IP, active org unit), MVC and locale configuration, the template beans `moneyFormat`, `relativeDays`, `markdown` and `handles` |
 | `kernel.livesync` | `/ws/sync`, the handler, the Redis fanout and presence |
 | `kernel.observability` | Request logging, log masking, the startup banner, metric names, tracing and observation filters |
