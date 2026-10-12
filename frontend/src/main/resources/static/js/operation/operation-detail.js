@@ -29,6 +29,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { operationHooks } from '/js/operation/operation-hooks.js';
 
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
@@ -75,16 +76,16 @@ function initOperationDetail() {
             }
         },
     });
-    window.opRefreshSection = operationSeam.refresh;
-    window.opNotifyChanged = operationSeam.notify;
+    operationHooks.refreshSection = operationSeam.refresh;
+    operationHooks.notifyChanged = operationSeam.notify;
 
     if (window.operationId && krtLiveSync && krtLiveSync.createReceiver) {
         krtLiveSync.createReceiver({
             topic: `operation:${window.operationId}`,
             sections: OPERATION_SECTIONS,
             refresh(keys) {
-                if (window.opRefreshSection) {
-                    window.opRefreshSection(withOverview(keys), { broadcast: false });
+                if (operationHooks.refreshSection) {
+                    operationHooks.refreshSection(withOverview(keys), { broadcast: false });
                 }
             },
             pill: {
@@ -462,8 +463,8 @@ function initOperationDetail4() {
                     }
                     adoptOperationFormValues(form);
                     krtModal.close('edit-operation-modal');
-                    if (window.opRefreshSection) {
-                        window.opRefreshSection('overview');
+                    if (operationHooks.refreshSection) {
+                        operationHooks.refreshSection('overview');
                     }
                 },
             });
@@ -606,11 +607,11 @@ async function handlePayoutPaidToggle(checkbox) {
         if (result && result.ok && result.body) {
             refreshPayoutPaidStatusCell(checkbox.closest('tr[data-participant-id]'), result.body);
             refreshPayoutPaidCount();
-            if (window.opRefreshSection) {
-                window.opRefreshSection('overview', { broadcast: false });
+            if (operationHooks.refreshSection) {
+                operationHooks.refreshSection('overview', { broadcast: false });
             }
-            if (window.opNotifyChanged) {
-                window.opNotifyChanged(['payout']);
+            if (operationHooks.notifyChanged) {
+                operationHooks.notifyChanged(['payout']);
             }
         }
     } finally {

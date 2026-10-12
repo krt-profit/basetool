@@ -23,6 +23,7 @@
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtHooks } from '/js/kernel/krt-hooks.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dataList = /** @type {HTMLDataListElement | null} */ (
@@ -65,7 +66,7 @@ function filterTable(tableId, query) {
     }
 }
 
-window.filterTable = filterTable;
+krtHooks.filterTable = filterTable;
 
 document.addEventListener('DOMContentLoaded', () => {
     /**

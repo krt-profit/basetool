@@ -19,6 +19,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { krtHooks } from '/js/kernel/krt-hooks.js';
 
 function initMaterialgesuchModal() {
     /**
@@ -691,7 +692,8 @@ function initMaterialgesuchModal() {
         }
     }
 
-    window.krtMaterialRequest = { open, close: cancel };
+    krtHooks.materialRequest = { open, close: cancel };
+    window.krtMaterialRequest = krtHooks.materialRequest;
 }
 
 initMaterialgesuchModal();

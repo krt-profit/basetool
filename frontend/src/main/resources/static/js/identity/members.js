@@ -48,8 +48,6 @@ function refreshMembersResults() {
     });
 }
 
-window.krtRefreshMembersResults = refreshMembersResults;
-
 /** Wires the live roster filter and the name autocomplete of the search field. */
 function bindFilter() {
     const searchInput = /** @type {HTMLInputElement | null} */ (
@@ -264,9 +262,7 @@ function initMembers() {
         sections: MEMBERS_SECTIONS,
         coalesceMs: 1500,
         refresh() {
-            if (typeof window.krtRefreshMembersResults === 'function') {
-                window.krtRefreshMembersResults();
-            }
+            refreshMembersResults();
         },
     });
 }

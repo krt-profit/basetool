@@ -27,6 +27,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtHooks } from '/js/kernel/krt-hooks.js';
 
 /** @type {string[]} */
 const materialNames = [];
@@ -251,7 +252,7 @@ function filterTable(tableId, query) {
     }
 }
 
-window.filterTable = filterTable;
+krtHooks.filterTable = filterTable;
 
 /**
  * Saves one inline-edited field of a material row.

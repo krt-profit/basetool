@@ -27,6 +27,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 function initOrdersDetailProduction() {
     const nav = /** @type {HTMLElement | null} */ (
@@ -934,8 +935,8 @@ export function bookProduction() {
         onSuccess() {
             krtModal.close('production-modal');
             showFrontendSuccessToast(PRODUCTION_I18N.booked);
-            if (window.krtRefreshOrderSection) {
-                window.krtRefreshOrderSection([
+            if (joborderHooks.refreshOrderSection) {
+                joborderHooks.refreshOrderSection([
                     'items',
                     'aggregated',
                     'header',

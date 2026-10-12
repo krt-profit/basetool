@@ -16,10 +16,11 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtHooks } from '/js/kernel/krt-hooks.js';
 
 function initInventoryMaterialboerse() {
     const i18n = window.materialboerseInventoryI18n || {};
-    const release = window.krtMaterialRelease;
+    const release = krtHooks.materialRelease;
     if (!krtEvents || !release || !krtFetch) {
         return;
     }

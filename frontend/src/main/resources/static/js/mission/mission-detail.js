@@ -25,6 +25,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { missionHooks } from '/js/mission/mission-hooks.js';
 
 const MISSION_SECTIONS = {
     crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
@@ -91,17 +92,17 @@ const missionSeam = krtFetch.sectionWrite({
         return window.missionId ? `/missions/${window.missionId}` : null;
     },
     broadcast(keys) {
-        if (window.missionPresence && typeof window.missionPresence.sendChanged === 'function') {
-            window.missionPresence.sendChanged(keys);
+        if (missionHooks.presence && typeof missionHooks.presence.sendChanged === 'function') {
+            missionHooks.presence.sendChanged(keys);
         }
         crossPublishToParentOperation(keys);
     },
 });
-window.krtMissionWrite = missionSeam.write;
+missionHooks.write = missionSeam.write;
 
-window.krtRefreshMissionSection = missionSeam.refresh;
+missionHooks.refresh = missionSeam.refresh;
 
-window.krtNotifyMissionChanged = missionSeam.notify;
+missionHooks.notify = missionSeam.notify;
 
 document.addEventListener('krt:swapped', (ev) => {
     const container = ev && ev.detail && ev.detail.container;
@@ -170,8 +171,8 @@ document.addEventListener('krt:swapped', (ev) => {
         }
         const utc = /** @type {HTMLElement} */ (meta).getAttribute(utcAttr);
         el.setAttribute('data-utc', utc != null ? utc : 'null');
-        if (typeof window.krtLocalizeDates === 'function') {
-            window.krtLocalizeDates(el.parentNode || el);
+        if (typeof missionHooks.localizeDates === 'function') {
+            missionHooks.localizeDates(el.parentNode || el);
         }
     }
     patchFact('facts-planned-start', 'data-planned-start-utc');
@@ -201,8 +202,8 @@ krtLiveSync.createReceiver({
     sections: MISSION_SECTIONS,
     events: { changed: 'krt:mission-changed', resync: 'krt:mission-resync' },
     refresh(keys) {
-        if (window.krtRefreshMissionSection) {
-            window.krtRefreshMissionSection(keys, { broadcast: false });
+        if (missionHooks.refresh) {
+            missionHooks.refresh(keys, { broadcast: false });
         }
     },
     pill: {
@@ -226,13 +227,13 @@ function stepsVersion() {
     return v === null || Number.isNaN(v) ? null : v;
 }
 function refreshSteps() {
-    if (window.krtRefreshMissionSection) {
-        return window.krtRefreshMissionSection(['steps', 'overview']);
+    if (missionHooks.refresh) {
+        return missionHooks.refresh(['steps', 'overview']);
     }
     return Promise.resolve();
 }
 function writeStep(opts) {
-    return window.krtMissionWrite(
+    return missionHooks.write(
         Object.assign({ sectionKey: 'steps', onSuccess: refreshSteps }, opts),
     );
 }
@@ -472,13 +473,13 @@ function initMissionDetail() {
         return v === null || Number.isNaN(v) ? null : v;
     }
     function refreshObjectives() {
-        if (window.krtRefreshMissionSection) {
-            return window.krtRefreshMissionSection(['objectives', 'overview']);
+        if (missionHooks.refresh) {
+            return missionHooks.refresh(['objectives', 'overview']);
         }
         return Promise.resolve();
     }
     function writeObjective(opts) {
-        return window.krtMissionWrite(
+        return missionHooks.write(
             Object.assign({ sectionKey: 'objectives', onSuccess: refreshObjectives }, opts),
         );
     }

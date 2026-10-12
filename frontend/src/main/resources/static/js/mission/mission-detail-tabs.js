@@ -22,6 +22,7 @@
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { missionHooks } from '/js/mission/mission-hooks.js';
 
 function initMissionDetailTabs() {
     const tabs = /** @type {HTMLElement[]} */ (
@@ -339,8 +340,8 @@ function initMissionDetailTabs2() {
             onSuccess(body) {
                 writeVersions(body);
                 clearFieldErrors();
-                if (window.krtRefreshMissionSection) {
-                    return window.krtRefreshMissionSection('overview');
+                if (missionHooks.refresh) {
+                    return missionHooks.refresh('overview');
                 }
                 return undefined;
             },
@@ -444,7 +445,7 @@ function initMissionDetailTabs3() {
     }
 
     async function moveParticipant(row, zone) {
-        if (!window.krtMissionWrite || !window.missionId) return;
+        if (!missionHooks.write || !window.missionId) return;
         const participantId = row.getAttribute('data-participant-id');
         const srcCrewId = row.getAttribute('data-crew-id') || '';
         const srcUnitId = row.getAttribute('data-unit-id') || '';
@@ -452,25 +453,25 @@ function initMissionDetailTabs3() {
         if (!participantId || srcUnitId === targetUnitId) return;
 
         if (srcCrewId && srcUnitId) {
-            const del = await window.krtMissionWrite({
+            const del = await missionHooks.write({
                 method: 'DELETE',
                 url: `/missions/${window.missionId}/units/${srcUnitId}/crew/${srcCrewId}/ajax`,
                 sectionKey: 'crew',
             });
             if (!del.ok) return;
             if (!targetUnitId) {
-                window.krtRefreshMissionSection('crew');
+                missionHooks.refresh('crew');
                 return;
             }
         }
         if (targetUnitId) {
-            await window.krtMissionWrite({
+            await missionHooks.write({
                 method: 'POST',
                 url: `/missions/${window.missionId}/units/${targetUnitId}/crew/ajax`,
                 payload: { participantId, jobTypeIds: [] },
                 sectionKey: 'crew',
             });
-            window.krtRefreshMissionSection('crew');
+            missionHooks.refresh('crew');
         }
     }
 
@@ -720,8 +721,8 @@ function initMissionDetailTabs3() {
         const value = sel.value;
         if (value === '__edit') {
             sel.value = sel.getAttribute('data-current') || '';
-            if (typeof window.krtOpenEditCrewModal === 'function') {
-                window.krtOpenEditCrewModal(sel);
+            if (typeof missionHooks.openEditCrewModal === 'function') {
+                missionHooks.openEditCrewModal(sel);
             }
             return;
         }
@@ -729,9 +730,9 @@ function initMissionDetailTabs3() {
             return;
         }
         const ajaxUrl = sel.getAttribute('data-action-ajax');
-        if (!ajaxUrl || !window.krtMissionWrite) return;
+        if (!ajaxUrl || !missionHooks.write) return;
         const versionAttr = sel.getAttribute('data-version');
-        const res = await window.krtMissionWrite({
+        const res = await missionHooks.write({
             method: 'PUT',
             url: ajaxUrl,
             payload: {
@@ -741,7 +742,7 @@ function initMissionDetailTabs3() {
             sectionKey: 'crew',
         });
         if (res.ok) {
-            window.krtRefreshMissionSection('crew');
+            missionHooks.refresh('crew');
         } else {
             sel.value = sel.getAttribute('data-current') || '';
         }
@@ -786,7 +787,7 @@ function krtFormatLocalDateTime(el) {
     el.innerText = '—';
 }
 
-window.krtLocalizeDates = function (root) {
+missionHooks.localizeDates = function (root) {
     const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
     /** @type {NodeListOf<HTMLElement>} */ (scope.querySelectorAll('.krt-local-dt')).forEach(
         krtFormatLocalDateTime,
@@ -804,8 +805,8 @@ window.krtLocalizeDates = function (root) {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    window.krtLocalizeDates(document);
+    missionHooks.localizeDates(document);
 });
 document.addEventListener('krt:swapped', (ev) => {
-    window.krtLocalizeDates((ev.detail && ev.detail.container) || document);
+    missionHooks.localizeDates((ev.detail && ev.detail.container) || document);
 });

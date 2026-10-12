@@ -38,6 +38,7 @@ import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtInventory } from '/js/inventory/inventory-common.js';
 import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
+import { inventoryHooks } from '/js/inventory/inventory-hooks.js';
 
 const adminLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
     triggerPrefix: 'inv-admin',
@@ -314,7 +315,7 @@ function broadcastInventoryAllChanged() {
         krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_ALL_SECTIONS));
     }
 }
-window.krtNotifyInventoryChanged = broadcastInventoryAllChanged;
+inventoryHooks.notifyChanged = broadcastInventoryAllChanged;
 
 if (
     krtLiveSync &&

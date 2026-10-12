@@ -25,6 +25,7 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { operationHooks } from '/js/operation/operation-hooks.js';
 
 function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement | null} */ (
@@ -57,7 +58,7 @@ function closeOperationModal(id) {
 }
 
 function reloadOperationsList() {
-    if (typeof window.krtOperationsReload === 'function') window.krtOperationsReload();
+    if (typeof operationHooks.reload === 'function') operationHooks.reload();
 }
 
 function initOperationsIndex() {

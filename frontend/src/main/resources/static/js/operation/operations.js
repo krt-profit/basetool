@@ -2,6 +2,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
+import { operationHooks } from '/js/operation/operation-hooks.js';
 
 function initOperations() {
     const filterForm = /** @type {HTMLFormElement | null} */ (
@@ -41,7 +42,7 @@ function initOperations() {
         });
     }
 
-    window.krtOperationsReload = loadResults;
+    operationHooks.reload = loadResults;
 
     function onFilterChange() {
         clearTimeout(debounceTimer ?? undefined);
