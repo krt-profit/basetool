@@ -49,6 +49,7 @@ public class IdentityMentionSource implements PersonMentionSource {
   public @NotNull Set<String> exemptColumns() {
     return Set.of(
         "app_user.approval_status",
+        "app_user.default_payout_preference",
         "app_user.discord_user_id",
         "deletion_request.status",
         "role.code",
