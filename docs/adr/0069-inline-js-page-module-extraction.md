@@ -148,5 +148,6 @@ environment), the cross-file bare names
 that the shared global scope allowed (`krtAutocomplete`, the inventory note dialog, the order detail
 parts) are imports now, and so is the kernel API (`krtFetch`, `krtModal`, the toasts, …): a
 module has no hidden shared scope. 48 immediately invoked wrappers were removed from modules where
-that was provably neutral; 49 stay because they guard with an early `return` (46) or because two
-wrappers of one file declare the same names (3).
+that was provably neutral, and the 49 that guard with an early `return` or pair names in one file are
+named functions with one call; the seams between the parts of a page are hook registries. No script
+but the classic beacon is wrapped.

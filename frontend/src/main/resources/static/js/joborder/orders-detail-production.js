@@ -27,8 +27,9 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
-(function () {
+function initOrdersDetailProduction() {
     const nav = /** @type {HTMLElement | null} */ (
         document.querySelector('.tab-nav[role="tablist"]')
     );
@@ -194,7 +195,9 @@ import { krtHtml } from '/js/kernel/krt-html.js';
         apply(resolveInitial(false));
     });
     apply(resolveInitial(true));
-})();
+}
+
+initOrdersDetailProduction();
 
 document.addEventListener('krt:swapped', (ev) => {
     const container = ev && ev.detail && ev.detail.container;
@@ -932,8 +935,8 @@ export function bookProduction() {
         onSuccess() {
             krtModal.close('production-modal');
             showFrontendSuccessToast(PRODUCTION_I18N.booked);
-            if (window.krtRefreshOrderSection) {
-                window.krtRefreshOrderSection([
+            if (joborderHooks.refreshOrderSection) {
+                joborderHooks.refreshOrderSection([
                     'items',
                     'aggregated',
                     'header',

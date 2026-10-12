@@ -2,6 +2,7 @@
 
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { missionHooks } from '/js/mission/mission-hooks.js';
 
 const HEARTBEAT_MS = 60000;
 const SECTION_SELECTOR = '[data-panel-key]';
@@ -233,13 +234,11 @@ MissionPresence.prototype._render = function () {
     });
 };
 
-window.MissionPresence = MissionPresence;
-
 document.addEventListener('DOMContentLoaded', () => {
     if (!window.missionId || window.missionPresenceUserId == null) {
         return;
     }
     const presence = new MissionPresence(window.missionId, window.missionPresenceUserId);
     presence.start();
-    window.missionPresence = presence;
+    missionHooks.presence = presence;
 });

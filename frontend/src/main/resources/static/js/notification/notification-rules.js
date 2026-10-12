@@ -24,7 +24,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
-(function () {
+function initNotificationRules() {
     const form = document.getElementById('rule-form');
     const container = document.getElementById('selectors-container');
     const template = document.getElementById('selector-row-template');
@@ -489,4 +489,6 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
         resetForm();
     }
-})();
+}
+
+initNotificationRules();

@@ -22,7 +22,7 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
-(function () {
+function initConnectedAppsConfirm() {
     const BASE = '/connected-apps/confirm';
 
     const box = document.getElementById('cac-box');
@@ -178,4 +178,6 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
             });
         });
     }
-})();
+}
+
+initConnectedAppsConfirm();

@@ -20,7 +20,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-(function () {
+function initPendingApproval() {
     const POLL_INTERVAL_MS = 20000;
     const STATE_ACTIVE = 'ACTIVE';
     const STATE_REJECTED = 'REJECTED';
@@ -102,4 +102,6 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
     });
 
     schedule();
-})();
+}
+
+initPendingApproval();

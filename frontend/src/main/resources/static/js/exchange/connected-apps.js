@@ -24,7 +24,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
-(function () {
+function initConnectedApps() {
     const BASE = '/connected-apps';
 
     const host = document.getElementById('ca-host');
@@ -257,4 +257,6 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
             }
         }
     });
-})();
+}
+
+initConnectedApps();

@@ -746,15 +746,10 @@ interface Window {
     trustedTypes?: TrustedTypePolicyFactory;
 
     krtModal: KrtModalApi;
-    /** Alias of `krtModal.open` for the mission page. */
-    krtModalOpen: (overlay: Element | null) => void;
-    krtModalClose: (overlay: Element | null) => void;
     openModal?: (...args: any[]) => void;
 
-    krtLocalizeDates: (root?: ParentNode | null) => void;
     krtSearchableSelect?: (select: HTMLSelectElement, config: Record<string, unknown>) => unknown;
     krtComboboxRemoteSources?: Record<string, unknown>;
-    krtSegSet: (targetId: string, value: string) => void;
 
     krtComboboxI18n?: KrtComboboxI18n;
     krtProfileI18n?: KrtI18nDict;
@@ -833,19 +828,11 @@ interface Window {
      * The refinery yield-badge manager; required because both refinery-order modules call it
      * unguarded at parse time.
      */
-    krtOpenEditCrewModal?: (source: Element) => void;
-    krtOperationsReload?: (...args: any[]) => void;
-    krtRefreshOrdersQueue?: (...args: any[]) => void;
     /**
      * Re-swaps the /members roster for the viewer's own filter and page, so the live-sync receiver
      * can apply a peer's change in place.
      */
-    krtRefreshMembersResults?: () => void;
 
-    krtMissionWrite: KrtSectionWriter['write'];
-    krtRefreshMissionSection: KrtSectionWriter['refresh'];
-    krtNotifyMissionChanged: KrtSectionWriter['notify'];
-    MissionPresence?: unknown;
     /** The viewer's user id on a saved mission, which starts the presence channel; else absent. */
     missionPresenceUserId?: string | null;
     /** The id of the saved mission on mission-detail.html; absent on a new mission. */
@@ -853,7 +840,6 @@ interface Window {
     /** Tooltip labels of the presence indicator, from `mission-detail.html`. */
     MISSION_PRESENCE_I18N?: KrtI18nDict;
     /** The running presence channel of the mission page; absent before `DOMContentLoaded`. */
-    missionPresence?: { sendChanged(sections: string[]): void };
     /** Whether the viewer may edit the mission; set by `mission-detail.html`. */
     missionCanEdit?: boolean;
     /** The id of the mission's parent operation, or null when it has none; from `mission-detail.html`. */
@@ -875,11 +861,6 @@ interface Window {
     /** Toast text of a failed actual-time save, from `mission-detail.html`. */
     MSG_MISSION_ACTUAL_TIME_ERROR?: string;
 
-    krtRefreshOrderSection?: (...args: any[]) => void;
-    krtNotifyOrderChanged?: (...args: any[]) => void;
-    krtNotifyInventoryChanged?: (...args: any[]) => void;
-    opRefreshSection?: (...args: any[]) => void;
-    opNotifyChanged?: (...args: any[]) => void;
     /** The id of the operation on operation-detail.html, keying its live-sync room and section URLs. */
     operationId?: string | null;
 
@@ -894,8 +875,4 @@ interface Window {
      */
     orderId?: string | null;
     __unsavedChangesInitialized?: boolean;
-    __ordersDragging?: boolean;
-    filterTable?: (...args: any[]) => void;
-    confirmRemoveMaterial?: (...args: any[]) => void;
-    materialRowToDelete?: Element | null;
 }

@@ -54,11 +54,21 @@ a nonced module.
 6. **A script under its plain URL is revalidated.** `/js/**` answers `Cache-Control: no-cache`, and
    only a content-hashed name (`*-` plus 32 characters, `.js`) answers `max-age=31536000, public,
    immutable`, so a module reached outside the import map can never be cached stale for a year.
-7. **Wrappers go where it is provably neutral.** A top-level immediately invoked function around a
-   module body is removed when it has no `return`, `await`, `this` or `arguments` of its own, no
-   name that collides with another top-level name of the file, and removing it leaves the set of
-   global names the file reads unchanged; the `'use strict'` directive goes everywhere but in the
-   classic beacon.
+7. **No script is wrapped in an immediately invoked function.** A wrapper around a module body is
+   removed when it has no `return`, `await`, `this` or `arguments` of its own, no name that collides
+   with another top-level name of the file, and removing it leaves the set of global names the file
+   reads unchanged (48 were). A module cannot `return` at the top level, so the 49 that open with an
+   early `return` guard, or that pair names in one file, became a named function and one call at the
+   same place (`function initBankGrants() { … }` then `initBankGrants();`): a plain call of a strict
+   function sees the same `this` and `arguments` as the immediately invoked one, nothing is hoisted
+   that was not, and the name is checked free in the file. The `'use strict'` directive goes
+   everywhere but in the classic beacon, the one script that is not a module and is still wrapped.
+8. **The seams between the parts of a page are hook registries**, not `window` names: `mission-hooks.js`,
+   `joborder-hooks.js`, `operation-hooks.js`, `inventory-hooks.js` and `kernel/krt-hooks.js` (the last
+   for collaborators a domain offers the kernel or another domain, which may not import it). A part
+   assigns its member where it used to assign the window property and another reads it where it used to
+   read it; a registry is a leaf module with no effect, so no import edge between two parts is added
+   and the parts evaluate in their tag order, which the old code relied on.
 
 ## Consequences
 
@@ -88,11 +98,11 @@ a nonced module.
   node tests run a module graph as one classic script (`scripts/flatten-module.mjs`).
 - The drawer and the palette, which are optional to each other, meet in a registry module
   (`krt-chrome.js`), which also keeps their imports acyclic.
-- Not converted: 23 `window.<name>` seams between the parts of one page or between a page and a
-  shared module (the mission, order, operation and inventory parts, `krtMaterialRelease` and
-  `krtMaterialRequest` read by Playwright and another domain, `filterTable` read by the kernel). They
-  are late-bound on purpose: the parts evaluate in tag order, and an import would make a part
-  evaluate its dependency first.
+- The 23 `window.<name>` seams between the parts of one page are registry members now (decision 8).
+  Only `window.krtMaterialRelease` and `window.krtMaterialRequest` are still published next to their
+  registry member, because Playwright sources evaluate them in the page. The import graph without the
+  registries is identical before and after (a script compares the two revisions), so the evaluation
+  order is unchanged.
 
 ## Rejected
 

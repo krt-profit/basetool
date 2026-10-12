@@ -103,7 +103,7 @@ document.addEventListener('change', (event) => {
     });
 });
 
-(function () {
+function initBankGrantsChartPrefs() {
     const CHART_CONTAINER_IDS = ['bank-chart-results', 'org-unit-bank-chart-results'];
 
     function storageKey() {
@@ -180,4 +180,6 @@ document.addEventListener('change', (event) => {
             writeSaved(rendered);
         }
     });
-})();
+}
+
+initBankGrantsChartPrefs();

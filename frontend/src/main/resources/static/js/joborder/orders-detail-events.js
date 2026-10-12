@@ -58,6 +58,7 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 if (krtEvents && typeof krtEvents.on === 'function') {
     krtEvents.on('change', 'od-update-status', (el) => {
@@ -115,7 +116,8 @@ if (krtEvents && typeof krtEvents.on === 'function') {
     krtEvents.on('click', 'od-cancel-status', cancelStatusChange);
     krtEvents.on('click', 'od-confirm-status', confirmStatusChange);
     krtEvents.on('click', 'od-confirm-remove-material', () => {
-        if (typeof window.confirmRemoveMaterial === 'function') window.confirmRemoveMaterial();
+        if (typeof joborderHooks.confirmRemoveMaterial === 'function')
+            joborderHooks.confirmRemoveMaterial();
     });
     krtEvents.on('click', 'od-add-handover-item', addHandoverItemRow);
     krtEvents.on('click', 'od-preview-handover', (el) => {
@@ -178,8 +180,8 @@ async function oaSend(method, url, opts) {
                 );
             }
             if (opts.successMsg) showFrontendSuccessToast(opts.successMsg);
-            if (window.krtNotifyOrderChanged) {
-                window.krtNotifyOrderChanged(['assignees']);
+            if (joborderHooks.notifyOrderChanged) {
+                joborderHooks.notifyOrderChanged(['assignees']);
             }
         },
         onError(status, _body, response) {

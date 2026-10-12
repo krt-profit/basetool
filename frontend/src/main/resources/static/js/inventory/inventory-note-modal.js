@@ -28,6 +28,7 @@ import {
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { inventoryHooks } from '/js/inventory/inventory-hooks.js';
 
 /** @type {HTMLElement | null} */
 let activeNoteButton = null;
@@ -178,8 +179,8 @@ function runNoteUpdate(btn, id, noteValue) {
                     p.title = txt;
                 }
             });
-            if (typeof window.krtNotifyInventoryChanged === 'function') {
-                window.krtNotifyInventoryChanged();
+            if (typeof inventoryHooks.notifyChanged === 'function') {
+                inventoryHooks.notifyChanged();
             }
         },
         onError(status) {

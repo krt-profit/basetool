@@ -29,6 +29,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { operationHooks } from '/js/operation/operation-hooks.js';
 
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
@@ -52,7 +53,7 @@ function withOverview(keys) {
     return list;
 }
 
-(function () {
+function initOperationDetail() {
     if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
@@ -75,16 +76,16 @@ function withOverview(keys) {
             }
         },
     });
-    window.opRefreshSection = operationSeam.refresh;
-    window.opNotifyChanged = operationSeam.notify;
+    operationHooks.refreshSection = operationSeam.refresh;
+    operationHooks.notifyChanged = operationSeam.notify;
 
     if (window.operationId && krtLiveSync && krtLiveSync.createReceiver) {
         krtLiveSync.createReceiver({
             topic: `operation:${window.operationId}`,
             sections: OPERATION_SECTIONS,
             refresh(keys) {
-                if (window.opRefreshSection) {
-                    window.opRefreshSection(withOverview(keys), { broadcast: false });
+                if (operationHooks.refreshSection) {
+                    operationHooks.refreshSection(withOverview(keys), { broadcast: false });
                 }
             },
             pill: {
@@ -141,9 +142,11 @@ function withOverview(keys) {
         setText('op-kpi-donated', meta.getAttribute('data-kpi-donated'));
         setText('op-kpi-participants', meta.getAttribute('data-kpi-participants'));
     });
-})();
+}
 
-(function () {
+initOperationDetail();
+
+function initOperationDetail2() {
     const tabs = Array.from(
         /** @type {NodeListOf<HTMLElement>} */ (
             document.querySelectorAll('#operation-tabs > .tab[data-tab]')
@@ -225,7 +228,9 @@ function withOverview(keys) {
             : tabs[0].getAttribute('data-tab'),
         false,
     );
-})();
+}
+
+initOperationDetail2();
 
 /**
  * Points the delete form at the operation and opens the confirmation dialog.
@@ -256,7 +261,7 @@ if (krtEvents && typeof krtEvents.on === 'function') {
     });
 }
 
-(function () {
+function initOperationDetail3() {
     const editor = document.getElementById('op-md-editor');
     if (!editor) return;
     const input = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('op-desc'));
@@ -385,7 +390,9 @@ if (krtEvents && typeof krtEvents.on === 'function') {
             }
         });
     }
-})();
+}
+
+initOperationDetail3();
 
 /**
  * The conflict dialog strings of this page.
@@ -418,7 +425,7 @@ function adoptOperationFormValues(form) {
     });
 }
 
-(function () {
+function initOperationDetail4() {
     if (!krtFetch) return;
 
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('operation-form'));
@@ -456,8 +463,8 @@ function adoptOperationFormValues(form) {
                     }
                     adoptOperationFormValues(form);
                     krtModal.close('edit-operation-modal');
-                    if (window.opRefreshSection) {
-                        window.opRefreshSection('overview');
+                    if (operationHooks.refreshSection) {
+                        operationHooks.refreshSection('overview');
                     }
                 },
             });
@@ -483,7 +490,9 @@ function adoptOperationFormValues(form) {
             });
         });
     }
-})();
+}
+
+initOperationDetail4();
 
 /**
  * The page's paid-out write URL.
@@ -598,11 +607,11 @@ async function handlePayoutPaidToggle(checkbox) {
         if (result && result.ok && result.body) {
             refreshPayoutPaidStatusCell(checkbox.closest('tr[data-participant-id]'), result.body);
             refreshPayoutPaidCount();
-            if (window.opRefreshSection) {
-                window.opRefreshSection('overview', { broadcast: false });
+            if (operationHooks.refreshSection) {
+                operationHooks.refreshSection('overview', { broadcast: false });
             }
-            if (window.opNotifyChanged) {
-                window.opNotifyChanged(['payout']);
+            if (operationHooks.notifyChanged) {
+                operationHooks.notifyChanged(['payout']);
             }
         }
     } finally {
@@ -623,7 +632,7 @@ document.addEventListener('change', (ev) => {
     }
 });
 
-(function () {
+function initOperationDetail5() {
     const currentOperationId = window.operationId;
     if (!currentOperationId) return;
     const opId = currentOperationId;
@@ -671,4 +680,6 @@ document.addEventListener('change', (ev) => {
         },
         true,
     );
-})();
+}
+
+initOperationDetail5();

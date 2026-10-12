@@ -8,7 +8,7 @@ const MISSIONS_SECTIONS = {
     list: { container: '#missions-results', fragmentValue: 'results' },
 };
 
-(function () {
+function initMissions() {
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('missions-filter-form')
     );
@@ -150,4 +150,6 @@ const MISSIONS_SECTIONS = {
     }
 
     restoreFilters();
-})();
+}
+
+initMissions();

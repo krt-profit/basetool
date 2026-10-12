@@ -37,6 +37,7 @@ import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtInventory } from '/js/inventory/inventory-common.js';
 import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
+import { inventoryHooks } from '/js/inventory/inventory-hooks.js';
 
 const myLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
     triggerPrefix: 'inv-my',
@@ -886,7 +887,7 @@ function broadcastInventoryChanged() {
         krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_MY_SECTIONS));
     }
 }
-window.krtNotifyInventoryChanged = broadcastInventoryChanged;
+inventoryHooks.notifyChanged = broadcastInventoryChanged;
 
 if (
     krtLiveSync &&

@@ -892,7 +892,7 @@ function syncPersonalAllocations() {
     updateAllocOver();
 }
 
-(function () {
+function initInventoryInput() {
     if (!krtFetch) return;
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('inventory-input-form')
@@ -937,4 +937,6 @@ function syncPersonalAllocations() {
             },
         });
     });
-})();
+}
+
+initInventoryInput();

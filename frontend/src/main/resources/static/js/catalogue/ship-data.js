@@ -27,6 +27,7 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtHooks } from '/js/kernel/krt-hooks.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const shipTypesData = /** @type {HTMLDataListElement | null} */ (
@@ -95,7 +96,7 @@ function closeModal(id) {
     krtModal.close(id);
 }
 
-window.filterTable = filterTable;
+krtHooks.filterTable = filterTable;
 
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.krt-modal-overlay').forEach((m) => {
@@ -113,7 +114,7 @@ if (krtEvents && typeof krtEvents.on === 'function') {
     });
 }
 
-(function () {
+function initShipData() {
     if (!krtFetch) {
         return;
     }
@@ -189,4 +190,6 @@ if (krtEvents && typeof krtEvents.on === 'function') {
                 el.disabled = false;
             });
     });
-})();
+}
+
+initShipData();

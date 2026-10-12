@@ -48,8 +48,6 @@ function refreshMembersResults() {
     });
 }
 
-window.krtRefreshMembersResults = refreshMembersResults;
-
 /** Wires the live roster filter and the name autocomplete of the search field. */
 function bindFilter() {
     const searchInput = /** @type {HTMLInputElement | null} */ (
@@ -251,7 +249,7 @@ krtEvents.on('click', 'members-consolidate', (el) => {
     openConsolidate(el);
 });
 
-(function () {
+function initMembers() {
     if (!krtLiveSync || typeof krtLiveSync.createReceiver !== 'function') {
         return;
     }
@@ -264,9 +262,9 @@ krtEvents.on('click', 'members-consolidate', (el) => {
         sections: MEMBERS_SECTIONS,
         coalesceMs: 1500,
         refresh() {
-            if (typeof window.krtRefreshMembersResults === 'function') {
-                window.krtRefreshMembersResults();
-            }
+            refreshMembersResults();
         },
     });
-})();
+}
+
+initMembers();

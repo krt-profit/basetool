@@ -26,6 +26,7 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { missionHooks } from '/js/mission/mission-hooks.js';
 
 /**
  * Fills a date-time input (plain or split into date and time parts) with the current local time;
@@ -98,7 +99,7 @@ async function saveActualTimeInPlace(field, nowDate) {
         return;
     }
 
-    await window.krtMissionWrite({
+    await missionHooks.write({
         method: 'POST',
         url: `/missions/${encodeURIComponent(currentMissionId)}/actual-time`,
         payload() {
@@ -125,11 +126,11 @@ async function saveActualTimeInPlace(field, nowDate) {
             );
             if (span) {
                 span.setAttribute('data-utc', String(nowDate.getTime()));
-                if (typeof window.krtLocalizeDates === 'function') {
-                    window.krtLocalizeDates(span.parentNode || span);
+                if (typeof missionHooks.localizeDates === 'function') {
+                    missionHooks.localizeDates(span.parentNode || span);
                 }
             }
-            window.krtRefreshMissionSection(['finance', 'overview']);
+            missionHooks.refresh(['finance', 'overview']);
         },
     });
 }
@@ -176,7 +177,7 @@ async function changeMissionOwner() {
             return attr != null && attr !== '' ? parseInt(attr, 10) : 0;
         };
 
-        await window.krtMissionWrite({
+        await missionHooks.write({
             method: 'PUT',
             url: `/missions/${cleanMissionId}/owner/ajax`,
             payload() {
@@ -193,7 +194,7 @@ async function changeMissionOwner() {
                         );
                     }
                 }
-                window.krtRefreshMissionSection('mgmt');
+                missionHooks.refresh('mgmt');
             },
         });
     } catch (_err) {
@@ -266,7 +267,7 @@ async function changeMissionOwningOrgUnit() {
         }
         const cleanMissionId = String(currentMissionId).trim();
 
-        await window.krtMissionWrite({
+        await missionHooks.write({
             method: 'PUT',
             url: `/missions/${cleanMissionId}/owning-org-unit/ajax`,
             payload() {
@@ -286,9 +287,9 @@ async function changeMissionOwningOrgUnit() {
                 if (dto) {
                     updateMissionHeadOrgBadge(dto.owningSquadron);
                 }
-                window.krtRefreshMissionSection('mgmt');
-                if (window.krtNotifyMissionChanged) {
-                    window.krtNotifyMissionChanged('overview');
+                missionHooks.refresh('mgmt');
+                if (missionHooks.notify) {
+                    missionHooks.notify('overview');
                 }
             },
         });
@@ -329,13 +330,13 @@ async function removeMissionManager(userId) {
             return;
         }
 
-        const result = await window.krtMissionWrite({
+        const result = await missionHooks.write({
             method: 'DELETE',
             url: `/missions/${currentMissionId}/managers/${userId}`,
             sectionKey: 'manager',
         });
         if (result.ok) {
-            window.krtRefreshMissionSection('mgmt');
+            missionHooks.refresh('mgmt');
         }
     } catch (err) {
         console.error(err);
@@ -361,13 +362,13 @@ async function addMissionManager() {
 
         const cleanMissionId = String(currentMissionId).trim();
         const cleanUserId = String(userId).trim();
-        const result = await window.krtMissionWrite({
+        const result = await missionHooks.write({
             method: 'POST',
             url: `/missions/${cleanMissionId}/managers/${cleanUserId}`,
             sectionKey: 'manager',
         });
         if (result.ok) {
-            window.krtRefreshMissionSection('mgmt');
+            missionHooks.refresh('mgmt');
         }
     } catch (err) {
         console.error('Network or unexpected error:', err);
@@ -399,8 +400,8 @@ async function updatePayoutPreference(selectElement) {
     const updatedParticipant = result.body;
     if (!updatedParticipant) return;
     selectElement.setAttribute('data-original-value', value);
-    if (window.krtNotifyMissionChanged) {
-        window.krtNotifyMissionChanged('finance');
+    if (missionHooks.notify) {
+        missionHooks.notify('finance');
     }
     const participantId = selectElement.getAttribute('data-participant-id');
     if (participantId) {
@@ -428,13 +429,13 @@ async function updatePayoutPreference(selectElement) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (!window.krtMissionWrite || !window.missionId) {
+    if (!missionHooks.write || !window.missionId) {
         return;
     }
     const financeMissionId = window.missionId;
 
     function refreshFinanceAndBadge() {
-        return window.krtRefreshMissionSection('finance');
+        return missionHooks.refresh('finance');
     }
 
     const addForm = /** @type {HTMLFormElement | null} */ (
@@ -444,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addForm.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             const fd = new FormData(addForm);
-            const res = await window.krtMissionWrite({
+            const res = await missionHooks.write({
                 method: 'POST',
                 url: `/missions/${financeMissionId}/finance-entries/ajax`,
                 payload: {
@@ -456,7 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sectionKey: 'finance',
             });
             if (res.ok) {
-                window.krtModalClose(addForm.closest('.krt-modal-overlay'));
+                missionHooks.modalClose(addForm.closest('.krt-modal-overlay'));
                 addForm.reset();
                 refreshFinanceAndBadge();
             }
@@ -475,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ev.preventDefault();
             const fd = new FormData(editForm);
             const versionRaw = fd.get('version');
-            const res = await window.krtMissionWrite({
+            const res = await missionHooks.write({
                 method: 'PUT',
                 url: `/missions/${financeMissionId}/finance-entries/${entryId}/ajax`,
                 payload: {
@@ -487,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sectionKey: 'finance',
             });
             if (res.ok) {
-                window.krtModalClose(editForm.closest('.krt-modal-overlay'));
+                missionHooks.modalClose(editForm.closest('.krt-modal-overlay'));
                 const dto = res.body;
                 if (dto && dto.version != null && krtFetch) {
                     document
@@ -521,13 +522,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!entryId) {
                 return;
             }
-            const res = await window.krtMissionWrite({
+            const res = await missionHooks.write({
                 method: 'DELETE',
                 url: `/missions/${financeMissionId}/finance-entries/${entryId}/ajax`,
                 sectionKey: 'finance',
             });
             if (res.ok) {
-                window.krtModalClose(dForm.closest('.krt-modal-overlay'));
+                missionHooks.modalClose(dForm.closest('.krt-modal-overlay'));
                 refreshFinanceAndBadge();
             }
         });
@@ -616,12 +617,12 @@ function openEditFinanceModal(id, note, type, amount, version) {
     form.setAttribute('data-entry-id', /** @type {string} */ (id));
     /** @type {HTMLTextAreaElement} */ (document.getElementById('edit-finance-note')).value =
         note && note !== 'null' ? note : '';
-    window.krtSegSet('edit-finance-type', type === 'EXPENSE' ? 'EXPENSE' : 'INCOME');
+    missionHooks.segSet('edit-finance-type', type === 'EXPENSE' ? 'EXPENSE' : 'INCOME');
     /** @type {HTMLInputElement} */ (document.getElementById('edit-finance-amount')).value =
         /** @type {string} */ (amount);
     /** @type {HTMLInputElement} */ (document.getElementById('edit-finance-version')).value =
         /** @type {string} */ (version);
-    window.krtModalOpen(document.getElementById('edit-finance-entry-modal'));
+    missionHooks.modalOpen(document.getElementById('edit-finance-entry-modal'));
 }
 
 function registerMissionDetailEventHandlers() {

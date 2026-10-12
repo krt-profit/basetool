@@ -22,7 +22,7 @@
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-(function () {
+function initAdminDeletionRequests() {
     if (!krtFetch) {
         return;
     }
@@ -191,4 +191,6 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
             });
         });
     }
-})();
+}
+
+initAdminDeletionRequests();

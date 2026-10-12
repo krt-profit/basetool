@@ -27,6 +27,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 /** @type {any[]} */
 export let cachedInventoryItems = [];
@@ -66,7 +67,7 @@ const ORDER_SECTIONS = {
     assignees: { container: '#order-assignees-results', fragmentValue: 'assignees' },
 };
 
-(function () {
+function initOrdersDetail() {
     if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
@@ -90,16 +91,16 @@ const ORDER_SECTIONS = {
             }
         },
     });
-    window.krtRefreshOrderSection = orderSeam.refresh;
-    window.krtNotifyOrderChanged = orderSeam.notify;
+    joborderHooks.refreshOrderSection = orderSeam.refresh;
+    joborderHooks.notifyOrderChanged = orderSeam.notify;
 
     if (window.orderId && krtLiveSync && krtLiveSync.createReceiver) {
         krtLiveSync.createReceiver({
             topic: `order:${window.orderId}`,
             sections: ORDER_SECTIONS,
             refresh(keys) {
-                if (window.krtRefreshOrderSection) {
-                    window.krtRefreshOrderSection(keys, { broadcast: false });
+                if (joborderHooks.refreshOrderSection) {
+                    joborderHooks.refreshOrderSection(keys, { broadcast: false });
                 }
             },
             pill: {
@@ -111,7 +112,9 @@ const ORDER_SECTIONS = {
             },
         });
     }
-})();
+}
+
+initOrdersDetail();
 
 export function _publishOrdersQueue() {
     if (krtLiveSync && typeof krtLiveSync.sendChanged === 'function') {

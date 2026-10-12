@@ -26,8 +26,9 @@ import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtOverflowMenu } from '/js/kernel/krt-overflow-menu.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { krtHooks } from '/js/kernel/krt-hooks.js';
 
-(function () {
+function initMaterialboerse() {
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const gi18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
     if (!krtFetch || !document.getElementById('mb-board')) {
@@ -625,8 +626,8 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
             toggleInterest(el);
         } else if (el.hasAttribute('data-mb-deactivate')) {
             deactivateOffer(el.getAttribute('data-offer-id'));
-        } else if (el.hasAttribute('data-mb-edit') && window.krtMaterialRelease) {
-            window.krtMaterialRelease.open(
+        } else if (el.hasAttribute('data-mb-edit') && krtHooks.materialRelease) {
+            krtHooks.materialRelease.open(
                 'edit',
                 {
                     offerId: el.getAttribute('data-offer-id'),
@@ -643,10 +644,10 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
                 },
                 swapBoard,
             );
-        } else if (el.hasAttribute('data-mb-open-release') && window.krtMaterialRelease) {
-            window.krtMaterialRelease.open('new', {}, onReleased);
-        } else if (el.hasAttribute('data-mb-open-item') && window.krtMaterialRelease) {
-            window.krtMaterialRelease.open('item', {}, onReleased);
+        } else if (el.hasAttribute('data-mb-open-release') && krtHooks.materialRelease) {
+            krtHooks.materialRelease.open('new', {}, onReleased);
+        } else if (el.hasAttribute('data-mb-open-item') && krtHooks.materialRelease) {
+            krtHooks.materialRelease.open('item', {}, onReleased);
         }
     }
 
@@ -655,8 +656,8 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
             toggleFulfillment(el);
         } else if (el.hasAttribute('data-mg-deactivate')) {
             deactivateRequest(el.getAttribute('data-request-id'));
-        } else if (el.hasAttribute('data-mg-edit') && window.krtMaterialRequest) {
-            window.krtMaterialRequest.open(
+        } else if (el.hasAttribute('data-mg-edit') && krtHooks.materialRequest) {
+            krtHooks.materialRequest.open(
                 'edit',
                 {
                     requestId: el.getAttribute('data-request-id'),
@@ -670,10 +671,10 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
                 },
                 swapBoard,
             );
-        } else if (el.hasAttribute('data-mg-open-request') && window.krtMaterialRequest) {
-            window.krtMaterialRequest.open('new', { kind: 'MATERIAL' }, onRequestCreated);
-        } else if (el.hasAttribute('data-mg-open-item-request') && window.krtMaterialRequest) {
-            window.krtMaterialRequest.open('new', { kind: 'ITEM' }, onRequestCreated);
+        } else if (el.hasAttribute('data-mg-open-request') && krtHooks.materialRequest) {
+            krtHooks.materialRequest.open('new', { kind: 'MATERIAL' }, onRequestCreated);
+        } else if (el.hasAttribute('data-mg-open-item-request') && krtHooks.materialRequest) {
+            krtHooks.materialRequest.open('new', { kind: 'ITEM' }, onRequestCreated);
         }
     }
 
@@ -842,4 +843,6 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
     applyAgo(document);
     restoreFilters();
-})();
+}
+
+initMaterialboerse();

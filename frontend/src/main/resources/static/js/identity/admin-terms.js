@@ -8,7 +8,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-(function () {
+function initAdminTerms() {
     const filterForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('admin-terms-filter-form')
     );
@@ -59,4 +59,6 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
             history: true,
         });
     });
-})();
+}
+
+initAdminTerms();

@@ -2,8 +2,9 @@
 
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtHooks } from '/js/kernel/krt-hooks.js';
 
-(function () {
+function initCommonHandlers() {
     window.addEventListener('pageshow', (event) => {
         if (event.persisted) {
             window.location.reload();
@@ -163,10 +164,10 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
      * value; bound to `input` and `keyup`.
      */
     function filterTableHandler(el) {
-        if (typeof window.filterTable !== 'function') return;
+        if (typeof krtHooks.filterTable !== 'function') return;
         const tableId = el.getAttribute('data-table-id');
         if (!tableId) return;
-        window.filterTable(tableId, /** @type {HTMLInputElement} */ (el).value);
+        krtHooks.filterTable(tableId, /** @type {HTMLInputElement} */ (el).value);
     }
     on('input', 'filter-table', filterTableHandler);
     on('keyup', 'filter-table', filterTableHandler);
@@ -203,4 +204,6 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
         event.preventDefault();
         krtModal.close(id);
     });
-})();
+}
+
+initCommonHandlers();

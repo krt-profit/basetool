@@ -22,7 +22,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
-(function () {
+function initMaterialsMatrix() {
     /**
      * One terminal column of the grid.
      *
@@ -906,4 +906,6 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
     }
 
     init();
-})();
+}
+
+initMaterialsMatrix();

@@ -27,12 +27,13 @@ import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
 import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 const ORDERS_SECTIONS = {
     queue: { container: '#orders-results', fragmentValue: 'results' },
 };
 
-(function () {
+function initOrdersIndex() {
     if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
@@ -56,7 +57,7 @@ const ORDERS_SECTIONS = {
             }
         },
     });
-    window.krtRefreshOrdersQueue = ordersQueueSeam.refresh;
+    joborderHooks.refreshOrdersQueue = ordersQueueSeam.refresh;
 
     if (krtLiveSync && krtLiveSync.createReceiver) {
         krtLiveSync.createReceiver({
@@ -64,12 +65,12 @@ const ORDERS_SECTIONS = {
             sections: ORDERS_SECTIONS,
             coalesceMs: 1500,
             refresh(keys) {
-                if (window.krtRefreshOrdersQueue) {
-                    window.krtRefreshOrdersQueue(keys, { broadcast: false });
+                if (joborderHooks.refreshOrdersQueue) {
+                    joborderHooks.refreshOrdersQueue(keys, { broadcast: false });
                 }
             },
             busyTest() {
-                return window.__ordersDragging === true;
+                return joborderHooks.ordersDragging === true;
             },
             pill: {
                 label() {
@@ -80,7 +81,9 @@ const ORDERS_SECTIONS = {
             },
         });
     }
-})();
+}
+
+initOrdersIndex();
 
 function colorOrderAges(root) {
     const now = new Date();

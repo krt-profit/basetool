@@ -20,7 +20,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 
-(function () {
+function initBankRequests() {
     /** The segments of the status control, in display order. */
     const SEGMENTS = ['PENDING', 'CONFIRMED', 'REJECTED', 'ALL'];
 
@@ -191,4 +191,6 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
             load(saved);
         }
     });
-})();
+}
+
+initBankRequests();

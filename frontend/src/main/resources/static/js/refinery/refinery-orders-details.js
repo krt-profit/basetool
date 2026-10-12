@@ -58,7 +58,7 @@ function refineryStoreModalOpen() {
     return !!modal && window.getComputedStyle(modal).display !== 'none';
 }
 
-(function () {
+function initRefineryOrdersDetails() {
     if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
@@ -98,7 +98,9 @@ function refineryStoreModalOpen() {
             },
         });
     }
-})();
+}
+
+initRefineryOrdersDetails();
 
 function _submitRefinery(options) {
     const form = options.form;

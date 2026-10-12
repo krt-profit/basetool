@@ -41,6 +41,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const handoverForm = /** @type {HTMLFormElement | null} */ (
@@ -260,6 +261,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         materialsContainer.querySelectorAll('.material-row').forEach(refreshEditMaterialUnit);
 
+        /** @type {Element | null} */
+        let materialRowToDelete = null;
+
         materialsContainer.addEventListener('click', (e) => {
             const target = /** @type {Element} */ (e.target);
             const removeBtn = target.closest && target.closest('.remove-material-btn');
@@ -267,18 +271,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const row = removeBtn.closest('.material-row');
                 if (materialsContainer.querySelectorAll('.material-row').length > 1) {
                     krtModal.open(document.getElementById('material-delete-confirm-modal'));
-                    window.materialRowToDelete = row;
+                    materialRowToDelete = row;
                 } else {
                     showFrontendErrorToast(ORDER_HANDOVER_I18N.keepOneMaterial);
                 }
             }
         });
 
-        window.confirmRemoveMaterial = function () {
-            if (window.materialRowToDelete) {
-                window.materialRowToDelete.remove();
+        joborderHooks.confirmRemoveMaterial = function () {
+            if (materialRowToDelete) {
+                materialRowToDelete.remove();
                 reindexMaterials();
-                window.materialRowToDelete = null;
+                materialRowToDelete = null;
             }
             krtModal.close(document.getElementById('material-delete-confirm-modal'));
         };
@@ -327,7 +331,7 @@ export function krtOrderWrite(opts) {
     );
 }
 
-(function () {
+function initOrdersDetailEdit() {
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('delete-order-form')
     );
@@ -357,7 +361,9 @@ export function krtOrderWrite(opts) {
             window.location.assign('/orders');
         }
     });
-})();
+}
+
+initOrdersDetailEdit();
 
 /**
  * Collects the order edit form into the request body.
@@ -400,7 +406,7 @@ function _serializeEditForm() {
         materials,
     };
 }
-(function () {
+function initOrdersDetailEdit2() {
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('edit-order-form'));
     if (!form) return;
     form.addEventListener('submit', async (e) => {
@@ -437,7 +443,9 @@ function _serializeEditForm() {
             },
         });
     });
-})();
+}
+
+initOrdersDetailEdit2();
 
 /**
  * Re-renders the materials, aggregated and KPI sections of the order in place.
@@ -447,8 +455,8 @@ function _serializeEditForm() {
  * @returns {Promise<boolean> | void} the swap outcome, absent when the section seam handled it
  */
 export function _refreshMaterialsSection(orderId, broadcastOpts) {
-    if (window.krtRefreshOrderSection) {
-        return window.krtRefreshOrderSection(['materials', 'aggregated', 'kpi'], broadcastOpts);
+    if (joborderHooks.refreshOrderSection) {
+        return joborderHooks.refreshOrderSection(['materials', 'aggregated', 'kpi'], broadcastOpts);
     }
     orderId ||= window.orderId || _odFieldValue('claim-order-id');
     const mat = document.getElementById('order-materials-results');
@@ -474,8 +482,8 @@ export function _refreshMaterialsSection(orderId, broadcastOpts) {
  * @returns {Promise<boolean> | void} the swap outcome, absent when the section seam handled it
  */
 export function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
-    if (window.krtRefreshOrderSection) {
-        return window.krtRefreshOrderSection(fragmentValue, broadcastOpts);
+    if (joborderHooks.refreshOrderSection) {
+        return joborderHooks.refreshOrderSection(fragmentValue, broadcastOpts);
     }
     const c = document.getElementById(containerId);
     if (!c || !orderId || !krtFetch || !krtFetch.swap) return Promise.resolve(false);
