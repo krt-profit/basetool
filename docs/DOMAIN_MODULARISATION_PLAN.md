@@ -2911,7 +2911,7 @@ The question for the owner: A, B or C.
 
 **Umbrella step 17 — requirement status, arc42 and the CLAUDE.md files — done 2026-10-12, partly**
 1. *Plan §14 status*: REQ-XCH-009/011 need nothing but the rewritten source paths; REQ-DATA-010 waits for the access-policy decision of step 12 (the six scope fragments are still `ScopeSpecifications`);
-   REQ-AUDIT-001 waits for P3-11, which the plan names and nowhere defines (question to the owner).
+   REQ-AUDIT-001 is not waiting for anything; P3-11 is struck (umbrella step 15).
 2. *arc42 §5*: the layer-package table is marked as the roles the layers had; the audit paragraph no longer says its classes sit in the layer packages; the per-module paragraphs were extended with every step.
 3. *CLAUDE.md*: the root file describes the backend as a modular monolith with `api` / `internal` / `web`; `backend/CLAUDE.md` gained three landmines found in this pull request (fragment implementation beside its
    interface, no field injection of another module's type, tests that read backend sources by path).
@@ -2984,7 +2984,6 @@ C) retire the target until a module extraction gives it a natural place. Not dec
 *Steps 18 and 19 — `backend-exchange` and `backend-bank`.* §5.8 starts them "only once the package boundary of each has been green for some releases". Both packages became real modules, with the Modulith and rank gates, on this branch within days,
 and NullAway does not cover them yet (69 and 44 findings). Extracting them now would also move their tests, their JaCoCo and PIT settings and the OpenAPI generator's classpath in the same change. Not started.
 
-*Step 15 — P3-11.* The plan names the per-command audit contract and nowhere defines it; nothing was invented.
 
 **Umbrella step 12 — built: the org-unit and user gates are named policies in `scope.api` — done 2026-10-12 (option A, confirmed by the owner 2026-10-12)**
 1. *Built as designed above.* `OrgUnitAccessPolicy` (bean `orgUnitAccessPolicy`: `canSeeOrgUnit`, `canEditOrgUnit`, both delegating to the scope kernel's `canSeeSquadron` / `canEditSquadron`) and `UserAccessPolicy` (bean `userAccessPolicy`:
@@ -2995,6 +2994,12 @@ and NullAway does not cover them yet (69 and 44 findings). Extracting them now w
    foreign unit; a Bereich lead reaching a child Staffel by cascade) against four org units and seven targets (members of one unit, of both, of the child, of none, an unknown account and the caller themselves), 189 verdicts. It was proven able to fail:
    dropping the self shortcut from `UserAccessPolicy` turned it red. The existing policy differential tests, `OwnerScopeServiceTest`, `JobOrderService*Test` and `MaterialClaimServiceTest` follow the new constructors; `TenancyGuardTest` and the
    architecture gates pass unchanged. `compileJava --rerun` shows 0 warnings.
+
+**Umbrella steps 1 and 15 — the mutation target and the struck P3-11 — done 2026-10-12**
+1. *Step 1 (option B, chosen by the owner 2026-10-12).* `backend/build-settings.properties` aims PIT at the module internals and the published services, `backend.*.internal.*` and `backend.*.api.*Service`, with the tests of the same packages
+   (`*.internal.*Test`, `*.api.*Test`) and the legacy `backend.service.*Test`, which still holds tests of moved classes. The old target matched nothing since the last class left `service`. The mutation run covers many more classes, so it takes much longer.
+   `help` runs with the configuration cache twice (the second reuses the entry); `:backend:pitest --dry-run` resolves.
+2. *Step 15 (struck by the owner 2026-10-12).* P3-11, "the per-command audit contract", was named in the plan and never defined, and is not implemented. REQ-AUDIT-001 keeps its text; its status in §14 no longer says it waits for it.
 
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
@@ -3008,7 +3013,7 @@ ends the step with a question to the owner. Ticked as the steps land; `Q` marks 
 before a decision.
 
 - [x] **0.** P4-7 slice c (this pull request's first commit).
-- [ ] **1.** `Q` options in the entry above — Housekeeping: `backend/build-settings.properties` aims the mutation tests at
+- [x] **1.** done, option B chosen by the owner 2026-10-12 — Housekeeping: `backend/build-settings.properties` aims the mutation tests at
       `backend.service.*`, which shrinks with every move (P4-5 "Open").
 - Rank 0–1 modules leave the layer packages (nothing below depends on them being late; **5a, the `kernel` half of step 5, is done**):
   - [x] **2.** done — `audit` (12): `AuditEvent`, `AuditEventRepository`, `AuditService` and its report,
@@ -3050,12 +3055,12 @@ before a decision.
         step comes after the path moves; its SQL and rollback go to the owner before they are pushed.
   - [x] **14.** Table-ownership map (§5.6): done before this branch (`table-ownership.txt`,
         `TableOwnershipTest`); each move updates the owner of the tables it moves, nothing else.
-  - [ ] **15.** `Q` P3-11, the per-command audit contract (REQ-AUDIT-001): the moves it waited for are done, but the plan names it and does not define it; waiting for the owner to say what the contract is.
+  - [x] **15.** struck by the owner 2026-10-12 — P3-11, the per-command audit contract: it was never defined and is not implemented.
 - Quality gates:
   - [x] **16.** partly done, `bank`, `exchange`, `kernel`, `app` open — NullAway to the whole tree of every module as it becomes whole (today: `blueprint`,
         `catalogue`, `hangar`, `identity`, `inventory`, `joborder`, `materialexchange`, `mission`,
         `operation`, `refinery`, `scope`; the other modules' `api` packages only).
-  - [x] **17.** partly done, REQ-DATA-010 and REQ-AUDIT-001 wait — Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
+  - [x] **17.** partly done, REQ-DATA-010 waits — Requirements still marked "waiting for a later move" in §14: REQ-DATA-010, REQ-AUDIT-001,
         REQ-XCH-009/011; arc42 §5.2/§5.3 per module; CLAUDE.md files.
 - Gradle extraction, last (they move whole source trees):
   - [ ] **18.** `Q` P5-c `backend-exchange`, then **19.** P5-d `backend-bank` (§5.8; P5-a and P5-b are done): not started, §5.8 asks for the package boundary to be green for some releases first (entry above).
@@ -3674,12 +3679,10 @@ Full tables, per finding with status, evidence and verdict:
   **Status 2026-10-10:** done — REQ-API-002 (the enforced rules, in place of the convention),
   REQ-API-007 (the annotation sentence corrected to what the build requires), REQ-DATA-001 (one
   location, one sequence; it keeps the plan's "REQ-DATA" row). Waiting for a later move — REQ-DATA-010
-  (the fragment per aggregate moves into each module with its repository, Phase 3), REQ-AUDIT-001
-  (the per-command contract, P3-11), REQ-XCH-009/011 (they name the domain APIs the exchange calls,
-  which exist when blueprint, inventory and hangar publish theirs, Phase 3).
+  (the fragment per aggregate moves into each module with its repository, Phase 3), REQ-XCH-009/011 (they name the domain APIs the exchange calls,
+  which exist when blueprint, inventory and hangar publish theirs, Phase 3). REQ-AUDIT-001 keeps its text; the "per-command contract" (P3-11) is not a status of it, see the entry of umbrella step 15.
   **Status 2026-10-12 (umbrella step 17):** the three modules publish their entities and repositories in `api` since steps 9, 10 and 11a; that did not change what REQ-XCH-009/011 say, only the
-  source paths in the specs, which the text scans rewrote. REQ-DATA-010 stays waiting: `ScopeSpecifications` still holds the six scope fragments in `scope.api` (§5.4, step 12). REQ-AUDIT-001 stays waiting for P3-11,
-  which the plan does not define beyond its name (question to the owner).
+  source paths in the specs, which the text scans rewrote. REQ-DATA-010 stays waiting: `ScopeSpecifications` still holds the six scope fragments in `scope.api` (§5.4, step 12). REQ-AUDIT-001 is not waiting for anything: P3-11 is struck (umbrella step 15).
 - **arc42:** §4.1, §4.2, §5.3 and §5.5 (corrected with this plan), §5.2 and §5.3 rewritten per
   module as the moves land, §8 (module rules, interaction styles — §8.14, done 2026-10-02), §11.9
   (the domain coupling as debt, opened with this plan; its decisions linked 2026-10-02).
