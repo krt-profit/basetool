@@ -270,8 +270,10 @@ registration request and result records beside the events; `identity.web` holds 
 Discord-existence controllers, `identity.internal` their services, mappers and DTOs. `RestClientConfig`
 lies in `platform.api`, which `KeycloakTrustSupport` needs. `UserService`, `UserRegistrationService`,
 `UserReconciliationService`, the `User` entity and `UserRepository` stay in the layer packages until two
-calls are inverted through identity-owned SPIs (membership operations towards the org-unit services,
-account erasure towards the GDPR orchestrator; slices b and c).
+calls are inverted through identity-owned SPIs. Slice b is done: `UserService` reaches the org-unit
+membership services only through `identity.api.MembershipOperations`, which
+`service.OrgUnitMembershipOperations` implements as a pure pass-through. The account-erasure call
+towards the GDPR orchestrator follows in slice c.
 
 The platform modules reach the domains only through SPIs they own and the domains implement
 (plan §5.3); Spring injects the implementations, so the platform names no domain class:

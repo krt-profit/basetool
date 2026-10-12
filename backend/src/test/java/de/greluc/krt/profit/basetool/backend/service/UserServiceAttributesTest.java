@@ -31,6 +31,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
@@ -77,7 +79,7 @@ class UserServiceAttributesTest {
   @Mock private UserRepository userRepository;
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private MembershipOperations<OrgUnitMembership> membershipOperations;
 
   @InjectMocks private UserService userService;
 

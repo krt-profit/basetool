@@ -635,7 +635,10 @@ dropped to one:
 
 **Enforced by:** `OrgUnitMembershipServiceTest` (the service-layer guards incl.
 `reconcileStaffelMemberships` add / remove / flag-patch / duplicate / >2 / leadership),
-`UserServiceMembershipDeltaTest` (the delta orchestrator forwards `staffeln` to the reconcile),
+`UserServiceMembershipDeltaTest` (the delta orchestrator forwards `staffeln` to the reconcile
+through the identity-owned `MembershipOperations` seam), `UserServiceMembershipSeamDifferentialTest`
+(the delta paths through the seam leave the same rows and audit entries and fail alike as the direct
+calls) and `OrgUnitMembershipOperationsTest` (the seam is a pure pass-through),
 `MemberManagementControllerTest` (the member-edit two-slot fold and the detail-load wipe-guard),
 `UserScopedQueriesDataTest` (the union-list scope queries' null + two-Staffel binding against the
 real dialect) and `OrgHierarchyMigrationTest`

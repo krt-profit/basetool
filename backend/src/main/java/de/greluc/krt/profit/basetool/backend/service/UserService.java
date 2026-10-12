@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.StaffelAssignment;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -34,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
@@ -88,8 +89,7 @@ public class UserService {
   private final AuditRecorder auditRecorder;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
-  private final OrgUnitMembershipService orgUnitMembershipService;
-  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
+  private final MembershipOperations<OrgUnitMembership> membershipOperations;
 
   /**
    * Returns whether the caller is a non-admin who can see none of the user's Staffeln through the
@@ -102,8 +102,7 @@ public class UserService {
     if (authHelperService.isAdmin()) {
       return false;
     }
-    List<UUID> targetSquadronIds =
-        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId);
+    List<UUID> targetSquadronIds = membershipOperations.findStaffelMembershipOrgUnitIds(userId);
     if (targetSquadronIds.isEmpty()) {
       return true;
     }
@@ -515,7 +514,7 @@ public class UserService {
    *
    * <ol>
    *   <li>A non-null {@code staffeln} list is the target Staffel set, reconciled by {@link
-   *       OrgUnitMembershipService#reconcileStaffelMemberships}; {@code null} leaves it untouched.
+   *       MembershipOperations#reconcileStaffelMemberships}; {@code null} leaves it untouched.
    *   <li>SK changes (ADD, REMOVE, PATCH) are then applied in request order; {@code is_lead} is not
    *       part of the payload.
    * </ol>
@@ -533,20 +532,27 @@ public class UserService {
             .orElseThrow(() -> new NoSuchElementException("User not found with id: " + userId));
 
     if (delta.staffeln() != null) {
-      orgUnitMembershipService.reconcileStaffelMemberships(user, delta.staffeln());
+      membershipOperations.reconcileStaffelMemberships(
+          user,
+          delta.staffeln().stream()
+              .map(
+                  c ->
+                      new StaffelAssignment(
+                          c.squadronId(), c.isLogistician(), c.isMissionManager()))
+              .toList());
     }
     if (delta.specialCommands() != null) {
       for (MembershipDeltaRequest.SpecialCommandChange sk : delta.specialCommands()) {
         applySpecialCommandChange(userId, sk);
       }
     }
-    return orgUnitMembershipQueryService.findAllMembershipsForUser(userId);
+    return membershipOperations.findAllMembershipsForUser(userId);
   }
 
   /**
    * Applies one SK-side change of {@link #applyMembershipDelta}: ADD creates the row with its
-   * initial flags in one save, PATCH delegates to {@link OrgUnitMembershipService#patchFlags},
-   * REMOVE to {@link OrgUnitMembershipService#removeMember}.
+   * initial flags in one save, PATCH delegates to {@link MembershipOperations#patchFlags}, REMOVE
+   * to {@link MembershipOperations#removeMember}.
    *
    * @param userId target user id
    * @param change the SK-side change record
@@ -555,7 +561,7 @@ public class UserService {
       UUID userId, MembershipDeltaRequest.SpecialCommandChange change) {
     switch (change.action()) {
       case ADD -> {
-        OrgUnitMembership fresh = orgUnitMembershipService.addMember(change.orgUnitId(), userId);
+        OrgUnitMembership fresh = membershipOperations.addMember(change.orgUnitId(), userId);
         if (Boolean.TRUE.equals(change.isLogistician())
             || Boolean.TRUE.equals(change.isMissionManager())) {
           if (Boolean.TRUE.equals(change.isLogistician())) {
@@ -566,13 +572,14 @@ public class UserService {
           }
         }
       }
-      case REMOVE -> orgUnitMembershipService.removeMember(change.orgUnitId(), userId);
+      case REMOVE -> membershipOperations.removeMember(change.orgUnitId(), userId);
       case PATCH ->
-          orgUnitMembershipService.patchFlags(
+          membershipOperations.patchFlags(
               change.orgUnitId(),
               userId,
-              new MembershipFlagsPatchRequest(
-                  change.isLogistician(), change.isMissionManager(), change.version()));
+              change.isLogistician(),
+              change.isMissionManager(),
+              change.version());
       case null -> throw new NullPointerException("special-command change action");
     }
   }
