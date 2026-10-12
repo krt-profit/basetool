@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.OutpostMapper;
-import de.greluc.krt.profit.basetool.backend.model.Outpost;
 import de.greluc.krt.profit.basetool.backend.model.dto.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.OutpostService;
@@ -31,7 +30,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,8 +72,7 @@ public class OutpostController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "starSystemName"), "name", PageCeiling.LOAD_ALL);
-    Page<Outpost> p = outpostService.getAllOutposts(pageable);
-    return PageResponse.of(p.map(outpostMapper::toDto));
+    return PageResponse.of(outpostService.getAllOutposts(pageable));
   }
 
   /**
@@ -86,7 +83,7 @@ public class OutpostController {
    */
   @GetMapping("/{id}")
   public OutpostDto getOutpost(@PathVariable @NotNull UUID id) {
-    return outpostMapper.toDto(outpostService.getOutpost(id));
+    return outpostService.getOutpost(id);
   }
 
   /**

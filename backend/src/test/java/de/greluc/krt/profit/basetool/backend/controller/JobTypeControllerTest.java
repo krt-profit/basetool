@@ -71,7 +71,6 @@ class JobTypeControllerTest {
 
   @Test
   void getAll_wrapsServicePageIntoPageResponse() {
-    JobType entity = new JobType();
     JobTypeDto dto =
         new JobTypeDto(
             UUID.randomUUID(),
@@ -84,8 +83,7 @@ class JobTypeControllerTest {
             false,
             1L);
     when(service.getJobTypes(any(), any(Pageable.class), eq(false)))
-        .thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.toDto(entity)).thenReturn(dto);
+        .thenReturn(new PageImpl<>(List.of(dto)));
 
     PageResponse<JobTypeDto> resp = controller.getAllJobTypes(null, 0, 50, null, false);
 

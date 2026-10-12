@@ -20,11 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObserver;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.mapper.JobTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
@@ -53,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobTypeService {
 
   private final JobTypeRepository jobTypeRepository;
+  private final JobTypeMapper jobTypeMapper;
 
   /**
    * Clears the derived mission-lead flag on participants whose job type loses the Einsatzleiter
@@ -64,14 +65,14 @@ public class JobTypeService {
    * Returns the unpaged active job-type list for a dropdown, optionally filtered by archetype.
    *
    * @param archetype optional filter; null means "all active types"
-   * @return cached list
+   * @return cached list of job type read models
    */
   @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
-  public List<JobType> getJobTypes(@Nullable JobTypeArchetype archetype) {
-    return CachedEntityGraphs.jobTypes(
-        archetype == null
+  public List<JobTypeDto> getJobTypes(@Nullable JobTypeArchetype archetype) {
+    return (archetype == null
             ? jobTypeRepository.findByActiveTrue()
-            : jobTypeRepository.findByArchetypeAndActiveTrue(archetype));
+            : jobTypeRepository.findByArchetypeAndActiveTrue(archetype))
+        .stream().map(jobTypeMapper::toDto).toList();
   }
 
   /**
@@ -80,10 +81,10 @@ public class JobTypeService {
    * @param archetype optional archetype filter
    * @param pageable page request
    * @param includeInactive true to include soft-deleted rows
-   * @return cached page
+   * @return cached page of job type read models
    */
   @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
-  public Page<JobType> getJobTypes(
+  public Page<JobTypeDto> getJobTypes(
       @Nullable JobTypeArchetype archetype, @NotNull Pageable pageable, boolean includeInactive) {
     Page<JobType> page;
     if (archetype == null) {
@@ -97,7 +98,7 @@ public class JobTypeService {
               ? jobTypeRepository.findByArchetype(archetype, pageable)
               : jobTypeRepository.findByArchetypeAndActiveTrue(archetype, pageable);
     }
-    return CachedEntityGraphs.jobTypes(page);
+    return page.map(jobTypeMapper::toDto);
   }
 
   /**

@@ -56,13 +56,10 @@ class FrequencyTypeControllerTest {
 
   @Test
   void getAll_buildsPageableAndMapsContent() {
-    FrequencyType combat = new FrequencyType();
-    combat.setName("Combat");
     FrequencyTypeDto dto = new FrequencyTypeDto(UUID.randomUUID(), "Combat", "desc", true, 0, 1L);
-    Page<FrequencyType> page = new PageImpl<>(List.of(combat));
+    Page<FrequencyTypeDto> page = new PageImpl<>(List.of(dto));
 
     when(service.getAllFrequencyTypes(eq(true), any(Pageable.class))).thenReturn(page);
-    when(mapper.toDto(combat)).thenReturn(dto);
 
     PageResponse<FrequencyTypeDto> response =
         controller.getAllFrequencyTypes(null, null, null, true);
@@ -98,12 +95,10 @@ class FrequencyTypeControllerTest {
   }
 
   @Test
-  void getById_delegatesAndMaps() {
+  void getById_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    FrequencyType entity = new FrequencyType();
     FrequencyTypeDto dto = new FrequencyTypeDto(id, "X", null, true, 0, 1L);
-    when(service.getFrequencyType(id)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getFrequencyType(id)).thenReturn(dto);
 
     FrequencyTypeDto result = controller.getFrequencyType(id);
 

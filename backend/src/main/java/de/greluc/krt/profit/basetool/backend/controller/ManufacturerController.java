@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.ManufacturerMapper;
-import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.ManufacturerService;
@@ -30,7 +29,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,8 +71,7 @@ public class ManufacturerController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "abbreviation", "id"), "name");
-    Page<Manufacturer> p = manufacturerService.getAllManufacturers(pageable, includeHidden);
-    return PageResponse.of(p.map(manufacturerMapper::toDto));
+    return PageResponse.of(manufacturerService.getAllManufacturers(pageable, includeHidden));
   }
 
   /**
@@ -85,7 +82,7 @@ public class ManufacturerController {
    */
   @GetMapping("/{id}")
   public ManufacturerDto getManufacturer(@PathVariable @NotNull UUID id) {
-    return manufacturerMapper.toDto(manufacturerService.getManufacturer(id));
+    return manufacturerService.getManufacturer(id);
   }
 
   /**

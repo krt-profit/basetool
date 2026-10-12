@@ -22,7 +22,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mapper.PoiMapper;
 import de.greluc.krt.profit.basetool.backend.model.Poi;
+import de.greluc.krt.profit.basetool.backend.model.dto.PoiDto;
 import de.greluc.krt.profit.basetool.backend.repository.PoiRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PoiService {
 
   private final PoiRepository poiRepository;
+  private final PoiMapper poiMapper;
 
   /**
    * Returns the paged POI catalogue.
@@ -52,19 +55,29 @@ public class PoiService {
    * @return one page of POIs, sorted by the pageable's sort
    */
   @Cacheable(cacheNames = CacheConfig.POIS_CACHE)
-  public Page<Poi> getAllPois(Pageable pageable) {
-    return poiRepository.findAll(pageable);
+  public Page<PoiDto> getAllPois(Pageable pageable) {
+    return poiRepository.findAll(pageable).map(poiMapper::toDto);
   }
 
   /**
    * Returns a single POI by primary key.
    *
    * @param id POI primary key
-   * @return the managed POI entity
+   * @return the POI read model
    * @throws NotFoundException when no POI matches the id
    */
   @Cacheable(cacheNames = CacheConfig.POIS_CACHE)
-  public Poi getPoi(UUID id) {
+  public PoiDto getPoi(UUID id) {
+    return poiMapper.toDto(requirePoi(id));
+  }
+
+  /**
+   * Loads the managed POI entity a mutator edits; it never comes from the cache.
+   *
+   * @param id POI primary key
+   * @return the managed entity
+   */
+  private Poi requirePoi(UUID id) {
     return Entities.require(poiRepository.findById(id), "POI not found");
   }
 
@@ -79,7 +92,7 @@ public class PoiService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.POIS_CACHE, allEntries = true)
   public Poi setLoadingDockOverride(UUID id, boolean value) {
-    Poi poi = getPoi(id);
+    Poi poi = requirePoi(id);
     poi.setHasLoadingDock(value);
     poi.setHasLoadingDockOverridden(true);
     return poiRepository.save(poi);
@@ -95,7 +108,7 @@ public class PoiService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.POIS_CACHE, allEntries = true)
   public Poi clearLoadingDockOverride(UUID id) {
-    Poi poi = getPoi(id);
+    Poi poi = requirePoi(id);
     poi.setHasLoadingDockOverridden(false);
     return poiRepository.save(poi);
   }

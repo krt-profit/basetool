@@ -22,7 +22,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mapper.OutpostMapper;
 import de.greluc.krt.profit.basetool.backend.model.Outpost;
+import de.greluc.krt.profit.basetool.backend.model.dto.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.repository.OutpostRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OutpostService {
 
   private final OutpostRepository outpostRepository;
+  private final OutpostMapper outpostMapper;
 
   /**
    * Returns the paged outpost catalogue.
@@ -52,19 +55,29 @@ public class OutpostService {
    * @return one page of outposts, sorted by the pageable's sort
    */
   @Cacheable(cacheNames = CacheConfig.OUTPOSTS_CACHE)
-  public Page<Outpost> getAllOutposts(Pageable pageable) {
-    return outpostRepository.findAll(pageable);
+  public Page<OutpostDto> getAllOutposts(Pageable pageable) {
+    return outpostRepository.findAll(pageable).map(outpostMapper::toDto);
   }
 
   /**
    * Returns a single outpost by primary key.
    *
    * @param id outpost primary key
-   * @return the managed outpost entity
+   * @return the outpost read model
    * @throws NotFoundException when no outpost matches the id
    */
   @Cacheable(cacheNames = CacheConfig.OUTPOSTS_CACHE)
-  public Outpost getOutpost(UUID id) {
+  public OutpostDto getOutpost(UUID id) {
+    return outpostMapper.toDto(requireOutpost(id));
+  }
+
+  /**
+   * Loads the managed Outpost entity a mutator edits; it never comes from the cache.
+   *
+   * @param id Outpost primary key
+   * @return the managed entity
+   */
+  private Outpost requireOutpost(UUID id) {
     return Entities.require(outpostRepository.findById(id), "Outpost not found");
   }
 
@@ -79,7 +92,7 @@ public class OutpostService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.OUTPOSTS_CACHE, allEntries = true)
   public Outpost setLoadingDockOverride(UUID id, boolean value) {
-    Outpost outpost = getOutpost(id);
+    Outpost outpost = requireOutpost(id);
     outpost.setHasLoadingDock(value);
     outpost.setHasLoadingDockOverridden(true);
     return outpostRepository.save(outpost);
@@ -95,7 +108,7 @@ public class OutpostService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.OUTPOSTS_CACHE, allEntries = true)
   public Outpost clearLoadingDockOverride(UUID id) {
-    Outpost outpost = getOutpost(id);
+    Outpost outpost = requireOutpost(id);
     outpost.setHasLoadingDockOverridden(false);
     return outpostRepository.save(outpost);
   }

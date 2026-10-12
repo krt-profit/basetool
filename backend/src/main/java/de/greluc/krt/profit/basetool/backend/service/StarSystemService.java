@@ -22,7 +22,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.mapper.StarSystemMapper;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
+import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.repository.StarSystemRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class StarSystemService {
 
   private final StarSystemRepository starSystemRepository;
+  private final StarSystemMapper starSystemMapper;
 
   /**
    * Returns cached page of star systems.
@@ -54,8 +57,8 @@ public class StarSystemService {
    * @return cached page of star systems
    */
   @Cacheable(cacheNames = CacheConfig.STAR_SYSTEMS_CACHE)
-  public Page<StarSystem> getAllStarSystems(@NotNull Pageable pageable) {
-    return starSystemRepository.findAll(pageable);
+  public Page<StarSystemDto> getAllStarSystems(@NotNull Pageable pageable) {
+    return starSystemRepository.findAll(pageable).map(starSystemMapper::toDto);
   }
 
   /**
@@ -66,7 +69,17 @@ public class StarSystemService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   @Cacheable(cacheNames = CacheConfig.STAR_SYSTEMS_CACHE)
-  public StarSystem getStarSystem(@NotNull UUID id) {
+  public StarSystemDto getStarSystem(@NotNull UUID id) {
+    return starSystemMapper.toDto(requireStarSystem(id));
+  }
+
+  /**
+   * Loads the managed star system entity a mutator edits; it never comes from the cache.
+   *
+   * @param id star system primary key
+   * @return the managed entity
+   */
+  private StarSystem requireStarSystem(UUID id) {
     return Entities.require(starSystemRepository.findById(id), "StarSystem not found");
   }
 
@@ -103,7 +116,7 @@ public class StarSystemService {
       throw new DuplicateEntityException(
           "A Star System with the name '" + starSystemDetails.getName() + "' already exists.");
     }
-    StarSystem starSystem = getStarSystem(id);
+    StarSystem starSystem = requireStarSystem(id);
 
     starSystem.setName(starSystemDetails.getName());
     starSystem.setDescription(starSystemDetails.getDescription());
@@ -119,7 +132,7 @@ public class StarSystemService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.STAR_SYSTEMS_CACHE, allEntries = true)
   public void deleteStarSystem(@NotNull UUID id) {
-    StarSystem starSystem = getStarSystem(id);
+    StarSystem starSystem = requireStarSystem(id);
     starSystemRepository.delete(starSystem);
   }
 }

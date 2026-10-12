@@ -52,7 +52,6 @@ class TerminalControllerTest {
 
   @Test
   void getAllTerminals_wrapsServicePageIntoPageResponse() {
-    Terminal entity = new Terminal();
     TerminalDto dto =
         new TerminalDto(
             UUID.randomUUID(),
@@ -70,8 +69,7 @@ class TerminalControllerTest {
             null,
             null,
             false);
-    when(service.getAllTerminals(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getAllTerminals(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(dto)));
 
     PageResponse<TerminalDto> resp = controller.getAllTerminals(null, null, null);
 
@@ -80,15 +78,13 @@ class TerminalControllerTest {
   }
 
   @Test
-  void getTerminal_delegatesAndMaps() {
+  void getTerminal_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    Terminal entity = new Terminal();
     TerminalDto dto =
         new TerminalDto(
             id, "x", null, null, null, null, null, null, null, false, false, null, null, null,
             false);
-    when(service.getTerminal(id)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getTerminal(id)).thenReturn(dto);
 
     TerminalDto result = controller.getTerminal(id);
 

@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
@@ -180,51 +181,43 @@ class LazyToOneReadPathsTest {
   }
 
   /**
-   * Verifies that each cached entity is stored with a fully initialised graph: cached methods are
-   * called through their beans, and associations are then read without a session.
+   * Verifies that each cached read model is complete: cached methods are called through their
+   * beans, and the nested records are then read without a session.
    */
   @Test
-  void aCachedEntityIsCompleteBeforeTheCacheStoresIt() {
+  void aCachedReadModelIsCompleteBeforeTheCacheStoresIt() {
     Seed seed = seed(2);
     clearCaches();
 
-    Material material = materialService.getMaterial(seed.rawMaterialIds.getFirst());
-    assertThat(material.getCategory().getName()).startsWith("Lazy Ores");
-    assertThat(material.getRefinedMaterial().getName()).startsWith("Lazy Refined");
-    assertThat(material.getRefinedMaterial().getCategory().getName()).startsWith("Lazy Ores");
+    MaterialDto material = materialService.getMaterial(seed.rawMaterialIds.getFirst());
+    assertThat(material.category().name()).startsWith("Lazy Ores");
+    assertThat(material.refinedMaterial().name()).startsWith("Lazy Refined");
+    assertThat(material.refinedMaterial().category().name()).startsWith("Lazy Ores");
 
     materialService
         .getAllMaterials(PageRequest.of(0, 500))
         .forEach(
             m -> {
-              if (m.getCategory() != null) {
-                assertThat(m.getCategory().getName()).isNotNull();
+              if (m.category() != null) {
+                assertThat(m.category().name()).isNotNull();
               }
-              if (m.getRefinedMaterial() != null) {
-                assertThat(m.getRefinedMaterial().getName()).isNotNull();
+              if (m.refinedMaterial() != null) {
+                assertThat(m.refinedMaterial().name()).isNotNull();
               }
             });
 
-    assertThat(locationService.getLocation(seed.locationId).getCity().getName())
-        .startsWith("Lazy City");
-    assertThat(shipTypeService.getShipType(seed.shipTypeId).getManufacturer().getName())
+    assertThat(locationService.getLocation(seed.locationId).name()).startsWith("Lazy Station");
+    assertThat(shipTypeService.getShipType(seed.shipTypeId).manufacturer().name())
         .startsWith("Lazy Works");
     shipTypeService
         .getAllShipTypes(PageRequest.of(0, 500), true)
         .forEach(
             t -> {
-              if (t.getManufacturer() != null) {
-                assertThat(t.getManufacturer().getName()).isNotNull();
+              if (t.manufacturer() != null) {
+                assertThat(t.manufacturer().name()).isNotNull();
               }
             });
-    jobTypeService
-        .getJobTypes(null)
-        .forEach(
-            j -> {
-              if (j.getParent() != null) {
-                assertThat(j.getParent().getName()).isNotNull();
-              }
-            });
+    assertThat(jobTypeService.getJobTypes(null)).isNotEmpty();
   }
 
   /**

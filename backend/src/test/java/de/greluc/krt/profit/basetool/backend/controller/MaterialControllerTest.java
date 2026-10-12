@@ -91,12 +91,8 @@ class MaterialControllerTest {
 
   @Test
   void getAllMaterials_byDefault_returnsVisibleOnly() {
-    Material mat = new Material();
-    mat.setId(UUID.randomUUID());
-    mat.setName("Agricium");
     when(materialService.getVisibleMaterials(any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of(mat)));
-    when(materialMapper.toDto(mat)).thenReturn(minimalDto(mat.getId(), "Agricium", true));
+        .thenReturn(new PageImpl<>(List.of(minimalDto(UUID.randomUUID(), "Agricium", true))));
 
     PageResponse<MaterialDto> result =
         materialController.getAllMaterials(false, false, 0, 10, null);
@@ -108,13 +104,10 @@ class MaterialControllerTest {
 
   @Test
   void getAllMaterials_includeHidden_returnsFullCatalogForAdmin() {
-    Material hidden = new Material();
-    hidden.setId(UUID.randomUUID());
-    hidden.setName("Ace Interceptor Helmet");
     when(materialService.getAllMaterials(any(Pageable.class)))
-        .thenReturn(new PageImpl<>(List.of(hidden)));
-    when(materialMapper.toDto(hidden))
-        .thenReturn(minimalDto(hidden.getId(), "Ace Interceptor Helmet", false));
+        .thenReturn(
+            new PageImpl<>(
+                List.of(minimalDto(UUID.randomUUID(), "Ace Interceptor Helmet", false))));
 
     PageResponse<MaterialDto> result = materialController.getAllMaterials(false, true, 0, 10, null);
 

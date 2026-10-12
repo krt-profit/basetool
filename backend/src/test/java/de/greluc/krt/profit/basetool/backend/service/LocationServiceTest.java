@@ -26,6 +26,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationUsage;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
+import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
@@ -47,6 +48,8 @@ class LocationServiceTest {
 
   @Mock private LocationRepository locationRepository;
 
+  @Mock private LocationMapper locationMapper;
+
   @Mock private LocationUsage shipUsage;
 
   @Mock private LocationUsage orderUsage;
@@ -55,7 +58,8 @@ class LocationServiceTest {
 
   @BeforeEach
   void setUp() {
-    locationService = new LocationService(locationRepository, List.of(orderUsage, shipUsage));
+    locationService =
+        new LocationService(locationRepository, locationMapper, List.of(orderUsage, shipUsage));
   }
 
   @Test
@@ -173,15 +177,19 @@ class LocationServiceTest {
   }
 
   @Test
-  void getHomeLocations_delegatesToCuratedDescendingQuery() {
+  void getHomeLocations_mapsTheCuratedDescendingQueryToReadModels() {
     Location orison = new Location();
     orison.setName("Orison");
     Location lorville = new Location();
     lorville.setName("Lorville");
+    LocationDto orisonDto = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 0L);
+    LocationDto lorvilleDto = new LocationDto(UUID.randomUUID(), "Lorville", null, false, true, 0L);
     when(locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc())
         .thenReturn(List.of(orison, lorville));
+    when(locationMapper.toDto(orison)).thenReturn(orisonDto);
+    when(locationMapper.toDto(lorville)).thenReturn(lorvilleDto);
 
-    assertEquals(List.of(orison, lorville), locationService.getHomeLocations());
+    assertEquals(List.of(orisonDto, lorvilleDto), locationService.getHomeLocations());
     verify(locationRepository, times(1)).findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
   }
 

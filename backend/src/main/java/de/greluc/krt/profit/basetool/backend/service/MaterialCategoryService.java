@@ -22,7 +22,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mapper.MaterialCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
 import java.util.List;
 import java.util.UUID;
@@ -45,27 +47,38 @@ import org.springframework.transaction.annotation.Transactional;
 public class MaterialCategoryService {
 
   private final MaterialCategoryRepository repository;
+  private final MaterialCategoryMapper mapper;
 
   /**
    * Returns all categories sorted by name ascending. Cached as a single entry keyed by the empty
    * argument list because the sort is fixed.
    *
-   * @return all categories sorted by name ascending
+   * @return all category read models sorted by name ascending
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE)
-  public List<MaterialCategory> findAll() {
-    return repository.findAll(Sort.by("name").ascending());
+  public List<MaterialCategoryDto> findAll() {
+    return repository.findAll(Sort.by("name").ascending()).stream().map(mapper::toDto).toList();
   }
 
   /**
    * Returns the category.
    *
    * @param id category primary key
-   * @return the category
+   * @return the category read model
    * @throws NotFoundException when no category matches
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE)
-  public MaterialCategory findById(UUID id) {
+  public MaterialCategoryDto findById(UUID id) {
+    return mapper.toDto(requireById(id));
+  }
+
+  /**
+   * Loads the managed category entity a mutator edits; it never comes from the cache.
+   *
+   * @param id category primary key
+   * @return the managed entity
+   */
+  private MaterialCategory requireById(UUID id) {
     return Entities.require(repository.findById(id), "MaterialCategory not found");
   }
 
@@ -92,7 +105,7 @@ public class MaterialCategoryService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE, allEntries = true)
   public MaterialCategory update(UUID id, MaterialCategory category) {
-    MaterialCategory existing = findById(id);
+    MaterialCategory existing = requireById(id);
     existing.setName(category.getName());
     return repository.save(existing);
   }
@@ -107,7 +120,7 @@ public class MaterialCategoryService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE, allEntries = true)
   public void delete(UUID id) {
-    MaterialCategory existing = findById(id);
+    MaterialCategory existing = requireById(id);
     repository.delete(existing);
   }
 }

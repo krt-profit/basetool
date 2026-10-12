@@ -65,52 +65,25 @@ class CacheableEntityRulesTest {
   /** Today's count of {@code @Cacheable} methods. */
   private static final int CACHEABLE_FLOOR = 33;
 
-  private static final String CATALOGUE_ENTITY_CACHE =
-      "A master-data cache holding the catalogue entity itself; it becomes a read model in"
-          + " Phase 4 (plan §5.6). Safe meanwhile only because its own mutators load through"
+  private static final String IDENTITY_OR_ORG_UNIT_ENTITY_CACHE =
+      "An identity or org-unit cache holding the entity itself; it becomes a read model with its"
+          + " module (plan §5.6). Safe meanwhile only because its own mutators load through"
           + " self-invocation, which the cached-entity invariant test holds.";
 
   /**
    * The {@code @Cacheable} methods that still return an entity, keyed {@code
-   * Class#method(ParameterTypes)}, each with the reason. The list may only shrink.
+   * Class#method(ParameterTypes)}, each with the reason. The list may only shrink; the catalogue's
+   * caches left it when they switched to read models (plan §7.6).
    */
   static final Map<String, String> ENTITY_CACHES =
       entityCaches(
-          "CityService#getAllCities(Pageable)",
-          "CityService#getCity(UUID)",
-          "FrequencyTypeService#getAllFrequencyTypes(Boolean,Pageable)",
-          "FrequencyTypeService#getFrequencyType(UUID)",
-          "JobTypeService#getJobTypes(JobTypeArchetype)",
-          "JobTypeService#getJobTypes(JobTypeArchetype,Pageable,boolean)",
-          "LocationService#getAllLocations(Pageable,boolean)",
-          "LocationService#getHomeLocations()",
-          "LocationService#getLocation(UUID)",
-          "LocationService#getRefineryLocations()",
-          "ManufacturerService#getAllManufacturers(Pageable,boolean)",
-          "ManufacturerService#getManufacturer(UUID)",
-          "MaterialCategoryService#findAll()",
-          "MaterialCategoryService#findById(UUID)",
-          "MaterialService#getAllMaterials(Pageable)",
-          "MaterialService#getMaterial(UUID)",
-          "MaterialService#getVisibleMaterials(Pageable)",
-          "OutpostService#getAllOutposts(Pageable)",
-          "OutpostService#getOutpost(UUID)",
-          "PoiService#getAllPois(Pageable)",
-          "PoiService#getPoi(UUID)",
-          "RefiningMethodService#getAllRefiningMethods(Pageable)",
-          "RefiningMethodService#getRefiningMethod(UUID)",
           "RoleService#getAllRoles(Pageable)",
-          "ShipTypeService#getAllShipTypes(Pageable,boolean)",
-          "ShipTypeService#getShipType(UUID)",
           "SquadronService#getAllSquadrons(Pageable,boolean)",
-          "SquadronService#getAllSquadrons(boolean)",
-          "StarSystemService#getAllStarSystems(Pageable)",
-          "StarSystemService#getStarSystem(UUID)",
-          "TerminalService#getAllTerminals(Pageable)",
-          "TerminalService#getTerminal(UUID)");
+          "SquadronService#getAllSquadrons(boolean)");
 
   @Test
-  @DisplayName("no @Cacheable method returns an entity, except the listed catalogue caches")
+  @DisplayName(
+      "no @Cacheable method returns an entity, except the listed identity and org-unit caches")
   void noCacheReturnsAnEntity() {
     List<JavaMethod> cacheable = cacheableMethods(PRODUCTION);
     assertThat(cacheable)
@@ -159,7 +132,7 @@ class CacheableEntityRulesTest {
   private static Map<String, String> entityCaches(String... keys) {
     Map<String, String> caches = new TreeMap<>();
     for (String key : keys) {
-      caches.put(key, CATALOGUE_ENTITY_CACHE);
+      caches.put(key, IDENTITY_OR_ORG_UNIT_ENTITY_CACHE);
     }
     return caches;
   }

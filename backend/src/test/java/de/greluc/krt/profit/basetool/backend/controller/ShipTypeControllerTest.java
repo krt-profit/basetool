@@ -59,27 +59,22 @@ class ShipTypeControllerTest {
   }
 
   @Test
-  void getAll_wrapsServicePageIntoPageResponse_usingShipTypeMapper() {
-    ShipType entity = new ShipType();
+  void getAll_wrapsServicePageIntoPageResponse() {
     ShipTypeDto dto = new ShipTypeDto(UUID.randomUUID(), "Cutlass Black", null, null, 46, false);
     when(service.getAllShipTypes(any(Pageable.class), eq(false)))
-        .thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.toDto(entity)).thenReturn(dto);
+        .thenReturn(new PageImpl<>(List.of(dto)));
 
     PageResponse<ShipTypeDto> resp = controller.getAllShipTypes(null, null, null, false);
 
     assertEquals(1, resp.totalElements());
     assertSame(dto, resp.content().getFirst());
-    verify(mapper).toDto(entity);
   }
 
   @Test
-  void getById_delegatesAndMaps() {
+  void getById_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    ShipType entity = new ShipType();
     ShipTypeDto dto = new ShipTypeDto(id, "x", null, null, 1, false);
-    when(service.getShipType(id)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getShipType(id)).thenReturn(dto);
 
     ShipTypeDto result = controller.getShipType(id);
 

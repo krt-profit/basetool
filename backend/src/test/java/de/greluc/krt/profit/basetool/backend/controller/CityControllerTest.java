@@ -49,10 +49,8 @@ class CityControllerTest {
 
   @Test
   void getAllCities_wrapsServicePageIntoPageResponse() {
-    City entity = new City();
     CityDto dto = new CityDto(UUID.randomUUID(), "Lorville", "Stanton", "Hurston", true, false);
-    when(service.getAllCities(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getAllCities(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(dto)));
 
     PageResponse<CityDto> resp = controller.getAllCities(null, null, null);
 
@@ -61,12 +59,10 @@ class CityControllerTest {
   }
 
   @Test
-  void getCity_delegatesAndMaps() {
+  void getCity_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    City entity = new City();
     CityDto dto = new CityDto(id, "Lorville", "Stanton", "Hurston", true, false);
-    when(service.getCity(id)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getCity(id)).thenReturn(dto);
 
     CityDto result = controller.getCity(id);
 

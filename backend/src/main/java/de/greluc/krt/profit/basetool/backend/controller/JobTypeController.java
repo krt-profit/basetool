@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,8 +78,7 @@ public class JobTypeController {
       @RequestParam(required = false) String sort,
       @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
-    Page<JobType> p = jobTypeService.getJobTypes(archetype, pageable, includeInactive);
-    return PageResponse.of(p.map(jobTypeMapper::toDto));
+    return PageResponse.of(jobTypeService.getJobTypes(archetype, pageable, includeInactive));
   }
 
   /**

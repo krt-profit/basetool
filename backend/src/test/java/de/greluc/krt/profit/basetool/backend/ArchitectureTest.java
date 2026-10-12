@@ -69,7 +69,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankViewUserDt
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibilityService;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
 import de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController;
@@ -326,7 +325,6 @@ class ArchitectureTest {
           AuditRetentionProperties.class,
           AuthenticatedSubject.class,
           AuthoritiesCacheProperties.class,
-          CachedEntityGraphs.class,
           ChangeSource.class,
           ChangeSourceProperties.class,
           ClientAttribution.class,

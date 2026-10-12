@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
+import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,13 +81,13 @@ class FrequencyTypeServiceCachingTest {
 
   @Test
   void getFrequencyType_populatesCacheKeyedByIdAndReturnsCachedInstanceOnSecondCall() {
-    FrequencyType first = frequencyTypeService.getFrequencyType(uhf.getId());
+    FrequencyTypeDto first = frequencyTypeService.getFrequencyType(uhf.getId());
 
     Cache.ValueWrapper entry = cache().get(uhf.getId());
     assertNotNull(entry, "getFrequencyType(id) must populate the cache under the id key");
     assertSame(first, entry.get(), "cache entry must reference the same instance as the read");
 
-    FrequencyType second = frequencyTypeService.getFrequencyType(uhf.getId());
+    FrequencyTypeDto second = frequencyTypeService.getFrequencyType(uhf.getId());
     assertSame(first, second, "second read must come from the cache, not the repository");
   }
 

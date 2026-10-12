@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.mapper.ManufacturerMapper;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -44,32 +46,45 @@ import org.springframework.transaction.annotation.Transactional;
 public class ManufacturerService {
 
   private final ManufacturerRepository manufacturerRepository;
+  private final ManufacturerMapper manufacturerMapper;
 
   /**
    * Returns a cached, paged manufacturer list.
    *
    * @param pageable page request (whitelisted sort fields applied by the controller)
    * @param includeHidden true to include manufacturers marked hidden
-   * @return cached page result
+   * @return cached page of manufacturer read models
    */
   @Cacheable(cacheNames = CacheConfig.MANUFACTURERS_CACHE)
-  public Page<Manufacturer> getAllManufacturers(@NotNull Pageable pageable, boolean includeHidden) {
-    if (includeHidden) {
-      return manufacturerRepository.findAll(pageable);
-    }
-    return manufacturerRepository.findByHiddenFalse(pageable);
+  public Page<ManufacturerDto> getAllManufacturers(
+      @NotNull Pageable pageable, boolean includeHidden) {
+    Page<Manufacturer> page =
+        includeHidden
+            ? manufacturerRepository.findAll(pageable)
+            : manufacturerRepository.findByHiddenFalse(pageable);
+    return page.map(manufacturerMapper::toDto);
   }
 
   /**
    * Looks up a single manufacturer by id.
    *
    * @param id manufacturer primary key
-   * @return the manufacturer
+   * @return the manufacturer read model
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no manufacturer
    *     matches
    */
   @Cacheable(cacheNames = CacheConfig.MANUFACTURERS_CACHE)
-  public Manufacturer getManufacturer(@NotNull UUID id) {
+  public ManufacturerDto getManufacturer(@NotNull UUID id) {
+    return manufacturerMapper.toDto(requireManufacturer(id));
+  }
+
+  /**
+   * Loads the managed manufacturer entity a mutator edits; it never comes from the cache.
+   *
+   * @param id manufacturer primary key
+   * @return the managed entity
+   */
+  private Manufacturer requireManufacturer(UUID id) {
     return Entities.require(manufacturerRepository.findById(id), "Manufacturer not found");
   }
 
@@ -83,7 +98,7 @@ public class ManufacturerService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.MANUFACTURERS_CACHE, allEntries = true)
   public Manufacturer updateManufacturerVisibility(@NotNull UUID id, boolean hidden) {
-    Manufacturer manufacturer = getManufacturer(id);
+    Manufacturer manufacturer = requireManufacturer(id);
     manufacturer.setHidden(hidden);
     return manufacturerRepository.save(manufacturer);
   }

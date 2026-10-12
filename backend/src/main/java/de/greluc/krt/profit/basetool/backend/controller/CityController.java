@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.CityMapper;
-import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.dto.CityDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.CityService;
@@ -31,7 +30,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,8 +72,7 @@ public class CityController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "starSystemName"), "name", PageCeiling.LOAD_ALL);
-    Page<City> p = cityService.getAllCities(pageable);
-    return PageResponse.of(p.map(cityMapper::toDto));
+    return PageResponse.of(cityService.getAllCities(pageable));
   }
 
   /**
@@ -86,7 +83,7 @@ public class CityController {
    */
   @GetMapping("/{id}")
   public CityDto getCity(@PathVariable @NotNull UUID id) {
-    return cityMapper.toDto(cityService.getCity(id));
+    return cityService.getCity(id);
   }
 
   /**

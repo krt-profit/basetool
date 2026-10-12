@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.config.EvictAllMaterialCaches;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
@@ -27,12 +26,14 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
@@ -66,16 +67,17 @@ public class MaterialService {
   private final MaterialRepository materialRepository;
   private final MaterialPriceRepository materialPriceRepository;
   private final MaterialCategoryRepository materialCategoryRepository;
+  private final MaterialMapper materialMapper;
 
   /**
    * Returns the cached page of all materials, including hidden ones.
    *
    * @param pageable page request
-   * @return cached paged list of all materials
+   * @return cached paged list of all material read models
    */
   @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE, key = "'all-' + #pageable")
-  public Page<Material> getAllMaterials(@NotNull Pageable pageable) {
-    return CachedEntityGraphs.materials(materialRepository.findAll(pageable));
+  public Page<MaterialDto> getAllMaterials(@NotNull Pageable pageable) {
+    return materialRepository.findAll(pageable).map(materialMapper::toDto);
   }
 
   /**
@@ -83,11 +85,11 @@ public class MaterialService {
    * trading catalog.
    *
    * @param pageable page request
-   * @return cached paged list of visible materials
+   * @return cached paged list of visible material read models
    */
   @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE, key = "'visible-' + #pageable")
-  public Page<Material> getVisibleMaterials(@NotNull Pageable pageable) {
-    return CachedEntityGraphs.materials(materialRepository.findByIsVisibleTrue(pageable));
+  public Page<MaterialDto> getVisibleMaterials(@NotNull Pageable pageable) {
+    return materialRepository.findByIsVisibleTrue(pageable).map(materialMapper::toDto);
   }
 
   /**
@@ -139,17 +141,25 @@ public class MaterialService {
   }
 
   /**
-   * Returns the material from the by-id cache. The instance is shared across callers and must be
-   * treated as read-only.
+   * Returns the material read model from the by-id cache.
    *
    * @param id material primary key
-   * @return the material
+   * @return the material read model
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE)
-  public Material getMaterial(@NotNull UUID id) {
-    return CachedEntityGraphs.material(
-        Entities.require(materialRepository.findById(id), "Material not found"));
+  public MaterialDto getMaterial(@NotNull UUID id) {
+    return materialMapper.toDto(requireMaterial(id));
+  }
+
+  /**
+   * Loads the managed material entity a mutator edits; it never comes from the cache.
+   *
+   * @param id material primary key
+   * @return the managed entity
+   */
+  private Material requireMaterial(UUID id) {
+    return Entities.require(materialRepository.findById(id), "Material not found");
   }
 
   /**
@@ -294,7 +304,7 @@ public class MaterialService {
   @Transactional
   @EvictAllMaterialCaches
   public Material updateMaterial(@NotNull UUID id, @NotNull Material materialDetails) {
-    Material material = getMaterial(id);
+    Material material = requireMaterial(id);
 
     OptimisticLock.checkOptionalClient(
         material.getVersion(), materialDetails.getVersion(), Material.class, id);
@@ -338,7 +348,7 @@ public class MaterialService {
   @Transactional
   @EvictAllMaterialCaches
   public void deleteMaterial(@NotNull UUID id) {
-    Material material = getMaterial(id);
+    Material material = requireMaterial(id);
     materialRepository.delete(material);
   }
 }

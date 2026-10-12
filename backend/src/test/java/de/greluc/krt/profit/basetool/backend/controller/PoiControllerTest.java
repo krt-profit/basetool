@@ -49,10 +49,8 @@ class PoiControllerTest {
 
   @Test
   void getAllPois_wrapsServicePageIntoPageResponse() {
-    Poi entity = new Poi();
     PoiDto dto = new PoiDto(UUID.randomUUID(), "Grim HEX", "Stanton", "Crusader", true, false);
-    when(service.getAllPois(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(entity)));
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getAllPois(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(dto)));
 
     PageResponse<PoiDto> resp = controller.getAllPois(null, null, null);
 
@@ -61,12 +59,10 @@ class PoiControllerTest {
   }
 
   @Test
-  void getPoi_delegatesAndMaps() {
+  void getPoi_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    Poi entity = new Poi();
     PoiDto dto = new PoiDto(id, "Grim HEX", "Stanton", "Crusader", true, false);
-    when(service.getPoi(id)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.getPoi(id)).thenReturn(dto);
 
     PoiDto result = controller.getPoi(id);
 

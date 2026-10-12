@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.mapper.TerminalMapper;
 import de.greluc.krt.profit.basetool.backend.model.Terminal;
+import de.greluc.krt.profit.basetool.backend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TerminalService {
 
   private final TerminalRepository terminalRepository;
+  private final TerminalMapper terminalMapper;
 
   /**
    * Returns paged terminal list (includes hidden — frontend filters via {@code includeHidden}).
@@ -52,8 +55,8 @@ public class TerminalService {
    * @return paged terminal list (includes hidden — frontend filters via {@code includeHidden})
    */
   @Cacheable(cacheNames = CacheConfig.TERMINALS_CACHE)
-  public Page<Terminal> getAllTerminals(Pageable pageable) {
-    return terminalRepository.findAll(pageable);
+  public Page<TerminalDto> getAllTerminals(Pageable pageable) {
+    return terminalRepository.findAll(pageable).map(terminalMapper::toDto);
   }
 
   /**
@@ -65,7 +68,17 @@ public class TerminalService {
    *     matches
    */
   @Cacheable(cacheNames = CacheConfig.TERMINALS_CACHE)
-  public Terminal getTerminal(UUID id) {
+  public TerminalDto getTerminal(UUID id) {
+    return terminalMapper.toDto(requireTerminal(id));
+  }
+
+  /**
+   * Loads the managed Terminal entity a mutator edits; it never comes from the cache.
+   *
+   * @param id Terminal primary key
+   * @return the managed entity
+   */
+  private Terminal requireTerminal(UUID id) {
     return Entities.require(terminalRepository.findById(id), "Terminal not found");
   }
 
@@ -79,7 +92,7 @@ public class TerminalService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.TERMINALS_CACHE, allEntries = true)
   public Terminal updateTerminalVisibility(UUID id, boolean hidden) {
-    Terminal terminal = getTerminal(id);
+    Terminal terminal = requireTerminal(id);
     terminal.setHidden(hidden);
     return terminalRepository.save(terminal);
   }
@@ -95,7 +108,7 @@ public class TerminalService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.TERMINALS_CACHE, allEntries = true)
   public Terminal setLoadingDockOverride(UUID id, boolean value) {
-    Terminal terminal = getTerminal(id);
+    Terminal terminal = requireTerminal(id);
     terminal.setHasLoadingDock(value);
     terminal.setHasLoadingDockOverridden(true);
     return terminalRepository.save(terminal);
@@ -111,7 +124,7 @@ public class TerminalService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.TERMINALS_CACHE, allEntries = true)
   public Terminal clearLoadingDockOverride(UUID id) {
-    Terminal terminal = getTerminal(id);
+    Terminal terminal = requireTerminal(id);
     terminal.setHasLoadingDockOverridden(false);
     terminal.setHasLoadingDock(terminal.getUexHasLoadingDock());
     return terminalRepository.save(terminal);
@@ -128,7 +141,7 @@ public class TerminalService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.TERMINALS_CACHE, allEntries = true)
   public Terminal setAutoLoadOverride(UUID id, boolean value) {
-    Terminal terminal = getTerminal(id);
+    Terminal terminal = requireTerminal(id);
     terminal.setIsAutoLoad(value);
     terminal.setIsAutoLoadOverridden(true);
     return terminalRepository.save(terminal);
@@ -144,7 +157,7 @@ public class TerminalService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.TERMINALS_CACHE, allEntries = true)
   public Terminal clearAutoLoadOverride(UUID id) {
-    Terminal terminal = getTerminal(id);
+    Terminal terminal = requireTerminal(id);
     terminal.setIsAutoLoadOverridden(false);
     terminal.setIsAutoLoad(terminal.getUexIsAutoLoad());
     return terminalRepository.save(terminal);

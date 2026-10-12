@@ -32,12 +32,14 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
@@ -67,6 +69,8 @@ class MaterialServiceTest {
   @Mock private MaterialPriceRepository materialPriceRepository;
 
   @Mock private MaterialCategoryRepository materialCategoryRepository;
+
+  @Mock private MaterialMapper materialMapper;
 
   @InjectMocks private MaterialService materialService;
 
@@ -218,13 +222,31 @@ class MaterialServiceTest {
     Material visible = new Material();
     visible.setId(UUID.randomUUID());
     visible.setName("Agricium");
+    MaterialDto read =
+        new MaterialDto(
+            visible.getId(),
+            "Agricium",
+            "RAW",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true,
+            0L);
     Page<Material> expected = new PageImpl<>(List.of(visible));
     when(materialRepository.findByIsVisibleTrue(pageRequest)).thenReturn(expected);
+    when(materialMapper.toDto(visible)).thenReturn(read);
 
-    Page<Material> result = materialService.getVisibleMaterials(pageRequest);
+    Page<MaterialDto> result = materialService.getVisibleMaterials(pageRequest);
 
     assertEquals(1, result.getTotalElements());
-    assertEquals("Agricium", result.getContent().get(0).getName());
+    assertEquals(read, result.getContent().get(0));
     verify(materialRepository).findByIsVisibleTrue(pageRequest);
     verify(materialRepository, never()).findAll(any(PageRequest.class));
   }

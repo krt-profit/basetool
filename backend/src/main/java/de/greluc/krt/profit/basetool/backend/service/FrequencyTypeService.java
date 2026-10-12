@@ -22,7 +22,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mapper.FrequencyTypeMapper;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
+import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
 import java.util.List;
 import java.util.UUID;
@@ -46,28 +48,41 @@ import org.springframework.transaction.annotation.Transactional;
 public class FrequencyTypeService {
 
   private final FrequencyTypeRepository frequencyTypeRepository;
+  private final FrequencyTypeMapper frequencyTypeMapper;
 
   /**
    * Returns paged frequency type list.
    *
    * @param active optional active-filter; null returns both active and inactive
    * @param pageable page request
-   * @return paged frequency type list
+   * @return paged frequency type read models
    */
   @Cacheable(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE)
-  public Page<FrequencyType> getAllFrequencyTypes(Boolean active, @NotNull Pageable pageable) {
-    return frequencyTypeRepository.findAllByActive(active, pageable);
+  public Page<FrequencyTypeDto> getAllFrequencyTypes(Boolean active, @NotNull Pageable pageable) {
+    return frequencyTypeRepository
+        .findAllByActive(active, pageable)
+        .map(frequencyTypeMapper::toDto);
   }
 
   /**
    * Returns the frequency type.
    *
    * @param id frequency type primary key
-   * @return the frequency type
+   * @return the frequency type read model
    * @throws NotFoundException when no match
    */
   @Cacheable(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE)
-  public FrequencyType getFrequencyType(@NotNull UUID id) {
+  public FrequencyTypeDto getFrequencyType(@NotNull UUID id) {
+    return frequencyTypeMapper.toDto(requireFrequencyType(id));
+  }
+
+  /**
+   * Loads the managed frequency type entity a mutator edits; it never comes from the cache.
+   *
+   * @param id frequency type primary key
+   * @return the managed entity
+   */
+  private FrequencyType requireFrequencyType(UUID id) {
     return Entities.require(frequencyTypeRepository.findById(id), "FrequencyType not found");
   }
 
@@ -95,7 +110,7 @@ public class FrequencyTypeService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE, allEntries = true)
   public FrequencyType updateFrequencyType(@NotNull UUID id, @NotNull FrequencyType frequencyType) {
-    FrequencyType existing = getFrequencyType(id);
+    FrequencyType existing = requireFrequencyType(id);
     existing.setName(frequencyType.getName());
     existing.setDescription(frequencyType.getDescription());
     existing.setActive(frequencyType.isActive());
@@ -114,7 +129,7 @@ public class FrequencyTypeService {
     if (!frequencyTypeRepository.existsById(id)) {
       throw new NotFoundException("FrequencyType not found");
     }
-    FrequencyType existing = getFrequencyType(id);
+    FrequencyType existing = requireFrequencyType(id);
     existing.setActive(false);
     frequencyTypeRepository.save(existing);
   }
@@ -128,7 +143,7 @@ public class FrequencyTypeService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE, allEntries = true)
   public void activateFrequencyType(@NotNull UUID id) {
-    FrequencyType existing = getFrequencyType(id);
+    FrequencyType existing = requireFrequencyType(id);
     existing.setActive(true);
     frequencyTypeRepository.save(existing);
   }
