@@ -105,6 +105,7 @@ public final class ApiDomains {
           Map.entry("MaterialExternalAliasController", "catalogue"),
           Map.entry("MaterialRequestController", "materialexchange"),
           Map.entry("MeController", "identity"),
+          Map.entry("MyBlueprintSharingController", "identity"),
           Map.entry("MyPayoutPreferenceController", "identity"),
           Map.entry("MemberMembershipController", "identity"),
           Map.entry("MemberEvaluationController", "promotion"),

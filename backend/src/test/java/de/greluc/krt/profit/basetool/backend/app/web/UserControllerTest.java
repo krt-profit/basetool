@@ -24,7 +24,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceSearchService;
@@ -64,7 +63,6 @@ class UserControllerTest {
   @Mock private UserReferenceSearchService userReferenceSearchService;
 
   @Mock private UserSyncService userSyncService;
-  @Mock private MemberBlueprintSharings memberBlueprintSharings;
   @Mock private TaskMetrics taskMetrics;
   @Mock private Jwt jwt;
 
@@ -102,34 +100,6 @@ class UserControllerTest {
 
     assertSame(refs, result);
     verifyNoInteractions(userMapper);
-  }
-
-  @Test
-  void getMyBlueprintSharing_resolvesIdFromJwt_andReturnsFlagAndVersion() {
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    when(memberBlueprintSharings.snapshotOf(CALLER_ID))
-        .thenReturn(new MemberBlueprintSharings.Snapshot(true, 4L));
-
-    UserController.MyBlueprintSharingResponse result = controller.getMyBlueprintSharing(jwt);
-
-    assertTrue(result.shareBlueprintsGlobally());
-    assertEquals(4L, result.version());
-  }
-
-  @Test
-  void updateMyBlueprintSharing_resolvesIdFromJwt_andForwardsFlagAndVersion() {
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    UserController.MyBlueprintSharingRequest req =
-        new UserController.MyBlueprintSharingRequest(true, 2L);
-    when(memberBlueprintSharings.update(CALLER_ID, true, 2L))
-        .thenReturn(new MemberBlueprintSharings.Snapshot(true, 3L));
-
-    UserController.MyBlueprintSharingResponse result =
-        controller.updateMyBlueprintSharing(jwt, req);
-
-    assertTrue(result.shareBlueprintsGlobally());
-    assertEquals(3L, result.version());
-    verify(memberBlueprintSharings).update(CALLER_ID, true, 2L);
   }
 
   @Test

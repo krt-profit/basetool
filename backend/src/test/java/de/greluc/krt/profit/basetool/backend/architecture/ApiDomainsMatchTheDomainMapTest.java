@@ -92,7 +92,11 @@ class ApiDomainsMatchTheDomainMapTest {
           Map.entry(
               "MyPayoutPreferenceController",
               "identity: the REST cut serves the payout preference under identity; the code keeps"
-                  + " the setting with the mission module"));
+                  + " the setting with the mission module"),
+          Map.entry(
+              "MyBlueprintSharingController",
+              "identity: the REST cut serves the blueprint sharing under identity; the code keeps"
+                  + " the setting with the blueprint module"));
 
   /** The controllers today; a smaller selection would check less. */
   private static final int CONTROLLER_FLOOR = 98;

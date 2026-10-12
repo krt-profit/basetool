@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.app.web;
 
-import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
@@ -75,7 +74,6 @@ public class UserController {
   private final UserMapper userMapper;
   private final UserReferenceSearchService userReferenceSearchService;
   private final UserSyncService userSyncService;
-  private final MemberBlueprintSharings memberBlueprintSharings;
 
   /** The consolidate action's orchestrator (REQ-SEC-055): duplicate in, survivor out. */
   private final AccountConsolidationService accountConsolidationService;
@@ -151,49 +149,6 @@ public class UserController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
     return userReferenceSearchService.search(query, page, size, sort);
-  }
-
-  /**
-   * Returns whether the calling user has opted into global blueprint sharing, plus the current
-   * optimistic-lock version, backing the profile page's blueprint-sharing toggle. Derived from the
-   * JWT subject — a caller can only ever read their own.
-   *
-   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
-   * @return the current opt-in flag plus the user-row version.
-   */
-  @NotNull
-  @GetMapping("/blueprints/me/sharing")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public MyBlueprintSharingResponse getMyBlueprintSharing(@AuthenticationPrincipal Jwt jwt) {
-    MemberBlueprintSharings.Snapshot sharing =
-        memberBlueprintSharings.snapshotOf(userService.getUserIdFromJwt(jwt));
-    return new MyBlueprintSharingResponse(sharing.shareGlobally(), sharing.version());
-  }
-
-  /**
-   * Sets whether the calling user opts into global blueprint sharing (REQ-INV-018), guarded by the
-   * optimistic-lock version.
-   *
-   * <p>When enabled, the user's blueprints count toward every org unit's availability and coverage
-   * views (read-only, name-only).
-   *
-   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
-   * @param request the new opt-in value plus the expected version.
-   * @return the persisted flag and the new version.
-   */
-  @NotNull
-  @PutMapping("/blueprints/me/sharing")
-  @PreAuthorize("isAuthenticated()")
-  public MyBlueprintSharingResponse updateMyBlueprintSharing(
-      @AuthenticationPrincipal Jwt jwt,
-      @NotNull @RequestBody @Valid MyBlueprintSharingRequest request) {
-    MemberBlueprintSharings.Snapshot sharing =
-        memberBlueprintSharings.update(
-            userService.getUserIdFromJwt(jwt),
-            request.shareBlueprintsGlobally(),
-            request.version());
-    return new MyBlueprintSharingResponse(sharing.shareGlobally(), sharing.version());
   }
 
   /**
@@ -281,27 +236,6 @@ public class UserController {
         accountConsolidationService.consolidate(
             id, body.targetUserId(), body.version(), adminUserId));
   }
-
-  /**
-   * Response for {@link #getMyBlueprintSharing} / {@link #updateMyBlueprintSharing}: whether the
-   * user opted into global blueprint sharing plus the user-row optimistic-lock version the toggle
-   * echoes back on save.
-   *
-   * @param shareBlueprintsGlobally the stored opt-in flag.
-   * @param version the user row's current {@code @Version}.
-   */
-  public record MyBlueprintSharingResponse(boolean shareBlueprintsGlobally, Long version) {}
-
-  /**
-   * Body for {@link #updateMyBlueprintSharing}: the new opt-in flag and the expected
-   * optimistic-lock version.
-   *
-   * @param shareBlueprintsGlobally the new opt-in value; never {@code null}.
-   * @param version the {@code @Version} of the user row the caller last read; never {@code null}.
-   */
-  public record MyBlueprintSharingRequest(
-      @jakarta.validation.constraints.NotNull Boolean shareBlueprintsGlobally,
-      @jakarta.validation.constraints.NotNull Long version) {}
 
   /**
    * Response for {@link #getMyRsiHandle} / {@link #updateMyRsiHandle}: the member's own RSI handle
