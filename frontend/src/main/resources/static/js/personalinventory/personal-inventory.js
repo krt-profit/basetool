@@ -5,6 +5,7 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 const SEARCH_LIMIT = 2000;
 

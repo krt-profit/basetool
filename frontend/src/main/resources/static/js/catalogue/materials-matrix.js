@@ -19,6 +19,7 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 (function () {
     /**

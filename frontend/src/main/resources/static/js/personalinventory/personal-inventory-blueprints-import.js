@@ -4,6 +4,7 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;

@@ -26,6 +26,7 @@ import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 /** @type {any[]} */
 export let cachedInventoryItems = [];

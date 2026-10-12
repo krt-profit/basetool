@@ -105,9 +105,6 @@ interface KrtHtmlApi {
     readonly policyName: string;
 }
 
-/** The tagged-template HTML builder; see {@linkcode KrtHtmlApi}. Installed by `krt-html.js`. */
-declare const krtHtml: KrtHtmlApi;
-
 /** CSRF token access and refresh, installed by `krt-fetch.js`. */
 interface KrtCsrfApi {
     /** The current CSRF token from the `_csrf` meta tag, or null when absent. */

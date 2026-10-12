@@ -107,6 +107,7 @@ for (const [name, [code, rule]] of Object.entries(BANNED)) {
 
 await test('the builder and its sinks pass in a page script', async () => {
     const code = [
+        "import { krtHtml } from '/js/kernel/krt-html.js';",
         "const el = document.getElementById('a');",
         'krtHtml.set(el, krtHtml`<li title="${window.name}">${[krtHtml`<b></b>`]}</li>`);',
         'el.replaceChildren();',

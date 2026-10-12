@@ -22,6 +22,7 @@
 /* global ALIAS_MSG, ALIAS_CONFLICT */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const table = document.getElementById('aliasesTable');

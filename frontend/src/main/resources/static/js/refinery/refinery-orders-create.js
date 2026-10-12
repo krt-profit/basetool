@@ -25,6 +25,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 

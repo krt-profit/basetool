@@ -26,6 +26,7 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 (function () {
     const nav = /** @type {HTMLElement | null} */ (

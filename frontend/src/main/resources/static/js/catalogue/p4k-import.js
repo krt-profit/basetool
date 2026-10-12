@@ -2,6 +2,7 @@
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;

@@ -29,6 +29,7 @@ import {
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 /**
  * Downloads the PDF report of a material handover.

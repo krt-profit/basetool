@@ -20,6 +20,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { krtHtml } from '/js/kernel/krt-html.js';
 
 /** @typedef {ApiDto<'ProfitCalculationDto'>} ProfitRow */
 
