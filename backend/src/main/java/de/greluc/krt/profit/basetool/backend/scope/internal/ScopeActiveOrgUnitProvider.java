@@ -17,8 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.scope.internal;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.ActiveOrgUnitProvider;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

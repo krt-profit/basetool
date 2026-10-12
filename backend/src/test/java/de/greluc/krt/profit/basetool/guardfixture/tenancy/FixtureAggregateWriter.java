@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.guardfixture.tenancy;
 
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 

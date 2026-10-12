@@ -118,6 +118,7 @@ basetool {
         "mission",
         "operation",
         "refinery",
+        "scope",
       )
       .map { "de.greluc.krt.profit.basetool.backend.$it" },
   )

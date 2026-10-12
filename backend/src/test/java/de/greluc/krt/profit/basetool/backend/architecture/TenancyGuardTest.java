@@ -71,9 +71,9 @@ import de.greluc.krt.profit.basetool.backend.promotion.web.RankRequirementContro
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
-import de.greluc.krt.profit.basetool.backend.service.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService;
 import de.greluc.krt.profit.basetool.guardfixture.tenancy.FixtureAggregate;
 import de.greluc.krt.profit.basetool.guardfixture.tenancy.FixtureAggregateController;

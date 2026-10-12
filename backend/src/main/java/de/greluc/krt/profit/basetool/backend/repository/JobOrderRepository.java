@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopeSpecifications;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -176,9 +177,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    *
    * <p>An order responsible to a Spezialkommando is visible to everyone; a squadron-responsible one
    * only to that squadron and admins (see {@link
-   * de.greluc.krt.profit.basetool.backend.service.ScopePredicate}). The squadron filter matches the
-   * responsible or requesting side and only narrows the scoped result. The processing filter keeps
-   * only orders whose profit-eligible responsible unit is in {@code processingOrgUnitIds}
+   * de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}). The squadron filter matches
+   * the responsible or requesting side and only narrows the scoped result. The processing filter
+   * keeps only orders whose profit-eligible responsible unit is in {@code processingOrgUnitIds}
    * (REQ-ORDERS-040) and likewise only narrows. Only the two org units are fetched; collections
    * batch-load (REQ-DATA-003).
    *

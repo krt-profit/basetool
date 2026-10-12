@@ -996,7 +996,7 @@ role). Every Materialbörse mutation — offers and requests — is audited unde
 ## 4. Multi-OrgUnit visibility (scoping)
 
 Read and write paths are filtered through
-[`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)
+[`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java)
 (formerly `SquadronScopeService`; today a facade over `RequestScopeResolver`, `AccessGateService`
 and `OrgUnitStampingService` covering every org-unit kind). Baseline rule: non-admins view the union
 of their memberships (widened by the leadership cascade of §4.1); admins without an active pin view

@@ -40,7 +40,7 @@ public class ActiveSquadronRelayFilter {
 
   /**
    * HTTP header name carrying the caller's active OrgUnit selection to the backend. {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService} reads this name to scope
+   * de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService} reads this name to scope
    * staffel-scoped queries for the current request.
    */
   public static final String ACTIVE_ORG_UNIT_HEADER = "X-Active-Org-Unit-Id";

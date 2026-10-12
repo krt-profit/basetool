@@ -129,7 +129,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   /**
    * Org-unit-scoped variant of {@link #findByMissionId(UUID)}: returns only the mission's refinery
    * orders within the caller's scope triple (see {@link
-   * de.greluc.krt.profit.basetool.backend.service.ScopePredicate}).
+   * de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}).
    *
    * <p>Refinery is strict-staffel, so an order of a foreign org unit is never returned, even when
    * the mission itself is public.
@@ -141,7 +141,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   List<RefineryOrder> findByMissionIdScoped(
       @Param("missionId") UUID missionId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
@@ -201,8 +201,8 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
 
   /**
    * One page of the refinery orders in the caller's scope triple (see {@link
-   * de.greluc.krt.profit.basetool.backend.service.ScopePredicate}) under the list filters of {@link
-   * #LIST_FILTER}, for the scoped list (REQ-REFINERY-019).
+   * de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}) under the list filters of
+   * {@link #LIST_FILTER}, for the scoped list (REQ-REFINERY-019).
    *
    * @param statuses the statuses to include; never empty
    * @param readyOnly {@code true} to keep only orders whose end is unknown or not after {@code now}
@@ -227,7 +227,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       @Param("now") Instant now,
       @Param("pattern") @Nullable String pattern,
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
@@ -235,7 +235,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * Org-unit-scoped variant of {@link #findByOwnerId(UUID, Pageable)} for the cross-user oversight
    * endpoint: returns only the target user's refinery orders whose {@code owningOrgUnit} falls
    * within the caller's scope (see {@link
-   * de.greluc.krt.profit.basetool.backend.service.ScopePredicate}).
+   * de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}).
    *
    * <p>Refinery is strict-staffel, so the list never returns an order the per-order {@code
    * canSeeRefineryOrder} gate would deny.
@@ -255,7 +255,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   Page<RefineryOrder> findByOwnerIdScoped(
       @Param("ownerId") UUID ownerId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
@@ -302,7 +302,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @Query("SELECT r FROM RefineryOrder r WHERE " + RefineryAccessPolicy.REFINERY_ORDER_SCOPE_TRIPLE)
   Page<RefineryOrder> findAllScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 

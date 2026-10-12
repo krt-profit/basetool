@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;

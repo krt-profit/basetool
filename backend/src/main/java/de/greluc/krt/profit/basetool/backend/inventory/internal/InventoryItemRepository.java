@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStock
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.ScopeSpecifications;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopeSpecifications;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;

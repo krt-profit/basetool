@@ -2391,6 +2391,91 @@ rewritten at once; the one string that is concatenated over two lines (`Material
 corrected by hand again. **Open:** `backend/build-settings.properties` points the mutation tests at
 `backend.service.*`, which holds fewer classes with every module move; not touched here.
 
+**P4-6 — the scope kernel moves into `scope.api` / `scope.internal`; the leadership cascade into `orgunit.api`; the logging SPI into `platform.api` — part 1 done 2026-10-12**
+(carried from §5.1: "the request-scoped scope kernel … and `OwnerScopeService` and `AccessGateService` until the per-domain access policies have taken their methods over").
+1. *Probe* (not a guess): ArchUnit dependencies over the compiled `main` classes, nested and generated
+   classes folded onto their source type, one node per first package segment, the candidates
+   reassigned; throwaway, deleted. The candidates are the eight classes the domain map assigns to
+   `scope` (`OwnerScopeService`, `AccessGateService`, `OrgUnitStampingService`,
+   `RequestScopeResolver`, `ScopePredicate`, `ScopeSpecifications`, `ScopeActiveOrgUnitProvider`,
+   `CustomJwtGrantedAuthoritiesConverter`) and the platform SPI `ActiveOrgUnitProvider`.
+   - *All nine at once* close exactly one cycle, `service ⇄ scope`. The `scope -> service` edges are
+     `RequestScopeResolver -> OrgUnitCascadeService` and `CustomJwtGrantedAuthoritiesConverter ->
+     OrgUnitCascadeService` and `-> UserReconciliationService`; the edge that closes the cycle is
+     `UserService -> OwnerScopeService` (`identity -> scope`, already in the module baseline). Because
+     the four other classes call `RequestScopeResolver`, a fixpoint that takes out the classes with an
+     edge into the cycle leaves only `ScopePredicate`, `ScopeSpecifications` and
+     `ActiveOrgUnitProvider`.
+   - *`OrgUnitCascadeService` is a pure leaf* (the kernel, three orgunit types and
+     `OrgUnitRepository`) and belongs to `orgunit` (§5.1), so it moved to `orgunit.api` as the
+     prerequisite: with it there, only the converter's edge to `UserReconciliationService` is left, and
+     **without the converter nothing closes a cycle** (top-level slices and the layers inside each
+     module).
+   - *`UserReconciliationService` cannot follow it yet.* Moved to `identity.api` it closes
+     `{scope, config, service, identity}`: it calls `UserRegistrationService` and `UserService`, which
+     stay in `service`, and `service` and `config` already reach identity types. The converter
+     therefore waits for the identity slice (below).
+2. *Move* (9 types, 5 tests, 152 files touched; `git mv` and a script for the imports and the
+   fully qualified names in code, Javadoc and strings, then Spotless): to `scope.api`
+   `OwnerScopeService`, `AccessGateService`, `OrgUnitStampingService`, `RequestScopeResolver`,
+   `ScopePredicate` and `ScopeSpecifications`; to `scope.internal` (new `package-info`)
+   `ScopeActiveOrgUnitProvider`; to `platform.api` `ActiveOrgUnitProvider`; to `orgunit.api`
+   `OrgUnitCascadeService`. Placement follows the rule of P4-5: what other modules use goes to `api`,
+   and everything an `api` type depends on goes there too, because `layersInsideEachModuleShould…`
+   refuses `api ⇄ internal`; `OwnerScopeService` calls the other three services, so they lie in `api`
+   beside it, and only the provider, which nothing in `api` names, is internal. The five tests of the
+   moved types followed them (`OwnerScopeServiceTest`, `RequestScopeResolverScopeTest`,
+   `OrgUnitStampingServiceOwnerRequiredTest`, `ScopeActiveOrgUnitProviderTest`,
+   `OrgUnitCascadeServiceTest`).
+3. *Fragments*: `ScopeSpecifications` keeps its four JPQL texts byte-for-byte. `MissionRepository`,
+   `JobOrderRepository` and `ShipRepository` still lie in `repository`, so `MISSION_SCOPE_PREDICATE`,
+   `SHIP_SCOPE_TRIPLE` and `JOB_ORDER_SCOPE_PREDICATE` lost their package-private visibility and are
+   `public` like `INVENTORY_ITEM_SCOPE_TRIPLE` (spliced by `inventory.internal` and
+   `materialexchange.internal`) already was. javac folds the constants, so no dependency tool sees the
+   repositories' reference. `scope.api` does read `OrgUnitMembershipRepository` and `OrgUnitRepository`,
+   so the pair is a source-level cycle that no tool reports until the three repositories move into
+   their modules, whose declarations allow `scope::api` already.
+4. *Unchanged*: SpEL bean names (`ownerScopeService` is explicit, `accessGateService` is the default
+   name of the unchanged class name), REST paths, `@PreAuthorize`, `@Transactional` boundaries, cache
+   names, metrics, and the logger names (none of the moved classes logs); `openapi.json` is
+   byte-identical. The domain map assigned all of them already, by class rule; the package rules
+   `scope`, `platform` and `orgunit` take them now, so the eight class rules of the moved classes left
+   the map. No `allowedDependencies` changed: `scope` allows `orgunit::api` and `platform::api`
+   already, and the one foreign user of `OrgUnitCascadeService` among the modules, `orgchart`, allows
+   `orgunit::api`.
+5. *NullAway*: the whole `scope` tree is checked now (`orgunit.api` and `platform.api` were). The
+   first compile named 13 sites, all callers in modules that were checked already, and the cause was
+   one thing: the moved code took `null` where its Javadoc said so without saying it in the type. Fixed
+   by `@Nullable` on the optional `owningOrgUnitId` of the three picker-resolution methods in
+   `OrgUnitStampingService` and their three delegates in `OwnerScopeService`, on the private
+   `resolveStampedOrgUnit`, on the four `activeOrgUnitId` parameters of `RefineryOrderRepository`
+   (the queries test `IS NULL`), and on `MissionService.formatOrgUnitRef`. No suppression.
+6. *Gates*, set from the failing assertions: the service layer's selection floor 510 → **508** (the
+   record `ScopePredicate` and the interface `ActiveOrgUnitProvider` were selected by the legacy
+   package alone) and the repository layer's target floor 114 → **113** (`ScopeSpecifications` lay in
+   the package). The repository layer's legacy-package anchor was `ScopeSpecifications`; it is
+   `UserRepository` now. Module baseline **32 → 32** (6 module pairs): the file holds the same lines,
+   among them the two `identity -> scope` ones.
+   `ModularityTest` and `ModuleBaselineTest` need no change. 419 tests ran, and only those two floors
+   failed; the rerun of `ArchitectureTest` (45 tests) is green. The 419: the architecture package (the tenancy guard, the domain map, the module gates, the
+   context shape), `ArchitectureTest`, the OpenAPI tests with the frozen contract, the scope tests, the
+   access-policy differential tests, `JobOrderScopeQueryIntegrationTest` and
+   `RefineryOrderRepositoryScopedTest` against Postgres, and the web slices that use the hub through
+   SpEL.
+**What remains of the scope module** (part 2): `CustomJwtGrantedAuthoritiesConverter` stays in
+`service`. It is the only blocked class: it calls `UserReconciliationService.syncUser(jwt)`, an
+identity service of rank 3, so the direction is right and no SPI belongs here; the identity slice has
+to move `UserReconciliationService`, `UserService` and `UserRegistrationService` together first
+(§7.6, identity). After that the converter moves to `scope.internal` (its callers in `config` and
+`exchange.internal` use it by type, so it may need `scope.api`). `OwnerScopeService` and
+`AccessGateService` stay until the per-domain access policies have taken over their methods (§5.4).
+**Corrections:** (1) §5.1 lists the authorities converter as part of the scope kernel, and the
+domain map assigns it there; it is the one scope class that cannot move yet. (2) The plan counted
+`OrgUnitCascadeService` among the orgunit classes only; it is also a blocker of the scope kernel, and
+moving it was not an SPI case but a plain move, because nothing in it points upward. (3) A fixpoint
+over the nine candidates alone moves three classes; the obstacle is not in the scope set but in two
+classes of other modules that still lie in `service`.
+
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
 Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-logic` convention

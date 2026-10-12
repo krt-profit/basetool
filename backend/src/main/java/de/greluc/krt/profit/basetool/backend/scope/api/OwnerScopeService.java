@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.scope.api;
 
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -275,7 +275,8 @@ public class OwnerScopeService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the picker
    *     output is invalid for the target user.
    */
-  public Squadron resolveSquadronForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
+  public Squadron resolveSquadronForPickerOutput(
+      @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
     return orgUnitStampingService.resolveSquadronForPickerOutput(targetUser, owningOrgUnitId);
   }
 
@@ -291,7 +292,8 @@ public class OwnerScopeService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException on an invalid
    *     picker output.
    */
-  public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
+  public OrgUnit resolveOrgUnitForPickerOutput(
+      @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
     return orgUnitStampingService.resolveOrgUnitForPickerOutput(targetUser, owningOrgUnitId);
   }
 
@@ -310,7 +312,7 @@ public class OwnerScopeService {
    */
   @Nullable
   public OrgUnit resolveOrgUnitForPickerOutputNullable(
-      @NotNull User targetUser, UUID owningOrgUnitId) {
+      @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
     return orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
         targetUser, owningOrgUnitId);
   }

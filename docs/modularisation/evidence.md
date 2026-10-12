@@ -9,8 +9,8 @@ methods give different figures, the table says which one it uses.
 **Conventions.** Paths are relative to the repository root. `…backend.` stands for the package
 prefix `de.greluc.krt.profit.basetool.backend.` (likewise `…frontend.`, `…ingest.`), and `…/` in a
 Java path stands for `src/main/java/de/greluc/krt/profit/basetool/<module>/`, so
-`backend/…/service/OwnerScopeService.java` is
-`backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java`. A bare
+`backend/…/scope/api/OwnerScopeService.java` is
+`backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java`. A bare
 `Name.java:line` is the backend main class of that name (all 1,389 backend simple names are unique);
 `ArchitectureTest.java` without a module is the backend test class. Frontend, ingest and
 keycloak-spi classes are named with their module where the context does not make it clear.

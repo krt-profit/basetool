@@ -18,8 +18,9 @@
  */
 
 /**
- * The scope module's published API: its problem codes and the missing-owner exception (plan §5.2,
- * §5.5).
+ * The scope module's published API: the scope kernel (request scope resolution, scope predicate,
+ * create-time stamping, the JPQL fragments), the scope hub, its problem codes and the missing-owner
+ * exception (plan §5.2, §5.4, §5.5).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.scope.api;

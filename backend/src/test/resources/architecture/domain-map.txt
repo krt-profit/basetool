@@ -59,15 +59,7 @@ class DecideDeletionRequestRequest privacy GDPR orchestration, transitional modu
 class ConsolidateAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class MergeAccountRequest privacy GDPR orchestration, transitional module (plan 5.1 rank 13, 7.6)
 class PayoutPreference identity member preference on User (plan 7.3)
-class AccessGateService scope the org-unit gates and the per-row kernel the module access policies call (ADR-0065)
-class OwnerScopeService scope scope facade referenced by 64+ SpEL strings (ADR-0065)
-class ScopeActiveOrgUnitProvider scope the active org unit for the logging MDC (plan 5.3)
-class RequestScopeResolver scope request-scoped pin and ScopePredicate resolution (ADR-0065)
-class OrgUnitStampingService scope create-time owner stamping behind OwnerScopeService (REQ-ORG-004)
-class ScopePredicate scope scope vector returned by OwnerScopeService#currentScopePredicate
-class ScopeSpecifications scope compile-time JPQL scope fragments per aggregate (REQ-DATA-010)
 class AuthHelperService platform the single SecurityContextHolder reader (ArchUnit rule)
-class ActiveOrgUnitProvider platform SPI for the orgUnitId MDC field, implemented by scope (plan 5.3)
 class CustomJwtGrantedAuthoritiesConverter scope JWT -> authorities, incl. contextual org-unit authorities
 class MaterialCollectionEntryDto inventory produced by InventoryAggregationService
 class JobOrderEarmark inventory what the Lager shows of an earmarked job order, in the layer because the job-order repository returns it

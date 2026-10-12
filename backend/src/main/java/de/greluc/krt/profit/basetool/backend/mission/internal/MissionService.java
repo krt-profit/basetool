@@ -49,8 +49,8 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipReposito
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -1239,7 +1239,7 @@ public class MissionService implements MissionCommands {
    * @return the {@code kind:id} reference, or {@code "none"} when {@code orgUnit} is {@code null}.
    */
   @NotNull
-  private static String formatOrgUnitRef(OrgUnit orgUnit) {
+  private static String formatOrgUnitRef(@Nullable OrgUnit orgUnit) {
     return orgUnit == null ? "none" : orgUnit.getKind() + ":" + orgUnit.getId();
   }
 

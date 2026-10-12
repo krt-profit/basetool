@@ -951,7 +951,7 @@ you touch these areas.
   that squadrons sign up for via material claims, a squadron-responsible
   order is private to that squadron + admins (reworked in #340, `V129`).
 - Scope is enforced in the service layer via
-  [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java);
+  [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java);
   controllers gate detail / write endpoints with
   `@PreAuthorize("@ownerScopeService.canEdit…")`.
 - ArchUnit rule `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`

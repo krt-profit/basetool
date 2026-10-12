@@ -45,7 +45,7 @@ release.
 
 ### REQ-ORG-002 — Scope is enforced in the service layer
 
-Use [`OwnerScopeService.currentOrgUnitId()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)
+Use [`OwnerScopeService.currentOrgUnitId()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java)
 for list-endpoint filters (three-component record `ScopePredicate`: `boolean adminAllScope`,
 `UUID activeOrgUnitId`, `Set<UUID> memberOrgUnitIds`) and `OwnerScopeService.canSee*` /
 `canEdit*` for `@PreAuthorize` SpEL on detail/write endpoints. Admins without an active pin
@@ -55,7 +55,7 @@ non-admins see the union of their memberships unless they pin one.
 ### REQ-ORG-003 — Aggregate scope kinds
 
 > The JPQL implementing every scope-predicate triple/escape below is centralised in
-> `repository.ScopeSpecifications` (one compile-time-constant fragment per aggregate) rather than
+> `scope.api.ScopeSpecifications` (one compile-time-constant fragment per aggregate) rather than
 > hand-copied per query — see [`data-persistence.md`](data-persistence.md) REQ-DATA-010. This is an
 > implementation detail; the scope semantics documented here are unchanged.
 >
@@ -337,7 +337,7 @@ product owner called out:
   `NULL` has not happened / does not apply).
 
 Enforced in the scope kernel's `permitsOwnedRow`
-([`OwnerScopeService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)),
+([`OwnerScopeService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/OwnerScopeService.java)),
 which the module access policies call (`canSee/canEditInventoryItem`, `canSee/canEditShip`,
 `canSee/canEditRefineryOrder`; corrected 2026-10-10, the gates had moved out of the scope hub): a shared
 `isCurrentUserOwner(owner)` check runs **before** the strict `owning_org_unit_id` scope check (and

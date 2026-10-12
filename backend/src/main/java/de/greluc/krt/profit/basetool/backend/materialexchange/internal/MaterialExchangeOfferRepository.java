@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.repository.ScopeSpecifications;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopeSpecifications;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

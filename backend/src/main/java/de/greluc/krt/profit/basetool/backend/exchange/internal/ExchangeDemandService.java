@@ -40,9 +40,9 @@ import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProd
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
-import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;

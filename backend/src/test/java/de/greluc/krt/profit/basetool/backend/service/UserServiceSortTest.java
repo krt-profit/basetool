@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.repository.*;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.Collections;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
