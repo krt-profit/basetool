@@ -26,6 +26,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportPreviewDto;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCreateRequest;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintCraftabilityService;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintImportApplyRequest;
@@ -39,9 +42,6 @@ import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprin
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintService;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

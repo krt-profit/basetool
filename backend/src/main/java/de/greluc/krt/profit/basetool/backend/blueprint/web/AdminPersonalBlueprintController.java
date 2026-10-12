@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.web;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportPreviewDto;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCreateRequest;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintImportApplyRequest;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintImportService;
@@ -30,9 +33,6 @@ import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprin
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

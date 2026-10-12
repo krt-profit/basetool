@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportStatus;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportSuggestionDto;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

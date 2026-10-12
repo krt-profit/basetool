@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeDraftService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintDraftDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryDraftRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
 import io.swagger.v3.oas.annotations.Operation;

@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintSource;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCommands;
-import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCreateRequest;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintResponse;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;

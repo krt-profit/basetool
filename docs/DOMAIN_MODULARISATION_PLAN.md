@@ -2797,6 +2797,19 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
 5. *Text scan*: source paths in `bank.md`, `personal-inventory-blueprints.md` and `security-and-access.md` rewritten; one test javadoc named the old package of a moved test.
    The module stays transitional (§5.1 rank 13); dissolving it into `identity` is the REST-surface and GDPR-SPI work, not this step.
 
+**Umbrella step 10 — the blueprint module's last ten types move into `blueprint.api` — done 2026-10-12**
+1. *Probe*: the ten types close no cycle at top level, alone or together with the inventory's ten.
+2. *Move* (61 files; `PersonalBlueprintRepositoryTest` follows): `PersonalBlueprint`, `PersonalBlueprintRepository`, `BlueprintSource`, `BlueprintOwnerProduct`, the import
+   preview, entry, suggestion and status DTOs, the create request and `PersonalBlueprintResponse` to `blueprint.api`. **Derived, not individually reviewed:** the plan names "a read API for
+   the seven finders"; the repository is published in `blueprint.api` instead, as the catalogue and identity do, because the exchange's feed, write, undo and demand services and the
+   job order's blueprint-owner service already call its finders and `blueprint` ranks below both. A read API can replace the published repository later without a path or data change.
+   `PersonalBlueprintResponse` first went to `internal` and moved to `api` when the layer rule showed `PersonalBlueprintCommands` returns it.
+3. *NullAway* (`blueprint` is checked as a whole tree): `PersonalBlueprint.acquiredAt`, `note` and `sourceClientId` and the four optional components of `BlueprintImportEntryDto` carry
+   `@Nullable`; no suppression, no behaviour change.
+4. *Gates*: the domain-map name rule `^(PersonalBlueprint|DefaultBlueprint|…)` assigns no class any more and left; join-column selection 173 -> **165**. The module baseline stays empty.
+   `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: source paths in `hangar-notifications.md` and `personal-inventory-blueprints.md`; nothing in code or resources.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2837,7 +2850,7 @@ before a decision.
         `InventoryItem` and the two allocations move into `inventory.internal`; with them
         `InventoryGameItemReferenceDto`, `JobOrderEarmark`/`MissionEarmark`, `JobOrderMaterialStockRow`
         and `StockViewerAccess`.
-  - [ ] **10.** P4-2 part 2, blueprint: a read API for the seven `PersonalBlueprintRepository` finders,
+  - [x] **10.** done — P4-2 part 2, blueprint: a read API for the seven `PersonalBlueprintRepository` finders,
         the data types the exchange names into `blueprint.api`, then the ten remaining types.
   - [ ] **11.** `hangar` (6), `joborder` (45), `mission` (36): what the foreign modules no longer
         hold after steps 6, 7 and 9; of the eight association-to-id conversions of §5.6 seven are done,

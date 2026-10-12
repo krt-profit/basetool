@@ -17,9 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
-import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
 import java.time.Instant;
 import java.util.UUID;
 

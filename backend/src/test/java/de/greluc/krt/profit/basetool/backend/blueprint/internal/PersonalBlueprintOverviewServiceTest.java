@@ -27,13 +27,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Collection;

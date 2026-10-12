@@ -249,9 +249,10 @@ families, `BlueprintAccessPolicy`, the default-blueprint grant observer and prov
 mappers, the default-blueprint and alias entities and repositories, the DTOs only the blueprint
 controllers use, and its four GDPR participants. No layer class names any of them, so the move closed
 no package cycle. `PersonalBlueprint`, `PersonalBlueprintRepository`, `BlueprintSource`, the import
-preview, suggestion and status DTOs, the create request and response and `BlueprintOwnerProduct` stay in
-the layer packages, because the exchange (feed, write, undo and demand services, the draft and resolve
-services) and the job order's blueprint-owner service read them directly (plan §7.6, P4-2).
+preview, entry, suggestion and status DTOs, the create request and response and `BlueprintOwnerProduct` lie in
+`blueprint.api` (umbrella step 10), because the exchange (feed, write, undo and demand services, the draft and resolve
+services) and the job order's blueprint-owner service read them directly; the repository is published there rather than
+behind a read API (plan §7.6).
 
 The scope kernel moved in part since P4-6 (plan §7.6). `scope.api` holds the request-scope kernel and
 the scope hub: `RequestScopeResolver`, `ScopePredicate`, `OrgUnitStampingService`,

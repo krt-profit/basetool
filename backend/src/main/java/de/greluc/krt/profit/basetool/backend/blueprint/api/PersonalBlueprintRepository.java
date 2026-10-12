@@ -17,10 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.repository;
+package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -151,7 +149,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct(b.ownerUserId, b.productName) FROM PersonalBlueprint b WHERE b.ownerUserId IN :ownerUserIds
+      SELECT new de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct(b.ownerUserId, b.productName) FROM PersonalBlueprint b WHERE b.ownerUserId IN :ownerUserIds
       """)
   List<BlueprintOwnerProduct> findOwnerProductByOwnerUserIdIn(
       @Param("ownerUserIds") Collection<UUID> ownerUserIds);

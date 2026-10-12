@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintFamilies;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintOwnerProduct;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
@@ -36,10 +38,8 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;

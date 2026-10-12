@@ -20,8 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintSource;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.DefaultBlueprintKeys;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCommands;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCreateRequest;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintChangeSet;
@@ -30,11 +34,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChang
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
-import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
-import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;

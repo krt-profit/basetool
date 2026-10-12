@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;

@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;

@@ -153,7 +153,7 @@ hard account deletion ([REQ-DATA-008 in `data-persistence.md`](data-persistence.
   hold and those rows become removable.
 
 **Code links:** [`DefaultBlueprintProvisioningService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintProvisioningService.java),
-[`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
+[`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/api/PersonalBlueprintRepository.java),
 [`UserReconciliationService#syncUser`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/identity/api/UserReconciliationService.java),
 [`DefaultBlueprintKeyService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintKeyService.java)
 (cached default-key set behind the `removable` flag and the delete guard),
@@ -547,7 +547,7 @@ caller's **entire removable owned-blueprint set** in one action, so a user who w
 
 **Code links:** [`PersonalBlueprintController#deleteAll`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/web/PersonalBlueprintController.java),
 [`PersonalBlueprintService#deleteAllOwn`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintService.java),
-[`PersonalBlueprintRepository#deleteRemovableByOwnerUserId`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
+[`PersonalBlueprintRepository#deleteRemovableByOwnerUserId`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/api/PersonalBlueprintRepository.java),
 [`PersonalInventoryBlueprintsPageController#deleteAll`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personalinventory/personal-inventory-blueprints.js)
 (`submitDeleteAll`).
@@ -586,7 +586,7 @@ removable owned blueprints of **every** user at once — a maintenance/reset too
 
 **Code links:** [`AdminPersonalBlueprintController#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/web/AdminPersonalBlueprintController.java),
 [`PersonalBlueprintService#deleteAllForAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintService.java),
-[`PersonalBlueprintRepository#deleteAllRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
+[`PersonalBlueprintRepository#deleteAllRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/api/PersonalBlueprintRepository.java),
 [`AdminPersonalBlueprintsPageController#deleteAllUsers`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminPersonalBlueprintsPageController.java),
 [`admin-personal-blueprints-purge.js`](../../frontend/src/main/resources/static/js/personalinventory/admin-personal-blueprints-purge.js).
 

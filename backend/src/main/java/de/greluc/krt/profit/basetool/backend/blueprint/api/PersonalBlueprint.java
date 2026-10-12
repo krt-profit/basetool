@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
@@ -40,6 +40,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A crafting blueprint one user ({@link #ownerUserId}) has unlocked in-game; part of the Personal
@@ -97,10 +98,12 @@ public class PersonalBlueprint extends AbstractEntity<UUID> {
 
   /** Optional in-game acquisition time; pre-filled from the export timestamp on import. */
   @Column(name = "acquired_at")
+  @Nullable
   private Instant acquiredAt;
 
   /** Optional free-form note the owner attaches to the entry. */
   @Column(length = 2000)
+  @Nullable
   private String note;
 
   /** Where the entry came from, or {@code null} for an entry older than the record of it. */
@@ -110,5 +113,6 @@ public class PersonalBlueprint extends AbstractEntity<UUID> {
 
   /** The exchange client that added the entry, or {@code null} for any other channel. */
   @Column(name = "source_client_id", length = 64)
+  @Nullable
   private String sourceClientId;
 }

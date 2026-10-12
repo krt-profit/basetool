@@ -64,5 +64,5 @@ nothing.
 `admin/api/events/HangarNotices`, `mission/internal/MissionNotificationPublisher`,
 `mission/internal/MissionStructureService`, `mission/internal/MissionUnitShipRelease`, `service/HangarService`, `blueprint/internal/PersonalBlueprintService`,
 `repository/ShipRepository#countFittedByOwnerScoped`,
-`repository/PersonalBlueprintRepository#countRemovableByOwner`,
+`blueprint/api/PersonalBlueprintRepository#countRemovableByOwner`,
 `V280__seed_hangar_and_blueprint_notification_rules.sql` · **Issues:** #2414

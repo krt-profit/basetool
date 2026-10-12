@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportSuggestionDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImports;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.NameResolution;
@@ -44,7 +45,6 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResol
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse.Status;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse.Warning;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportSuggestionDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.service.ShipTypeMatcher;
 import io.micrometer.core.instrument.Counter;

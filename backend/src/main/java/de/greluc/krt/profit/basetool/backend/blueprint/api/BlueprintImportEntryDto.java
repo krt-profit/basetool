@@ -17,11 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One preview row of a blueprint import: an external name and how it resolved. Resolved-product
@@ -41,8 +42,8 @@ import java.util.UUID;
 public record BlueprintImportEntryDto(
     String externalName,
     BlueprintImportStatus status,
-    String productKey,
-    String productName,
-    UUID outputItemId,
-    Instant suggestedAcquiredAt,
+    @Nullable String productKey,
+    @Nullable String productName,
+    @Nullable UUID outputItemId,
+    @Nullable Instant suggestedAcquiredAt,
     List<BlueprintImportSuggestionDto> suggestions) {}

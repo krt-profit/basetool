@@ -19,9 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
-import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

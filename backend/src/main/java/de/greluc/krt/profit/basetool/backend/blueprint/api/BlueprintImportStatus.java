@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
 /**
  * Per-name resolution outcome of a blueprint import preview, deciding whether a row is

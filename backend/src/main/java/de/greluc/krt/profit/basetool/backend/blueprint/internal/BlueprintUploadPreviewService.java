@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintEnvelopeReader;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
 import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

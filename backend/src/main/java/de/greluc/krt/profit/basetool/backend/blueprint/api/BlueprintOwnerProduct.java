@@ -17,21 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import java.time.Instant;
+import java.util.UUID;
 
 /**
- * Payload adding one blueprint to the caller's owned set; the server resolves display name and
- * output item.
+ * JPQL projection of a {@code personal_blueprint} row reduced to its owner and product name, for
+ * the availability overview and the item-order owner drill-down (REQ-DATA-003).
  *
- * @param productKey normalized product key of the blueprint, max 255 chars
- * @param acquiredAt optional in-game acquisition time
- * @param note optional free-form note, max 2000 chars
+ * @param ownerUserId the {@code app_user.id} of the blueprint's owner.
+ * @param productName the product name as stored on the blueprint (case-preserving).
  */
-public record PersonalBlueprintCreateRequest(
-    @NotBlank @Size(max = 255) String productKey,
-    Instant acquiredAt,
-    @Size(max = 2000) String note) {}
+public record BlueprintOwnerProduct(UUID ownerUserId, String productName) {}

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.repository;
+package de.greluc.krt.profit.basetool.backend.blueprint.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,8 +26,6 @@ import de.greluc.krt.profit.basetool.backend.blueprint.internal.DefaultBlueprint
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.DefaultBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
