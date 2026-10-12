@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
@@ -44,7 +46,7 @@ class UserServiceCrossSquadronTest {
 
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
-  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
+  @Mock private MembershipOperations<OrgUnitMembership> membershipOperations;
 
   @InjectMocks private UserService userService;
 
@@ -53,13 +55,12 @@ class UserServiceCrossSquadronTest {
     when(authHelperService.isAdmin()).thenReturn(true);
 
     assertFalse(userService.isCrossSquadronForNonAdmin(USER_ID));
-    verifyNoInteractions(orgUnitMembershipQueryService, ownerScopeService);
+    verifyNoInteractions(membershipOperations, ownerScopeService);
   }
 
   @Test
   void aUserWithoutAStaffelIsCrossSquadron() {
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(USER_ID))
-        .thenReturn(List.of());
+    when(membershipOperations.findStaffelMembershipOrgUnitIds(USER_ID)).thenReturn(List.of());
 
     assertTrue(userService.isCrossSquadronForNonAdmin(USER_ID));
     verifyNoInteractions(ownerScopeService);
@@ -67,7 +68,7 @@ class UserServiceCrossSquadronTest {
 
   @Test
   void aUserInForeignStaffelnOnlyIsCrossSquadron() {
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(USER_ID))
+    when(membershipOperations.findStaffelMembershipOrgUnitIds(USER_ID))
         .thenReturn(List.of(STAFFEL_A, STAFFEL_B));
 
     assertTrue(userService.isCrossSquadronForNonAdmin(USER_ID));
@@ -75,7 +76,7 @@ class UserServiceCrossSquadronTest {
 
   @Test
   void oneVisibleStaffelIsEnough() {
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(USER_ID))
+    when(membershipOperations.findStaffelMembershipOrgUnitIds(USER_ID))
         .thenReturn(List.of(STAFFEL_A, STAFFEL_B));
     when(ownerScopeService.canSeeSquadron(STAFFEL_A)).thenReturn(false);
     when(ownerScopeService.canSeeSquadron(STAFFEL_B)).thenReturn(true);

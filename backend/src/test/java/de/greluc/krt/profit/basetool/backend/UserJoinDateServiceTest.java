@@ -23,9 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -40,7 +41,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class UserJoinDateServiceTest {
 
   @Mock private UserRepository userRepository;
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private MembershipOperations<OrgUnitMembership> membershipOperations;
 
   @InjectMocks private UserService userService;
 

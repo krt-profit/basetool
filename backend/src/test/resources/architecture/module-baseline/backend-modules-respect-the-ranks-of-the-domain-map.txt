@@ -16,10 +16,7 @@ identity -> orgunit: UserMapper -> SquadronMapper
 identity -> orgunit: UserMapper -> SquadronReferenceDto
 identity -> orgunit: UserMapper -> StaffelMembershipResolver
 identity -> orgunit: UserService -> MembershipDeltaRequest
-identity -> orgunit: UserService -> MembershipFlagsPatchRequest
 identity -> orgunit: UserService -> OrgUnitMembership
-identity -> orgunit: UserService -> OrgUnitMembershipQueryService
-identity -> orgunit: UserService -> OrgUnitMembershipService
 identity -> privacy: DiscordRegistrationAdminController -> MergeAccountRequest
 identity -> privacy: DiscordRegistrationAdminController -> UserAccountMergeService
 identity -> privacy: RejectedRegistrationRetentionService -> UserDeletionService

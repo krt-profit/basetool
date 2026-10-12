@@ -2571,6 +2571,52 @@ the move is slice c. (2) The 32 leaf classes of the first probe were not free of
 edge in every case: `Role` and `UserReferenceDto` are named by `User` and the model DTOs and stay;
 `RoleDto`, `RoleMapper` and `RoleService` moved because they point at `Role`, not the other way.
 
+**P4-7, slice b — the membership-operations SPI — done 2026-10-12**
+1. *Callee annotations, read from the code*: the four writes (`reconcileStaffelMemberships`, `addMember`,
+   `removeMember`, `patchFlags`) are plain `@Transactional` (REQUIRED, not `MANDATORY`) on a class
+   that is `readOnly = true` otherwise; the two reads inherit the class-level read-only transaction.
+   `UserService.applyMembershipDelta` is `@Transactional` and `UserService` is read-only otherwise, so
+   the callees join whatever transaction `UserService` holds. The delegate declares no transaction at
+   all, so each callee's propagation applies exactly as before (`OrgUnitMembershipOperationsTest` fails on any
+   `@Transactional` on the class or a method).
+2. *SPI*: `identity.api.MembershipOperations<M>` with the six calls, implemented by
+   `service.OrgUnitMembershipOperations` (bean `orgUnitMembershipOperations`, assigned to `orgunit`
+   by the name rule, `orgunit -> identity` is a lower-rank edge) delegating verbatim to
+   `OrgUnitMembershipService` and `OrgUnitMembershipQueryService`. The rows come back as the
+   managed instances: `UserService` sets the initial flags on the row `addMember` returns, which
+   works only by dirty checking inside the same transaction.
+3. *Types, measured*: a first version named the org-unit request records and the entity in the
+   interface and the baseline test refused it with three new `identity -> orgunit` lines
+   (`MembershipOperations -> MembershipDeltaRequest`, `-> MembershipFlagsPatchRequest`,
+   `-> OrgUnitMembership`), because the baseline may only shrink. The final interface names no
+   org-unit type: the Staffel changes travel as the identity-owned record `StaffelAssignment`, the
+   patch as its three components (the delegate rebuilds `MembershipDeltaRequest.StaffelChange` and
+   `MembershipFlagsPatchRequest` with equal values), and the membership row is the type parameter
+   `M`, bound to `OrgUnitMembership` by `UserService` and by the implementation. `M` goes away when
+   the entity leaves `model` or a read model replaces it.
+4. *Differential test* `UserServiceMembershipSeamDifferentialTest` (real schema, one rolled-back
+   transaction): eight test methods run scenarios once through `UserService.applyMembershipDelta` and once as the
+   direct calls it made before the seam, on two fresh users over the same units: a Staffel set that
+   grows and shrinks, a Spezialkommando added with flags, patched and removed, a mixed delta in
+   request order, an empty delta, a duplicate and a third Staffel, an unknown Staffel and
+   Spezialkommando, a second add, a remove of a non-member, a stale patch, and an unknown user. Every
+   step must leave the same membership rows (unit, kind, role, flags, row version) and the same
+   Staffel ids, the audit rows about the user must be equal in order, and the exceptions must have the
+   same type and message (ids masked). Proven able to fail: swapping the two flags in the delegate
+   turns the add-patch-remove scenario red. `OrgUnitMembershipOperationsTest` pins arguments, return
+   instances, exception identity and the absence of any other call.
+5. *Gates*: baseline **32 → 29**, measured by `ModuleBaselineTest`: `UserService ->
+   OrgUnitMembershipQueryService`, `-> OrgUnitMembershipService` and `-> MembershipFlagsPatchRequest`
+   left. `UserService -> MembershipDeltaRequest` and `-> OrgUnitMembership` stay (the public
+   method signature). No floor, domain-map rule or declaration changed; no NullAway finding; no
+   compiler warning. Six `UserService` unit tests mock the seam now.
+**Corrections:** (1) The slice design said the write calls are `MANDATORY` ("same `MANDATORY`
+semantics"); they are plain `@Transactional`, and the seam keeps that. (2) The design named six
+baseline lines; three left, because the third (`MembershipFlagsPatchRequest`) went with the flat
+patch arguments, and `MembershipDeltaRequest` stays in `UserService`'s signature. (3) A `null`
+element in `staffeln` (the request validates the elements but not their presence) now fails with a
+`NullPointerException` in `UserService` instead of in the reconcile; both are the same type.
+
 ### 7.7 Phase 5 — Gradle modules for exchange and bank
 
 Right after Phases 2–4 (D-23, which drops the soak of some releases): `build-logic` convention
