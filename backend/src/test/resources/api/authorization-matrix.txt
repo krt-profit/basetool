@@ -252,8 +252,8 @@ GET /api/v1/me/layout | MeController#getLayout | pre=isAuthenticated() | url=any
 GET /api/v1/missions | MissionController#getAllMissions | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
 POST /api/v1/missions | MissionController#createMission | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
 GET /api/v1/missions/lookup | MissionController#lookupMissions | pre=isAuthenticated() | url=anyRequest -> authenticated
-GET /api/v1/missions/me/payout-preference | UserController#getMyPayoutPreference | pre=isAuthenticated() | url=anyRequest -> authenticated
-PUT /api/v1/missions/me/payout-preference | UserController#updateMyPayoutPreference | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/missions/me/payout-preference | MyPayoutPreferenceController#getMyPayoutPreference | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/missions/me/payout-preference | MyPayoutPreferenceController#updateMyPayoutPreference | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/missions/next | MissionController#getNextMission | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() | url=anyRequest -> authenticated
 DELETE /api/v1/missions/{id} | MissionController#deleteMission | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/missions/{id} | MissionController#getMissionById | pre=isAuthenticated() and @authHelperService.isMemberOrAbove() and @missionAccessPolicy.canSeeMission(#id) | url=anyRequest -> authenticated

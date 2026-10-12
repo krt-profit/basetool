@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.app.web;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
-import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
@@ -30,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
@@ -77,7 +75,6 @@ public class UserController {
   private final UserMapper userMapper;
   private final UserReferenceSearchService userReferenceSearchService;
   private final UserSyncService userSyncService;
-  private final MemberPayoutSettings memberPayoutSettings;
   private final MemberBlueprintSharings memberBlueprintSharings;
 
   /** The consolidate action's orchestrator (REQ-SEC-055): duplicate in, survivor out. */
@@ -154,49 +151,6 @@ public class UserController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
     return userReferenceSearchService.search(query, page, size, sort);
-  }
-
-  /**
-   * Returns the calling user's personal default payout preference and the current optimistic-lock
-   * version, backing the profile page's payout-preference selector. Derived from the JWT subject —
-   * a caller can only ever read their own. A {@code null} preference means the user has made no
-   * explicit choice yet (mission sign-up then falls back to {@code PAYOUT}, and the selector
-   * pre-selects {@code PAYOUT}).
-   *
-   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
-   * @return the current default payout preference (possibly {@code null}) plus the user-row
-   *     version.
-   */
-  @NotNull
-  @GetMapping("/missions/me/payout-preference")
-  @PreAuthorize("isAuthenticated()")
-  @Transactional(readOnly = true)
-  public MyPayoutPreferenceResponse getMyPayoutPreference(@AuthenticationPrincipal Jwt jwt) {
-    MemberPayoutSettings.Snapshot setting =
-        memberPayoutSettings.snapshotOf(userService.getUserIdFromJwt(jwt));
-    return new MyPayoutPreferenceResponse(setting.preference(), setting.version());
-  }
-
-  /**
-   * Sets the calling user's personal default payout preference. The JWT identifies the row — no
-   * impersonation possible. Carries the optimistic-lock version so a concurrent edit surfaces as a
-   * 409 instead of a silent overwrite. The new value only pre-fills future mission sign-ups; it
-   * does not rewrite existing participations.
-   *
-   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
-   * @param request the new preference plus the expected version.
-   * @return the persisted preference and the new version.
-   */
-  @NotNull
-  @PutMapping("/missions/me/payout-preference")
-  @PreAuthorize("isAuthenticated()")
-  public MyPayoutPreferenceResponse updateMyPayoutPreference(
-      @AuthenticationPrincipal Jwt jwt,
-      @NotNull @RequestBody @Valid MyPayoutPreferenceRequest request) {
-    MemberPayoutSettings.Snapshot setting =
-        memberPayoutSettings.update(
-            userService.getUserIdFromJwt(jwt), request.preference(), request.version());
-    return new MyPayoutPreferenceResponse(setting.preference(), setting.version());
   }
 
   /**
@@ -327,30 +281,6 @@ public class UserController {
         accountConsolidationService.consolidate(
             id, body.targetUserId(), body.version(), adminUserId));
   }
-
-  /**
-   * Response for {@link #getMyPayoutPreference} / {@link #updateMyPayoutPreference}: the user's
-   * current default payout preference (or {@code null} when never chosen) plus the user-row
-   * optimistic-lock version the selector echoes back on save.
-   *
-   * @param defaultPayoutPreference the stored default, or {@code null} for "no explicit choice".
-   * @param version the user row's current {@code @Version}.
-   */
-  public record MyPayoutPreferenceResponse(
-      @Nullable PayoutPreference defaultPayoutPreference, Long version) {}
-
-  /**
-   * Body for {@link #updateMyPayoutPreference}: the new default payout preference and the expected
-   * optimistic-lock version. The preference is {@code @NotNull} — the profile selector always posts
-   * a concrete {@code PAYOUT} / {@code DONATE} (a user wanting the implicit default simply picks
-   * {@code PAYOUT}); there is no API path that clears it back to {@code null}.
-   *
-   * @param preference the new default payout preference; never {@code null}.
-   * @param version the {@code @Version} of the user row the caller last read; never {@code null}.
-   */
-  public record MyPayoutPreferenceRequest(
-      @jakarta.validation.constraints.NotNull PayoutPreference preference,
-      @jakarta.validation.constraints.NotNull Long version) {}
 
   /**
    * Response for {@link #getMyBlueprintSharing} / {@link #updateMyBlueprintSharing}: whether the

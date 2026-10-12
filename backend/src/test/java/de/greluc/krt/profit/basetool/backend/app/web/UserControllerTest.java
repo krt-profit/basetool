@@ -25,7 +25,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
-import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceSearchService;
@@ -33,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.mission.api.MemberPayoutSettings;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
@@ -66,7 +64,6 @@ class UserControllerTest {
   @Mock private UserReferenceSearchService userReferenceSearchService;
 
   @Mock private UserSyncService userSyncService;
-  @Mock private MemberPayoutSettings memberPayoutSettings;
   @Mock private MemberBlueprintSharings memberBlueprintSharings;
   @Mock private TaskMetrics taskMetrics;
   @Mock private Jwt jwt;
@@ -105,47 +102,6 @@ class UserControllerTest {
 
     assertSame(refs, result);
     verifyNoInteractions(userMapper);
-  }
-
-  @Test
-  void getMyPayoutPreference_resolvesIdFromJwt_andReturnsPreferenceAndVersion() {
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    when(memberPayoutSettings.snapshotOf(CALLER_ID))
-        .thenReturn(new MemberPayoutSettings.Snapshot(PayoutPreference.DONATE, 4L));
-
-    UserController.MyPayoutPreferenceResponse result = controller.getMyPayoutPreference(jwt);
-
-    assertEquals(PayoutPreference.DONATE, result.defaultPayoutPreference());
-    assertEquals(4L, result.version());
-  }
-
-  @Test
-  void getMyPayoutPreference_returnsNullPreference_whenUserNeverChose() {
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    when(memberPayoutSettings.snapshotOf(CALLER_ID))
-        .thenReturn(new MemberPayoutSettings.Snapshot(null, 0L));
-
-    UserController.MyPayoutPreferenceResponse result = controller.getMyPayoutPreference(jwt);
-
-    assertNull(
-        result.defaultPayoutPreference(), "no explicit choice surfaces as a null preference");
-    assertEquals(0L, result.version());
-  }
-
-  @Test
-  void updateMyPayoutPreference_resolvesIdFromJwt_andForwardsPreferenceAndVersion() {
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    UserController.MyPayoutPreferenceRequest req =
-        new UserController.MyPayoutPreferenceRequest(PayoutPreference.DONATE, 2L);
-    when(memberPayoutSettings.update(CALLER_ID, PayoutPreference.DONATE, 2L))
-        .thenReturn(new MemberPayoutSettings.Snapshot(PayoutPreference.DONATE, 3L));
-
-    UserController.MyPayoutPreferenceResponse result =
-        controller.updateMyPayoutPreference(jwt, req);
-
-    assertEquals(PayoutPreference.DONATE, result.defaultPayoutPreference());
-    assertEquals(3L, result.version());
-    verify(memberPayoutSettings).update(CALLER_ID, PayoutPreference.DONATE, 2L);
   }
 
   @Test

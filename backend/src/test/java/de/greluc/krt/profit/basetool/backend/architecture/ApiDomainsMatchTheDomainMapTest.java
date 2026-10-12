@@ -88,7 +88,11 @@ class ApiDomainsMatchTheDomainMapTest {
           Map.entry(
               "BankMemberSearchController",
               "identity: the REST cut serves the member searches under identity; the code serves"
-                  + " the bank pickers' twins from the bank module"));
+                  + " the bank pickers' twins from the bank module"),
+          Map.entry(
+              "MyPayoutPreferenceController",
+              "identity: the REST cut serves the payout preference under identity; the code keeps"
+                  + " the setting with the mission module"));
 
   /** The controllers today; a smaller selection would check less. */
   private static final int CONTROLLER_FLOOR = 98;
