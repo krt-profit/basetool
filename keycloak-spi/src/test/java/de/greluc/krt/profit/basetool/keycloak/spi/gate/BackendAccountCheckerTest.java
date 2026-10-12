@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import de.greluc.krt.profit.basetool.keycloak.spi.LogCapture;
 import de.greluc.krt.profit.basetool.keycloak.spi.gate.BackendAccountChecker.Result;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -32,6 +33,7 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -66,8 +68,9 @@ class BackendAccountCheckerTest {
   @Test
   void featureDisabled503_failsOpenUnknown() throws IOException {
     HttpServer server = start(respond(503, ""));
-    try {
+    try (LogCapture log = LogCapture.of(BackendAccountChecker.class)) {
       assertEquals(Result.UNKNOWN, check(server, Duration.ofSeconds(2)));
+      assertTrue(log.logged(Level.WARNING));
     } finally {
       server.stop(0);
     }
@@ -76,8 +79,9 @@ class BackendAccountCheckerTest {
   @Test
   void badSecret401_failsOpenUnknown() throws IOException {
     HttpServer server = start(respond(401, ""));
-    try {
+    try (LogCapture log = LogCapture.of(BackendAccountChecker.class)) {
       assertEquals(Result.UNKNOWN, check(server, Duration.ofSeconds(2)));
+      assertTrue(log.logged(Level.WARNING));
     } finally {
       server.stop(0);
     }
@@ -86,8 +90,9 @@ class BackendAccountCheckerTest {
   @Test
   void malformedBody_failsOpenUnknown() throws IOException {
     HttpServer server = start(respond(200, "this is not json"));
-    try {
+    try (LogCapture log = LogCapture.of(BackendAccountChecker.class)) {
       assertEquals(Result.UNKNOWN, check(server, Duration.ofSeconds(2)));
+      assertTrue(log.logged(Level.WARNING));
     } finally {
       server.stop(0);
     }
@@ -115,8 +120,9 @@ class BackendAccountCheckerTest {
               }
               writeResponse(exchange, 200, "{\"exists\":true}");
             });
-    try {
+    try (LogCapture log = LogCapture.of(BackendAccountChecker.class)) {
       assertEquals(Result.UNKNOWN, check(server, Duration.ofMillis(300)));
+      assertTrue(log.logged(Level.WARNING));
     } finally {
       server.stop(0);
     }
