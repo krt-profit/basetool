@@ -1,17 +1,17 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:8a7123b8-e7ea-4db3-9cdf-56da4930bc25",
+  "serialNumber" : "urn:uuid:750eafca-6092-42a9-acf0-4cc78426f817",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-10-11T16:19:49Z",
+    "timestamp" : "2026-10-12T07:29:02Z",
     "tools" : {
       "components" : [
         {
           "type" : "application",
           "author" : "CycloneDX",
           "name" : "cyclonedx-gradle-plugin",
-          "version" : "3.4.1"
+          "version" : "3.5.1"
         }
       ]
     },
@@ -25,12 +25,8 @@
       "modified" : false,
       "externalReferences" : [
         {
-          "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/38154932131"
-        },
-        {
           "type" : "vcs",
-          "url" : "https://github.com/krt-profit/basetool"
+          "url" : "https://github.com/krt-profit/basetool.git"
         }
       ]
     }
@@ -6161,43 +6157,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.commonmark/commonmark@0.30.0?type=jar",
+      "bom-ref" : "pkg:maven/org.commonmark/commonmark@0.30.1?type=jar",
       "group" : "org.commonmark",
       "name" : "commonmark",
-      "version" : "0.30.0",
+      "version" : "0.30.1",
       "description" : "Core of commonmark-java (a library for parsing Markdown to an AST, modifying the AST and rendering it to HTML or Markdown)",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "4da0c702b6551c89fbf53a3c1a6a581c"
+          "content" : "581e924354c7ecafb9e886022dfab932"
         },
         {
           "alg" : "SHA-1",
-          "content" : "fc611136b3191a08d2b84c5d5a26116e3531afee"
+          "content" : "afb908826d0948e91df1a7c0592039b00f35c0d6"
         },
         {
           "alg" : "SHA-256",
-          "content" : "090f0a758ac2f4f51aa86dff9dff0fdf7403666d0efd29f59886dc8e8b1eac53"
+          "content" : "9b0d20064975a17e876fcb4b599c6b3667f46a7739ed61e2f06c96f44b50629f"
         },
         {
           "alg" : "SHA-512",
-          "content" : "88468209cb33c25237d039207c876198488cb2b5d9ffe1b7791e4d40854c5bfd3e267a3fb71ccf03528a8a83beb9b621fd54c4a6563d4a3a8d0969f31994d238"
+          "content" : "98a349bcb75a2cfa570c13bada5bbf4ed78b7ba022e535fe66fd96c313cba4f85873c536911a51b9e9fff24f01738e72d7a3a0d3dbc09e4eb0a388beab5c0e87"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "3a0e7b649f4159dd9857c1756f7ec3fa35f5746272828d6408582a6f6ed7b891"
+          "content" : "763000385cb0f4ecc9f73443c713c6682638bea48157f21211545560301cb5ec"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "cad669422207b95a9587590247873e13cbd9c3f1e7065933934e517fbb5e15b492f05e582c62b8bd8be99c617157fc633b266509d47b778d540ed0f37aa741bf"
+          "content" : "9f2677433a9aa736eb6a5a198e7b7a6891db79798ccfad4ceca5bc4630f1ec88435fbc9ab0007f7996c925d2461d709c4c11375e056856bb6a2d10c8bf92cb44"
         },
         {
           "alg" : "SHA-384",
-          "content" : "f94220a6dd64e63c2be10a41e041ed8987658d903a5c345f8574ba1f42b676f0aafbfea5615a87111937212236b84db8"
+          "content" : "450ec12086665d68e05e04e659abe6cff017d2e81f49ac0c102ab670b4165585a473c86d84a456b7f5108e07eb5e1795"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "dc2009aab662f3107e24a31dde35346309c47a63a902bd7e2dc61480e942360c88159bca58c000f4e09d729480f4243d"
+          "content" : "04d9f18a2c9289d203d0c9d87d2a72c17ecb0da417c306eaa1ef5f1193263e0fe946c4af18157c5391899f0f433501d0"
         }
       ],
       "licenses" : [
@@ -6208,7 +6204,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.commonmark/commonmark@0.30.0?type=jar",
+      "purl" : "pkg:maven/org.commonmark/commonmark@0.30.1?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -12967,7 +12963,7 @@
         "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.1?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
-        "pkg:maven/org.commonmark/commonmark@0.30.0?type=jar",
+        "pkg:maven/org.commonmark/commonmark@0.30.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.1?type=jar",
@@ -13607,7 +13603,7 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/org.commonmark/commonmark@0.30.0?type=jar",
+      "ref" : "pkg:maven/org.commonmark/commonmark@0.30.1?type=jar",
       "dependsOn" : [ ]
     },
     {

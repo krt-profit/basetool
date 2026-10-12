@@ -28,7 +28,7 @@ val generatedContract = layout.buildDirectory.dir("generated/openapi")
 openApiGenerate {
   generatorName.set("java")
   inputSpec.set(
-    rootProject.layout.projectDirectory.file("backend/src/main/resources/api/openapi.json")
+    rootProject.layout.projectDirectory.file("backend/src/main/resources/api/openapi.json"),
   )
   cleanupOutput.set(true)
   outputDir.set(generatedContract)
@@ -45,7 +45,7 @@ openApiGenerate {
       "hideGenerationTimestamp" to "true",
       "supportUrlQuery" to "false",
       "sourceFolder" to "src/main/java",
-    )
+    ),
   )
 }
 
@@ -84,7 +84,7 @@ val resolvedAppVersion: Provider<String> =
             }
         }
           .getOrNull() ?: projectVersion
-      }
+      },
     )
     .map { it.removePrefix("v") }
 
@@ -265,7 +265,7 @@ val generateOssLicenses =
 
       val bundled =
         ((slurper.parse(bundledComponents) as Map<*, *>)["components"] as List<*>).filterIsInstance<
-          Map<*, *>
+          Map<*, *>,
         >()
 
       val out = outputFile.get().asFile
@@ -276,13 +276,13 @@ val generateOssLicenses =
             mapOf(
               "generator" to generator,
               "components" to components.values + bundled,
-            )
-          )
+            ),
+          ),
         ),
         Charsets.UTF_8,
       )
       logger.lifecycle(
-        "generateOssLicenses: ${components.size} libraries + ${bundled.size} bundled components"
+        "generateOssLicenses: ${components.size} libraries + ${bundled.size} bundled components",
       )
     }
   }
@@ -319,7 +319,7 @@ tasks.named<Test>("test") {
   inputs
     .files(
       rootProject.file(
-        "frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/E2eStackExtension.java"
+        "frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/E2eStackExtension.java",
       ),
       rootProject.file("frontend/src/e2e/resources/realm-export.e2e.json"),
     )
@@ -385,7 +385,7 @@ val minifyStaticCss =
       if (totalBefore > 0) {
         val pct = 100.0 * (totalBefore - totalAfter) / totalBefore
         logger.lifecycle(
-          "minifyStaticCss: ${totalBefore} -> ${totalAfter} bytes (-${"%.1f".format(pct)}%)"
+          "minifyStaticCss: ${totalBefore} -> ${totalAfter} bytes (-${"%.1f".format(pct)}%)",
         )
       }
     }
@@ -431,11 +431,11 @@ val playwrightInstall =
         requested in allBrowsers -> listOf(requested)
         else ->
           throw GradleException(
-            "-Pe2e.browser=$requested is not one of $allBrowsers; nothing would be installed for it"
+            "-Pe2e.browser=$requested is not one of $allBrowsers; nothing would be installed for it",
           )
       }
     setArgs(
-      if (withDeps) listOf("install", "--with-deps") + browsers else listOf("install") + browsers
+      if (withDeps) listOf("install", "--with-deps") + browsers else listOf("install") + browsers,
     )
   }
 
@@ -508,7 +508,7 @@ val lintCssInline =
         "--config",
         ".stylelintrc.templates.json",
         "src/main/resources/templates/**/*.html",
-      )
+      ),
     )
     ignoreExitValue.set(false)
     inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
@@ -518,7 +518,7 @@ val lintCssInline =
 
 val probeSource =
   layout.projectDirectory.file(
-    "src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/TouchClassLayoutE2eTest.java"
+    "src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/TouchClassLayoutE2eTest.java",
   )
 val extractProbeScript = layout.projectDirectory.file("scripts/extract-probe-js.mjs")
 val extractedProbe = layout.buildDirectory.file("probe/probe.js")
@@ -548,7 +548,7 @@ val lintProbeJs =
         "--config",
         "eslint.probe.config.mjs",
         extractedProbe.get().asFile.absolutePath,
-      )
+      ),
     )
     ignoreExitValue.set(false)
     inputs.file(extractedProbe)
@@ -597,7 +597,7 @@ val prettierCheck =
         "src/main/resources/static/js/**/*.js",
         "types/**/*.d.ts",
         "scripts/**/*.mjs",
-      )
+      ),
     )
     ignoreExitValue.set(false)
     inputs.files(fileTree("src/main/resources/static/css") { include("**/*.css") })
@@ -605,7 +605,7 @@ val prettierCheck =
       fileTree("src/main/resources/static/js") {
         include("**/*.js")
         exclude("vendor/**")
-      }
+      },
     )
     inputs.files(fileTree("types") { include("**/*.d.ts") })
     inputs.files(fileTree("scripts") { include("**/*.mjs") })
@@ -626,7 +626,7 @@ tasks.register<NpxTask>("prettierApply") {
       "src/main/resources/static/js/**/*.js",
       "types/**/*.d.ts",
       "scripts/**/*.mjs",
-    )
+    ),
   )
   ignoreExitValue.set(false)
 }
@@ -663,7 +663,7 @@ val typecheckJs =
       fileTree("src/main/resources/static/js") {
         include("**/*.js")
         exclude("vendor/**")
-      }
+      },
     )
     inputs.files(fileTree("types") { include("**/*.d.ts") })
     inputs.file(generatedApiTypes)
@@ -686,7 +686,7 @@ val testTypecheckRatchet =
     inputs.files(
       fileTree("src/main/resources/static/js") {
         include("*.js")
-      }
+      },
     )
     outputs.upToDateWhen { false }
   }
@@ -713,7 +713,7 @@ val testLiveSyncJs =
     ignoreExitValue.set(false)
     inputs.file(layout.projectDirectory.file("scripts/krt-live-sync.test.mjs"))
     inputs.file(
-      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-live-sync.js")
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-live-sync.js"),
     )
     outputs.upToDateWhen { false }
   }
@@ -727,7 +727,7 @@ val testPromotionCsvEscape =
     ignoreExitValue.set(false)
     inputs.file(layout.projectDirectory.file("scripts/promotion-csv-escape.test.mjs"))
     inputs.file(
-      layout.projectDirectory.file("src/main/resources/static/js/promotion/promotion-manage.js")
+      layout.projectDirectory.file("src/main/resources/static/js/promotion/promotion-manage.js"),
     )
     outputs.upToDateWhen { false }
   }

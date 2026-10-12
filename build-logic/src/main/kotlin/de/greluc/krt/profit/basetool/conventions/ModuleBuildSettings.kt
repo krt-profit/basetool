@@ -20,7 +20,7 @@ class ModuleBuildSettings(
     values[key]?.trim()?.takeIf { it.isNotEmpty() }
       ?: throw GradleException(
         "$projectPath: $source does not set '$key'. Every module declares its own quality " +
-          "settings for each plugin it applies; nothing falls back to a default (REQ-OPS-037)."
+          "settings for each plugin it applies; nothing falls back to a default (REQ-OPS-037).",
       )
 
   private fun floor(key: String): BigDecimal {
@@ -88,7 +88,7 @@ fun Project.moduleBuildSettings(): ModuleBuildSettings {
     providers.fileContents(file).asText.orNull
       ?: throw GradleException(
         "$path: $source is missing. Every Java module declares its test heap, and its coverage " +
-          "floors and mutation targets when it applies JaCoCo or PIT (REQ-OPS-037)."
+          "floors and mutation targets when it applies JaCoCo or PIT (REQ-OPS-037).",
       )
   val properties = Properties().apply { load(StringReader(text)) }
   val values = properties.stringPropertyNames().associateWith { properties.getProperty(it) }

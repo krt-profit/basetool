@@ -38,7 +38,7 @@ tasks.withType<Test>().configureEach {
     CommandLineArgumentProvider {
       agent.files.singleOrNull()?.let { listOf("-Xshare:off", "-javaagent:${it.absolutePath}") }
         ?: emptyList()
-    }
+    },
   )
 }
 

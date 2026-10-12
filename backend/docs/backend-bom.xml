@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:bb33a4b5-fb2e-4f94-a872-ef7dec6f802c" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:4e4c0786-4bb2-4226-a0ae-5be1d8b36d2b" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-10-11T16:19:49Z</timestamp>
+    <timestamp>2026-10-12T07:29:02Z</timestamp>
     <tools>
       <components>
         <component type="application">
           <author>CycloneDX</author>
           <name>cyclonedx-gradle-plugin</name>
-          <version>3.4.1</version>
+          <version>3.5.1</version>
         </component>
       </components>
     </tools>
@@ -18,11 +18,8 @@
       <purl>pkg:maven/de.greluc.krt.profit.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend</purl>
       <modified>false</modified>
       <externalReferences>
-        <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/38154932131</url>
-        </reference>
         <reference type="vcs">
-          <url>https://github.com/krt-profit/basetool</url>
+          <url>https://github.com/krt-profit/basetool.git</url>
         </reference>
       </externalReferences>
     </component>
@@ -2528,76 +2525,76 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-core@13.9.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-core@13.10.0?type=jar">
       <group>org.flywaydb</group>
       <name>flyway-core</name>
-      <version>13.9.0</version>
+      <version>13.10.0</version>
       <hashes>
-        <hash alg="MD5">d37c6c00bf0f928e36dfe15cbeadbd52</hash>
-        <hash alg="SHA-1">3eb571c2b59efe92d4c3bd2e77471ff6db75c119</hash>
-        <hash alg="SHA-256">d7ef137f0c02ef18fb85f21370504c737061a446d0387109ee6111ff27e631fe</hash>
-        <hash alg="SHA-512">3f1ac56868852a3b2794308186493700eae07a865e6ca641511ea388ee75c26cb568e29ed76ad5a6dc81e6807b620bb782c86e83d3a21848c99119203db63f2d</hash>
-        <hash alg="SHA3-256">5c518cf666ddf04a6d9a788a1d57efc9119539554153a8c7c36ddcd89f49dfb1</hash>
-        <hash alg="SHA3-512">f87d0f2d41878d914f62b062ffbc339ff27f4b3791b20af750eef5ab3eb096ff007cf415769a02bbb3c7e2da2213b15f281f0e9500a37b38e4cd11ad1ae96fe5</hash>
-        <hash alg="SHA-384">b2c16a21e2de284bbf17e7350f6771585ca21e60ba1cd39837b58157d08c676b9ddd6dae2ee3950418b9d3d41cbcab89</hash>
-        <hash alg="SHA3-384">4cbaaab7cb5394dbb67da4e9752aacfae58230280dce02c14f0ee1cbb10e41b50f9bb0c41de8ba2766999d9305673b99</hash>
+        <hash alg="MD5">54f5a4029a0f0c4e0cf9e09cfd0e115a</hash>
+        <hash alg="SHA-1">4f94241984f040655f24a56cccba586650091a00</hash>
+        <hash alg="SHA-256">e45a2ff698e42070d223e5edce579921710fcd94ac195bd3a57d676af04b1a88</hash>
+        <hash alg="SHA-512">50f9a72ae2f71e21fc449ef9e7772c9244a7180fe966c4c341aae09f928773bbec6bf38e5fde4bd443787ca7e67bcf47e7bbee1b50585592ab47b35a5572c143</hash>
+        <hash alg="SHA3-256">e890a550745d6925df7f55e1338200da180f6e5bf21c777225edea4959e3e13b</hash>
+        <hash alg="SHA3-512">4722629c848541b033ca2f6172662e6e6401f7b3018ea02c7e4d74c4adad36af8e60939eb03e2cec34f9772a60fa993adc5efca97d74fe7b834a0b265bba07ee</hash>
+        <hash alg="SHA-384">be8101e7cbc5fb0186cb6e311a9b90143b7bdfd76d0fde494792ce43e03636b8e1053dbbcb7cd1d2d3f92a3bdd595607</hash>
+        <hash alg="SHA3-384">c2421cf668dffdefeb8a40608dc96da498409bbaf9c54e7dba832f904b3f2370dd5167267ee85219b8db9fd2f1382067</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.flywaydb/flyway-core@13.9.0?type=jar</purl>
+      <purl>pkg:maven/org.flywaydb/flyway-core@13.10.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.9.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.10.0?type=jar">
       <group>org.flywaydb</group>
       <name>flyway-database-cockroachdb</name>
-      <version>13.9.0</version>
+      <version>13.10.0</version>
       <hashes>
-        <hash alg="MD5">129b0ffddfa8ebf8cd5d04b910af565d</hash>
-        <hash alg="SHA-1">5efdc251e53de6a2b20a7bc5f48cf06aa6cba3b2</hash>
-        <hash alg="SHA-256">5df0261e26f14ad8ede5673ec2723d8687852fa47a384934f1a52a97c1c73d3a</hash>
-        <hash alg="SHA-512">65ee79b4017e974a2eb6715e172406a4dc674982688fffa05ae2310250712005d315d55282f8f1bca69bb25c6f27114e02a66b9d0b91c48d18a7842e31b2515d</hash>
-        <hash alg="SHA3-256">ec95cda887d850f1a2da8bbe2f86e7629cd54c0e069fa45facd3fcef7093d60c</hash>
-        <hash alg="SHA3-512">463bcc6e13b3a70101cd0cb029f4f42234294bbc3afa7350cf2acccf7396d5a1327f03038dc8ce6beb635bc5bc16f51523022e2fa989b5c49f265f974ca67f0d</hash>
-        <hash alg="SHA-384">17905715193d0ca9eabc9768dee7c03d7b7a5c1c7d89db51b603b9d602ae6c75e9f7a55aeb14dc7b2f882b7688f3ee68</hash>
-        <hash alg="SHA3-384">c5409b3a5138fa1c2d30e12f524a42eb8b5e71f1aeb43dbf2125318d7ed854eea78d1a2b0f2c19f8b17d3aa81d8ef32c</hash>
+        <hash alg="MD5">c41cc2d2c01cc97b9569a6c4786ca5c5</hash>
+        <hash alg="SHA-1">ac1690dc10c17e8d954b1184ce9ecc60afda9277</hash>
+        <hash alg="SHA-256">d4f981515a68761f81be992f69d7fff5ff78eac11fc3da435029ca546b816fe8</hash>
+        <hash alg="SHA-512">be129479ed0efee519b798a09262becf28f3c9ca1fcbeb0efa808a10dbc3c2235a2e0919b5ecda48f17e058536cc31611b30a7cd0685f23df44fc6676bd5e10d</hash>
+        <hash alg="SHA3-256">567abf26226d05194c8ce1ff8094bc2617ae1651f9754bd8e0caaebe1590f4c3</hash>
+        <hash alg="SHA3-512">0439a09f61d7f0bdcd1c63c82913f853b44636c47c8b8d47567f826f831a52b3d800ef584f1062c35755005cf0ae8a7845339b02337d5fee45fb30ef977d4e8d</hash>
+        <hash alg="SHA-384">892533ede40b408ff9273e6b5311fe14d505e09a07e29a54c33fc65ae7e41a019576609f84f3b600cd6111fecbd25c25</hash>
+        <hash alg="SHA3-384">c2dc3c5647eb638208fb2fd5d28db3ad99c1ee567637c67bbca0c38ffbfd4ec41bceb56647c1210a5ef3aeb8b560ead4</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.9.0?type=jar</purl>
+      <purl>pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.10.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.9.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.10.0?type=jar">
       <group>org.flywaydb</group>
       <name>flyway-database-postgresql</name>
-      <version>13.9.0</version>
+      <version>13.10.0</version>
       <hashes>
-        <hash alg="MD5">8002fec471ae80b6a2fc95fd84841bec</hash>
-        <hash alg="SHA-1">bd293e850ca67c6f4730da8d4043586e21e49030</hash>
-        <hash alg="SHA-256">cab30d5a1a4de2723b55601ebb54ec412e869d8b7583f45acdd32cff7c037ef7</hash>
-        <hash alg="SHA-512">3b7315e2f3bd83fbcd87dbdd90e0f163388a2dd216426f2e2176e0441f0b6552d6bf0b91f99a6d99ecf59a3d04df989b3a616517755fe5d420d674bbe3f98a2d</hash>
-        <hash alg="SHA3-256">fc5a83faa0c8c720c617a0c31468f19ef37c2d855d7cd2377b1108957a8536de</hash>
-        <hash alg="SHA3-512">c22b9b18833585c114e3dc164e6d971e160c1ed3b6f02d660fc0670b2cab623e7f95dc0a8efb8050346ba3a88dad2917c488d1e75a37349887850c057fd06574</hash>
-        <hash alg="SHA-384">66d11242a7d98f3f2c2eb08f165c181c7f8e0d40016550ffdee75012f9f4785c56eaae01c82e005c2ea86c877f49d843</hash>
-        <hash alg="SHA3-384">f9714fec0e36a12d9b8dc8c441749777f42ee824369d489df11fde305c53618dcf86d77511edfcdb1c4dd45cefba2793</hash>
+        <hash alg="MD5">3b727036dd1d45a05bb9ccdca8908a92</hash>
+        <hash alg="SHA-1">f71a5123dbd3647fdfaf1c0bed7a402725df17da</hash>
+        <hash alg="SHA-256">b564729935c122546dd97d30d32c3d258703dbc7821b47aebb4d909b52faf477</hash>
+        <hash alg="SHA-512">5af109759181456741a3c8865c970e79ff363fe05588713ea99989debbfcafe18724f9ead332f1f8f408da31f2840eb517ec9b09b5dc1fae5bdef065d3e87ce3</hash>
+        <hash alg="SHA3-256">770183bf3fd559774e99a0479dcf6c2f1b5b9e7c73f341c31d6cbd6f6a7b6c77</hash>
+        <hash alg="SHA3-512">51687f275f98b9227c68c5d93cc97d44ea16de4c9706b387e43a517a798ab27c3524d66a393fb95a951c47d8067a6b1ebcb0cd6198f6cb5d10f0282c9c6aa25b</hash>
+        <hash alg="SHA-384">7e1b2ebccef150e016a4fc8f7830980fb8eeaa64969414e3bfab0abeda020ba616db73cfae2e67b673b1b8360f4b7df1</hash>
+        <hash alg="SHA3-384">f9ad2c489b30d7e5e50cf08df2e91d5f30c428271d5a5bfa0ee05b8c743ef4b17dcc776866f5e97af8fd6e09d040b777</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.flywaydb/flyway-database-postgresql@13.9.0?type=jar</purl>
+      <purl>pkg:maven/org.flywaydb/flyway-database-postgresql@13.10.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -6261,8 +6258,8 @@
       <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@0.0.1-SNAPSHOT?project_path=%3Alogging-support"/>
       <dependency ref="pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.1?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
-      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.9.0?type=jar"/>
-      <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.9.0?type=jar"/>
+      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.10.0?type=jar"/>
+      <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.10.0?type=jar"/>
       <dependency ref="pkg:maven/org.mapstruct/mapstruct@1.6.3?type=jar"/>
       <dependency ref="pkg:maven/org.postgresql/postgresql@42.7.13?type=jar"/>
       <dependency ref="pkg:maven/org.semver4j/semver4j@6.0.0?type=jar"/>
@@ -6514,15 +6511,15 @@
       <dependency ref="pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar"/>
       <dependency ref="pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.9.0?type=jar">
+    <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.10.0?type=jar">
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.9.0?type=jar">
-      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.9.0?type=jar"/>
+    <dependency ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.10.0?type=jar">
+      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.10.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.9.0?type=jar">
-      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.9.0?type=jar"/>
-      <dependency ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.9.0?type=jar"/>
+    <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@13.10.0?type=jar">
+      <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.10.0?type=jar"/>
+      <dependency ref="pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.10.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.9?type=jar">
       <dependency ref="pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar"/>
