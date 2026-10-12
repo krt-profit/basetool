@@ -27,6 +27,7 @@ dependencies {
   testImplementation(libs.keycloak.server.spi.private)
   testImplementation(libs.keycloak.services)
   testImplementation(libs.keycloak.core)
+  testImplementation(libs.jboss.logmanager) { isTransitive = false }
   testImplementation(platform(libs.protobuf3.bom))
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

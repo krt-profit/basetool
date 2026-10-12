@@ -2,20 +2,25 @@
 """Fail when a shipped Gradle module's SBOM is not generated, committed and published.
 
 Every module in ``settings.gradle.kts`` must be wired for an SBOM end to end, listed in
-``NOT_SHIPPED`` with a reason, or listed in ``SHIPPED_INSIDE`` with its carriers. Also
-checks fresh BOM generation and that the release notes name every image and SBOM.
+``NOT_SHIPPED`` with a reason, or listed in ``SHIPPED_INSIDE`` with its carriers. A module named
+``<app>-<name>`` for an application in ``APP_MODULES`` (``backend-exchange``) is a library of that
+application and counts as shipped inside it without an entry: the application must declare it as
+an ``implementation`` dependency, and it publishes no SBOM of its own. Also checks fresh BOM
+generation and that the release notes name every image and SBOM.
 
 Exit codes:
-  0  -> every shipped module is wired end to end.
-  1  -> at least one gap; each is printed with the file that must change.
+  0  -> every shipped module is wired end to end, or the self-test passed.
+  1  -> at least one gap, or the self-test failed; each gap is printed with the file that must change.
 
 Usage:
     check_sbom_coverage.py
+    check_sbom_coverage.py --selftest
 """
 
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -46,6 +51,41 @@ SHIPPED_INSIDE = {
         ("backend", "frontend", "ingest"),
     ),
 }
+
+
+APP_MODULES = ("backend", "frontend", "ingest")
+
+
+def library_carrier(module: str) -> str | None:
+    """Return the application that carries a ``<app>-<name>`` library module.
+
+    :param module: a Gradle module name.
+    :return: the application name, or ``None`` when ``module`` follows no such convention.
+    """
+    for app in APP_MODULES:
+        if module.startswith(app + "-") and len(module) > len(app) + 1:
+            return app
+    return None
+
+
+def classify(declared: list[str]) -> tuple[list[str], dict[str, tuple[str, tuple[str, ...]]]]:
+    """Split the declared modules into those that publish an SBOM and those shipped inside another.
+
+    :param declared: the module names of ``settings.gradle.kts``.
+    :return: ``(shipped, inside)`` -- ``shipped`` publishes its own SBOM, ``inside`` maps a module
+        to its reason and carriers: ``SHIPPED_INSIDE`` plus every ``<app>-<name>`` library module.
+    """
+    inside = dict(SHIPPED_INSIDE)
+    for module in declared:
+        carrier = library_carrier(module)
+        if carrier is not None and module not in inside:
+            inside[module] = (
+                f"library module of the {carrier} application, compiled into its boot JAR and "
+                f"never an artifact of its own",
+                (carrier,),
+            )
+    shipped = [m for m in declared if m not in NOT_SHIPPED and m not in inside]
+    return shipped, inside
 
 
 def modules() -> list[str]:
@@ -296,11 +336,11 @@ def main() -> None:
             f"exemption list keeps meaning something"
         )
 
-    for module, (_reason, carriers) in SHIPPED_INSIDE.items():
+    shipped, inside_modules = classify(declared)
+    for module, (_reason, carriers) in inside_modules.items():
         if module in declared:
             problems.extend(check_shipped_inside(module, carriers))
 
-    shipped = [m for m in declared if m not in NOT_SHIPPED and m not in SHIPPED_INSIDE]
     for module in shipped:
         problems.extend(check_module(module, prepare, publish))
 
@@ -319,7 +359,7 @@ def main() -> None:
         raise SystemExit(1)
 
     exempt = ", ".join(sorted(NOT_SHIPPED)) or "none"
-    inside = ", ".join(sorted(SHIPPED_INSIDE)) or "none"
+    inside = ", ".join(sorted(inside_modules)) or "none"
     print(
         f"SBOM coverage OK: {', '.join(shipped)} (not shipped: {exempt}; "
         f"shipped inside another module's artifact: {inside})"
@@ -327,5 +367,42 @@ def main() -> None:
     print("Release-notes footer OK: image list matches the build matrix, SBOM list matches above")
 
 
+def selftest() -> int:
+    """Assert the module classification on synthetic module lists.
+
+    :return: 0 when every case holds, 1 otherwise.
+    """
+    failures = 0
+
+    def check(name: str, cond: bool) -> None:
+        nonlocal failures
+        print(f"  [{'ok ' if cond else 'FAIL'}] {name}")
+        failures += not cond
+
+    declared = [
+        "backend", "frontend", "ingest", "keycloak-spi", "test-support", "logging-support",
+        "backend-exchange", "backend-bank", "ingest-relay",
+    ]
+    shipped, inside = classify(declared)
+    check("the applications and keycloak-spi publish their own SBOM",
+          shipped == ["backend", "frontend", "ingest", "keycloak-spi"])
+    check("backend-exchange and backend-bank are shipped inside backend",
+          inside["backend-exchange"][1] == ("backend",) and inside["backend-bank"][1] == ("backend",))
+    check("ingest-relay is shipped inside ingest", inside["ingest-relay"][1] == ("ingest",))
+    check("logging-support keeps its explicit carriers", inside["logging-support"][1] == SHIPPED_INSIDE["logging-support"][1])
+    check("test-support is neither shipped nor inside", "test-support" not in shipped and "test-support" not in inside)
+    check("an application's own name is not a library", library_carrier("backend") is None)
+    check("a name without the hyphen boundary is not a library", library_carrier("backendx") is None)
+    check("a bare prefix with a trailing hyphen is not a library", library_carrier("backend-") is None)
+    check("keycloak-spi follows no application prefix", library_carrier("keycloak-spi") is None)
+    check("the real settings file declares only modules that classify",
+          set(classify(modules())[0]) | set(classify(modules())[1]) | set(NOT_SHIPPED) == set(modules()))
+
+    print("selftest: FAILED" if failures else "selftest: passed")
+    return 1 if failures else 0
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        raise SystemExit(selftest())
     main()

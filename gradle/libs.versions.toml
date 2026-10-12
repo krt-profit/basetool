@@ -51,6 +51,7 @@ checkstyle = "14.3.0"
 googleJavaFormat = "1.36.1"
 node = "24.21.0"
 keycloak = "26.8.0"
+jbossLogmanager = "3.2.2.Final"
 junit = "6.1.3"
 lombok = "1.18.46"
 mockito = "5.24.0"
@@ -100,6 +101,7 @@ keycloak-server-spi = { module = "org.keycloak:keycloak-server-spi", version.ref
 keycloak-server-spi-private = { module = "org.keycloak:keycloak-server-spi-private", version.ref = "keycloak" }
 keycloak-services = { module = "org.keycloak:keycloak-services", version.ref = "keycloak" }
 keycloak-core = { module = "org.keycloak:keycloak-core", version.ref = "keycloak" }
+jboss-logmanager = { module = "org.jboss.logmanager:jboss-logmanager", version.ref = "jbossLogmanager" }
 protobuf3-bom = { module = "com.google.protobuf:protobuf-bom", version.ref = "protobuf3" }
 handlebars = { module = "com.github.jknack:handlebars", version.ref = "handlebars" }
 plexus-utils = { module = "org.codehaus.plexus:plexus-utils", version.ref = "plexusUtils" }

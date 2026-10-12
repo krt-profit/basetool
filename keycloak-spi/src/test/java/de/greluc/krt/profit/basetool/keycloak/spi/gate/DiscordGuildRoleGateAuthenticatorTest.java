@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.keycloak.spi.gate;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,12 +29,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.keycloak.spi.LogCapture;
 import jakarta.ws.rs.core.Response;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import java.util.logging.Level;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.keycloak.authentication.AuthenticationFlowContext;
@@ -128,7 +131,11 @@ class DiscordGuildRoleGateAuthenticatorTest {
     when(context.getAuthenticatorConfig()).thenReturn(null);
     stubDenyForm();
 
-    authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
+    try (LogCapture log = LogCapture.of(DiscordGuildRoleGateAuthenticator.class)) {
+      authenticator("tok", "Maverick", "mav@example.com").authenticate(context);
+
+      assertTrue(log.logged(Level.SEVERE));
+    }
 
     verify(context).failure(eq(AuthenticationFlowError.ACCESS_DENIED), any());
     verifyNoInteractions(checker, backendChecker);
@@ -139,7 +146,11 @@ class DiscordGuildRoleGateAuthenticatorTest {
     stubConfig(VALID_CONFIG);
     stubDenyForm();
 
-    authenticator(null, null, null).authenticate(context);
+    try (LogCapture log = LogCapture.of(DiscordGuildRoleGateAuthenticator.class)) {
+      authenticator(null, null, null).authenticate(context);
+
+      assertTrue(log.logged(Level.WARNING));
+    }
 
     verify(context).failure(eq(AuthenticationFlowError.ACCESS_DENIED), any());
     verifyNoInteractions(checker, backendChecker);

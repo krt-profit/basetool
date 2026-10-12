@@ -2542,7 +2542,7 @@ what it guards:
 
 - **Every input path a build script declares exists.** `scripts/check-gradle-input-paths.py`
   resolves each `inputs.file`, `inputs.files` and `inputs.dir` of every tracked `*.gradle.kts`
-  (literals, `file`/`fileTree`, `layout.projectDirectory`, `rootProject.file`, and a `val` holding
+  (literals, `file`/`fileTree`, `layout.projectDirectory`, `layout.settingsDirectory`, and a `val` holding
   one) and fails on a missing one; Gradle drops a missing `inputs.files` entry silently, leaving the
   task up to date when the real file changes. A selection floor fails it when the parser stops
   finding today's references (`repo-lint.yml`, `gradle-input-paths`).
@@ -2937,6 +2937,56 @@ isolated projects have nothing to reject and a module added later inherits no de
 (`sbom-coverage`) · `.github/scripts/image_reuse_plan.py` (`--selftest`) · **Decision:**
 [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md) ·
 **Related:** REQ-OPS-034, REQ-OPS-037, REQ-OPS-038
+
+### REQ-OPS-047 — A library module of an application is named `<app>-<name>`, and the build reads the name
+
+A module that is compiled into an application's boot JAR and ships in its image, without being an
+application, is named `<app>-<name>` for `<app>` in `backend`, `frontend`, `ingest` (the planned
+`backend-exchange` and `backend-bank`). The build and its scripts act on that name, so extracting one
+needs no change to a convention or a script (ADR-0249).
+
+- **Repository paths come from the settings directory.** A module script names a file or directory of
+  the repository with `layout.settingsDirectory.file|dir(…)`; none names `rootProject`.
+  `scripts/check-gradle-input-paths.py` fails any tracked `*.gradle.kts` other than the root script
+  and the settings files that does. The frontend's DTO-mirror input covers `backend/src/main/java`
+  and the same path of every `backend-*` directory (`backendModuleDirectories()` in `build-logic`),
+  and `DtoMirrorConsistencyTest` looks for a record's twin in all of them.
+- **Image reuse.** In `image_reuse_plan.py`, a Dockerfile `COPY` source `<app>-<name>/src/main[/…]` is
+  an own input of `<app>`, so a change there rebuilds that application's image only; the module's
+  build script and settings stay shared inputs, like every module's.
+- **SBOM.** In `check_sbom_coverage.py`, a module `<app>-<name>` is shipped inside `<app>` without an
+  entry in `SHIPPED_INSIDE`: it publishes no SBOM and `<app>` must declare it as
+  `implementation(project(":<app>-<name>"))`. Both scripts have a self-test run by `repo-lint.yml`.
+- **JaCoCo.** `basetool.coverage-conventions` takes the application's project dependencies named
+  `<app>-*` from its `implementation` configuration and adds their classes, execution data and source
+  directories to `jacocoTestReport` and `jacocoTestCoverageVerification` of the application, so its
+  floors cover the code it ships and the libraries' own tests count toward them. An application with
+  no such dependency is measured exactly as before.
+- **No behaviour change by the move.** The task graph, every task's dependencies, the file inputs of
+  the `Test` tasks, the JaCoCo class, execution-data and source sets, and the arguments of
+  `generateEdgeAdmission`, `openApiGenerate` and `generateApiTypes` are identical before and after.
+
+**Acceptance**
+
+- [x] A dump of every project's tasks, dependencies, `Test` file inputs, JaCoCo sets and the listed task
+  arguments (an init script, not committed) is byte-identical on the parent commit and on the change.
+- [x] With a throwaway `backend-probe` module (not committed) depended on by the backend, the backend's
+  `jacocoTestReport` lists the probe's classes, its execution data and its sources, and depends on the
+  probe's compile and `test` tasks.
+- [x] `check-gradle-input-paths.py --selftest` reports a `rootProject` use in a module script and in a
+  convention script and allows it in the root script and the settings files.
+- [x] `image_reuse_plan.py --selftest`: a `backend-exchange/src/main` change rebuilds the backend only,
+  its build script rebuilds all three. `check_sbom_coverage.py --selftest`: `backend-exchange` and
+  `backend-bank` classify as shipped inside `backend`.
+- [x] `./gradlew help --configuration-cache` and `./gradlew build -m --configuration-cache` reuse their
+  entry on the second run.
+
+**Enforced by:** `scripts/check-gradle-input-paths.py` (`gradle-input-paths`) ·
+`.github/scripts/image_reuse_plan.py` (`--selftest`) · `.github/scripts/check_sbom_coverage.py`
+(`sbom-coverage`, `--selftest`) · `build-logic` (`basetool.coverage-conventions`,
+`RepositoryLayout.kt`) · `frontend/…/DtoMirrorConsistencyTest` · **Decision:**
+[ADR-0249](../adr/0249-an-applications-library-modules-are-named-app-name-and-the-build-reads-the-name.md) ·
+**Related:** REQ-OPS-021, REQ-OPS-025, REQ-OPS-038, REQ-OPS-046
 
 ## Open questions
 
