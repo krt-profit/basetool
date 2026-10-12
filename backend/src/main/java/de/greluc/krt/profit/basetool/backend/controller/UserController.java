@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
@@ -33,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.AccountConsolidationService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;

@@ -80,8 +80,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
 import de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController;
-import de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController;
-import de.greluc.krt.profit.basetool.backend.controller.TermsDocumentController;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
@@ -98,6 +96,8 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RejectedRegistrationRetentionProperties;
+import de.greluc.krt.profit.basetool.backend.identity.web.DiscordAccountExistenceController;
+import de.greluc.krt.profit.basetool.backend.identity.web.TermsDocumentController;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
@@ -682,7 +682,7 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 508);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 507);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 
@@ -1679,7 +1679,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 239);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 224);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

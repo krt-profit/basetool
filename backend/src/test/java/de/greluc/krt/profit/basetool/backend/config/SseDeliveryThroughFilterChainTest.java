@@ -24,8 +24,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.internal.TermsAcceptanceService;
 import de.greluc.krt.profit.basetool.backend.service.CustomJwtGrantedAuthoritiesConverter;
-import de.greluc.krt.profit.basetool.backend.service.TermsAcceptanceService;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;

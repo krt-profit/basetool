@@ -17,5 +17,5 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** The identity module's internal settings (plan §5.2). */
+/** The identity module's internals: services, mappers, DTOs and settings (plan §5.2). */
 package de.greluc.krt.profit.basetool.backend.identity.internal;

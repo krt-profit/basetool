@@ -112,6 +112,7 @@ basetool {
         "blueprint",
         "catalogue",
         "hangar",
+        "identity",
         "inventory",
         "joborder",
         "materialexchange",

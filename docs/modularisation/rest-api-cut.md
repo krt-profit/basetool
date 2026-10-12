@@ -234,7 +234,7 @@ six domains. **Cons** 10 app operations in one wave; two storage options with di
 **Risks → guards** a storable cache directive on member data → G-07; a lost URL rule on a moved
 path → G-02; `/terms/admin` would be admitted on the public vhost by the prefix rule
 `^/api/v1/terms/` (allow-list line 2) and exempted from the terms gate by the prefix exemption
-`/api/v1/terms/**` (`backend/src/main/…/config/TermsAcceptanceAccessFilter.java:83-88`) → G-08 and
+`/api/v1/terms/**` (`backend/src/main/…/identity/api/TermsAcceptanceAccessFilter.java:83-88`) → G-08 and
 G-07 first; `/roles/**` leaves every admin URL rule, so its class-level `hasRole('ADMIN')` becomes
 its only gate → G-02 shows it. **Effort** M with the path-only option, L with the column move.
 

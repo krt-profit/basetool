@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRev
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallation;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Notification;
@@ -53,7 +54,6 @@ import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.service.NotificationCreationService;
 import java.time.Instant;
 import java.util.EnumSet;

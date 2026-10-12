@@ -20,15 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApproveRegistrationRequest;
+import de.greluc.krt.profit.basetool.backend.identity.api.LinkRegistrationRequest;
+import de.greluc.krt.profit.basetool.backend.identity.api.PendingRegistrationDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.RejectRegistrationRequest;
+import de.greluc.krt.profit.basetool.backend.identity.api.ReopenRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.ApproveRegistrationRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.LinkRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MergeAccountRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.PendingRegistrationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.RejectRegistrationRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.ReopenRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.service.UserAccountMergeService;
 import de.greluc.krt.profit.basetool.backend.service.UserRegistrationService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;

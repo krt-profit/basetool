@@ -40,9 +40,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexSpaceStat
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexStarSystemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexTerminalDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexVehicleDto;
-import de.greluc.krt.profit.basetool.backend.config.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.ResponseSizeLimitInterceptor;
+import de.greluc.krt.profit.basetool.backend.platform.api.RestClientConfig;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;

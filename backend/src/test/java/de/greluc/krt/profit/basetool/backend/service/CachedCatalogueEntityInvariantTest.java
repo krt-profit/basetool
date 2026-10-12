@@ -62,6 +62,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalService;
+import de.greluc.krt.profit.basetool.backend.identity.internal.RoleService;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
