@@ -27,7 +27,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.audit.internal.AuditHandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
@@ -37,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransactionRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;

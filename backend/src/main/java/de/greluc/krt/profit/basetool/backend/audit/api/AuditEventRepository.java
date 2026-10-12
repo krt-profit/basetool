@@ -17,14 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.repository;
+package de.greluc.krt.profit.basetool.backend.audit.api;
 
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -66,11 +64,11 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
       """)
   Page<AuditEvent> findFiltered(
       @Param("domain") AuditDomain domain,
-      @Param("from") Instant from,
-      @Param("to") Instant to,
-      @Param("actorUserId") UUID actorUserId,
-      @Param("eventType") AuditEventType eventType,
-      @Param("clientId") String clientId,
+      @Param("from") @Nullable Instant from,
+      @Param("to") @Nullable Instant to,
+      @Param("actorUserId") @Nullable UUID actorUserId,
+      @Param("eventType") @Nullable AuditEventType eventType,
+      @Param("clientId") @Nullable String clientId,
       Pageable pageable);
 
   /**

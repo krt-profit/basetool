@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.audit.api;
 
 /**
  * Result of an admin audit-log retention purge (REQ-AUDIT-004), shared by the per-area and the bank

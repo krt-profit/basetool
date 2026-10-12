@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.PersonMentionRegistry;
 import java.util.List;

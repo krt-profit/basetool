@@ -26,10 +26,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEvent;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.HashSet;
 import java.util.List;
@@ -50,9 +50,9 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Proves the five data-subject-rights endpoints write their audit row with a real {@link
- * de.greluc.krt.profit.basetool.backend.service.AuditService}, whose {@code MANDATORY} propagation
- * mocked tests cannot exercise (REQ-SEC-058, REQ-SEC-060). The export requests also send the
- * frontend's real {@code Accept} header.
+ * de.greluc.krt.profit.basetool.backend.audit.api.AuditService}, whose {@code MANDATORY}
+ * propagation mocked tests cannot exercise (REQ-SEC-058, REQ-SEC-060). The export requests also
+ * send the frontend's real {@code Accept} header.
  *
  * <p>The class and its methods must never be {@code @Transactional}; seeding uses an explicit
  * {@link TransactionTemplate}.

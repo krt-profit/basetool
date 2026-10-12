@@ -2715,6 +2715,20 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
    SpotBugs exclude for `BasetoolErrorController`, and the source paths in nine docs were rewritten; no logger name of a moved
    class appears in `monitoring/`, the logging configuration or the observability spec; the historical audit appendices were left.
 
+**Umbrella step 2 — the audit module's 12 classes move into `audit.api` / `audit.internal` / `audit.web` — done 2026-10-12**
+1. *Probe*: `audit`, `livesync` and `notification` moved together close no cycle at top level; the audit repository leaving `repository` is
+   what lets the handle-anonymisation participant leave `service` (the P4 slice-b note).
+2. *Move* (103 files by `git mv` and the import script): `AuditEvent`, `AuditEventDto`, `AuditPurgeResultDto`, `AuditEventMapper`,
+   `AuditEventRepository`, `AuditService`, `AuditReportService`, `AuditRetentionService`, `AuditRetentionTask`, `AuditLogPdfFormat` to `audit.api`
+   (what other modules use, plus what those depend on), `AuditHandleAnonymisation` and two more to `audit.internal`, `AuditAdminController` to
+   `audit.web`. Entity name, table, bean names, REST paths and `openapi.json` are unchanged.
+3. *NullAway*: `AuditEventRepository.findFiltered` takes five optional filters (the JPQL tests `IS NULL`); they carry `@Nullable`.
+4. *Gates*: the layers of `ArchitectureTest` were anchored on a class (`AuditService`, `UserMapper`, `UserRepository`, `User`, `UserController`), so a
+   move of the anchor re-aimed the layer. They are anchored on the legacy package name now (`service`, `mapper`, `repository`, `model`,
+   `controller`) and need no re-anchoring again. Floors from the failing assertions: service layer 504 → **495**, join-column selection 224 → **222**;
+   the domain-map rule `name ^Audit audit` assigns no class any more and left. Baseline unchanged.
+5. *Text scan*: no code or resource names the old packages; nine source paths in `audit.md` and `security-and-access.md` follow.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2730,7 +2744,7 @@ before a decision.
 - [ ] **1.** Housekeeping: `backend/build-settings.properties` aims the mutation tests at
       `backend.service.*`, which shrinks with every move (P4-5 "Open").
 - Rank 0–1 modules leave the layer packages (nothing below depends on them being late; **5a, the `kernel` half of step 5, is done**):
-  - [ ] **2.** `audit` (12): `AuditEvent`, `AuditEventRepository`, `AuditService` and its report,
+  - [x] **2.** done — `audit` (12): `AuditEvent`, `AuditEventRepository`, `AuditService` and its report,
         retention and handle-anonymisation participant, mapper, controller, task. The P4 slice-b entry
         records that the participant waits for the repository.
   - [ ] **3.** `livesync` (9: controller, DTO, seven services).

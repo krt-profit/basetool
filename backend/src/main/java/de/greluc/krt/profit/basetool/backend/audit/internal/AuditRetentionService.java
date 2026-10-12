@@ -17,11 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.audit.internal;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.audit.api.RetentionParticipant;
-import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

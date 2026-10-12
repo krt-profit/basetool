@@ -52,6 +52,7 @@ import com.tngtech.archunit.library.dependencies.SliceAssignment;
 import com.tngtech.archunit.library.dependencies.SliceIdentifier;
 import de.greluc.krt.profit.basetool.backend.admin.web.AppVersionPolicyController;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderPostingRepository;
@@ -79,7 +80,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
-import de.greluc.krt.profit.basetool.backend.controller.UserController;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ActingMemberAuthorities;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
@@ -128,7 +128,6 @@ import de.greluc.krt.profit.basetool.backend.livesync.internal.LiveSyncFanoutPro
 import de.greluc.krt.profit.basetool.backend.mapper.MissionViewerAccess;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.StockViewerAccess;
-import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeQueryParams;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
@@ -169,9 +168,7 @@ import de.greluc.krt.profit.basetool.backend.privacy.internal.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.PromotionTopic;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
@@ -300,23 +297,22 @@ class ArchitectureTest {
 
   /** The controller layer: web controllers, their nested classes and the legacy package. */
   static final DescribedPredicate<JavaClass> CONTROLLER_CODE =
-      layer("controller code", WEB_CONTROLLERS, UserController.class);
+      layer("controller code", WEB_CONTROLLERS, "controller");
 
   /** The service layer: services, their nested classes and the legacy package. */
   static final DescribedPredicate<JavaClass> SERVICE_CODE =
-      layer("service code", SERVICES, AuditService.class);
+      layer("service code", SERVICES, "service");
 
   /** The mapper layer: MapStruct mappers, their nested classes and the legacy package. */
-  static final DescribedPredicate<JavaClass> MAPPER_CODE =
-      layer("mapper code", MAPPERS, UserMapper.class);
+  static final DescribedPredicate<JavaClass> MAPPER_CODE = layer("mapper code", MAPPERS, "mapper");
 
   /** The repository layer: Spring Data repositories, their nested classes and the package. */
   static final DescribedPredicate<JavaClass> REPOSITORY_CODE =
-      layer("repository code", SPRING_DATA_REPOSITORIES, UserRepository.class);
+      layer("repository code", SPRING_DATA_REPOSITORIES, "repository");
 
   /** The model: JPA-managed types, their nested classes and the legacy model package tree. */
   static final DescribedPredicate<JavaClass> MODEL_CODE =
-      layer("model code", PERSISTENT_TYPES, User.class);
+      layer("model code", PERSISTENT_TYPES, "model");
 
   /** The validation leaf: constraints and validators, wherever they lie. */
   static final DescribedPredicate<JavaClass> VALIDATION_CODE =
@@ -683,7 +679,7 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 504);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 495);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 
@@ -1680,7 +1676,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 224);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 222);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 
@@ -2034,17 +2030,17 @@ class ArchitectureTest {
   }
 
   /**
-   * A layer: classes of a role, the classes nested in them, and the package tree of a legacy anchor
-   * class, so today's package is still covered and a role class stays covered wherever it moves.
+   * A layer: classes of a role, the classes nested in them, and the package tree of a legacy
+   * package, so today's package is still covered and a role class stays covered wherever it moves.
    *
    * @param name the layer's name
    * @param role the role predicate
-   * @param legacyAnchor a class of the layer's legacy package
+   * @param legacyPackage the layer's legacy package below the root package, or {@code null}
    * @return the layer predicate
    */
   static DescribedPredicate<JavaClass> layer(
-      String name, DescribedPredicate<JavaClass> role, @Nullable Class<?> legacyAnchor) {
-    String anchorPackage = legacyAnchor == null ? null : legacyAnchor.getPackageName();
+      String name, DescribedPredicate<JavaClass> role, @Nullable String legacyPackage) {
+    String anchorPackage = legacyPackage == null ? null : ROOT_PACKAGE + "." + legacyPackage;
     return DescribedPredicate.describe(
         "are "
             + name
@@ -2052,7 +2048,7 @@ class ArchitectureTest {
             + role.getDescription()
             + ", the classes nested in them, or the"
             + " package tree of "
-            + (legacyAnchor == null ? "no legacy package" : legacyAnchor.getSimpleName())
+            + (legacyPackage == null ? "no legacy package" : "the legacy package " + legacyPackage)
             + ")",
         c ->
             role.test(c)

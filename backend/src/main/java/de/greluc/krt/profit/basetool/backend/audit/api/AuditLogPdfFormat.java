@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service.pdf;
+package de.greluc.krt.profit.basetool.backend.audit.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
 import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;

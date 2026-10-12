@@ -5174,10 +5174,10 @@ it.
 that must stay, the counts and both marker rows), `HandleAnonymisationServiceTest`,
 `HandleErasureCoverageTest`, `HandleAnonymisationCoverageTest` · **Code:**
 `service/HandleAnonymisationService`, `platform/api/HandleAnonymisationParticipant`,
-`service/AuditHandleAnonymisation`, `bank/internal/BankHandleAnonymisation`,
+`audit/internal/AuditHandleAnonymisation`, `bank/internal/BankHandleAnonymisation`,
 `joborder/internal/JobOrderHandleAnonymisation`, `kernel/HandleAnonymisation`,
 `privacy/internal/HandleErasureCoverage`,
-`repository/AuditEventRepository#anonymiseActorHandle`,
+`audit/api/AuditEventRepository#anonymiseActorHandle`,
 `bank/internal/BankAuditEventRepository#anonymiseActorHandle`,
 `bank/internal/BankTransactionRepository#anonymiseCounterpartyHandle`,
 `bank/internal/BankBookingRequestRepository#anonymiseHandles`,

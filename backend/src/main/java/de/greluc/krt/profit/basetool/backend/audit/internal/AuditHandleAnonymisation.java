@@ -17,11 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.audit.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.platform.api.HandleAnonymisationParticipant;
-import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
