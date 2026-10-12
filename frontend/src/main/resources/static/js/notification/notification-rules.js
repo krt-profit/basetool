@@ -20,6 +20,7 @@
 // @ts-check
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
     const form = document.getElementById('rule-form');
@@ -241,7 +242,7 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
                 return;
             }
             const select = rowSelect(row, 'userId');
-            window.krtFetch
+            krtFetch
                 .getJson(`/users/${encodeURIComponent(userId)}`)
                 .catch(() => {
                     return null;
@@ -343,7 +344,7 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 
         /** @param {string} id */
         function editRule(id) {
-            window.krtFetch
+            krtFetch
                 .getJson(`/admin/notification-rules/${encodeURIComponent(id)}`)
                 .then((rule) => {
                     if (rule) {
@@ -359,7 +360,7 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 
         /** Re-renders the rules table in place from the `rules` fragment. */
         function refreshRules() {
-            return window.krtFetch.swap({
+            return krtFetch.swap({
                 url: '/admin/notification-rules',
                 container: '#rules-host',
                 fragmentValue: 'rules',
@@ -370,12 +371,12 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
         /** @param {SubmitEvent} event */
         function onSubmit(event) {
             event.preventDefault();
-            if (!window.krtFetch) {
+            if (!krtFetch) {
                 return;
             }
             const id = el.form.getAttribute('data-rule-id');
             const submitter = el.form.querySelector('button[type="submit"]');
-            window.krtFetch.write({
+            krtFetch.write({
                 method: id ? 'PUT' : 'POST',
                 url: `/admin/notification-rules${id ? `/${encodeURIComponent(id)}` : ''}`,
                 payload: buildPayload(),
@@ -394,11 +395,11 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
          * @param {Element} submitter
          */
         function deleteRule(id, submitter) {
-            if (!window.krtFetch) {
+            if (!krtFetch) {
                 return;
             }
             confirmThen(() => {
-                window.krtFetch.write({
+                krtFetch.write({
                     method: 'DELETE',
                     url: `/admin/notification-rules/${encodeURIComponent(id)}`,
                     successMessage: i18n.deleted,

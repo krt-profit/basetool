@@ -25,6 +25,7 @@ import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const shipTypesData = /** @type {HTMLDataListElement | null} */ (
@@ -112,7 +113,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 }
 
 (function () {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     const i18n = shipDataI18n;
@@ -134,7 +135,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         if (btn) {
             btn.disabled = true;
         }
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: `${form.getAttribute('action')}?hidden=${desired}`,
@@ -169,7 +170,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'shipdata-reset', (target) => {
         const el = /** @type {HTMLButtonElement} */ (target);
         el.disabled = true;
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: shipDataResetUrl,

@@ -22,6 +22,7 @@
 /* global MSG_OWNER_UPDATED, MSG_LOCATION_UPDATED, MSG_DELIVERED_UPDATED, MSG_ERROR_GENERIC */
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * Finds the collection row of an inventory entry.
@@ -129,13 +130,13 @@ function broadcastCollectionChanged() {
  */
 async function collectionTransfer(inventoryId, target, successMessage) {
     const row = collectionRow(inventoryId);
-    if (!window.krtFetch || !row) return;
+    if (!krtFetch || !row) return;
     const amount = parseFloat(row.getAttribute('data-amount') ?? '');
     const version = parseInt(row.getAttribute('data-version') ?? '', 10);
     row.querySelectorAll('select').forEach((s) => {
         s.disabled = true;
     });
-    const _result = await window.krtFetch.write({
+    const _result = await krtFetch.write({
         method: 'POST',
         url: `/inventory/${inventoryId}/transfer`,
         payload: {
@@ -203,9 +204,9 @@ document.addEventListener('change', (e) => {
 async function onDeliveredToggle(cb) {
     const inventoryId = cb.getAttribute('data-inventory-id');
     const row = collectionRow(inventoryId);
-    if (!window.krtFetch || !row) return;
+    if (!krtFetch || !row) return;
     const previous = !cb.checked;
-    const result = await window.krtFetch.write({
+    const result = await krtFetch.write({
         method: 'PATCH',
         url: `/inventory/${inventoryId}/delivered`,
         payload: {
@@ -236,8 +237,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.orderId &&
         window.krtLiveSync &&
         typeof window.krtLiveSync.createReceiver === 'function' &&
-        window.krtFetch &&
-        typeof window.krtFetch.swap === 'function' &&
+        krtFetch &&
+        typeof krtFetch.swap === 'function' &&
         document.getElementById('item-collection-results')
     ) {
         window.krtLiveSync.createReceiver({
@@ -245,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sections: ITEM_COLLECTION_SECTIONS,
             coalesceMs: 1500,
             refresh() {
-                window.krtFetch.swap({
+                krtFetch.swap({
                     url: `/orders/${window.orderId}/item-collection`,
                     container: '#item-collection-results',
                     fragmentValue: ITEM_COLLECTION_SECTIONS.items.fragmentValue,

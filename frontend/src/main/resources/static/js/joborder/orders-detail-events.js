@@ -56,6 +56,7 @@ import {
 } from '/js/joborder/orders-detail.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'od-update-status', (el) => {
@@ -157,7 +158,7 @@ const OA_CONFLICT = {
  */
 async function oaSend(method, url, opts) {
     opts ||= {};
-    if (!window.krtFetch) return false;
+    if (!krtFetch) return false;
     const errorMsg = opts.errorMsg || I18N_NOTE_ERROR;
     const common = {
         method,
@@ -168,7 +169,7 @@ async function oaSend(method, url, opts) {
         onSuccess(html) {
             const sec = document.getElementById('assignees-section');
             if (sec && typeof html === 'string') {
-                window.krtFetch.replaceWithTrustedHtml(sec, html);
+                krtFetch.replaceWithTrustedHtml(sec, html);
                 document.dispatchEvent(
                     new CustomEvent('krt:swapped', {
                         detail: { container: document.getElementById('assignees-section') },
@@ -182,7 +183,7 @@ async function oaSend(method, url, opts) {
         },
         onError(status, _body, response) {
             if (status === 409) {
-                window.krtFetch.handleProblem(
+                krtFetch.handleProblem(
                     response,
                     { code: 'OPTIMISTIC_LOCK', detail: I18N_NOTE_CONFLICT },
                     { conflict: OA_CONFLICT },
@@ -197,8 +198,8 @@ async function oaSend(method, url, opts) {
     };
     const result =
         opts.form !== undefined
-            ? await window.krtFetch.submitForm(Object.assign(common, { formData: opts.form }))
-            : await window.krtFetch.write(Object.assign(common, { payload: opts.json }));
+            ? await krtFetch.submitForm(Object.assign(common, { formData: opts.form }))
+            : await krtFetch.write(Object.assign(common, { payload: opts.json }));
     return result.ok;
 }
 

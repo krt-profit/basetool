@@ -21,6 +21,8 @@
 
 /* global MSG_SAVED, MSG_ERROR */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     /**
      * Marks the active button of an override group and updates the mismatch flag of the chip.
@@ -68,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
             form.querySelector('input[name="action"]')
         );
         const action = actionInput ? actionInput.value : '';
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: `${form.getAttribute('action')}?action=${encodeURIComponent(action)}`,
             successMessage: MSG_SAVED,
@@ -89,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const hiddenInput = /** @type {HTMLInputElement | null} */ (
             form.querySelector('input[name="hidden"]')
         );
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: /** @type {string} */ (form.getAttribute('action')),
             successMessage: MSG_SAVED,
@@ -120,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('submit', (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
-            if (!window.krtFetch) {
+            if (!krtFetch) {
                 form.submit();
                 return;
             }
@@ -136,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('submit', (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
-            if (!window.krtFetch) {
+            if (!krtFetch) {
                 form.submit();
                 return;
             }

@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 function viewToggles() {
     return document.querySelector('[data-bank-view-toggles]');
 }
@@ -94,11 +96,11 @@ function reapplyNameFilter() {
 }
 
 function fetchView(state) {
-    if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+    if (!krtFetch || typeof krtFetch.swap !== 'function') {
         window.location.reload();
         return;
     }
-    window.krtFetch
+    krtFetch
         .swap({
             url: `/bank?layout=${state.layout}&group=${state.group}`,
             container: '#bank-grid-results',
@@ -195,11 +197,11 @@ document.addEventListener('change', (event) => {
     }
 
     function fetchView(layout) {
-        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+        if (!krtFetch || typeof krtFetch.swap !== 'function') {
             window.location.reload();
             return;
         }
-        window.krtFetch
+        krtFetch
             .swap({
                 url: `/org-unit-bank?layout=${layout}`,
                 container: '#ou-acc-results',

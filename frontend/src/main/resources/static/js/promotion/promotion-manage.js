@@ -26,9 +26,10 @@ import {
     showFrontendSuccessToast,
     showKrtConfirm,
 } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 function pmPutEvaluation(url, payload) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return Promise.resolve(null);
     }
     function toastError(message) {
@@ -36,7 +37,7 @@ function pmPutEvaluation(url, payload) {
             showFrontendErrorToast(message);
         }
     }
-    return window.krtFetch
+    return krtFetch
         .write({
             method: 'PUT',
             url,
@@ -66,11 +67,11 @@ function pmPutEvaluation(url, payload) {
 const pmEligibilityDirty = new Set();
 
 function pmRefreshMatrix() {
-    if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+    if (!krtFetch || typeof krtFetch.swap !== 'function') {
         window.location.reload();
         return Promise.resolve(false);
     }
-    return window.krtFetch.swap({
+    return krtFetch.swap({
         url: '/promotion/manage',
         container: '#pm-matrix-results',
         fragmentValue: 'matrixBody',
@@ -82,10 +83,10 @@ function pmRefreshEligibility(userId) {
     const row = document.querySelector(`tr[data-pm-user-id="${userId}"]`);
     if (!row) return Promise.resolve(false);
     const cell = row.querySelector('.pm-eligibility-cell');
-    if (!cell || !window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+    if (!cell || !krtFetch || typeof krtFetch.swap !== 'function') {
         return Promise.resolve(false);
     }
-    return window.krtFetch
+    return krtFetch
         .swap({
             url: `/promotion/manage?userId=${encodeURIComponent(userId)}`,
             container: cell,

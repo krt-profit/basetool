@@ -23,9 +23,10 @@
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     const body = document.getElementById('registrationsBody');
@@ -265,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function approve(row) {
         const id = row.getAttribute('data-id');
         const version = row.getAttribute('data-version');
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: `/admin/discord-registrations/${encodeURIComponent(id)}/approve`,
             payload: { version: version == null ? null : Number(version) },
@@ -384,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const id = row.getAttribute('data-id');
             const version = row.getAttribute('data-version');
             const reason = reasonInput ? reasonInput.value.trim() : '';
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/reject`,
                 payload: {
@@ -426,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = linkTarget;
             const id = row.getAttribute('data-id');
             const version = row.getAttribute('data-version');
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/link`,
                 payload: {
@@ -468,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = mergeTarget;
             const id = row.getAttribute('data-id');
             const version = row.getAttribute('data-version');
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/merge`,
                 payload: {
@@ -504,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const id = row.getAttribute('data-id');
             const version = row.getAttribute('data-version');
             const reason = reopenReasonInput ? reopenReasonInput.value.trim() : '';
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/discord-registrations/${encodeURIComponent(String(id))}/reopen`,
                 payload: {

@@ -1,6 +1,7 @@
 // @ts-check
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
@@ -158,11 +159,11 @@ function upload() {
             );
         return;
     }
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
     const fd = new FormData();
     fd.append('file', file);
     let reported = false;
-    window.krtFetch
+    krtFetch
         .submitForm({
             url: jobsUrl(),
             method: 'POST',
@@ -193,7 +194,7 @@ function upload() {
 }
 
 function loadJobs() {
-    window.krtFetch
+    krtFetch
         .get(jobsUrl(), { accept: 'application/json' })
         .then(readJson)
         .then((jobs) => {
@@ -467,9 +468,9 @@ function confirmApply() {
     const url = `${jobsUrl()}/${encodeURIComponent(applyTargetId)}/apply?seedNew=${
         seed ? 'true' : 'false'
     }`;
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
     let reported = false;
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url,

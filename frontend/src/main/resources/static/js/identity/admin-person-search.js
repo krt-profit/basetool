@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 const RESULTS_ID = 'person-search-results';
 
 document.addEventListener('submit', (event) => {
@@ -32,13 +34,13 @@ document.addEventListener('submit', (event) => {
     const term = input ? input.value.trim() : '';
     const action = form.getAttribute('action') || '/admin/person-search';
     const url = action + (term ? `?q=${encodeURIComponent(term)}` : '');
-    if (window.krtFetch) {
-        window.krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
+    if (krtFetch) {
+        krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
     } else {
         window.location.assign(url);
     }
 });
 
-if (window.krtFetch) {
-    window.krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
+if (krtFetch) {
+    krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
 }

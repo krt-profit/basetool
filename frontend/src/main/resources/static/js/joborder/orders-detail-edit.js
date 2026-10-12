@@ -38,6 +38,7 @@ import {
 } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const handoverForm = /** @type {HTMLFormElement | null} */ (
@@ -48,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             if (!validateHandoverAmounts()) return;
             const orderId = handoverForm.getAttribute('data-order-id');
-            if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
+            if (!orderId || !krtFetch || typeof krtOrderWrite !== 'function') {
                 handoverForm.submit();
                 return;
             }
@@ -90,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             if (!validateItemHandoverForm()) return;
             const orderId = itemHandoverForm.getAttribute('data-order-id');
-            if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
+            if (!orderId || !krtFetch || typeof krtOrderWrite !== 'function') {
                 itemHandoverForm.submit();
                 return;
             }
@@ -313,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
  * @returns {Promise<KrtWriteResult>} the outcome of the write
  */
 export function krtOrderWrite(opts) {
-    return window.krtFetch.write(
+    return krtFetch.write(
         Object.assign({}, opts, {
             serialize: opts.serialize || 'order',
             conflict: {
@@ -335,7 +336,7 @@ export function krtOrderWrite(opts) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
-        if (!orderId || typeof showKrtConfirm !== 'function' || !window.krtFetch) {
+        if (!orderId || typeof showKrtConfirm !== 'function' || !krtFetch) {
             form.submit();
             return;
         }
@@ -406,7 +407,7 @@ function _serializeEditForm() {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
-        if (!orderId || !window.krtFetch) {
+        if (!orderId || !krtFetch) {
             form.submit();
             return;
         }
@@ -454,9 +455,8 @@ export function _refreshMaterialsSection(orderId, broadcastOpts) {
     const mat = document.getElementById('order-materials-results');
     const agg = document.getElementById('order-aggregated-results');
     const container = mat || agg;
-    if (!orderId || !container || !window.krtFetch || !window.krtFetch.swap)
-        return Promise.resolve(false);
-    return window.krtFetch.swap({
+    if (!orderId || !container || !krtFetch || !krtFetch.swap) return Promise.resolve(false);
+    return krtFetch.swap({
         url: `/orders/${orderId}`,
         container,
         fragmentValue: mat ? 'materials' : 'aggregated',
@@ -479,8 +479,8 @@ export function _swapOrderSection(orderId, containerId, fragmentValue, broadcast
         return window.krtRefreshOrderSection(fragmentValue, broadcastOpts);
     }
     const c = document.getElementById(containerId);
-    if (!c || !orderId || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
-    return window.krtFetch.swap({
+    if (!c || !orderId || !krtFetch || !krtFetch.swap) return Promise.resolve(false);
+    return krtFetch.swap({
         url: `/orders/${orderId}`,
         container: c,
         fragmentValue,

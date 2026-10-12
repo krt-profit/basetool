@@ -3,6 +3,7 @@
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** @type {HTMLInputElement | null} */
 let searchInput = null;
@@ -150,7 +151,7 @@ function wireAdminMemberPersistence() {
  * still reloads.
  */
 function wireAdminSwap() {
-    if (!window.krtFetch || !document.getElementById('bp-results')) return;
+    if (!krtFetch || !document.getElementById('bp-results')) return;
     /** @type {number | null} */
     let filterTimer = null;
     /**
@@ -163,7 +164,7 @@ function wireAdminSwap() {
             /** @type {Record<string, string>} */ (/** @type {unknown} */ (new FormData(form))),
         ).toString();
         const url = form.getAttribute('action') + (params ? `?${params}` : '');
-        window.krtFetch.swap({ url, container: '#bp-results', history: true });
+        krtFetch.swap({ url, container: '#bp-results', history: true });
     }
     document.addEventListener('submit', (e) => {
         const target = /** @type {HTMLFormElement} */ (e.target);
@@ -202,7 +203,7 @@ function runSearch() {
             'krtBlueprintsI18n.searching',
         )}</div>`,
     );
-    window.krtFetch
+    krtFetch
         .getJson(url)
         .then(renderResults)
         .catch(() => {
@@ -324,18 +325,18 @@ function conflictObj() {
 }
 
 function reswapList() {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     if (!document.getElementById('krt-bp-list') && document.getElementById('bp-results')) {
-        window.krtFetch.swap({
+        krtFetch.swap({
             url: window.location.pathname + window.location.search,
             container: '#bp-results',
             history: false,
         });
         return;
     }
-    window.krtFetch.swap({
+    krtFetch.swap({
         url: window.location.pathname + window.location.search,
         container: '#krt-bp-list',
         fragmentValue: 'list',
@@ -403,14 +404,14 @@ function recountAndSync() {
 }
 
 function addSelected() {
-    if (staged.size === 0 || !window.krtFetch) {
+    if (staged.size === 0 || !krtFetch) {
         return;
     }
     const keys = Array.from(staged.keys());
     if (addSelectedBtn) {
         addSelectedBtn.disabled = true;
     }
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: endpoints().addSelected || '/personal-inventory/blueprints/add-selected',
@@ -534,7 +535,7 @@ function normalizeAcquired(value) {
  */
 function submitEditNote(e) {
     e.preventDefault();
-    if (!editForm || !window.krtFetch) {
+    if (!editForm || !krtFetch) {
         return;
     }
     const noteEl = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (
@@ -553,7 +554,7 @@ function submitEditNote(e) {
     if (submitBtn) {
         submitBtn.disabled = true;
     }
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: safeSameOriginUrl(editForm.getAttribute('action'), editForm.action),
@@ -648,7 +649,7 @@ function patchBlueprintRow(dto) {
  */
 function submitDeleteBp(e) {
     e.preventDefault();
-    if (!deleteForm || !window.krtFetch) {
+    if (!deleteForm || !krtFetch) {
         return;
     }
     const submitBtn = /** @type {HTMLButtonElement | null} */ (
@@ -657,7 +658,7 @@ function submitDeleteBp(e) {
     if (submitBtn) {
         submitBtn.disabled = true;
     }
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: safeSameOriginUrl(deleteForm.getAttribute('action'), deleteForm.action),
@@ -686,7 +687,7 @@ function submitDeleteAll(e) {
     if (!deleteAllForm) {
         return;
     }
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         deleteAllForm.submit();
         return;
     }
@@ -696,7 +697,7 @@ function submitDeleteAll(e) {
     if (submitBtn) {
         submitBtn.disabled = true;
     }
-    window.krtFetch
+    krtFetch
         .submitForm({
             form: deleteAllForm,
             toast: false,

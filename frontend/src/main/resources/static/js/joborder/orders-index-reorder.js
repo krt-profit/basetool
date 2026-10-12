@@ -22,6 +22,7 @@
 /* global KRT_ORDERS_REORDER_I18N */
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * Moves a job order to a priority slot, refreshes the queue and toasts the outcome.
@@ -32,8 +33,8 @@ import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 async function persistOrderReorder(orderId, targetPriority) {
     const container = document.getElementById('orders-results');
     let res = { ok: false };
-    if (window.krtFetch) {
-        res = await window.krtFetch.write({
+    if (krtFetch) {
+        res = await krtFetch.write({
             method: 'PUT',
             url: `/orders/${orderId}/priority/ajax?priority=${targetPriority}`,
             toast: false,
@@ -49,8 +50,8 @@ async function persistOrderReorder(orderId, targetPriority) {
     }
     if (window.krtRefreshOrdersQueue) {
         await window.krtRefreshOrdersQueue(['queue'], res.ok ? undefined : { broadcast: false });
-    } else if (container && window.krtFetch && window.krtFetch.swap) {
-        await window.krtFetch.swap({
+    } else if (container && krtFetch && krtFetch.swap) {
+        await krtFetch.swap({
             url: window.location.pathname + window.location.search,
             container,
             fragmentValue: 'results',

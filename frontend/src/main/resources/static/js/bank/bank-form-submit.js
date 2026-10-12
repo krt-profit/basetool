@@ -23,6 +23,7 @@ import { clearErrors, showError } from '/js/bank/bank-form-errors.js';
 import { publishBankLiveSync } from '/js/bank/bank-livesync.js';
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** Form field names serialized as JSON numbers instead of strings. */
 const NUMBER_FIELDS = [
@@ -141,7 +142,7 @@ async function submitBankForm(form) {
     );
 
     const submitButton = form.querySelector('button[type="submit"]');
-    await window.krtFetch.write({
+    await krtFetch.write({
         method,
         url: endpoint,
         payload: method !== 'GET' && method !== 'DELETE' ? body : undefined,
@@ -201,7 +202,7 @@ function handleBankSuccess(form) {
     }
     publishBankLiveSync(form);
     const spec = REFRESH_TARGETS[form.getAttribute('data-refresh')];
-    if (!spec || !window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+    if (!spec || !krtFetch || typeof krtFetch.swap !== 'function') {
         window.location.reload();
         return;
     }
@@ -220,7 +221,7 @@ function handleBankSuccess(form) {
     frozen.forEach((button) => {
         button.disabled = true;
     });
-    window.krtFetch
+    krtFetch
         .swap({
             url,
             container: spec.container,

@@ -21,6 +21,7 @@
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
     const BASE = '/connected-apps';
@@ -114,7 +115,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
     if (undoForm instanceof HTMLFormElement) {
         undoForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            if (!undoClientId || !window.krtFetch) {
+            if (!undoClientId || !krtFetch) {
                 return;
             }
             const span = /** @type {HTMLSelectElement | null} */ (
@@ -123,7 +124,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
             const hours = span ? Number(span.value) : 24;
             const since = new Date(Date.now() - hours * HOUR_MS).toISOString();
             const submitter = undoForm.querySelector('button[type="submit"]');
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `${BASE}/${encodeURIComponent(undoClientId)}/undo`,
                 payload: { since },
@@ -145,10 +146,10 @@ import { krtModal } from '/js/kernel/krt-modal.js';
      * @param {Element} submitter
      */
     function markSeen(id, submitter) {
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             return;
         }
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: `${BASE}/installations/${encodeURIComponent(id)}/seen`,
             toast: false,
@@ -162,7 +163,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 
     /** Re-renders the list in place from the `apps` fragment. */
     function refreshApps() {
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: BASE,
             container: '#ca-host',
             fragmentValue: 'apps',
@@ -178,11 +179,11 @@ import { krtModal } from '/js/kernel/krt-modal.js';
      * @param {Element} submitter
      */
     function disconnect(titleText, bodyText, url, submitter) {
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             return;
         }
         const send = function () {
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'DELETE',
                 url,
                 successMessage: i18n.disconnected,

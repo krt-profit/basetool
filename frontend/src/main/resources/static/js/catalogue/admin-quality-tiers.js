@@ -22,6 +22,7 @@
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
     const PAGE_URL = '/admin/quality-tiers';
@@ -174,7 +175,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 
     /** @returns {Promise<boolean>} */
     function refreshTable() {
-        return window.krtFetch.swap({ url: PAGE_URL, container: '#qt-results', history: false });
+        return krtFetch.swap({ url: PAGE_URL, container: '#qt-results', history: false });
     }
 
     /**
@@ -221,11 +222,11 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 
     form.addEventListener('submit', (event) => {
         event.preventDefault();
-        if (!window.krtFetch || !idInput) {
+        if (!krtFetch || !idInput) {
             return;
         }
         const id = idInput.value;
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: id ? `${PAGE_URL}/${encodeURIComponent(id)}` : PAGE_URL,
             payload: payload(),
@@ -243,11 +244,11 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 
     if (deleteConfirm) {
         deleteConfirm.addEventListener('click', () => {
-            if (!window.krtFetch || !pendingDeleteId) {
+            if (!krtFetch || !pendingDeleteId) {
                 return;
             }
             const id = pendingDeleteId;
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `${PAGE_URL}/${encodeURIComponent(id)}/delete`,
                 submitter: deleteConfirm,

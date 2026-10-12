@@ -23,6 +23,7 @@
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * A form control of a material or store row, whose `id`, `name` and `value` the renumbering
@@ -53,10 +54,10 @@ function refineryStoreModalOpen() {
 }
 
 (function () {
-    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
+    if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
-    refinerySeam = window.krtFetch.sectionWrite({
+    refinerySeam = krtFetch.sectionWrite({
         dict() {
             return {
                 'refineryorder.section.refresh.error': REFINERY_DETAIL_MSG.sectionRefreshError,
@@ -100,7 +101,7 @@ function refineryStoreModalOpen() {
 
 function _submitRefinery(options) {
     const form = options.form;
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         form.submit();
         return;
     }
@@ -117,7 +118,7 @@ function _submitRefinery(options) {
         );
         return true;
     }
-    window.krtFetch.submitForm({
+    krtFetch.submitForm({
         form,
         submitter: options.submitter,
         serialize: `refinery-order:${window.refineryOrderId}`,
@@ -312,7 +313,7 @@ document.addEventListener('change', (e) => {
     const index = sel.id.substring('storeUser_'.length);
     const orgSelect = document.getElementById(`storeOrgUnit_${index}`);
     if (!orgSelect || !sel.value) return;
-    window.krtFetch
+    krtFetch
         .getJson(`/refinery-orders/users/${encodeURIComponent(sel.value)}/org-units`)
         .then((opts) => rebuildOrgUnitOptions(orgSelect, Array.isArray(opts) ? opts : []))
         .catch(() => rebuildOrgUnitOptions(orgSelect, []));

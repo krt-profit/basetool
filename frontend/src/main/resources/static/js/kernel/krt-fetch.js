@@ -127,12 +127,15 @@ function refreshCsrf() {
     return refreshInFlight;
 }
 
-window.krtCsrf = {
+/** @type {KrtCsrfApi} */
+export const krtCsrf = {
     token: csrfToken,
     headerName: csrfHeaderName,
     headers: csrfHeaders,
     refresh: refreshCsrf,
 };
+
+window.krtCsrf = krtCsrf;
 
 const REAUTH_GUARD_KEY = 'krtReauthAt';
 const REAUTH_MIN_INTERVAL_MS = 10000;
@@ -198,8 +201,11 @@ function termsGateRedirect(url) {
     return true;
 }
 
-window.krtReauth = { redirect: reauthRedirect, check: maybeReauthenticate };
-window.krtTermsGate = { check: maybeTermsGate, redirect: termsGateRedirect };
+/** @type {KrtReauthApi} */
+export const krtReauth = { redirect: reauthRedirect, check: maybeReauthenticate };
+
+/** @type {KrtTermsGateApi} */
+export const krtTermsGate = { check: maybeTermsGate, redirect: termsGateRedirect };
 
 /**
  * Assembles the headers shared by {@link write} and {@link submitForm}: Accept,
@@ -1070,7 +1076,8 @@ function sectionWrite(config) {
     };
 }
 
-window.krtFetch = {
+/** @type {KrtFetchApi} */
+export const krtFetch = {
     get,
     getJson,
     write,
@@ -1087,5 +1094,7 @@ window.krtFetch = {
     reauthRedirect,
     sectionWrite,
     serialize: runSerialized,
-    csrf: window.krtCsrf,
+    csrf: krtCsrf,
 };
+
+window.krtFetch = krtFetch;

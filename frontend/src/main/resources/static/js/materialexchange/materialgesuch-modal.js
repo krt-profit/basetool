@@ -15,6 +15,7 @@
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
     /**
@@ -48,7 +49,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 
     const i18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
     const modal = /** @type {HTMLElement} */ (document.getElementById('mg-modal'));
-    if (!modal || !window.krtFetch) {
+    if (!modal || !krtFetch) {
         return;
     }
 
@@ -293,7 +294,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
     function loadMaterialPicker(query) {
         const seq = ++materialSeq;
         const url = `/materialboerse/request-materials${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-        window.krtFetch
+        krtFetch
             .getJson(url)
             .then((page) => {
                 if (seq !== materialSeq) {
@@ -380,7 +381,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
     function loadItemPicker(query) {
         const seq = ++itemSeq;
         const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-        window.krtFetch
+        krtFetch
             .getJson(url)
             .then((items) => {
                 if (seq !== itemSeq) {
@@ -509,7 +510,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
         toggle('[data-mg-qty-error]', false);
 
         if (state.mode === 'edit') {
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'PUT',
                 url: `/materialboerse/requests/${state.requestId}/ajax`,
                 payload: {
@@ -535,7 +536,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
                 showError(i18n.subjectRequired);
                 return;
             }
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: '/materialboerse/item-requests/ajax',
                 payload: {
@@ -559,7 +560,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
             showError(i18n.subjectRequired);
             return;
         }
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: '/materialboerse/requests/ajax',
             payload: {

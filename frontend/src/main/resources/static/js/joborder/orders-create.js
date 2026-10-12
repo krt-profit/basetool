@@ -24,6 +24,7 @@
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 function buildScuHint() {
     const hint = document.createElement('span');
@@ -288,7 +289,7 @@ function updateCounter(area) {
 async function findJobOrderMaterialByName(normalizedName) {
     try {
         const list =
-            (await window.krtFetch.getJson(
+            (await krtFetch.getJson(
                 `/catalog/material-search?jobOrder=true&q=${encodeURIComponent(normalizedName)}`,
             )) || [];
         return list.find((m) => (m.name || '').trim().toLowerCase() === normalizedName) || null;
@@ -443,7 +444,7 @@ function addMaterialRow() {
 let itemLineIndex = 0;
 
 function fetchItemOptions(query) {
-    return window.krtFetch
+    return krtFetch
         .getJson(`/orders/item-search?q=${encodeURIComponent(query || '')}`)
         .then((list) => {
             return (list || []).map((gi) => {
@@ -576,7 +577,7 @@ function loadBlueprints(row, preselectBpId, qualities) {
         bpSelect.replaceChildren();
         return;
     }
-    window.krtFetch
+    krtFetch
         .getJson(`/orders/item-blueprints/${encodeURIComponent(gameItemId)}`)
         .catch(() => [])
         .then((list) => {
@@ -615,7 +616,7 @@ function loadDerivation(row, qualities) {
     const derived = row.querySelector('[data-role="derived"]');
     const unresolved = row.querySelector('[data-role="unresolved"]');
     const subs = row.querySelector('[data-role="subassemblies"]');
-    window.krtFetch
+    krtFetch
         .getJson(`/orders/item-derivation/${encodeURIComponent(blueprintId)}?amount=${amount}`)
         .then((d) => {
             if (!d) {
@@ -767,11 +768,11 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 }
 
 function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         form.submit();
         return;
     }
-    window.krtFetch.submitForm({
+    krtFetch.submitForm({
         form,
         submitter,
         toast: false,

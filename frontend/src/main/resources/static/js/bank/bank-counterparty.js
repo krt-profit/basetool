@@ -19,6 +19,7 @@
  */
 
 import { setMovementControlActive } from '/js/bank/bank-controls.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * Fills a counterparty org-unit <select> from the chosen user's memberships (REQ-BANK-044). It
@@ -42,7 +43,7 @@ async function fillCounterpartyOrgUnits(userSelect, orgSelect) {
     }
     let memberships;
     try {
-        memberships = await window.krtFetch.getJson(
+        memberships = await krtFetch.getJson(
             `/users/${encodeURIComponent(userId)}/memberships?allKinds=true`,
         );
     } catch {

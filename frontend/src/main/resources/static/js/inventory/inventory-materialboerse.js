@@ -13,11 +13,12 @@
 // @ts-check
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
     const i18n = window.materialboerseInventoryI18n || {};
     const release = window.krtMaterialRelease;
-    if (!window.krtEvents || !release || !window.krtFetch) {
+    if (!window.krtEvents || !release || !krtFetch) {
         return;
     }
 
@@ -75,7 +76,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
                 el.checked = true;
                 return;
             }
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/materialboerse/items/${itemId}/deactivate/ajax`,
                 successMessage: i18n.deactivated,

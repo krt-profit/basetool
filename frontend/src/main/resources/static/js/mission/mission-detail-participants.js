@@ -20,6 +20,7 @@
 // @ts-check
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     (function wireParticipantAjax() {
@@ -99,14 +100,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     window.krtModalClose(editForm.closest('.krt-modal-overlay'));
                     const dto = res.body;
-                    if (
-                        dto &&
-                        dto.version !== undefined &&
-                        dto.version !== null &&
-                        window.krtFetch
-                    ) {
+                    if (dto && dto.version !== undefined && dto.version !== null && krtFetch) {
                         document.querySelectorAll(`[data-participant-id="${pId}"]`).forEach((c) => {
-                            window.krtFetch.syncVersion(c, dto.version);
+                            krtFetch.syncVersion(c, dto.version);
                         });
                     }
                     window.krtRefreshMissionSection(['crew', 'finance', 'overview']);
@@ -136,9 +132,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (res.ok) {
                 const dto = res.body;
-                if (dto && dto.version !== undefined && dto.version !== null && window.krtFetch) {
+                if (dto && dto.version !== undefined && dto.version !== null && krtFetch) {
                     document.querySelectorAll(`[data-participant-id="${pId}"]`).forEach((c) => {
-                        window.krtFetch.syncVersion(c, dto.version);
+                        krtFetch.syncVersion(c, dto.version);
                     });
                 }
                 window.krtRefreshMissionSection(['crew', 'finance']);
@@ -331,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             debounceTimer = setTimeout(() => {
-                window.krtFetch
+                krtFetch
                     .getJson(`/users/search?query=${encodeURIComponent(val)}`)
                     .then((users) => {
                         closeAllLists();
@@ -419,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         partyLeadDebounce = setTimeout(() => {
-            window.krtFetch
+            krtFetch
                 .getJson(`/users/search?query=${encodeURIComponent(val)}`)
                 .then((users) => {
                     partyLeadCloseLists();

@@ -20,6 +20,7 @@
 
 import { genericError } from '/js/bank/bank-messages.js';
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * Registers the document listeners of the type-to-confirm hurdle and the admin wipe-reset form it
@@ -59,7 +60,7 @@ export function initTypeToConfirm() {
             return;
         }
         event.preventDefault();
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             form.submit();
             return;
         }
@@ -74,7 +75,7 @@ export function initTypeToConfirm() {
             submitBtn.disabled = true;
         }
         const url = `${form.getAttribute('action')}?confirm=${encodeURIComponent(confirmValue)}`;
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url,

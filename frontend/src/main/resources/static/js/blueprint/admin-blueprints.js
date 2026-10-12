@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 function clamp01(t) {
     return t < 0 ? 0 : t > 1 ? 1 : t;
 }
@@ -101,8 +103,8 @@ function search(form) {
     const input = form.querySelector('input[name="search"]');
     const term = input ? input.value.trim() : '';
     const url = form.getAttribute('action') + (term ? `?search=${encodeURIComponent(term)}` : '');
-    if (window.krtFetch) {
-        window.krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
+    if (krtFetch) {
+        krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
     } else {
         window.location.assign(url);
     }
@@ -122,7 +124,7 @@ document.addEventListener('submit', (e) => {
 });
 
 const filterForm = document.getElementById('admin-bp-filter');
-if (filterForm && window.krtFetch) {
+if (filterForm && krtFetch) {
     filterForm.addEventListener('input', () => {
         clearTimeout(searchTimer ?? undefined);
         searchTimer = setTimeout(() => {
@@ -132,8 +134,8 @@ if (filterForm && window.krtFetch) {
 }
 
 computeAll(document);
-if (window.krtFetch) {
-    window.krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
+if (krtFetch) {
+    krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
 }
 document.addEventListener('krt:swapped', (e) => {
     const c = e.detail && e.detail.container;

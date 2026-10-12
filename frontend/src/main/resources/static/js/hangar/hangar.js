@@ -25,6 +25,7 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
@@ -51,8 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function reswapHangar() {
-        if (window.krtFetch) {
-            window.krtFetch.swap({
+        if (krtFetch) {
+            krtFetch.swap({
                 url: currentListUrl(),
                 container: '#hangar-results',
                 history: false,
@@ -310,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 deleteForm.querySelector('button[type="submit"]')
             );
             if (submitBtn) submitBtn.disabled = true;
-            window.krtFetch
+            krtFetch
                 .write({
                     method: 'POST',
                     url: safeSameOriginUrl(deleteForm.getAttribute('action'), deleteForm.action),
@@ -418,7 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showError(button.getAttribute('data-error-toolarge'));
                 return;
             }
-            if (!window.krtFetch) {
+            if (!krtFetch) {
                 return;
             }
             const formData = new FormData();
@@ -431,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             button.setAttribute('aria-busy', 'true');
-            window.krtFetch
+            krtFetch
                 .submitForm({
                     url: '/hangar/import/ships',
                     method: 'POST',
@@ -502,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
             deleteAllConfirmBtn.disabled = true;
             deleteAllCancelBtn.disabled = true;
 
-            window.krtFetch
+            krtFetch
                 .write({
                     method: 'DELETE',
                     url: '/hangar/ships/all',
@@ -579,7 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 if (submitBtn) submitBtn.disabled = true;
-                window.krtFetch
+                krtFetch
                     .write({
                         method: 'POST',
                         url: safeSameOriginUrl(homeForm.getAttribute('action'), homeForm.action),
@@ -620,7 +621,7 @@ document.addEventListener('DOMContentLoaded', () => {
             form.querySelector('button[type="submit"]')
         );
         if (submitBtn) submitBtn.disabled = true;
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: safeSameOriginUrl(action, action),
@@ -686,11 +687,11 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function applyHangarFilter(url) {
         const target = url || filterUrl();
-        if (!hangarResults || !window.krtFetch) {
+        if (!hangarResults || !krtFetch) {
             window.location.assign(target);
             return;
         }
-        window.krtFetch.swap({ url: target, container: hangarResults, history: true });
+        krtFetch.swap({ url: target, container: hangarResults, history: true });
     }
 
     if (filterForm) {
@@ -749,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (window.krtFetch && typeof window.krtFetch.bindSwap === 'function') {
-        window.krtFetch.bindSwap({ container: '#hangar-results', history: true });
+    if (krtFetch && typeof krtFetch.bindSwap === 'function') {
+        krtFetch.bindSwap({ container: '#hangar-results', history: true });
     }
 });

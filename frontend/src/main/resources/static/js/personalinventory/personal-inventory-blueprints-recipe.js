@@ -1,6 +1,7 @@
 // @ts-check
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** @type {HTMLElement | null} */
 let mdEl = null;
@@ -304,7 +305,7 @@ function loadRecipe(id) {
             window.krtI18nText(i18n().loading, 'krtBlueprintsRecipeI18n.loading'),
         ),
     );
-    window.krtFetch
+    krtFetch
         .getJson(resolveUrl(endpoints().recipe, id))
         .then((recipe) => {
             if (!recipe) {
@@ -633,7 +634,7 @@ function loadCraftability() {
     const target = safeSameOriginUrl
         ? safeSameOriginUrl(`${url + sep}includeRefinery=true`, url)
         : `${url + sep}includeRefinery=true`;
-    window.krtFetch
+    krtFetch
         .getJson(target)
         .catch(() => null)
         .then((list) => {

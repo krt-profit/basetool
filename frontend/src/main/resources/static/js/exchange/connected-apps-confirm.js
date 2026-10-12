@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 (function () {
     const BASE = '/connected-apps/confirm';
 
@@ -114,12 +116,12 @@
         return false;
     }
 
-    if (!handoffId || !window.krtFetch) {
+    if (!handoffId || !krtFetch) {
         show('cac-missing');
         return;
     }
 
-    window.krtFetch.write({
+    krtFetch.write({
         method: 'POST',
         url: `${BASE}/load`,
         payload: { handoffId },
@@ -144,7 +146,7 @@
     const confirmBtn = document.getElementById('cac-confirm');
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `${BASE}/apply`,
                 payload: { handoffId },
@@ -162,7 +164,7 @@
     const discardBtn = document.getElementById('cac-discard');
     if (discardBtn) {
         discardBtn.addEventListener('click', () => {
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `${BASE}/discard`,
                 payload: { handoffId },

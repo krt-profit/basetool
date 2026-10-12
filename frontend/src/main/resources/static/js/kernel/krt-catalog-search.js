@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 /** @param {ApiDto<'MaterialDto'>} row */
 function toMaterialOption(row) {
     return {
@@ -42,7 +44,7 @@ function toGameItemOption(row) {
 }
 
 function fetchCatalog(path, query, toOption) {
-    return window.krtFetch
+    return krtFetch
         .getJson(
             `${path + (path.indexOf('?') >= 0 ? '&' : '?')}q=${encodeURIComponent(query || '')}`,
         )

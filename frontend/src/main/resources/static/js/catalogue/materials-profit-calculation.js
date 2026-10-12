@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 /** @typedef {ApiDto<'ProfitCalculationDto'>} ProfitRow */
 
 const PROFIT_FILTER_KEY = 'profit_calculation_filters';
@@ -206,7 +208,7 @@ async function updateProfitCalculation() {
         if (c.checked) params.append('starSystemNames', c.value);
     });
     try {
-        const data = await window.krtFetch.getJson(
+        const data = await krtFetch.getJson(
             `/api/proxy/materials/profit-calculation?${params.toString()}`,
         );
         if (token !== requestToken) return;

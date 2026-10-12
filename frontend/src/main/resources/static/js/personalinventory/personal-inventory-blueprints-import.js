@@ -2,6 +2,7 @@
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** @type {HTMLInputElement | null} */
 let fileInput = null;
@@ -65,11 +66,11 @@ function loadHandoff() {
     if (window.history && window.history.replaceState) {
         window.history.replaceState(null, '', cleaned);
     }
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
     const url = `${
         endpoints().importStaged || '/personal-inventory/blueprints/import/staged'
     }?handoff=${encodeURIComponent(id)}`;
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url,
@@ -111,10 +112,10 @@ function onFileChosen() {
 }
 
 function uploadPreview(file) {
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
     const fd = new FormData();
     fd.append('file', file);
-    window.krtFetch
+    krtFetch
         .submitForm({
             url: endpoints().importPreview || '/personal-inventory/blueprints/import/preview',
             method: 'POST',
@@ -307,7 +308,7 @@ function rowSearch(input, results, row) {
     const url = `${
         endpoints().search || '/personal-inventory/blueprints/search'
     }?q=${encodeURIComponent(q)}&limit=10`;
-    window.krtFetch
+    krtFetch
         .getJson(url)
         .then((items) => {
             renderRowResults(results, row, items);
@@ -396,11 +397,11 @@ function apply() {
         return;
     }
     if (applyBtn) applyBtn.disabled = true;
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         applyError();
         return;
     }
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: endpoints().importApply || '/personal-inventory/blueprints/import/apply',
@@ -429,7 +430,7 @@ function apply() {
                     showFrontendSuccessToast(msg);
                 }
                 closeModal();
-                window.krtFetch.swap({
+                krtFetch.swap({
                     url: window.location.pathname + window.location.search,
                     container: '#krt-bp-list',
                     fragmentValue: 'list',

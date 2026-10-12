@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 const ORG_STRUCTURE_SECTIONS = {
     units: { container: '#org-structure-units', fragmentValue: 'units' },
     forms: { container: '#org-structure-forms', fragmentValue: 'forms' },
@@ -26,12 +28,12 @@ const ORG_STRUCTURE_SECTIONS = {
 const ORG_STRUCTURE_CHART_SECTION = 'chart';
 
 (function () {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     const i18n = readMessages();
 
-    const orgStructureSeam = window.krtFetch.sectionWrite({
+    const orgStructureSeam = krtFetch.sectionWrite({
         dict() {
             return { 'admin.orgStructure.refresh.error': i18n.refreshError };
         },
@@ -105,7 +107,7 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
 
     window.krtEvents.on('submit', 'os-create-ol', (form, event) => {
         event.preventDefault();
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: '/admin/org-structure/organisationsleitung',
             payload: {
@@ -122,7 +124,7 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
 
     window.krtEvents.on('submit', 'os-create-bereich', (form, event) => {
         event.preventDefault();
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: '/admin/org-structure/bereiche',
             payload: {
@@ -145,7 +147,7 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
             return;
         }
         const id = row.getAttribute('data-org-unit-id');
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'PATCH',
             url: `/admin/org-structure/org-units/${encodeURIComponent(String(id))}/parent`,
             serialize: `org-unit:${id}`,

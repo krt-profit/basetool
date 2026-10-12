@@ -24,6 +24,7 @@
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** @type {string[]} */
 const materialNames = [];
@@ -142,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         event.preventDefault();
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             form.submit();
             return;
         }
@@ -156,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return;
         }
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: /** @type {string} */ (form.getAttribute('action')),
             payload: { name },
@@ -198,8 +199,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const categoryId = form.getAttribute('data-category-id');
-            if (window.krtFetch && categoryId) {
-                window.krtFetch.write({
+            if (krtFetch && categoryId) {
+                krtFetch.write({
                     method: 'POST',
                     url: /** @type {string} */ (form.getAttribute('action')),
                     successMessage: CAT_MSG.deleteSuccess,
@@ -263,7 +264,7 @@ function updateMaterial(selectElement) {
     const tr = closestRow;
     const matId = /** @type {string} */ (tr.getAttribute('data-mat-id'));
     const updateType = selectElement.getAttribute('data-update-type');
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
 
@@ -297,7 +298,7 @@ function updateMaterial(selectElement) {
         return requestBody;
     }
 
-    window.krtFetch
+    krtFetch
         .write({
             method: 'PUT',
             url: `/admin/materials/${encodeURIComponent(matId)}/ajax`,
@@ -387,10 +388,10 @@ function submitCreateMaterial(btn) {
         isVolatileTime: createMaterialCheckbox('cm-volatile-time').checked,
     };
 
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
-    window.krtFetch.write({
+    krtFetch.write({
         method: 'POST',
         url: '/admin/materials/ajax',
         payload,
@@ -425,7 +426,7 @@ function replaceFromDocument(fresh, selector) {
  * @returns {Promise<boolean>} true when the table was refreshed
  */
 function refreshMaterialsTable() {
-    return window.krtFetch
+    return krtFetch
         .get(window.location.pathname + window.location.search)
         .then((res) => {
             return !res || !res.ok ? null : res.text();
@@ -434,7 +435,7 @@ function refreshMaterialsTable() {
             if (html === null) {
                 return false;
             }
-            const fresh = window.krtFetch.parseTrustedDocument(html);
+            const fresh = krtFetch.parseTrustedDocument(html);
             if (!fresh.querySelector('#materials-results #materialsTable tbody')) {
                 return false;
             }

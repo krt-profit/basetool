@@ -1,4 +1,7 @@
 // @ts-check
+
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 const state = {
     yieldByMaterialId: {},
     helpText: '',
@@ -76,7 +79,7 @@ function onLocationChange(selectElement) {
         refreshAll();
         return Promise.resolve();
     }
-    return window.krtFetch
+    return krtFetch
         .getJson(`/refinery-orders/locations/${encodeURIComponent(locationId)}/yields`)
         .catch(() => {
             return {};

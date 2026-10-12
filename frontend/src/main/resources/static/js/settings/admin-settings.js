@@ -22,6 +22,7 @@
 /* global MSG_ENABLED, MSG_DISABLED, MSG_ERROR, MSG_SAVED, MSG_PROFIT_ENABLED, MSG_PROFIT_DISABLED, MSG_PROFIT_ERROR, MSG_PROFIT_SAVED, SAVE_SUCCESS, SAVE_ERROR, SAVE_CONFLICT */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * Wires one family of optimistic boolean toggles: each change flips the label at once and PATCHes
@@ -38,7 +39,7 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
     /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll(selector)).forEach(
         (checkbox) => {
             checkbox.addEventListener('change', () => {
-                if (!window.krtFetch) {
+                if (!krtFetch) {
                     return;
                 }
                 const id = checkbox.getAttribute(idAttribute) || '';
@@ -55,7 +56,7 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
                         labelSpan.textContent = !checked ? labels.on : labels.off;
                     }
                 }
-                window.krtFetch.write({
+                krtFetch.write({
                     method: 'PATCH',
                     url: urlFor(id),
                     payload: bodyFor(checked),
@@ -132,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     settingsForm.addEventListener('submit', (event) => {
         event.preventDefault();
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             settingsForm.submit();
             return;
         }
@@ -155,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (submitBtn) {
             submitBtn.disabled = true;
         }
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: settingsForm.getAttribute('action') || '',

@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 (function () {
     /**
      * One terminal column of the grid.
@@ -158,7 +160,7 @@
     /** Fetches the grid for the current filter selection; a newer request wins. */
     function fetchGrid() {
         const token = ++fetchToken;
-        window.krtFetch
+        krtFetch
             .getJson(DATA_URL + buildFilterQuery())
             .then((data) => {
                 if (token !== fetchToken) {

@@ -23,6 +23,7 @@
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 window.krtRefineryYield.init(MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP);
 
@@ -433,7 +434,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             }
             select.dispatchEvent(new Event('change', { bubbles: true }));
         };
-        window.krtFetch
+        krtFetch
             .getJson(`/catalog/material-search?raw=true&q=${encodeURIComponent(materialName)}`)
             .then((list) => {
                 const rows = Array.isArray(list) ? list : [];
@@ -475,11 +476,11 @@ function _refineryCreateErrorMessage(status, body) {
  * @param {HTMLElement | null} submitter the control that triggered the submit
  */
 function _submitRefineryCreate(form, submitter) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         form.submit();
         return;
     }
-    window.krtFetch.submitForm({
+    krtFetch.submitForm({
         form,
         submitter,
         toast: false,
@@ -568,7 +569,7 @@ function _swapRefineryImportFragment(html) {
         window.location.reload();
         return;
     }
-    window.krtFetch.setTrustedHtml(container, html);
+    krtFetch.setTrustedHtml(container, html);
     document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
     if (typeof resetUnsavedChanges === 'function') resetUnsavedChanges();
 }
@@ -588,11 +589,11 @@ function _refineryImportFailed() {
 }
 
 function _submitRefineryImport(form) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         form.submit();
         return;
     }
-    window.krtFetch
+    krtFetch
         .submitForm({
             form,
             method: 'POST',
@@ -623,8 +624,8 @@ function _loadRefineryHandoff() {
             window.history.replaceState(null, '', cleaned);
         }
     } catch (_e) {}
-    if (!window.krtFetch) return;
-    window.krtFetch
+    if (!krtFetch) return;
+    krtFetch
         .write({
             method: 'POST',
             url: `/refinery-orders/import-handoff?handoff=${encodeURIComponent(id)}`,

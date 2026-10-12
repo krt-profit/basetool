@@ -20,6 +20,7 @@
 
 import { genericError } from '/js/bank/bank-messages.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** Maps a grant flag name onto the row attribute the next toggle click reads. */
 const FLAG_ATTR = {
@@ -49,8 +50,8 @@ function applyGrantFlagResult(button, row, flag, newValue, payload) {
     if (version == null) {
         return;
     }
-    if (window.krtFetch && typeof window.krtFetch.syncVersion === 'function') {
-        window.krtFetch.syncVersion(row, version);
+    if (krtFetch && typeof krtFetch.syncVersion === 'function') {
+        krtFetch.syncVersion(row, version);
     } else {
         row.setAttribute('data-version', String(version));
     }
@@ -83,7 +84,7 @@ export function initGrantMatrix() {
         const endpoint = `/api/proxy/bank/grants/${encodeURIComponent(
             /** @type {string} */ (row.getAttribute('data-user-id')),
         )}/${encodeURIComponent(/** @type {string} */ (row.getAttribute('data-account-id')))}`;
-        await window.krtFetch.write({
+        await krtFetch.write({
             method: 'PATCH',
             url: endpoint,
             serialize: `bank-grant:${row.getAttribute('data-user-id')}:${row.getAttribute(

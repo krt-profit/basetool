@@ -15,6 +15,7 @@
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
     /**
@@ -50,7 +51,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const modal = /** @type {HTMLElement} */ (document.getElementById('mb-modal'));
-    if (!modal || !window.krtFetch) {
+    if (!modal || !krtFetch) {
         return;
     }
 
@@ -381,7 +382,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
         const url = `/materialboerse/releasable-items?kind=${encodeURIComponent(
             pickerKind,
         )}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
-        window.krtFetch
+        krtFetch
             .getJson(url)
             .then((items) => {
                 if (seq !== pickerSeq) {
@@ -520,7 +521,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
     function loadItemPicker(query) {
         const seq = ++itemPickerSeq;
         const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
-        window.krtFetch
+        krtFetch
             .getJson(url)
             .then((items) => {
                 if (seq !== itemPickerSeq) {
@@ -613,7 +614,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
             if (offeredAmount === null) {
                 return;
             }
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'PUT',
                 url: `/materialboerse/offers/${state.offerId}/remark/ajax`,
                 payload: {
@@ -643,7 +644,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
         if (offeredAmount === null) {
             return;
         }
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: '/materialboerse/offers/ajax',
             payload: {
@@ -680,7 +681,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
             return;
         }
         toggle('[data-mb-qty-error]', false);
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: '/materialboerse/item-offers/ajax',
             payload: { productKey: state.productKey, quantity, remark },

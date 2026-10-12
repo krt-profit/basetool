@@ -21,6 +21,8 @@
 
 /* global KRT_DEMAND_LIVESYNC_UPDATES, KRT_DEMAND_SECTION_REFRESH_ERROR */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 const DEMAND_SECTIONS = {
     demand: { container: '#orders-material-demand-results', fragmentValue: 'results' },
 };
@@ -577,8 +579,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (
         window.krtLiveSync &&
         typeof window.krtLiveSync.createReceiver === 'function' &&
-        window.krtFetch &&
-        typeof window.krtFetch.swap === 'function' &&
+        krtFetch &&
+        typeof krtFetch.swap === 'function' &&
         document.getElementById('orders-material-demand-results')
     ) {
         window.krtLiveSync.createReceiver({
@@ -586,7 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sections: DEMAND_SECTIONS,
             coalesceMs: 1500,
             refresh() {
-                window.krtFetch.swap({
+                krtFetch.swap({
                     url: window.location.pathname,
                     container: '#orders-material-demand-results',
                     fragmentValue: DEMAND_SECTIONS.demand.fragmentValue,

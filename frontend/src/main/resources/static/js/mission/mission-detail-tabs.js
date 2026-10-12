@@ -20,6 +20,7 @@
 // @ts-check
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
     const tabs = /** @type {HTMLElement[]} */ (
@@ -253,8 +254,8 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
             }
         } else if (showFrontendErrorToast) {
             const ownerRequired =
-                window.krtFetch && window.krtFetch.ownerOrgUnitRequiredMessage
-                    ? window.krtFetch.ownerOrgUnitRequiredMessage(problem)
+                krtFetch && krtFetch.ownerOrgUnitRequiredMessage
+                    ? krtFetch.ownerOrgUnitRequiredMessage(problem)
                     : null;
             showFrontendErrorToast(
                 ownerRequired ||
@@ -309,12 +310,12 @@ import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
     }
 
     async function submitInPlace() {
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             form.submit();
             return;
         }
         markDirtySections();
-        await window.krtFetch.submitForm({
+        await krtFetch.submitForm({
             form,
             url: form.action,
             serialize: 'section:schedule',

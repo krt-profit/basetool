@@ -18,11 +18,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 (function () {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
-    const krtFetch = window.krtFetch;
     /** @type {Record<string, string>} */
     const i18n = window.krtProfileI18n || {};
 

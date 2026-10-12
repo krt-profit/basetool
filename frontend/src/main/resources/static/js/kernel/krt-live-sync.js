@@ -1,4 +1,7 @@
 // @ts-check
+
+import { krtTermsGate } from '/js/kernel/krt-fetch.js';
+
 const DEFAULT_COALESCE_MS = 400;
 
 function containerSelector(sectionValue) {
@@ -165,8 +168,8 @@ const syncSocket = (function () {
                 window.clearTimeout(reconnectTimer);
                 reconnectTimer = null;
             }
-            if (window.krtTermsGate) {
-                window.krtTermsGate.redirect(ev.reason);
+            if (krtTermsGate) {
+                krtTermsGate.redirect(ev.reason);
             }
             return;
         }

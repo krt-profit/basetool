@@ -8,6 +8,7 @@
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** @type {Record<string, any>} */
 const i18n = /** @type {any} */ (window).leitungI18n || {};
@@ -41,7 +42,7 @@ function root() {
  * @returns {Promise<boolean> | undefined} the swap, or nothing when it fell back to a reload
  */
 function reswap() {
-    if (!window.krtFetch || !window.krtFetch.swap) {
+    if (!krtFetch || !krtFetch.swap) {
         window.location.reload();
         return undefined;
     }
@@ -53,7 +54,7 @@ function reswap() {
         params.set('tab', 'groups');
     }
     params.set('fragment', 'leitungSections');
-    return window.krtFetch.swap({
+    return krtFetch.swap({
         url: `/organisation/leitung?${params.toString()}`,
         container: `#${SECTIONS_ID}`,
         fragmentValue: 'leitungSections',
@@ -69,11 +70,11 @@ function reswap() {
  *     success: string }} opts the request
  */
 function write(opts) {
-    if (!window.krtFetch || !window.krtFetch.write) {
+    if (!krtFetch || !krtFetch.write) {
         window.location.reload();
         return;
     }
-    window.krtFetch.write({
+    krtFetch.write({
         url: opts.url,
         method: opts.method,
         payload: opts.payload,
@@ -645,12 +646,12 @@ function submitModal() {
             success: i18n.saved,
         });
     } else if (context.action === 'add-sk') {
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             return;
         }
         const params = new URLSearchParams();
         params.set('userId', userId);
-        window.krtFetch.submitForm({
+        krtFetch.submitForm({
             url: `/organisation/special-commands/${context.unitId}/members`,
             method: 'POST',
             formData: params,

@@ -19,6 +19,7 @@
  */
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** How many of the newest notifications the home card lists. */
 const NOTIFICATION_LIMIT = 3;
@@ -95,7 +96,7 @@ function renderNotifications(items) {
 /** Loads the newest notifications from the bell's endpoint. */
 function loadNotifications() {
     if (!document.querySelector('[data-home-notif-list]')) return;
-    window.krtFetch
+    krtFetch
         .getJson('/notifications/recent')
         .then((items) => {
             renderNotifications(Array.isArray(items) ? items : []);
@@ -109,14 +110,14 @@ document.addEventListener('DOMContentLoaded', () => {
     loadNotifications();
 
     const announcementForm = document.getElementById('announcement-read-form');
-    if (announcementForm && window.krtFetch) {
+    if (announcementForm && krtFetch) {
         announcementForm.addEventListener('submit', (event) => {
             event.preventDefault();
             const idInput = /** @type {HTMLInputElement | null} */ (
                 announcementForm.querySelector('input[name="id"]')
             );
             const announcementId = idInput ? idInput.value : '';
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/announcement/read?id=${encodeURIComponent(announcementId)}`,
                 toast: false,

@@ -3,6 +3,7 @@
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const SEARCH_LIMIT = 2000;
 
@@ -118,7 +119,7 @@ function wireAdminMemberPersistence() {
 }
 
 function wireWriteSubmits() {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     document.addEventListener('submit', (e) => {
@@ -144,7 +145,7 @@ function conflictObj() {
 }
 
 function reswapResults() {
-    window.krtFetch.swap({
+    krtFetch.swap({
         url: window.location.pathname + window.location.search,
         container: '#pi-results',
         history: false,
@@ -217,7 +218,7 @@ function submitItemForm() {
     if (submitBtn) {
         submitBtn.disabled = true;
     }
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: safeSameOriginUrl(action, action),
@@ -249,7 +250,7 @@ function submitDeleteForm() {
     if (btn) {
         btn.disabled = true;
     }
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: safeSameOriginUrl(action, action),
@@ -269,10 +270,10 @@ function submitDeleteForm() {
 }
 
 function wireFilterSwap() {
-    if (!window.krtFetch || !document.getElementById('pi-results')) {
+    if (!krtFetch || !document.getElementById('pi-results')) {
         return;
     }
-    window.krtFetch.bindSwap({ container: '#pi-results', history: true });
+    krtFetch.bindSwap({ container: '#pi-results', history: true });
     /** @type {number | null} */
     let timer = null;
     /**
@@ -288,7 +289,7 @@ function wireFilterSwap() {
             /** @type {Record<string, string>} */ (/** @type {unknown} */ (new FormData(formEl))),
         ).toString();
         const url = formEl.getAttribute('action') + (params ? `?${params}` : '');
-        window.krtFetch.swap({ url, container: '#pi-results', history: true });
+        krtFetch.swap({ url, container: '#pi-results', history: true });
     }
     document.addEventListener('submit', (e) => {
         const target = /** @type {HTMLFormElement} */ (e.target);
@@ -454,7 +455,7 @@ function runSearch() {
             'krtPersonalInventoryI18n.searching',
         )}</div>`,
     );
-    window.krtFetch
+    krtFetch
         .getJson(url)
         .then(renderResults)
         .catch(() => {

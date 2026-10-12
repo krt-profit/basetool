@@ -23,6 +23,7 @@
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const matSelect = /** @type {HTMLSelectElement | null} */ (
@@ -127,7 +128,7 @@ function startOrderNeedsLiveSync() {
 }
 
 function refreshOrderNeeds() {
-    window.krtFetch
+    krtFetch
         .getJson('/inventory/order-needs')
         .then((needs) => {
             if (!needs) return;
@@ -339,7 +340,7 @@ function scheduleMergeProbe() {
         return;
     }
     mergeProbeTimer = window.setTimeout(() => {
-        window.krtFetch
+        krtFetch
             .getJson(`/inventory/merge-candidates?${query}`)
             .then((answer) => {
                 if (sequence !== mergeProbeSequence) return;
@@ -485,7 +486,7 @@ function reloadOwnerPickerForUser() {
         scheduleMergeProbe();
         return;
     }
-    window.krtFetch
+    krtFetch
         .getJson(`/users/${encodeURIComponent(userId)}/memberships?allKinds=true`)
         .catch(() => {
             return [];
@@ -891,7 +892,7 @@ function syncPersonalAllocations() {
 }
 
 (function () {
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('inventory-input-form')
     );
@@ -904,7 +905,7 @@ function syncPersonalAllocations() {
             blank[0].focus();
             return;
         }
-        window.krtFetch.submitForm({
+        krtFetch.submitForm({
             form,
             submitter: form.querySelector('button[type="submit"]'),
             toast: false,
@@ -912,8 +913,8 @@ function syncPersonalAllocations() {
             onError(status, problem) {
                 let msg = INV_ADD_MSG.failed;
                 const ownerRequired =
-                    window.krtFetch && window.krtFetch.ownerOrgUnitRequiredMessage
-                        ? window.krtFetch.ownerOrgUnitRequiredMessage(problem)
+                    krtFetch && krtFetch.ownerOrgUnitRequiredMessage
+                        ? krtFetch.ownerOrgUnitRequiredMessage(problem)
                         : null;
                 if (ownerRequired) msg = ownerRequired;
                 else if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT')

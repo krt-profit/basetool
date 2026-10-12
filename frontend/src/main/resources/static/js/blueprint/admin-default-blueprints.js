@@ -21,6 +21,7 @@
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const cfg = window.krtDefaultBlueprints || {};
 /** @type {KrtI18nDict} */
@@ -115,7 +116,7 @@ function refreshList() {
     if (!listHost || !cfg.listUrl) {
         return Promise.resolve();
     }
-    return window.krtFetch
+    return krtFetch
         .swap({
             url: cfg.listUrl,
             container: listHost,
@@ -207,7 +208,7 @@ function runSearch(q) {
     }
     renderMessage(window.krtI18nText(i18n.searching, 'krtDefaultBlueprints.i18n.searching'));
     const url = `${cfg.searchUrl}?q=${encodeURIComponent(q.trim())}&limit=25`;
-    window.krtFetch
+    krtFetch
         .getJson(url)
         .then(renderResults)
         .catch(() => {
@@ -307,14 +308,14 @@ function applyAddResult(result) {
 if (addForm) {
     const form = addForm;
     form.addEventListener('submit', (event) => {
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             return;
         }
         event.preventDefault();
         if (staged.size === 0) {
             return;
         }
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: form.getAttribute('action') || '',
@@ -360,11 +361,11 @@ if (deleteConfirm) {
         if (!form) {
             return;
         }
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             form.requestSubmit();
             return;
         }
-        window.krtFetch.write({
+        krtFetch.write({
             method: 'POST',
             url: form.getAttribute('action') || '',
             submitter: confirmBtn,

@@ -31,6 +31,7 @@ import {
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const adminLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-admin',
@@ -279,7 +280,7 @@ function filterInventory() {
         window.history.replaceState({}, '', visibleUrl.toString());
     } catch {}
 
-    window.krtFetch
+    krtFetch
         .get(url.toString())
         .then((response) => {
             if (!response || !response.ok) {
@@ -288,7 +289,7 @@ function filterInventory() {
             return response.text();
         })
         .then((html) => {
-            window.krtFetch.replaceWithTrustedHtml(container, html);
+            krtFetch.replaceWithTrustedHtml(container, html);
             adminLager.restoreExpandedTree();
         })
         .catch((error) => {
@@ -603,7 +604,7 @@ function openUmbuchenModal(
 function submitUmbuchen(event) {
     if (event && event.defaultPrevented) return;
     if (event) event.preventDefault();
-    if (adminUmbuchenInFlight || !window.krtFetch || !adminUmbuchenItemId) return;
+    if (adminUmbuchenInFlight || !krtFetch || !adminUmbuchenItemId) return;
     const amountEl = adminUmbuchenInput('umbuchenAmount');
     const targetUserEl = adminUmbuchenInput('umbuchenTargetUserId');
     const targetLocationEl = adminUmbuchenInput('umbuchenTargetLocationId');
@@ -649,7 +650,7 @@ function submitUmbuchen(event) {
     const affectedOrderIds = adminLager.collectLeafOrderIds(adminUmbuchenItemId);
     adminUmbuchenInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: `/inventory/${adminUmbuchenItemId}/transfer`,
@@ -701,11 +702,11 @@ function submitUmbuchen(event) {
     });
 
     confirmBtn.addEventListener('click', async () => {
-        if (!window.krtFetch) return;
+        if (!krtFetch) return;
         confirmBtn.disabled = true;
         cancelBtn.disabled = true;
         try {
-            await window.krtFetch.write({
+            await krtFetch.write({
                 method: 'DELETE',
                 url: '/inventory/all',
                 toast: false,

@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 /** Look-back in days of each preset booking-history segment. */
 const PERIOD_DAYS = { '30d': 30, '90d': 90 };
 
@@ -26,11 +28,11 @@ const PERIOD_DAYS = { '30d': 30, '90d': 90 };
  * contained page or range link re-renders only that container's fragment (REQ-FE-002).
  */
 function bindDetailSwaps() {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     document.querySelectorAll('[data-bank-swap][id]').forEach((el) => {
-        window.krtFetch.bindSwap({
+        krtFetch.bindSwap({
             container: `#${el.id}`,
             fragmentValue: el.getAttribute('data-bank-swap') || undefined,
             history: el.getAttribute('data-bank-swap-history') === 'true',
@@ -89,10 +91,10 @@ function historySwapUrl(form) {
  */
 function applyHistoryFilter(form) {
     const container = form.getAttribute('data-results');
-    if (!window.krtFetch || !container) {
+    if (!krtFetch || !container) {
         return;
     }
-    window.krtFetch.swap({
+    krtFetch.swap({
         url: historySwapUrl(form),
         container,
         fragmentValue: form.getAttribute('data-fragment') || undefined,
@@ -147,7 +149,7 @@ function applyPreset(form, preset) {
 document.addEventListener('submit', (event) => {
     const target = /** @type {Element | null} */ (event.target);
     const form = target && target.closest ? target.closest('form[data-bank-history-filter]') : null;
-    if (!form || !window.krtFetch) {
+    if (!form || !krtFetch) {
         return;
     }
     event.preventDefault();

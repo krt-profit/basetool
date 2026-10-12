@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 const REFINERY_SECTIONS = {
     queue: { container: '#refinery-orders-results', fragmentValue: 'results' },
 };
@@ -59,9 +61,9 @@ const REFINERY_SECTIONS = {
      *     in sync; a peer refresh keeps the scroll position instead
      */
     function load(fromUser) {
-        if (!results || !window.krtFetch) return;
+        if (!results || !krtFetch) return;
         const query = queryString();
-        window.krtFetch.swap({
+        krtFetch.swap({
             url: `/refinery-orders${query ? `?${query}` : ''}`,
             container: results,
             indicator: indicator || undefined,

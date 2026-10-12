@@ -25,6 +25,7 @@ import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const ASSOC_EPS = 0.0005;
 
@@ -376,14 +377,14 @@ function createLager(cfg) {
         );
         if (!content) return;
         setStackEntriesStatus(content, stackEntriesI18n.loading, false);
-        window.krtFetch
+        krtFetch
             .get(buildStackEntriesUrl(headerRow, page))
             .then((r) => {
                 if (!r || !r.ok) throw new Error(`HTTP ${r ? r.status : 0}`);
                 return r.text();
             })
             .then((html) => {
-                window.krtFetch.setTrustedHtml(content, html);
+                krtFetch.setTrustedHtml(content, html);
                 headerRow.setAttribute('data-stack-loaded', 'true');
                 if (typeof window.krtEnhanceComboboxes === 'function') {
                     window.krtEnhanceComboboxes(content);
@@ -742,7 +743,7 @@ function createLager(cfg) {
             if (reason) reason.hidden = false;
             return;
         }
-        window.krtFetch
+        krtFetch
             .getJson(`/api/proxy/materials/${encodeURIComponent(materialId)}/terminals`)
             .then((data) => {
                 if (data && data.length > 0) {
@@ -865,7 +866,7 @@ function createLager(cfg) {
     function submitBookOut(event) {
         if (event.defaultPrevented) return;
         event.preventDefault();
-        if (bookOutInFlight || !window.krtFetch || !bookOutItemId) return;
+        if (bookOutInFlight || !krtFetch || !bookOutItemId) return;
         const itemId = bookOutItemId;
         const typeInput = /** @type {HTMLInputElement | null} */ (
             document.querySelector('input[name="type"]:checked')
@@ -906,7 +907,7 @@ function createLager(cfg) {
         const affectedOrderIds = collectLeafOrderIds(itemId);
         bookOutInFlight = true;
         if (submitBtn) submitBtn.disabled = true;
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: `/inventory/${itemId}/transfer`,
@@ -999,7 +1000,7 @@ function createLager(cfg) {
      */
     function submitStolenMark(event) {
         event.preventDefault();
-        if (stolenMarkInFlight || !window.krtFetch || !stolenMarkTarget.id) return;
+        if (stolenMarkInFlight || !krtFetch || !stolenMarkTarget.id) return;
         const amountInput = input('stolenMarkAmount');
         const raw = amountInput ? amountInput.value : '';
         const amount = krtScuInput ? krtScuInput.parse(raw) : parseFloat(raw);
@@ -1022,7 +1023,7 @@ function createLager(cfg) {
         );
         stolenMarkInFlight = true;
         if (submitBtn) submitBtn.disabled = true;
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'POST',
                 url: `/inventory/${stolenMarkTarget.id}/stolen`,
@@ -1085,7 +1086,7 @@ function createLager(cfg) {
             wrapper.hidden = true;
             return;
         }
-        window.krtFetch
+        krtFetch
             .getJson(`/users/${encodeURIComponent(targetUserId)}/memberships?allKinds=true`)
             .then(
                 /** @param {Array<{ orgUnitId: string, orgUnitName: string }>} memberships */
@@ -1283,13 +1284,9 @@ function createLager(cfg) {
             },
         );
         assocUpdateRestChip(split.querySelector('[data-assoc-rest]'), rest, isPiece);
-        if (
-            dto.version != null &&
-            window.krtFetch &&
-            typeof window.krtFetch.syncVersion === 'function'
-        ) {
+        if (dto.version != null && krtFetch && typeof krtFetch.syncVersion === 'function') {
             const leaf = split.closest('.tree-row--leaf');
-            if (leaf) window.krtFetch.syncVersion(leaf, dto.version);
+            if (leaf) krtFetch.syncVersion(leaf, dto.version);
         }
     }
 
@@ -1321,8 +1318,8 @@ function createLager(cfg) {
      * @returns {Promise<void>} settles when the write finished
      */
     async function assocSend(entryId, method, body, split, pop) {
-        if (!window.krtFetch) return;
-        await window.krtFetch.write({
+        if (!krtFetch) return;
+        await krtFetch.write({
             method,
             url: `/inventory/${encodeURIComponent(entryId ?? '')}/allocation`,
             payload: body,
@@ -1395,8 +1392,8 @@ function createLager(cfg) {
             const body = { field, targetId, amount, version };
             return assocSend(entryId, method, body, split, pop);
         };
-        if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
-            return window.krtFetch.serialize(`inv-assoc:${entryId}`, run).finally(release);
+        if (krtFetch && typeof krtFetch.serialize === 'function') {
+            return krtFetch.serialize(`inv-assoc:${entryId}`, run).finally(release);
         }
         return Promise.resolve().then(run).finally(release);
     }

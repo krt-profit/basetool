@@ -21,15 +21,17 @@
 
 /* global KRT_ORDERS_AGE_YELLOW, KRT_ORDERS_AGE_RED, KRT_ORDERS_LIVESYNC_UPDATES, KRT_ORDERS_SECTION_REFRESH_ERROR */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 const ORDERS_SECTIONS = {
     queue: { container: '#orders-results', fragmentValue: 'results' },
 };
 
 (function () {
-    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
+    if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
-    const ordersQueueSeam = window.krtFetch.sectionWrite({
+    const ordersQueueSeam = krtFetch.sectionWrite({
         dict() {
             return {
                 'orders.section.refresh.error':
@@ -239,7 +241,7 @@ function applyOrdersFilter() {
         document.getElementById('orders-filter-form')
     );
     const resultsContainer = document.getElementById('orders-results');
-    if (!filterForm || !resultsContainer || !window.krtFetch) return;
+    if (!filterForm || !resultsContainer || !krtFetch) return;
     const data = new FormData(filterForm);
     const params = new URLSearchParams();
     for (const [key, value] of data.entries()) {
@@ -256,7 +258,7 @@ function applyOrdersFilter() {
         }
     }
     const query = params.toString();
-    window.krtFetch.swap({
+    krtFetch.swap({
         url: `/orders${query ? `?${query}` : ''}`,
         container: resultsContainer,
         history: true,
@@ -450,10 +452,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const squadronDiffers = restoreSquadronFilter();
     refreshOrdersFilterBadge();
     if (window.krtFilterChips) window.krtFilterChips.refresh();
-    if ((scopeDiffers || statusDiffers || squadronDiffers) && window.krtFetch) applyOrdersFilter();
+    if ((scopeDiffers || statusDiffers || squadronDiffers) && krtFetch) applyOrdersFilter();
 
     const filterForm = document.getElementById('orders-filter-form');
-    if (filterForm && window.krtFetch) {
+    if (filterForm && krtFetch) {
         filterForm.addEventListener('submit', (event) => {
             event.preventDefault();
             applyOrdersFilter();

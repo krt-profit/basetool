@@ -30,6 +30,7 @@ import {
 } from '/js/inventory/inventory-note-modal.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const myLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-my',
@@ -225,7 +226,7 @@ function fetchAllMatchingEntryIds() {
     if (nonPersonalOnly) url.searchParams.append('nonPersonalOnly', 'true');
     appendMyStolenFilter(url.searchParams, myStolenFilterValue());
 
-    return window.krtFetch.getJson(url.toString());
+    return krtFetch.getJson(url.toString());
 }
 
 async function toggleSelectAllInView() {
@@ -283,7 +284,7 @@ async function executeBulkCheckout() {
         return;
     }
     closeBulkCheckoutModal();
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     const affectedOrderIds = [];
@@ -292,7 +293,7 @@ async function executeBulkCheckout() {
             if (affectedOrderIds.indexOf(orderId) < 0) affectedOrderIds.push(orderId);
         });
     });
-    await window.krtFetch.write({
+    await krtFetch.write({
         method: 'POST',
         url: '/inventory/bulk-checkout',
         payload: { itemIds: ids },
@@ -361,7 +362,7 @@ function refreshBulkRebookOrgUnitPicker() {
             ? userSelect.value
             : currentInventoryUserId();
     if (!ownerId) return;
-    window.krtFetch
+    krtFetch
         .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) return;
@@ -447,7 +448,7 @@ function reportBulkRebookOutcome(body) {
 
 function submitBulkRebook(event) {
     if (event) event.preventDefault();
-    if (bulkRebookInFlight || !window.krtFetch) return;
+    if (bulkRebookInFlight || !krtFetch) return;
     const ids = getCheckedItemIds();
     if (ids.length === 0) {
         closeBulkRebookModal();
@@ -493,7 +494,7 @@ function submitBulkRebook(event) {
     );
     bulkRebookInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: '/inventory/bulk-rebook',
@@ -808,7 +809,7 @@ function filterMyInventory() {
         window.history.replaceState({}, '', visibleUrl.toString());
     } catch {}
 
-    window.krtFetch
+    krtFetch
         .get(url.toString())
         .then((response) => {
             if (!response || !response.ok) {
@@ -817,7 +818,7 @@ function filterMyInventory() {
             return response.text();
         })
         .then((html) => {
-            window.krtFetch.replaceWithTrustedHtml(container, html);
+            krtFetch.replaceWithTrustedHtml(container, html);
             myLager.restoreExpandedTree();
         })
         .catch((error) => {
@@ -995,7 +996,7 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     select.replaceChildren();
     wrapper.hidden = true;
     if (!ownerId) return;
-    window.krtFetch
+    krtFetch
         .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) return;
@@ -1151,7 +1152,7 @@ function openUmbuchenModal(
 function submitUmbuchen(event) {
     if (event && event.defaultPrevented) return;
     if (event) event.preventDefault();
-    if (umbuchenInFlight || !window.krtFetch || !umbuchenItemId) return;
+    if (umbuchenInFlight || !krtFetch || !umbuchenItemId) return;
     const modeInput = /** @type {HTMLInputElement | null} */ (
         document.querySelector('input[name="umbuchenMode"]:checked')
     );
@@ -1222,7 +1223,7 @@ function submitUmbuchen(event) {
     const affectedOrderIds = mode === 'PERSONAL' ? [] : myLager.collectLeafOrderIds(umbuchenItemId);
     umbuchenInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url,
@@ -1270,7 +1271,7 @@ function fillOrgUnitChangePicker(currentOrgUnitId) {
     select.appendChild(none);
     const me = currentInventoryUserId();
     if (!me) return;
-    window.krtFetch
+    krtFetch
         .getJson(`/users/${encodeURIComponent(me)}/memberships?allKinds=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships)) return;
@@ -1375,7 +1376,7 @@ function reportBulkOrgUnitOutcome(body) {
  */
 function submitOrgUnitChange(event) {
     if (event) event.preventDefault();
-    if (orgUnitChangeInFlight || !window.krtFetch) return;
+    if (orgUnitChangeInFlight || !krtFetch) return;
     const orgUnitId = myFieldValue('orgUnitChangeTarget') || null;
     const merge = /** @type {HTMLInputElement | null} */ (
         document.getElementById('orgUnitChangeMergeStock')
@@ -1392,7 +1393,7 @@ function submitOrgUnitChange(event) {
     );
     orgUnitChangeInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url,
@@ -1424,7 +1425,7 @@ let bulkStolenInFlight = false;
  * @param {Element} el the bulk-bar button carrying the requested marker in data-stolen
  */
 function submitBulkStolenMark(el) {
-    if (bulkStolenInFlight || !window.krtFetch) return;
+    if (bulkStolenInFlight || !krtFetch) return;
     const ids = getCheckedItemIds();
     if (ids.length === 0) {
         showBulkRebookError(stolenMarkI18n.errorEmpty);
@@ -1433,7 +1434,7 @@ function submitBulkStolenMark(el) {
     const button = /** @type {HTMLButtonElement} */ (el);
     bulkStolenInFlight = true;
     button.disabled = true;
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: '/inventory/bulk-stolen',

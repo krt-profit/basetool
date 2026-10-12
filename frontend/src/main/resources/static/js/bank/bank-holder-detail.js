@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 /**
  * Sizes the reserved and private segments of the balance bar from the entered in-game balance
  * (REQ-BANK-032): the reserved share is the holder's custody total, capped at the balance.
@@ -56,8 +58,8 @@ document.addEventListener('input', (event) => {
 
 /** Binds the bookings pager of the holder detail to an in-place fragment swap. */
 function bindBankHolderBookingsPager() {
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({
+    if (krtFetch) {
+        krtFetch.bindSwap({
             container: '#bank-holder-bookings-results',
             fragmentValue: 'holderBookings',
             history: true,

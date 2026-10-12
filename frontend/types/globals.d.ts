@@ -741,8 +741,6 @@ interface Window {
 
     krtFetch: KrtFetchApi;
     krtCsrf: KrtCsrfApi;
-    krtReauth: KrtReauthApi;
-    krtTermsGate: KrtTermsGateApi;
 
     krtEvents: KrtEventsApi;
     krtLiveSync: KrtLiveSyncApi;

@@ -23,6 +23,7 @@
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * Fills a date-time input (plain or split into date and time parts) with the current local time;
@@ -393,7 +394,7 @@ async function addMissionManager() {
 async function updatePayoutPreference(selectElement) {
     const url = selectElement.getAttribute('data-payout-url');
     const value = selectElement.value;
-    const result = await window.krtFetch.write({
+    const result = await krtFetch.write({
         method: 'POST',
         url: /** @type {string} */ (url),
         payload: { preference: value },
@@ -428,7 +429,7 @@ async function updatePayoutPreference(selectElement) {
                             10,
                         );
                         if (Number.isNaN(current) || updatedParticipant.version > current) {
-                            window.krtFetch.syncVersion(container, updatedParticipant.version);
+                            krtFetch.syncVersion(container, updatedParticipant.version);
                         }
                     });
             }
@@ -498,11 +499,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 window.krtModalClose(editForm.closest('.krt-modal-overlay'));
                 const dto = res.body;
-                if (dto && dto.version != null && window.krtFetch) {
+                if (dto && dto.version != null && krtFetch) {
                     document
                         .querySelectorAll(`.edit-finance-btn[data-id="${entryId}"]`)
                         .forEach((btn) => {
-                            window.krtFetch.syncVersion(btn, dto.version);
+                            krtFetch.syncVersion(btn, dto.version);
                         });
                     const hiddenVersion = /** @type {HTMLInputElement | null} */ (
                         document.getElementById('edit-finance-version')

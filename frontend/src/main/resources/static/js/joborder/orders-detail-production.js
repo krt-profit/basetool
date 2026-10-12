@@ -24,6 +24,7 @@
 import { krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
     const nav = /** @type {HTMLElement | null} */ (
@@ -440,7 +441,7 @@ export function openProductionModal(button) {
             skipCb.addEventListener('change', _prodReconcile);
         }
         Promise.all([
-            window.krtFetch
+            krtFetch
                 .getJson(`/orders/${orderId}/materials/${mat.materialId}/inventory`)
                 .catch(() => []),
             _prodLoadHigherAttribution(orderId, mat),
@@ -570,7 +571,7 @@ async function _prodLoadHigherAttribution(orderId, mat) {
     });
     if (tiers.size < 2 || !orderId) return higher;
     try {
-        const entries = await window.krtFetch.getJson(
+        const entries = await krtFetch.getJson(
             `/orders/${orderId}/materials/${mat.materialId}/attribution`,
         );
         for (const entry of entries) {
@@ -730,7 +731,7 @@ export function _prodRefreshOrgUnitPicker() {
         wrapper.hidden = true;
         return;
     }
-    window.krtFetch
+    krtFetch
         .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships) || memberships.length < 1) {

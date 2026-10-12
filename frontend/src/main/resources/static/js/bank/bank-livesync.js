@@ -19,6 +19,7 @@
  */
 
 import { bankRefreshError } from '/js/bank/bank-messages.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const BANK_ACCOUNT_SECTIONS = {
     account: { container: '#bank-account-results', fragmentValue: 'accountBody' },
@@ -90,7 +91,7 @@ function bankAccountId() {
  */
 function makeBankReceiverRefresh(sectionMap) {
     return function (keys) {
-        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+        if (!krtFetch || typeof krtFetch.swap !== 'function') {
             return;
         }
         const url = window.location.pathname + window.location.search;
@@ -103,7 +104,7 @@ function makeBankReceiverRefresh(sectionMap) {
                 return;
             }
             done[cfg.container] = true;
-            window.krtFetch.swap({
+            krtFetch.swap({
                 url,
                 container: cfg.container,
                 fragmentValue: cfg.fragmentValue,
@@ -121,8 +122,8 @@ export function initLiveSyncReceivers() {
     if (
         !window.krtLiveSync ||
         typeof window.krtLiveSync.createReceiver !== 'function' ||
-        !window.krtFetch ||
-        typeof window.krtFetch.swap !== 'function'
+        !krtFetch ||
+        typeof krtFetch.swap !== 'function'
     ) {
         return;
     }

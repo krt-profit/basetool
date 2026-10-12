@@ -25,6 +25,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
@@ -49,10 +50,10 @@ function withOverview(keys) {
 }
 
 (function () {
-    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
+    if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
-    const operationSeam = window.krtFetch.sectionWrite({
+    const operationSeam = krtFetch.sectionWrite({
         dict() {
             return { 'operation.section.refresh.error': OPS_DETAIL_MSG.sectionRefreshError };
         },
@@ -237,8 +238,8 @@ function openDeleteModal(id) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({
+    if (krtFetch) {
+        krtFetch.bindSwap({
             container: '#op-missions-results',
             fragmentValue: 'missions',
             history: true,
@@ -286,15 +287,15 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     function renderPreview() {
         if (!input || !preview) return;
         preview.textContent = '';
-        if (!window.krtFetch) return;
-        window.krtFetch.write({
+        if (!krtFetch) return;
+        krtFetch.write({
             method: 'POST',
             url: '/operations/markdown-preview',
             payload: { markdown: input.value },
             accept: 'text/html, application/problem+json',
             toast: false,
             onSuccess(html) {
-                window.krtFetch.setTrustedHtml(preview, typeof html === 'string' ? html : '');
+                krtFetch.setTrustedHtml(preview, typeof html === 'string' ? html : '');
             },
             onError() {
                 return true;
@@ -415,7 +416,7 @@ function adoptOperationFormValues(form) {
 }
 
 (function () {
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
 
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('operation-form'));
     if (form) {
@@ -424,7 +425,7 @@ function adoptOperationFormValues(form) {
             const versionInput = /** @type {HTMLInputElement | null} */ (
                 form.querySelector('[name="version"]')
             );
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: /** @type {string} */ (form.getAttribute('action')),
                 serialize: 'operation:core',
@@ -466,7 +467,7 @@ function adoptOperationFormValues(form) {
     if (deleteForm) {
         deleteForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: deleteForm.action,
                 submitter: deleteForm.querySelector('button[type="submit"]'),
@@ -567,7 +568,7 @@ async function handlePayoutPaidToggle(checkbox) {
     const previous = !desired;
     checkbox.disabled = true;
     try {
-        const result = await window.krtFetch.write({
+        const result = await krtFetch.write({
             method: 'POST',
             url,
             payload: { participantKey, paidOut: desired },
@@ -639,11 +640,11 @@ document.addEventListener('change', (ev) => {
         if (!missionId) return;
         body.setAttribute('data-loaded', 'loading');
         const url = `/operations/${encodeURIComponent(opId)}/finance/${encodeURIComponent(missionId)}`;
-        window.krtFetch
+        krtFetch
             .get(url)
             .then((r) => (r && r.ok ? r.text() : Promise.reject(r ? r.status : 0)))
             .then((html) => {
-                window.krtFetch.setTrustedHtml(body, html);
+                krtFetch.setTrustedHtml(body, html);
                 body.setAttribute('data-loaded', 'true');
             })
             .catch(() => {

@@ -23,6 +23,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtSyncDatetimeSplitGroup } from '/js/kernel/datetime-splitter.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
     const objectiveList = document.getElementById('mission-create-objective-list');
@@ -652,7 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (result.ok) {
                 window.krtModalClose(customFreqModal);
-                if (isEdit && Array.isArray(result.body) && window.krtFetch) {
+                if (isEdit && Array.isArray(result.body) && krtFetch) {
                     const updated = result.body.find((e) => {
                         return e && e.id === fid;
                     });
@@ -660,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         document
                             .querySelectorAll(`.custom-freq-row[data-custom-freq-id="${fid}"]`)
                             .forEach((row) => {
-                                window.krtFetch.syncVersion(row, updated.version);
+                                krtFetch.syncVersion(row, updated.version);
                             });
                         versionInput.value = updated.version;
                     }

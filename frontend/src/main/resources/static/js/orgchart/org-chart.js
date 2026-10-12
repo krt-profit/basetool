@@ -27,6 +27,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const ORG_CHART_SECTIONS = {
     chart: { container: '#oc-chart', fragmentValue: 'chartBody' },
@@ -42,12 +43,12 @@ const modalContent = modal ? modal.querySelector('.krt-modal') : null;
 let lastTrigger = null;
 
 function refreshChart(keepScroll) {
-    if (!chart || !window.krtFetch) {
+    if (!chart || !krtFetch) {
         window.location.reload();
         return;
     }
     const savedX = typeof keepScroll === 'number' ? keepScroll : chart.scrollLeft;
-    window.krtFetch
+    krtFetch
         .swap({
             url: '/org-chart',
             container: chart,
@@ -216,11 +217,11 @@ function openModal(mode, ctx) {
 }
 
 function send(method, url, body) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         showFrontendErrorToast(OC_I18N.genericError);
         return;
     }
-    window.krtFetch.write({
+    krtFetch.write({
         method,
         url,
         payload: body === null ? undefined : body,

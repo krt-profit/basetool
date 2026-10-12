@@ -1,5 +1,7 @@
 // @ts-check
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 (function () {
     const filterForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('operations-filter-form')
@@ -8,7 +10,7 @@
     const loadingIndicator = document.getElementById('operations-loading-indicator');
     const resetBtn = document.getElementById('operations-filter-reset');
 
-    if (!filterForm || !resultsContainer || !window.krtFetch) return;
+    if (!filterForm || !resultsContainer || !krtFetch) return;
     const form = filterForm;
 
     /** @type {number | null} */
@@ -30,7 +32,7 @@
 
     function loadResults() {
         const query = buildQueryString();
-        window.krtFetch.swap({
+        krtFetch.swap({
             url: `/operations${query ? `?${query}` : ''}`,
             container: resultsContainer,
             indicator: loadingIndicator,

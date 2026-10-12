@@ -28,6 +28,7 @@ import {
 } from '/js/joborder/orders-detail.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /**
  * Downloads the PDF report of a material handover.
@@ -65,7 +66,7 @@ export async function downloadHandoverReport(btn) {
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
         }
-        const response = await window.krtFetch.get(
+        const response = await krtFetch.get(
             `/api/v1/orders/${orderId}/handovers/${handoverId}/report`,
             { headers: downloadHeaders },
         );
@@ -124,7 +125,7 @@ export async function downloadItemHandoverReport(btn) {
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
         }
-        const response = await window.krtFetch.get(
+        const response = await krtFetch.get(
             `/api/v1/orders/${orderId}/item-handovers/${handoverId}/report`,
             { headers: downloadHeaders },
         );
@@ -253,8 +254,8 @@ export async function previewHandoverReport(btn) {
         recipientHandle,
         items,
     };
-    if (!window.krtFetch) return;
-    const result = await window.krtFetch.write({
+    if (!krtFetch) return;
+    const result = await krtFetch.write({
         method: 'POST',
         url: `/api/v1/orders/${encodeURIComponent(String(orderId))}/handovers/report/preview`,
         payload,
@@ -310,7 +311,7 @@ export async function previewHandoverReport(btn) {
 async function _loadStockAttribution(orderId, materialId, tierId) {
     if (!tierId || !orderId || !materialId) return null;
     try {
-        const list = await window.krtFetch.getJson(
+        const list = await krtFetch.getJson(
             `/orders/${orderId}/materials/${materialId}/attribution`,
         );
         /** @type {Map<string, number>} */
@@ -362,7 +363,7 @@ export async function toggleInventory(row) {
     /** @type {Node} */ (row.parentNode).insertBefore(detailsRow, row.nextSibling);
 
     try {
-        const allItems = await window.krtFetch.getJson(
+        const allItems = await krtFetch.getJson(
             `/orders/${orderId}/materials/${materialId}/inventory`,
         );
         const attribution = await _loadStockAttribution(

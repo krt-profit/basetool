@@ -24,6 +24,7 @@
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const MISSION_KINDS = ['squadrons', 'jobtypes', 'freqtypes'];
 
@@ -139,8 +140,8 @@ function missionSectionForAction(action) {
  */
 function reswapMissionSection(action) {
     const section = missionSectionForAction(action);
-    if (section && window.krtFetch) {
-        window.krtFetch.swap({
+    if (section && krtFetch) {
+        krtFetch.swap({
             url: `/admin/mission-data?${missionFilterParams()}`,
             container: `#${section}`,
             fragmentValue: section,
@@ -158,7 +159,7 @@ function reswapMissionSection(action) {
  */
 function missionWrite(form, successMessage, onSuccess) {
     const action = /** @type {string} */ (form.getAttribute('action'));
-    window.krtFetch.submitForm({
+    krtFetch.submitForm({
         form,
         submitter: form.querySelector('button[type="submit"]'),
         successMessage,
@@ -388,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            if (!window.krtFetch) {
+            if (!krtFetch) {
                 form.submit();
                 return;
             }
@@ -406,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (deleteForm) {
         deleteForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            if (!window.krtFetch) {
+            if (!krtFetch) {
                 deleteForm.submit();
                 return;
             }
@@ -426,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         e.preventDefault();
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             actForm.submit();
             return;
         }
@@ -468,8 +469,8 @@ function setupDragAndDrop(containerId, reorderUrl) {
         const newOrderIds = rows.map((row) => row.dataset.id);
 
         const reswapFreqTypes = function () {
-            if (window.krtFetch) {
-                window.krtFetch.swap({
+            if (krtFetch) {
+                krtFetch.swap({
                     url: `/admin/mission-data?${missionFilterParams()}`,
                     container: '#freqtypes-results',
                     fragmentValue: 'freqtypes-results',
@@ -477,8 +478,8 @@ function setupDragAndDrop(containerId, reorderUrl) {
                 });
             }
         };
-        if (window.krtFetch) {
-            window.krtFetch
+        if (krtFetch) {
+            krtFetch
                 .write({
                     method: 'POST',
                     url: reorderUrl,
@@ -575,7 +576,7 @@ function persistMissionFilters() {
     } catch (_e) {}
 }
 
-if (window.krtFetch) {
+if (krtFetch) {
     /**
      * Re-renders a result section whenever its inactive-toggle changes.
      *
@@ -587,7 +588,7 @@ if (window.krtFetch) {
         if (!cb) return;
         cb.addEventListener('change', () => {
             persistMissionFilters();
-            window.krtFetch.swap({
+            krtFetch.swap({
                 url: `/admin/mission-data?${missionFilterParams()}`,
                 container: `#${sectionId}`,
                 fragmentValue: sectionId,

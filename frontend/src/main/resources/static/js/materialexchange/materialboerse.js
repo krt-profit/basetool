@@ -20,11 +20,12 @@
 // @ts-check
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
     const i18n = { ...window.materialboerseModalI18n, ...window.materialboerseI18n };
     const gi18n = { ...window.materialgesuchModalI18n, ...window.materialgesuchI18n };
-    if (!window.krtFetch || !document.getElementById('mb-board')) {
+    if (!krtFetch || !document.getElementById('mb-board')) {
         return;
     }
 
@@ -286,7 +287,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
     function swapList() {
         const p = params();
         p.set('fragment', 'list');
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: `/materialboerse?${p.toString()}`,
             container: activeMode() === 'requests' ? '#mg-listwrap' : '#mb-listwrap',
             fragmentValue: 'list',
@@ -297,7 +298,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
     function swapBoard() {
         const p = params();
         p.set('fragment', 'board');
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: `/materialboerse?${p.toString()}`,
             container: '#mb-board',
             fragmentValue: 'board',
@@ -306,7 +307,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
     }
 
     function swapDetail(id) {
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: `/materialboerse?fragment=detail&selected=${encodeURIComponent(id)}`,
             container: '#mb-detail',
             fragmentValue: 'detail',
@@ -315,7 +316,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
     }
 
     function swapRequestDetail(id) {
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: `/materialboerse?view=requests&fragment=detail&selected=${encodeURIComponent(id)}`,
             container: '#mg-detail',
             fragmentValue: 'detail',
@@ -503,7 +504,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
     function toggleInterest(button) {
         const id = button.getAttribute('data-offer-id');
         const interested = button.getAttribute('data-interested') === 'true';
-        window.krtFetch.write({
+        krtFetch.write({
             method: interested ? 'DELETE' : 'POST',
             url: `/materialboerse/offers/${id}/interest/ajax`,
             successMessage: interested ? i18n.interestRemoved : i18n.interestAdded,
@@ -529,7 +530,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
             if (!ok) {
                 return;
             }
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/materialboerse/offers/${id}/deactivate/ajax`,
                 successMessage: i18n.deactivated,
@@ -554,7 +555,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
     function toggleFulfillment(button) {
         const id = button.getAttribute('data-request-id');
         const interested = button.getAttribute('data-interested') === 'true';
-        window.krtFetch.write({
+        krtFetch.write({
             method: interested ? 'DELETE' : 'POST',
             url: `/materialboerse/requests/${id}/interest/ajax`,
             successMessage: interested ? gi18n.interestRemoved : gi18n.interestAdded,
@@ -580,7 +581,7 @@ import { showKrtConfirm } from '/js/kernel/toast.js';
             if (!ok) {
                 return;
             }
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/materialboerse/requests/${id}/deactivate/ajax`,
                 successMessage: gi18n.deactivated,

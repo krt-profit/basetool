@@ -1,6 +1,7 @@
 // @ts-check
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const RESULTS_ID = 'bp-overview-results';
 const CHIP_LIMIT = 4;
@@ -215,7 +216,7 @@ function load(cell) {
         return;
     }
     running++;
-    window.krtFetch
+    krtFetch
         .getJson(ownersUrl(productKey))
         .then((owners) => {
             if (!Array.isArray(owners)) {
@@ -318,11 +319,11 @@ function buildSearchUrl(form) {
  * @returns {void}
  */
 function swapResults(url) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         window.location.assign(url);
         return;
     }
-    window.krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
+    krtFetch.swap({ url, container: `#${RESULTS_ID}`, history: true });
 }
 
 /**
@@ -364,8 +365,8 @@ function wireFilter() {
 document.addEventListener('DOMContentLoaded', () => {
     wireRows(document);
     wireFilter();
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
+    if (krtFetch) {
+        krtFetch.bindSwap({ container: `#${RESULTS_ID}`, history: true });
     }
 });
 

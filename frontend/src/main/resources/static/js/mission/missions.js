@@ -1,5 +1,7 @@
 // @ts-check
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 const MISSIONS_SECTIONS = {
     list: { container: '#missions-results', fragmentValue: 'results' },
 };
@@ -12,7 +14,7 @@ const MISSIONS_SECTIONS = {
     const loadingIndicator = document.getElementById('missions-loading-indicator');
     const resetBtn = document.getElementById('missions-filter-reset');
 
-    if (!resultsContainer || !window.krtFetch) return;
+    if (!resultsContainer || !krtFetch) return;
 
     /** @type {number | null} */
     let debounceTimer = null;
@@ -29,7 +31,7 @@ const MISSIONS_SECTIONS = {
 
     function loadResults(pushHistory) {
         const query = buildQueryString();
-        window.krtFetch.swap({
+        krtFetch.swap({
             url: `/missions${query ? `?${query}` : ''}`,
             container: resultsContainer,
             indicator: loadingIndicator,

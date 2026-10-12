@@ -1,6 +1,7 @@
 // @ts-check
 
 import { showFrontendSuccessToast } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 document.addEventListener('input', (event) => {
     const input = /** @type {HTMLInputElement | null} */ (
@@ -27,7 +28,7 @@ document.addEventListener('submit', (event) => {
         return;
     }
     event.preventDefault();
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         form.submit();
         return;
     }
@@ -40,7 +41,7 @@ document.addEventListener('submit', (event) => {
     if (submitBtn) {
         submitBtn.disabled = true;
     }
-    window.krtFetch
+    krtFetch
         .submitForm({
             form,
             toast: false,
@@ -61,8 +62,8 @@ document.addEventListener('submit', (event) => {
                 if (confirmInput) {
                     confirmInput.value = '';
                 }
-                if (window.krtFetch.swap && document.getElementById('bp-results')) {
-                    window.krtFetch.swap({
+                if (krtFetch.swap && document.getElementById('bp-results')) {
+                    krtFetch.swap({
                         url: window.location.pathname + window.location.search,
                         container: '#bp-results',
                         fragmentValue: 'results',

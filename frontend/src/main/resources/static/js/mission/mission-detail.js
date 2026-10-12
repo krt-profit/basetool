@@ -22,6 +22,7 @@
 /* global missionId */
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const MISSION_SECTIONS = {
     crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
@@ -70,7 +71,7 @@ function crossPublishToParentOperation(keys) {
     }
 }
 
-const missionSeam = window.krtFetch.sectionWrite({
+const missionSeam = krtFetch.sectionWrite({
     dictName: 'MISSION_SUBRES_I18N',
     dict() {
         return window.MISSION_SUBRES_I18N || {};

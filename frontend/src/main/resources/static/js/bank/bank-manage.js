@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 /**
  * Formats a whole aUEC amount with German thousands separators.
  *
@@ -103,8 +105,8 @@ document.addEventListener('input', (event) => {
 
 /** Binds the manage view's filters and pager to an in-place fragment swap. */
 function bindBankManageSwaps() {
-    if (window.krtFetch) {
-        window.krtFetch.bindSwap({
+    if (krtFetch) {
+        krtFetch.bindSwap({
             container: '#bank-manage-results',
             fragmentValue: 'manageBody',
             history: true,

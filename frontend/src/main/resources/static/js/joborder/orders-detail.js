@@ -24,6 +24,7 @@
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** @type {any[]} */
 export let cachedInventoryItems = [];
@@ -64,10 +65,10 @@ const ORDER_SECTIONS = {
 };
 
 (function () {
-    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
+    if (!krtFetch || typeof krtFetch.sectionWrite !== 'function') {
         return;
     }
-    const orderSeam = window.krtFetch.sectionWrite({
+    const orderSeam = krtFetch.sectionWrite({
         dict() {
             return {
                 'orders.section.refresh.error':
@@ -320,7 +321,7 @@ async function _loadHandoverTierSuggestions(materialIds, orderId) {
         const tiers = _orderTiersForMaterial(materialId);
         if (tiers.length < 2) continue;
         try {
-            const entries = await window.krtFetch.getJson(
+            const entries = await krtFetch.getJson(
                 `/orders/${orderId}/materials/${materialId}/attribution`,
             );
             /** @type {Map<string, {code: string, amount: number}>} */
@@ -391,7 +392,7 @@ export async function openHandoverModal() {
                 const orderId = row.dataset.orderId;
                 const matId = row.dataset.materialId;
                 if (orderId && matId) {
-                    return window.krtFetch
+                    return krtFetch
                         .getJson(`/orders/${orderId}/materials/${matId}/inventory`)
                         .catch(() => []);
                 }

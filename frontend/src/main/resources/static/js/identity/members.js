@@ -27,6 +27,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const MEMBERS_SECTIONS = {
     roster: { container: '#members-results', fragmentValue: 'results' },
@@ -35,11 +36,11 @@ const MEMBERS_SECTIONS = {
 /** Re-renders the roster fragment in place, or reloads when the transport is missing. */
 function refreshMembersResults() {
     const container = document.getElementById('members-results');
-    if (!container || !window.krtFetch) {
+    if (!container || !krtFetch) {
         location.reload();
         return;
     }
-    window.krtFetch.swap({
+    krtFetch.swap({
         url: window.location.pathname + window.location.search,
         container,
     });
@@ -61,7 +62,7 @@ function bindFilter() {
 
     /** Swaps the roster for the current filter values, or submits the form without transport. */
     function applyMembersFilter() {
-        if (!filterForm || !resultsContainer || !window.krtFetch) {
+        if (!filterForm || !resultsContainer || !krtFetch) {
             if (filterForm) filterForm.submit();
             return;
         }
@@ -71,7 +72,7 @@ function bindFilter() {
             if (value !== '') params.append(key, String(value));
         }
         const query = params.toString();
-        window.krtFetch.swap({
+        krtFetch.swap({
             url: `/members${query ? `?${query}` : ''}`,
             container: resultsContainer,
             history: true,
@@ -97,7 +98,7 @@ function bindFilter() {
             async (/** @type {string} */ query) => {
                 if (query.length < 2) return [];
                 try {
-                    const data = await window.krtFetch.getJson(
+                    const data = await krtFetch.getJson(
                         `/members/api/search?query=${encodeURIComponent(query)}`,
                     );
                     return [
@@ -137,7 +138,7 @@ async function deleteUser(userId) {
           )
         : false;
     if (!confirmed) return;
-    window.krtFetch.write({
+    krtFetch.write({
         method: 'DELETE',
         url: `/members/${encodeURIComponent(userId || '')}`,
         successMessage: MSG_DELETE_SUCCESS,
@@ -150,7 +151,7 @@ async function deleteUser(userId) {
 
 /** Triggers the member synchronisation and refreshes the roster. */
 function syncMembersNow() {
-    window.krtFetch.write({
+    krtFetch.write({
         method: 'POST',
         url: '/members/sync',
         successMessage: MSG_SYNC_SUCCESS,
@@ -206,7 +207,7 @@ function confirmConsolidate() {
         return;
     }
     const source = consolidateSource;
-    window.krtFetch.write({
+    krtFetch.write({
         method: 'POST',
         url: `/members/${encodeURIComponent(source.id || '')}/consolidate`,
         payload: {

@@ -20,6 +20,7 @@
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
+import { krtFetch, krtReauth, krtTermsGate } from '/js/kernel/krt-fetch.js';
 
 const POLL_INTERVAL_FAST_MS = 60000;
 const POLL_INTERVAL_SLOW_MS = 300000;
@@ -58,7 +59,7 @@ function readMessages() {
  * @returns {Promise<Response | null>} the response, or null when a gate took over
  */
 function readNotifications(url) {
-    return window.krtFetch.get(url, { accept: 'application/json' });
+    return krtFetch.get(url, { accept: 'application/json' });
 }
 
 /**
@@ -319,10 +320,10 @@ function refreshEmptyState(list) {
 }
 
 function doMarkRead(id, submitter) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: `/notifications/${encodeURIComponent(id)}/read`,
@@ -337,10 +338,10 @@ function doMarkRead(id, submitter) {
 }
 
 function doDelete(id, submitter) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
-    window.krtFetch
+    krtFetch
         .write({
             method: 'DELETE',
             url: `/notifications/${encodeURIComponent(id)}`,
@@ -355,10 +356,10 @@ function doDelete(id, submitter) {
 }
 
 function doMarkAll(submitter) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
-    window.krtFetch
+    krtFetch
         .write({
             method: 'POST',
             url: '/notifications/read-all',
@@ -374,11 +375,11 @@ function doMarkAll(submitter) {
 }
 
 function doClearRead(submitter) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     confirmThen(i18n.confirmClearTitle, i18n.confirmClearBody, () => {
-        window.krtFetch
+        krtFetch
             .write({
                 method: 'DELETE',
                 url: '/notifications/read',
@@ -665,8 +666,8 @@ function startSse() {
                 window.clearTimeout(sseReconnectTimer);
                 sseReconnectTimer = null;
             }
-            if (window.krtReauth) {
-                window.krtReauth.redirect(event && event.data ? event.data : null);
+            if (krtReauth) {
+                krtReauth.redirect(event && event.data ? event.data : null);
             }
         });
         source.addEventListener('terms-gate', (event) => {
@@ -681,8 +682,8 @@ function startSse() {
             if (sseSource === source) {
                 sseSource = null;
             }
-            if (window.krtTermsGate) {
-                window.krtTermsGate.redirect(event && event.data ? event.data : null);
+            if (krtTermsGate) {
+                krtTermsGate.redirect(event && event.data ? event.data : null);
             }
         });
         source.addEventListener('replaced', () => {

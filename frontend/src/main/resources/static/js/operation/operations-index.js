@@ -23,6 +23,7 @@
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 function openDeleteModal(id) {
     const deleteForm = /** @type {HTMLFormElement | null} */ (
@@ -59,7 +60,7 @@ function reloadOperationsList() {
 }
 
 (function () {
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
 
     const createForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('create-operation-form')
@@ -74,7 +75,7 @@ function reloadOperationsList() {
                 createForm.querySelector('button[type="submit"]')
             );
             if (submitBtn) submitBtn.disabled = true;
-            window.krtFetch
+            krtFetch
                 .write({
                     method: 'POST',
                     url: /** @type {string} */ (createForm.getAttribute('action')),
@@ -115,7 +116,7 @@ function reloadOperationsList() {
                 deleteForm.querySelector('button[type="submit"]')
             );
             if (submitBtn) submitBtn.disabled = true;
-            window.krtFetch
+            krtFetch
                 .write({
                     method: 'POST',
                     url: deleteForm.action,

@@ -22,6 +22,7 @@
 
 import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const SERIALIZE_KEY = 'sk-roster';
 
@@ -35,10 +36,10 @@ function refresh(roster) {
     const url = roster.getAttribute('data-refresh-url');
     const container = roster.getAttribute('data-refresh-container');
     const fragment = roster.getAttribute('data-refresh-fragment');
-    if (!url || !container || !fragment || !window.krtFetch) {
+    if (!url || !container || !fragment || !krtFetch) {
         return undefined;
     }
-    return window.krtFetch.swap({
+    return krtFetch.swap({
         url,
         container,
         fragmentValue: fragment,
@@ -110,11 +111,11 @@ function toggleFlag(button) {
     const parts = rowOf(button);
     const flag = button.getAttribute('data-sk-flag');
     const url = parts ? parts.row.getAttribute('data-flags-url') : null;
-    if (!parts || !flag || !url || !window.krtFetch) {
+    if (!parts || !flag || !url || !krtFetch) {
         return;
     }
     button.setAttribute('aria-busy', 'true');
-    window.krtFetch
+    krtFetch
         .serialize(SERIALIZE_KEY, () => {
             const row = currentRow(parts.skId, parts.userId) || parts.row;
             let logistician = row.getAttribute('data-logistician') === 'true';
@@ -128,7 +129,7 @@ function toggleFlag(button) {
             params.set('isLogistician', String(logistician));
             params.set('isMissionManager', String(missionManager));
             params.set('version', row.getAttribute('data-version') || '0');
-            return window.krtFetch.submitForm({
+            return krtFetch.submitForm({
                 url,
                 method: 'POST',
                 formData: params,
@@ -154,14 +155,14 @@ function toggleFlag(button) {
 function toggleLead(item) {
     const parts = rowOf(item);
     const url = parts ? parts.row.getAttribute('data-lead-url') : null;
-    if (!parts || !url || !window.krtFetch) {
+    if (!parts || !url || !krtFetch) {
         return;
     }
     const lead = parts.row.getAttribute('data-lead') === 'true';
     const mode = parts.roster.getAttribute('data-lead-mode');
     const name = parts.row.getAttribute('data-user-name');
     confirmThen(name, lead ? MEMBER_MSG.confirmDemote : MEMBER_MSG.confirmPromote, () => {
-        window.krtFetch.serialize(SERIALIZE_KEY, () => {
+        krtFetch.serialize(SERIALIZE_KEY, () => {
             const row = currentRow(parts.skId, parts.userId) || parts.row;
             const version = row.getAttribute('data-version') || '0';
             const onSuccess = function () {
@@ -171,7 +172,7 @@ function toggleLead(item) {
                 const params = new URLSearchParams();
                 params.set('isLead', String(!lead));
                 params.set('version', version);
-                return window.krtFetch.submitForm({
+                return krtFetch.submitForm({
                     url,
                     method: 'POST',
                     formData: params,
@@ -181,7 +182,7 @@ function toggleLead(item) {
                     onSuccess,
                 });
             }
-            return window.krtFetch.write({
+            return krtFetch.write({
                 url,
                 method: 'PATCH',
                 payload: { isLead: !lead, version: Number(version) },
@@ -202,12 +203,12 @@ function toggleLead(item) {
 function removeMember(item) {
     const parts = rowOf(item);
     const url = parts ? parts.row.getAttribute('data-remove-url') : null;
-    if (!parts || !url || !window.krtFetch) {
+    if (!parts || !url || !krtFetch) {
         return;
     }
     confirmThen(parts.row.getAttribute('data-user-name'), MEMBER_MSG.confirmRemove, () => {
-        window.krtFetch.serialize(SERIALIZE_KEY, () => {
-            return window.krtFetch.submitForm({
+        krtFetch.serialize(SERIALIZE_KEY, () => {
+            return krtFetch.submitForm({
                 url,
                 method: 'POST',
                 formData: new URLSearchParams(),
@@ -253,10 +254,10 @@ const scId = membersBox ? membersBox.getAttribute('data-sc-id') : '';
 
 /** Re-renders the member page's roster fragment. */
 function reswapMembers() {
-    if (!window.krtFetch || !scId) {
+    if (!krtFetch || !scId) {
         return undefined;
     }
-    return window.krtFetch.swap({
+    return krtFetch.swap({
         url: `/organisation/special-commands/${encodeURIComponent(scId)}?fragment=members`,
         container: '#members-results',
         fragmentValue: 'members',
@@ -303,11 +304,11 @@ if (modal && openBtn) {
     if (addForm) {
         addForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            if (!window.krtFetch) {
+            if (!krtFetch) {
                 addForm.submit();
                 return;
             }
-            window.krtFetch.submitForm({
+            krtFetch.submitForm({
                 form: addForm,
                 successMessage: MEMBER_MSG.saved,
                 errorMessage: MEMBER_MSG.error,

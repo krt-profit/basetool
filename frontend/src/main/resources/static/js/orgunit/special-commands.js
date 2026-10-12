@@ -23,6 +23,7 @@
 
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 const modal = /** @type {HTMLElement} */ (document.getElementById('specialcommand-modal'));
 const form = /** @type {HTMLFormElement} */ (document.getElementById('sc-form'));
@@ -106,7 +107,7 @@ const SC_FILTER_PREF_KEY = 'admin_special_commands_filter';
 const includeInactive = /** @type {HTMLInputElement | null} */ (
     document.getElementById('includeInactive')
 );
-if (includeInactive && window.krtFetch) {
+if (includeInactive && krtFetch) {
     const persistScFilter = function () {
         try {
             localStorage.setItem(
@@ -120,7 +121,7 @@ if (includeInactive && window.krtFetch) {
         const url = `/admin/special-commands${
             includeInactive.checked ? '?includeInactive=true' : ''
         }`;
-        window.krtFetch.swap({ url, container: '#sc-results', history: true });
+        krtFetch.swap({ url, container: '#sc-results', history: true });
     });
 
     if (/[?&]includeInactive=/.test(window.location.search)) {
@@ -143,15 +144,15 @@ if (includeInactive && window.krtFetch) {
 }
 
 function reswapScResults() {
-    if (!window.krtFetch) return;
+    if (!krtFetch) return;
     const url = `/admin/special-commands${
         includeInactive && includeInactive.checked ? '?includeInactive=true' : ''
     }`;
-    window.krtFetch.swap({ url, container: '#sc-results', history: false });
+    krtFetch.swap({ url, container: '#sc-results', history: false });
 }
 
 function scWrite(theForm, successMessage, onSuccess) {
-    window.krtFetch.submitForm({
+    krtFetch.submitForm({
         form: theForm,
         successMessage,
         errorMessage: SC_MSG.error,
@@ -168,7 +169,7 @@ function scWrite(theForm, successMessage, onSuccess) {
 if (form) {
     form.addEventListener('submit', (e) => {
         e.preventDefault();
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             form.submit();
             return;
         }
@@ -178,7 +179,7 @@ if (form) {
 if (deleteForm) {
     deleteForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        if (!window.krtFetch) {
+        if (!krtFetch) {
             deleteForm.submit();
             return;
         }
@@ -193,7 +194,7 @@ document.addEventListener('submit', (e) => {
         return;
     }
     e.preventDefault();
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         actForm.submit();
         return;
     }

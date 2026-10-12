@@ -27,6 +27,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 /** @type {HTMLElement | null} */
 let activeNoteButton = null;
@@ -106,8 +107,8 @@ function submitNoteUpdate(noteValue) {
     const btn = activeNoteButton;
     if (!btn) return;
     const id = /** @type {string} */ (btn.getAttribute('data-id'));
-    if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
-        return window.krtFetch.serialize(`inv-note:${id}`, () => {
+    if (krtFetch && typeof krtFetch.serialize === 'function') {
+        return krtFetch.serialize(`inv-note:${id}`, () => {
             return runNoteUpdate(btn, id, noteValue);
         });
     }
@@ -123,7 +124,7 @@ function submitNoteUpdate(noteValue) {
  * @returns {Promise<unknown>} the write
  */
 function runNoteUpdate(btn, id, noteValue) {
-    if (!window.krtFetch) return Promise.resolve();
+    if (!krtFetch) return Promise.resolve();
     const version = btn.getAttribute('data-version');
     const trimmed = (noteValue || '').trim();
     const isEmpty = trimmed.length === 0;
@@ -131,7 +132,7 @@ function runNoteUpdate(btn, id, noteValue) {
         typeof inventoryConflictI18n !== 'undefined'
             ? Object.assign({}, inventoryConflictI18n, { reloadDetailFallback: noteI18n.conflict })
             : { reloadDetailFallback: noteI18n.conflict };
-    return window.krtFetch.write({
+    return krtFetch.write({
         method: 'PUT',
         url: `/inventory/${encodeURIComponent(id)}/note`,
         payload: {
@@ -144,7 +145,7 @@ function runNoteUpdate(btn, id, noteValue) {
         onSuccess(updated) {
             closeNoteModal();
             if (updated && updated.version != null) {
-                window.krtFetch.syncVersion(btn.closest('.tree-row--leaf'), updated.version);
+                krtFetch.syncVersion(btn.closest('.tree-row--leaf'), updated.version);
             }
             const noteBtns = /** @type {NodeListOf<HTMLElement>} */ (
                 document.querySelectorAll(`button.inventory-note-btn[data-id="${id}"]`)

@@ -1,12 +1,13 @@
 // @ts-check
 
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtCsrf, krtFetch } from '/js/kernel/krt-fetch.js';
 
 const form = /** @type {HTMLFormElement | null} */ (document.getElementById('audit-filter-form'));
 const resultsContainer = document.getElementById('audit-results');
 const resetLink = document.getElementById('audit-filter-reset');
 
-if (form && resultsContainer && window.krtFetch) {
+if (form && resultsContainer && krtFetch) {
     /** @type {number | null} */
     let debounceTimer = null;
 
@@ -21,7 +22,7 @@ if (form && resultsContainer && window.krtFetch) {
     };
 
     const loadResults = function (url) {
-        window.krtFetch.swap({
+        krtFetch.swap({
             url: url || buildUrl(),
             container: resultsContainer,
             history: true,
@@ -64,7 +65,7 @@ if (form && resultsContainer && window.krtFetch) {
 }
 
 const reloadAuditResults = function () {
-    if (!resultsContainer || !window.krtFetch) {
+    if (!resultsContainer || !krtFetch) {
         return;
     }
     let url = '/admin/audit-log';
@@ -77,7 +78,7 @@ const reloadAuditResults = function () {
         const query = params.toString();
         if (query) url += `?${query}`;
     }
-    window.krtFetch.swap({ url, container: resultsContainer, history: true });
+    krtFetch.swap({ url, container: resultsContainer, history: true });
 };
 
 const EVENT_FILTER_PREF_KEY = 'admin_audit_filter';
@@ -114,7 +115,7 @@ const persistEventType = function () {
     } catch (_e) {}
 };
 
-if (eventSelect && activeDomain && form && resultsContainer && window.krtFetch) {
+if (eventSelect && activeDomain && form && resultsContainer && krtFetch) {
     eventSelect.addEventListener('change', persistEventType);
     if (resetLink) {
         resetLink.addEventListener('click', persistEventType);
@@ -139,8 +140,8 @@ if (eventSelect && activeDomain && form && resultsContainer && window.krtFetch) 
 const csrfHeaders = function () {
     const base = { Accept: 'application/json' };
     try {
-        if (window.krtCsrf && typeof window.krtCsrf.headers === 'function') {
-            return window.krtCsrf.headers(base);
+        if (krtCsrf && typeof krtCsrf.headers === 'function') {
+            return krtCsrf.headers(base);
         }
     } catch {}
     return base;
@@ -156,7 +157,7 @@ const downloadBlob = async function (url, filename, onError) {
     }
     let response;
     try {
-        response = await window.krtFetch.get(url, { headers });
+        response = await krtFetch.get(url, { headers });
     } catch {
         response = null;
     }
@@ -251,14 +252,14 @@ document.addEventListener('submit', (event) => {
         showError(frm, 'before', required);
         return;
     }
-    if (!window.krtFetch || typeof window.krtFetch.write !== 'function') {
+    if (!krtFetch || typeof krtFetch.write !== 'function') {
         showError(frm, '_global', deleteError);
         return;
     }
     const endpoint = frm.getAttribute('data-endpoint');
     const url = `${endpoint}?before=${encodeURIComponent(before.value)}`;
     const successTemplate = frm.getAttribute('data-success-template') || '';
-    window.krtFetch.write({
+    krtFetch.write({
         url,
         method: 'DELETE',
         submitter: event.submitter,

@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 const JUSTIFICATION_TYPES = ['CARTEL', 'CARTEL_BANK', 'SPECIAL'];
 
 const accountMeta = window.krtBankAccountMeta || {};
@@ -33,7 +35,7 @@ function toOption(row) {
 }
 
 function fetchAccounts(query) {
-    return window.krtFetch
+    return krtFetch
         .getJson(`/api/proxy/bank/accounts/search?query=${encodeURIComponent(query || '')}`)
         .then((list) => {
             return (list || []).map(toOption);

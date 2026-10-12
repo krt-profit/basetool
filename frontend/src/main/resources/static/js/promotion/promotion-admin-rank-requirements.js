@@ -27,6 +27,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 function toastSuccess(msg) {
     if (showFrontendSuccessToast) showFrontendSuccessToast(msg);
@@ -53,11 +54,11 @@ function openModal(id) {
 }
 
 function arRefresh() {
-    if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+    if (!krtFetch || typeof krtFetch.swap !== 'function') {
         window.location.reload();
         return Promise.resolve(false);
     }
-    return window.krtFetch.swap({
+    return krtFetch.swap({
         url: '/promotion/admin/rank-requirements',
         container: '#ar-results',
         fragmentValue: 'ranksResults',
@@ -101,11 +102,11 @@ function isValidSingleStep(fromVal, toVal) {
 }
 
 function apiCall(url, method, body) {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         toastError(MSG_ERROR);
         return Promise.resolve(null);
     }
-    return window.krtFetch
+    return krtFetch
         .write({
             method,
             url,

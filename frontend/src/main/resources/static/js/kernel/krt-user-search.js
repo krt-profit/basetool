@@ -18,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { krtFetch } from '/js/kernel/krt-fetch.js';
+
 function toOption(row) {
     return {
         value: row.id,
@@ -26,7 +28,7 @@ function toOption(row) {
 }
 
 function fetchUsers(path, query) {
-    return window.krtFetch
+    return krtFetch
         .getJson(`${path}?query=${encodeURIComponent(query || '')}`)
         .then((list) => {
             return (list || []).map(toOption);

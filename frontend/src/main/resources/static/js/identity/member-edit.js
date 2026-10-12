@@ -19,6 +19,8 @@
 
 // @ts-check
 
+import { krtCsrf, krtFetch } from '/js/kernel/krt-fetch.js';
+
 /**
  * Wires the Stammdaten / Mitgliedschaften / Datenauskunft tabs: arrow-key navigation and the
  * `tab` query-parameter deeplink. The edit form stays visible for every tab whose panel it
@@ -205,8 +207,8 @@ function bindSubmit() {
     if (
         !formElement ||
         formElement.getAttribute('data-member-edit') === null ||
-        !window.krtFetch ||
-        !window.krtCsrf
+        !krtFetch ||
+        !krtCsrf
     ) {
         return;
     }
@@ -262,7 +264,7 @@ function bindSubmit() {
 
     form.addEventListener('submit', (event) => {
         event.preventDefault();
-        window.krtFetch.submitForm({
+        krtFetch.submitForm({
             form,
             submitter: /** @type {HTMLElement | null} */ (
                 form.querySelector('button[type="submit"]')

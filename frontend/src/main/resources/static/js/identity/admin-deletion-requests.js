@@ -20,9 +20,10 @@
 // @ts-check
 
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { krtFetch } from '/js/kernel/krt-fetch.js';
 
 (function () {
-    if (!window.krtFetch) {
+    if (!krtFetch) {
         return;
     }
     /** @type {KrtI18nDict} */
@@ -52,7 +53,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 
     /** Reloads the queue table in place. */
     function refresh() {
-        return window.krtFetch.swap({
+        return krtFetch.swap({
             url: '/admin/deletion-requests',
             container: '#deletionRequestsHost',
             fragmentValue: 'rows',
@@ -152,7 +153,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
             if (slot) {
                 slot.textContent = '';
             }
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/deletion-requests/${current.id}/decline`,
                 payload: { note: text, version: current.version },
@@ -174,7 +175,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
             }
             /** @type {HTMLInputElement | null} */
             const erase = document.querySelector('#execute-erase-history');
-            window.krtFetch.write({
+            krtFetch.write({
                 method: 'POST',
                 url: `/admin/deletion-requests/${current.id}/execute`,
                 payload: {
