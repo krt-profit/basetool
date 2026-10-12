@@ -160,7 +160,7 @@ public class JobOrderItemProductionService {
     final int amount = dto.amount();
     final int remainingToManufacture = line.getAmount() - line.getManufacturedAmount();
     if (amount > remainingToManufacture) {
-      throw new ProductionAllocationException();
+      throw ProductionAllocationException.amountExceedsRemaining(amount, remainingToManufacture);
     }
 
     final Set<UUID> skippedMaterials =
@@ -194,12 +194,14 @@ public class JobOrderItemProductionService {
     for (Map.Entry<UUID, Double> demand : demandByMaterial.entrySet()) {
       double consumed = consumedByMaterial.getOrDefault(demand.getKey(), 0.0);
       if (Math.abs(consumed - demand.getValue()) > QUANTITY_EPSILON) {
-        throw new ProductionAllocationException();
+        throw ProductionAllocationException.demandMismatch(
+            demand.getKey(), demand.getValue(), consumed);
       }
     }
-    for (UUID consumedMaterialId : consumedByMaterial.keySet()) {
-      if (!demandByMaterial.containsKey(consumedMaterialId)) {
-        throw new ProductionAllocationException();
+    for (Map.Entry<UUID, Double> consumedEntry : consumedByMaterial.entrySet()) {
+      if (!demandByMaterial.containsKey(consumedEntry.getKey())) {
+        throw ProductionAllocationException.materialNotRequired(
+            consumedEntry.getKey(), consumedEntry.getValue());
       }
     }
 
@@ -235,10 +237,12 @@ public class JobOrderItemProductionService {
       }
       double orderSliceAmount = orderSlice.getAmount() != null ? orderSlice.getAmount() : 0.0;
       if (consumed > orderSliceAmount + QUANTITY_EPSILON) {
-        throw new ProductionAllocationException();
+        throw ProductionAllocationException.overOrderSlice(
+            c.materialId(), inventoryItem.getId(), consumed, orderSliceAmount);
       }
       if (consumed > inventoryItem.getAmount() + QUANTITY_EPSILON) {
-        throw new ProductionAllocationException();
+        throw ProductionAllocationException.overStock(
+            c.materialId(), inventoryItem.getId(), consumed, inventoryItem.getAmount());
       }
       QuantityType quantityType =
           inventoryItem.getMaterial() != null
