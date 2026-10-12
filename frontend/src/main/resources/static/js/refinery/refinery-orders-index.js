@@ -184,7 +184,9 @@ const REFINERY_SECTIONS = {
         VIEWS.forEach((view) => {
             const key = view.toLowerCase();
             const value = source.getAttribute(`data-${key}`);
-            const count = form.querySelector(`[data-testid="segment-view-${key}"] .seg-count`);
+            const count = form.querySelector(
+                `[data-testid="segment-view-${key}"] .krt-segmented__count`,
+            );
             if (count && value !== null) count.textContent = value;
         });
     }

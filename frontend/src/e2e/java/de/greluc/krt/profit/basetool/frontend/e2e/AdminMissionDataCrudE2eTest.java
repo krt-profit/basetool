@@ -176,7 +176,7 @@ class AdminMissionDataCrudE2eTest {
           page.locator("#" + filter[2]).click();
           assertThat(page.locator("#" + filter[1])).isVisible();
           Locator checkbox = page.locator("#" + filter[0]);
-          Locator toggle = page.locator("label.switch[for='" + filter[0] + "']");
+          Locator toggle = page.locator("label.krt-switch[for='" + filter[0] + "']");
           boolean before = checkbox.isChecked();
           page.waitForResponse(
               response -> response.url().contains("fragment=" + filter[1]), toggle::click);

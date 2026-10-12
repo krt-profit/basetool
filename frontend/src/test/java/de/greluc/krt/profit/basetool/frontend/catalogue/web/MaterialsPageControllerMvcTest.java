@@ -169,7 +169,8 @@ class MaterialsPageControllerMvcTest {
         .contains("class=\"toolbar__search\"")
         .containsPattern("type=\"search\" id=\"materialFilter\" data-trigger=\"materials-filter\"")
         .containsPattern(
-            "<label class=\"switch\"[^>]*>\\s*<input type=\"checkbox\" id=\"groupByCategory\"")
+            "<label class=\"krt-switch\"[^>]*>\\s*<input type=\"checkbox\" role=\"switch\""
+                + " id=\"groupByCategory\"")
         .containsPattern(
             "class=\"kind-toggle\"[^>]*aria-expanded=\"false\"[^>]*aria-controls=\"materials-kind-0\"")
         .contains(">Mineral<")
@@ -386,7 +387,7 @@ class MaterialsPageControllerMvcTest {
         .contains("id=\"filterLoadingDock\"")
         .contains("id=\"filterAutoLoad\"")
         .containsPattern(
-            "<label class=\"switch\"[^>]*>\\s*<input type=\"checkbox\""
+            "<label class=\"krt-switch\"[^>]*>\\s*<input type=\"checkbox\" role=\"switch\""
                 + " id=\"filterGroupByCategory\"")
         .contains("data-testid=\"materials-matrix-legend\"")
         .contains(">bester Verkauf<")

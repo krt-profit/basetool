@@ -1,7 +1,7 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    .refinery-segments [data-testid='segment-view-ready'] .seg-count {
+    .refinery-segments [data-testid='segment-view-ready'] .krt-segmented__count {
         color: var(--color-success-text);
     }
 

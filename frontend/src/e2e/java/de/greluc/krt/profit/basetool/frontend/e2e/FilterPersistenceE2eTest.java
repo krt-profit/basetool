@@ -109,7 +109,7 @@ class FilterPersistenceE2eTest {
         page.locator("[data-testid='segment-view-completed']").click();
         assertThat(page.locator("#refinery-filter-form input[name='view'][value='COMPLETED']"))
             .isChecked();
-        page.locator("label.switch[for='refinery-only-mine']").click();
+        page.locator("label.krt-switch[for='refinery-only-mine']").click();
         assertThat(page.locator("#refinery-filter-form input[name='onlyMine']")).isChecked();
 
         E2eSupport.navigate(page, STACK.baseUrl() + "/refinery-orders");

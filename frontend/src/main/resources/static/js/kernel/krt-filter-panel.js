@@ -72,8 +72,8 @@
     }
 
     /**
-     * Re-renders the count chip on a panel's toggle: the visible digit and its visually-hidden
-     * spelled-out label; the chip is hidden at zero.
+     * Re-renders the count badge on a panel's toggle: the visible digit and its visually-hidden
+     * spelled-out label; the badge is hidden at zero and the toggle carries `is-filtered` while any filter is active.
      *
      * @param {HTMLElement} panel the panel element
      */
@@ -84,6 +84,7 @@
         if (!chip) return;
         const active = countActive(panel);
         /** @type {HTMLElement} */ (chip).hidden = active === 0;
+        toggle.classList.toggle('is-filtered', active > 0);
         const value = chip.querySelector('[data-filter-count-value]');
         if (value) value.textContent = String(active);
         const label = chip.querySelector('[data-filter-count-label]');

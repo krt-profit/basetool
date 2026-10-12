@@ -42,7 +42,7 @@
             <div class="form-group">
                 <span class="form-label" aria-hidden="true" th:text="#{admin.settings.refinery.roundingMode}">Rundungsmodus (Units -> SCU)</span>
                 <th:block th:replace="~{kernel/fragments/components :: segmented(name='refineryRoundingMode', labelKey='admin.settings.refinery.roundingMode',
-                    selected=${refineryRoundingMode != null ? refineryRoundingMode : 'UP'}, variant='segmented--block segmented--lg',
+                    selected=${refineryRoundingMode != null ? refineryRoundingMode : 'UP'}, variant='krt-segmented--block',
                     options=${ {{value: 'UP', labelKey: 'admin.settings.refinery.rounding.up'}, {value: 'DOWN', labelKey: 'admin.settings.refinery.rounding.down'}} })}"></th:block>
             </div>
         </fieldset>
@@ -85,13 +85,12 @@
                             <td><span class="cell-title" th:text="${squadron.shorthand}">IRI</span></td>
                             <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${squadron.name}">IRIDIUM</td>
                             <td class="cell-actions">
-                                <label class="switch">
-                                    <input type="checkbox"
+                                <label class="krt-switch">
+                                    <input type="checkbox" role="switch"
                                            class="squadron-promotion-toggle"
                                            th:attr="data-squadron-id=${squadron.id}"
                                            th:aria-label="|#{admin.settings.squadron.column.promotion}: ${squadron.shorthand}|"
                                            th:checked="${squadron.isPromotionEnabled}">
-                                    <span class="switch__track" aria-hidden="true"></span>
                                     <span class="toggle-state-text" th:text="${squadron.isPromotionEnabled} ? #{admin.settings.squadron.promotion.enabled} : #{admin.settings.squadron.promotion.disabled}">aktiv</span>
                                 </label>
                             </td>
@@ -122,13 +121,12 @@
                             <td><span class="cell-title" th:text="${squadron.shorthand}">IRI</span></td>
                             <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${squadron.name}">IRIDIUM</td>
                             <td class="cell-actions">
-                                <label class="switch">
-                                    <input type="checkbox"
+                                <label class="krt-switch">
+                                    <input type="checkbox" role="switch"
                                            class="squadron-profit-toggle"
                                            th:attr="data-squadron-id=${squadron.id}"
                                            th:aria-label="|#{admin.settings.squadron.column.profit}: ${squadron.shorthand}|"
                                            th:checked="${squadron.isProfitEligible}">
-                                    <span class="switch__track" aria-hidden="true"></span>
                                     <span class="toggle-state-text" th:text="${squadron.isProfitEligible} ? #{admin.settings.squadron.profit.enabled} : #{admin.settings.squadron.profit.disabled}">berechtigt</span>
                                 </label>
                             </td>
@@ -159,13 +157,12 @@
                             <td><span class="cell-title" th:text="${sk.shorthand}">SK</span></td>
                             <td th:attr="data-label=#{admin.settings.squadron.column.name}" th:text="${sk.name}">Spezialkommando</td>
                             <td class="cell-actions">
-                                <label class="switch">
-                                    <input type="checkbox"
+                                <label class="krt-switch">
+                                    <input type="checkbox" role="switch"
                                            class="sk-profit-toggle"
                                            th:attr="data-sk-id=${sk.id}"
                                            th:aria-label="|#{admin.settings.squadron.column.profit}: ${sk.shorthand}|"
                                            th:checked="${sk.isProfitEligible}">
-                                    <span class="switch__track" aria-hidden="true"></span>
                                     <span class="toggle-state-text" th:text="${sk.isProfitEligible} ? #{admin.settings.squadron.profit.enabled} : #{admin.settings.squadron.profit.disabled}">berechtigt</span>
                                 </label>
                             </td>

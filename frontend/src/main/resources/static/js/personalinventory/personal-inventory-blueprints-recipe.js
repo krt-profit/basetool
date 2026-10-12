@@ -775,7 +775,7 @@
      */
     function updateCraftableCount() {
         const countEl = document.querySelector(
-            '[data-testid="segment-bpScope-craftable"] .seg-count',
+            '[data-testid="segment-bpScope-craftable"] .krt-segmented__count',
         );
         if (!countEl) {
             return;
