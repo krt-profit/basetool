@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryMissionAllocation;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

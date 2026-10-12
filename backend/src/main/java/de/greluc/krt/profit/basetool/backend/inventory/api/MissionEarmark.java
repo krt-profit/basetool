@@ -17,18 +17,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.inventory.api;
 
+import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Slim {@code GameItem} reference for the Lager item-stock surfaces and the item-catalog picker
- * (REQ-INV-029).
+ * What the Lager shows of a mission its stock is earmarked to.
  *
- * @param id the game item's primary key
- * @param name the item's display name
- * @param manufacturer the manufacturer's display name, or {@code null} when unresolved
- * @param kind the {@code GameItemKind} name, e.g. {@code WEAPON}
+ * @param id the mission
+ * @param name the mission's name
+ * @param plannedStartTime the mission's planned start, or {@code null}
  */
-public record InventoryGameItemReferenceDto(
-    UUID id, String name, String manufacturer, String kind) {}
+public record MissionEarmark(
+    @NotNull UUID id, @Nullable String name, @Nullable Instant plannedStartTime) {}

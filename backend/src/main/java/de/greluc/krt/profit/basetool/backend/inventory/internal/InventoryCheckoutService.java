@@ -30,7 +30,10 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
@@ -47,9 +50,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -711,7 +711,8 @@ public class InventoryCheckoutService {
     if (material == null && !gameItemRow) {
       return row;
     }
-    final boolean autoMerge = gameItemRow || material.getQuantityType() == QuantityType.PIECE;
+    final boolean autoMerge =
+        gameItemRow || Objects.requireNonNull(material).getQuantityType() == QuantityType.PIECE;
     if (!autoMerge && !clientRequestedMerge) {
       return row;
     }
@@ -724,7 +725,7 @@ public class InventoryCheckoutService {
             ? inventoryItemRepository.findMergeGroupForUpdate(
                 row.getUser().getId(),
                 null,
-                row.getGameItem().getId(),
+                Objects.requireNonNull(row.getGameItem()).getId(),
                 row.getLocation().getId(),
                 null,
                 row.getPersonal(),
@@ -732,7 +733,7 @@ public class InventoryCheckoutService {
                 row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null)
             : inventoryItemRepository.findMergeGroupForUpdate(
                 row.getUser().getId(),
-                material.getId(),
+                Objects.requireNonNull(material).getId(),
                 row.getLocation().getId(),
                 row.getQuality(),
                 row.getPersonal(),
@@ -821,7 +822,7 @@ public class InventoryCheckoutService {
    * @param notes the ordered accumulator of distinct notes.
    * @param note the raw note of one folded row, possibly {@code null} or blank.
    */
-  private static void collectNote(Set<String> notes, String note) {
+  private static void collectNote(Set<String> notes, @Nullable String note) {
     final String normalized = StringNormalization.trimToNull(note);
     if (normalized != null) {
       notes.add(normalized);

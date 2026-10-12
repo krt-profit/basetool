@@ -36,6 +36,8 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
@@ -48,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -57,7 +58,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
-import de.greluc.krt.profit.basetool.backend.service.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -1125,8 +1125,8 @@ class JobOrderServiceTest {
 
   @Test
   void getInventoryItemsForJobOrderMaterial_ShouldReturnMappedDtos() {
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem item =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem item =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     item.setId(UUID.randomUUID());
     item.setAmount(10.0);
 
@@ -1210,8 +1210,8 @@ class JobOrderServiceTest {
   @Test
   void unlinkInventoryItem_ShouldDropTheOrdersAllocationSlice() {
     UUID inventoryItemId = UUID.randomUUID();
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem item =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem item =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     item.setId(inventoryItemId);
     item.setAmount(10.0);
     InventoryAllocations.addJobOrder(item, jobOrder.getId(), 10.0, false);
@@ -1259,8 +1259,8 @@ class JobOrderServiceTest {
     JobOrder otherOrder = new JobOrder();
     otherOrder.setId(otherOrderId);
 
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem item =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem item =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     item.setId(inventoryItemId);
     item.setAmount(10.0);
     InventoryAllocations.addJobOrder(item, otherOrder.getId(), 10.0, false);
@@ -1277,17 +1277,17 @@ class JobOrderServiceTest {
   @Test
   void
       getInventoryItemsForJobOrderMaterial_ShouldReturnItemsSortedByOwnerAscQualityDescLocationAscAmountDesc() {
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem i1 =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem i1 =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     i1.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem i2 =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem i2 =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     i2.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem i3 =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem i3 =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     i3.setId(UUID.randomUUID());
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem i4 =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem i4 =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     i4.setId(UUID.randomUUID());
 
     UserReferenceDto userAlpha =
@@ -1414,12 +1414,12 @@ class JobOrderServiceTest {
         new de.greluc.krt.profit.basetool.backend.catalogue.api.Material();
     orphanMat.setId(orphanMatId);
 
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem requiredItem =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem requiredItem =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     requiredItem.setId(UUID.randomUUID());
     requiredItem.setMaterial(requiredMat);
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem orphanItem =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem orphanItem =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     orphanItem.setId(UUID.randomUUID());
     orphanItem.setMaterial(orphanMat);
 
@@ -1476,12 +1476,12 @@ class JobOrderServiceTest {
         new de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem();
     orphanGameItem.setId(orphanGameItemId);
 
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem requestedRow =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem requestedRow =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     requestedRow.setId(UUID.randomUUID());
     requestedRow.setGameItem(requestedGameItem);
-    de.greluc.krt.profit.basetool.backend.model.InventoryItem orphanRow =
-        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem orphanRow =
+        new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem();
     orphanRow.setId(UUID.randomUUID());
     orphanRow.setGameItem(orphanGameItem);
 

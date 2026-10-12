@@ -17,9 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mapper;
+package de.greluc.krt.profit.basetool.backend.inventory.api;
 
+import de.greluc.krt.profit.basetool.backend.mapper.MissionViewerAccess;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Caller-aware seam the stock mappers use to fill the viewer-dependent {@code canEdit} field of
@@ -39,7 +41,7 @@ public interface StockViewerAccess {
    * @param ownerId the row's owner, or {@code null} when unknown, which counts as not the caller.
    * @return {@code true} iff the current caller may write to it.
    */
-  boolean mayEditInventoryItem(UUID inventoryItemId, UUID ownerId);
+  boolean mayEditInventoryItem(UUID inventoryItemId, @Nullable UUID ownerId);
 
   /**
    * Reports whether the current caller may edit one job order, applying both the {@code

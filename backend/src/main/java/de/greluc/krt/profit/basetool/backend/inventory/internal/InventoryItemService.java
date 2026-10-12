@@ -35,8 +35,13 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.AppException;
@@ -47,11 +52,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
-import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
@@ -633,7 +633,8 @@ public class InventoryItemService {
         if (item.getGameItem() != null) {
           assertGameItemRequiredByJobOrder(item.getGameItem(), dto.targetId());
         } else {
-          assertMaterialRequiredByJobOrder(item.getMaterial(), dto.targetId());
+          assertMaterialRequiredByJobOrder(
+              Objects.requireNonNull(item.getMaterial()), dto.targetId());
         }
         if (findJobOrderSlice(item, dto.targetId()) != null) {
           throw new BadRequestException("error.inventory.allocation.duplicate.jobOrder");
@@ -973,7 +974,7 @@ public class InventoryItemService {
       AuditEventType type,
       InventoryItem item,
       InventoryAllocationDimension field,
-      String ref,
+      @Nullable String ref,
       @Nullable Double amount) {
     AuditDetails details = AuditDetails.of("dim", field).with("ref", ref);
     if (amount != null) {

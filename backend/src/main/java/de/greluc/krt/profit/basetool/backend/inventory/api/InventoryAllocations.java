@@ -20,9 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

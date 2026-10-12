@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model;
+package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
@@ -51,6 +51,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One warehouse stock row, either a material row ({@link #material} and {@link #quality}) or a game
@@ -84,6 +85,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
   @ManyToOne(optional = true, fetch = FetchType.LAZY)
   @JoinColumn(name = "material_id", nullable = true)
   @ToString.Exclude
+  @Nullable
   private Material material;
 
   /**
@@ -95,6 +97,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "game_item_id", nullable = true)
   @ToString.Exclude
+  @Nullable
   private GameItem gameItem;
 
   @ManyToOne(optional = false, fetch = FetchType.LAZY)
@@ -109,6 +112,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
    */
   @QualityValue
   @Column(nullable = true)
+  @Nullable
   private Integer quality;
 
   @Min(0)
@@ -149,6 +153,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
   private List<InventoryMissionAllocation> missionAllocations = new ArrayList<>();
 
   @Column(name = "note", length = 1000)
+  @Nullable
   private String note;
 
   /**
@@ -159,6 +164,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id", nullable = true)
   @ToString.Exclude
+  @Nullable
   private OrgUnit owningOrgUnit;
 
   /**

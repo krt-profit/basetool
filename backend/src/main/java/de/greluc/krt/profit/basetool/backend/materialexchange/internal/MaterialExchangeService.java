@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -34,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MaterialExchangeInterestRegisteredEvent;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
@@ -188,7 +188,7 @@ public class MaterialExchangeService {
     final int quantity = requireOfferableItemQuantity(request.offeredAmount(), item);
     ResolvedProduct product =
         blueprintProductService
-            .resolveByGameItem(item.getGameItem().getId())
+            .resolveByGameItem(Objects.requireNonNull(item.getGameItem()).getId())
             .orElseThrow(
                 () ->
                     new BadRequestException(
@@ -592,7 +592,8 @@ public class MaterialExchangeService {
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
       return offer.getItemName();
     }
-    return Objects.requireNonNull(boardService.rowOf(offer)).getMaterial().getName();
+    return Objects.requireNonNull(Objects.requireNonNull(boardService.rowOf(offer)).getMaterial())
+        .getName();
   }
 
   /**

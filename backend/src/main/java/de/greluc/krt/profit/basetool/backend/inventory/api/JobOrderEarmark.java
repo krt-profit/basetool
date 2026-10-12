@@ -17,25 +17,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.dto;
+package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * One inventory entry in the material collection overview of a job order.
+ * What the Lager shows of a job order its stock is earmarked to.
  *
- * <p>{@code quantity} is the entry's total physical stock; {@code allocatedQuantity} is the share
- * earmarked to this order (REQ-INV-027) and is at most {@code quantity}.
+ * @param id the job order
+ * @param displayId the order's running number, or {@code null} before it is assigned
  */
-public record MaterialCollectionEntryDto(
-    UUID inventoryEntryId,
-    long version,
-    String ownerName,
-    UUID ownerId,
-    String location,
-    UUID locationId,
-    String materialName,
-    Double quality,
-    Double quantity,
-    Double allocatedQuantity,
-    boolean delivered) {}
+public record JobOrderEarmark(@NotNull UUID id, @Nullable Integer displayId) {}

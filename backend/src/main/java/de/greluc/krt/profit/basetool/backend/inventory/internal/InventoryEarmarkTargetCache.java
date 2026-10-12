@@ -20,10 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;
-import de.greluc.krt.profit.basetool.backend.model.projection.MissionEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryMissionAllocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import jakarta.persistence.EntityManager;
 import java.util.HashMap;
 import java.util.LinkedHashSet;

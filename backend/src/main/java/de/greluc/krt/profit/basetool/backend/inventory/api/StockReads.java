@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

@@ -17,16 +17,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.projection;
+package de.greluc.krt.profit.basetool.backend.inventory.api;
 
-import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
 
 /**
- * What the Lager shows of a job order its stock is earmarked to.
- *
- * @param id the job order
- * @param displayId the order's running number, or {@code null} before it is assigned
+ * Pins the SCU storage-precision invariant of {@link InventoryItem}: the
+ * {@code @PrePersist}/{@code @PreUpdate} hook rounds every persisted amount to three decimals.
  */
-public record JobOrderEarmark(@NotNull UUID id, @Nullable Integer displayId) {}
+class InventoryItemTest {
+
+  @Test
+  void lifecycleCallbackRoundsTheAmountField() {
+    InventoryItem item = new InventoryItem();
+    item.setAmount(37.160000000000004);
+
+    item.roundAmountToScuScale();
+
+    assertEquals(37.16, item.getAmount());
+  }
+}

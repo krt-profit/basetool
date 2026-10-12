@@ -2810,6 +2810,22 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
    `compileJava --rerun` shows 0 warnings.
 5. *Text scan*: source paths in `hangar-notifications.md` and `personal-inventory-blueprints.md`; nothing in code or resources.
 
+**Umbrella step 9 — the inventory's last ten types move into `inventory.api` — done 2026-10-12**
+1. *Probe*: the ten types close no cycle at top level once the blueprint's ten have moved (`InventoryCraftableStock -> CraftabilitySlice` needed the blueprint first).
+2. *Move* (122 files by script; `InventoryItemTest` follows): `InventoryItem`, `InventoryJobOrderAllocation`, `InventoryMissionAllocation`, `InventoryGameItemReferenceDto`, `JobOrderEarmark`,
+   `MissionEarmark`, `JobOrderMaterialStockRow`, `MaterialCollectionEntryDto`, `OrderLinkedStockRows` and `StockViewerAccess` to `inventory.api`. **Not as planned, derived, not individually
+   reviewed:** the plan converts the Lager row to a record plus id commands and then moves `InventoryItem` into `inventory.internal`. That conversion is **not done**: the entity is published in
+   `inventory.api` because the exchange, the job order and the Materialbörse (rank above the inventory) still read the row. `StockWriteOwnershipTest` passes, so no foreign module writes it. The
+   record-plus-commands conversion stays open as the remainder of P4-1 part 3.
+3. *NullAway* (`inventory` is checked as a whole tree, and the entity now reaches `joborder` and `materialexchange`): `InventoryItem.material`, `gameItem`, `quality`, `note` and `owningOrgUnit` carry
+   `@Nullable` (a game-item row has no material and no quality); so do the optional components of `InventoryGameItemReferenceDto`, `MaterialCollectionEntryDto` (the redacted owner and location) and
+   `JobOrderMaterialStockRow`, the owner id of `StockViewerAccess.mayEditInventoryItem`, the audit reference of `recordAllocation` and `collectNote`. Eleven dereferences of a getter that is
+   null only for the other kind of row are wrapped in `Objects.requireNonNull`, which throws the same `NullPointerException` the dereference threw. No suppression.
+4. *Gates* from the failing assertions: mapper layer (two rules) 106 -> **105**, service layer 485 -> **484**, join-column selection 165 -> **160**, read-only mutation rule 488 -> **487**;
+   `InventoryGameItemReferenceDto` and `MaterialCollectionEntryDto` joined the leaf helpers (the rule let them depend on the legacy `model` package); the domain-map name rule
+   `^(Inventory|StockViewerAccess)` assigns no class any more and left. The module baseline stays empty. `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: no code, resource or doc named the old packages.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2846,7 +2862,7 @@ before a decision.
   - [x] **8.** done — `privacy` (23, 28 with the identity leftovers): the GDPR orchestration classes (§5.1 rank 13) into `privacy`, then
         dissolved into identity as §5.1 and §7.6 say.
 - Business core leftovers (the entities other modules still hold):
-  - [ ] **9.** P4-1 part 3, inventory: the Lager row becomes a record plus id commands, then
+  - [x] **9.** moved, conversion open — P4-1 part 3, inventory: the Lager row becomes a record plus id commands, then
         `InventoryItem` and the two allocations move into `inventory.internal`; with them
         `InventoryGameItemReferenceDto`, `JobOrderEarmark`/`MissionEarmark`, `JobOrderMaterialStockRow`
         and `StockViewerAccess`.

@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import org.jetbrains.annotations.Nullable;
 
 /**

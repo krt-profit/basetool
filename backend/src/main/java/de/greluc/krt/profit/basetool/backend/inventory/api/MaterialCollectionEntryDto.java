@@ -17,19 +17,26 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.model.projection;
+package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Internal projection of one job-order allocation of a material inventory row, used to distribute
- * per-(order, material) stock in memory from a single query (REQ-DATA-003).
+ * One inventory entry in the material collection overview of a job order.
  *
- * @param jobOrderId the id of the job order the inventory row is linked to.
- * @param inventoryItemId the id of the linked inventory row.
- * @param materialId the id of the row's material.
- * @param quality the row's quality grade, or {@code null} when ungraded.
- * @param amount the amount earmarked to the order; never {@code null}.
+ * <p>{@code quantity} is the entry's total physical stock; {@code allocatedQuantity} is the share
+ * earmarked to this order (REQ-INV-027) and is at most {@code quantity}.
  */
-public record JobOrderMaterialStockRow(
-    UUID jobOrderId, UUID inventoryItemId, UUID materialId, Integer quality, Double amount) {}
+public record MaterialCollectionEntryDto(
+    UUID inventoryEntryId,
+    long version,
+    @Nullable String ownerName,
+    @Nullable UUID ownerId,
+    @Nullable String location,
+    @Nullable UUID locationId,
+    @Nullable String materialName,
+    @Nullable Double quality,
+    Double quantity,
+    Double allocatedQuantity,
+    boolean delivered) {}

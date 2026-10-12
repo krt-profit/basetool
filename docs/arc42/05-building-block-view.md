@@ -234,13 +234,11 @@ three repositories, `InventoryItemMapper`, `InventoryItemCatalogService` (the `S
 request and read DTOs. `inventory.api` publishes what other modules use: `StockCommands`, `StockReads`
 (the exchange's lots, the stock earmarked to a job order as `LinkedStockRow` or Lager DTOs, the rows the
 Materialbörse offers), `StockItemCatalogue`, `InventoryItemDto` with its two allocation DTOs and the
-projection rows. The three entities (`InventoryItem` and the two allocations) still stay in the layer
-package `model`, because seven classes of the exchange, the job order and the Materialbörse hold the row
-(plan §7.6, P4-1 part 2). Four layer types keep a seam beside the module, as `MissionViewerAccess`
-does: `mapper.StockViewerAccess` (the caller's `canEdit`, read by `JobOrderMapper`),
-`service.OrderLinkedStockRows` (the material rows the job order's stock projection reads), and the
-records the job-order and mission repositories return, `model.projection.JobOrderEarmark` and
-`MissionEarmark`, so the layer packages and the module stay acyclic.
+projection rows. The three entities (`InventoryItem` and the two allocations) lie in `inventory.api` too (umbrella step 9), because
+seven classes of the exchange, the job order and the Materialbörse hold the row; no foreign module writes it (`StockWriteOwnershipTest`),
+and the conversion to a record plus id commands that would let the entity move into `internal` is still open (plan §7.6, P4-1). Four more
+seams lie in `inventory.api` as well: `StockViewerAccess` (the caller's `canEdit`, read by `JobOrderMapper`), `OrderLinkedStockRows` (the material rows
+the job order's stock projection reads), and the records the job-order and mission repositories return, `JobOrderEarmark` and `MissionEarmark`.
 
 The blueprint moved in part since P4-2: the five controllers sit in `blueprint.web`, and
 `blueprint.internal` holds the personal and default blueprint services, the command service behind
