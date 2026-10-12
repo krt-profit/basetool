@@ -2791,7 +2791,7 @@ before a decision.
 - Gradle extraction, last (they move whole source trees):
   - [ ] **18.** P5-c `backend-exchange`, then **19.** P5-d `backend-bank` (§5.8; P5-a and P5-b are done).
 - Not in this branch:
-  - The ES-module step of F5 (§7.8) is another agent's branch, `claude/mod-f5-es-modules`.
+  - [x] The ES-module step of F5 (§7.8) was built on its own branch, `claude/mod-f5-es-modules`, and merged into this branch on 2026-10-12 (ADR-0250, REQ-FE-035).
   - `Q` The REST API cut (§7.9, waves on `claude/api-cut` and `claude/api-cut-w1` … `w6`, the
     forced app update, T0/T1 breaks) and with it "identity's REST surface sheds the six domains" (wave 2):
     these are path changes that need the owner's release decision and an app release.
