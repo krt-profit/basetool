@@ -115,10 +115,14 @@ class StaticResourceHandlerMappingTest {
 
     SimpleUrlHandlerMapping mapping =
         context.getBean("resourceHandlerMapping", SimpleUrlHandlerMapping.class);
+    Set<String> registered = new TreeSet<>(mapping.getUrlMap().keySet());
+    assertTrue(
+        registered.remove("/js/*/" + WebMvcConfig.HASHED_FILE),
+        "the content-hashed script pattern is registered beside /js/**");
 
     assertEquals(
         expected,
-        new TreeSet<>(mapping.getUrlMap().keySet()),
+        registered,
         "the resource handler patterns must match the asset trees on the classpath exactly — a new"
             + " tree needs a pattern in WebMvcConfig, and a catch-all must never come back");
   }
@@ -170,7 +174,6 @@ class StaticResourceHandlerMappingTest {
   @ValueSource(
       strings = {
         "/css/kernel/styles.css",
-        "/js/kernel/krt-html.js",
         "/fonts/Lato-Regular.woff2",
         "/images/made-by-the-community.png",
         "/images/pattern.svg",
@@ -273,5 +276,31 @@ class StaticResourceHandlerMappingTest {
     }
     int found = entries;
     assertTrue(found >= 10, () -> "selection floor: import map entries, got " + found);
+  }
+
+  /**
+   * A script under its plain URL is revalidated, not cached for a year; under its content-hashed
+   * URL it is immutable (REQ-FE-035). A module reached outside the import map can therefore never
+   * be held stale.
+   *
+   * @throws Exception if a request cannot be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void aScriptIsImmutableOnlyUnderItsContentHashedUrl() throws Exception {
+    mockMvc
+        .perform(get("/js/kernel/krt-html.js"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "no-cache"))
+        .andExpect(header().exists("Last-Modified"));
+
+    String hashed = resourceUrlProvider.getForLookupPath("/js/kernel/krt-html.js");
+    assertNotNull(hashed);
+    mockMvc
+        .perform(get(hashed))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "max-age=31536000, public, immutable"));
+
+    mockMvc.perform(get(hashed.replace(".js", "0.js"))).andExpect(status().isNotFound());
   }
 }
