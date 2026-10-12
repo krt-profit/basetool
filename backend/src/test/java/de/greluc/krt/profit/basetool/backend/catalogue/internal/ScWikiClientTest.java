@@ -330,6 +330,10 @@ class ScWikiClientTest {
             .count(),
         "a swallowed SC Wiki fetch error must increment"
             + " basetool_external_fetch_errors_total{source=scwiki}");
+    assertEquals(
+        0.0,
+        fetchErrorCount(MetricNames.REASON_CENSUS),
+        "a transport failure is a fetch error, never a census finding");
   }
 
   @Test
@@ -350,6 +354,14 @@ class ScWikiClientTest {
         fetchErrorCount(),
         "a missing pagination contract must increment"
             + " basetool_external_fetch_errors_total{source=scwiki}");
+    assertEquals(
+        1.0,
+        fetchErrorCount(MetricNames.REASON_CENSUS),
+        "an incomplete census is recorded under reason=census");
+    assertEquals(
+        0.0,
+        fetchErrorCount(MetricNames.REASON_FETCH),
+        "an incomplete census must not feed the reason=fetch series ExternalFetchErrors watches");
   }
 
   @Test
@@ -546,6 +558,10 @@ class ScWikiClientTest {
         1.0,
         fetchErrorCount(),
         "a dropped page and the row-count shortfall it causes are one failed fetch, not two");
+    assertEquals(
+        0.0,
+        fetchErrorCount(MetricNames.REASON_CENSUS),
+        "the shortfall caused by a dropped page is already a fetch error and adds no census count");
   }
 
   @Test
@@ -659,6 +675,17 @@ class ScWikiClientTest {
     return meterRegistry
         .find(MetricNames.EXTERNAL_FETCH_ERRORS)
         .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
+        .counters()
+        .stream()
+        .mapToDouble(io.micrometer.core.instrument.Counter::count)
+        .sum();
+  }
+
+  private double fetchErrorCount(String reason) {
+    return meterRegistry
+        .find(MetricNames.EXTERNAL_FETCH_ERRORS)
+        .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
+        .tag(MetricNames.TAG_REASON, reason)
         .counters()
         .stream()
         .mapToDouble(io.micrometer.core.instrument.Counter::count)

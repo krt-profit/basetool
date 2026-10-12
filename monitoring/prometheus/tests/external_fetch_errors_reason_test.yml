@@ -1,0 +1,59 @@
+rule_files:
+  - ../alerts/business.yml
+  - ../alerts/infrastructure.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: suppressed - standing census floor plus a burst of five incomplete walks
+    interval: 1m
+    input_series:
+      - series: 'basetool_external_fetch_errors_total{source="scwiki",reason="census"}'
+        values: "0x60 5x400"
+    alert_rule_test:
+      - eval_time: 300m
+        alertname: ExternalFetchErrors
+        exp_alerts: []
+
+  - name: fires - real fetch failures on the same source
+    interval: 1m
+    input_series:
+      - series: 'basetool_external_fetch_errors_total{source="scwiki",reason="fetch"}'
+        values: "0x60 5x400"
+    alert_rule_test:
+      - eval_time: 100m
+        alertname: ExternalFetchErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              source: scwiki
+            exp_annotations:
+              summary: "External fetch errors (scwiki)"
+              description: "The scwiki client swallowed more than 3 fetch/parse errors in 6 hours (incomplete page-walk censuses, reason=census, are excluded: they carry a standing per-run floor and are watched by ScWikiCensusIncompleteStreak) — the catalogue sync may be silently importing nothing while still recording a success. Check the upstream API and the sync logs."
+
+  - name: suppressed - dnf-makecache is a self-healing distribution timer
+    interval: 1m
+    input_series:
+      - series: 'node_systemd_unit_state{name="dnf-makecache.service",state="failed"}'
+        values: "1x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: SystemdUnitFailed
+        exp_alerts: []
+
+  - name: fires - any other failed system unit
+    interval: 1m
+    input_series:
+      - series: 'node_systemd_unit_state{name="iri-backup.service",state="failed"}'
+        values: "1x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: SystemdUnitFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              name: iri-backup.service
+              state: failed
+            exp_annotations:
+              summary: "systemd unit failed: iri-backup.service"
+              description: "The systemd unit iri-backup.service is in the failed state (e.g. iri-deploy / iri-backup / iri-restore-drill)."

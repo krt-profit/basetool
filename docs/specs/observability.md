@@ -1449,9 +1449,14 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 - `basetool_sync_events_total{source,event_type}` counter at the three `SyncReportService`
   `log*Event` write sites (`source` = `SyncSourceSystem`, `event_type` = `SyncEventType`; both
   bounded enums — never the external asset name/uuid/detail).
-- `basetool_external_fetch_errors_total{source}` counter incremented where the `UexClient` /
+- `basetool_external_fetch_errors_total{source,reason}` counter incremented where the `UexClient` /
   `ScWikiClient` swallow an upstream fetch or parse error into an empty result (`source` = the fixed
-  literal `uex` / `scwiki`). Because every upstream failure is mapped to an empty list and the sync
+  literal `uex` / `scwiki`; `reason` = `fetch` for a transport, decode or envelope failure,
+  `census` for an SC-Wiki page walk flagged incomplete). `ExternalFetchErrors` watches
+  `reason!="census"` only: the census series carries a standing per-run floor (`/api/items` and
+  `/api/vehicle-items` tie across page boundaries on every run) and a deploy restart or an upstream
+  re-pagination pushes it past `> 3` with no outage behind it (false positive 2026-10-12);
+  `ScWikiCensusIncompleteStreak` keeps summing both reasons. Because every upstream failure is mapped to an empty list and the sync
   job still records a success, this is the only signal of a sustained catalogue outage; it backs the
   `ExternalFetchErrors` alert. The backend's `RestClient.Builder` (`RestClientConfig`, ADR-0204) is
   wired to the `ObservationRegistry` (REQ-OBS-009) so these same calls also emit
@@ -2954,7 +2959,10 @@ therefore alerts on:
   `ContainerMemoryHigh`, `ContainerOomKilled` and `ContainerPidsHigh` cover them unchanged.
   `HostServiceMetricsMissing` (warning, 30m) fires when either name disappears while the collector
   reports host services, so a renamed package unit cannot silently take that coverage away again.
-  Liveness stays with `TargetDown` (`job="alloy"`, `job="node"`) and `SystemdUnitFailed`. Locked by
+  Liveness stays with `TargetDown` (`job="alloy"`, `job="node"`) and `SystemdUnitFailed` (which
+  excludes `dnf-makecache.service`: a stock distribution timer that fails when a mirror answers 5xx
+  and heals on its next run, hours later; patching is watched by `HostSecurityUpdatesStale`; false
+  positive 2026-10-11, `monitoring/prometheus/tests/external_fetch_errors_reason_test.yml`). Locked by
   `tests/host_service_metrics_test.yml` and the collector's self-test.
 - **Container memory pressure is measured on ANONYMOUS memory, not the working set** (amended
   2026-08-02). `ContainerMemoryHigh` (warning) fires when
