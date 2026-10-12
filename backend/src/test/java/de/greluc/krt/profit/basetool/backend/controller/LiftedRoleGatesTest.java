@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.config.SecurityConfig;
+import de.greluc.krt.profit.basetool.backend.app.api.SecurityConfig;
 import de.greluc.krt.profit.basetool.backend.hangar.web.HangarController;
 import de.greluc.krt.profit.basetool.backend.inventory.web.InventoryItemController;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;

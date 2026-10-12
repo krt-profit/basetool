@@ -73,7 +73,7 @@ class MissionSecurityServiceTest {
 
   @BeforeEach
   void setUp() {
-    roleHierarchy = de.greluc.krt.profit.basetool.backend.config.SecurityConfig.roleHierarchy();
+    roleHierarchy = de.greluc.krt.profit.basetool.backend.app.api.SecurityConfig.roleHierarchy();
     missionSecurityService =
         new MissionSecurityService(
             missionRepository,

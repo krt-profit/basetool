@@ -4077,7 +4077,7 @@ REQ-FE-025) ·
 `HomeControllerMvcTest#anonymousRootRendersTheLandingPageWithoutDataOrSession` ·
 `SecurityConfigStaticAssetPermitAllTest` · `ManagementPortIsolationTest` ·
 `ApiVhostAnonymousSurfaceTest` and the nightly `edge-deny-probe.yml` (the same statuses from outside
-the host) · **Code:** `backend/…/config/SecurityConfig`, `frontend/…/kernel/security/SecurityConfig`,
+the host) · **Code:** `backend/…/app/api/SecurityConfig`, `frontend/…/kernel/security/SecurityConfig`,
 `frontend/…/dashboard/web/HomeController`, `frontend/…/kernel/layout/SafeCsrfAdvice`,
 `templates/dashboard/landing.html` · **ADR:**
 [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
@@ -4812,7 +4812,7 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 `BusinessMetricsCollectorTest` · **Code:** `identity/api/User#keycloakAbsentSince`,
 `identity/api/UserRepository#markMissingUsers` / `#countOrphanedMemberAccounts` /
 `#findOldestOrphanedMemberAbsenceStamp`, `identity/api/UserReconciliationService#syncUser`,
-`task/BusinessMetricsCollector`, `platform/api/MetricNames#USERS_PENDING_DELETION`,
+`app/internal/BusinessMetricsCollector`, `platform/api/MetricNames#USERS_PENDING_DELETION`,
 `db/migration/V241`, `monitoring/prometheus/alerts/business.yml`,
 `monitoring/grafana/dashboards/07-basetool-operations.json` · **Decision:**
 [ADR-0182](../adr/0182-an-unfinished-account-deletion-is-measured-from-a-recorded-absence.md) ·

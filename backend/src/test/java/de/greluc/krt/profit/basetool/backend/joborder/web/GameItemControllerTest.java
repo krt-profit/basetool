@@ -26,8 +26,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.app.api.SecurityConfig;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintReferenceDto;
-import de.greluc.krt.profit.basetool.backend.config.SecurityConfig;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ItemDerivationDto;

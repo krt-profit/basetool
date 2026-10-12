@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.config;
+package de.greluc.krt.profit.basetool.backend.app.api;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakTrustSupport;
 import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;

@@ -251,7 +251,7 @@ documented in `ROLES_AND_PERMISSIONS.md`, and added to the E2E realm export
 - [x] `hasRole('BANK_EMPLOYEE')` is satisfied by management and admins via the hierarchy.
 - [x] `ROLES_AND_PERMISSIONS.md` documents the bank column/row in the access matrix.
 
-**Enforced by:** `SecurityConfig` role hierarchy + `DataInitializer` seed · **Code:** `config/SecurityConfig`, `config/DataInitializer` · **Issues:** #556
+**Enforced by:** `SecurityConfig` role hierarchy + `DataInitializer` seed · **Code:** `app/api/SecurityConfig`, `app/internal/DataInitializer` · **Issues:** #556
 
 ### REQ-BANK-008 — Bank membership is independent of org-unit membership
 
@@ -2149,7 +2149,7 @@ reaches `/memberships`) · **Code:**
 (`resolveCounterparty`), `bank/internal/BankBookingRequestService`,
 `orgunit/api/OrgUnitMembershipQueryService#listDirectMembershipOptions`, `bank/internal/BankBookingRow`,
 `bank/internal/BankPostingRepository`, `bank/internal/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
-`bank/internal/OrgUnitBankAccessService#redact`, `privacy/web/UserController`, `config/SecurityConfig`,
+`bank/internal/OrgUnitBankAccessService#redact`, `privacy/web/UserController`, `app/api/SecurityConfig`,
 `db/migration/V197`, `db/migration/V205` (#994 constraint relax),
 `orgunit/api/OrgUnitMembershipQueryService#listAllActiveOrgUnitOptionsAllKinds` (#994),
 frontend `bank/web/BankPageController`, `bank/web/BankRequestQueuePageController`,

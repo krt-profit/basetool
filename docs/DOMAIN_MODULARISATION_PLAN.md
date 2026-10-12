@@ -2869,6 +2869,17 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
    domain-map name rules for the job-order classes assign no class any more and left. The module baseline stays empty. `compileJava --rerun` shows 0 warnings.
 5. *Text scan*: source paths in `security-and-access.md` and `whole-number-amounts.md`.
 
+**Umbrella step 11d — the composition root `app` is declared and takes two of its three classes — done 2026-10-12**
+1. *Probe*: the three classes the domain map assigns to `app` close no cycle. The census had listed them but the checklist named no step.
+2. *Move* (16 files; five `SecurityConfig*Test` follow): `SecurityConfig` to `app.api`, `DataInitializer` to `app.internal`, plus the `app` module declaration. `allowedDependencies` is every other
+   module's `api` and the kernel, which is what `ModularityTest` derives from the rank-14 row. `ModularityTest` lists `app` among the 26 declared modules. Bean names, the filter chains and paths are unchanged.
+3. *Not moved — open question for the plan*: `BusinessMetricsCollector` stays in `task`. It reads the internal repositories of five modules (bank, operation, refinery, materialexchange, material exchange requests), and
+   `ModularityTest` rejects that from `app`. Moving it needs either each module publishing its own gauges (the plan's "until each module publishes its own gauges") or five repositories published in `api`.
+   Neither is a pure move, so the class waits; the domain map still assigns it to `app`, and no baseline line is involved.
+4. *Gates*: no floor changed; the `Javadoc` link of `MonitoringScrapeSecurityConfig` to `SecurityConfig` is the only reference from `platform` and creates no bytecode dependency.
+   `compileJava --rerun` shows 0 warnings.
+5. *Text scan*: source paths in the role matrix, ADR-0034, the REST-cut appendix and four specs.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code

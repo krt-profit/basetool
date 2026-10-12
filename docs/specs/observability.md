@@ -3307,7 +3307,7 @@ redeploy.
 **Enforced by:** the module `application.yml` exposure lists ·
 `{frontend,ingest}/src/main/resources/application-prod.yml`
 (`management.endpoint.loggers.access: read-only`) ·
-`backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/SecurityConfig.java` (the
+`backend/src/main/java/de/greluc/krt/profit/basetool/backend/app/api/SecurityConfig.java` (the
 `ROLE_ADMIN` matcher on `POST /actuator/loggers/**`) ·
 `backend/src/test/java/de/greluc/krt/profit/basetool/backend/config/ActuatorLoggersAuthorizationTest.java` ·
 **Related:** ADR-0090 (management-port isolation and its 2026-08 mutator amendment), REQ-OBS-005

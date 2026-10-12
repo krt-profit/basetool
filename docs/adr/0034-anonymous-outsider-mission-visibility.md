@@ -7,7 +7,7 @@
 
 ## Context
 
-The public mission sign-up surface is reachable without an account. `config/SecurityConfig.java` marks `GET /api/v1/missions/search`, `GET /api/v1/missions/next` and `GET /api/v1/missions/{id}` as `permitAll()` (and falls through to the same for `GET /api/v1/missions/**`). The `{id}` read is method-gated by `@ownerScopeService.canSeeMission(#id)`. The visibility decision splits across two methods:
+The public mission sign-up surface is reachable without an account. `app/api/SecurityConfig.java` marks `GET /api/v1/missions/search`, `GET /api/v1/missions/next` and `GET /api/v1/missions/{id}` as `permitAll()` (and falls through to the same for `GET /api/v1/missions/**`). The `{id}` read is method-gated by `@ownerScopeService.canSeeMission(#id)`. The visibility decision splits across two methods:
 
 - `OwnerScopeService.canSeeMissionRow` is the per-row escape — an org-owned mission is visible if the caller may see the owning org unit **or** the mission is non-internal (the cross-staffel public escape), so **any non-internal mission is visible to anyone**; an ownerless non-internal mission is likewise public.
 - `OwnerScopeService.canSeeMission` adds audit hardening M-2: it walks the parent chain through `canSeeMissionRow` and, for **anonymous** callers only (`!authHelper.isAuthenticated()`), denies `COMPLETED`/`CANCELLED` missions.

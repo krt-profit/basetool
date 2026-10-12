@@ -18,7 +18,7 @@ with a forced app update.
   624 `BackendApiClient` call sites resolve to a literal path.
 - API paths drop the `/api/v1` prefix where the context is clear: `/users/me` is `/api/v1/users/me`.
 - In Java paths, `…` stands for `java/de/greluc/krt/profit/basetool/<module>`:
-  `backend/src/main/…/config/SecurityConfig.java` is the backend's security configuration,
+  `backend/src/main/…/app/api/SecurityConfig.java` is the backend's security configuration,
   `ingest/src/main/…/web/ExchangeController.java` the gateway's relay. After its first mention a
   file is cited by its name. Line numbers are exact for `95e945326`; class and symbol names outlive
   them.

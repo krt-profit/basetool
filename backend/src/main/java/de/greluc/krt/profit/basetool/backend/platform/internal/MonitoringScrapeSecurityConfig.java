@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.platform.internal;
 
-import de.greluc.krt.profit.basetool.backend.config.SecurityConfig;
+import de.greluc.krt.profit.basetool.backend.app.api.SecurityConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
