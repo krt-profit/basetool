@@ -2880,6 +2880,25 @@ Owner decision 2026-10-12: yes, `kernel` and `platform` physically leave their l
    `compileJava --rerun` shows 0 warnings.
 5. *Text scan*: source paths in the role matrix, ADR-0034, the REST-cut appendix and four specs.
 
+**Umbrella step 12 — design of the org-unit and user gates (§5.4), not built; waits for the owner's decision**
+What the code says (2026-10-12): `canSeeOrgUnit` and `canEditOrgUnit` are pure aliases of `canSeeSquadron` and `canEditSquadron` (`scopePredicate.permits(unitId)` for both); `canActOnTargetUser(target, edit)`
+passes for an admin, for the member themselves, or when the read or edit scope accepts any membership of the target. Ten call sites, no `@PreAuthorize` expression: `JobOrderService` and `MaterialClaimService`
+(`canEditOrgUnit`), `InventoryAccessPolicy` and `RefineryAccessPolicy` (`canActOnTargetUser`, twice for refinery), `OrgUnitStampingService` (`canEditOrgUnit`, twice). Tests that name them: `OwnerScopeServiceTest`,
+`JobOrderServiceTest` (four), `MaterialClaimServiceTest` (two).
+*Why the plan's rule does not place them.* §5.4 makes the policy of an aggregate a bean of the module that owns the aggregate. The aggregates are the org unit (`orgunit`, rank 4) and the user (`identity`, rank 3), but both
+gates need `RequestScopeResolver` (`scope`, rank 5), so a policy in the owning module would depend upward. A policy that fits the ranks has to live in `scope`.
+*Options.*
+- **A. Two named policy beans in `scope.api`** (recommended, the `OperationAccessPolicy` precedent): `OrgUnitAccessPolicy` (bean `orgUnitAccessPolicy`, methods `canSeeOrgUnit(UUID)` and `canEditOrgUnit(UUID)`, delegating to the
+  scope kernel's `canSeeSquadron` / `canEditSquadron`) and `UserAccessPolicy` (bean `userAccessPolicy`, method `canActOnTargetUser(UUID, boolean)`, the body of `AccessGateService` verbatim). `OwnerScopeService` and
+  `AccessGateService` lose the three methods and the pass-through; the ten call sites change their receiver. Because no expression names the methods, no SpEL bean name changes and the authorization matrix does not change.
+  Pinned by a differential test that keeps a verbatim copy of the old methods and compares the verdicts over the same caller and unit matrix as `OperationAccessPolicyDifferentialTest` (admin unpinned and pinned, members of zero,
+  one and two units, a member pinned to an own and a foreign unit, a Bereich lead reaching a child by cascade, guests, self, an unknown target), before the old methods go. Gains little: a rename of receivers, and a smaller hub.
+- **B. Keep them and say so.** Declare the three as part of the scope kernel (they are its on-behalf and org-unit gates, rank 5 by construction), delete only the pass-through duplicates in `OwnerScopeService` so each
+  gate has one home (`AccessGateService`), and close step 12 with that sentence in §5.4. No behaviour and no test changes beyond the ten receivers.
+- **C. Policies in the aggregate modules behind an SPI.** `orgunit` owns `OrgUnitAccessPolicy`, `identity` owns `UserAccessPolicy`, each asking a scope-owned SPI for "does the caller's scope accept this unit". Follows §5.4
+  to the letter, adds two SPIs for a one-line delegation and an inverted dependency; not recommended.
+The question for the owner: A, B or C.
+
 **The rest of the plan — one umbrella pull request (#2552), checklist — started 2026-10-12**
 Owner instruction 2026-10-12: all remaining steps in one pull request, one commit per step, each green
 on its targeted tests, the full suite being the pull request's CI. Built from this plan and the code
@@ -2925,7 +2944,7 @@ before a decision.
   - [x] **11.** done — `hangar` (6), `joborder` (45), `mission` (36): what the foreign modules no longer
         hold after steps 6, 7 and 9; of the eight association-to-id conversions of §5.6 seven are done,
         `MissionUnit.ship` is still an entity association.
-  - [ ] **12.** Access policies left in the scope hub (§5.4): `OwnerScopeService` and
+  - [ ] **12.** `Q` design written, waiting for the owner's choice of A, B or C (entry above) — Access policies left in the scope hub (§5.4): `OwnerScopeService` and
         `AccessGateService` keep the org-unit and user gates; `Q` the plan names no policy for them.
 - Persistence:
   - [ ] **13.** `Q` D-17, member settings move with their owner: the payout-preference and
