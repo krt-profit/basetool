@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
@@ -89,7 +88,7 @@ public class UserService {
   private final AuditRecorder auditRecorder;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
-  private final MembershipOperations<OrgUnitMembership> membershipOperations;
+  private final MembershipOperations membershipOperations;
 
   /**
    * Returns whether the caller is a non-admin who can see none of the user's Staffeln through the
@@ -512,6 +511,9 @@ public class UserService {
    * Applies a Staffel and Spezialkommando membership change set in one transaction; any failure
    * rolls back the whole delta.
    *
+   * <p>The pending writes are flushed before the method returns, so a constraint or optimistic-lock
+   * failure surfaces from here.
+   *
    * <ol>
    *   <li>A non-null {@code staffeln} list is the target Staffel set, reconciled by {@link
    *       MembershipOperations#reconcileStaffelMemberships}; {@code null} leaves it untouched.
@@ -521,11 +523,10 @@ public class UserService {
    *
    * @param userId the user whose memberships to change; never {@code null}
    * @param delta the delta to apply; never {@code null}, either half may be empty
-   * @return the user's complete membership list after the write; never {@code null}
    * @throws java.util.NoSuchElementException when the user does not exist
    */
   @Transactional
-  public List<OrgUnitMembership> applyMembershipDelta(UUID userId, MembershipDeltaRequest delta) {
+  public void applyMembershipDelta(UUID userId, MembershipDeltaRequest delta) {
     User user =
         userRepository
             .findById(userId)
@@ -546,7 +547,7 @@ public class UserService {
         applySpecialCommandChange(userId, sk);
       }
     }
-    return membershipOperations.findAllMembershipsForUser(userId);
+    membershipOperations.flushMembershipChanges(userId);
   }
 
   /**
@@ -561,16 +562,8 @@ public class UserService {
       UUID userId, MembershipDeltaRequest.SpecialCommandChange change) {
     switch (change.action()) {
       case ADD -> {
-        OrgUnitMembership fresh = membershipOperations.addMember(change.orgUnitId(), userId);
-        if (Boolean.TRUE.equals(change.isLogistician())
-            || Boolean.TRUE.equals(change.isMissionManager())) {
-          if (Boolean.TRUE.equals(change.isLogistician())) {
-            fresh.setLogistician(true);
-          }
-          if (Boolean.TRUE.equals(change.isMissionManager())) {
-            fresh.setMissionManager(true);
-          }
-        }
+        membershipOperations.addMember(
+            change.orgUnitId(), userId, change.isLogistician(), change.isMissionManager());
       }
       case REMOVE -> membershipOperations.removeMember(change.orgUnitId(), userId);
       case PATCH ->

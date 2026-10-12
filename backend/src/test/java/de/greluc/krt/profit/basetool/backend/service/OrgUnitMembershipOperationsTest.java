@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.identity.api.StaffelAssignment;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
@@ -40,11 +41,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Pins that {@link OrgUnitMembershipOperations} is a pure pass-through: each of the six methods
- * forwards its arguments unchanged (the identity-owned records become the equal org-unit request
- * types), returns the very instance the org-unit service returned (callers mutate the managed row),
- * lets the callee's exception through untouched, calls nothing else, and declares no transaction of
- * its own, so the callee's propagation applies.
+ * Pins that {@link OrgUnitMembershipOperations} is a pass-through: each of the six methods forwards
+ * its arguments unchanged (the identity-owned records become the equal org-unit request types),
+ * sets the initial flags of an added member on the very row the org-unit service returned, lets the
+ * callee's exception through untouched, calls nothing else, and declares no transaction of its own,
+ * so the callee's propagation applies.
  */
 class OrgUnitMembershipOperationsTest {
 
@@ -71,17 +72,6 @@ class OrgUnitMembershipOperationsTest {
   }
 
   @Test
-  void findAllMembershipsForUser_forwardsAndReturnsTheSameList() {
-    UUID userId = UUID.randomUUID();
-    List<OrgUnitMembership> rows = List.of(new OrgUnitMembership());
-    when(queryService.findAllMembershipsForUser(userId)).thenReturn(rows);
-
-    assertThat(operations.findAllMembershipsForUser(userId)).isSameAs(rows);
-    verify(queryService).findAllMembershipsForUser(userId);
-    verifyNoMoreInteractions(queryService, membershipService);
-  }
-
-  @Test
   void reconcileStaffelMemberships_forwardsTheSameUserAndEqualChanges() {
     User user = new User();
     UUID squadronId = UUID.randomUUID();
@@ -95,13 +85,45 @@ class OrgUnitMembershipOperationsTest {
   }
 
   @Test
-  void addMember_returnsTheSameManagedRow() {
+  void addMember_setsTheInitialFlagsOnTheManagedRowTheServiceReturned() {
     UUID skId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     OrgUnitMembership row = new OrgUnitMembership();
     when(membershipService.addMember(skId, userId)).thenReturn(row);
 
-    assertThat(operations.addMember(skId, userId)).isSameAs(row);
+    operations.addMember(skId, userId, true, true);
+
+    assertThat(row.isLogistician()).isTrue();
+    assertThat(row.isMissionManager()).isTrue();
+    verify(membershipService).addMember(skId, userId);
+    verifyNoMoreInteractions(queryService, membershipService);
+  }
+
+  @Test
+  void addMember_setsOnlyTheFlagsThatAreTrue() {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    OrgUnitMembership onlyLogistician = new OrgUnitMembership();
+    OrgUnitMembership none = new OrgUnitMembership();
+    when(membershipService.addMember(skId, userId)).thenReturn(onlyLogistician, none);
+
+    operations.addMember(skId, userId, true, false);
+    operations.addMember(skId, userId, null, null);
+
+    assertThat(onlyLogistician.isLogistician()).isTrue();
+    assertThat(onlyLogistician.isMissionManager()).isFalse();
+    assertThat(none.isLogistician()).isFalse();
+    assertThat(none.isMissionManager()).isFalse();
+  }
+
+  @Test
+  void addMember_letsTheCalleesExceptionThrough() {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    DuplicateEntityException refusal = new DuplicateEntityException("already a member");
+    when(membershipService.addMember(skId, userId)).thenThrow(refusal);
+
+    assertThatThrownBy(() -> operations.addMember(skId, userId, true, null)).isSameAs(refusal);
     verify(membershipService).addMember(skId, userId);
     verifyNoMoreInteractions(queryService, membershipService);
   }
@@ -119,15 +141,25 @@ class OrgUnitMembershipOperationsTest {
   }
 
   @Test
-  void patchFlags_rebuildsTheSameRequestAndReturnsTheSameRow() {
+  void patchFlags_rebuildsTheSameRequest() {
     UUID skId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     MembershipFlagsPatchRequest request = new MembershipFlagsPatchRequest(true, null, 3L);
-    OrgUnitMembership row = new OrgUnitMembership();
-    when(membershipService.patchFlags(skId, userId, request)).thenReturn(row);
 
-    assertThat(operations.patchFlags(skId, userId, true, null, 3L)).isSameAs(row);
+    operations.patchFlags(skId, userId, true, null, 3L);
+
     verify(membershipService).patchFlags(skId, userId, request);
+    verifyNoMoreInteractions(queryService, membershipService);
+  }
+
+  @Test
+  void flushMembershipChanges_runsTheUsersMembershipReadAndNothingElse() {
+    UUID userId = UUID.randomUUID();
+    when(queryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+
+    operations.flushMembershipChanges(userId);
+
+    verify(queryService).findAllMembershipsForUser(userId);
     verifyNoMoreInteractions(queryService, membershipService);
   }
 

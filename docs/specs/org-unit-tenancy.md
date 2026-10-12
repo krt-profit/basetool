@@ -638,7 +638,7 @@ dropped to one:
 `UserServiceMembershipDeltaTest` (the delta orchestrator forwards `staffeln` to the reconcile
 through the identity-owned `MembershipOperations` seam), `UserServiceMembershipSeamDifferentialTest`
 (the delta paths through the seam leave the same rows and audit entries and fail alike as the direct
-calls) and `OrgUnitMembershipOperationsTest` (the seam is a pure pass-through),
+calls) and `OrgUnitMembershipOperationsTest` (the seam is a pass-through that also sets the initial flags),
 `MemberManagementControllerTest` (the member-edit two-slot fold and the detail-load wipe-guard),
 `UserScopedQueriesDataTest` (the union-list scope queries' null + two-Staffel binding against the
 real dialect) and `OrgHierarchyMigrationTest`

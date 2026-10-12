@@ -24,7 +24,6 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.*;
@@ -49,7 +48,7 @@ class UserServiceRankTest {
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
-  @Mock private MembershipOperations<OrgUnitMembership> membershipOperations;
+  @Mock private MembershipOperations membershipOperations;
 
   @InjectMocks private UserService userService;
 
