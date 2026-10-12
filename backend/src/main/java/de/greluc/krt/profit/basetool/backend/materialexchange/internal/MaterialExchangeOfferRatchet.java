@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.materialexchange.api.events.MarketNotices;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository.OfferStock;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;

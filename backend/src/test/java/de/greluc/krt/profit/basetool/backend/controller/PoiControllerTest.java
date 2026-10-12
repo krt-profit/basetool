@@ -25,9 +25,10 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.PoiDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.Poi;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.PoiController;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.mapper.PoiMapper;
-import de.greluc.krt.profit.basetool.backend.service.PoiService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

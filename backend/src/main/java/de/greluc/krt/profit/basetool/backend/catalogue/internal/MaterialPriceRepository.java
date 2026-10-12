@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -175,10 +176,10 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
       AND (:isAutoLoad IS NULL OR t.isAutoLoad = :isAutoLoad)
       """)
   Page<MaterialMatrixItemDto> findMatrixItems(
-      @Param("materialNames") Collection<String> materialNames,
-      @Param("starSystems") Collection<String> starSystems,
-      @Param("hasLoadingDock") Boolean hasLoadingDock,
-      @Param("isAutoLoad") Boolean isAutoLoad,
+      @Param("materialNames") @Nullable Collection<String> materialNames,
+      @Param("starSystems") @Nullable Collection<String> starSystems,
+      @Param("hasLoadingDock") @Nullable Boolean hasLoadingDock,
+      @Param("isAutoLoad") @Nullable Boolean isAutoLoad,
       Pageable pageable);
 
   /**

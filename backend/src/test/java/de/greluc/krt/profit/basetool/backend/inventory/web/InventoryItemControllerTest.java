@@ -57,7 +57,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStolenM
 import de.greluc.krt.profit.basetool.backend.inventory.internal.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.List;
 import java.util.UUID;

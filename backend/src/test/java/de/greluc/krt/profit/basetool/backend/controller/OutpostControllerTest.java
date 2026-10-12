@@ -25,9 +25,10 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.Outpost;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.OutpostMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.OutpostService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.OutpostController;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.mapper.OutpostMapper;
-import de.greluc.krt.profit.basetool.backend.service.OutpostService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

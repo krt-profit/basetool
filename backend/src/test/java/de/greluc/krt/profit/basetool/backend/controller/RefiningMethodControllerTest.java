@@ -25,9 +25,10 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.RefiningMethodService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.RefiningMethodController;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
-import de.greluc.krt.profit.basetool.backend.service.RefiningMethodService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

@@ -24,6 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.JobTypeMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.JobTypeMapperImpl;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 

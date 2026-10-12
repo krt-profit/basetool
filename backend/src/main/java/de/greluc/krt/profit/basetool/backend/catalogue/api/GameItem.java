@@ -38,6 +38,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Joint UEX and SC Wiki item, keyed by the shared in-game asset {@link #externalUuid}.
@@ -74,6 +75,7 @@ public class GameItem extends AbstractEntity<UUID> {
   /** Joint manufacturer link. Sticky on UEX in case of a UEX/Wiki disagreement. */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "manufacturer_id")
+  @Nullable
   private Manufacturer manufacturer;
 
   /** Joint kind discriminator (more-specific wins; see {@link GameItemKind}). */
@@ -120,6 +122,7 @@ public class GameItem extends AbstractEntity<UUID> {
 
   /** Component / weapon size tier. R4. */
   @Column(name = "size_class")
+  @Nullable
   private Integer sizeClass;
 
   /** Item grade marker (often a single character or short tier label). R4. */
@@ -148,10 +151,12 @@ public class GameItem extends AbstractEntity<UUID> {
 
   /** English description from Wiki. R4. */
   @Column(name = "description_en", columnDefinition = "TEXT")
+  @Nullable
   private String descriptionEn;
 
   /** German description from Wiki. R4. */
   @Column(name = "description_de", columnDefinition = "TEXT")
+  @Nullable
   private String descriptionDe;
 
   /** Wiki flag indicating this is the base variant of a family. R4. */
@@ -168,6 +173,7 @@ public class GameItem extends AbstractEntity<UUID> {
 
   /** SC Wiki soft-delete marker. R4. */
   @Column(name = "scwiki_deleted_at")
+  @Nullable
   private Instant scwikiDeletedAt;
 
   /** Game version in which the Wiki sync last observed this row. R4. */
@@ -202,6 +208,7 @@ public class GameItem extends AbstractEntity<UUID> {
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "linked_ship_type_id")
+  @Nullable
   private ShipType linkedShipType;
 
   /** Primary colour of the variant. */
@@ -226,22 +233,27 @@ public class GameItem extends AbstractEntity<UUID> {
 
   /** UEX flag (0/1) for pledge-store exclusivity, normalised to Boolean. */
   @Column(name = "is_exclusive_pledge")
+  @Nullable
   private Boolean isExclusivePledge;
 
   /** UEX flag for subscriber exclusivity. */
   @Column(name = "is_exclusive_subscriber")
+  @Nullable
   private Boolean isExclusiveSubscriber;
 
   /** UEX flag for concierge exclusivity. */
   @Column(name = "is_exclusive_concierge")
+  @Nullable
   private Boolean isExclusiveConcierge;
 
   /** UEX flag indicating the item also appears in the commodity catalogue. */
   @Column(name = "uex_is_commodity")
+  @Nullable
   private Boolean uexIsCommodity;
 
   /** UEX flag indicating the item is a harvestable. */
   @Column(name = "uex_is_harvestable")
+  @Nullable
   private Boolean uexIsHarvestable;
 
   /** Free-form UEX note (rarely populated; surfaced in admin sync report). */
@@ -254,6 +266,7 @@ public class GameItem extends AbstractEntity<UUID> {
 
   /** UEX soft-delete marker. */
   @Column(name = "uex_deleted_at")
+  @Nullable
   private Instant uexDeletedAt;
 
   /** Game version in which UEX last observed this row. */
@@ -272,6 +285,7 @@ public class GameItem extends AbstractEntity<UUID> {
    * exchange {@code locKey} (REQ-XCH-012).
    */
   @Column(name = "name_key", length = 200)
+  @Nullable
   private String nameKey;
 
   /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */

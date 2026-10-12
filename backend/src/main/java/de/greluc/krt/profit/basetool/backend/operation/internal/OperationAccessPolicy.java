@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

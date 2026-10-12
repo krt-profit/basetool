@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

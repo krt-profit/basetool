@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;

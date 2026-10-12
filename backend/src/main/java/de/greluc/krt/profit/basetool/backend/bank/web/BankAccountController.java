@@ -36,7 +36,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.SetBankBalanceTargetR
 import de.greluc.krt.profit.basetool.backend.bank.internal.SetCartelApprovalTiersRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.web.UserZone;

@@ -29,6 +29,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepositor
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayload;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayloadRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobService;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;

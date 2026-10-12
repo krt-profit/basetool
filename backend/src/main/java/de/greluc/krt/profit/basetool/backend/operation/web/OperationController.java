@@ -35,7 +35,7 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationPayoutS
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationUpdateDto;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

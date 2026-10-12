@@ -26,9 +26,10 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.UexCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCategoryRefService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCategoryRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCategoryDto;
-import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;

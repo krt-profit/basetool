@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.FrequencyTypeService;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One material's best trade route for a ship: the cheapest purchase, the best sale and the
@@ -50,6 +51,6 @@ public record ProfitCalculationDto(
     BigDecimal fullLoadCost,
     BigDecimal maxProfitFullLoad,
     String buyTerminalName,
-    String buyTerminalLocation,
+    @Nullable String buyTerminalLocation,
     String sellTerminalName,
-    String sellTerminalLocation) {}
+    @Nullable String sellTerminalLocation) {}

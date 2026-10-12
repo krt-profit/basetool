@@ -23,7 +23,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankDashboardDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankDashboardService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

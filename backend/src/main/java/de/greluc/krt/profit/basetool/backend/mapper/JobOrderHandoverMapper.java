@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverItemDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

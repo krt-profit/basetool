@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
-import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import java.math.BigDecimal;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

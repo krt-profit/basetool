@@ -75,7 +75,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
 import de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController;
 import de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController;
@@ -96,8 +98,6 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RejectedRegistrationRetentionProperties;
-import de.greluc.krt.profit.basetool.backend.integration.UexClient;
-import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
@@ -125,10 +125,10 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.livesync.internal.LiveSyncFanoutProperties;
-import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionViewerAccess;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.StockViewerAccess;
+import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeQueryParams;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
@@ -149,6 +149,7 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationService
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitLabels;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
@@ -168,7 +169,6 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderServ
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ScopeSpecifications;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -303,11 +303,11 @@ class ArchitectureTest {
 
   /** The service layer: services, their nested classes and the legacy package. */
   static final DescribedPredicate<JavaClass> SERVICE_CODE =
-      layer("service code", SERVICES, AuthHelperService.class);
+      layer("service code", SERVICES, AuditService.class);
 
   /** The mapper layer: MapStruct mappers, their nested classes and the legacy package. */
   static final DescribedPredicate<JavaClass> MAPPER_CODE =
-      layer("mapper code", MAPPERS, CentralMapperConfig.class);
+      layer("mapper code", MAPPERS, UserMapper.class);
 
   /** The repository layer: Spring Data repositories, their nested classes and the package. */
   static final DescribedPredicate<JavaClass> REPOSITORY_CODE =
@@ -408,9 +408,13 @@ class ArchitectureTest {
                   .anyMatch(
                       outermost(c.isArray() ? c.getBaseComponentType() : c).getName()::equals));
 
-  /** The outbound integration clients, anchored on {@link UexClient}. */
+  /** The outbound integration clients: {@link UexClient} and {@link ScWikiClient}. */
   static final DescribedPredicate<JavaClass> INTEGRATION_CODE =
-      packageTreeOf("integration code", UexClient.class);
+      DescribedPredicate.describe(
+          "integration code (UexClient, ScWikiClient and their nested classes)",
+          c ->
+              outermost(c).isEquivalentTo(UexClient.class)
+                  || outermost(c).isEquivalentTo(ScWikiClient.class));
 
   /**
    * The event payloads: the {@code api.events} package tree of every module, which holds {@link
@@ -588,7 +592,7 @@ class ArchitectureTest {
               + "."
               + methodName(BankTransactionRepository.class, "anonymiseCounterpartyHandle"));
 
-  /** Classes in {@code ScWikiClient}'s package exempt from injecting it; empty. */
+  /** Sync services exempt from injecting {@code ScWikiClient}; empty. */
   static final Set<Class<?>> SCWIKI_CLIENT_INJECTION_EXEMPT = Set.of();
 
   /**
@@ -678,7 +682,7 @@ class ArchitectureTest {
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 495);
+    assertClassFloor("serviceLayerShouldNotReachIntoSecurityContext", serviceSelection(), 510);
     serviceLayerShouldNotReachIntoSecurityContextRule(serviceSelection()).check(CLASSES);
   }
 
@@ -707,7 +711,7 @@ class ArchitectureTest {
 
   @Test
   void controllerLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("controllerLayerShouldNotReachIntoSecurityContext", CONTROLLER_CODE, 99);
+    assertClassFloor("controllerLayerShouldNotReachIntoSecurityContext", CONTROLLER_CODE, 104);
     controllerLayerShouldNotReachIntoSecurityContextRule().check(CLASSES);
   }
 
@@ -755,7 +759,7 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotReachIntoSecurityContext() {
-    assertClassFloor("mapperLayerShouldNotReachIntoSecurityContext", MAPPER_CODE, 100);
+    assertClassFloor("mapperLayerShouldNotReachIntoSecurityContext", MAPPER_CODE, 106);
     mapperLayerShouldNotReachIntoSecurityContextRule().check(CLASSES);
   }
 
@@ -1249,7 +1253,7 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotDependOnServiceLayer() {
-    assertClassFloor("mapperLayerShouldNotDependOnServiceLayer", MAPPER_CODE, 100);
+    assertClassFloor("mapperLayerShouldNotDependOnServiceLayer", MAPPER_CODE, 106);
     mustNotDependOnServicesRule(MAPPER_CODE)
         .because(
             "the service layer depends on mappers, so a mapper -> service edge re-creates the "
@@ -1617,14 +1621,19 @@ class ArchitectureTest {
   }
 
   /**
-   * Every top-level class in {@code ScWikiClient}'s package except the client itself must inject
-   * {@code ScWikiClient}, unless listed in {@link #SCWIKI_CLIENT_INJECTION_EXEMPT}.
+   * Every SC Wiki sync service next to {@code ScWikiClient} must inject {@code ScWikiClient},
+   * unless listed in {@link #SCWIKI_CLIENT_INJECTION_EXEMPT}.
    */
   @Test
   void scWikiIntegrationClassesMustWireScWikiClient() {
     DescribedPredicate<JavaClass> selection =
-        packageTreeOf("ScWikiClient's package", ScWikiClient.class);
-    assertClassFloor("scWikiIntegrationClassesMustWireScWikiClient", selection, 1);
+        DescribedPredicate.describe(
+            "the SC Wiki sync services",
+            c ->
+                c.isTopLevelClass()
+                    && c.getPackageName().equals(ScWikiClient.class.getPackageName())
+                    && c.getSimpleName().matches("ScWiki\\w+SyncService"));
+    assertClassFloor("scWikiIntegrationClassesMustWireScWikiClient", selection, 5);
     scWikiIntegrationClassesMustWireTheClientRule(
             selection, ScWikiClient.class, SCWIKI_CLIENT_INJECTION_EXEMPT)
         .check(CLASSES);

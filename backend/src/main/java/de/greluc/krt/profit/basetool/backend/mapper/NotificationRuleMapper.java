@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.mapstruct.Mapper;
 
 /**

@@ -37,9 +37,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintSummaryPrope
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintOutputNameOverrides;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiBlueprintSyncService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
@@ -53,8 +56,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlu
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintRequirementChildDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintRequirementGroupDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintSummaryPropertyDto;
-import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
-import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.HashMap;
 import java.util.List;

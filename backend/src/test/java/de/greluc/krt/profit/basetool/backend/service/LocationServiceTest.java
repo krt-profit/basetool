@@ -25,12 +25,13 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationUsage;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.LocationService;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
-import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

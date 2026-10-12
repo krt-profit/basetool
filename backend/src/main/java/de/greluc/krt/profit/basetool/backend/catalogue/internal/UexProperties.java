@@ -27,8 +27,8 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Configuration properties under {@code krt.uex.*}: the UEX (uexcorp.space) base URL, every
- * endpoint path used by {@link de.greluc.krt.profit.basetool.backend.integration.UexClient}, and
- * the sync scheduler switches.
+ * endpoint path used by {@link de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient},
+ * and the sync scheduler switches.
  *
  * @param apiUrl the UEX API base URL the endpoint paths are appended to
  * @param commoditiesEndpoint the commodity catalogue path

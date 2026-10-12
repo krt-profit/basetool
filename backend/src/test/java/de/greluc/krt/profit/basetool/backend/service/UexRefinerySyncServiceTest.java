@@ -38,9 +38,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodReposit
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexRefinerySyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexRefineryYieldDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexRefiningMethodDto;
-import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

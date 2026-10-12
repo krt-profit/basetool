@@ -18,9 +18,9 @@
  */
 
 /**
- * The catalogue module's published API: the quantity-type rounding the job-order, blueprint and
- * exchange paths share, the job-type designation observer, the location usage SPI, the name helpers
- * other modules resolve imports with, and the read models its caches hold (plan §5.2).
+ * The catalogue module's published API: its entities, enums, repositories and read-model records,
+ * the mappers and services other modules call, the quantity-type rounding, the job-type designation
+ * observer, the location usage SPI and the name helpers (plan §5.2).
  */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.catalogue.api;

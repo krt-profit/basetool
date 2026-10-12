@@ -32,11 +32,12 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiManufacturerSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiManufacturerDto;
-import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.HashMap;
 import java.util.List;

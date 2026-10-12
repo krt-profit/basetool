@@ -83,7 +83,8 @@ class MissionServiceTest {
 
   @Mock private de.greluc.krt.profit.basetool.backend.service.UserService userService;
 
-  @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
+  @Mock
+  private de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService authHelperService;
 
   @Mock
   private de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService

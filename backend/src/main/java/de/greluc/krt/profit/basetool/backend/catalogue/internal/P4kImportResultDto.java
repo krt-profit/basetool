@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Summary of a P4K catalog import, shared by the preview ({@code dryRun}) and apply paths of {@code
@@ -45,7 +46,7 @@ public record P4kImportResultDto(
     Counts commodities,
     Counts blueprints,
     int ingredientsResolved,
-    UUID runId) {
+    @Nullable UUID runId) {
 
   /**
    * Per-type reconciliation tally: {@link #matched}, {@link #created} and {@link #unmatched}

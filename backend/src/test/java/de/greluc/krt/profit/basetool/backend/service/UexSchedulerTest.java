@@ -23,7 +23,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncCoordinator;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCategoryRefService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCommodityService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexItemPriceSyncService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexItemSyncService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexManufacturerService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexRefinerySyncService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexScheduler;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexStarSystemService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexUniverseSyncService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexVehicleService;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;

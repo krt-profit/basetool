@@ -36,6 +36,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One ingredient line of a {@link Blueprint}: a {@link BlueprintIngredientKind#RESOURCE} consumes a
@@ -85,11 +86,13 @@ public class BlueprintIngredient extends AbstractEntity<UUID> {
   /** Resolved commodity for a RESOURCE line; {@code null} when unresolved or for an ITEM line. */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "material_id")
+  @Nullable
   private Material material;
 
   /** Resolved game item for an ITEM line; {@code null} when unresolved or for a RESOURCE line. */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "game_item_id")
+  @Nullable
   private GameItem gameItem;
 
   /** Raw Wiki resource UUID for a RESOURCE line — kept for forensic re-resolution. */
@@ -106,10 +109,12 @@ public class BlueprintIngredient extends AbstractEntity<UUID> {
 
   /** Quantity in SCU for a RESOURCE line. */
   @Column(name = "quantity_scu")
+  @Nullable
   private Double quantityScu;
 
   /** Quantity in whole units for an ITEM line. */
   @Column(name = "quantity_units")
+  @Nullable
   private Integer quantityUnits;
 
   /**

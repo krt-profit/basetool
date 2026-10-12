@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

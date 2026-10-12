@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestDeclinedEvent;
 import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestResolvedEvent;
 import de.greluc.krt.profit.basetool.backend.privacy.api.events.AccountDeletionRequestedEvent;

@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
 import java.util.UUID;
 
 /** Test factories for the id-projection rows the UEX syncs preload (BE-PERF-09). */
-final class UexRefs {
+public final class UexRefs {
 
   private UexRefs() {}
 
@@ -35,7 +35,7 @@ final class UexRefs {
    * @param id the local id
    * @return the row
    */
-  static UexKeyRef ref(Integer uexId, UUID id) {
+  public static UexKeyRef ref(Integer uexId, UUID id) {
     return new UexKeyRef() {
       @Override
       public Integer getUexId() {
@@ -57,7 +57,7 @@ final class UexRefs {
    * @param id the row id
    * @return the row
    */
-  static PairKeyRef pair(UUID parentId, UUID terminalId, UUID id) {
+  public static PairKeyRef pair(UUID parentId, UUID terminalId, UUID id) {
     return new PairKeyRef() {
       @Override
       public UUID getParentId() {

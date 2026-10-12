@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.JobTypeMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;

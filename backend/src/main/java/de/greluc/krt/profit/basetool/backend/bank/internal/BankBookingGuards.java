@@ -23,7 +23,7 @@ import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.UUID;

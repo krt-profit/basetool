@@ -217,8 +217,12 @@ repository and the integration properties sit in `catalogue.internal`. The kerne
 enums, DTOs, repositories and validation types followed (P4-5 part 2): 69 in `catalogue.api`, which
 publishes the entities as the foundation modules do (§5.2 of the plan), and 32 in
 `catalogue.internal`; whatever an `api` type depends on lies in `api` too, because the layers inside
-a module must stay acyclic. The mappers, controllers and services stay in the layer packages until
-`CentralMapperConfig` has left the `mapper` package (§11).
+a module must stay acyclic. The module is whole since P4-5 part 3: the 21 controllers sit in
+`catalogue.web`, the services, mappers and the two HTTP clients (`UexClient`, `ScWikiClient`) in
+`catalogue.internal` (the ones other modules call, such as `MaterialMapper`, `LocationMapper` and
+`QualityTierService`, in `catalogue.api`). Three platform types left the layer packages for
+`platform.api` on the way: `CentralMapperConfig`, `ResponseSizeLimitInterceptor` and
+`AuthHelperService`.
 
 The inventory (the Lager) moved since P4-1: `InventoryItemController` sits in `inventory.web`, and
 `inventory.internal` holds the Lager services (item, aggregation, checkout, org-unit change, stolen

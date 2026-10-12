@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.Poi;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiService;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import java.util.Optional;
 import java.util.UUID;

@@ -87,7 +87,7 @@ public class AsyncConfig {
 
   /**
    * Bounded executor for the UEX sync dispatched by {@link
-   * de.greluc.krt.profit.basetool.backend.service.UexScheduler}.
+   * de.greluc.krt.profit.basetool.backend.catalogue.internal.UexScheduler}.
    *
    * <p>Two core threads, at most four, a 100-slot queue, abort on overflow; waits up to 20 s for
    * in-flight tasks on shutdown and propagates the submitter's MDC.

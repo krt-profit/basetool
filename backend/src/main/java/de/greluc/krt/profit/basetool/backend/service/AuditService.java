@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.mapper.AuditEventMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import io.micrometer.core.instrument.MeterRegistry;

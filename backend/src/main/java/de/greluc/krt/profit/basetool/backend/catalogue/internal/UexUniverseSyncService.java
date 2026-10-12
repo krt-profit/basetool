@@ -1,0 +1,919 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.catalogue.internal;
+
+import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCityDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexFactionDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexJurisdictionDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexMoonDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexOrbitDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexOutpostDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexPlanetDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexPoiDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexSpaceStationDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexTerminalDto;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Imports the UEX universe topology: factions, jurisdictions, planets, moons, orbits, cities,
+ * outposts, points of interest, space stations and terminals.
+ *
+ * <p>Parents must be synced before their children; a child whose parent is not yet mirrored is
+ * dropped until the next sweep. {@link #syncTerminals()} has no parent constraint and runs first
+ * (REQ-REFINERY-020).
+ *
+ * <p>Each method fetches outside any transaction and writes through {@link SyncChunkWriter} in
+ * chunk transactions of their own (REQ-DATA-005), upserting by UEX id with a name fallback. An
+ * empty response writes nothing; an unchanged ({@code 304 Not Modified}) catalogue does the same
+ * and is logged at INFO rather than WARN.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class UexUniverseSyncService {
+
+  private final UexClient uexClient;
+  private final CityRepository cityRepository;
+  private final FactionRepository factionRepository;
+  private final JurisdictionRepository jurisdictionRepository;
+  private final MoonRepository moonRepository;
+  private final OrbitRepository orbitRepository;
+  private final OutpostRepository outpostRepository;
+  private final PlanetRepository planetRepository;
+  private final PoiRepository poiRepository;
+  private final SpaceStationRepository spacestationRepository;
+  private final TerminalRepository terminalRepository;
+  private final LocationRepository locationRepository;
+
+  /** Writes each catalogue in short isolated transactions after its fetch (BE-PERF-09). */
+  private final SyncChunkWriter chunkWriter;
+
+  /**
+   * Syncs UEX cities into {@code city}. Parents (planet, moon) are resolved against the local
+   * mirror; rows with an unresolved parent are still upserted but with the parent reference
+   * cleared.
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void syncCities() {
+    log.info("Starting sync for Citys...");
+    UexClient.FetchResult<UexCityDto> fetched = uexClient.getCities();
+    if (fetched.notModified()) {
+      log.info("UEX city catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexCityDto> dtos = fetched.data();
+    if (dtos.isEmpty()) {
+      log.warn("No cities received from UEX API. Aborting city synchronization.");
+      return;
+    }
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexCityDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            City entity =
+                cityRepository
+                    .findByIdCity(dto.id())
+                    .orElseGet(
+                        () ->
+                            cityRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdCity(dto.id());
+                                      return cityRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      City n = new City();
+                                      n.setIdCity(dto.id());
+                                      n.setName(dto.name());
+                                      return cityRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setCode(dto.code());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+            entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+            entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+            entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+            entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+            entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+            entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+            entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+            entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+            entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+            entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+            entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+            entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+            entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+            entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
+            if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+              entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
+            }
+            entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+            entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
+            entity.setPadTypes(dto.padTypes());
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setMoonName(dto.moonName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            cityRepository.save(entity);
+
+            if (Boolean.TRUE.equals(entity.getIsAvailableLive())) {
+              Location location =
+                  locationRepository
+                      .findByCityId(entity.getId())
+                      .orElseGet(
+                          () ->
+                              locationRepository
+                                  .findByName(entity.getName())
+                                  .map(
+                                      l -> {
+                                        l.setCity(entity);
+                                        return l;
+                                      })
+                                  .orElseGet(
+                                      () -> {
+                                        Location l = new Location();
+                                        l.setName(entity.getName());
+                                        l.setCity(entity);
+                                        return l;
+                                      }));
+              location.setName(entity.getName());
+              locationRepository.save(location);
+            }
+          }
+          return chunk;
+        },
+        "city",
+        dto -> "(id=" + dto.id() + ")");
+    log.info("Finished sync for Citys.");
+  }
+
+  /**
+   * Syncs UEX factions. No parent table — factions stand alone, so this method can run first in the
+   * universe sweep.
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void syncFactions() {
+    log.info("Starting sync for Factions...");
+    UexClient.FetchResult<UexFactionDto> fetched = uexClient.getFactions();
+    if (fetched.notModified()) {
+      log.info("UEX faction catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexFactionDto> dtos = fetched.data();
+    if (dtos.isEmpty()) {
+      log.warn("No factions received from UEX API. Aborting faction synchronization.");
+      return;
+    }
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexFactionDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Faction entity =
+                factionRepository
+                    .findByIdFaction(dto.id())
+                    .orElseGet(
+                        () ->
+                            factionRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdFaction(dto.id());
+                                      return factionRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Faction n = new Faction();
+                                      n.setIdFaction(dto.id());
+                                      n.setName(dto.name());
+                                      return factionRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setWiki(dto.wiki());
+            entity.setIsPiracy(dto.checkIsPiracy());
+            entity.setIsBountyHunting(dto.checkIsBountyHunting());
+            factionRepository.save(entity);
+          }
+          return chunk;
+        },
+        "faction",
+        dto -> "(id=" + dto.id() + ")");
+    log.info("Finished sync for Factions.");
+  }
+
+  /**
+   * Syncs UEX jurisdictions. Parent is faction; unresolved faction → jurisdiction's faction
+   * reference stays null.
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void syncJurisdictions() {
+    log.info("Starting sync for Jurisdictions...");
+    UexClient.FetchResult<UexJurisdictionDto> fetched = uexClient.getJurisdictions();
+    if (fetched.notModified()) {
+      log.info(
+          "UEX jurisdiction catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexJurisdictionDto> dtos = fetched.data();
+    if (dtos.isEmpty()) {
+      log.warn("No jurisdictions received from UEX API. Aborting jurisdiction synchronization.");
+      return;
+    }
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexJurisdictionDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Jurisdiction entity =
+                jurisdictionRepository
+                    .findByIdJurisdiction(dto.id())
+                    .orElseGet(
+                        () ->
+                            jurisdictionRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdJurisdiction(dto.id());
+                                      return jurisdictionRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Jurisdiction n = new Jurisdiction();
+                                      n.setIdJurisdiction(dto.id());
+                                      n.setName(dto.name());
+                                      return jurisdictionRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+
+            entity.setNickname(dto.nickname());
+            entity.setWiki(dto.wiki());
+            entity.setFactionName(dto.factionName());
+            jurisdictionRepository.save(entity);
+          }
+          return chunk;
+        },
+        "jurisdiction",
+        dto -> "(id=" + dto.id() + ")");
+    log.info("Finished sync for Jurisdictions.");
+  }
+
+  /** Syncs UEX moons. Parent is planet. */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void syncMoons() {
+    log.info("Starting sync for Moons...");
+    UexClient.FetchResult<UexMoonDto> fetched = uexClient.getMoons();
+    if (fetched.notModified()) {
+      log.info("UEX moon catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexMoonDto> dtos = fetched.data();
+    if (dtos.isEmpty()) {
+      log.warn("No moons received from UEX API. Aborting moon synchronization.");
+      return;
+    }
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexMoonDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Moon entity =
+                moonRepository
+                    .findByIdMoon(dto.id())
+                    .orElseGet(
+                        () ->
+                            moonRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdMoon(dto.id());
+                                      return moonRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Moon n = new Moon();
+                                      n.setIdMoon(dto.id());
+                                      n.setName(dto.name());
+                                      return moonRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setCode(dto.code());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            moonRepository.save(entity);
+          }
+          return chunk;
+        },
+        "moon",
+        dto -> "(id=" + dto.id() + ")");
+    log.info("Finished sync for Moons.");
+  }
+
+  /** Syncs UEX orbits (orbital positions / lagrange points around a planet). Parent is planet. */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void syncOrbits() {
+    log.info("Starting sync for Orbits...");
+    UexClient.FetchResult<UexOrbitDto> fetched = uexClient.getOrbits();
+    if (fetched.notModified()) {
+      log.info("UEX orbit catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexOrbitDto> dtos = fetched.data();
+    if (dtos.isEmpty()) {
+      log.warn("No orbits received from UEX API. Aborting orbit synchronization.");
+      return;
+    }
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexOrbitDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Orbit entity =
+                orbitRepository
+                    .findByIdOrbit(dto.id())
+                    .orElseGet(
+                        () ->
+                            orbitRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdOrbit(dto.id());
+                                      return orbitRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Orbit n = new Orbit();
+                                      n.setIdOrbit(dto.id());
+                                      n.setName(dto.name());
+                                      return orbitRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setCode(dto.code());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            orbitRepository.save(entity);
+          }
+          return chunk;
+        },
+        "orbit",
+        dto -> "(id=" + dto.id() + ")");
+    log.info("Finished sync for Orbits.");
+  }
+
+  /**
+   * Syncs UEX outposts (surface settlements). Parent is planet or moon — UEX provides exactly one
+   * of the two ids.
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void syncOutposts() {
+    log.info("Starting sync for Outposts...");
+    UexClient.FetchResult<UexOutpostDto> fetched = uexClient.getOutposts();
+    if (fetched.notModified()) {
+      log.info("UEX outpost catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexOutpostDto> dtos = fetched.data();
+    if (dtos.isEmpty()) {
+      log.warn("No outposts received from UEX API. Aborting outpost synchronization.");
+      return;
+    }
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexOutpostDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Outpost entity =
+                outpostRepository
+                    .findByIdOutpost(dto.id())
+                    .orElseGet(
+                        () ->
+                            outpostRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdOutpost(dto.id());
+                                      return outpostRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Outpost n = new Outpost();
+                                      n.setIdOutpost(dto.id());
+                                      n.setName(dto.name());
+                                      return outpostRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+            entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+            entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+            entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+            entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+            entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+            entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+            entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+            entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+            entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+            entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+            entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+            entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+            entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+            entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
+            if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+              entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
+            }
+            entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+            entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
+            entity.setPadTypes(dto.padTypes());
+            entity.setNickname(dto.nickname());
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setMoonName(dto.moonName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            outpostRepository.save(entity);
+          }
+          return chunk;
+        },
+        "outpost",
+        dto -> "(id=" + dto.id() + ")");
+    log.info("Finished sync for Outposts.");
+  }
+
+  /**
+   * Syncs UEX planets. Parent is star system; this method must run AFTER the star-system sync
+   * (which lives in {@link UexStarSystemService}) so unresolved parents stay rare.
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void syncPlanets() {
+    log.info("Starting sync for Planets...");
+    UexClient.FetchResult<UexPlanetDto> fetched = uexClient.getPlanets();
+    if (fetched.notModified()) {
+      log.info("UEX planet catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexPlanetDto> dtos = fetched.data();
+    if (dtos.isEmpty()) {
+      log.warn("No planets received from UEX API. Aborting planet synchronization.");
+      return;
+    }
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexPlanetDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Planet entity =
+                planetRepository
+                    .findByIdPlanet(dto.id())
+                    .orElseGet(
+                        () ->
+                            planetRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdPlanet(dto.id());
+                                      return planetRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Planet n = new Planet();
+                                      n.setIdPlanet(dto.id());
+                                      n.setName(dto.name());
+                                      return planetRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setCode(dto.code());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            planetRepository.save(entity);
+          }
+          return chunk;
+        },
+        "planet",
+        dto -> "(id=" + dto.id() + ")");
+    log.info("Finished sync for Planets.");
+  }
+
+  /**
+   * Syncs UEX points of interest (derelicts, anomalies, lagrange POIs). Parent varies by POI type —
+   * star system, planet or moon.
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void syncPois() {
+    log.info("Starting sync for Pois...");
+    UexClient.FetchResult<UexPoiDto> fetched = uexClient.getPoi();
+    if (fetched.notModified()) {
+      log.info(
+          "UEX point-of-interest catalogue unchanged since the last sync (304) — nothing to"
+              + " import.");
+      return;
+    }
+    List<UexPoiDto> dtos = fetched.data();
+    if (dtos.isEmpty()) {
+      log.warn("No points of interest received from UEX API. Aborting POI synchronization.");
+      return;
+    }
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexPoiDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Poi entity =
+                poiRepository
+                    .findByIdPoi(dto.id())
+                    .orElseGet(
+                        () ->
+                            poiRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdPoi(dto.id());
+                                      return poiRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Poi n = new Poi();
+                                      n.setIdPoi(dto.id());
+                                      n.setName(dto.name());
+                                      return poiRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+            entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+            entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+            entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+            entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+            entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+            entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+            entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+            entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+            entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+            entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+            entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+            entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+            entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+            entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
+            if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+              entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
+            }
+            entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+            entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
+            entity.setPadTypes(dto.padTypes());
+            entity.setNickname(dto.nickname());
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setMoonName(dto.moonName());
+            entity.setSpaceStationName(dto.spaceStationName());
+            entity.setOutpostName(dto.outpostName());
+            entity.setCityName(dto.cityName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            poiRepository.save(entity);
+          }
+          return chunk;
+        },
+        "point of interest",
+        dto -> "(id=" + dto.id() + ")");
+    log.info("Finished sync for Pois.");
+  }
+
+  /**
+   * Syncs UEX space stations. Parent is star system or orbit; carries the loading-dock / jump-point
+   * / auto-load flags used by the profit-calculation page.
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void syncSpaceStations() {
+    log.info("Starting sync for SpaceStations...");
+    UexClient.FetchResult<UexSpaceStationDto> fetched = uexClient.getSpaceStations();
+    if (fetched.notModified()) {
+      log.info(
+          "UEX space station catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexSpaceStationDto> dtos = fetched.data();
+    if (dtos.isEmpty()) {
+      log.warn("No space stations received from UEX API. Aborting space station synchronization.");
+      return;
+    }
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexSpaceStationDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            SpaceStation entity =
+                spacestationRepository
+                    .findByIdSpaceStation(dto.id())
+                    .orElseGet(
+                        () ->
+                            spacestationRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdSpaceStation(dto.id());
+                                      return spacestationRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      SpaceStation n = new SpaceStation();
+                                      n.setIdSpaceStation(dto.id());
+                                      n.setName(dto.name());
+                                      return spacestationRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+            entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+            entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+            entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+            entity.setIsLagrange(UexValues.asBooleanOrFalse(dto.isLagrange()));
+            entity.setIsJumpPoint(UexValues.asBooleanOrFalse(dto.isJumpPoint()));
+            entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+            entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+            entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+            entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+            entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+            entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+            entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+            entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+            entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+            entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+            entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
+            if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+              entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
+            }
+            entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+            entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
+            entity.setPadTypes(dto.padTypes());
+            entity.setNickname(dto.nickname());
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setMoonName(dto.moonName());
+            entity.setCityName(dto.cityName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            spacestationRepository.save(entity);
+
+            if (Boolean.TRUE.equals(entity.getIsAvailableLive())) {
+              Location location =
+                  locationRepository
+                      .findBySpaceStationId(entity.getId())
+                      .orElseGet(
+                          () ->
+                              locationRepository
+                                  .findByName(entity.getName())
+                                  .map(
+                                      l -> {
+                                        l.setSpaceStation(entity);
+                                        return l;
+                                      })
+                                  .orElseGet(
+                                      () -> {
+                                        Location l = new Location();
+                                        l.setName(entity.getName());
+                                        l.setSpaceStation(entity);
+                                        return l;
+                                      }));
+              location.setName(entity.getName());
+              locationRepository.save(location);
+            }
+          }
+          return chunk;
+        },
+        "space station",
+        dto -> "(id=" + dto.id() + ")");
+    log.info("Finished sync for SpaceStations.");
+  }
+
+  /**
+   * Syncs UEX terminals (trade kiosks at any parent location type). The parent is stored as a
+   * denormalised name, so terminals have no ordering constraint and run first in the sweep.
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void syncTerminals() {
+    log.info("Starting sync for Terminals...");
+    UexClient.FetchResult<UexTerminalDto> fetched = uexClient.getTerminals();
+    if (fetched.notModified()) {
+      log.info("UEX terminal catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexTerminalDto> dtos = fetched.data();
+    if (dtos.isEmpty()) {
+      log.warn("No terminals received from UEX API. Aborting terminal synchronization.");
+      return;
+    }
+    Instant syncedAt = Instant.now();
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexTerminalDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Terminal entity =
+                terminalRepository
+                    .findByIdTerminal(dto.id())
+                    .orElseGet(
+                        () ->
+                            terminalRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdTerminal(dto.id());
+                                      return terminalRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Terminal n = new Terminal();
+                                      n.setIdTerminal(dto.id());
+                                      n.setName(dto.name());
+                                      return terminalRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setCode(dto.code());
+            entity.setType(dto.type());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsJumpPoint(UexValues.asBooleanOrFalse(dto.isJumpPoint()));
+            Boolean uexLoadingDock =
+                dto.hasLoadingDock() == null ? null : dto.hasLoadingDock() == 1;
+            Boolean uexAutoLoad = dto.isAutoLoad() == null ? null : dto.isAutoLoad() == 1;
+            entity.setUexHasLoadingDock(uexLoadingDock);
+            entity.setUexIsAutoLoad(uexAutoLoad);
+            entity.setUexSyncedAt(syncedAt);
+            if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+              entity.setHasLoadingDock(Boolean.TRUE.equals(uexLoadingDock));
+            }
+            entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+            entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
+            if (!Boolean.TRUE.equals(entity.getIsAutoLoadOverridden())) {
+              entity.setIsAutoLoad(Boolean.TRUE.equals(uexAutoLoad));
+            }
+            entity.setNickname(dto.nickname());
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setMoonName(dto.moonName());
+            entity.setSpaceStationName(dto.spaceStationName());
+            entity.setOutpostName(dto.outpostName());
+            entity.setCityName(dto.cityName());
+            entity.setFactionName(dto.factionName());
+            entity.setCompanyName(dto.companyName());
+            terminalRepository.save(entity);
+          }
+          return chunk;
+        },
+        "terminal",
+        dto -> "(id=" + dto.id() + ")");
+    log.info("Finished sync for Terminals.");
+  }
+
+  /**
+   * Recomputes {@code city.has_refinery_terminal} / {@code space_station.has_refinery_terminal}
+   * from the synced terminals: a parent is flagged iff it hosts at least one live {@code type =
+   * 'refinery'} terminal (REQ-REFINERY-020).
+   *
+   * <p>Corrects UEX's unreliable parent-level {@code has_refinery} claim, which stays stored for
+   * diagnostics. Called once per sweep from {@code UexScheduler}'s {@code finally}, after all sync
+   * steps, and issues no network call. Matches by the terminal's parent-name columns; a station
+   * within a city does not flag the city.
+   *
+   * <p>The explicit {@code @Transactional} must stay: the class default is read-only, in which
+   * Hibernate silently discards the writes.
+   */
+  @Transactional
+  public void reconcileRefineryTerminalFlags() {
+    Set<String> refineryCities = new HashSet<>();
+    Set<String> refineryStations = new HashSet<>();
+    for (Terminal terminal :
+        terminalRepository.findByTypeAndIsAvailableLiveTrue(Terminal.TYPE_REFINERY)) {
+      if (terminal.getSpaceStationName() != null) {
+        refineryStations.add(terminal.getSpaceStationName());
+      } else if (terminal.getCityName() != null) {
+        refineryCities.add(terminal.getCityName());
+      }
+    }
+
+    int changed = 0;
+    for (City city : cityRepository.findAll()) {
+      boolean expected = city.getName() != null && refineryCities.contains(city.getName());
+      if (expected != Boolean.TRUE.equals(city.getHasRefineryTerminal())) {
+        city.setHasRefineryTerminal(expected);
+        cityRepository.save(city);
+        changed++;
+      }
+    }
+    for (SpaceStation station : spacestationRepository.findAll()) {
+      boolean expected = station.getName() != null && refineryStations.contains(station.getName());
+      if (expected != Boolean.TRUE.equals(station.getHasRefineryTerminal())) {
+        station.setHasRefineryTerminal(expected);
+        spacestationRepository.save(station);
+        changed++;
+      }
+    }
+    log.info(
+        "Reconciled refinery-terminal flags: {} refinery terminals ({} stations, {} cities),"
+            + " {} parent rows updated",
+        refineryStations.size() + refineryCities.size(),
+        refineryStations.size(),
+        refineryCities.size(),
+        changed);
+  }
+}

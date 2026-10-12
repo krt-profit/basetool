@@ -31,6 +31,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.Nullable;
 
 /** Refining Method JPA entity. */
 @Entity
@@ -44,6 +45,7 @@ public class RefiningMethod extends AbstractEntity<UUID> {
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
+  @Setter(onParam_ = @__(@Nullable))
   private UUID id;
 
   @Column(nullable = false, unique = true)

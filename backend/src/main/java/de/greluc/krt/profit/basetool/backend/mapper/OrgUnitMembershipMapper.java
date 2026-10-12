@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

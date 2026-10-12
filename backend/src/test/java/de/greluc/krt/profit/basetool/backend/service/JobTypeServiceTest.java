@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObserver;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.JobTypeService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

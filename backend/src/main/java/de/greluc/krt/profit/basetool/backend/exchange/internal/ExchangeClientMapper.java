@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
+import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import java.util.Collection;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;

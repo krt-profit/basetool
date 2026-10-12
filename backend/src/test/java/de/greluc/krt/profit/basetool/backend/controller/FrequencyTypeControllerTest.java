@@ -26,9 +26,10 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.FrequencyTypeMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.FrequencyTypeService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.FrequencyTypeController;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.mapper.FrequencyTypeMapper;
-import de.greluc.krt.profit.basetool.backend.service.FrequencyTypeService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

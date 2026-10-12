@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
+import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import java.util.Collection;
 import java.util.Collections;

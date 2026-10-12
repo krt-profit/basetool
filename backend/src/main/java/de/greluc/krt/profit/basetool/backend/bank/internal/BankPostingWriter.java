@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;

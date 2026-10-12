@@ -88,7 +88,9 @@ class MissionControllerLifecycleTest {
   @Mock private MissionMapper missionMapper;
   @Mock private UserMapper userMapper;
   @Mock private MissionSecurityService missionSecurityService;
-  @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
+
+  @Mock
+  private de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService authHelperService;
 
   private final de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor
       missionPeerRedactor =

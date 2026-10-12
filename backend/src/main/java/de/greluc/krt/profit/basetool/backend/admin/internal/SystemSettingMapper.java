@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.admin.internal;
 
-import de.greluc.krt.profit.basetool.backend.mapper.CentralMapperConfig;
+import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between System Setting entities and DTOs. */

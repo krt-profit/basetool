@@ -37,8 +37,8 @@ import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialE
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;

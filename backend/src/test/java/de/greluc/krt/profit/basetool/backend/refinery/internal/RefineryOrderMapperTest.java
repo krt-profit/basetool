@@ -22,12 +22,12 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapperImpl;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryMapperImpl;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapperImpl;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
-import de.greluc.krt.profit.basetool.backend.mapper.LocationMapperImpl;
-import de.greluc.krt.profit.basetool.backend.mapper.MaterialCategoryMapperImpl;
-import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapperImpl;
-import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapperImpl;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodMapperImpl;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;

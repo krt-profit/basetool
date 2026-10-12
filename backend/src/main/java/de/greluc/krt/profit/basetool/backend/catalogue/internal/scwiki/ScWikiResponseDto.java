@@ -24,7 +24,7 @@ import java.util.List;
 
 /**
  * Envelope of a paginated SC Wiki response, with {@code T} the row type bound at the {@link
- * de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient} call site.
+ * de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient} call site.
  *
  * <p>Unlike the UEX envelope it has no {@code status} field; unknown fields are ignored.
  *

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexUniverseSyncService;
 import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

@@ -26,10 +26,11 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.LocationService;
+import de.greluc.krt.profit.basetool.backend.catalogue.web.LocationController;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
-import de.greluc.krt.profit.basetool.backend.service.LocationService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

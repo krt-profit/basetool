@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
-import de.greluc.krt.profit.basetool.backend.service.FrequencyTypeService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.FrequencyTypeService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

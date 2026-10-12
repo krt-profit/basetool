@@ -55,7 +55,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.time.LocalDateTime;

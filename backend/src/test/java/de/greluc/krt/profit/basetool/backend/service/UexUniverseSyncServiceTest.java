@@ -46,6 +46,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.Poi;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexUniverseSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexFactionDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexJurisdictionDto;
@@ -56,7 +58,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexPlanetDto
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexPoiDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexSpaceStationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexTerminalDto;
-import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.List;
 import java.util.Optional;

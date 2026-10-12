@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
 import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One asynchronous P4K catalog-import run, as polled by the admin page.
@@ -45,10 +46,10 @@ public record P4kImportJobDto(
     P4kImportJobKind kind,
     P4kImportJobStatus status,
     boolean seedNew,
-    String sourceFilename,
+    @Nullable String sourceFilename,
     Long fileSizeBytes,
     UUID previewJobId,
-    P4kImportResultDto result,
+    @Nullable P4kImportResultDto result,
     String errorMessage,
     Instant createdAt,
     Instant startedAt,
