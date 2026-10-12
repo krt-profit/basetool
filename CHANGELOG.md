@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Ablehnungen nennen ihren Grund im Log.** Die WARN-Zeile einer 422 `PRODUCTION_ALLOCATION` trägt jetzt, welche der fünf Prüfungen abgelehnt hat, samt Material-/Lagerzeilen-ID und Mengen (`reason`, `materialId`, `consumed`, …) als abfragbare Felder in Loki – nie den Request-Body. Die Antwort an den Client bleibt unverändert.
+
 ### Changed
 
 - **Lesbarere Bedienelemente (Design-System 2026-10).** Buttons, Eingabefelder, Auswahlen und Seitenzahlen haben eine Füllung und einen sichtbaren Rand (mindestens 3:1); Umschalter wie „Kommend / Vergangen / Alle“ oder „Globales / Mein Lager“ sind ein gemeinsames Segment-Element, Ein/Aus-Optionen ein Schalter; Listen-Seiten liegen mit Toolbar, Tabelle und Seitenzahlen auf einer Fläche, der Filter-Button zeigt aktive Filter mit eckigem Zähler.

@@ -37,6 +37,7 @@ import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -130,14 +131,23 @@ class DomainProblemContractTest {
             null,
             Map.of()),
         new Expected(
-            new ProductionAllocationException(),
+            ProductionAllocationException.demandMismatch(
+                UUID.fromString("00000000-0000-0000-0000-00000000000a"), 2.0, 1.0),
             HttpStatus.UNPROCESSABLE_CONTENT,
             "PRODUCTION_ALLOCATION",
             "production-allocation",
             "problem.production_allocation",
             "problem.production_allocation.detail",
             "Production allocation",
-            null,
+            Map.of(
+                "reason",
+                "DEMAND_MISMATCH",
+                "materialId",
+                UUID.fromString("00000000-0000-0000-0000-00000000000a"),
+                "demand",
+                2.0,
+                "consumed",
+                1.0),
             Map.of()),
         new Expected(
             new MissionParticipantRequiredException(),

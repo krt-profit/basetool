@@ -30,6 +30,7 @@ import java.util.Map;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.logstash.logback.argument.StructuredArguments;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
@@ -213,8 +214,9 @@ public abstract class ProblemSupport {
 
   /**
    * Writes the structured 4xx log line with method, URI, status, {@code code} and {@code
-   * correlationId}. The {@code extra} map is appended verbatim and must not contain rejected user
-   * values.
+   * correlationId}. The {@code extra} map is appended to the line and, in the prod JSON appender,
+   * written as top-level fields; it holds only allow-listed enums, ids and numbers, never rejected
+   * user values (REQ-OBS-004).
    *
    * @param req the servlet request, for method and URI
    * @param pd the problem carrying status, {@code code} and {@code correlationId}
@@ -238,7 +240,13 @@ public abstract class ProblemSupport {
     Object[] args =
         hasExtra
             ? new Object[] {
-              shortMessage, req.getMethod(), req.getRequestURI(), pd.getStatus(), code, cid, extra
+              shortMessage,
+              req.getMethod(),
+              req.getRequestURI(),
+              pd.getStatus(),
+              code,
+              cid,
+              StructuredArguments.entries(extra)
             }
             : new Object[] {
               shortMessage, req.getMethod(), req.getRequestURI(), pd.getStatus(), code, cid
