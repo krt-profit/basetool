@@ -2410,6 +2410,11 @@ the result onto the Dependabot branch.
   `TestImages` class (Redis, PostgreSQL) is moved to the digest `docker-compose.yml` pins for the same
   `name:tag`, so `TestImagesTest` stays green on the bump; an image the compose file pins to two
   digests is left alone with a warning.
+- **The sandbox Keycloak Dockerfile follows the compose pin.** The `FROM quay.io/keycloak/keycloak:…`
+  line of `docker/sandbox/keycloak/Dockerfile` is moved to the tag and digest `docker-compose.yml`
+  pins, so a Keycloak bump lands in all three pins (compose, Quadlet unit, Dockerfile) on one branch;
+  Dependabot's `docker` entry for that directory ignores the image. A compose file that pins Keycloak
+  zero times, twice or to two digests leaves the Dockerfile alone with a warning.
 - **No `pull_request_target` or `workflow_run` trigger** is used for it.
 - **A Keycloak image bump to another minor is not completed automatically.** The follow-up does not
   touch the version catalog, so `keycloak-version` (REQ-OPS-040) stays red until a human moves the
@@ -2425,10 +2430,12 @@ the result onto the Dependabot branch.
 - [ ] A Dependabot branch carrying a human commit or a merge commit is refused with an error naming
   the commit.
 - [x] `dependabot_compose_followup.py --selftest` passes in `repo-lint.yml` (`quadlet-drift`),
-  including the `sync-test-images` cases and the check that the real `TestImages` and
-  `docker-compose.yml` still hold the Redis and PostgreSQL pins it syncs.
+  including the `sync-test-images` and `sync-sandbox-keycloak` cases and the checks that the real
+  `TestImages`, `docker-compose.yml` and sandbox Dockerfile still hold the pins they sync.
 - [ ] A Redis or PostgreSQL digest bump's `basetool-release[bot]` commit also moves the matching
   `TestImages` constant.
+- [ ] A Keycloak digest bump's `basetool-release[bot]` commit also moves the sandbox Dockerfile's
+  `FROM` line, and `keycloak-version` (REQ-OPS-040) is green on the new head.
 
 **Enforced by:** `.github/workflows/dependabot-compose.yml` ·
 `.github/scripts/dependabot_compose_followup.py` · `.github/scripts/create_signed_commit.py` ·
@@ -2625,7 +2632,7 @@ but is not registered fails only at login, so both are checked at build time.
   when the pins disagree with each other in tag or digest. Documentation, CHANGELOGs and shell
   self-tests are not pins. A Dependabot bump of the image to another minor therefore stays red until
   the catalog moves with it and the SPI is rebuilt and re-tested against it; a digest bump within the
-  minor passes.
+  minor passes once all three pins carry it, which the compose follow-up (REQ-OPS-035) arranges.
 - **Every registration loads.** `ServiceRegistrationsTest` reads the six files under
   `keycloak-spi/src/main/resources/META-INF/services/` and fails when a file is missing or
   unexpected, an entry does not resolve, does not implement the SPI interface it is registered for,

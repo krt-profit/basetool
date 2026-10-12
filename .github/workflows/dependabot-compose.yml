@@ -55,6 +55,9 @@ jobs:
       - name: Move the test-support image constants to the compose pins
         run: python3 .github/scripts/dependabot_compose_followup.py sync-test-images
 
+      - name: Move the sandbox Keycloak image to the compose pin
+        run: python3 .github/scripts/dependabot_compose_followup.py sync-sandbox-keycloak
+
       - name: Regenerate the Quadlet units and the documented monitoring pins
         run: |
           set -euo pipefail

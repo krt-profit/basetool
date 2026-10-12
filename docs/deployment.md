@@ -996,7 +996,8 @@ moved. Dependabot's image-pin bumps take this path too.
 
 Dependabot edits `docker-compose*.yml` only. `.github/workflows/dependabot-compose.yml` completes each
 compose bump on its branch (ADR-0215, REQ-OPS-035): it re-resolves the digests the bump pins, moves
-the `TestImages` digest constants (Redis, PostgreSQL) to the pins in `docker-compose.yml`, runs
+the `TestImages` digest constants (Redis, PostgreSQL) and the sandbox Keycloak Dockerfile's `FROM`
+line to the pins in `docker-compose.yml`, runs
 `generate-quadlet.py` and `check-monitoring-image-pins.sh --fix`, and commits the changed files as
 `basetool-release[bot]`. The required checks then run again on that head and should be green.
 
@@ -1008,7 +1009,7 @@ the `TestImages` digest constants (Redis, PostgreSQL) to the pins in `docker-com
 | `Mint a basetool-release App token` failed | The Dependabot copy of the key is stale or malformed — see below. |
 | A warning `could not resolve the tag` | The registry could not be read; the digest is Dependabot's. Re-resolve it by hand before merging: `docker buildx imagetools inspect <repo>:<tag> --format '{{json .Manifest}}'`. |
 | A warning `pins … to 2 digests; leaving the TestImages constant` | `docker-compose.yml` pins one image to two digests; make them agree, then the constant follows on the next run. |
-| No run at all | The PR touches no `docker-compose*.yml`, or it is not Dependabot's. Regenerate by hand: `python .github/scripts/dependabot_compose_followup.py sync-test-images && python scripts/generate-quadlet.py && scripts/check-monitoring-image-pins.sh --fix`, commit, push. |
+| No run at all | The PR touches no `docker-compose*.yml`, or it is not Dependabot's. Regenerate by hand: `python .github/scripts/dependabot_compose_followup.py sync-test-images && python .github/scripts/dependabot_compose_followup.py sync-sandbox-keycloak && python scripts/generate-quadlet.py && scripts/check-monitoring-image-pins.sh --fix`, commit, push. |
 
 **The App key lives in two secret stores.** A Dependabot-triggered run reads Dependabot secrets only,
 so `RELEASE_APP_PRIVATE_KEY` is set both in the `release` environment (*Settings → Environments*,
