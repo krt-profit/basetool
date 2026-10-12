@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -232,6 +231,7 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
     UUID few = seed(FEW);
     UUID many = seed(MANY);
     updateOrgUnits(firstParticipantOf(few), command.getId());
+    updateOrgUnits(firstParticipantOf(many), command.getId());
     Target fewTarget = firstParticipantOf(few);
     Target manyTarget = firstParticipantOf(many);
     Statistics stats = statistics();
@@ -304,7 +304,8 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
         () -> {
           MissionParticipant first =
               missionRepository.findById(missionId).orElseThrow().getParticipants().stream()
-                  .min(Comparator.comparing(MissionParticipant::getId))
+                  .filter(participant -> "Guest 0".equals(participant.getGuestName()))
+                  .findFirst()
                   .orElseThrow();
           return new Target(missionId, first.getId(), first.getVersion());
         });
@@ -332,16 +333,17 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   }
 
   private void assertStampedOrgUnits(MissionParticipantDto participant) {
-    int index = Integer.parseInt(participant.guestName().substring("Guest ".length()));
+    String guestName = participant.guestName();
+    boolean even = (guestName.charAt(guestName.length() - 1) - '0') % 2 == 0;
     List<UUID> expected =
-        index % 2 == 0 ? List.of(staffel.getId(), command.getId()) : List.of(command.getId());
+        even ? List.of(staffel.getId(), command.getId()) : List.of(command.getId());
     assertThat(participant.orgUnits())
         .extracting(OrgUnitReferenceDto::id)
         .containsExactlyElementsOf(expected);
     assertThat(participant.orgUnits())
         .extracting(OrgUnitReferenceDto::kind)
         .containsExactlyElementsOf(
-            index % 2 == 0
+            even
                 ? List.of(OrgUnitKind.SQUADRON, OrgUnitKind.SPECIAL_COMMAND)
                 : List.of(OrgUnitKind.SPECIAL_COMMAND));
   }
