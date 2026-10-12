@@ -1971,7 +1971,10 @@ classpath per module (`slf4j-api` is 2.0.18 in the included build where the back
 build-time only, and the four security floors hold in the included build. (6) The plan
 counted 22 cross-project `rootProject` accesses; there are 32 in three module scripts, and they are
 P5-b. (7) A `.kt` file of `build-logic` is formatted by the same Spotless format as the `*.gradle.kts`
-files (ktfmt, Google style), so no new Spotless task appeared.
+files (ktfmt, Google style), so no new Spotless task appeared. (8) The helper package is
+`…basetool.conventions`, not `…basetool.build`: a directory named `build` is excluded by
+`.dockerignore` (`**/build`), which failed the first image builds with unresolved references, and by
+Spotless's vendored globs (`**/build/**`), which had left those files unformatted.
 
 ### 7.8 Frontend track
 

@@ -1,4 +1,4 @@
-package de.greluc.krt.profit.basetool.build
+package de.greluc.krt.profit.basetool.conventions
 
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
@@ -14,6 +14,8 @@ abstract class BasetoolExtension {
   /** The Java release the module compiles for; unset means the toolchain's own release. */
   abstract val javaRelease: Property<Int>
 
-  /** The package prefixes NullAway treats as annotated; read by `basetool.errorprone-conventions`. */
+  /**
+   * The package prefixes NullAway treats as annotated; read by `basetool.errorprone-conventions`.
+   */
   abstract val nullAwayPackages: ListProperty<String>
 }

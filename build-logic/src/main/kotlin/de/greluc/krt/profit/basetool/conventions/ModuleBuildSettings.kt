@@ -1,4 +1,4 @@
-package de.greluc.krt.profit.basetool.build
+package de.greluc.krt.profit.basetool.conventions
 
 import java.io.StringReader
 import java.math.BigDecimal

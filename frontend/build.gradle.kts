@@ -1,6 +1,6 @@
 import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
-import de.greluc.krt.profit.basetool.build.OssLicensePolicy
+import de.greluc.krt.profit.basetool.conventions.OssLicensePolicy
 
 buildscript {
   dependencies {

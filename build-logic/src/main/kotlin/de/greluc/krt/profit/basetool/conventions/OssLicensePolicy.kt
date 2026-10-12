@@ -1,4 +1,4 @@
-package de.greluc.krt.profit.basetool.build
+package de.greluc.krt.profit.basetool.conventions
 
 /**
  * The licence policy of the shipped dependencies (ADR-0197): what Licensee allows and how the
@@ -47,6 +47,7 @@ object OssLicensePolicy {
     )
 
   /** [coordinateOverrides] reduced to `group:artifact` to SPDX identifier. */
-  val overrideLicenses: Map<String, String> =
-    coordinateOverrides.mapValues { (_, versionAndId) -> versionAndId.second }
+  val overrideLicenses: Map<String, String> = coordinateOverrides.mapValues { (_, versionAndId) ->
+    versionAndId.second
+  }
 }

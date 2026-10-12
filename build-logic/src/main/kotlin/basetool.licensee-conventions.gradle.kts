@@ -1,5 +1,5 @@
 import app.cash.licensee.UnusedAction
-import de.greluc.krt.profit.basetool.build.OssLicensePolicy
+import de.greluc.krt.profit.basetool.conventions.OssLicensePolicy
 
 plugins {
   id("basetool.java-conventions")

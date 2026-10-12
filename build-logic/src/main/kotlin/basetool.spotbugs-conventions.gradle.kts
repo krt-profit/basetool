@@ -1,8 +1,8 @@
 import com.github.spotbugs.snom.Confidence
 import com.github.spotbugs.snom.Effort
 import com.github.spotbugs.snom.SpotBugsTask
-import de.greluc.krt.profit.basetool.build.catalog
-import de.greluc.krt.profit.basetool.build.requiredLibrary
+import de.greluc.krt.profit.basetool.conventions.catalog
+import de.greluc.krt.profit.basetool.conventions.requiredLibrary
 
 plugins {
   id("basetool.java-conventions")

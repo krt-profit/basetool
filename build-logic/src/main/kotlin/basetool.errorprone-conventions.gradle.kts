@@ -1,6 +1,6 @@
-import de.greluc.krt.profit.basetool.build.BasetoolExtension
-import de.greluc.krt.profit.basetool.build.catalog
-import de.greluc.krt.profit.basetool.build.requiredLibrary
+import de.greluc.krt.profit.basetool.conventions.BasetoolExtension
+import de.greluc.krt.profit.basetool.conventions.catalog
+import de.greluc.krt.profit.basetool.conventions.requiredLibrary
 import net.ltgt.gradle.errorprone.CheckSeverity
 import net.ltgt.gradle.errorprone.errorprone
 

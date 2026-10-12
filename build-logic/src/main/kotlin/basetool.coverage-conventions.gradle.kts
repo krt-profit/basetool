@@ -1,4 +1,4 @@
-import de.greluc.krt.profit.basetool.build.moduleBuildSettings
+import de.greluc.krt.profit.basetool.conventions.moduleBuildSettings
 
 plugins {
   id("basetool.java-conventions")

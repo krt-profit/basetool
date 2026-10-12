@@ -1,4 +1,4 @@
-package de.greluc.krt.profit.basetool.build
+package de.greluc.krt.profit.basetool.conventions
 
 import org.gradle.api.Project
 import org.gradle.api.artifacts.MinimalExternalModuleDependency
@@ -18,4 +18,6 @@ fun VersionCatalog.requiredVersion(alias: String): String =
 
 /** The catalog library [alias] as a dependency provider, failing when the entry does not exist. */
 fun VersionCatalog.requiredLibrary(alias: String): Provider<MinimalExternalModuleDependency> =
-  findLibrary(alias).orElseThrow { IllegalStateException("The version catalog has no library '$alias'.") }
+  findLibrary(alias).orElseThrow {
+    IllegalStateException("The version catalog has no library '$alias'.")
+  }
