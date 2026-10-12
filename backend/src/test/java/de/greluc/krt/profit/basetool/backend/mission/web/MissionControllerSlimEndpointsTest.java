@@ -70,7 +70,7 @@ class MissionControllerSlimEndpointsTest {
   private de.greluc.krt.profit.basetool.backend.mission.internal.MissionSecurityService
       missionSecurityService;
 
-  @MockitoBean private de.greluc.krt.profit.basetool.backend.service.UserService userService;
+  @MockitoBean private de.greluc.krt.profit.basetool.backend.identity.api.UserService userService;
 
   @MockitoBean
   private de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy

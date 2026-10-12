@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDir
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository.ExchangeClientDisplayName;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
@@ -57,7 +58,6 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;

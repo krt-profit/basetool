@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -51,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service("ownerScopeService")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class OwnerScopeService {
+public class OwnerScopeService implements SquadronVisibility {
 
   /**
    * Name of the HTTP request header relaying the caller's active OrgUnit selection; same value as
@@ -118,6 +119,7 @@ public class OwnerScopeService {
    *     admin/leadership all-scope.
    */
   @Nullable
+  @Override
   public Set<UUID> currentUserListScopeSquadronIds() {
     return requestScopeResolver.currentUserListScopeSquadronIds();
   }
@@ -352,6 +354,7 @@ public class OwnerScopeService {
    * @param squadronId the org-unit id whose data the caller wants to read; never {@code null}.
    * @return {@code true} iff the caller may see the given org unit's data.
    */
+  @Override
   public boolean canSeeSquadron(@NotNull UUID squadronId) {
     return accessGateService.canSeeSquadron(squadronId);
   }

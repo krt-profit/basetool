@@ -81,7 +81,7 @@ class MissionServiceTest {
 
   @Mock private de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService ownerScopeService;
 
-  @Mock private de.greluc.krt.profit.basetool.backend.service.UserService userService;
+  @Mock private de.greluc.krt.profit.basetool.backend.identity.api.UserService userService;
 
   @Mock
   private de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService authHelperService;

@@ -32,12 +32,13 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
@@ -77,7 +78,7 @@ class UserServiceAttributesTest {
 
   @Mock private UserRepository userRepository;
   @Mock private AuthHelperService authHelperService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private SquadronVisibility squadronVisibility;
   @Mock private MembershipOperations membershipOperations;
 
   @InjectMocks private UserService userService;
@@ -345,7 +346,7 @@ class UserServiceAttributesTest {
 
     @Test
     void searchByUsername_unpaged_delegatesToRepository() {
-      when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
+      when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
       when(userRepository.searchScopedList("ali", null)).thenReturn(List.of(newUser(USER_ID)));
 
       assertEquals(1, userService.searchByUsername("ali").size());
@@ -355,7 +356,7 @@ class UserServiceAttributesTest {
     void searchByUsername_paged_delegatesToRepository() {
       PageRequest pr = PageRequest.of(0, 10);
       Page<User> page = new PageImpl<>(List.of(newUser(USER_ID)));
-      when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
+      when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
       when(userRepository.searchScoped("ali", null, pr)).thenReturn(page);
 
       assertEquals(1, userService.searchByUsername("ali", pr).getTotalElements());
@@ -364,7 +365,7 @@ class UserServiceAttributesTest {
     @Test
     void findAllReference_delegatesToRepository() {
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
-      when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
+      when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
       when(userRepository.findAllReferenceScoped(null)).thenReturn(List.of(dto));
 
       assertEquals(List.of(dto), userService.findAllReference());
@@ -374,7 +375,7 @@ class UserServiceAttributesTest {
     void findAllPaged_delegatesToRepository() {
       PageRequest pr = PageRequest.of(0, 10);
       Page<User> page = new PageImpl<>(List.of(newUser(USER_ID)));
-      when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
+      when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
       when(userRepository.findAllScoped(null, pr)).thenReturn(page);
 
       assertSame(page, userService.findAll(pr));
@@ -385,7 +386,7 @@ class UserServiceAttributesTest {
       UUID scope = UUID.randomUUID();
       java.util.Set<UUID> scopeSet = java.util.Set.of(scope);
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
-      when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(scopeSet);
+      when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(scopeSet);
       when(userRepository.findAllReferenceScoped(scopeSet)).thenReturn(List.of(dto));
 
       assertEquals(List.of(dto), userService.findAllReference());

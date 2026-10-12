@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.mission.api.events.MissionNotices;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
@@ -27,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;

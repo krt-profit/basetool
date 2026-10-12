@@ -22,7 +22,6 @@ identity -> privacy: RejectedRegistrationRetentionService -> UserDeletionService
 identity -> privacy: UserController -> AccountConsolidationService
 identity -> privacy: UserController -> ConsolidateAccountRequest
 identity -> privacy: UserController -> UserDeletionService
-identity -> privacy: UserRegistrationService -> UserDeletionService
 identity -> scope: MeController -> OwnerScopeService
 identity -> scope: UserService -> OwnerScopeService
 notification -> orgunit: OrgUnitRef -> OrgUnitKind

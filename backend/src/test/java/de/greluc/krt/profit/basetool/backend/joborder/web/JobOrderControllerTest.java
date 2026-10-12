@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.HandoverReportPreviewRequestDto;
@@ -56,7 +57,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;

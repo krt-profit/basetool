@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
@@ -25,8 +25,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
-import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
-import de.greluc.krt.profit.basetool.backend.identity.api.StaffelAssignment;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -40,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
@@ -87,7 +84,7 @@ public class UserService {
   private final UserRepository userRepository;
   private final AuditRecorder auditRecorder;
   private final AuthHelperService authHelperService;
-  private final OwnerScopeService ownerScopeService;
+  private final SquadronVisibility squadronVisibility;
   private final MembershipOperations membershipOperations;
 
   /**
@@ -105,7 +102,7 @@ public class UserService {
     if (targetSquadronIds.isEmpty()) {
       return true;
     }
-    return targetSquadronIds.stream().noneMatch(ownerScopeService::canSeeSquadron);
+    return targetSquadronIds.stream().noneMatch(squadronVisibility::canSeeSquadron);
   }
 
   /**
@@ -355,7 +352,7 @@ public class UserService {
    * @return scoped user list, sorted by username
    */
   public List<User> findAll() {
-    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
     return userRepository.findAllScopedList(
         scope, Sort.by(Sort.Order.asc("username").ignoreCase()));
   }
@@ -367,7 +364,7 @@ public class UserService {
    * @return scoped paged user list
    */
   public Page<User> findAll(@NotNull Pageable pageable) {
-    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
     return userRepository.findAllScoped(scope, pageable);
   }
 
@@ -381,19 +378,19 @@ public class UserService {
    */
   @NotNull
   public Page<User> findEvaluatableMembers(@NotNull Pageable pageable) {
-    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
     return userRepository.findEvaluatableMembers(scope, pageable);
   }
 
   /**
    * Returns lightweight reference projection used by typeaheads (id + username + displayName).
-   * Squadron-scoped via {@link OwnerScopeService#currentUserListScopeSquadronIds()} — a non-admin
+   * Squadron-scoped via {@link SquadronVisibility#currentUserListScopeSquadronIds()} — a non-admin
    * sees the members of every Staffel they belong to in pickers (REQ-ORG-017).
    *
    * @return lightweight reference projection used by typeaheads
    */
   public List<UserReferenceDto> findAllReference() {
-    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
     return userRepository.findAllReferenceScoped(scope);
   }
 
@@ -405,7 +402,7 @@ public class UserService {
    * @return matching users in the caller's squadron context
    */
   public List<User> searchByUsername(@NotNull String query) {
-    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
     return userRepository.searchScopedList(LikePatterns.escapeNullable(query), scope);
   }
 
@@ -418,7 +415,7 @@ public class UserService {
    * @return matching users in the caller's squadron context
    */
   public Page<User> searchByUsername(@NotNull String query, @NotNull Pageable pageable) {
-    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
     return userRepository.searchScoped(LikePatterns.escapeNullable(query), scope, pageable);
   }
 
@@ -433,7 +430,7 @@ public class UserService {
    */
   public Page<UserReferenceDto> searchReferencesByUsername(
       @NotNull String query, @NotNull Pageable pageable) {
-    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
     return userRepository.searchScopedReferences(
         LikePatterns.escapeNullable(query), scope, pageable);
   }

@@ -154,7 +154,7 @@ hard account deletion ([REQ-DATA-008 in `data-persistence.md`](data-persistence.
 
 **Code links:** [`DefaultBlueprintProvisioningService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintProvisioningService.java),
 [`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
-[`UserReconciliationService#syncUser`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserReconciliationService.java),
+[`UserReconciliationService#syncUser`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/identity/api/UserReconciliationService.java),
 [`DefaultBlueprintKeyService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintKeyService.java)
 (cached default-key set behind the `removable` flag and the delete guard),
 [`DefaultBlueprintProvisioningTask`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/DefaultBlueprintProvisioningTask.java),
@@ -270,7 +270,7 @@ and a global sharer is counted once.
 - [ ] Given a user who never opts in, then they are counted only in their own org units
   (unchanged behaviour).
 
-**Code links:** [`UserService#updateUserShareBlueprintsGlobally`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserService.java),
+**Code links:** [`UserService#updateUserShareBlueprintsGlobally`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/identity/api/UserService.java),
 [`UserController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/UserController.java) (`/me/blueprint-sharing`),
 [`PersonalBlueprintOverviewService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/blueprint/internal/PersonalBlueprintOverviewService.java),
 [`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/joborder/internal/JobOrderItemBlueprintOwnersService.java),

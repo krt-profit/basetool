@@ -25,8 +25,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -44,7 +45,7 @@ class UserServiceCrossSquadronTest {
   private static final UUID STAFFEL_B = UUID.randomUUID();
 
   @Mock private AuthHelperService authHelperService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private SquadronVisibility squadronVisibility;
   @Mock private MembershipOperations membershipOperations;
 
   @InjectMocks private UserService userService;
@@ -54,7 +55,7 @@ class UserServiceCrossSquadronTest {
     when(authHelperService.isAdmin()).thenReturn(true);
 
     assertFalse(userService.isCrossSquadronForNonAdmin(USER_ID));
-    verifyNoInteractions(membershipOperations, ownerScopeService);
+    verifyNoInteractions(membershipOperations, squadronVisibility);
   }
 
   @Test
@@ -62,7 +63,7 @@ class UserServiceCrossSquadronTest {
     when(membershipOperations.findStaffelMembershipOrgUnitIds(USER_ID)).thenReturn(List.of());
 
     assertTrue(userService.isCrossSquadronForNonAdmin(USER_ID));
-    verifyNoInteractions(ownerScopeService);
+    verifyNoInteractions(squadronVisibility);
   }
 
   @Test
@@ -77,8 +78,8 @@ class UserServiceCrossSquadronTest {
   void oneVisibleStaffelIsEnough() {
     when(membershipOperations.findStaffelMembershipOrgUnitIds(USER_ID))
         .thenReturn(List.of(STAFFEL_A, STAFFEL_B));
-    when(ownerScopeService.canSeeSquadron(STAFFEL_A)).thenReturn(false);
-    when(ownerScopeService.canSeeSquadron(STAFFEL_B)).thenReturn(true);
+    when(squadronVisibility.canSeeSquadron(STAFFEL_A)).thenReturn(false);
+    when(squadronVisibility.canSeeSquadron(STAFFEL_B)).thenReturn(true);
 
     assertFalse(userService.isCrossSquadronForNonAdmin(USER_ID));
   }

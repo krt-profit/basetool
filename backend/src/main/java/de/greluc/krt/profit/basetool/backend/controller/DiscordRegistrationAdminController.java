@@ -25,13 +25,13 @@ import de.greluc.krt.profit.basetool.backend.identity.api.LinkRegistrationReques
 import de.greluc.krt.profit.basetool.backend.identity.api.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.RejectRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.identity.api.ReopenRegistrationRequest;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRegistrationService;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MergeAccountRequest;
 import de.greluc.krt.profit.basetool.backend.service.UserAccountMergeService;
-import de.greluc.krt.profit.basetool.backend.service.UserRegistrationService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

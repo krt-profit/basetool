@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldReposito
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
@@ -54,7 +55,6 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;

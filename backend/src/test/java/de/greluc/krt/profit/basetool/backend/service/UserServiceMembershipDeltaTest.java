@@ -29,7 +29,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
 import de.greluc.krt.profit.basetool.backend.identity.api.StaffelAssignment;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
@@ -45,7 +47,6 @@ import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -84,7 +85,7 @@ class UserServiceMembershipDeltaTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private SquadronRepository squadronRepository;
   @Mock private AuthHelperService authHelperService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private SquadronVisibility squadronVisibility;
   @Mock private MembershipOperations membershipOperations;
 
   @InjectMocks private UserService userService;

@@ -17,11 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.identity.api;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakUserDto;
-import de.greluc.krt.profit.basetool.backend.identity.api.MemberCreatedObserver;
-import de.greluc.krt.profit.basetool.backend.identity.api.RolesChangedObserver;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -32,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.CustomJwtGrantedAuthoritiesConverter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Collection;
@@ -193,7 +191,7 @@ public class UserReconciliationService {
           localRoles.size());
     }
 
-    if (viaDiscord && applyDiscordLink(user, discordUserId)) {
+    if (viaDiscord && discordUserId != null && applyDiscordLink(user, discordUserId)) {
       changed = true;
     }
 

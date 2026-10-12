@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakPresence;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRegistrationService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;

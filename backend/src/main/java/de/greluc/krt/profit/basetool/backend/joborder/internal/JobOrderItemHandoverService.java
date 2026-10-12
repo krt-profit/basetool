@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockConsumption;
@@ -42,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepo
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

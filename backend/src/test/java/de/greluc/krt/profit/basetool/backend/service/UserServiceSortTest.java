@@ -24,10 +24,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
+import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.repository.*;
-import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.util.Collections;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +54,7 @@ class UserServiceSortTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private SquadronRepository squadronRepository;
   @Mock private AuthHelperService authHelperService;
-  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private SquadronVisibility squadronVisibility;
   @Mock private MembershipOperations membershipOperations;
 
   @InjectMocks private UserService userService;
@@ -63,7 +64,7 @@ class UserServiceSortTest {
 
   @Test
   void findAll_shouldRequestSortedUsers() {
-    when(ownerScopeService.currentUserListScopeSquadronIds()).thenReturn(null);
+    when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
     when(userRepository.findAllScopedList(
             org.mockito.ArgumentMatchers.<java.util.Collection<java.util.UUID>>any(),
             org.mockito.ArgumentMatchers.<Sort>any()))

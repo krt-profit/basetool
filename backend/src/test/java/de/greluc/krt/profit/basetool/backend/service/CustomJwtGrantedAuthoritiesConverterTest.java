@@ -35,6 +35,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReconciliationService;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReconciliationService.ReconciledUser;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
@@ -48,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthoritiesCacheProper
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.service.UserReconciliationService.ReconciledUser;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

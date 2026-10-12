@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeReposito
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -56,7 +57,6 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;

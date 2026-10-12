@@ -17,14 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.service;
+package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
-import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakPresence;
-import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;

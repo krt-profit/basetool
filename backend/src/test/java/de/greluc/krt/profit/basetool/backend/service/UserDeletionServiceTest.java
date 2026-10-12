@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayPropertie
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;

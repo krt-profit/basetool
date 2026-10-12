@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateDeletionRequestRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.DeletionRequestDto;
 import de.greluc.krt.profit.basetool.backend.service.DeletionRequestService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
@@ -41,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

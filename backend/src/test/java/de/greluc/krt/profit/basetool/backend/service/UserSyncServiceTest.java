@@ -36,6 +36,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakUserDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserReconciliationService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncFollowUp;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;

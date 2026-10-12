@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintSource;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
@@ -37,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintResponse
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
 import java.util.ArrayList;

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.promotion.web;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
@@ -26,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.MemberEvaluationResponse;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.MemberEvaluationService;
 import de.greluc.krt.profit.basetool.backend.promotion.internal.MemberEvaluationUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
