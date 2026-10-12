@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
@@ -48,7 +49,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -93,7 +93,7 @@ public class JobOrderService {
 
   private final JobOrderRepository jobOrderRepository;
   private final MaterialRepository materialRepository;
-  private final InventoryItemRepository inventoryItemRepository;
+  private final StockReads stockReads;
   private final StockCommands stockCommands;
   private final JobOrderAssigneeService jobOrderAssigneeService;
   private final OrgUnitRepository orgUnitRepository;
@@ -949,7 +949,7 @@ public class JobOrderService {
 
     InventoryItem item =
         Entities.require(
-            inventoryItemRepository.findById(inventoryItemId),
+            stockReads.findRow(inventoryItemId),
             () -> "InventoryItem not found: " + inventoryItemId);
 
     if (InventoryAllocations.jobOrderSlice(item, jobOrderId) == null) {

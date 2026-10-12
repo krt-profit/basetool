@@ -40,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -95,7 +94,6 @@ public class JobOrderHandoverService {
 
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
-  private final InventoryItemRepository inventoryItemRepository;
   private final StockCommands stockCommands;
   private final JobOrderHandoverMapper jobOrderHandoverMapper;
   private final JobOrderMaterialRepository jobOrderMaterialRepository;
@@ -266,8 +264,7 @@ public class JobOrderHandoverService {
     for (JobOrderHandoverItemCreateDto itemDto : dto.items()) {
       InventoryItem inventoryItem =
           Entities.require(
-              inventoryItemRepository.findByIdForUpdate(itemDto.inventoryItemId()),
-              "Inventory item not found");
+              stockCommands.lockRow(itemDto.inventoryItemId()), "Inventory item not found");
 
       if (InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId) == null) {
         throw new BadRequestException(ERROR_ITEM_NOT_LINKED_TO_ORDER);

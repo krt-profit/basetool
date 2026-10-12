@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.service.InventoryItemCatalogService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -70,7 +70,7 @@ public class GameItemController {
           + Roles.KRT_MEMBER
           + "'))";
 
-  private final InventoryItemCatalogService inventoryItemCatalogService;
+  private final StockItemCatalogue stockItemCatalogue;
   private final JobOrderItemService jobOrderItemService;
 
   /**
@@ -105,8 +105,8 @@ public class GameItemController {
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
     Page<InventoryGameItemReferenceDto> p =
         orderable
-            ? inventoryItemCatalogService.findOrderableItems(q, pageable)
-            : inventoryItemCatalogService.findBookableItems(q, pageable);
+            ? stockItemCatalogue.findOrderableItems(q, pageable)
+            : stockItemCatalogue.findBookableItems(q, pageable);
     return PageResponse.of(p);
   }
 

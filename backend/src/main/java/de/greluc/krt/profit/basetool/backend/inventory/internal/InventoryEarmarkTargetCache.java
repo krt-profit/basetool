@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryEarmarkLookup;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderEarmark;

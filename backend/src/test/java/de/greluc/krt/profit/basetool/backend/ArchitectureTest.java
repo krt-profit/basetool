@@ -96,7 +96,10 @@ import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
@@ -112,6 +115,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncAuthorization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
@@ -343,7 +347,9 @@ class ArchitectureTest {
           IngestGatewayProperties.class,
           InventoryAllocations.class,
           InventoryAuditLabels.class,
+          InventoryItemDto.class,
           InventoryProperties.class,
+          JobOrderAllocationDto.class,
           JobOrderAuditLabel.class,
           JobOrderInventoryOwnerRedactor.class,
           KnownExchangeClients.class,
@@ -353,6 +359,7 @@ class ArchitectureTest {
           LiveSyncTopic.class,
           LiveSyncTopicClass.class,
           MaterialExchangeQueryParams.class,
+          MissionAllocationDto.class,
           MissionPeerRedactor.class,
           MissionSectionVersions.class,
           MissionViewerAccess.class,
@@ -374,6 +381,7 @@ class ArchitectureTest {
           RequestMemo.class,
           ResilientRedisMessageListenerContainer.class,
           Roles.class,
+          ScuAmounts.class,
           StaffelMembershipResolver.class,
           StalePriceSweep.class,
           StockViewerAccess.class,
@@ -1655,7 +1663,7 @@ class ArchitectureTest {
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
     DescribedPredicate<JavaClass> selection = nonInterfaces(MODEL_CODE);
     assertClassFloor(
-        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 325);
+        "noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities", selection, 293);
     noSquadronIdJoinColumnRule(selection, SQUADRON_ID_COLUMN_GRANDFATHERED).check(CLASSES);
   }
 

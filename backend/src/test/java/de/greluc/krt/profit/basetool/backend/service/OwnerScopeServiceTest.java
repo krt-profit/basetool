@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -56,7 +57,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolv
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;

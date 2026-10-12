@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
@@ -36,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;

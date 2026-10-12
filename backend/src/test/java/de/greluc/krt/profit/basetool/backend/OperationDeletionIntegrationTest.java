@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;

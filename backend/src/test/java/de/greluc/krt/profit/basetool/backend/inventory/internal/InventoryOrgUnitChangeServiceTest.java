@@ -33,14 +33,9 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeResultDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemOrgUnitChangeDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;

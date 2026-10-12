@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -73,11 +74,11 @@ public class JobOrderMaterial extends AbstractEntity<UUID> {
    * insert and update, covering both the creation snapshot and handover decrements; a no-op for
    * whole {@code PIECE} amounts.
    *
-   * @see InventoryItem#roundToScuScale(Double)
+   * @see ScuAmounts#roundToScuScale(Double)
    */
   @PrePersist
   @PreUpdate
   void roundAmountToScuScale() {
-    amount = InventoryItem.roundToScuScale(amount);
+    amount = ScuAmounts.roundToScuScale(amount);
   }
 }

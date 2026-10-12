@@ -28,6 +28,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderGameItemNeedDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialNeedDto;
@@ -47,9 +50,7 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
@@ -90,6 +91,8 @@ class JobOrderReferenceNeedsTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
 
+  @Mock private OrderLinkedStockRows orderLinkedStockRows;
+
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
@@ -120,15 +123,14 @@ class JobOrderReferenceNeedsTest {
         new JobOrderQueryService(
             jobOrderRepository,
             null,
-            inventoryItemRepository,
+            new InventoryStockReads(inventoryItemRepository, null),
             ownerScopeService,
             jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
             jobOrderItemService,
             stockProjectionService,
-            requirementResolver,
-            null);
+            requirementResolver);
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
     when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class))).thenReturn(Set.of());
@@ -352,8 +354,7 @@ class JobOrderReferenceNeedsTest {
    * @param rows the linked inventory rows to index.
    */
   private void givenLinkedStock(JobOrderMaterialStockRow... rows) {
-    when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(anyCollection()))
-        .thenReturn(List.of(rows));
+    when(orderLinkedStockRows.materialStockOfOrders(anyCollection())).thenReturn(List.of(rows));
   }
 
   /**

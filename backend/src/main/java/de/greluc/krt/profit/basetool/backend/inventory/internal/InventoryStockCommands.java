@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
@@ -32,17 +33,13 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockConsumption;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
-import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemStolenMarkDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -54,6 +51,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -144,6 +142,12 @@ public class InventoryStockCommands implements StockCommands {
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull Optional<InventoryItem> lockRow(@NotNull UUID rowId) {
+    return inventoryRepository.findByIdForUpdate(rowId);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
   public void bookIn(@NotNull UUID member, @NotNull StockLot lot, double amount) {
     User user = userRepository.findById(member).orElseThrow();
     InventoryItem item = new InventoryItem();
@@ -153,7 +157,7 @@ public class InventoryStockCommands implements StockCommands {
     item.setGameItem(lot.gameItem());
     item.setLocation(lot.location());
     item.setQuality(lot.material() == null ? null : lot.quality() == null ? 0 : lot.quality());
-    item.setAmount(InventoryItem.roundToScuScale(amount));
+    item.setAmount(ScuAmounts.roundToScuScale(amount));
     item.setPersonal(true);
     item.setStolen(lot.stolen());
     InventoryItem saved = inventoryRepository.save(item);
@@ -272,7 +276,7 @@ public class InventoryStockCommands implements StockCommands {
       }
       double take = Math.min(remainingToConsume, sliceAmount);
       double rowAmount = row.getAmount() != null ? row.getAmount() : 0.0;
-      double rowRemaining = InventoryItem.roundToScuScale(rowAmount - take);
+      double rowRemaining = ScuAmounts.roundToScuScale(rowAmount - take);
       boolean depleted = rowRemaining <= QUANTITY_EPSILON;
       String gameItemName = row.getGameItem() != null ? row.getGameItem().getName() : "—";
       consumed.add(
@@ -383,7 +387,7 @@ public class InventoryStockCommands implements StockCommands {
     item.setMaterial(material);
     item.setLocation(location);
     item.setQuality(quality);
-    item.setAmount(InventoryItem.roundToScuScale(amount));
+    item.setAmount(ScuAmounts.roundToScuScale(amount));
     item.setNote(note);
     item.setPersonal(personal);
     if (jobOrderId != null) {

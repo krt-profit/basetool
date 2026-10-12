@@ -35,6 +35,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintVariantFamilyResolver;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeDemandMaterialDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgDemandDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
@@ -44,9 +46,7 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.QualityTierDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
-import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -82,7 +82,7 @@ class ExchangeDemandServiceTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderMaterialRequirementResolver requirementResolver;
   @Mock private JobOrderStockProjectionService stockProjectionService;
-  @Mock private InventoryItemRepository inventoryRepository;
+  @Mock private StockReads stockReads;
   @Mock private MaterialRepository materialRepository;
   @Mock private PersonalBlueprintRepository blueprintRepository;
   @Mock private BlueprintVariantFamilyResolver familyResolver;
@@ -201,7 +201,7 @@ class ExchangeDemandServiceTest {
     variants.getItems().add(line(arrowhead, "Arrowhead Sniper Rifle", 2, 0));
     givenOrders(exact, variants);
     when(requirementResolver.requirementsOf(any())).thenReturn(List.of());
-    when(inventoryRepository.findGameItemStockRowsByJobOrderIds(any()))
+    when(stockReads.gameItemStockOfOrders(any()))
         .thenReturn(List.of(new JobOrderGameItemStockRow(exact.getId(), arrowhead.getId(), 1.0)));
     when(blueprintRepository.findOwnerProductByOwnerUserIdIn(Set.of(MEMBER)))
         .thenReturn(List.of(new BlueprintOwnerProduct(MEMBER, "ORC-mkX Helmet")));

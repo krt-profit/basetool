@@ -32,9 +32,11 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
-import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
@@ -43,7 +45,6 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
@@ -51,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.service.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -81,6 +83,7 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
+  @Mock private OrderLinkedStockRows orderLinkedStockRows;
   @Mock private UserRepository userRepository;
   @Mock private SquadronRepository squadronRepository;
   @Mock private OwnerScopeService ownerScopeService;
@@ -110,7 +113,7 @@ class JobOrderServicePriorityAndStatusTest {
         new JobOrderService(
             jobOrderRepository,
             materialRepository,
-            inventoryItemRepository,
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper),
             new InventoryStockCommands(inventoryItemRepository, null, null, null, null, null, null),
             null,
             null,

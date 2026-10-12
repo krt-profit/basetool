@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -102,12 +103,12 @@ public class MaterialClaim extends AbstractEntity<UUID> {
    * Rounds the claimed {@code amount} to SCU scale (three decimals, {@code HALF_UP}) on insert and
    * update; a no-op for whole {@code PIECE} amounts.
    *
-   * @see InventoryItem#roundToScuScale(Double)
+   * @see ScuAmounts#roundToScuScale(Double)
    */
   @PrePersist
   @PreUpdate
   void roundAmountToScuScale() {
-    amount = InventoryItem.roundToScuScale(amount);
+    amount = ScuAmounts.roundToScuScale(amount);
   }
 
   /**

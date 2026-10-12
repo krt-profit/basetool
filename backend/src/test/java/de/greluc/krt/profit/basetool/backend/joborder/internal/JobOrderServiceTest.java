@@ -28,7 +28,10 @@ import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
@@ -38,14 +41,12 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QualityTier;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.JobOrderMaterialStockRow;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
@@ -53,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.service.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -79,6 +81,7 @@ class JobOrderServiceTest {
   @Mock private MaterialRepository materialRepository;
 
   @Mock private InventoryItemRepository inventoryItemRepository;
+  @Mock private OrderLinkedStockRows orderLinkedStockRows;
 
   @Mock private de.greluc.krt.profit.basetool.backend.repository.UserRepository userRepository;
 
@@ -96,7 +99,8 @@ class JobOrderServiceTest {
   @Mock private de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper squadronMapper;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper inventoryItemMapper;
+  private de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper
+      inventoryItemMapper;
 
   @Mock private MaterialClaimService materialClaimService;
 
@@ -138,7 +142,7 @@ class JobOrderServiceTest {
         new JobOrderService(
             jobOrderRepository,
             materialRepository,
-            inventoryItemRepository,
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper),
             new InventoryStockCommands(inventoryItemRepository, null, null, null, null, null, null),
             null,
             orgUnitRepository,
@@ -157,15 +161,14 @@ class JobOrderServiceTest {
         new JobOrderQueryService(
             jobOrderRepository,
             materialRepository,
-            inventoryItemRepository,
+            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper),
             ownerScopeService,
             jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
             jobOrderItemService,
             jobOrderStockProjectionService,
-            null,
-            inventoryItemMapper);
+            null);
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
 
@@ -276,7 +279,7 @@ class JobOrderServiceTest {
   }
 
   private void stubLinkedStock(Integer quality, double amount) {
-    when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(any()))
+    when(orderLinkedStockRows.materialStockOfOrders(any()))
         .thenReturn(
             List.of(
                 new JobOrderMaterialStockRow(
@@ -1943,7 +1946,7 @@ class JobOrderServiceTest {
                       null)));
       when(jobOrderItemService.buildItemLine(any()))
           .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
-      when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(List.of(orderId)))
+      when(orderLinkedStockRows.materialStockOfOrders(List.of(orderId)))
           .thenReturn(
               List.of(
                   new JobOrderMaterialStockRow(orderId, UUID.randomUUID(), materialId, 650, 4.0)));

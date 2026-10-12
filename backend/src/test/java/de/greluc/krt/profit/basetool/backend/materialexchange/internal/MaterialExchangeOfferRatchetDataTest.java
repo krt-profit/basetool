@@ -21,8 +21,11 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
-import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemBookOutDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -31,9 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
