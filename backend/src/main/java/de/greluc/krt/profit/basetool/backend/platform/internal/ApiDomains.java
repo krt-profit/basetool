@@ -41,6 +41,7 @@ public final class ApiDomains {
   /** Controller simple name to its domain. */
   private static final Map<String, String> BY_CONTROLLER =
       Map.ofEntries(
+          Map.entry("AccountRemovalController", "identity"),
           Map.entry("AdminController", "identity"),
           Map.entry("AdminDataExportController", "identity"),
           Map.entry("AdminDefaultBlueprintController", "blueprint"),

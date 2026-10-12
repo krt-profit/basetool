@@ -31,10 +31,8 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
-import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -58,8 +56,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class UserControllerTest {
 
   @Mock private UserService userService;
-  @Mock private UserDeletionService userDeletionService;
-  @Mock private UserMapper userMapper;
   @Mock private UserReferenceSearchService userReferenceSearchService;
 
   @Mock private UserSyncService userSyncService;
@@ -99,17 +95,6 @@ class UserControllerTest {
     List<UserReferenceDto> result = controller.lookupUsers();
 
     assertSame(refs, result);
-    verifyNoInteractions(userMapper);
-  }
-
-  @Test
-  void deleteUser_delegatesIdToService() {
-    UUID id = UUID.randomUUID();
-
-    controller.deleteUser(id);
-
-    verify(userDeletionService).deleteUser(id);
-    verifyNoMoreInteractions(userService, userDeletionService, userMapper);
   }
 
   private static UserDto mockDto(UUID id) {

@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.app.web;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceSearchService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -28,13 +27,8 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
-import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
-import de.greluc.krt.profit.basetool.backend.privacy.api.AccountConsolidationService;
-import de.greluc.krt.profit.basetool.backend.privacy.api.ConsolidateAccountRequest;
-import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -46,7 +40,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -70,13 +63,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
   private final UserService userService;
-  private final UserDeletionService userDeletionService;
-  private final UserMapper userMapper;
   private final UserReferenceSearchService userReferenceSearchService;
   private final UserSyncService userSyncService;
-
-  /** The consolidate action's orchestrator (REQ-SEC-055): duplicate in, survivor out. */
-  private final AccountConsolidationService accountConsolidationService;
 
   private final TaskMetrics taskMetrics;
 
@@ -200,41 +188,6 @@ public class UserController {
   @Transactional(readOnly = true)
   public UserRsiHandleResponse getUserRsiHandle(@PathVariable @NotNull UUID id) {
     return new UserRsiHandleResponse(userService.findById(id).getRsiHandle());
-  }
-
-  /**
-   * ADMIN-only: deletes a user account along with all owned data (ships, inventory, refinery
-   * orders, mission memberships).
-   *
-   * @param id user id
-   */
-  @DeleteMapping("/users/{id}")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public void deleteUser(@PathVariable @NotNull UUID id) {
-    userDeletionService.deleteUser(id);
-  }
-
-  /**
-   * Folds an approved duplicate account into the account the member keeps (REQ-SEC-055).
-   *
-   * <p>Owned data moves to the survivor, the Discord identity is re-linked in Keycloak, and the
-   * duplicate's row and Keycloak user are removed. The path names the duplicate, the body the
-   * survivor. ADMIN-only.
-   *
-   * @param id the duplicate account to dissolve
-   * @param adminUserId the acting admin, recorded as the audit actor
-   * @param body the surviving account's id and the duplicate's optimistic-lock version
-   * @return the surviving account, carrying the moved Discord link
-   */
-  @PostMapping("/users/{id}/consolidate")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public UserDto consolidateAccount(
-      @PathVariable @NotNull UUID id,
-      @CurrentUserId UUID adminUserId,
-      @NotNull @RequestBody @Valid ConsolidateAccountRequest body) {
-    return userMapper.toDto(
-        accountConsolidationService.consolidate(
-            id, body.targetUserId(), body.version(), adminUserId));
   }
 
   /**

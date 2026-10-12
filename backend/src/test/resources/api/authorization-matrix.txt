@@ -569,10 +569,10 @@ PUT /api/v1/users/me/rsi-handle | UserController#updateMyRsiHandle | pre=isAuthe
 GET /api/v1/users/search | UserProfileController#searchUsers | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER') | url=/api/v1/users/search -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_OFFICER)
 GET /api/v1/users/search/references | UserController#searchUserReferences | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER') | url=/api/v1/users/search/references -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_OFFICER)
 POST /api/v1/users/sync | UserController#syncUsersNow | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
-DELETE /api/v1/users/{id} | UserController#deleteUser | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/users/{id} | AccountRemovalController#deleteUser | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/users/{id} | UserProfileController#getUserById | pre=hasAnyRole('ADMIN', 'OFFICER', 'KRT_MEMBER') | url=GET /api/v1/users/* -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER,ROLE_OFFICER)
 PUT /api/v1/users/{id}/attributes | UserProfileController#updateUserAttributes | pre=hasRole('ADMIN') | url=PUT /api/v1/users/*/attributes -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/users/{id}/consolidate | UserController#consolidateAccount | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/users/{id}/consolidate | AccountRemovalController#consolidateAccount | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/users/{id}/rsi-handle | UserController#getUserRsiHandle | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll
 GET /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll
