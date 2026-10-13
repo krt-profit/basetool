@@ -6906,14 +6906,14 @@
         padding: 0 0.75rem;
         font-size: var(--fs-2xs);
     }
-    .krt-krt-krt-segmented--block {
+    .krt-segmented--block {
         display: flex;
     }
-    .krt-krt-krt-segmented--block > * {
+    .krt-segmented--block > * {
         flex: 1 1 0;
         min-width: 0;
     }
-    .krt-krt-krt-segmented--block > .krt-segmented__item {
+    .krt-segmented--block > .krt-segmented__item {
         text-align: center;
         white-space: normal;
     }
@@ -7223,7 +7223,7 @@
         width: 100%;
         max-width: var(--content-max-form);
         display: flex;
-        flex-direction: column;
+        flex-flow: column nowrap;
         gap: var(--space-6);
     }
     .form-layout.card {

@@ -11,6 +11,7 @@
 
 ### Fixed
 
+- **Mobil: Auswahlgruppen füllen wieder die Breite.** Die Variante `krt-segmented--block` (Umschalter über die volle Zeile, z. B. Rundungsmodus in den Systemeinstellungen) war seit dem Design-System-Update 2026-10 durch einen Tippfehler im Selektor wirkungslos; die Systemeinstellungen scrollten dadurch auf dem Handy seitwärts.
 - **Mein Lager: die Tabelle scrollt am Desktop nicht mehr seitwärts.** Die Baumtabelle füllt wieder ihren Container; nur auf schmalen Bildschirmen (bis 1024 px) darf sie breiter als der Bildschirm sein.
 - **Kachel-Raster: alle Kacheln sind gleich ausgerichtet.** In der Material-Übersicht (und anderen Kachel-Rastern) saßen alle Kacheln außer der ersten um 1 rem tiefer, weil die Regel für aufeinanderfolgende Karten auch im Raster griff.
 - **Leitung: die Einheiten-Liste links ist einheitlich eingerückt.** Die Gruppen (Organisationsleitung, Bereiche, Staffeln, Spezialkommandos) saßen je nach Namenslänge unterschiedlich weit rechts; dasselbe Layout-Problem hatte das Inhaltsverzeichnis der Datenschutzerklärung.
